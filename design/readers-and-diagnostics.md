@@ -38,8 +38,15 @@ is small and parsed once.)
   path segment — a *node*, not a string, see
   `design/reader-naming-and-schema-location.md`), `at`/`withSchemaPosition`/`withPosition`,
   `report(code, message, expected, actual)`, `reported()`. The factories are `of(events, receiver)`,
-  `of(events, receiver, identifierPolicy)` and `throwing(events, identifierPolicy)`, over one
-  implementation. **The context holds no error policy**: `report` builds the `Diagnostic` from the path and
+  `of(events, receiver, identifierPolicy)`, `throwing(events, identifierPolicy)` and
+  `schemaDocument(events, identifierPolicy, heldByName, valueBody)`, over one implementation. The last is the resolver's
+  replay of a value inside a schema document, the one read whose `readsSchemaDocument()` is true; the readers
+  consult it for the one rule that is a schema document's alone, a bare name at a record position being a value by
+  name (`design/record-dispatch.md`), and it **collects** every name read at a kind-, reference- or `type_ref`-typed
+  slot: the reader there hands the name to `heldByName` with the path the read descended and the slot's declared
+  type, which the reader was built from (`TsonReadContext.heldByName`, `TsonSchema.SlotType`), and `SchemaResolver`
+  keeps them per entry for the linker. Every other read drops it.
+  **The context holds no error policy**: `report` builds the `Diagnostic` from the path and
   positions it tracks and hands it to the read's **`DiagnosticsReceiver`**, which decides its fate —
   `throwing()` raises `ReadException` at the first problem, `collecting()` accumulates into a
   `DiagnosticsCollector`, and a caller's own `void report(Diagnostic)` can stream them anywhere. No
@@ -186,7 +193,7 @@ is small and parsed once.)
   point of claiming it.
 - **A bound component's own bridge is applied where the field is wired, not where the value is read**
   (`ElementBridging.wrap`, from `RecordBindReader`'s field loop and from the array and map readers). A
-  schema-driven read is exactly the path that does not go through `tson-bind`'s binder, which is what
+  schema-driven read is exactly the path that does not go through `ltr8-bind`'s binder, which is what
   applies a bridge as it collects a record's constructor arguments — `RecordBindReader` fills its own
   argument array from the compiled field readers, and a collection appends elements through an access
   bridge that converts nothing. So both wrap, and a consumer's `registerAtom(Money.class, bridge)` or
@@ -266,7 +273,7 @@ is small and parsed once.)
   only until a collecting receiver is handed the same document, at which point the value it declined is still
   pending and the enclosing frame's next pull sees it. At the document boundary that pull is
   `requireDocumentEnd`, whose belt-and-braces `IllegalStateException` then fires on ordinary caller input —
-  which is how `DataClassObjectReader`'s unbindable-target report (a target class `tson-bind` cannot produce
+  which is how `DataClassObjectReader`'s unbindable-target report (a target class `ltr8-bind` cannot produce
   a descriptor for) reached a caller as an internal-invariant exception with the diagnostics they asked for
   lost inside it. Where the skip goes is a per-caller question, not `descriptorFor`'s: `read` has taken
   nothing and skips a whole `dataValue`, while `bindUnion` has already consumed the framing to find the

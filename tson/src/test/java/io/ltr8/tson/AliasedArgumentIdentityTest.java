@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,8 +38,8 @@ class AliasedArgumentIdentityTest {
     private static TsonLinkedSchema resolve() {
         return Tson.standard().resolve("""
                 !!id:"%s"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   user_id  => uuid
                   stock_id => uuid
@@ -68,11 +68,11 @@ class AliasedArgumentIdentityTest {
      * longer the question a rename test can ask: two declarations naming one application are two entries with
      * one structure, exactly as two hand-written records with the same fields are. What survives, and is the
      * property §8.2 actually states, is that the two record the <em>same application</em>: dereferencing
-     * {@code user_id} to {@code uuid} happens in {@code source}, so {@code box<user_id>} and
+     * {@code user_id} to {@code uuid} happens in the application each records, so {@code box<user_id>} and
      * {@code box<uuid>} agree there even though each declaration keeps its own name.
      */
     private static String applicationOf(TsonLinkedSchema linked, String alias) {
-        return linked.schema().entries().get(alias).source().orElseThrow().toString();
+        return linked.schema().applicationOf(alias).orElseThrow().toString();
     }
 
     /** The rule: an application of a rename is an application of the name it renames. */

@@ -34,8 +34,8 @@ class NumericArgumentIdentityTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/numeric-identity.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -56,9 +56,9 @@ class NumericArgumentIdentityTest {
     }
 
     /**
-     * The headline case, through a template so both naming sites are exercised at once: the lifted
-     * {@code array} synthetic (named by {@code SchemaDesugarer} from the binding record) and the
-     * {@code vector} instantiation (named by {@code TemplateMaterialiser} from the application).
+     * The headline case, through a template so both lift channels name a binding record at once: the lifted
+     * {@code array} synthetic (named by {@code SchemaDesugarer}) and the record {@code vector<float32, 255>}
+     * expands to (named by {@code TemplateMaterialiser}, the application being its expansion).
      */
     @Test
     void oneNumberSpelledTwoWaysIsOneEntryAtBothNamingSites() {
@@ -67,7 +67,8 @@ class NumericArgumentIdentityTest {
                   use    => { a: vector<float32, 255>  b: vector<float32, 0xFF> }"""));
 
         assertEquals(1, derived.stream().filter(n -> n.startsWith("array_float32_")).count(), derived::toString);
-        assertEquals(1, derived.stream().filter(n -> n.startsWith("vector_")).count(), derived::toString);
+        assertEquals(1, derived.stream().filter(n -> n.startsWith("record_v_array_float32_255_255_")).count(),
+                derived::toString);
         assertTrue(derived.stream().anyMatch(n -> n.startsWith("array_float32_255_255_")),
                 () -> "named by the canonical spelling: " + derived);
     }
@@ -129,8 +130,8 @@ class NumericArgumentIdentityTest {
         assertEquals(2, derived.size(), derived::toString);
         Set<String> readable = derived.stream().map(n -> n.substring(0, n.lastIndexOf('_')))
                 .collect(Collectors.toSet());
-        assertTrue(readable.contains("box_float64_1"), () -> "the integer reads plainly: " + derived);
-        assertTrue(readable.stream().anyMatch(n -> n.matches("box_float64_1_0_h[0-9a-f]{8}")),
+        assertTrue(readable.contains("record_v_float64_true_FIXED_1"), () -> "the integer reads plainly: " + derived);
+        assertTrue(readable.stream().anyMatch(n -> n.matches("record_v_float64_true_FIXED_1_0_h[0-9a-f]{8}")),
                 () -> "and the float as its digits plus a hash of '1.0': " + derived);
     }
 

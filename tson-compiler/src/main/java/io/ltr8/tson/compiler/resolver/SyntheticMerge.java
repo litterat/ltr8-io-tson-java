@@ -1,12 +1,15 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.LinkedHashMap;
@@ -84,10 +87,27 @@ final class SyntheticMerge {
      * because the other channel already published it, is {@code SchemaResolver}'s to decide -- it is the one
      * holding both the local and the materialised map.
      */
-    static void rewrite(Map<String, TypeDefinition> entries, Map<String, String> renames) {
-        for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
+    static void rewrite(Map<String, Top> entries, Map<String, String> renames) {
+        for (Map.Entry<String, Top> entry : entries.entrySet()) {
             entry.setValue(MetaRefs.mapRefs(entry.getValue(), ref -> rename(ref, renames)));
         }
+    }
+
+    /**
+     * The {@code applications} each instantiation records, rewritten the same way and at every depth: an
+     * instantiation's application is its identity, what a message shows and what §5.8's applied-parent edge is
+     * keyed on, and an argument naming the eager name would key it on a form that no longer exists.
+     */
+    static void rewriteApplications(Map<String, TypeRef> applications, Map<String, String> renames) {
+        applications.replaceAll((name, application) -> renamed(application, renames));
+    }
+
+    private static TypeRef renamed(TypeRef ref, Map<String, String> renames) {
+        List<TypeArgument> arguments = ref.arguments().stream()
+                .map(argument -> argument instanceof TypeArgument.Ref nested
+                        ? (TypeArgument) new TypeArgument.Ref(renamed(nested.ref(), renames)) : argument)
+                .toList();
+        return new TypeRef(renames.getOrDefault(ref.name(), ref.name()), arguments, ref.annotations());
     }
 
     /** One type-ref rewritten, its own arguments included -- an application may name a merged form. */
@@ -113,8 +133,8 @@ final class SyntheticMerge {
 
     /**
      * Whether any slot of the binding record holds an application -- {@code type_ref}'s record form, the one
-     * shape {@code SchemaDesugarer} writes for an application standing in a slot. Nested records and arrays
-     * recurse, so {@code [[box<text>]]} and {@code (box<text> | int32)} are found alike.
+     * shape {@code SchemaDesugarer} writes for an application standing in a slot. Nested records, arrays and
+     * maps recurse, so {@code [[box<text>]]} and {@code (box<text> | int32)} are found alike.
      */
     private static boolean holdsApplication(CoreValue value) {
         return switch (value) {
@@ -122,6 +142,8 @@ final class SyntheticMerge {
                     || record.fields().stream().anyMatch(f -> holdsApplication(f.value().value().coreValue()));
             case ArrayValue array ->
                     array.elements().stream().anyMatch(e -> holdsApplication(e.value().coreValue()));
+            case MapValue map -> map.entries().stream().anyMatch(e -> holdsApplication(e.key().coreValue())
+                    || holdsApplication(e.value().value().coreValue()));
             default -> false;
         };
     }

@@ -1,22 +1,30 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.diagnostics.SubsumptionDiagnostics;
-import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -52,6 +60,9 @@ final class RecordPlan {
     /** Each field's name as a member name compares and is written -- NFC, computed once. */
     final String[] names;
 
+    /** Each field's name as the record declares it -- what a schema pointer and a message name it by. */
+    final String[] declaredNames;
+
     final RecordField[] fields;
 
     /** What each field yields when the document never writes it ({@link RecordField#omitted}). */
@@ -64,6 +75,16 @@ final class RecordPlan {
     final FieldValue[] stated;
 
     private final Map<String, Integer> index;
+    private final Normalization nameForm;
+
+    /**
+     * The record's name type, by name for messages, and its reader -- {@code null} for the kernel's
+     * {@code field_name}, which §7.7's grammar answers without allocating -- and the profile a member name it
+     * admits is judged under ({@link #unmatched}).
+     */
+    private final String nameType;
+    private final AtomType<?> nameReader;
+    private final IdentifierProfile nameProfile;
 
     /** Each field group, compiled to slots once ({@link GroupPlan}). */
     private final GroupPlan[] groups;
@@ -72,51 +93,81 @@ final class RecordPlan {
     final RecordDiagnostics rules;
     private final SubsumptionDiagnostics subsumption;
 
-    RecordPlan(String name, TypeDefinition definition, ValueReaderContext context) {
-        RecordBody body = (RecordBody) definition.body();
+    RecordPlan(String name, Top definition, ValueReaderContext context) {
+        RecordBody body = (RecordBody) definition;
         this.name = name;
-        this.schemaLocation = context.locationOf(name, definition);
-        this.displayName = EntryDisplayName.of(name, definition, context.schema().entries());
+        this.schemaLocation = context.locationOf(name);
+        this.displayName = EntryDisplayName.of(name, context.schema());
         this.selfNames = Set.copyOf(context.admitting(List.of(name)));
         int count = body.fields().size();
-        this.fields = body.fields().toArray(RecordField[]::new);
+        this.declaredNames = body.fields().keySet().toArray(String[]::new);
+        this.fields = body.fields().values().toArray(RecordField[]::new);
         this.names = new String[count];
         this.omitted = new RecordField.Omitted[count];
         this.schemaReaders = new JsonTypeReader<?>[count];
         this.stated = new FieldValue[count];
         Map<String, Integer> byName = new HashMap<>();
+        // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule, and
+        // then put into the record's name type's form (§5.5), so a name the type holds equal to a field is it.
+        this.nameForm = context.linked().nameForm(name);
+        this.nameType = body.nameTypeName();
+        IdentifierType identifiers = context.linked().nameType(name)
+                .map(type -> type instanceof IdentifierType family ? family : null)
+                .orElse(null);
+        this.nameReader = identifiers == null ? null : AtomParsers.forType(identifiers).orElseThrow(() ->
+                new IllegalStateException("'" + name + "': name_type '" + nameType + "' has no reader of its own"));
+        this.nameProfile = identifiers == null ? IdentifierGrammar.PROFILE : identifiers.profile();
         for (int i = 0; i < count; i++) {
             RecordField field = fields[i];
-            // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule.
-            names[i] = Nfc.of(field.name());
-            byName.put(names[i], i);
-            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(field.name())));
+            String declared = declaredNames[i];
+            names[i] = Nfc.of(declared);
+            byName.put(nameForm.apply(names[i]), i);
+            omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(declared)));
             schemaReaders[i] = context.readers().resolve(field.type().name());
             if (field.value().isPresent()) {
                 stated[i] = FieldValue.of(context.linked(), field.type().name(), field.value().get());
             }
         }
         this.index = Map.copyOf(byName);
-        this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName)).toArray(GroupPlan[]::new);
-        this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().stream()
-                .map(RecordField::name).toList()));
+        this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName, nameForm))
+                .toArray(GroupPlan[]::new);
+        this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().keySet()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
     }
 
-    /** The field slot a member name fills, or -1 where it names no field. */
+    /** The field slot an NFC member name fills, in the name type's form, or -1 where it names no field. */
     int slotOf(String memberName) {
-        Integer at = index.get(memberName);
+        Integer at = index.get(nameForm.apply(memberName));
         return at == null ? -1 : at;
     }
 
-    /** {@code ctx} one declared field deeper, stepping the data path, the schema pointer and the schema line. */
-    JsonReadContext field(JsonReadContext ctx, int at) {
-        return ctx.schemaField(fields[at].name(), fields[at].position());
+    /**
+     * {@code ctx} one declared field deeper, stepping the data path by {@code memberName}, the member as the
+     * document wrote it (NFC), and the schema pointer and line by the field -- the two differ where the name type
+     * folds case, and only the written name is a pointer into the document.
+     */
+    JsonReadContext field(JsonReadContext ctx, int at, String memberName) {
+        return ctx.schemaField(memberName, declaredNames[at], fields[at].position());
     }
 
-    /** §3.1: a repeated member name is an error at the repeated occurrence; the later value still wins. */
-    void duplicate(JsonReadContext ctx, int at, String memberName) {
-        field(ctx, at).report(rules.duplicateField(memberName));
+    /** {@link #field(JsonReadContext, int, String)} for a field the document never wrote, which has one name. */
+    JsonReadContext field(JsonReadContext ctx, int at) {
+        return field(ctx, at, declaredNames[at]);
+    }
+
+    /**
+     * §3.1: a repeated member name is an error at the repeated occurrence; the later value still wins. Under a
+     * folding name type {@code first} is the member that first gave the field, which the report names with its
+     * position, a repeat there possibly being another spelling; {@code null} under NFC, where the two are one.
+     */
+    void duplicate(JsonReadContext ctx, int at, String memberName, JsonEvent.MemberName first) {
+        field(ctx, at, memberName).report(first == null ? rules.duplicateField(memberName)
+                : rules.duplicateField(memberName, declaredNames[at], Nfc.of(first.name()), first.position()));
+    }
+
+    /** Whether this record's name type folds, so a repeat may be another spelling ({@link #duplicate}). */
+    boolean folds() {
+        return nameForm != Normalization.NFC;
     }
 
     /**
@@ -128,7 +179,7 @@ final class RecordPlan {
     boolean admitsTag(JsonReadContext ctx) {
         if (!(ctx.peek() instanceof JsonEvent.StringValue tag)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "this object leads with this encoding's reserved members but no '$type' naming a type (§3.3)",
+                    "this object leads with this encoding's annotation members but no '$type' naming a type (§3.3)",
                     "a '$type' member holding a type name", "no $type");
             return false;
         }
@@ -145,34 +196,55 @@ final class RecordPlan {
     }
 
     /**
-     * A reserved member where none may stand (§3.2, §3.3): a {@code $schema}, which no record position admits;
-     * a {@code $type} or {@code $value} out of its leading place; or a name outside the closed set.
+     * One of §3.2's three where none may stand (§3.3): a {@code $schema}, which no record position admits, or a
+     * {@code $type} or {@code $value} out of its leading place.
      */
-    void refuseReserved(JsonReadContext ctx, String member, boolean tagged) {
+    void refuseTagMember(JsonReadContext ctx, String member, boolean tagged) {
         switch (member) {
-            case ReservedMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
-            case ReservedMembers.TYPE -> ReservedMembers.refuseMisplaced(ctx, member);
-            case ReservedMembers.VALUE -> ctx.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
+            case TagMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
+            case TagMembers.TYPE -> TagMembers.refuseMisplaced(ctx, member);
+            case TagMembers.VALUE -> ctx.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
                     ? "'$value' follows members of the record's own, and an annotation object in wrapper form "
                             + "admits nothing beside it (§3.3)"
                     : "'$value' belongs to an annotation object in wrapper form, which leads with '$type' "
                             + "naming the value's type (§3.3)", "'$value' straight after a leading '$type'", member);
-            default -> ReservedMembers.refuseUnknown(ctx, member);
+            default -> throw new IllegalStateException("'" + member + "' is none of §3.2's three");
         }
     }
 
     /**
-     * A member no declared field matches: §6.1.1's closure error. §8.2 before §6.1.1, and the order is the
-     * point: a name-hygiene refusal MUST NOT be reported in one of §8.1's four categories, so a look-alike field
-     * name is refused here rather than told it is unknown -- which would be a verdict on the document for a
-     * policy rule, and would advise adding a field that is already declared.
+     * A member no declared field matches: §6.1.1's closure error, judged by the record's name type
+     * ([TSON-SCHEMA] §5.2). A name that is no value of the type can be no field and is no name, so it is
+     * unknown, with the type's reason, and meets no hygiene rule. One the type admits meets §8.2 first, under
+     * the type's profile, and the order is the point: a name-hygiene refusal MUST NOT be reported in one of
+     * §8.1's four categories, so a look-alike field name is refused here rather than told it is unknown -- which
+     * would be a verdict on the document for a policy rule, and would advise adding a field already declared.
      */
     void unmatched(JsonReadContext ctx, String memberName) {
         JsonReadContext at = ctx.field(memberName);
-        if (!NameHygiene.refuses(ctx, memberName)) {
+        Optional<String> notAName = nameRefusal(memberName);
+        if (notAName.isPresent()) {
+            // Under the default the message is the plain one, as for any undeclared identifier; only an author's
+            // own name type is named, with its reason, since its rules are the ones to look up.
+            at.report(nameReader == null ? rules.unrecognizedField(memberName)
+                    : rules.unrecognizedField(memberName, nameType, notAName.get()));
+        } else if (!NameHygiene.refusesMember(ctx, memberName, nameProfile)) {
             at.report(rules.unrecognizedField(memberName));
         }
         EventSkip.nextValue(at);
+    }
+
+    /** Why {@code memberName} is no value of the record's name type, or empty when it is one. */
+    private Optional<String> nameRefusal(String memberName) {
+        if (nameReader == null) {
+            return IdentifierGrammar.validate(memberName);
+        }
+        try {
+            nameReader.read(memberName);
+            return Optional.empty();
+        } catch (AtomTypeException refused) {
+            return Optional.of(refused.getMessage());
+        }
     }
 
     /**
@@ -231,16 +303,17 @@ final class RecordPlan {
     private record GroupPlan(FieldGroup group, int[][] options, int[][] required, String[] optionText,
                              String text) {
 
-        static GroupPlan of(FieldGroup group, Map<String, Integer> byName) {
+        static GroupPlan of(FieldGroup group, Map<String, Integer> byName, Normalization form) {
             List<List<String>> members = group.members();
             int[][] options = new int[members.size()][];
             int[][] required = new int[members.size()][];
             String[] optionText = new String[members.size()];
             for (int o = 0; o < members.size(); o++) {
                 List<String> option = members.get(o);
-                options[o] = option.stream().mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
+                options[o] = option.stream()
+                        .mapToInt(member -> byName.getOrDefault(form.apply(Nfc.of(member)), -1)).toArray();
                 required[o] = option.stream().filter(member -> !group.optionalMembers().contains(member))
-                        .mapToInt(member -> byName.getOrDefault(Nfc.of(member), -1)).toArray();
+                        .mapToInt(member -> byName.getOrDefault(form.apply(Nfc.of(member)), -1)).toArray();
                 optionText[o] = String.join(" ", option);
             }
             return new GroupPlan(group, options, required, optionText, group.describe());

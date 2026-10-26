@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.diagnostics.MapDiagnostics;
-import io.ltr8.tson.base.unicode.ConfusableNames;
+import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -111,8 +111,8 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * refinement of either.
      */
     static boolean keysAreNames(MapBody body, ValueReaderContext context) {
-        return ReferenceChain.terminalDefinition(body.keyType().name(), context.schema().entries())
-                .map(key -> key.body() instanceof IdentifierType)
+        return ReferenceChain.terminalDefinition(body.keyType().name(), context.schema().entries()::get)
+                .map(key -> key instanceof IdentifierType)
                 .orElse(false);
     }
 
@@ -180,6 +180,10 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             String keySegment = keySegmentFor(keyPeek);
             int before = ctx.reported();
             Object key = keyParser.read(ctx.field(keySegment));
+            if (!(keyPeek instanceof TokenEvent) && key != null) {
+                // An annotated key is known once read: the steps that follow carry it rather than the placeholder.
+                keySegment = ValueIdentity.nameOf(key) instanceof String name ? name : String.valueOf(key);
+            }
             if (ctx.reported() == before) {
                 if (!seen.add(ValueIdentity.of(key))) {
                     ctx.field(keySegment).report(rules.duplicateKey(keySegment));

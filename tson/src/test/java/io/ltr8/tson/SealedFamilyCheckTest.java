@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>Written against the real pipeline rather than hand-built entries</b>, because half of what is under
  * test is not expressible without one: a discriminator's type has to resolve through core to an atom, a pin
  * has to be parsed at that atom to be compared as a value, and the cross-schema cases need an import that
- * really merges a namespace. A hand-built {@code TypeDefinition} can state none of those.
+ * really merges a namespace. A hand-built {@code Top} can state none of those.
  */
 class SealedFamilyCheckTest {
 
@@ -97,9 +97,9 @@ class SealedFamilyCheckTest {
 
         RecordBody member = (RecordBody) tson.schemaRegistry()
                 .get("https://example.test/inherit.tn").orElseThrow()
-                .schema().entries().get("dog").body();
-        RecordField pinned = member.fields().stream()
-                .filter(f -> f.name().equals("pet_type")).findFirst().orElseThrow();
+                .schema().entries().get("dog");
+        RecordField pinned = member.fields().entrySet().stream()
+                .filter(f -> f.getKey().equals("pet_type")).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
 
         assertEquals("fixed", pinned.describe(), "the member pins the selector");
         assertTrue(member.discriminators().isEmpty(),
@@ -173,9 +173,8 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * §5.9 empties the contract index and mints no IS-A edge, which is the only thing FINAL constrains -- so
-     * subtracting from a final record is admissible where composing and refining are not. The check reads
-     * {@code TypeDefinition.supertypes} rather than the body's authorial lineage for exactly this case.
+     * §5.9 leaves a subtracted record's chain empty and mints no IS-A edge, which is the only thing FINAL
+     * constrains -- so subtracting from a final record is admissible where composing and refining are not.
      */
     @Test
     void subtractingFromAFinalRecordIsAdmissible() {

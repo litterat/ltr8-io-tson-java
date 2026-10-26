@@ -17,7 +17,9 @@ that resolves meta-kernel itself. Current form only; history lives in git.
 - Resolved output states the reference chain as written; the chain collapses only where `TsonSchemaCompiler` compiles a
   `REFERENCE` entry. `ReferenceChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
 - `@synthetic` goes on the **key** of exactly the sugar-form entries (both channels), never on an instantiation entry
-  or a `TypeDefinition` value, and the linker re-attaches it (`withNameAnnotations`), imports included.
+  or an entry's value, and the linker re-attaches it (`withNameAnnotations`), imports included.
+- `@application` goes on the **key** of exactly the entries that close an application, whatever their kind, by the
+  same path; `@synthetic` is recomputed on ingest, `@application` read as stated, and an author writing it is refused.
 - The bootstrap is three passes — ordinary declarations, instances, atom refinements — over a closed `instanceBody`
   switch and a hand-written `refinedBody` merge, with no compiled reader, and attaches no `@synthetic`.
 
@@ -33,12 +35,14 @@ once.
 
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
 the `scoped`/`nameField` builders every producer goes through; `refValue` and its inverse
-`typeRefOf`/`argumentOf`; the held-record writers `heldRecord`/`heldEmptyRecord`; and §5.10 `substitute` over
-a held body.
+`typeRefOf`/`argumentOf`; the held-record writer `heldRecord`, which spells `fields` as a map
+from each field's declared name to its `record_field` (`fieldMap`/`fieldEntry`); and §5.10 `substitute` over a
+held body. Every walk over a held body descends into a map's keys and values as it does into a record or an
+array, `fields` being one.
 
-- **Why one class and not a producer beside one phase and a consumer beside another.** A held body is written
-  by two phases (`SchemaDesugarer` lifting a sugar form, `DefinitionResolver` holding a composition or
-  refinement template) and read by four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
+- **Why one class and not a producer beside one phase and a consumer beside another.** A held tree is written
+  by two phases (`SchemaDesugarer` lifting a sugar form, `HeldBody.of` writing an open record's) and read by
+  four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
   declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterTypes`
   walking one for parameter kinds). `isApplication`'s own contract is that a held body is written by one
   phase and read by several, so a second opinion about what an application looks like is what makes one of
@@ -48,7 +52,8 @@ a held body.
 - **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
   gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
   `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
-  parameters at all. That is why `heldRecord` builds the wire tree directly. Once built, the tree is an
+  parameters at all. That is why `heldRecord` builds the wire tree directly, for an open record's held tree. A
+  held body of any other constructor is built by the desugar phase the same way. Once built, the tree is an
   AST, and `TsonObjectWriter` writes an AST as syntax rather than as a description of itself
   (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
@@ -138,7 +143,7 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
   diagnostic naming the hop the author wrote — and end to end by `ResolvedFixtureTest` against the spec's own
   `spec/m/*-resolved.tn`.
 
-## The `@synthetic` marker (`tson-compiler/.../resolver/SchemaResolver.java`)
+## The derived key annotations: `@synthetic` and `@application` (`tson-compiler/.../resolver/SchemaResolver.java`)
 
 §8.2 puts a bare **`@synthetic` on the key of every entry the resolver materialised from a sugar form**, and
 on no other. It is *derived* — attached by the resolver rather than written by an author, and discarded and
@@ -152,9 +157,9 @@ meta the way an author-written annotation is: there is no author to resolve agai
   materialised entry from a declared one, which is what folding these entries back into the nested form the
   author wrote depends on.
 - **Key position, per §6.** An annotation before a declared name is metadata *about the declaration*, and a
-  resolved schema is a `{type_name => type_definition}` — so the marker lands on the map's key, which
-  `TsonSchema.entries()` keeps reachable through `AnnotatedMap.getAnnotations(name)`, never on the
-  `TypeDefinition` value. §6 forbids hoisting between the two positions and nothing here does.
+  resolved schema is a `{type_name => top}` — so the marker lands on the map's key, which
+  `TsonSchema.entries()` keeps reachable through `Namespace.getAnnotations(name)`, never on the
+  entry's value. §6 forbids hoisting between the two positions and nothing here does.
 - **Marked: exactly the synthetic entries, from both channels.** The desugar lift produces them and
   `SchemaDesugarer.lifted` names them as the document's own set difference
   (`design/schema-grammar-and-desugaring.md`); materialisation produces more of the same kind when it closes an
@@ -163,11 +168,21 @@ meta the way an author-written annotation is: there is no author to resolve agai
   of one (§5.3).
 - **`SchemaResolver` attaches it where it assembles the entry map**, from those two mint sites — the desugar lift
   (`SchemaDesugarer.lifted`, the document's own set difference) and materialisation closing an open synthetic
-  (`TemplateMaterialiser.syntheticNames`). It is the one derived marker (§8.1).
-- **Unmarked: instantiation entries.** §8.2 draws that line itself — "the two families are distinguishable
-  (an instantiation's `source` is an application; a synthetic's is a bare constructor), and only synthetics
-  are the fold-back-into-display case the marker serves." Marking too much would be as wrong as marking too
+  (`TemplateMaterialiser.syntheticNames`).
+- **Unmarked: instantiation entries.** §8.2 draws that line itself: only synthetics are the
+  fold-back-into-display case the marker serves; an instantiation is a type the author named by its
+  application. Marking too much would be as wrong as marking too
   little, so `SyntheticEntryMarkerTest` asserts both halves.
+- **`@application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
+  closes a template application, the application it is the instantiation of, `@application:{ name: box  arguments:
+  [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a namespace entry
+  (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Reference` a
+  non-record template's application closes to — which is why it is no field of `type_chain`. The materialiser records
+  each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
+  it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`;
+  `TsonSchema.applicationOf` is the one accessor. **Unlike `@synthetic` it is read as stated on ingest**, not
+  recomputed: it is the one fact the entry's value does not state, and what an imported schema's instantiations unify
+  by. An author writing it is a resolver error (`DefinitionResolver.refuseWrittenApplication`), as writing `chain` is.
 - **It survives linking and the import merge**, which is where a key-side fact is easiest to lose: the linker
   rebuilds its entry map several times and re-attaches key annotations at the one point every entry passes
   through (`withNameAnnotations`), imports included, so an imported synthetic keeps the marker its own schema
@@ -204,12 +219,19 @@ it can't handle `boolean` preceding `enum`; this ordering lives here.
   to a type called `T`. Held bodies are the one thing the bootstrap shares with ordinary resolution.
 - **An atom refinement merges through `refinedBody`**, `instanceBody`'s twin and bounded the same way:
   meta-kernel refines exactly one family, so the merge handles that one and refuses any other by name.
+- **Every name the kernel holds is the kernel's own**, so the first pass's `DefinitionResolver` judges kinds and
+  constructors with a predicate that admits every name (`name -> true`); ordinary resolution judges by the origin
+  of each name in the merged namespace instead, and a name's origin is meta-kernel exactly when it is one of these.
 
 - **Constructor-application binding goes through a closed `instanceBody` switch, not the generic path.**
-  Meta-kernel instantiates constructors in exactly three shapes — a bare `{}` (each target's
-  `UNCONSTRAINED` constant), a bare token array (`enum`, via `toEnumBody` reading `TokenValue.text()`
-  directly), and the binding record `SchemaDesugarer` emits for an `array`/`set`/`map` application. No
-  compiled reader is involved.
+  Meta-kernel instantiates constructors in exactly four shapes — a bare `{}` (each target's `UNCONSTRAINED`
+  constant), a bare token array (`enum`, via `toEnumBody` reading `TokenValue.text()` directly), a record of tokens
+  (`identifier_type`, `iri_type`, and the three `kind_type` instances, whose one field is `of`), and the binding
+  record `SchemaDesugarer` emits for an `array`/`set`/`map` application. `schema` and `field_map` are none of them:
+  each is a composition over `namespace` pinning its facets, an ordinary first-pass declaration, so no instance
+  shape reads a namespace. No compiled reader is involved. `enum_type.name_type` is typed by `identifier_kind`, an
+  instance the second pass builds, and nothing in the first pass reads a field's type, so the self-hosted slot
+  needs no ordering.
 - **Why even a compiled-reader bootstrap can't read meta-kernel from its own in-progress state:**
   `integer_size => { bits: ... signed: boolean }` is a first-pass entry whose `signed` field already
   references `boolean`, which the *second* pass resolves — so there is no moment at which a reader could be

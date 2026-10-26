@@ -5,7 +5,8 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -16,7 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * §8.2 names a materialised instantiation by a function of its <b>resolved form alone</b>, which is what lets
+ * §8.2 names a minted entry by a function of its <b>resolved form alone</b> -- an application nothing declares is
+ * its expansion (§5.10), named for its content -- which is what lets
  * §2.2.3 unify two schemas that each closed the same application: they mint one name because they mint one
  * entry.
  *
@@ -60,9 +62,9 @@ class MintedEntryUnificationTest {
         return Map.of("left", tson.resolve(LEFT), "right", tson.resolve(RIGHT));
     }
 
-    /** The one minted name both schemas reach by closing {@code box<text>}. */
+    /** The one minted name both schemas reach by closing {@code box<text>}: the record it expands to. */
     private static String mintedName(TsonLinkedSchema schema) {
-        return schema.schema().entries().keySet().stream().filter(name -> name.startsWith("box_text_"))
+        return schema.schema().entries().keySet().stream().filter(name -> name.startsWith("record_item_text_"))
                 .findFirst().orElseThrow(() -> new AssertionError(
                         "no box<text> instantiation in " + schema.schema().entries().keySet()));
     }
@@ -83,8 +85,8 @@ class MintedEntryUnificationTest {
         String name = mintedName(schemas.get("left"));
         assertEquals(name, mintedName(schemas.get("right")), "one content-addressed name");
 
-        TypeDefinition fromLeft = schemas.get("left").schema().entries().get(name);
-        TypeDefinition fromRight = schemas.get("right").schema().entries().get(name);
+        Top fromLeft = schemas.get("left").schema().entries().get(name);
+        Top fromRight = schemas.get("right").schema().entries().get(name);
         assertEquals(fromLeft, fromRight,
                 () -> "an entry shaped by which schema closed it is not a function of the form:\n  left:  "
                         + fromLeft + "\n  right: " + fromRight);
@@ -100,7 +102,7 @@ class MintedEntryUnificationTest {
         Map<String, TsonLinkedSchema> schemas = both();
         String name = mintedName(schemas.get("right"));
 
-        assertEquals(List.of(), schemas.get("right").schema().entries().get(name).subtypes(),
+        assertEquals(List.of(), TypeChain.subtypesOf(schemas.get("right").schema().entries().get(name)),
                 "a closed record has no subtypes of its own here");
     }
 
@@ -112,7 +114,7 @@ class MintedEntryUnificationTest {
     void theTemplateDoesNotIndexAMintedInstantiation() {
         Map<String, TsonLinkedSchema> schemas = both();
         schemas.forEach((which, schema) -> assertFalse(
-                schema.schema().entries().get("box").subtypes().contains(mintedName(schema)),
-                () -> which + ": " + schema.schema().entries().get("box").subtypes()));
+                TypeChain.subtypesOf(schema.schema().entries().get("box")).contains(mintedName(schema)),
+                () -> which + ": " + TypeChain.subtypesOf(schema.schema().entries().get("box"))));
     }
 }

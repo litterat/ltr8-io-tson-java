@@ -152,10 +152,11 @@ public final class TsonTreeReader {
      * leaving this one unchanged, sharing its compiled-schema registry.
      *
      * <p>A schemaless read has nothing to resolve {@code !person} against, so by default it is {@code
-     * UNKNOWN_TYPE_REF} -- a reader policy, §7.1 asking only that an unresolved annotation be treated as
-     * informational. This is the opt-out for a caller who wants the wire
-     * back as authored: reading the structure of a document whose {@code !!schema} defines those names but is
-     * deliberately out of scope, or round-tripping a tree through {@link TsonTreeWriter}. Built-in type-refs
+     * UNKNOWN_TYPE_REF}: §5's vocabulary is a schemaless document's only source of type names
+     * ([TSON-DATA] §3.2). This is the opt-out for a caller who wants the wire back as authored, which is a
+     * reading of the structure and not a verdict on the document: reading the structure of a document whose
+     * {@code !!schema} defines those names but is deliberately out of scope, or round-tripping a tree through
+     * {@link TsonTreeWriter}. Built-in type-refs
      * are still checked -- {@code !uuid nope} is a problem either way. Affects the schemaless path only; a
      * schema-aware read resolves type-refs against its compiled schema.
      */
@@ -553,8 +554,13 @@ public final class TsonTreeReader {
 
     /** The document's value alone, from a header already read -- shared by the source and peek routes. */
     private TsonValue valueFrom(TsonReadContext ctx, DocumentStart start, boolean ignoreSchema) {
-        TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
-                ? schemaless.read(ctx)
+        boolean schemaless = ignoreSchema || tree == null || start.schema().isEmpty();
+        if (schemaless && start.schema().isPresent()) {
+            // A document naming a schema, read without it: its field names are that schema's to judge.
+            DefaultTsonReadContext.leavingFieldNamesToTheSchema(ctx);
+        }
+        TsonValue result = schemaless
+                ? this.schemaless.read(ctx)
                 : readAgainstSchema(start.schema().get(), ctx, null);
         requireDocumentEnd(ctx);
         return result;
@@ -630,7 +636,8 @@ public final class TsonTreeReader {
      * <p>A problem reaching the schema is reported through {@code ctx} like any other, so a fail-fast reader
      * still throws while a collecting one gets it as a {@link Diagnostic} -- the same promise {@link
      * Tson#validate} makes. The document's own value is then skipped so the stream still lands on {@code
-     * DocumentEnd} and {@link #requireDocumentEnd} stays meaningful.
+     * DocumentEnd} and {@link #requireDocumentEnd} stays meaningful -- parsed, so a syntax error still reports,
+     * and judged by no other rule, since no schema is judging it ({@link DefaultTsonReadContext#discardUnjudged}).
      */
     private TsonValue readAgainstSchema(String schemaUri, TsonReadContext ctx, String typeName) {
         TsonCompiledSchema compiled;
@@ -651,7 +658,7 @@ public final class TsonTreeReader {
         }
         if (compiled == null) {
             // Reported above; skip the value so the stream still lands on DocumentEnd.
-            EventSkip.dataValue(ctx);
+            DefaultTsonReadContext.discardUnjudged(ctx);
             return null;
         }
         String name = typeName;
@@ -686,7 +693,8 @@ public final class TsonTreeReader {
     }
 
     /**
-     * Reports {@code code}/{@code message}, discards the root value, and yields no tree -- see {@link
+     * Reports {@code code}/{@code message}, discards the root value unjudged ({@link
+     * DefaultTsonReadContext#discardUnjudged}), and yields no tree -- see {@link
      * #readAgainstSchema}. There is deliberately no overload that omits {@code expected}/{@code actual}: a
      * facade-level failure is exactly the kind a machine consumer must be able to act on without reading
      * prose, and the omitting overload this used to have is how three of them ended up with a blank
@@ -695,7 +703,7 @@ public final class TsonTreeReader {
     private static TsonValue abandon(TsonReadContext ctx, Diagnostic.Code code, String message, String expected,
             String actual) {
         ctx.report(code, message, expected, actual);
-        EventSkip.dataValue(ctx);
+        DefaultTsonReadContext.discardUnjudged(ctx);
         return null;
     }
 
@@ -708,7 +716,7 @@ public final class TsonTreeReader {
      */
     private static TsonValue abandon(TsonReadContext ctx, SchemaFailure failure, String message, String actual) {
         ctx.report(failure.code(), message, failure.expected(), actual);
-        EventSkip.dataValue(ctx);
+        DefaultTsonReadContext.discardUnjudged(ctx);
         return null;
     }
 }

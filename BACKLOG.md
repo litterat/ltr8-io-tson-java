@@ -43,15 +43,49 @@ own prose (which had gone stale on it):
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (including this session's own `TinySchemaImportsCoreTn1Test`) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
-  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the four bundled
+  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the five bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
-  so no path reads a resolved `type_definition` map and verifies it. §8.1's ingest verifies rather than
+  so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest verifies rather than
   recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`
   must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
-  family checks (no member minted at a use site) over the ingested map and its closure, and the §5.11 group
-  declaration rules over every `field_group`. `ParameterTypes` already derives the type to check against.
+  family checks (no member minted at a use site) over the ingested map and its closure, the §5.11 group
+  declaration rules over every `field_group`, and every kind-typed slot's name against its kind, which the reader
+  of a meta-governed data document checks for grammar alone ([TSON-SCHEMA] §4.2, `KindParser.namesOnly`).
+  `ParameterTypes` already derives the type to check against.
+- [ ] **An application is not yet unified with an imported library's entry for it** ([TSON-SCHEMA] §8.1, §8.2). A
+  library declaring `int_box => box<int32>` writes `@application:{ name: box  arguments: [{ name: int32 }] }` on that
+  key, and a schema importing it that writes `box<int32>` still closes the application to an entry of its own rather
+  than resolving to `int_box`. The lookup runs application to entry, so it needs an index over imported keys keyed by
+  `DerivedName.canonicalApplication`; `TemplateMaterialiser.ownedBy` is that index for local declarations and
+  `SchemaResolver` already reads every import's `@application` into the map the applied-parent fold uses, so the
+  index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
+  application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
+
+- [ ] **A value named through a FIXED field** ([TSON-SCHEMA] §5.12). A qualified name whose segment selects a
+  FIXED field of a record value is reported as `NOT_IMPLEMENTED`: bind agreement exempts a FIXED field from having a
+  component, so the host holds no value for it and `ValuesByName.fieldOf` finds no component to read. The value is the
+  schema's own, the field's pinned value in the record type, so the walk should take it from the declared
+  `RecordField` and continue; no test covers the case yet.
+- [ ] **A value a schema writes at a reference-typed field is not judged** ([TSON-SCHEMA] §4.2, §5.12). In a kernel-governed
+  schema, `rpick => { m: ref<order> = os.o1 }` (or `~`) reaches `AtomParsers.forType`'s token-level reading from the
+  linker's field-value check, which a reference has none of, and the `UnsupportedOperationException` escapes
+  `validateSchema` rather than arriving as a `NOT_IMPLEMENTED` diagnostic. The name is to be recorded with the field's
+  slot type and judged as a value body's names are (`ValuesByName.judge`), or the default refused if a reference
+  admits none.
+- [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
+  component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
+  `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
+  component there is a bind mismatch. Nothing in the JSON stack binds `schema.meta` today, so nothing fails yet; a
+  JSON reading of resolved output, a record's `fields` among it, would.
+- [ ] **A parameter in a record template has no channel of its own** ([TSON-SCHEMA] §5.10). An open record's
+  parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
+  type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
+  channel: `record_field` `( type: type_kind | type_param: param_name )` and `( value: value | value_param: param_name
+  )`, `type_argument` a `param` member, so `type_ref.name` always names an entry. Sequenced with the collapse of
+  `kind_type`, `ref_type` and the name-only `type_ref` into one reference atom, a Revision 39 direction, which needs
+  exactly that, and with what `@application` means on a declared entry that is no record.
 
 ## Checked annotations
 
@@ -75,6 +109,15 @@ thing outstanding under it is unrelated to the check itself.
 it — and no schema declares one, so nothing in this stack reads a schema-side annotation to decide how a value is
 written. A record is closed under its type and open-ended data is a declared map-typed field, identically in both
 encodings ([TSON-JSON] §6.1.1).
+
+- [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 39.** §3.3 requires `$type` (after any `$schema`)
+  to lead its object and argues that code-point sorting preserves that; with `record.name_type` admitting `$ref`,
+  `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged value —
+  `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. Decided: the reader admits the annotation
+  members anywhere within the object's leading run of `$`-named members, a run bounded by the record's declared `$`
+  fields so the lookahead stays fixed by the schema. Implement it in the JSON readers (`RecordPlan`,
+  `DispatchChoiceReader`, `DispatchScopedReader`) and edit §3.3 with it, as a Revision 39 proposal; Revision 38
+  keeps the strict lead.
 
 - [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
@@ -121,7 +164,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     `EntryDisplayName.of` and `locationOf` — `DispatchFactories` and `RecordPlan` both build the display name for
     one OPEN record with subtypes today.
   - **Shared rules as helpers.** The refusal pattern (report, `EventSkip`, return nothing), still written
-    out in each loop and dispatcher; the "reserved members but no `$type`" message written twice
+    out in each loop and dispatcher; the "annotation members but no `$type`" message written twice
     (`RecordPlan.admitsTag`, `DispatchChoiceReader`); the absence spelling `"null"` declared once per family
     (`RecordPlan`, `ArrayReader`, `TupleReader`, `MapEntries`); and failure detected by `ctx.reported() > before`
     (`TreeAtomReader`, `TreeAtomKeyedReader`, `RecordReader.verifyFixed`, `MapPairsReader`) taken from what the
@@ -147,15 +190,15 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   exactly that when compiling for reading), and the target's reader carries the target's name — so a refusal at
   `day => date` says `date`. The schema *location* is already right, because the entry point seeds the root
   declaration (`JsonCompiledSchema.rootDeclaration`), but the name in the message is not. `tson-compiler` solves
-  it with `UseSite.named` over `EntryDisplayName`, which also renders a minted entry as the sugar or application
-  that produced it; this stack has no counterpart. Owed with the facade, which is what will seed the root for a
-  real read rather than a test doing it.
+  it with `UseSite.named` over `EntryDisplayName`, which also renders a minted entry as the sugar, the record body
+  or the application that produced it; this stack has no counterpart. Owed with the facade, which is what will seed
+  the root for a real read rather than a test doing it.
 
 - [ ] **No "can this type receive JSON" answer for a schema author.** Which of an author's types a JSON document can
   validate against is discoverable only by sending one and reading the failure. The facts that decide it are all
   available at link time — an undiscriminated `choice` in a JSON-facing position, and a position whose only admissible
   values are ones JSON cannot spell (a `REQUIRED_FIXED` field fixed to a based-integer or to `.nan`/`.inf`, a `bytes`
-  value) — so this is a report over the linked namespace or a property on `TypeDefinition`, not a new mechanism. What
+  value) — so this is a report over the linked namespace or a property of a linked entry, not a new mechanism. What
   needs deciding is whether it is a diagnostic, a queryable property, or both.
 
 - [ ] **The corpus has no way to state a fact about two encodings.** `class1/`/`class2/` are TSON-processor
@@ -163,23 +206,20 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   — and §6's directive half, the place TSON text and JSON deliberately differ, is exactly what a single-encoding
   corpus cannot express. Needs the upstream decision on whether that is a layer, a further conformance class, or a
   per-vector encoding axis, before any vectors are owed; `RUNNER.md` is normative for whichever shape it takes.
+  There are no Part 3 vectors at all yet, so the first set is owed as soon as the shape is settled, starting with
+  what `record.name_type` decided for JSON and Java tests alone pin today (`JsonFieldNameTypeTest`,
+  `JsonTaggedValueReadTest`): `$ref`/`$id` read as declared fields; a declared `$type` obscured by the annotation
+  member; an undeclared `$foo` as a validation error; a member outside its record's name type unknown, not refused;
+  a member matched in a folding name type's form, its repeat a duplicate at its own spelling.
 
 ## Module structure
-
-- [ ] **The Unicode identifier machinery becomes a library of its own, `io.ltr8.unicode`, as `tson-net` did for
-  network formats.** `tson-base.unicode` holds UAX #31 profiles (`IdentifierProfile`, `Xid`), UTS #39's confusable
-  skeletons, `Identifier_Status` and joining-control contexts, and `NfkcCasefold`; `base.policy.ScriptPolicy` holds
-  UTS #39's restriction levels. None of it knows TSON, and the JDK implements none of UTS #39 (ICU4J is the usual
-  answer). What constrains it: the lexer and the identifier policy read these tables on the hot path, so the move
-  must keep `Nfc`'s allocation-free fast path and the allocation harness flat, and `ScriptPolicy` splits into the
-  UTS #39 levels (the library) and the policy a deployment states (`tson-base`).
 
 - [ ] **The encoding-neutral reader parts move into a module both stacks share — `tson-encoding` or similar, not
   `tson-base`.** With two working stacks the seam is visible (`design/json-encoding.md` deferred this until there
   were two to find it from): everything above the event level is encoding-neutral, and today it exists twice,
   guarded by `CrossEncodingParityTest` rather than by being one thing. `tson-base` is the wrong home — it is already
   the shared bottom of everything and is at risk of becoming a miscellany — so this is a module of its own, below
-  `tson-json` and the TSON reader and above `tson-schema`, `tson-atom` and `tson-bind`. The JSON shape (a plan, one
+  `tson-json` and the TSON reader and above `tson-schema`, `tson-atom` and `ltr8-bind`. The JSON shape (a plan, one
   loop per encoding, a builder per mode) is what shares; `tson-compiler`'s base class with hooks shares only by
   making both stacks extend it. In order of value:
   - **The bind plan** — field-to-component matching, the FIXED exemption, `@Unbound`, the atom checks and
@@ -230,9 +270,9 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
-  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
+  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`Namespace.getAnnotations`) and survives
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
-  `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
+  `{type_name => top}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
   — the fixtures carry `@synthetic` on the keys the resolver minted and `@ordering`/`@bounded`/`@exact` on core's,
   and the bound side renders none of them, so the entries would compare equal for the wrong reason;
@@ -271,28 +311,62 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **No test pins [TSON-SCHEMA] §5.9 rule 8.** A subtracted construction whose head is a constructor
+  (`my_record => record - { groups }` in a meta layer) resolves with an empty chain and `!my_record { … }` is refused
+  as not IS-A `top`, which is the rule; nothing in the suite or the corpus exercises it, and the refusal's hint
+  ("Did you mean atom refinement") misleads there. Add a vector and drop the hint for a subtracted head.
+- [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
+  kind's members, and the list holds `kind_type_type_c430c650`, the entry minted for the application `kind<type>`
+  itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an
+  author can write (`InternalName`), so `KindMembers` should pass over `@synthetic` entries, in the message's list
+  and in `expected` alike, or the walk should exclude an application's minted entry from every kind.
+- [ ] **A linker refusal of an atom application names its minted entry.** `pick => { m: ref<record> }`, in a
+  kernel-governed schema, reads "'ref_type_record_3034e1a1' is a reference whose 'of' names 'record', a constructor
+  …", and an unresolved `ref<nope>` or `kind<nope>` the same way: an application nothing declares is its expansion,
+  which `EntryDisplayName` gives no authored name, so `TsonSchemaLinker.validateEntry`'s subject falls back to the
+  key. Name it by the application the key's facts carry (`ref<record>`), or state the refusal without a subject, since
+  the diagnostic is already located at the declaration that wrote it.
+- [ ] **The §7.2 refusal names a synthetic by its key.** `VariantSchemaReader` builds its `SubsumptionDiagnostics`
+  from the entry name and keeps it through `renamed`, so beside `text_list => [text]` and `r => { t: [text] }`,
+  `!r { t: !text_list [a] }` reads "'text_list' is not admissible at a 'array_text_4cc4a482' position". The position
+  is to be named as `EntryDisplayName` names it everywhere else (`[text]`), in the message and in `admissible()`'s
+  list; the JSON readers (`DispatchTagReader`, `RecordPlan`) already pass a display name. Pin it with a tree-mode
+  test on that schema.
+
+- [ ] **Whether a closed set of text binds to a host enum.** [TSON-SCHEMA] §7.4 lets an enum bind to "a host enum by a
+  mapping the binder owns". `text_enum` is gone from the kernel, and a closed set of text that is no name is now
+  `text_type`'s `members` facet (`!text ^ { members: [...] }`), an atom rather than an enum, so a schema that bound
+  such a set to a Java enum may have lost the mapping. Check what `ltr8-bind` does with a `text_type` carrying
+  `members` at an enum-typed component; if it refuses, decide whether the binder maps a member set as it maps an
+  enum's members, and pin the answer in a bind-mode test.
+
 - [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
   `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
   `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two
-  causes -- the desugar phase was skipped, "or a position inside it is an application, which has no entry to name until
-  it is materialised" -- and the second is not one: a container position holding an application (`[box<text>]`) lifts,
-  its slot written in `type_ref`'s record form and rewritten to the instantiation entry at materialisation. The comment
-  above the throw says the same. `resolveTypeDef`'s fall-through lists what is "resolved so far" -- six shapes, where the
-  method dispatches on everything §12.1's `type-def` produces -- so it reads as a feature gap where the only way to
-  reach it is a `TypeDef` subclass the dispatch was never taught, an internal fault. What constrains the fix is the
+  causes -- the desugar phase was skipped, "or a position inside it is an application, which has no entry to name until it is
+  materialised" -- and the second is not one: a container position holding an application (`[box<text>]`) lifts, its slot
+  written in `type_ref`'s record form and rewritten to the entry its expansion lands on at materialisation. The comment above
+  the throw says the same. `resolveTypeDef`'s fall-through lists what is "resolved so far" -- six shapes, where the method
+  dispatches on everything §12.1's `type-def` produces -- so it reads as a feature gap where the only way to reach it is a
+  `TypeDef` subclass the dispatch was never taught, an internal fault. What constrains the fix is the
   exception-classification policy: deciding what each site *is* (the first is reachable only by a caller that skipped a
-  phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit
-  70's two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
+  phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit 70's
+  two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
 
-- [ ] **A template application is named in a diagnostic by the construction it closes, in array spelling.**
-  `tags: set<text>` given `[a a]` reports `'[text]' requires unique elements`, and `only: tuple1<text>` given `[]`
-  reports `'[text]' has 1 positions, found only 0 elements` — so a set and a one-element tuple both read as the
-  array `[text]`, a type the author never wrote. The instantiation entry carries the application in its `source`
-  (`{ name: set  arguments: [text] }`), but its body is a reference to the synthetic construction it closes
-  (`!set_type { element_type: text }`, sourced from the bare constructor), and the reader that reports is the
-  synthetic's, which `EntryDisplayName` renders from its body. The fix is to keep the application as the display
-  name across that hop, as `UseSite.named` already does for an alias; and where no application is in reach,
-  `EntryDisplayName` should not render a `set_type` body or a one-position tuple as array sugar.
+- [ ] **A one-position tuple is named in a diagnostic in array spelling.** `only: tuple1<text>` given `[]` reports
+  `'[text]' has 1 positions, found only 0 elements`: `tuple1<text>` expands to a tuple no author named, and
+  `EntryDisplayName` renders a one-element `TupleBody` as `[text]`, which is the array. Render no name for it, as a set
+  gets none (`EntryDisplayName.authored`), and let `TupleDiagnostics` state the rule alone where it has no name, as
+  `ArrayDiagnostics` does.
+
+- [ ] **A map key's pointer step is the key's Java rendering.** `MapAbstractReader.readInto` replaces the `?`
+  placeholder for any key that is not a single token with `ValueIdentity.nameOf(key)` or `String.valueOf(key)`, so
+  `counts: { @doc:"x" 0x10 => oops }` reports `/counts/16` where the unannotated key reports `/counts/0x10`, and a
+  compound key `grid: { {x: 1 y: 2} => oops }` reports `/grid/TsonRecord[fields={x=1, y=2}, …]` in tree mode and
+  `/grid/Point[x=1, y=2]` when bound, naming the reading application's class; the duplicate-key message quotes the
+  same rendering. An annotated single-token key takes its step from the token's spelling, which means keeping the key
+  token's text across the annotations before it; a compound key keeps `?` until it has a pointer form. The JSON
+  encoding writes such a map as pairs and reports `/grid/0/1`, so the two encodings disagree about the step too.
 
 - [ ] **A tuple refused a scalar prints the event record.** `only: tuple1<text>` given `a` reports
   `expected a tuple (array-shaped) for '[text]', found TokenEvent[text=a, form=UNQUOTED, position=…]`:

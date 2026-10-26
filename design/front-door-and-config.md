@@ -24,8 +24,8 @@ the registries a `Tson` holds, and `validate`. Current form only; history lives 
   vocabulary, composed over `SchemaMetaNameBinder.INSTANCE`.
 
 Related: `design/facades-and-tree.md` (the readers a `Tson` hands out), `design/writers-and-document-header.md`
-(`TsonDocumentPeek`, the writers), `design/tree-model.md`, `design/linking-and-compilation.md` (registries, the
-`data` base kind), `design/cli-config-hashing.md`.
+(`TsonDocumentPeek`, the writers), `design/tree-model.md`, `design/linking-and-compilation.md` (registries),
+`design/meta-layer-namespaces.md` (a meta layer's own vocabulary), `design/cli-config-hashing.md`.
 
 ## Front door: `Tson` (`tson` module) and `ProcessorConfig` (`tson-base`)
 
@@ -39,7 +39,7 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
 ```
 
 `ProcessorConfig.withDataBindContext` says which Java classes the schema's types bind to. **The vocabulary
-for building a context is `tson-bind`'s, not `ProcessorConfig`'s** — `DataNameBinder.ofMap(map)` over
+for building a context is `ltr8-bind`'s, not `ProcessorConfig`'s** — `DataNameBinder.ofMap(map)` over
 `DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a caller's
 names over the kernel's own — so the front door has no binding or profile setters restating it.
 **Strictness is configuration and not a reader derivation**, which is a fact about when
@@ -70,7 +70,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
     `@Atom` on a constructor or static factory, or a plain enum's own `name()` crossing — and falls back to
     a bare `DataClassAtom` only for a class that declares none. The bare form asserts "one scalar" and
     supplies nothing that makes it one, so it is right exactly for a class the *encoding* already knows: the
-    JDK scalars, and the vocabulary's host types (`UUID`, `LocalDate`, `Inet4Address`, …). `tson-bind` cannot
+    JDK scalars, and the vocabulary's host types (`UUID`, `LocalDate`, `Inet4Address`, …). `ltr8-bind` cannot
     check which those are, knowing nothing of any encoding, so a class that is neither is accepted here and
     refused by the reader or writer that meets it. **The order is the point**: writing the bare form
     unconditionally would settle the class in the descriptor cache, short-circuiting analysis permanently, so
@@ -100,18 +100,22 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   ways of naming a source are learnt once and the exclusion rules among them are stated once — a second copy
   at the front door would be a second surface to keep in step.
   - **Identity is not location, and that is what makes two sources one design** ([TSON-DATA] §2.2.1). A
-    reference's identity is its lowercase host plus path — the scheme "a transport hint, not part of the
-    name", no port, no userinfo, no fragment — so `https://schemas.example.com/order-1.tn` may legitimately
+    reference's identity is its host plus path (`CanonicalIdentity`) — the scheme "a transport hint, not part of
+    the name", no port, no userinfo, no fragment — so `https://schemas.example.com/order-1.tn` may legitimately
     be served from a directory, and moving a schema between the two renames nothing. `SchemaReference`
     holds those rules once, for both: two sources enforcing them separately is two places for one to drift
-    lenient, and this is a security check.
+    lenient, and this is a security check. A source's host keys are put into the identity's host form, so a host
+    is allowed by name in either label form; a directory is read by the identity's path and an origin by its URI
+    spelling, and a failed fetch of a reference beyond US-ASCII names the URI it requested as well.
   - **The reference is attacker-controlled**, since a document names its own schema and in a server that
     string came out of a request body. Both deny by default and match a host exactly (a suffix test for
     `.example.com` also matches `evil-example.com`). Beyond that they guard different primitives: the HTTP
     one is an SSRF risk, so it never follows redirects and caps size against bytes delivered rather than
     `Content-Length`; the file one is an arbitrary-read risk, so containment is checked **after**
     `toRealPath`, which settles `..` and symlink escape together — checking the unresolved path is the usual
-    way that control is defeated.
+    way that control is defeated. Neither discloses its configuration in a failure: a refusal names the host and
+    the rule, never the allowed hosts ([TSON-SCHEMA] §11.2's SHOULD NOT), and no file-source message names a
+    local path.
   - **And the pair is one value, `SchemaAccess`** (`base.source`): the source plus the `FetchPolicy`
     governing it, answering "where may this deployment obtain a schema, and under what constraints". The two
     facts always travel together and are meaningless apart — a source with no policy has unstated bounds, a
@@ -219,7 +223,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   needs to re-derive the binding without the application in between.
 - **Two binding seams, never merged.** `ProcessorConfig.withDataBindContext` binds the *data* a schema
   describes (`order` → `Order`); `ProcessorConfig.withMetaNameBinder` binds a governing meta's own *vocabulary*
-  (`operation` → `Operation`, the `data` base kind's case — `design/meta-layer-data-kind.md`). One
+  (`method` → `Method`, a record a namespace constructor holds — `design/meta-layer-namespaces.md`). One
   namespace holding both would collide the first time a schema type and a meta-layer constructor shared a
   name. The meta binder is composed over `SchemaMetaNameBinder.INSTANCE` rather than replacing it, so what a
   consumer supplies adds names and gives up nothing: the standard library still compiles in object-binding

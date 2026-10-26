@@ -41,8 +41,12 @@ public record ValidationRun(Outcome outcome, CliPolicy policy, List<FileReport> 
 
     /** A run that never reached a document -- no files, one run-level problem, and exit 2. */
     static ValidationRun failed(CliPolicy policy, Diagnostic.Code code, String message) {
+        return failed(policy, List.of(CliDiagnostic.minimal(code, message)));
+    }
+
+    /** {@link #failed(CliPolicy, Diagnostic.Code, String)} for a failure that has several diagnostics of its own. */
+    static ValidationRun failed(CliPolicy policy, List<CliDiagnostic> errors) {
         // Exit 2: the invocation was wrong, so nothing was judged and acceptance cannot be stated.
-        return new ValidationRun(Outcome.UNDETERMINED, policy, List.of(),
-                List.of(CliDiagnostic.minimal(code, message)));
+        return new ValidationRun(Outcome.UNDETERMINED, policy, List.of(), List.copyOf(errors));
     }
 }

@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
@@ -16,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * The real proof this whole sketch works, not against small hand-built fragments: compiles the
@@ -65,37 +68,31 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(68, registered.entries().size());
+        assertEquals(77, registered.entries().size());
     }
 
+    /**
+     * {@code top => abstract {}} ([TSON-SCHEMA] §4.1): the root has no instances of its own, so a value at a
+     * {@code top}-typed position names the subtype it is -- an untagged one is refused, and so is a tag naming
+     * {@code top} itself, each naming the subtypes that would satisfy the position.
+     */
     @Test
-    void bareTopWithNoTypeRefReadsAgainstItsOwnEmptyBody() {
-        // top => top & {} -- an empty body, but also the (transitive) supertype of everything else
-        // in the schema. A value with no type annotation at a top-typed position is a real, valid
-        // "just a top" reading, not an error demanding one of its many subtypes be named.
+    void topIsAbstractSoAValueThereNamesItsSubtype() {
         TsonCompiledSchema compiled = compiled();
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("top")
-                .read(TestDocuments.document("{}")));
+        ReadException untagged = assertThrows(ReadException.class,
+                () -> compiled.get("top").read(TestDocuments.document("{}")));
+        ReadException self = assertThrows(ReadException.class,
+                () -> compiled.get("top").read(TestDocuments.document("!top {}")));
 
-        assertEquals(Map.of(), result);
-    }
-
-    @Test
-    void explicitTypeRefNamingTheDeclarationItselfAlsoUsesItsOwnBody() {
-        TsonCompiledSchema compiled = compiled();
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("top")
-                .read(TestDocuments.document("!top {}")));
-
-        assertEquals(Map.of(), result);
+        assertTrue(untagged.getMessage().contains("'top' is abstract"), untagged.getMessage());
+        assertTrue(self.getMessage().contains("a tag naming 'top' selects nothing"), self.getMessage());
+        assertTrue(self.getMessage().contains("record"), "the subtypes that would satisfy it: " + self.getMessage());
     }
 
     @Test
     void readsEnumsOwnMembersFieldAgainstRealData() {
-        // enum => enum_type ^ { type?: = identifier }: the pinned `type` is injected, and `members` reads
+        // enum => enum_type ^ { name_type?: = identifier }: the pinned `name_type` is injected, and `members` reads
         // through enum_set, a genuine ArrayBody.
         TsonCompiledSchema compiled = compiled();
 
@@ -137,12 +134,9 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("tuple_element")
-                .read(TestDocuments.document("{ element_type: { name: text arguments: [] } voidable: true }")));
+                .read(TestDocuments.document("{ element_type: text voidable: true }")));
 
         assertEquals(true, result.get("voidable"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> elementType = (Map<String, Object>) result.get("element_type");
-        assertEquals("text", elementType.get("name"));
-        assertEquals(List.of(), elementType.get("arguments"));
+        assertEquals("text", result.get("element_type"), "a type_kind slot holds a type's name");
     }
 }

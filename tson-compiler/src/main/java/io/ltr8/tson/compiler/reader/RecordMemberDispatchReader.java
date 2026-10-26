@@ -4,7 +4,8 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
-import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -17,13 +18,12 @@ import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.TokenEvent;
-import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,6 +31,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 
 /**
@@ -71,7 +72,10 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final Set<String> selfNames;
 
     private final List<Selector> selectors;
-    private final Set<String> selectorNames;
+
+    /** Each selector's name in the base's name form (§5.5), to the name as declared -- what the scan matches. */
+    private final Map<String, String> selectorNames;
+    private final io.ltr8.unicode.Normalization nameForm;
     private final Map<List<Object>, String> members;
     private final Map<String, Set<String>> deeper;
     private final TsonTypeReaderResolver readerFor;
@@ -79,26 +83,31 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final String pinned;
 
     /**
-     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}). A
-     * closed record declares its discriminator fields; a family-base template names them on the entry and
-     * their types are recovered from its members, which carry the selector at the base's own declared type.
-     * Taking the fields rather than a {@code RecordBody} is what lets one dispatcher serve both -- the
-     * alternative was fabricating a record body for a template that has none, which put the choice of "which
-     * fields select" in two places that could disagree.
+     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}), each
+     * read off the base's own fields: a family base's selector is pinned to a parameter, which the derivation
+     * drops, so its field is handed over as the selector a closed base declares. Taking the fields rather than
+     * a {@code RecordBody} is what keeps the choice of "which fields select" in that one derivation.
      */
-    RecordMemberDispatchReader(Set<String> selfNames, String displayName, List<RecordField> selectorFields,
+    RecordMemberDispatchReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
                                 Set<String> subtypes, ValueReaderContext context,
                                 TsonTypeReaderResolver readerFor) {
-        Map<String, TypeDefinition> entries = context.schema().entries();
+        Namespace<Top> entries = context.schema().entries();
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
-        this.selectors = selectorFields.stream().map(field -> selectorOf(field, entries, context.linked())).toList();
-        this.selectorNames = new LinkedHashSet<>(selectors.stream().map(Selector::name).toList());
+        this.selectors = selectorFields.entrySet().stream()
+                .map(field -> selectorOf(field.getKey(), field.getValue(), entries, context.linked())).toList();
+        // The family's members compose the base, so they share its name type; a template base states none.
+        this.nameForm = selfNames.stream().map(context.linked()::nameForm)
+                .filter(form -> form != io.ltr8.unicode.Normalization.NFC).findFirst()
+                .orElse(io.ltr8.unicode.Normalization.NFC);
+        this.selectorNames = new LinkedHashMap<>();
+        selectors.forEach(selector -> selectorNames.put(nameForm.apply(selector.name()), selector.name()));
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            TypeDefinition definition = entries.get(subtype);
-            if (definition == null || !(definition.body() instanceof RecordBody record)) {
+            // A record template IS-A the base is no member: its applications are, each pinned once closed.
+            if (!(entries.get(subtype) instanceof RecordBody record)
+                    || io.ltr8.tson.schema.meta.OpenEntry.isOpen(record)) {
                 continue;
             }
             List<Object> key = pinsOf(record);
@@ -107,7 +116,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             }
             Set<String> under = new LinkedHashSet<>();
             under.add(subtype);
-            under.addAll(definition.subtypes());
+            under.addAll(record.subtypes());
             deeper.put(subtype, Subsumption.admitting(under, context.namesMeaning()));
         }
         this.pinned = members.keySet().stream().map(RecordMemberDispatchReader::render)
@@ -115,22 +124,22 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
-    private static Selector selectorOf(RecordField field, Map<String, TypeDefinition> entries,
+    private static Selector selectorOf(String name, RecordField field, Namespace<Top> entries,
                                        TsonLinkedSchema linked) {
-        String terminal = ReferenceChain.terminal(field.type().name(), entries);
-        TypeDefinition target = entries.get(terminal);
-        AtomType<?> parser = AtomParsers.forType(target.body(), linked.enumForm(terminal)).orElseThrow(
+        String terminal = ReferenceChain.terminal(field.type().name(), entries::get);
+        Top target = entries.get(terminal);
+        AtomType<?> parser = AtomParsers.forType(target, linked.enumForm(terminal)).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
-        return new Selector(Nfc.of(field.name()), parser);
+        return new Selector(Nfc.of(name), parser);
     }
 
     /** One member's pins in the base's declaration order, or null where it does not pin them all. */
     private List<Object> pinsOf(RecordBody record) {
         List<Object> key = new ArrayList<>(selectors.size());
         for (Selector selector : selectors) {
-            Optional<RecordField> field = record.fields().stream()
-                    .filter(f -> Nfc.of(f.name()).equals(selector.name())).findFirst();
+            Optional<RecordField> field = record.fields().entrySet().stream()
+                    .filter(f -> Nfc.of(f.getKey()).equals(selector.name())).map(Map.Entry::getValue).findFirst();
             if (field.isEmpty() || field.get().role() != FieldRole.FIXED
                     || field.get().value().isEmpty()) {
                 return null; // the linker already refused this; the family is read without it
@@ -210,8 +219,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             if (!(ctx.next() instanceof FieldName field)) {
                 return found;
             }
-            if (selectorNames.contains(field.name()) && ctx.peek() instanceof TokenEvent token) {
-                found.putIfAbsent(field.name(), token);
+            String selector = selectorNames.get(nameForm.apply(field.name()));
+            if (selector != null && ctx.peek() instanceof TokenEvent token) {
+                found.putIfAbsent(selector, token);
             }
             EventSkip.scopedValue(ctx);
         }

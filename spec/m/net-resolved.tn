@@ -1,0 +1,34 @@
+!!id:"https://tson.io/2026/38/m/net-resolved.tn"
+!!schema:"https://tson.io/2026/38/m/meta.tn"
+@doc:"""
+  Resolver-output fixture for net.tn (2026 Revision 38 draft).
+  Parse the source schema, run the resolver, canonicalise, compare.
+  Conventions as in meta-kernel-resolved.tn, and the header note in
+  core-resolved.tn applies here unchanged: net.tn imports nothing, and
+  every entry's tag names a meta- or kernel-level constructor.
+  """
+!schema {
+  @ordering:TOTAL @bounded:true
+  ipv4 => !ipv4_type {}
+
+  @ordering:TOTAL @bounded:true
+  ipv6 => !ipv6_type {}
+
+  @ordering:PARTIAL @bounded:false
+  cidr4 => !cidr4_type {}
+
+  @ordering:PARTIAL @bounded:false
+  cidr6 => !cidr6_type {}
+
+  @ordering:NONE @bounded:false
+  mac => !mac_type {}
+
+  @ordering:NONE @bounded:false
+  hostname => !hostname_type {}
+
+  @ordering:NONE @bounded:false
+  host => !host_type {}
+
+  @ordering:NONE @bounded:false
+  media_type => !media_type_type {}
+}

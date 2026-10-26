@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * own line. An author fixing them was pointed at one line six times and an editor had one place
  * to jump to, while the pointer beside it had already said which field.
  *
- * <p>{@code RecordField.position} is {@code @Unbound}, on {@code TypeDefinition.position}'s precedent:
+ * <p>{@code RecordField.position} is {@code @Unbound}, on {@code Top.position}'s precedent:
  * §8.1's {@code record_field} declares no such field, so nothing fills it and strict binding would call it a
  * mismatch. It is not carried in the annotation channel, which is schema data -- it resolves one hop against
  * the governing meta (§6) and round-trips into resolver output, none of which is true of a source position.
@@ -40,8 +41,8 @@ class PerFieldSchemaPositionTest {
     private static List<Diagnostic> read(String declarations, String data) {
         String schema = """
                 !!id:"https://example.test/pos.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -139,13 +140,13 @@ class PerFieldSchemaPositionTest {
     }
 
     /**
-     * <b>Position stays out of identity</b>, on {@code annotations}' footing and for {@code TypeDefinition}'s
+     * <b>Position stays out of identity</b>, on {@code annotations}' footing and for {@code Top}'s
      * stated reason: the resolver test suite compares hand-built expected values against really-resolved
      * ones, and a position in equality would stop two representations of one logical field comparing equal.
      */
     @Test
     void positionDoesNotParticipateInIdentity() {
-        RecordField bare = RecordField.required("f", TypeRef.of("text"));
+        RecordField bare = RecordField.required(TypeRef.of("text"));
         RecordField located = bare.withPosition(Optional.of(new SourcePosition() {
             @Override
             public int line() {

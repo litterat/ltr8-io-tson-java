@@ -35,8 +35,8 @@ class VoidHasOneSpellingTest {
     private static final String ID = "https://example.test/person-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/person-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               person => {
                 name: text

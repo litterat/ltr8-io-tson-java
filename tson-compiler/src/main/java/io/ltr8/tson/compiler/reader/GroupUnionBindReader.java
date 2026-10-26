@@ -7,6 +7,7 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.TsonReadContext.FieldNameRule;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
@@ -31,7 +32,7 @@ import java.util.Map;
  *
  * <p><b>Why a Java union rather than a record with two {@code Optional}s</b>, which is the more literal
  * translation: {@link io.ltr8.tson.schema.meta.TypeArgument} holds a {@code type_ref} whose {@code arguments}
- * hold {@code type_argument}s right back, and {@code tson-bind}'s record resolution has no cycle detection.
+ * hold {@code type_argument}s right back, and {@code ltr8-bind}'s record resolution has no cycle detection.
  * The union defers member resolution and breaks the loop -- see that type's own Javadoc. This reader is what
  * makes the shape chosen for the <em>write</em> side readable on the way back in.
  *
@@ -52,16 +53,17 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
     private final Map<String, DataClassRecord> members;
 
     GroupUnionBindReader(String name, String displayName, RecordBody body, Map<String, DataClassRecord> members,
-                          TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
+                          TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
+                          FieldNameRule fieldNames) {
         // Per field, so a member whose own component is a Token reads the token where its sibling of the
         // same schema type reads the value -- see RecordBindReader.tokenAware for why a slot wants one.
-        super(name, displayName, body, field -> {
-            DataClassRecord member = members.get(field.name());
+        super(name, displayName, body, (fieldName, field) -> {
+            DataClassRecord member = members.get(fieldName);
             Class<?> component = member == null ? null : member.fields()[0].type();
             return component == io.ltr8.tson.schema.meta.Token.class
                     ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, schemaLocation)
                     : resolver.resolve(field.type().name());
-        }, schemaLocation);
+        }, schemaLocation, fieldNames);
         this.members = members;
     }
 
@@ -95,7 +97,7 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
             if (!seen[i]) {
                 continue;
             }
-            String fieldName = fields.get(i).schema().name();
+            String fieldName = fields.get(i).name();
             DataClassRecord member = members.get(fieldName);
             if (member == null) {
                 anchoredCtx.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "'" + name + "' has no bound form "

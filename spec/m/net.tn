@@ -1,0 +1,95 @@
+!!id:"https://tson.io/2026/38/m/net.tn?sha256=06a939fac91c6f27d02f105ea248d33504b4d437484884a20acd3b6ddcb8c32a"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=62dde2f344853848cd0ce4f722a0305d979e5883c0dcd14308959ad6a01bff47"
+@doc:"""
+  TSON Network Type Library — addresses, networks and host names
+  (2026 Revision 38 draft).
+
+  A library a schema imports when it wants these names, and only then: every
+  name a schema imports is one it may not declare ([TSON-SCHEMA] §2.2.3). The
+  types are empty instances of meta's constructors, as core's atoms are.
+  The schemaless annotations of the same names ([TSON-DATA] §5.5) denote these
+  types.
+
+  Hash pins here are real digests over the bytes of this copy; see
+  meta-kernel.tn's note.
+
+  References:
+    RFC 1123              Host name syntax (§2.1)
+    RFC 3492              Punycode
+    RFC 3986              IPv4address grammar
+    RFC 3987              Internationalized Resource Identifiers (ihost)
+    RFC 4291              IPv6 addressing architecture
+    RFC 4632              Classless Inter-domain Routing (CIDR)
+    RFC 5890-5893         IDNA2008: definitions, protocol, code points, Bidi
+    RFC 5952              IPv6 address text representation
+    RFC 6838, RFC 6839    Media type specifications, structured suffixes
+    RFC 9110 §8.3.1       Media type parameters
+    RFC 9542              IEEE 802 parameters (EUI-48 format)
+  """
+{
+  @doc:"""
+    IPv4 address, dotted-quad per the RFC 3986 IPv4address production. Totally
+    ordered by numeric address value over a finite 32-bit space.
+    """
+  @ordering:TOTAL @bounded:true
+  ipv4 => !ipv4_type {}
+
+  @doc:"""
+    IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers (RFC 4007,
+    `fe80::1%eth0`) are host-local and excluded from the contract. Totally
+    ordered by numeric address value over a finite 128-bit space. (TSON text:
+    contains colons, so quote it.)
+    """
+  @ordering:TOTAL @bounded:true
+  ipv6 => !ipv6_type {}
+
+  @doc:"""
+    IPv4 network, address `/` prefix length 0-32 (RFC 4632). PARTIAL ordering is
+    by containment: a network precedes another when its address range is a
+    strict subset; CIDR blocks never partially overlap, so any two are nested or
+    disjoint, and disjoint networks are incomparable. (TSON text: contains `/`,
+    so quote it.)
+    """
+  @ordering:PARTIAL @bounded:false
+  cidr4 => !cidr4_type {}
+
+  @doc:"""
+    IPv6 network, address `/` prefix length 0-128 (RFC 4291 §2.3). PARTIAL
+    ordering is by containment, as for cidr4. (TSON text: contains colons and
+    `/`, so quote it.)
+    """
+  @ordering:PARTIAL @bounded:false
+  cidr6 => !cidr6_type {}
+
+  @doc:"""
+    MAC address, EUI-48: six hex octets, colon- or hyphen-separated (RFC 9542).
+    An opaque hardware identifier — like uuid, ordering is not semantically
+    meaningful. (TSON text: the colon form must be quoted; the hyphen form may
+    go unquoted.)
+    """
+  @ordering:NONE @bounded:false
+  mac => !mac_type {}
+
+  @doc:"""
+    Internet host name, in either label form: `Example.COM` and `example.com`
+    are one value, and so are `xn--bcher-kva.example` and `bücher.example`,
+    whose canonical text is the second. See `hostname_type` in meta.
+    """
+  @ordering:NONE @bounded:false
+  hostname => !hostname_type {}
+
+  @doc:"""
+    A host: a `hostname`, an IPv4 address or an IPv6 address, one string-class
+    type, so `localhost`, `"127.0.0.1"`, `"::1"` and `"[::1]"` need no tag. See
+    `host_type` in meta.
+    """
+  @ordering:NONE @bounded:false
+  host => !host_type {}
+
+  @doc:"""
+    A media type without parameters: `text/html`, `application/ld+json`. See
+    `media_type_type` in meta.
+    """
+  @ordering:NONE @bounded:false
+  media_type => !media_type_type {}
+}

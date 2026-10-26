@@ -17,8 +17,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -47,23 +46,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RecordClosureTest {
 
-    private static TypeDefinition atom(io.ltr8.tson.schema.meta.Top body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(), body);
+    private static Top atom(io.ltr8.tson.schema.meta.Top body) {
+        return body;
     }
 
     /** {@code person => { name: text  address: addr }}, {@code addr => { city: text }} -- a record inside a record. */
     private static TsonCompiledSchema personSchema() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("text", atom(TextType.UNCONSTRAINED));
-        entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
-        entries.put("normalization", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new EnumBody(
-                List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
+        entries.put("text_member_set", ArrayBody.of(TypeRef.of("text")));
+        entries.put("normalization", new EnumBody(
+                List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
         entries.put("integer", atom(IntegerType.UNCONSTRAINED));
-        entries.put("addr", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("city", TypeRef.of("text"))))));
-        entries.put("person", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("name", TypeRef.of("text")),
-                RecordField.required("address", TypeRef.of("addr"))))));
+        entries.put("addr", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("city", RecordField.required(TypeRef.of("text"))))));
+        entries.put("person", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("name", RecordField.required(TypeRef.of("text"))),
+                Map.entry("address", RecordField.required(TypeRef.of("addr"))))));
         TsonSchema schema = new TsonSchema("https://example.test/closure.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         return TsonSchemaCompiler.compile(new TsonLinkedSchema(schema), ValueReaderFactoryRegistry.tree());
@@ -142,19 +141,20 @@ class RecordClosureTest {
      */
     @Test
     void closureReachesObjectBindingModeToo() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", atom(IntegerType.UNCONSTRAINED));
         entries.put("text", atom(TextType.UNCONSTRAINED));
-        entries.put("text_member_set", TypeDefinition.product(ArrayBody.of(TypeRef.of("text"))));
-        entries.put("normalization", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), List.of(), new EnumBody(
-                List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD"))));
-        entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.optionalVoidable("min_length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("max_length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("length", TypeRef.of("integer")),
-                RecordField.optionalVoidable("pattern", TypeRef.of("text")),
-                RecordField.optionalVoidable("members", TypeRef.of("text_member_set")),
-                RecordField.defaulted("normalization", TypeRef.of("normalization"),
+        entries.put("text_member_set", ArrayBody.of(TypeRef.of("text")));
+        entries.put("normalization", new EnumBody(
+                List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
+        entries.put("text_type", RecordBody.of(RecordBody.fieldMap(
+                KernelChainFields.chainField(entries),
+                Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
+                Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
+                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
                         new Token("NONE", Token.Form.UNQUOTED))))));
         TsonSchema schema = new TsonSchema("https://example.test/bind-closure.tn",
                 "https://example.test/meta.tn", List.of(), entries);
@@ -169,7 +169,8 @@ class RecordClosureTest {
         Diagnostic diagnostic = problems.diagnostics().getFirst();
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, diagnostic.code());
         assertEquals(Optional.of("/minLength"), diagnostic.path());
-        assertEquals("min_length | max_length | length | pattern | members | normalization", diagnostic.expected());
+        assertEquals("chain | min_length | max_length | length | pattern | members | normalization",
+                diagnostic.expected());
         assertNull(bound);
 
         // The same schema, the same reader, nothing unknown: the binding itself still works.

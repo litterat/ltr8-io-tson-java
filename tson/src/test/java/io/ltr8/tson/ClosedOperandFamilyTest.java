@@ -3,6 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the argument is a literal rather than the declaring declaration's own parameter (§5.10).
  *
  * <p><b>The member is the author's own declaration and nothing is minted for the operand.</b> §5.8 absorbs
- * the operand's fields, §5.7's fixation turns the routed {@code = T} into the member's own {@code
- * REQUIRED_FIXED} pin, and what outlives the substitution is that {@code dog} IS-A {@code pet}. An entry for
+ * the operand's fields, substitution puts the argument in the routed {@code = T}, already FIXED where it is
+ * written, and what outlives the substitution is that {@code dog} IS-A {@code pet}. An entry for
  * {@code pet<"dog">} would be a derivation step wearing an entry's clothes -- nothing names it, and the
  * member a document actually writes is {@code dog}.
  *
@@ -63,10 +64,10 @@ class ClosedOperandFamilyTest {
     void theMemberIsIndexedUnderTheFamilyBaseItComposes() {
         TsonLinkedSchema linked = Tson.standard().resolve(schema("cof1", SEALED));
 
-        assertEquals(java.util.List.of("dog", "cat"), linked.schema().entries().get("pet").subtypes(),
+        assertEquals(java.util.List.of("dog", "cat"), TypeChain.subtypesOf(linked.schema().entries().get("pet")),
                 "the base's members are the declarations that compose it");
-        assertTrue(linked.schema().entries().get("dog").supertypes().contains("pet"),
-                () -> "dog IS-A pet: " + linked.schema().entries().get("dog").supertypes());
+        assertTrue(TypeChain.supertypesOf(linked.schema().entries().get("dog")).contains("pet"),
+                () -> "dog IS-A pet: " + TypeChain.supertypesOf(linked.schema().entries().get("dog")));
     }
 
     /** The operand mints nothing: the only entries are the four the author wrote. */

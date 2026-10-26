@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.EntryKind;
 
 import java.util.Collection;
 import java.util.List;
@@ -45,6 +46,19 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
      * The {@link TsonLinkedSchema} this was compiled from -- package-private, so the {@link
      * TsonCompiledMetaSchema} subtype can pass it to {@code super} when built from an existing base schema.
      */
+    /**
+     * {@code name}'s kind ([TSON-SCHEMA] §4.1), judged by where each base kind its chain names is defined --
+     * {@code null} for a name this schema lacks.
+     */
+    public EntryKind kindOf(String name) {
+        return linkedSchema.kindOf(name);
+    }
+
+    /** Whether {@code name} denotes the meta-kernel's own entry of that name ({@link TsonLinkedSchema#isKernel}). */
+    public boolean isKernel(String name) {
+        return linkedSchema.isKernel(name);
+    }
+
     TsonLinkedSchema linkedSchema() {
         return linkedSchema;
     }
@@ -163,7 +177,8 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
      */
     Optional<SchemaLocation> rootDeclaration(String typeName) {
         return Optional.ofNullable(schema().entries().get(typeName))
-                .map(entry -> SchemaLocation.of(linkedSchema.originOf(typeName), typeName, entry.position()));
+                .map(entry -> SchemaLocation.of(linkedSchema.originOf(typeName), typeName,
+                        schema().positionOf(typeName)));
     }
 
     /**

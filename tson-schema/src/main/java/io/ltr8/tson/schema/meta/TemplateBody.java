@@ -6,7 +6,6 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * The meta-kernel's {@code template} body -- the body of an entry that declares type parameters, which
@@ -14,8 +13,8 @@ import java.util.Optional;
  * <em>unread</em> until materialisation substitutes the parameters away; {@link #parameters} are what it
  * binds, in order, each with the type an argument for it is read as ({@link TemplateParam}).
  *
- * <p><b>It holds in both directions</b>: a {@link TypeDefinition} whose body is one of these declares type
- * parameters, and every entry that declares them has one. §5.10's partial application is no exception --
+ * <p><b>It holds in both directions</b>: an entry whose value is one of these declares type parameters, and
+ * every entry that declares them has one. §5.10's partial application is no exception --
  * {@code <B> pair<uuid, B>} holds the {@code !reference { target: pair<uuid, B> }} §8.1 says it denotes.
  *
  * <p><b>Why the body is text, and not a value of the constructor's own vocabulary.</b> A parameter stands
@@ -38,52 +37,23 @@ import java.util.Optional;
  * here instead would put a grammar type in the value model and, since {@code DataValue} lives one module up,
  * could not be done at all without inverting the dependency this package deliberately keeps.
  *
- * <p><b>Composes with {@code top} directly</b>, like {@link Reference} and {@link Data}: it describes no
- * value's shape, and nothing is ever typed by it.
- *
- * <p><b>{@link #extension} is the parent's, and only a record-bodied template has one.</b> Absent means this
- * template is no type, so naming it at a type position is an error; present, it is ABSTRACT or SEALED and
- * never OPEN or FINAL, a parent having no direct instances (nothing can write a value whose type is the
- * template rather than one of its applications) and its applications being subtypes by construction.
- *
- * <p>It is <em>derived</em> rather than stated, in the manner of {@code choice.disjoint} -- which is what
- * keeps it apart from the author's {@code abstract} mark. That mark is the <em>instantiation's</em> fact and
- * travels inside {@link #template}'s own text, so the two levels have one carrier each and never collide.
- * Optional with no default, because absence is a fact no member of the enum spells: a default would be
- * omitted from output at its own value (§8.1), and deriving the answer from the body shape instead would
- * mean parsing the held text -- the one thing §1.3 promises a resolved-output consumer never has to do.
+ * <p><b>Composes {@code top} alone</b>: it is not a type, its open form denotes nothing, and naming it at a type
+ * position is an error. A record template is not one of these -- it is a {@link RecordBody} with
+ * {@link RecordBody#parameters}, a family base ({@link OpenEntry}) -- so every held body applies some other
+ * constructor, and an application of it is its expansion, with whatever chain the expansion's own body gives.
  */
 @Typename(name = "template")
-public record TemplateBody(List<TemplateParam> parameters, String template,
-                            Optional<RecordExtensionType> extension,
-                            List<String> discriminators) implements Top {
+public record TemplateBody(List<TemplateParam> parameters, String template) implements Top {
 
-    /**
-     * <b>{@link #discriminators} names the fields a SEALED family base dispatches on</b>, in the order their
-     * pins are compared as a tuple -- the same statement {@code record.discriminators} makes for a closed
-     * base, so a dispatcher reads one field whichever kind of base it has.
-     *
-     * <p><b>Absent and empty say the same thing here</b>, unlike {@link #extension}, whose absence is the
-     * distinct fact that this template is no type at all and which no member of the enum spells. A template
-     * with no discriminators is ABSTRACT or not a family base, and either way the list is nothing.
-     */
     @Record
     public TemplateBody {
         Objects.requireNonNull(parameters, "parameters");
         Objects.requireNonNull(template, "template");
-        Objects.requireNonNull(extension, "extension");
         if (parameters.isEmpty()) {
             throw new IllegalArgumentException("a held body belongs to an entry that declares type "
                     + "parameters, and a template with none is a closed entry (§5.10)");
         }
         parameters = List.copyOf(parameters);
-        discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
-    }
-
-    /** The same body with {@code discriminators} unstated -- every producer, until they are wired. */
-    public TemplateBody(List<TemplateParam> parameters, String template,
-                         Optional<RecordExtensionType> extension) {
-        this(parameters, template, extension, List.of());
     }
 
     /** The parameter names, in order -- what substitution binds and what an application's arity is checked against. */
@@ -93,7 +63,6 @@ public record TemplateBody(List<TemplateParam> parameters, String template,
 
     /** The same body with each parameter replaced by {@code settled}'s entry for it, where there is one. */
     public TemplateBody withParameters(Map<String, TemplateParam> settled) {
-        return new TemplateBody(parameters.stream().map(p -> settled.getOrDefault(p.name(), p)).toList(),
-                template, extension, discriminators);
+        return new TemplateBody(parameters.stream().map(p -> settled.getOrDefault(p.name(), p)).toList(), template);
     }
 }

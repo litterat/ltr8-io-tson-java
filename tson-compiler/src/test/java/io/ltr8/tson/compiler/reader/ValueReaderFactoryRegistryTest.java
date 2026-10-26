@@ -8,8 +8,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ScopeKind;
 import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.tree.TsonValue;
@@ -72,8 +71,7 @@ class ValueReaderFactoryRegistryTest {
      */
     @Test
     void everyRegisteredConstructorBuildsARealReader() {
-        TypeDefinition declared = new TypeDefinition(Optional.empty(), TypeKind.SUM, 
-                List.of(), List.of(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()));
+        Top declared = new Scoped(List.of(ScopeKind.LOCAL), Optional.empty());
 
         for (ValueReaderFactoryRegistry registry : List.of(ValueReaderFactoryRegistry.tree(),
                 ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()))) {
@@ -84,8 +82,7 @@ class ValueReaderFactoryRegistryTest {
 
     @Test
     void treeAndBindBothReadBooleanEnumMembersAsRealBooleans() {
-        TypeDefinition booleanEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), new EnumBody(List.of("true", "false")));
+        Top booleanEntry = new EnumBody(List.of("true", "false"));
 
         TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("boolean", booleanEntry, CONTEXT);
@@ -99,8 +96,7 @@ class ValueReaderFactoryRegistryTest {
 
     @Test
     void treeAndBindReadAnOrdinaryEnumMemberAsItsText() {
-        TypeDefinition statusEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), new EnumBody(List.of("ACTIVE", "INACTIVE")));
+        Top statusEntry = new EnumBody(List.of("ACTIVE", "INACTIVE"));
 
         TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("status", statusEntry, CONTEXT);

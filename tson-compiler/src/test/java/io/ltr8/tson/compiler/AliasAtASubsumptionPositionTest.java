@@ -47,8 +47,8 @@ class AliasAtASubsumptionPositionTest {
     private static Read read(String declarations, String rootType, String document) {
         String schema = """
                 !!id:"https://example.test/alias-subsumption.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }

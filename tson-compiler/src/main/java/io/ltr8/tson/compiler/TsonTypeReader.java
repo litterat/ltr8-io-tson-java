@@ -14,7 +14,7 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  *
  * <p>The Class 2 analogue of {@link AtomType}, generalized from atoms to every {@link
  * io.ltr8.tson.schema.meta.Top} kind. One instance is compiled per {@link TsonCompiledSchema} entry;
- * unlike consulting the resolved schema's {@code Map<String, TypeDefinition>} directly, a compiled
+ * unlike consulting the resolved schema's {@code Map<String, Top>} directly, a compiled
  * instance already knows its own child readers as real object references, so reading a value at
  * this position never re-consults the schema's own name-keyed map at read time -- except at the
  * specific edges that close a cycle, where a deferred, name-keyed lookup does exactly one.
@@ -38,7 +38,7 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  * <p><b>Unchecked failures only, deliberately</b> -- every exception this whole read/parse stack
  * throws is a {@link RuntimeException} (the lexer's own {@code LexException}, {@code
  * ParseException}, {@code SchemaValidationException}, and so on); the one checked exception
- * anywhere in this codebase, {@code tson-bind}'s own {@code DataBindException}, is confined to
+ * anywhere in this codebase, {@code ltr8-bind}'s own {@code DataBindException}, is confined to
  * compile/bind-time setup and never reaches a {@link #read} call. A checked exception here would
  * also propagate through every functional interface this reader composes through ({@link
  * ValueReaderFactory}, {@code CompilationContext}, {@code DataNameBinder}), which this codebase has

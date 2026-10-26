@@ -7,11 +7,12 @@ import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.math.BigInteger;
@@ -45,8 +46,8 @@ class ApplicationInContainerPositionTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/nested.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -63,32 +64,34 @@ class ApplicationInContainerPositionTest {
     }
 
     private static String fieldType(TsonCompiledSchema compiled, String record, String field) {
-        RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
-        return body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow()
+        RecordBody body = (RecordBody) compiled.schema().entries().get(record);
+        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
     }
 
     /**
-     * The entry a field's type resolves to, following the instantiation entry's hop. A closure whose body is a
-     * synthetic is named by <em>two</em> entries -- the form, and the instantiation that records the
-     * application -- so a fixture asking about the shape has to step past the second to reach the first.
+     * The entry a field's type resolves to, following an instantiation entry's hop. Only an expansion that names
+     * its own application has one -- every other application names its synthetic directly -- so for most
+     * fixtures this is the field's own type.
      */
-    private static TypeDefinition formBehind(TsonCompiledSchema compiled, String record, String field) {
-        TypeDefinition entry = compiled.schema().entries().get(fieldType(compiled, record, field));
-        return entry.body() instanceof Reference reference
+    private static Top formBehind(TsonCompiledSchema compiled, String record, String field) {
+        Top entry = compiled.schema().entries().get(fieldType(compiled, record, field));
+        return entry instanceof Reference reference
                 ? compiled.schema().entries().get(reference.target().name()) : entry;
     }
 
     /** The entries this schema derived rather than the author declaring them -- synthetics and instantiations. */
     private static List<String> derived(TsonCompiledSchema compiled) {
         return compiled.schema().entries().entrySet().stream()
-                .filter(e -> e.getValue().position().isEmpty()).map(java.util.Map.Entry::getKey).sorted().toList();
+                .filter(e -> compiled.schema().positionOf(e.getKey()).isEmpty()).map(java.util.Map.Entry::getKey)
+                .sorted().toList();
     }
 
     /** Derived entries still carrying parameters -- the open half of §8's counts. */
     private static List<String> openNames(TsonCompiledSchema compiled) {
         return derived(compiled).stream()
-                .filter(n -> compiled.schema().entries().get(n).body() instanceof TemplateBody).toList();
+                .filter(n -> compiled.schema().entries().get(n) instanceof TemplateBody).toList();
     }
 
     private static long openSynthetics(TsonCompiledSchema compiled) {
@@ -118,12 +121,12 @@ class ApplicationInContainerPositionTest {
         String instantiation = fieldType(compiled, "use", "t");
         String synthetic = fieldType(compiled, instantiation, "children");
         ArrayBody children = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(synthetic).body());
+                compiled.schema().entries().get(synthetic));
 
         assertEquals(TypeRef.of(instantiation), children.elementType(), "the knot");
         assertEquals(Optional.of(BigInteger.ONE), children.minItems());
-        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries().get(instantiation).body())
-                .fields().get(0).type(), "T bound at the value field too");
+        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries().get(instantiation))
+                .fields().values().stream().toList().get(0).type(), "T bound at the value field too");
     }
 
     /** The open form the fixture rests on: an array template whose element is an application of {@code tree}. */
@@ -136,12 +139,12 @@ class ApplicationInContainerPositionTest {
         // The lifted synthetic, by its derived name: `tree` itself holds a body too now (a record template
         // is normalised into the `!record { ... }` §5.2 says it denotes), so "the first held body" no longer
         // names this one.
-        TypeDefinition open = compiled.schema().entries().entrySet().stream()
-                .filter(e -> e.getKey().startsWith("array_") && e.getValue().body() instanceof TemplateBody)
+        Top open = compiled.schema().entries().entrySet().stream()
+                .filter(e -> e.getKey().startsWith("array_") && e.getValue() instanceof TemplateBody)
                 .findFirst().orElseThrow().getValue();
-        TemplateBody body = (TemplateBody) open.body();
+        TemplateBody body = (TemplateBody) open;
 
-        assertEquals(List.of("p0"), open.parameters(), "renamed positionally, as every open synthetic is");
+        assertEquals(List.of("p0"), OpenEntry.parameterNames(open), "renamed positionally, as every open synthetic is");
         // The application is held whole, so the names it mentions are simply the tokens in the body -- its
         // own head and the parameter it still awaits.
         assertTrue(HeldBody.of(body).names().containsAll(List.of("tree", "p0")),
@@ -205,37 +208,48 @@ class ApplicationInContainerPositionTest {
 
         // grid<pixel, 3> -> { x: [[pixel; 1..3]; 2..3] }, outermost entry inwards.
         String outer = fieldType(compiled, fieldType(compiled, "a", "g"), "x");
-        ArrayBody rows = assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(outer).body());
+        ArrayBody rows = assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(outer));
         assertEquals(Optional.of(BigInteger.TWO), rows.minItems());
         assertEquals(fieldType(compiled, "direct", "d"), rows.elementType().name(),
                 "the row the grid builds is the row written directly");
     }
 
     /**
-     * The <b>whole-body</b> spelling records the application too, and needs <em>two</em> entries to do it.
-     * Its closure is a closed synthetic, whose {@code source} must name the constructor it builds -- keying
-     * it on the application would tie identity to the internal name of the open synthetic that produced it,
-     * and would split {@code [text]} written directly from {@code [T]} closed to {@code text}. So the
-     * instantiation is a separate reference entry pointing at the form.
-     *
-     * <p>The record spelling needs only one, because substituting a record yields a record -- structurally
-     * distinct from any synthetic, so it can be the instantiation itself.
+     * The <b>whole-body</b> spelling is its expansion: an application nothing declares names the closed
+     * synthetic its closing produced, so {@code grid<pixel, 3>} and {@code [[pixel; 3]; 3]} written out are one
+     * entry, and no entry records the application.
      */
     @Test
-    void theWholeBodySpellingRecordsTheApplicationInAReferenceEntry() {
+    void theWholeBodySpellingIsItsExpansion() {
         TsonCompiledSchema compiled = compile("""
-                  pixel => { r: int32 }
-                  grid  => <T, N> [[T; N]; N]
-                  a     => { g: grid<pixel, 3> }""");
+                  pixel  => { r: int32 }
+                  grid   => <T, N> [[T; N]; N]
+                  a      => { g: grid<pixel, 3> }
+                  direct => { d: [[pixel; 3]; 3] }""");
 
-        TypeDefinition instantiation = compiled.schema().entries().get(fieldType(compiled, "a", "g"));
-        assertInstanceOf(Reference.class, instantiation.body());
-        assertEquals("grid", instantiation.source().orElseThrow().name(), "the application, recorded");
+        String form = fieldType(compiled, "a", "g");
+        assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(form));
+        assertEquals(Optional.of("array"), compiled.schema().constructorOf(form),
+                "the form stays an instance of the constructor it builds");
+        assertEquals(form, fieldType(compiled, "direct", "d"), "the grid is the form written out");
+        assertTrue(compiled.schema().applicationOf(form).isEmpty(), "no entry records the application");
+    }
 
-        TypeDefinition form = formBehind(compiled, "a", "g");
-        assertInstanceOf(ArrayBody.class, form.body());
-        assertEquals(TypeRef.of("array"), form.source().orElseThrow(),
-                "the form stays sourced to the constructor it builds");
+    /**
+     * An expansion that names its own application cannot be written without a name, so the application keeps
+     * an entry of its own: a reference to the synthetic, recording the application, which is what the knot is
+     * tied on.
+     */
+    @Test
+    void aSelfReachingExpansionIsNamedByItsApplication() {
+        TsonCompiledSchema compiled = compile("""
+                  nested => <T> ( T | [nested<T>] )
+                  use    => { n: nested<text> }""");
+
+        String instantiation = fieldType(compiled, "use", "n");
+        Reference hop = assertInstanceOf(Reference.class, compiled.schema().entries().get(instantiation));
+        assertEquals("nested", compiled.schema().applicationOf(instantiation).orElseThrow().name());
+        assertEquals(Optional.of("choice"), compiled.schema().constructorOf(hop.target().name()));
     }
 
     /**
@@ -250,9 +264,8 @@ class ApplicationInContainerPositionTest {
                   grid  => <T, N> [[T; N]; N]
                   a     => { g: grid<pixel, 3> }""");
 
-        assertEquals(1, derived(compiled).stream()
-                .filter(n -> compiled.schema().entries().get(n).body() instanceof Reference).count(),
-                () -> "one instantiation, for the one application written: " + derived(compiled));
+        assertTrue(derived(compiled).stream().noneMatch(n -> compiled.schema().applicationOf(n).isPresent()),
+                () -> "no instantiation, the application being its expansion: " + derived(compiled));
         assertTrue(derived(compiled).stream().noneMatch(n -> n.contains("06c4e11f_")),
                 () -> "no entry named after a generated head: " + derived(compiled));
     }
@@ -268,7 +281,7 @@ class ApplicationInContainerPositionTest {
                   use   => { w: weird<text> }""");
 
         String instantiation = fieldType(compiled, "use", "w");
-        ArrayBody form = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "w").body());
+        ArrayBody form = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "w"));
 
         assertEquals(instantiation, form.elementType().name(), "the knot");
     }
@@ -288,7 +301,7 @@ class ApplicationInContainerPositionTest {
                   direct => { d: [pixel; 3] }""");
 
         assertEquals(fieldType(compiled, "a", "g"), fieldType(compiled, "b", "g"), "one instantiation");
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "a", "g").body());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "a", "g"));
         assertEquals(fieldType(compiled, "direct", "d"), outer.elementType().name(),
                 "the row the grid builds is the row written directly");
         assertEquals(Optional.of(BigInteger.valueOf(3)), outer.minItems());
@@ -316,7 +329,7 @@ class ApplicationInContainerPositionTest {
                   three => { g: grid<pixel, 3> }
                   four  => { g: grid<pixel, 4> }""");
 
-        assertEquals(List.of("T", "N"), both.schema().entries().get("grid").parameters(),
+        assertEquals(List.of("T", "N"), OpenEntry.parameterNames(both.schema().entries().get("grid")),
                 "the declared template, unchanged");
         assertEquals(openBefore, openNames(both), "both open synthetics reused, neither rewritten");
         assertEquals(2, openSynthetics(both));
@@ -333,11 +346,11 @@ class ApplicationInContainerPositionTest {
                   three => { g: grid<pixel, 3> }
                   four  => { g: grid<pixel, 4> }""");
 
-        assertInstanceOf(TemplateBody.class, compiled.schema().entries().get("grid").body());
+        assertInstanceOf(TemplateBody.class, compiled.schema().entries().get("grid"));
         assertEquals(1, openSynthetics(compiled),
                 () -> "one open synthetic, shared by both closures: " + derived(compiled));
-        assertEquals(6, closedDerived(compiled),
-                () -> "two closed arrays and one instantiation per closure: " + derived(compiled));
+        assertEquals(4, closedDerived(compiled),
+                () -> "two closed arrays per closure: " + derived(compiled));
     }
 
     /**
@@ -353,7 +366,7 @@ class ApplicationInContainerPositionTest {
         assertEquals(1, openSynthetics(compiled), () -> derived(compiled).toString());
         assertEquals(2, closedDerived(compiled), () -> derived(compiled).toString());
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")).body());
+                .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
         assertEquals(TypeRef.of("text"), array.elementType());
     }
 
@@ -366,9 +379,9 @@ class ApplicationInContainerPositionTest {
                   use  => { u: tmpl<text> }""");
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")).body());
+                .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(outer.elementType().name()).body());
+                compiled.schema().entries().get(outer.elementType().name()));
 
         assertEquals(TypeRef.of("text"), inner.elementType());
     }
@@ -389,11 +402,12 @@ class ApplicationInContainerPositionTest {
                   box_carrier => { a: [box<text>] }""");
 
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, "box_carrier", "a")).body());
-        TypeDefinition instantiation = compiled.schema().entries().get(array.elementType().name());
+                .get(fieldType(compiled, "box_carrier", "a")));
+        Top instantiation = compiled.schema().entries().get(array.elementType().name());
 
-        assertEquals(List.of(), instantiation.parameters(), "closed");
-        assertEquals(TypeRef.of("text"), ((RecordBody) instantiation.body()).fields().get(0).type(),
+        assertEquals(List.of(), OpenEntry.parameterNames(instantiation), "closed");
+        assertEquals(TypeRef.of("text"), ((RecordBody) instantiation).fields()
+                .values().stream().toList().get(0).type(),
                 "T bound");
         assertNotNull(compiled.get("box_carrier")
                 .read(TestDocuments.document("{ a: [ { a: \"x\" } ] }")));
@@ -408,11 +422,12 @@ class ApplicationInContainerPositionTest {
                   deep => { d: [box<pair<int32>>] }""");
 
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, "deep", "d")).body());
+                .get(fieldType(compiled, "deep", "d")));
         String inner = fieldType(compiled, array.elementType().name(), "a");
 
         assertEquals(TypeRef.of("int32"),
-                ((RecordBody) compiled.schema().entries().get(inner).body()).fields().get(0).type());
+                ((RecordBody) compiled.schema().entries().get(inner)).fields()
+                        .values().stream().toList().get(0).type());
     }
 
     /**
@@ -426,10 +441,10 @@ class ApplicationInContainerPositionTest {
                   vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
                   holder => { p: [vector<float32, 3>] }""");
 
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "holder", "p").body());
-        TypeDefinition inner = compiled.schema().entries().get(outer.elementType().name());
-        ArrayBody vector = assertInstanceOf(ArrayBody.class, inner.body() instanceof Reference r
-                ? compiled.schema().entries().get(r.target().name()).body() : inner.body());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "holder", "p"));
+        Top inner = compiled.schema().entries().get(outer.elementType().name());
+        ArrayBody vector = assertInstanceOf(ArrayBody.class, inner instanceof Reference r
+                ? compiled.schema().entries().get(r.target().name()) : inner);
 
         assertEquals(Optional.of(BigInteger.valueOf(3)), vector.minItems());
         assertNotNull(compiled.get("holder")
@@ -461,10 +476,10 @@ class ApplicationInContainerPositionTest {
                   m   => { entries: {text => box<text>} }""");
 
         MapBody map = assertInstanceOf(MapBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, "m", "entries")).body());
+                .get(fieldType(compiled, "m", "entries")));
 
         assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries()
-                .get(map.valueType().name()).body()).fields().get(0).type());
+                .get(map.valueType().name())).fields().values().stream().toList().get(0).type());
     }
 
     /**
@@ -482,10 +497,10 @@ class ApplicationInContainerPositionTest {
                   bounded => <N> [box<text>; N..]
                   use     => { u: bounded<2> }""");
 
-        ArrayBody closed = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "u").body());
+        ArrayBody closed = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "u"));
 
         assertEquals(Optional.of(BigInteger.TWO), closed.minItems());
         assertInstanceOf(RecordBody.class,
-                compiled.schema().entries().get(closed.elementType().name()).body(), "box<text>, closed");
+                compiled.schema().entries().get(closed.elementType().name()), "box<text>, closed");
     }
 }

@@ -109,7 +109,7 @@ public final class JsonCompiledSchema {
         String own = CanonicalIdentity.canonicalize(schema().id());
         List<String> mine = schema().entries().entrySet().stream()
                 .filter(entry -> own.equals(linkedSchema.originOf(entry.getKey())))
-                .filter(entry -> entry.getValue().position().isPresent())
+                .filter(entry -> schema().positionOf(entry.getKey()).isPresent())
                 .map(Map.Entry::getKey).toList();
         return mine.isEmpty() ? List.copyOf(schema().entries().keySet()) : mine;
     }
@@ -122,6 +122,7 @@ public final class JsonCompiledSchema {
      */
     Optional<JsonSchemaLocation> rootDeclaration(String typeName) {
         return Optional.ofNullable(schema().entries().get(typeName))
-                .map(entry -> JsonSchemaLocation.of(linkedSchema.originOf(typeName), typeName, entry.position()));
+                .map(entry -> JsonSchemaLocation.of(linkedSchema.originOf(typeName), typeName,
+                        schema().positionOf(typeName)));
     }
 }

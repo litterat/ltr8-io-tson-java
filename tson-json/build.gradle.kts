@@ -10,7 +10,7 @@ dependencies {
     // `tson-compiler`'s `TsonEventSource`. The lexical, structural and tree layers depend on nothing: RFC 8259
     // is an external standard and none of them is TSON-specific.
     //
-    // `tson-bind` is the one dependency, and it is the shape `tson-compiler` already takes on it: a
+    // `ltr8-bind` is the one dependency, and it is the shape `tson-compiler` already takes on it: a
     // dependency-free binding engine that reads a class's own descriptor, so a JSON document binds to a Java
     // object with no TSON schema in sight. `api` rather than `implementation` because a caller building a
     // `DataBindContext` to hand `JsonObjectReader` names its types directly.
@@ -21,7 +21,7 @@ dependencies {
     // re-exports. So what crosses from the schema pipeline is its output, a value model; the resolve -> link ->
     // register phases that produce it stay `tson-compiler`'s and are named by no type in this module.
     api(project(":tson-base"))
-    api(project(":tson-bind"))
+    api(project(":ltr8-bind"))
 
     // The atom vocabulary -- TsonAtomContext, so this encoding's default reader binds the host types the
     // built-in families read to exactly as the TSON text one does. [TSON-JSON] §5.1 is why that is right
@@ -35,9 +35,9 @@ dependencies {
     api(project(":tson-schema"))
 
     // Named directly now -- `@Typename`, read off a resolved body to learn which constructor it instantiates
-    // -- and needed on the module path regardless, since `tson-bind` declares it `implementation` and that
+    // -- and needed on the module path regardless, since `ltr8-bind` declares it `implementation` and that
     // does not propagate. `tson-compiler` carries the same line.
-    implementation(project(":tson-annotation"))
+    implementation(project(":ltr8-annotation"))
 
     // Tests only, and one direction only. Producing a `TsonLinkedSchema` means parsing, resolving and
     // linking a schema document, which is `tson-compiler`'s and reached here through the `:tson` front door

@@ -23,8 +23,8 @@ class JsonMapReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/maps-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               counts    => { text => int32 }
               by_date   => { date => number }
@@ -84,7 +84,7 @@ class JsonMapReadTest {
         assertEquals("/not-a-date", refusal.path().orElseThrow());
     }
 
-    /** §3.2: nothing is reserved at a map position -- keys are data, not names. */
+    /** §3.2: the three mean nothing at a map position -- keys are data, not names. */
     @Test
     void aDollarInitialMemberIsAnOrdinaryKey() {
         assertEquals("""

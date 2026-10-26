@@ -6,21 +6,20 @@ import io.ltr8.tson.base.SourcePosition;
 
 /**
  * Bridge for {@link SourcePosition}, converting to/from a compact {@code "line:column:byteOffset"}
- * string -- same reasoning as {@code tson-bind}'s own {@code PatternStringBridge}: {@code
- * SourcePosition} is an interface with no {@code sealed}/{@code @Union} signal {@code tson-bind}
+ * string -- same reasoning as {@code ltr8-bind}'s own {@code PatternStringBridge}: {@code
+ * SourcePosition} is an interface with no {@code sealed}/{@code @Union} signal {@code ltr8-bind}
  * could auto-detect (and couldn't be given one even if this project wanted to -- {@code
- * schema.meta.TypeDefinition}'s own {@code position} field is typed {@code SourcePosition}
- * specifically so {@code tson-schema} never has to name {@link Position}, its own real
- * implementation, at all), so a caller registers this explicitly. Lives here, not {@code
- * tson-bind.bridge}, since -- unlike {@code Pattern}/{@code EnumStringBridge}'s own targets -- both
+ * schema.meta}'s positions are typed {@code SourcePosition} specifically so {@code tson-schema} never has to
+ * name {@link Position}, its own real implementation, at all), so a caller registers this explicitly. Lives here, not {@code
+ * ltr8-bind.bridge}, since -- unlike {@code Pattern}/{@code EnumStringBridge}'s own targets -- both
  * {@code SourcePosition} and {@link Position} are this project's own types, not generic reusable
  * ones.
  *
  * <p>{@link #toObject} always produces a real {@link Position} -- the only concrete {@code
- * SourcePosition} that exists anywhere in this codebase -- even though nothing currently reads a
- * {@code TypeDefinition} generically from data (only writes one, for test verification via {@code
- * TsonObjectWriter.toTson}); implementing the read direction correctly costs nothing and avoids
- * leaving a bridge that's only honest in one direction.
+ * SourcePosition} that exists anywhere in this codebase -- even though nothing currently reads a position
+ * generically from data (only writes one, for test verification via {@code TsonObjectWriter.toTson});
+ * implementing the read direction correctly costs nothing and avoids leaving a bridge that's only honest in one
+ * direction.
  */
 public final class SourcePositionStringBridge implements DataBridge<String, SourcePosition> {
 

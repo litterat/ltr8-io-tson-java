@@ -2,7 +2,8 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
+import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonReadContext;
 
 import java.util.List;
@@ -19,12 +20,13 @@ import java.util.List;
  * exactly the case the rule exists for -- advice to add a field already declared, when the fix is one character.
  *
  * <p><b>Two kinds of name reach here</b>, which is §9.4's reach and is narrower than it looks. A member name is
- * judged only when it is unmatched: one matching a declared field, or a {@code $type} naming a declared type,
- * carries that declaration's own verdict, given when the schema loaded. And a value whose type is an identifier
- * family is judged wherever it stands -- a member value, or a member name keying a map whose key type is one --
- * since the schema typed it as a name ({@link #refusesValue}). The schemaless bind reader checks every member
- * name instead, and is right to: there the target class is the schema and nothing judged its component names at
- * load.
+ * judged only when it is unmatched, and then only when it is a value of its record's name type, under that type's
+ * profile: one matching a declared field, or a {@code $type} naming a declared type, carries that declaration's own
+ * verdict, given when the schema loaded, and one that is no name of the type is no name. And a value whose type is
+ * an identifier family is judged wherever it stands -- a member value, or a member name keying a map whose key type
+ * is one -- since the schema typed it as a name ({@link #refusesValue}). The schemaless bind reader checks every
+ * member name instead, and is right to: there the target class is the schema and nothing judged its component names
+ * at load.
  */
 final class NameHygiene {
 
@@ -39,7 +41,15 @@ final class NameHygiene {
      * passes, which is every name of an ordinary document, where a capturing lambda allocates per name.
      */
     static boolean refuses(JsonReadContext ctx, String name) {
-        return judge(ctx, name, IdentifierProfile.NAME, true);
+        return judge(ctx, name, IdentifierGrammar.PROFILE, true);
+    }
+
+    /**
+     * The same judgement of an unmatched member name, under its record's name type's {@code profile}, whose
+     * added characters are its own ([TSON-SCHEMA] §5.2), reported at the member.
+     */
+    static boolean refusesMember(JsonReadContext ctx, String name, IdentifierProfile profile) {
+        return judge(ctx, name, profile, true);
     }
 
     /**

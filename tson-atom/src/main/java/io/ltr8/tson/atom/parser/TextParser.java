@@ -2,8 +2,8 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.base.unicode.Nfc;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Nfc;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.regex.IRegex;
 import io.ltr8.tson.schema.meta.TextType;
 import java.util.Optional;
@@ -64,7 +64,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
      */
     void validate(String text, String subject) {
         checkLengths(text, subject, constraints.length(), constraints.minLength(), constraints.maxLength());
-        // The pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
+        // The pattern is I-Regexp (RFC 9485), matched via ltr8-regex (linear-time, ReDoS-safe), not
         // java.util.regex; it was already validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!IRegex.parse(p).matches(text)) {

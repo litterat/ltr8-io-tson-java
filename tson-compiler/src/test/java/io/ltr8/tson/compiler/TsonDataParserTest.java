@@ -116,6 +116,23 @@ class TsonDataParserTest {
                 () -> parse("!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }"));
     }
 
+    /**
+     * §7.1: a token-initial {@code _} is the void sentinel, so {@code _id} is two tokens with no separator. The
+     * error is at either half, and says what was meant: a name, written quoted.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"{ _id: 1 }", "!_id 1", "[_id]", "{ a: 1  _b: 2 }"})
+    void aLeadingUnderscoreIsAParseErrorThatSaysToQuoteTheName(String source) {
+        String message = messageOf(source);
+        assertTrue(message.contains("cannot be written unquoted") && message.contains("quote it, \"_"), message);
+    }
+
+    /** The hint is only for a name: a sentinel separated from what follows is the sentinel, and its error is its own. */
+    @Test
+    void aSeparatedUnderscoreGetsNoNameHint() {
+        assertTrue(!messageOf("!_ x").contains("quote it"));
+    }
+
     @Test
     void multilineTokenAsDirectiveArgumentIsParseError() {
         assertThrows(ParseException.class, () -> parse("!!id:\"\"\"\nx\n\"\"\"\n_"));
@@ -758,18 +775,16 @@ class TsonDataParserTest {
     }
 
     /**
-     * A quoted field name still parses -- the production has two spellings and always did. What it is not is an
-     * escape hatch from the profile: a field name is an identifier however it was written (§2.5, §7.7), so
-     * quoting carries a name the unquoted form would misread and never a key that is not a name.
+     * A quoted field name parses whatever its text: what a field name may be is its record's to say
+     * ([TSON-DATA] §2.5), so the grammar admits any single-line token in name position and a reader judges it
+     * ({@code SchemalessTreeReaderTest} has the schemaless refusal).
      */
     @Test
-    void aSingleLineQuotedFieldNameIsStillMatchedAgainstTheProfile() {
+    void aSingleLineQuotedFieldNameParsesWhateverItsText() {
         RecordValue record = assertInstanceOf(RecordValue.class, root("{\"order-id\": 1}").coreValue());
         assertEquals("order-id", record.fields().get(0).name());
-
-        ParseException thrown = assertThrows(ParseException.class, () -> root("{\"first name\": 1}"));
-        assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("belongs in a map"), thrown.getMessage());
+        RecordValue spaced = assertInstanceOf(RecordValue.class, root("{\"first name\": 1}").coreValue());
+        assertEquals("first name", spaced.fields().get(0).name());
     }
 
     @Test

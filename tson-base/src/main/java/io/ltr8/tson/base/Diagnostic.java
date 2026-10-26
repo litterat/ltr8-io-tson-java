@@ -211,7 +211,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * would only be a fact the code already fixes, free to disagree with it.
      *
      * <p><b>{@code RESTRICTED_SCRIPT} is a script the policy does not admit, which is wider than a mix.</b>
-     * A script <em>combination</em> is the usual finding, and at {@code ScriptPolicy.Level.ASCII_ONLY}
+     * A script <em>combination</em> is the usual finding, and at {@code RestrictionLevel.ASCII_ONLY}
      * a single-script name is refused with nothing mixed at all -- so the code names what the policy would
      * not admit rather than what the text did, and pairs with {@code RESTRICTED_CHARACTER} as the two halves
      * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@code
@@ -407,7 +407,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          * this deployment's own policy, {@link #SCHEMA_NOT_PERMITTED} (what it holds and may fetch) and {@link
          * #SCHEMA_TOO_LARGE} ([TSON-SCHEMA] §11.2's size limit). Not a {@link #verdict()}, since one configured
          * otherwise may accept the same bytes, yet a rejection by <em>this</em> processor, which is the answer a
-         * sender asking "will it be accepted here" needs (SPEC-FEEDBACK.md #1). The other three fetch codes are
+         * sender asking "will it be accepted here" needs ([TSON-DATA] §8.1). The other three fetch codes are
          * what this processor <em>could not</em> obtain, and leave acceptance undetermined.
          */
         public boolean isRefusal() {

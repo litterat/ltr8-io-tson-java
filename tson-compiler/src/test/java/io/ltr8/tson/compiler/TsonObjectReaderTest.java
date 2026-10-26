@@ -51,6 +51,9 @@ class TsonObjectReaderTest {
 
     private final TsonObjectReader mapper = new TsonObjectReader();
 
+    /** The bound classes as the schema for tags -- what choosing a union member by name needs. */
+    private final TsonObjectReader hosted = mapper.withHostTypes();
+
     // ── Records ──────────────────────────────────────────────────────────
 
     public record Point(int x, int y) {
@@ -637,13 +640,42 @@ class TsonObjectReaderTest {
     void aTypeRefNamingTheTargetClassIsAccepted() throws DataBindException {
         // No @Typename anywhere: the simple class name matches case-insensitively, so a document tagged
         // with the type it actually is binds without every fixture having to be annotated.
-        assertEquals(new Point(1, 2), mapper.read("!point { x: 1  y: 2 }", Point.class));
-        assertEquals(new Point(1, 2), mapper.read("!Point { x: 1  y: 2 }", Point.class));
+        assertEquals(new Point(1, 2), hosted.read("!point { x: 1  y: 2 }", Point.class));
+        assertEquals(new Point(1, 2), hosted.read("!Point { x: 1  y: 2 }", Point.class));
     }
 
     @Test
     void aTypeRefNamingTheTargetsDeclaredTypenameIsAccepted() throws DataBindException {
-        assertEquals(new Square(2), mapper.read("!sq { side: 2 }", Square.class));
+        assertEquals(new Square(2), hosted.read("!sq { side: 2 }", Square.class));
+    }
+
+    /**
+     * Without host types a schemaless bind judges as {@code tson validate} does: {@code !point} names no
+     * built-in type, so it is {@code UNKNOWN_TYPE_REF} even into a {@code Point} -- and the message says how
+     * to make the class the schema for it.
+     */
+    @Test
+    void aTypeRefNamingTheTargetClassIsReportedWithoutHostTypes() {
+        ReadException thrown = assertThrows(ReadException.class, () -> mapper.read("!point { x: 1  y: 2 }", Point.class));
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, thrown.diagnostic().code());
+        assertTrue(thrown.diagnostic().message().contains("withHostTypes()"), thrown.diagnostic().message());
+    }
+
+    /** A union member is chosen by a tag naming it only where the classes are the schema for tags. */
+    @Test
+    void aUnionMemberTagIsReportedWithoutHostTypes() {
+        ReadException thrown = assertThrows(ReadException.class,
+                () -> mapper.read("{ shape: !circle { radius: 5 } }", ShapeHolder.class));
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, thrown.diagnostic().code());
+        assertTrue(thrown.diagnostic().message().contains("withHostTypes()"), thrown.diagnostic().message());
+    }
+
+    /** The schemaless controls compose: each derived reader keeps the others. */
+    @Test
+    void theSchemalessControlsCompose() throws DataBindException {
+        TsonObjectReader both = mapper.ignoringUnknownFields().withHostTypes().preservingUnknownTypeRefs();
+        assertEquals(new Point(1, 2), both.read("!point { x: 1  y: 2  z: 3 }", Point.class));
+        assertEquals(new Point(1, 2), both.read("!elsewhere { x: 1  y: 2 }", Point.class));
     }
 
     @Test
@@ -717,7 +749,7 @@ class TsonObjectReaderTest {
 
     // ── A target class this context cannot bind ──────────────────────────
 
-    /** An interface has no constructor to bind through, so {@code tson-bind} cannot produce a descriptor for it. */
+    /** An interface has no constructor to bind through, so {@code ltr8-bind} cannot produce a descriptor for it. */
     interface Unbindable {
     }
 
@@ -886,7 +918,7 @@ class TsonObjectReaderTest {
     @Test
     void builtinUuidAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
         // Unlike Rational/Complex, UUID isn't a Java record, so it doesn't collide with
-        // tson-bind's record auto-detection -- but it also can't self-declare @Atom (it's a JDK
+        // ltr8-bind's record auto-detection -- but it also can't self-declare @Atom (it's a JDK
         // class), so TsonObjectReader's default DataBindContext pre-registers it (see
         // AtomContext.defaultContext()) rather than requiring every caller to do so themselves.
         UuidHolder h = mapper.read("{ value: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 }", UuidHolder.class);
@@ -1027,7 +1059,7 @@ class TsonObjectReaderTest {
     @Test
     void aMembersSimpleClassNameStillDiscriminatesBehindTheVocabulary() throws DataBindException {
         assertEquals(CidrInet4Network.parse("10.0.0.0/8"),
-                mapper.read("{ value: !cidrinet4network \"10.0.0.0/8\" }", CidrHolder.class).value());
+                hosted.read("{ value: !cidrinet4network \"10.0.0.0/8\" }", CidrHolder.class).value());
     }
 
     /**
@@ -1289,14 +1321,14 @@ class TsonObjectReaderTest {
 
     @Test
     void unionMemberMatchedByCaseInsensitiveSimpleName() throws DataBindException {
-        ShapeHolder h = mapper.read("{ shape: !circle { radius: 5 } }", ShapeHolder.class);
+        ShapeHolder h = hosted.read("{ shape: !circle { radius: 5 } }", ShapeHolder.class);
         assertInstanceOf(Circle.class, h.shape());
         assertEquals(5, ((Circle) h.shape()).radius());
     }
 
     @Test
     void unionMemberMatchedByCaseInsensitiveSimpleNameOtherMember() throws DataBindException {
-        ShapeHolder h = mapper.read("{ shape: !rectangle { width: 3 height: 4 } }", ShapeHolder.class);
+        ShapeHolder h = hosted.read("{ shape: !rectangle { width: 3 height: 4 } }", ShapeHolder.class);
         assertInstanceOf(Rectangle.class, h.shape());
     }
 
@@ -1313,7 +1345,7 @@ class TsonObjectReaderTest {
 
     @Test
     void unionMemberMatchedByExplicitTypename() throws DataBindException {
-        NamedShapeHolder h = mapper.read("{ shape: !sq { side: 2 } }", NamedShapeHolder.class);
+        NamedShapeHolder h = hosted.read("{ shape: !sq { side: 2 } }", NamedShapeHolder.class);
         assertEquals(2, ((Square) h.shape()).side());
     }
 
@@ -1336,7 +1368,7 @@ class TsonObjectReaderTest {
     /**
      * <b>A member of an open union is found by name, not only once something else has registered it.</b>
      * Such a union starts with an empty member list and grows through {@code DataClassUnion.addMemberType},
-     * which every route reaching it holds a class or an instance for -- the writer, {@code tson-bind}'s
+     * which every route reaching it holds a class or an instance for -- the writer, {@code ltr8-bind}'s
      * mappers, and the analysis of the member itself. A read holds a name, so the list used to grow only as
      * a side effect: writing a {@code Hexagon} made the next read of {@code !hexagon} work and a process
      * that only ever read never got there. The same document, bound or refused by what else had happened
@@ -1353,7 +1385,7 @@ class TsonObjectReaderTest {
         assertEquals(0, ((DataClassUnion) fresh.getDescriptor(OpenShape.class)).memberTypes().length,
                 "nothing has registered a member yet, which is the case under test");
 
-        OpenShapeHolder read = new TsonObjectReader(fresh)
+        OpenShapeHolder read = new TsonObjectReader(fresh).withHostTypes()
                 .read("{ shape: !hexagon { sides: 6 } }", OpenShapeHolder.class);
 
         assertEquals(new Hexagon(6), read.shape());
@@ -1367,7 +1399,7 @@ class TsonObjectReaderTest {
                 .registerAtoms(AtomContext.hostTypes()).build();
         DiagnosticsCollector collected = new DiagnosticsCollector();
 
-        new TsonObjectReader(fresh).withDiagnostics(collected)
+        new TsonObjectReader(fresh).withHostTypes().withDiagnostics(collected)
                 .read("{ shape: !circle { radius: 5 } }", OpenShapeHolder.class);
 
         // `circle` names a real class; what fails is that this union does not admit it.

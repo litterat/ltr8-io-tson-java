@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.base.Diagnostic;
@@ -8,10 +9,10 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,11 +45,11 @@ class TsonSchemaCompilerTest {
         // A -> B -> A. Compiling "A" at all (without a StackOverflowError) is what this proves --
         // B's own field circles back to A while A is still mid-construction, exactly the edge
         // DeferredTypeReader exists for.
-        RecordBody bodyA = RecordBody.of(List.of(RecordField.required("b", TypeRef.of("B"))));
-        RecordBody bodyB = RecordBody.of(List.of(RecordField.required("a", TypeRef.of("A"))));
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("A", TypeDefinition.product(bodyA));
-        entries.put("B", TypeDefinition.product(bodyB));
+        RecordBody bodyA = RecordBody.of(RecordBody.fieldMap(Map.entry("b", RecordField.required(TypeRef.of("B")))));
+        RecordBody bodyB = RecordBody.of(RecordBody.fieldMap(Map.entry("a", RecordField.required(TypeRef.of("A")))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("A", bodyA);
+        entries.put("B", bodyB);
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
@@ -62,9 +62,10 @@ class TsonSchemaCompilerTest {
 
     @Test
     void directSelfReferenceCompilesWithoutStackOverflow() {
-        RecordBody selfReferencing = RecordBody.of(List.of(RecordField.required("child", TypeRef.of("Node"))));
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("Node", TypeDefinition.product(selfReferencing));
+        RecordBody selfReferencing =
+                RecordBody.of(RecordBody.fieldMap(Map.entry("child", RecordField.required(TypeRef.of("Node")))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("Node", selfReferencing);
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
@@ -75,15 +76,14 @@ class TsonSchemaCompilerTest {
 
     @Test
     void anEntryWithNoRegisteredFactoryDoesNotBlockCompilingTheRestOfTheSchemaButFailsOnlyWhenActuallyRead() {
-        // "orphan" is a meta-layer constructor's instance (EndpointBody) -- [TSON-SCHEMA] §2.2.2's extension
+        // "orphan" is an instance of a meta layer's own namespace type -- [TSON-SCHEMA] §2.2.2's extension
         // point, and the only kind of entry left that this library can build no reader for, every kernel and
         // meta constructor having one. TsonSchemaCompiler.compile() still builds the whole schema eagerly,
-        // including "orphan" itself (get("orphan") succeeds, unlike the old lazy behavior where it never got
-        // attempted at all until asked for); "used" (which never references "orphan") reads normally either
-        // way.
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
-        entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.DATA,  List.of(), List.of(), new EndpointBody("/search")));
+        // including "orphan" itself (get("orphan") succeeds); "used" (which never references "orphan") reads
+        // normally either way.
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("used", RecordBody.of(RecordBody.fieldMap()));
+        entries.put("orphan", new Namespace<>("endpoints", AnnotatedMap.of(Map.of("search", "/search"))));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
@@ -116,9 +116,9 @@ class TsonSchemaCompilerTest {
 
     @Test
     void getOnAnUnknownNameEnumeratesTheTypesTheSchemaDoesDeclare() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("first", TypeDefinition.product(RecordBody.of(List.of())));
-        entries.put("second", TypeDefinition.product(RecordBody.of(List.of())));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("first", RecordBody.of(RecordBody.fieldMap()));
+        entries.put("second", RecordBody.of(RecordBody.fieldMap()));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 

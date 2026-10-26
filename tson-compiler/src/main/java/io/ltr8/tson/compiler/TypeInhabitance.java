@@ -2,15 +2,22 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Scoped;
+import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.math.BigInteger;
@@ -58,12 +65,12 @@ final class TypeInhabitance {
      * The names some finite document can satisfy. Everything else in {@code namespace} is uninhabited --
      * {@link #cycleThrough} explains one such entry to its author.
      */
-    static Set<String> derive(Map<String, TypeDefinition> namespace) {
+    static Set<String> derive(Map<String, Top> namespace) {
         Set<String> inhabited = new HashSet<>();
         boolean changed = true;
         while (changed) {
             changed = false;
-            for (Map.Entry<String, TypeDefinition> entry : namespace.entrySet()) {
+            for (Map.Entry<String, Top> entry : namespace.entrySet()) {
                 if (!inhabited.contains(entry.getKey()) && isInhabited(entry.getValue(), namespace, inhabited)) {
                     inhabited.add(entry.getKey());
                     changed = true;
@@ -85,9 +92,17 @@ final class TypeInhabitance {
      * one as inhabited, and an application {@code tree<p0>} already depends on {@code tree} -- both fall out
      * of looking the reference's own name up.
      */
-    private static boolean isInhabited(TypeDefinition definition, Map<String, TypeDefinition> namespace,
+    private static boolean isInhabited(Top definition, Map<String, Top> namespace,
             Set<String> inhabited) {
-        return switch (definition.body()) {
+        // A held body is not walked: its element type and bounds are tokens that mean nothing until
+        // substitution supplies the arguments, so a template is inhabited here and the closure that does
+        // supply them is judged on its own -- it is an ordinary entry in this map by the time linking
+        // runs, materialisation having minted it. A template nobody applies is judged nowhere, which is
+        // the same answer §5.10's deferred checking gives everywhere else.
+        if (OpenEntry.isOpen(definition)) {
+            return true;
+        }
+        return switch (definition) {
             case RecordBody record -> recordInhabited(record, namespace, inhabited);
             case ArrayBody array -> array.voidable()
                     || isEmptyAllowed(array.minItems())
@@ -101,14 +116,15 @@ final class TypeInhabitance {
             // branches rather than conjoins, and the reason `(leaf | node)` survives a non-productive `node`.
             case ChoiceBody choice -> choice.variants().stream()
                     .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
+            // A kind's values are the names of its members, whatever the types they name admit, so it is
+            // inhabited exactly when linking found a member.
+            case KindBody kind -> !kind.memberNames().isEmpty();
+            case RefBody ignored -> true; // a name; what it reaches is the linker's judgement
             case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
-            // A held body is not walked: its element type and bounds are tokens that mean nothing until
-            // substitution supplies the arguments, so a template is inhabited here and the closure that does
-            // supply them is judged on its own -- it is an ordinary entry in this map by the time linking
-            // runs, materialisation having minted it. A template nobody applies is judged nowhere, which is
-            // the same answer §5.10's deferred checking gives everywhere else.
-            case TemplateBody ignored -> true;
-            default -> true; // an atom's own satisfiability is its family's question, not this one
+            case TemplateBody ignored -> true; // open, answered above
+            case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
+            case Scoped ignored -> true; // a scope's values name their own types
+            case Namespace<?> ignored -> true; // a value, which nothing is typed by
         };
     }
 
@@ -120,12 +136,13 @@ final class TypeInhabitance {
      * group's members uniformly optional in {@code fields}, with the requirement carried by the group's own
      * {@code optional}. Reading only the field list would find nothing required and call every group satisfied.
      */
-    private static boolean recordInhabited(RecordBody record, Map<String, TypeDefinition> namespace,
+    private static boolean recordInhabited(RecordBody record, Map<String, Top> namespace,
             Set<String> inhabited) {
         Set<String> grouped = new HashSet<>();
         record.groups().forEach(group -> grouped.addAll(group.memberNames()));
-        for (RecordField field : record.fields()) {
-            if (grouped.contains(field.name()) || demandsNothing(field)) {
+        for (Map.Entry<String, RecordField> entry : record.fields().entrySet()) {
+            RecordField field = entry.getValue();
+            if (grouped.contains(entry.getKey()) || demandsNothing(field)) {
                 continue;
             }
             if (!satisfiable(field, namespace, inhabited)) {
@@ -146,7 +163,7 @@ final class TypeInhabitance {
      * not mark {@code ?}, and at least one member, so an option whose members are all marked needs one of them.
      */
     private static boolean choosable(List<String> option, FieldGroup group, RecordBody record,
-            Map<String, TypeDefinition> namespace, Set<String> inhabited) {
+            Map<String, Top> namespace, Set<String> inhabited) {
         boolean anyStated = false;
         for (String member : option) {
             boolean stated = memberSatisfiable(member, record, namespace, inhabited);
@@ -159,10 +176,10 @@ final class TypeInhabitance {
     }
 
     /** The member's field can be stated; a member naming no field is the linker's to report, and counts as one. */
-    private static boolean memberSatisfiable(String member, RecordBody record, Map<String, TypeDefinition> namespace,
+    private static boolean memberSatisfiable(String member, RecordBody record, Map<String, Top> namespace,
             Set<String> inhabited) {
-        return record.fields().stream().filter(field -> field.name().equals(member)).findFirst()
-                .map(field -> satisfiable(field, namespace, inhabited)).orElse(true);
+        RecordField field = record.fields().get(member);
+        return field == null || satisfiable(field, namespace, inhabited);
     }
 
     /**
@@ -179,7 +196,7 @@ final class TypeInhabitance {
      * type. {@code void}'s only value is {@code _}, so a {@code void} field that is not voidable can be stated
      * by nothing -- {@code a: void} empties its record, where {@code a?: void} empties only the field.
      */
-    private static boolean satisfiable(RecordField field, Map<String, TypeDefinition> namespace,
+    private static boolean satisfiable(RecordField field, Map<String, Top> namespace,
             Set<String> inhabited) {
         if (field.voidable()) {
             return true;
@@ -188,7 +205,7 @@ final class TypeInhabitance {
                 && refInhabited(field.type(), namespace, inhabited);
     }
 
-    private static boolean positionInhabited(TupleElement element, Map<String, TypeDefinition> namespace,
+    private static boolean positionInhabited(TupleElement element, Map<String, Top> namespace,
             Set<String> inhabited) {
         return element.voidable()
                 || refInhabited(element.elementType(), namespace, inhabited);
@@ -208,7 +225,7 @@ final class TypeInhabitance {
      * TsonSchemaLinker.validateEntry} has already reported against this very entry -- calling it uninhabited
      * too would report the same defect twice, in words that name a different problem.
      */
-    private static boolean refInhabited(TypeRef ref, Map<String, TypeDefinition> namespace,
+    private static boolean refInhabited(TypeRef ref, Map<String, Top> namespace,
             Set<String> inhabited) {
         return !namespace.containsKey(ref.name()) || inhabited.contains(ref.name());
     }
@@ -218,7 +235,7 @@ final class TypeInhabitance {
      * diagnostic. Walks the demands the rules above make -- the parts a value cannot do without -- so the
      * chain shown is the one that actually has to be broken.
      */
-    static List<String> cycleThrough(String name, Map<String, TypeDefinition> namespace,
+    static List<String> cycleThrough(String name, Map<String, Top> namespace,
             Set<String> inhabited) {
         List<String> chain = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
@@ -245,12 +262,13 @@ final class TypeInhabitance {
      * the group matters because its members are optional in {@code fields}, so a chain that walked only
      * required fields would stop at the record and explain nothing.
      */
-    private static String recordDependency(RecordBody record, Map<String, TypeDefinition> namespace,
+    private static String recordDependency(RecordBody record, Map<String, Top> namespace,
             Set<String> inhabited) {
         Set<String> grouped = new HashSet<>();
         record.groups().forEach(group -> grouped.addAll(group.memberNames()));
-        for (RecordField field : record.fields()) {
-            if (!grouped.contains(field.name()) && !demandsNothing(field)
+        for (Map.Entry<String, RecordField> entry : record.fields().entrySet()) {
+            RecordField field = entry.getValue();
+            if (!grouped.contains(entry.getKey()) && !demandsNothing(field)
                     && !satisfiable(field, namespace, inhabited)) {
                 return field.type().name();
             }
@@ -259,18 +277,18 @@ final class TypeInhabitance {
                 .filter(group -> !group.optional() && group.members().stream()
                         .noneMatch(option -> choosable(option, group, record, namespace, inhabited)))
                 .flatMap(group -> group.memberNames().stream())
-                .flatMap(member -> record.fields().stream().filter(field -> field.name().equals(member)))
+                .flatMap(member -> java.util.Optional.ofNullable(record.fields().get(member)).stream())
                 .filter(field -> !satisfiable(field, namespace, inhabited))
                 .map(field -> field.type().name()).findFirst().orElse(null);
     }
 
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */
-    private static String firstUnsatisfiedDependency(TypeDefinition definition,
-            Map<String, TypeDefinition> namespace, Set<String> inhabited) {
-        if (definition == null) {
-            return null;
+    private static String firstUnsatisfiedDependency(Top definition,
+            Map<String, Top> namespace, Set<String> inhabited) {
+        if (definition == null || OpenEntry.isOpen(definition)) {
+            return null; // an open entry is inhabited, as isInhabited says
         }
-        return switch (definition.body()) {
+        return switch (definition) {
             case RecordBody record -> recordDependency(record, namespace, inhabited);
             case ArrayBody array -> refInhabited(array.elementType(), namespace, inhabited)
                     ? null : array.elementType().name();
@@ -281,7 +299,11 @@ final class TypeInhabitance {
                     .map(element -> element.elementType().name()).findFirst().orElse(null);
             case Reference reference -> refInhabited(reference.target(), namespace, inhabited)
                     ? null : reference.target().name();
-            default -> null; // a choice fails on every variant at once, so no single link continues the chain
+            // A choice fails on every variant at once, so no single link continues the chain; the rest name none.
+            case Sum ignored -> null;
+            case Atom ignored -> null;
+            case TemplateBody ignored -> null;
+            case Namespace<?> ignored -> null;
         };
     }
 }

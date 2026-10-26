@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 /**
  * Builds the {@link TsonTypeReader} for one resolved schema entry -- the unit of work {@link
@@ -10,10 +10,10 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * *declaration's* own name, not necessarily the constructor's -- they coincide only for a
  * meta-schema's own declarations (e.g. {@code "record"} itself); every other real declaration's own
  * name differs from its constructor (e.g. {@code "float32"} constructed via {@code "float_type"}).
- * {@code typeDefinition} is that declaration's own fully-resolved {@link TypeDefinition}; {@code context}
+ * {@code typeDefinition} is that declaration's own fully-resolved {@link Top}; {@code context}
  * carries the compilation environment beyond this one entry -- the whole schema (for reaching sibling
  * entries) and the reader resolution a composite implementation calls for its own child readers.
  */
 public interface ValueReaderFactory {
-    TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context);
+    TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context);
 }

@@ -28,7 +28,7 @@ final class Tags {
      *
      * @param what how the position describes itself: {@link #RECORD} or {@link #CHOICE}
      */
-    static boolean refusesScope(JsonReadContext ctx, ReservedMembers.Lead lead, String displayName, String what) {
+    static boolean refusesScope(JsonReadContext ctx, TagMembers.Lead lead, String displayName, String what) {
         if (!lead.schema()) {
             return false;
         }
@@ -44,9 +44,9 @@ final class Tags {
      * the model never opted into.
      */
     static void refuseScope(JsonReadContext ctx, String displayName, String what) {
-        ctx.field(ReservedMembers.SCHEMA).report(Diagnostic.Code.SCOPE_NOT_ADMITTED,
+        ctx.field(TagMembers.SCHEMA).report(Diagnostic.Code.SCOPE_NOT_ADMITTED,
                 "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
                         + "-- '" + displayName + "' " + what, "no $schema at this position",
-                ReservedMembers.SCHEMA);
+                TagMembers.SCHEMA);
     }
 }

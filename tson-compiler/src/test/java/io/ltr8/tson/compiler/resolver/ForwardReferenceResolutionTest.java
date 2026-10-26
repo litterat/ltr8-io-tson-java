@@ -5,7 +5,8 @@ import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -23,7 +24,7 @@ class ForwardReferenceResolutionTest {
     private static TsonSchema resolve(String body) {
         String document = """
                 !!id:"https://example.test/fwd.tn"
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                 """ + body + "\n}\n";
         SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
@@ -35,10 +36,10 @@ class ForwardReferenceResolutionTest {
         // employee is declared *before* person, the supertype it composes -- fails under strict source order.
         TsonSchema resolved = resolve("  employee => person & { }\n  person => { }");
 
-        TypeDefinition employee = resolved.entries().get("employee");
+        Top employee = resolved.entries().get("employee");
         assertNotNull(employee);
-        assertTrue(employee.supertypes().contains("person"),
-                () -> "employee should compose person; supertypes=" + employee.supertypes());
+        assertTrue(TypeChain.supertypesOf(employee).contains("person"),
+                () -> "employee should compose person; supertypes=" + TypeChain.supertypesOf(employee));
     }
 
     @Test

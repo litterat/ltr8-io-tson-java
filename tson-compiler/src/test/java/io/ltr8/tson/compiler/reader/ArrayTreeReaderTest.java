@@ -13,8 +13,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -38,12 +37,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ArrayTreeReaderTest {
 
-    private static TypeDefinition integerEntry() {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(), IntegerType.UNCONSTRAINED);
+    private static Top integerEntry() {
+        return IntegerType.UNCONSTRAINED;
     }
 
-    private static TsonCompiledSchema compile(Map<String, TypeDefinition> extraEntries) {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+    private static TsonCompiledSchema compile(Map<String, Top> extraEntries) {
+        Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry());
         entries.putAll(extraEntries);
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
@@ -60,7 +59,7 @@ class ArrayTreeReaderTest {
 
     @Test
     void readsAPlainArrayOfIntegers() {
-        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer")))));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", ArrayBody.of(TypeRef.of("integer"))));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO, BigInteger.valueOf(3)),
                 readArray(compiled, "numbers", "[1 2 3]"));
@@ -68,7 +67,7 @@ class ArrayTreeReaderTest {
 
     @Test
     void emptyArrayReadsAsEmptyList() {
-        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer")))));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", ArrayBody.of(TypeRef.of("integer"))));
 
         assertEquals(List.of(), readArray(compiled, "numbers", "[]"));
     }
@@ -77,7 +76,7 @@ class ArrayTreeReaderTest {
     void minItemsRejectsAShorterArray() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
                 Optional.of(BigInteger.TWO), Optional.empty());
-        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
         assertThrows(ReadException.class, () -> readArray(compiled, "numbers", "[1]"));
@@ -87,7 +86,7 @@ class ArrayTreeReaderTest {
     void maxItemsRejectsALongerArray() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
                 Optional.empty(), Optional.of(BigInteger.TWO));
-        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
         assertThrows(ReadException.class, () -> readArray(compiled, "numbers", "[1 2 3]"));
@@ -97,7 +96,7 @@ class ArrayTreeReaderTest {
     void uniqueItemsRejectsADuplicateDecodedElement() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, true,
                 Optional.empty(), Optional.empty());
-        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
         assertThrows(ReadException.class, () -> readArray(compiled, "numbers", "[1 2 1]"));
@@ -112,7 +111,7 @@ class ArrayTreeReaderTest {
     void aDuplicateElementIsReportedAsItsValueNotAsATreeNodesComponents() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, true,
                 Optional.empty(), Optional.empty());
-        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", body));
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         compiled.get("numbers").read(TestDocuments.document("[1 2 1]", problems));
@@ -126,7 +125,7 @@ class ArrayTreeReaderTest {
     void aVoidableElementToleratesTheVoidSentinel() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), true, true, false,
                 Optional.empty(), Optional.empty());
-        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         List<Object> result = readArray(compiled, "numbers", "[1 _ 3]");
         assertEquals(BigInteger.ONE, result.get(0));
@@ -138,17 +137,17 @@ class ArrayTreeReaderTest {
     void aNonVoidableElementRejectsTheVoidSentinel() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
                 Optional.empty(), Optional.empty());
-        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         assertThrows(ReadException.class, () -> readArray(compiled, "numbers", "[1 _ 3]"));
     }
 
     @Test
     void arrayFieldNestedInsideARecordReadsCorrectly() {
-        Map<String, TypeDefinition> extra = new LinkedHashMap<>();
-        extra.put("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer"))));
-        extra.put("holder", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("items", TypeRef.of("numbers"))))));
+        Map<String, Top> extra = new LinkedHashMap<>();
+        extra.put("numbers", ArrayBody.of(TypeRef.of("integer")));
+        extra.put("holder", RecordBody.of(RecordBody.fieldMap(Map.entry("items",
+                RecordField.required(TypeRef.of("numbers"))))));
         TsonCompiledSchema compiled = compile(extra);
 
         @SuppressWarnings("unchecked")

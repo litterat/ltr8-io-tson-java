@@ -5,7 +5,6 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TemplateBody;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,8 +32,8 @@ class TemplateDiscriminatorTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/template-discriminator.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -56,17 +55,17 @@ class TemplateDiscriminatorTest {
      * already named the same application.
      */
     private static String target(TsonCompiledSchema compiled, String alias) {
-        return compiled.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
                 ? ref.target().name() : alias;
     }
 
     private static RecordBody bodyOf(TsonCompiledSchema compiled, String entry) {
-        return (RecordBody) compiled.schema().entries().get(entry).body();
+        return (RecordBody) compiled.schema().entries().get(entry);
     }
 
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
-        return bodyOf(compiled, entry).fields().stream()
-                .filter(f -> f.name().equals(field)).findFirst().orElseThrow();
+        return bodyOf(compiled, entry).fields().entrySet().stream()
+                .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     private static final String FAMILY = """
@@ -85,16 +84,16 @@ class TemplateDiscriminatorTest {
     void theHeldBodyNamesTheSelector() {
         TsonCompiledSchema compiled = compile(FAMILY);
 
-        TemplateBody held = (TemplateBody) compiled.schema().entries().get("pet").body();
+        RecordBody base = bodyOf(compiled, "pet");
 
-        assertEquals(List.of("type"), held.discriminators(),
-                () -> "the field the author marked survives into the held body: " + held.template());
+        assertEquals(List.of("type"), base.discriminators(),
+                () -> "the field the author marked survives onto the open record: " + base);
     }
 
     /**
      * <b>And the instantiation names none, because it has pinned the selector.</b> Which field a family
      * dispatches on is the base's statement; a member restates the selector to pin it and carries the value
-     * instead, so fixation is where the statement stops (§5.2). A member naming one would fail the rule its
+     * instead, so closing is where the statement stops (§5.2). A member naming one would fail the rule its
      * own closing created -- {@code abstract} does not travel either.
      */
     @Test

@@ -15,44 +15,48 @@ import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.IriType;
-import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.ComplexType;
 import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.FamilySelectors;
+import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.Ipv4Type;
-import io.ltr8.tson.schema.meta.Ipv6Type;
-import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.Ipv4Type;
+import io.ltr8.tson.schema.meta.Ipv6Type;
+import io.ltr8.tson.schema.meta.IriType;
+import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.RegexType;
+import io.ltr8.tson.schema.meta.ScopeKind;
+import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueType;
-import io.ltr8.tson.schema.meta.ScopeKind;
-import io.ltr8.tson.schema.meta.Scoped;
+import io.ltr8.tson.base.ParseException;
+import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -73,7 +77,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Writes resolved values through plain {@code TsonObjectWriter.toTson} -- no hand-written
  * schema-model writer at all -- deliberately, to validate the {@code io.ltr8.tson.schema.meta}
  * model is built from ordinary, idiomatic Java (records, sealed interfaces, enums, {@code
- * Optional}) that {@code tson-bind}'s generic introspection already knows how to bind, rather than
+ * Optional}) that {@code ltr8-bind}'s generic introspection already knows how to bind, rather than
  * a shape that happens to work only because a bespoke writer papered over it.
  *
  * <p>What this confirms works with zero extra code: {@code Top}'s sealed-interface variants
@@ -85,30 +89,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>What it also surfaces, honestly: generic binding produces output that is structurally
  * equivalent to, but textually more verbose than, {@code meta-kernel-resolved.tn}'s own
- * hand-authored style -- no outer {@code !type_definition} tag (plain records, unlike union
+ * hand-authored style -- no {@code !record} tag at the root (plain records, unlike union
  * members, never self-announce a type-ref), quoted strings where the fixture writes bare tokens
  * (an enum's bridge produces a {@code String}, and {@code TsonObjectWriter} always quotes strings --
  * already true, and already documented, for every other enum this codebase binds), every
  * empty-list/false/{@code REQUIRED}-at-default field written out rather than omitted ({@code
- * Optional.empty()}/{@code null} are the only things generic binding omits), and {@code TypeRef}
- * always in its full {@code { name: ... arguments: [...] } } form, never Part 2 §5.6's positional
- * bare-token spelling (a schema-specific encoding convention plain {@code TsonObjectWriter}, a
- * Part-1-only binder, has no reason to know about). None of these are wrong -- same value, just a
+ * Optional.empty()}/{@code null} are the only things generic binding omits). A {@code TypeRef} with no
+ * arguments writes as its bare name, §8.1's positional spelling; one with arguments keeps the explicit
+ * record. None of these are wrong -- same value, just a
  * different spelling -- so the assertions below check the real, current {@code toTson} output
  * exactly, not a hand-massaged approximation of the fixture's own terser conventions.
  */
 class DefinitionResolverTest {
 
     private static final String EXPECTED_INTEGER_SIZE =
-            "{ supertypes: [] subtypes: [] "
-                    + "body: !record { supertypes: [] fields: [ "
-                    + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } "
-                    + "optional: false voidable: false role: \"FREE\" "
-                    + "} "
-                    + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } "
-                    + "optional: false voidable: false role: \"FREE\" "
-                    + "} "
-                    + "] groups: [] extension: \"OPEN\" discriminators: [] } }";
+            "{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { bits => { type: integer optional: false "
+                    + "voidable: false role: \"FREE\" } signed => { type: boolean optional: false voidable: false "
+                    + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }";
 
     /**
      * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
@@ -116,8 +113,8 @@ class DefinitionResolverTest {
      * about the kernel's own field types -- keep the plainer spelling.
      */
     private static final String EXPECTED_FIXTURE_INTEGER_SIZE =
-            EXPECTED_INTEGER_SIZE.replace("{ name: \"bits\" type: { name: \"integer\"",
-                    "{ name: \"bits\" type: { name: \"non_negative_integer\"");
+            EXPECTED_INTEGER_SIZE.replace("bits => { type: integer ",
+                    "bits => { type: non_negative_integer ");
 
     /** Throws if ever actually invoked -- most tests below never reach {@code Instance}/{@code AtomRefinement} binding at all; the ones that do build their own {@link DefinitionResolver} wrapping a real compiled reader instead of using this field. */
     private static final DefinitionMetaReader NEVER_CALLED = (type, value) -> {
@@ -136,38 +133,48 @@ class DefinitionResolverTest {
      * {@code PER_METHOD} lifecycle gives every {@code @Test} method its own fresh instance of this
      * class, so this field starts empty at the top of every test.
      */
-    private final Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+    private final Map<String, Top> resolved = new LinkedHashMap<>();
 
     private final DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, resolved::get);
     private final TsonObjectWriter mapper = new TsonObjectWriter();
 
     private static DefinitionResolver definitionResolverFor(TsonCompiledMetaSchema metaParser, DefinitionGetter definitionGetter) {
-        return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type)
-                        .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
-                                IdentifierPolicy.none())),
-                metaParser.schema().entries()::get, definitionGetter);
+        return definitionResolverFor(metaParser, definitionGetter, new LinkedHashMap<>());
     }
 
-    private String write(TypeDefinition value) throws DataBindException {
+    /** The same, recording each entry's facts into {@code facts}, which outlives the resolver. */
+    private static DefinitionResolver definitionResolverFor(TsonCompiledMetaSchema metaParser,
+            DefinitionGetter definitionGetter, Map<String, TsonSchema.EntryFacts> facts) {
+        return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type)
+                        .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
+                                IdentifierPolicy.none())), null,
+                metaParser.schema().entries()::get, definitionGetter, null, SchemaPositions.none(), facts,
+                n -> true, metaParser.compiledSchema()::isKernel);
+    }
+
+    /** The facts {@link #resolveSnippet} and {@link #resolveSnippetsAgainstMetaKernel} recorded. */
+    private final Map<String, TsonSchema.EntryFacts> snippetFacts = new LinkedHashMap<>();
+
+    private String write(Top value) throws DataBindException {
         return mapper.toTson(value);
     }
 
     // ── DefinitionResolver: the one construct it resolves so far ──────────────
 
 
-    /** How a parameter whose type is still the provisional {@code type_ref} is written. */
+    /** How a type parameter is written: its {@code type} is {@code type_kind}, the kind of the types. */
     private static String typeParameter(String name) {
-        return "{ name: \"" + name + "\" type: { name: \"type_ref\" arguments: [] } }";
+        return "{ name: \"" + name + "\" type: type_kind }";
     }
 
     @Test
     void resolvesAFreshRecordWithPlainRequiredFields() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { integer_size => { bits: integer  signed: boolean } }""").parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
 
-        TypeDefinition resolved = resolver.resolve(declaration);
+        Top resolved = resolver.resolve(declaration);
 
         assertEquals(EXPECTED_INTEGER_SIZE, write(resolved));
     }
@@ -177,7 +184,7 @@ class DefinitionResolverTest {
         SchemaDocument doc = new TsonSchemaParser(readFixture()).parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
 
-        TypeDefinition resolved = resolver.resolve(declaration);
+        Top resolved = resolver.resolve(declaration);
 
         assertEquals(EXPECTED_FIXTURE_INTEGER_SIZE, write(resolved));
     }
@@ -188,7 +195,7 @@ class DefinitionResolverTest {
         // resolving a whole document, in source order, is this loop, matching
         // SchemaResolver#resolveSchema's own production loop.
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   integer_size => { bits: integer  signed: boolean }
                   point => { x: integer  y: integer }
@@ -215,19 +222,19 @@ class DefinitionResolverTest {
     @Test
     void structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   integer_size => { bits: integer  signed: boolean }
                   point => { x: integer  y: integer }
                 }""").parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
-        Map<String, TypeDefinition> irrelevantStructureNamespace =
-                Map.of("unrelated", TypeDefinition.reference("token"));
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        Map<String, Top> irrelevantStructureNamespace =
+                Map.of("unrelated", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("token")));
+        Map<String, Top> entries = new LinkedHashMap<>();
         DefinitionResolver resolverWithIrrelevantNamespace =
                 new DefinitionResolver(NEVER_CALLED, irrelevantStructureNamespace::get, entries::get);
 
-        TypeDefinition viaResolve = resolverWithIrrelevantNamespace.resolve(declaration);
+        Top viaResolve = resolverWithIrrelevantNamespace.resolve(declaration);
         assertEquals(EXPECTED_INTEGER_SIZE, write(viaResolve));
 
         for (SchemaMap.Declaration decl : doc.body().declarations().values()) {
@@ -243,66 +250,56 @@ class DefinitionResolverTest {
 
     @Test
     void writesAValueTypeBody() throws DataBindException {
-        // Structurally: value => !type_definition { source: value_type body: !value_type {} }
-        TypeDefinition value = new TypeDefinition(Optional.of(TypeRef.of("value_type")), TypeKind.ATOM,
-                List.of(), List.of(), new ValueType());
+        // Structurally: value => !value_type {}
+        Top value = new ValueType();
 
-        assertEquals("{ source: { name: \"value_type\" arguments: [] } "
-                + "supertypes: [] subtypes: [] body: !value_type {} }", write(value));
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } }", write(value));
     }
 
     @Test
     void writesAnEnumBody() throws DataBindException {
-        // Structurally: boolean => !type_definition { source: enum body: !enum { type: identifier  members: [...] } }
-        TypeDefinition booleanDef = new TypeDefinition(Optional.of(TypeRef.of("enum")), TypeKind.ATOM,
-                 List.of(), List.of(), new EnumBody(List.of("true", "false")));
+        // Structurally: boolean => !enum { name_type: identifier  members: [...] }
+        Top booleanDef = new EnumBody(List.of("true", "false"));
 
-        assertEquals("{ source: { name: \"enum\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] body: !enum { type: \"identifier\" "
-                        + "members: [ \"true\" \"false\" ] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } name_type: \"identifier\" members: [ \"true\" "
+                + "\"false\" ] }",
                 write(booleanDef));
     }
 
     @Test
     void writesAChoiceBody() throws DataBindException {
         // No user choice type is declared in meta-kernel itself; this checks binding mechanics only.
-        TypeDefinition choice = TypeDefinition.product(
-                new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone"))));
+        Top choice = new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone")));
 
-        assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !choice { variants: [ { name: \"email\" arguments: [] } { name: \"phone\" arguments: [] } ] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } variants: [ email phone ] }",
                 write(choice));
     }
 
     @Test
     void writesAnArrayBody() throws DataBindException {
-        TypeDefinition intList = TypeDefinition.product(ArrayBody.of(TypeRef.of("integer")));
+        Top intList = ArrayBody.of(TypeRef.of("integer"));
 
-        assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !array { element_type: { name: \"integer\" arguments: [] } voidable: false "
-                        + "ordered: true unique_items: false } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } element_type: integer voidable: false "
+                        + "ordered: true unique_items: false }",
                 write(intList));
     }
 
     @Test
     void writesAMapBody() throws DataBindException {
-        TypeDefinition translations = TypeDefinition.product(MapBody.of(TypeRef.of("text"), TypeRef.of("text")));
+        Top translations = MapBody.of(TypeRef.of("text"), TypeRef.of("text"));
 
-        assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !map { key_type: { name: \"text\" arguments: [] } value_type: { name: \"text\" arguments: [] } "
-                        + "voidable: false ordered: false } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } key_type: text value_type: text voidable: "
+                + "false ordered: false }",
                 write(translations));
     }
 
     @Test
     void writesATupleBody() throws DataBindException {
-        TypeDefinition point = TypeDefinition.product(new TupleBody(List.of(
-                TupleElement.required(TypeRef.of("number")), TupleElement.required(TypeRef.of("number")))));
+        Top point = new TupleBody(List.of(
+                TupleElement.required(TypeRef.of("number")), TupleElement.required(TypeRef.of("number"))));
 
-        assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !tuple { elements: [ "
-                        + "{ element_type: { name: \"number\" arguments: [] } voidable: false } "
-                        + "{ element_type: { name: \"number\" arguments: [] } voidable: false } ] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } elements: [ { element_type: number voidable: "
+                        + "false } { element_type: number voidable: false } ] }",
                 write(point));
     }
 
@@ -314,113 +311,95 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesTopAsAFreshEmptyRecord() throws IOException, DataBindException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = kernelDeclarations();
 
-        TypeDefinition top = resolver.resolve(schemaMap.declarations().get("top"));
+        Top top = resolver.resolve(schemaMap.declarations().get("top"));
 
-        assertEquals(TypeKind.PRODUCT, top.kind());
-        assertEquals(List.of(), top.supertypes());
-        assertEquals("{ supertypes: [] subtypes: [] "
-                + "body: !record { supertypes: [] fields: [] groups: [] extension: \"OPEN\" "
-                + "discriminators: [] } }", write(top));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(top, n -> true));
+        assertEquals(List.of(), TypeChain.supertypesOf(top));
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: {} groups: [] extension: \"ABSTRACT\" "
+                + "discriminators: [] parameters: [] }",
+                write(top));
     }
 
     @Test
     void resolvesAtomProductSumAndReferenceByComposingWithTop() throws IOException, DataBindException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
 
-        TypeDefinition atom = resolver.resolve(schemaMap.declarations().get("atom"));
+        Top atom = resolver.resolve(schemaMap.declarations().get("atom"));
         resolved.put("atom", atom);
-        TypeDefinition product = resolver.resolve(schemaMap.declarations().get("product"));
+        Top product = resolver.resolve(schemaMap.declarations().get("product"));
         resolved.put("product", product);
-        TypeDefinition sum = resolver.resolve(schemaMap.declarations().get("sum"));
+        Top sum = resolver.resolve(schemaMap.declarations().get("sum"));
         resolved.put("sum", sum);
-        TypeDefinition reference = resolver.resolve(schemaMap.declarations().get("reference"));
+        Top reference = resolver.resolve(schemaMap.declarations().get("reference"));
         resolved.put("reference", reference);
 
         // §4.1: atom/product/sum are each kind PRODUCT -- their own transitive chain is just
-        // [top], which contains none of the three literal base-kind names, so the structural
-        // default applies even to the base kinds' own entries.
-        assertEquals(TypeKind.PRODUCT, atom.kind());
-        assertEquals(TypeKind.PRODUCT, product.kind());
-        assertEquals(TypeKind.PRODUCT, sum.kind());
-        assertEquals(TypeKind.PRODUCT, reference.kind());
-        assertEquals(List.of("top"), atom.supertypes());
-        assertEquals(List.of("top"), product.supertypes());
-        assertEquals(List.of("top"), sum.supertypes());
-        assertEquals(List.of("top"), reference.supertypes());
+        // [type, top], which contains none of the three literal base-kind names, so the structural
+        // default applies even to the base kinds' own entries. They compose with `type`; reference with top.
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(atom, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(product, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(sum, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(reference, n -> true));
+        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(atom));
+        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(product));
+        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(sum));
+        assertEquals(List.of("top"), TypeChain.supertypesOf(reference));
 
-        // atom, sum: empty trailing body, no fields inherited from top (which has none) -- just the composition itself.
-        assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
-                + "extension: \"OPEN\" discriminators: [] } }", write(atom));
-        assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
-                + "extension: \"OPEN\" discriminators: [] } }", write(sum));
+        // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
+        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
+                + "chain => { type: type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
+                + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(atom));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
+                + "chain => { type: type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
+                + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(sum));
 
-        // product: two brand-new fields added by the trailing body (top contributes none).
-        assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
-                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                + "optional: false voidable: false role: \"FREE\" "
-                + "} "
-                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                + "optional: false voidable: false role: \"FREE\" "
-                + "} "
-                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(product));
+        // product: two brand-new fields added by the trailing body (type contributes none).
+        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
+                + "chain => { type: type_chain optional: true voidable: false role: \"FREE\" } access_pattern => "
+                + "{ type: product_access_type optional: false voidable: false role: \"FREE\" } size_type => { type: "
+                + "product_size_type optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
+                + "\"ABSTRACT\" discriminators: [] parameters: [] }", write(product));
 
         // reference: one brand-new field.
-        assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
-                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } "
-                + "optional: false voidable: false role: \"FREE\" } "
-                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(reference));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" ] subtypes: [] } fields: { target => { "
+                + "type: type_ref optional: false "
+                + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
+                        write(reference));
     }
 
     // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
 
     @Test
     void resolvesIntegerTypeWithFieldGroupsAndOptionalFields() throws IOException, DataBindException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
 
-        TypeDefinition integerType = resolver.resolve(schemaMap.declarations().get("integer_type"));
+        Top integerType = resolver.resolve(schemaMap.declarations().get("integer_type"));
 
         // ~atom & {...} -- propagates straight from the "~" marker; kind: ATOM
         // because "atom" (the literal base-kind name) is in integer_type's own transitive chain.
-        assertTrue(integerType.supertypes().contains("top"), "a constructor: IS-A top");
-        assertEquals(TypeKind.ATOM, integerType.kind());
-        assertEquals(List.of("atom", "top"), integerType.supertypes());
+        assertTrue(TypeChain.supertypesOf(integerType).contains("top"), "a constructor: IS-A top");
+        assertEquals(EntryKind.ATOM, EntryKind.of(integerType, n -> true));
+        assertEquals(List.of("atom", "top", "type"), TypeChain.supertypesOf(integerType));
 
-        assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} ] "
-                        + "groups: [ "
-                        + "{ members: [ [ \"min\" ] [ \"exclusive_min\" ] ] optional_members: [] optional: true } "
-                        + "{ members: [ [ \"max\" ] [ \"exclusive_max\" ] ] optional_members: [] optional: true } "
-                        + "] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
+                        + "fields: { chain => { type: type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "size => { type: integer_size optional: true voidable: false role: \"FREE\" } min => { "
+                        + "type: integer optional: true voidable: false role: \"FREE\" } exclusive_min => { type: "
+                        + "integer optional: true voidable: false role: \"FREE\" } max => { type: integer optional: "
+                        + "true voidable: false role: \"FREE\" } exclusive_max => { type: integer optional: true "
+                        + "voidable: false role: \"FREE\" } multiple_of => { type: non_negative_integer optional: "
+                        + "true voidable: false role: \"FREE\" } members => { type: integer_member_set optional: "
+                        + "true voidable: false role: \"FREE\" } } groups: [ { members: [ [ \"min\" ] [ "
+                        + "\"exclusive_min\" ] ] optional_members: [] optional: true } { members: [ [ \"max\" ] [ "
+                        + "\"exclusive_max\" ] ] optional_members: [] optional: true } ] extension: \"OPEN\" "
+                        + "discriminators: [] parameters: [] }",
                 write(integerType));
     }
 
@@ -430,39 +409,32 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesBareTypeReferencesToAReferenceKindEntry() throws IOException, DataBindException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = kernelDeclarations();
 
-        TypeDefinition typeName = resolver.resolve(schemaMap.declarations().get("type_name"));
-        TypeDefinition fieldName = resolver.resolve(schemaMap.declarations().get("field_name"));
-        TypeDefinition paramName = resolver.resolve(schemaMap.declarations().get("param_name"));
-        TypeDefinition annotation = resolver.resolve(schemaMap.declarations().get("annotation"));
-        TypeDefinition doc = resolver.resolve(schemaMap.declarations().get("doc"));
+        Top typeName = resolver.resolve(schemaMap.declarations().get("type_name"));
+        Top fieldName = resolver.resolve(schemaMap.declarations().get("field_name"));
+        Top paramName = resolver.resolve(schemaMap.declarations().get("param_name"));
+        Top annotation = resolver.resolve(schemaMap.declarations().get("annotation"));
+        Top doc = resolver.resolve(schemaMap.declarations().get("doc"));
 
         // type_name/field_name/param_name => identifier; each is its own fresh REFERENCE entry, not
         // three views of the same one -- source/target both name "identifier" for all three.
-        assertEquals(TypeKind.REFERENCE, typeName.kind());
-        assertEquals(TypeKind.REFERENCE, fieldName.kind());
-        assertEquals(TypeKind.REFERENCE, paramName.kind());
-        assertEquals(TypeKind.REFERENCE, annotation.kind());
-        assertEquals(TypeKind.REFERENCE, doc.kind());
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(typeName, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(fieldName, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(paramName, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(annotation, n -> true));
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(doc, n -> true));
 
-        assertEquals("{ source: { name: \"identifier\" arguments: [] } "
-                + "supertypes: [] subtypes: [] "
-                + "body: !reference { target: { name: \"identifier\" arguments: [] } } }", write(typeName));
+        assertEquals("{ target: identifier }", write(typeName));
         assertEquals(write(typeName), write(fieldName));
         assertEquals(write(typeName), write(paramName));
 
         // annotation => @annotation void -- the @annotation marker is written after "=>", so §6 binds it to
-        // the definition and it is now carried on the resolved entry. It writes back as a wire annotation
-        // ahead of the record (§7.4's `*annotation [type-ref] core-value`), which is how §8.1 represents one:
-        // type_definition has no annotations field, and does not need one.
-        assertEquals("@annotation { source: { name: \"void\" arguments: [] } "
-                + "supertypes: [] subtypes: [] "
-                + "body: !reference { target: { name: \"void\" arguments: [] } } }", write(annotation));
+        // the value, and the entry's facts carry it: no constructor's record has an annotations field, and a
+        // resolved document writes it ahead of the value (§7.4's `*annotation [type-ref] core-value`).
+        assertEquals("{ target: void }", write(annotation));
 
-        assertEquals("@annotation { source: { name: \"text\" arguments: [] } "
-                + "supertypes: [] subtypes: [] "
-                + "body: !reference { target: { name: \"text\" arguments: [] } } }", write(doc));
+        assertEquals("{ target: text }", write(doc));
     }
 
     // ── A sugar form must be lifted before resolution ────────────────────
@@ -494,23 +466,23 @@ class DefinitionResolverTest {
      * §8.2's own worked example, one bound apart -- and deliberately not the entry it prints. {@code [text;
      * 1920]} closes by routing into a construction of {@code array} rather than materialising an
      * instantiation entry, the kernel binding {@code array}'s fields directly with no size template in
-     * between. So {@code source} is plain
-     * {@code array}, exactly as {@code [text]}'s is, and the bounds live in the body where they constrain.
+     * between. So the entry's tag is plain {@code array}, exactly as {@code [text]}'s is, and the bounds live in
+     * the body where they constrain.
      *
      * <p>{@code supertypes} is empty for the same entry's reason: a constructor is a factory, not a type
      * anything can be a subtype of.
      */
     @Test
     void resolvesASizedArrayToAConstructionOfArray() {
-        TypeDefinition frame = resolveSnippet("frame => [text; 1920]");
+        Top frame = resolveSnippet("frame => [text; 1920]");
 
-        assertEquals(TypeKind.PRODUCT, frame.kind());
-        assertEquals(List.of(), frame.parameters());
-        assertEquals(List.of(), frame.supertypes());
-        assertEquals(TypeRef.of("array"), frame.source().orElseThrow(),
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(frame, n -> true));
+        assertEquals(List.of(), OpenEntry.parameterNames(frame));
+        assertEquals(List.of(), TypeChain.supertypesOf(frame));
+        assertEquals(Optional.of("array"), snippetFacts.get("frame").constructor(),
                 "the constructor the application closes at, not the template it was spelled through");
 
-        ArrayBody body = assertInstanceOf(ArrayBody.class, frame.body());
+        ArrayBody body = assertInstanceOf(ArrayBody.class, frame);
         assertEquals(TypeRef.of("text"), body.elementType());
         assertEquals(Optional.of(new BigInteger("1920")), body.minItems());
         assertEquals(Optional.of(new BigInteger("1920")), body.maxItems());
@@ -519,11 +491,11 @@ class DefinitionResolverTest {
     /** The three spellings all land on the same shape -- only which bound each supplies differs (§5.3). */
     @Test
     void theOpenEndedSpellingsRouteToArrayMinAndArrayMax() {
-        ArrayBody atLeast = assertInstanceOf(ArrayBody.class, resolveSnippet("score_list => [integer; 1..]").body());
+        ArrayBody atLeast = assertInstanceOf(ArrayBody.class, resolveSnippet("score_list => [integer; 1..]"));
         assertEquals(Optional.of(BigInteger.ONE), atLeast.minItems());
         assertEquals(Optional.empty(), atLeast.maxItems());
 
-        ArrayBody atMost = assertInstanceOf(ArrayBody.class, resolveSnippet("recent => [text; ..5]").body());
+        ArrayBody atMost = assertInstanceOf(ArrayBody.class, resolveSnippet("recent => [text; ..5]"));
         assertEquals(Optional.empty(), atMost.minItems());
         assertEquals(Optional.of(new BigInteger("5")), atMost.maxItems());
     }
@@ -538,129 +510,101 @@ class DefinitionResolverTest {
      */
     @Test
     void aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes() {
-        TypeDefinition idList = resolveSnippet("id_list => [text]");
+        Top idList = resolveSnippet("id_list => [text]");
 
-        assertEquals(TypeKind.PRODUCT, idList.kind());
-        assertEquals(List.of(), idList.supertypes());
-        assertEquals(TypeRef.of("array"), idList.source().orElseThrow());
-        assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList.body()).elementType());
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(idList, n -> true));
+        assertEquals(List.of(), TypeChain.supertypesOf(idList));
+        assertEquals(Optional.of("array"), snippetFacts.get("id_list").constructor());
+        assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList).elementType());
     }
 
     // ── Type parameters (§5.10): a template's own <T, ...> list ───────────
-    //    Threaded straight into TypeDefinition.parameters, with no substitution or
+    //    Threaded straight into Top.parameters, with no substitution or
     //    validation that a field actually uses each parameter.
 
     /**
-     * A record template's body is <b>held</b>, as every open body is: {@code { first: A  second: B }} is the
-     * {@code !record { fields: [ ... ] }} §5.2 says it denotes, normalised at desugar and left unread until
-     * materialisation substitutes the parameters away. The entry is a {@code record} construction, so
-     * {@code source} names that constructor -- the same shape {@code <T> [T]} has with {@code array}.
-     *
-     * <p>{@code extension} is the <b>parent's</b> and is derived, not stated: a record-bodied template has a
-     * parent, and a parent has no direct instances whatever anyone writes, so ABSTRACT falls out with no
-     * discriminator in sight (§5.10).
+     * A record template is the record it is: {@code { first: A  second: B }} with its parameters stated, each
+     * field typed by the parameter it names. Its own {@code extension} is each application's, OPEN unless marked;
+     * the base is ABSTRACT by construction, with no discriminator in sight (§5.10).
      */
     @Test
-    void resolvesAFreshRecordTemplateAsAHeldRecordConstruction() throws DataBindException {
-        TypeDefinition pair = resolveSnippet("pair => <A, B> { first: A  second: B }");
+    void resolvesAFreshRecordTemplateAsAnOpenRecord() {
+        RecordBody pair = assertInstanceOf(RecordBody.class, resolveSnippet("pair => <A, B> { first: A  second: B }"));
 
-        assertEquals(List.of("A", "B"), pair.parameters());
-        assertEquals("{ source: { name: \"record\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] "
-                        + "body: !template { parameters: [ " + typeParameter("A") + " " + typeParameter("B") + " ] "
-                        + "template: \"!record { fields: [ "
-                        + "{ name: first type: A } { name: second type: B } ] }\" "
-                        + "extension: \"ABSTRACT\" discriminators: [] } }",
-                write(pair));
+        assertEquals(List.of("A", "B"), OpenEntry.parameterNames(pair));
+        assertEquals(TypeRef.of("A"), pair.fields().get("first").type());
+        assertEquals(TypeRef.of("B"), pair.fields().get("second").type());
+        assertEquals(RecordExtensionType.OPEN, pair.extension(), "each application's");
+        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(pair), "the base's");
     }
 
     /** A <b>closed</b> record still resolves at its declaration -- only an open body is held. */
     @Test
     void resolvesAClosedRecordAsAnOrdinaryRecordBody() throws DataBindException {
-        TypeDefinition pair = resolveSnippet("pair => { first: text  second: text }");
+        Top pair = resolveSnippet("pair => { first: text  second: text }");
 
-        assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" "
-                        + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { first => { type: text optional: "
+                        + "false voidable: false role: \"FREE\" } second => { type: text optional: false voidable: "
+                        + "false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(pair));
     }
 
     /**
-     * A <b>composition</b> template holds its body too, so one process closes every open form. What it holds
-     * is the <em>flattened</em> record -- resolved against its supertypes first, since §5.8's absorption and
-     * §5.7's tightening both need a namespace -- written back in the held spelling. Everything outside the
-     * body is the composition's own: {@code constructor}, and both supertype lists.
+     * A <b>composition</b> template is the <em>flattened</em> record with its parameters stated -- resolved
+     * against its supertypes first, since §5.8's absorption and §5.7's tightening both need a namespace. Its
+     * chain keeps the parents as written beside the closed entries they reach.
      */
     @Test
-    void resolvesACompositionTemplateAsAHeldFlattenedRecord() throws DataBindException {
+    void resolvesACompositionTemplateAsAFlattenedOpenRecord() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   base => {}
                   box => <T> base & { value: T }
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
-        TypeDefinition box = resolver.resolve(schemaMap.declarations().get("box"));
+        RecordBody box = assertInstanceOf(RecordBody.class, resolver.resolve(schemaMap.declarations().get("box")));
 
-        assertEquals(List.of("T"), box.parameters());
-        assertEquals(List.of("base"), box.supertypes());
-        assertEquals("{ supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !template { parameters: [ " + typeParameter("T") + " ] "
-                        + "template: \"!record { supertypes: [ base ] "
-                        + "fields: [ { name: value type: T } ] }\" "
-                        + "extension: \"ABSTRACT\" discriminators: [] } }",
-                write(box));
+        assertEquals(List.of("T"), OpenEntry.parameterNames(box));
+        assertEquals(List.of("base"), TypeChain.supertypesOf(box), "a template is IS-A what its parents reach");
+        assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "and keeps them as written");
+        assertEquals(TypeRef.of("T"), box.fields().get("value").type());
     }
 
     /**
      * The flattening is the point, so it is pinned against a supertype that actually contributes: {@code id}
-     * is absorbed from {@code base} and stands in the held body beside the template's own field, which is
-     * what makes the held form readable by the {@code record} constructor at all -- a §5.7 tightening entry
-     * states a modifier and no type-ref, and is not a {@code record_field} until the inherited field gives it
-     * one.
+     * is absorbed from {@code base} and stands in the open record beside the template's own field -- a §5.7
+     * tightening entry states a modifier and no type-ref, and is not a {@code record_field} until the
+     * inherited field gives it one.
      */
     @Test
-    void aCompositionTemplateHoldsTheFieldsItAbsorbed() throws DataBindException {
-        Map<String, TypeDefinition> entries = resolveAll("""
+    void aCompositionTemplateHoldsTheFieldsItAbsorbed() {
+        Map<String, Top> entries = resolveAll("""
                 base => { id: text }
                 box  => <T> base & { value: T }
                 """);
 
-        assertEquals("{ supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !template { parameters: [ " + typeParameter("T") + " ] "
-                        + "template: \"!record { supertypes: [ base ] "
-                        + "fields: [ { name: id type: text } { name: value type: T } ] }\" "
-                        + "extension: \"ABSTRACT\" discriminators: [] } }",
-                write(entries.get("box")));
+        RecordBody box = assertInstanceOf(RecordBody.class, entries.get("box"));
+        assertEquals(List.of("id", "value"), List.copyOf(box.fields().keySet()));
+        assertEquals(TypeRef.of("text"), box.fields().get("id").type());
+        assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "closing completes the chain from these");
     }
 
     // ── Field modifiers (§5.2, §5.10): default (~) and fixed (=) values ───
 
     @Test
     void resolvesTupleElementFromTheRealMetaKernelFixture() throws IOException, DataBindException {
-        // tuple_element => { element_type: type_ref  voidable?: boolean ~ false } -- a fresh
+        // tuple_element => { element_type: type_kind  voidable?: boolean ~ false } -- a fresh
         // record (no supertypes, so no tightening involved), exercising an ordinary literal default.
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = kernelDeclarations();
 
-        TypeDefinition tupleElement = resolver.resolve(schemaMap.declarations().get("tuple_element"));
+        Top tupleElement = resolver.resolve(schemaMap.declarations().get("tuple_element"));
 
-        assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"voidable\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" "
-                        + ""
-                        + "value: false } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { element_type => { type: "
+                        + "type_kind optional: false voidable: false role: \"FREE\" } voidable => { type: boolean "
+                        + "optional: true voidable: false role: \"DEFAULT\" value: false } } groups: [] extension: "
+                        + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(tupleElement));
     }
 
@@ -674,21 +618,13 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = SchemaDesugarer.desugar(
                 new TsonSchemaParser(readFixture()).parseSchemaDocument(), Set.of()).body();
 
-        TypeDefinition fieldGroup = resolver.resolve(schemaMap.declarations().get("field_group"));
+        Top fieldGroup = resolver.resolve(schemaMap.declarations().get("field_group"));
 
-        assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array_array_field_name_1_5d4d7dc5_1_0942e088\" "
-                        + "arguments: [] } optional: false voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"optional_members\" type: { name: \"array_field_name_1_5d4d7dc5\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"optional\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" "
-                        + ""
-                        + "value: false } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { members => { type: "
+                        + "array_array_text_1_3600e7d5_1_1b8fef23 optional: false voidable: false role: \"FREE\" } "
+                        + "optional_members => { type: array_text_1_3600e7d5 optional: true voidable: false role: "
+                        + "\"FREE\" } optional => { type: boolean optional: true voidable: false role: \"DEFAULT\" "
+                        + "value: false } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(fieldGroup));
     }
 
@@ -696,60 +632,55 @@ class DefinitionResolverTest {
     void resolvesAnOrdinaryLiteralFixedValue() throws DataBindException {
         // Mirrors array's own "access_pattern?: product_access_type = INDEX" without the surrounding
         // composition, so it isn't also blocked by tightening -- an ordinary (non-parameter) fixed value.
-        TypeDefinition pinned = resolveSnippet("pinned => { access_pattern?: product_access_type = INDEX }");
+        Top pinned = resolveSnippet("pinned => { access_pattern?: product_access_type = INDEX }");
 
-        assertEquals("{ supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { access_pattern => { type: "
+                        + "product_access_type optional: true voidable: false role: \"FIXED\" value: INDEX } } groups: "
+                        + "[] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(pinned));
     }
 
     /**
-     * A parameter routed into a field's value rides the <b>ordinary {@code value} slot</b>, which is what a
-     * held body buys and what retires {@code record_field.value_param}. §8.1's shadowing rule tells it from a
-     * literal: inside a template a token that resolves into {@code parameters} is a parameter, and a closed
-     * record has no parameters for one to resolve into.
+     * A parameter routed into a field's value rides the <b>ordinary {@code value} slot</b> of the open record.
+     * §8.1's shadowing rule tells it from a literal: inside a template a token that resolves into {@code
+     * parameters} is a parameter, and a closed record has no parameters for one to resolve into.
      *
-     * <p>{@code state} is the unmarked {@code REQUIRED} and so is not written: nothing is fixed at
-     * declaration, because the value does not exist yet. §5.7's fixation to {@code REQUIRED_FIXED} happens at
-     * materialisation, where the value is concrete -- {@code ValueParamFixedFieldTest} pins both ends.
+     * <p>The field is FIXED where it is declared, as its literal spelling would be: the role is the modifier's,
+     * and only the value waits for an application. Closing substitutes the value and changes no fact -- {@code
+     * ValueParamFixedFieldTest} pins both ends ([TSON-SCHEMA] §5.7).
      *
      * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
      * extra claim: one value per application is one value per member, so the base dispatches on
      * {@code [value]} with no {@code =?} written (§5.2, §5.10).
      */
     @Test
-    void aParametricFixedValueRidesTheValueSlotAndFixesNothingYet() throws DataBindException {
-        TypeDefinition sized = resolveSnippet("sized => <T> { value: type_ref = T }");
+    void aParametricFixedValueRidesTheValueSlotOfAFixedField() {
+        RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: type_ref = T }"));
+        RecordField value = sized.fields().get("value");
 
-        assertEquals(List.of("T"), sized.parameters());
-        assertEquals("{ source: { name: \"record\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] "
-                        + "body: !template { parameters: [ " + typeParameter("T") + " ] "
-                        + "template: \"!record { fields: [ "
-                        + "{ name: value type: type_ref value: T } ] "
-                        + "discriminators: [ value ] }\" "
-                        + "extension: \"ABSTRACT\" discriminators: [ \"value\" ] } }",
-                write(sized));
+        assertEquals(List.of("T"), OpenEntry.parameterNames(sized));
+        assertEquals(TypeRef.of("type_ref"), value.type());
+        assertEquals("T", value.value().orElseThrow().text());
+        assertEquals(FieldRole.FIXED, value.role());
+        assertFalse(value.optional());
+        assertEquals(List.of("value"), sized.discriminators());
+        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(sized));
     }
 
     /**
-     * {@code ~ P} promotes to {@code REQUIRED_DEFAULT} exactly as a literal default does (§5.10), and stays
-     * one through materialisation: data may still override a default where it may not override a fixed value.
+     * {@code ~ P} is an optional DEFAULT exactly as a literal default is (§5.10), and stays one through
+     * materialisation: data may still override a default where it may not override a fixed value.
      */
     @Test
-    void aParametricDefaultValueIsPromotedToRequiredDefault() throws DataBindException {
-        TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts?: integer ~ N }");
+    void aParametricDefaultValueIsPromotedToRequiredDefault() {
+        RecordBody retry = assertInstanceOf(RecordBody.class,
+                resolveSnippet("retry_policy => <N> { attempts?: integer ~ N }"));
+        RecordField attempts = retry.fields().get("attempts");
 
-        assertEquals("{ source: { name: \"record\" arguments: [] } "
-                        + "supertypes: [] subtypes: [] "
-                        + "body: !template { parameters: [ " + typeParameter("N") + " ] "
-                        + "template: \"!record { fields: [ "
-                        + "{ name: attempts type: integer optional: true role: DEFAULT value: N } ] }\" "
-                        + "extension: \"ABSTRACT\" discriminators: [] } }",
-                write(retry));
+        assertEquals(TypeRef.of("integer"), attempts.type());
+        assertTrue(attempts.optional());
+        assertEquals(FieldRole.DEFAULT, attempts.role());
+        assertEquals("N", attempts.value().orElseThrow().text());
     }
 
     // ── Tightening (§5.7), via composition bodies: array, map ─────────────
@@ -759,77 +690,59 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesArrayFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
 
-        TypeDefinition array = resolver.resolve(schemaMap.declarations().get("array"));
+        Top array = resolver.resolve(schemaMap.declarations().get("array"));
 
-        assertEquals(TypeKind.PRODUCT, array.kind());
-        assertEquals(List.of(), array.parameters(), "the container constructors carry no parameters");
-        assertTrue(array.supertypes().contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("product", "top"), array.supertypes());
-        assertEquals("{ "
-                        + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
-                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"voidable\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
-                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" value: true } "
-                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(array, n -> true));
+        assertEquals(List.of(), OpenEntry.parameterNames(array), "the container constructors carry no parameters");
+        assertTrue(TypeChain.supertypesOf(array).contains("top"), "a constructor: IS-A top");
+        assertEquals(List.of("product", "top", "type"), TypeChain.supertypesOf(array));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"product\" \"top\" \"type\" ] subtypes: [] } "
+                        + "fields: { chain => { type: type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "access_pattern => { type: product_access_type optional: true voidable: false role: "
+                        + "\"FIXED\" value: INDEX } size_type => { type: product_size_type optional: true voidable: "
+                        + "false role: \"FIXED\" value: VARIABLE } element_type => { type: type_kind optional: false "
+                        + "voidable: false role: \"FREE\" } voidable => { type: boolean optional: true voidable: "
+                        + "false role: \"DEFAULT\" value: false } ordered => { type: boolean optional: true "
+                        + "voidable: false role: \"DEFAULT\" value: true } unique_items => { type: boolean optional: "
+                        + "true voidable: false role: \"DEFAULT\" value: false } min_items => { type: "
+                        + "non_negative_integer optional: true voidable: false role: \"FREE\" } max_items => { type: "
+                        + "non_negative_integer optional: true voidable: false role: \"FREE\" } } groups: [] extension: "
+                        + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(array));
     }
 
     @Test
     void resolvesMapFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
 
-        TypeDefinition map = resolver.resolve(schemaMap.declarations().get("map"));
+        Top map = resolver.resolve(schemaMap.declarations().get("map"));
 
-        assertEquals(TypeKind.PRODUCT, map.kind());
-        assertEquals(List.of(), map.parameters(), "the container constructors carry no parameters");
-        assertTrue(map.supertypes().contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("product", "top"), map.supertypes());
-        assertEquals("{ "
-                        + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: NAMED } "
-                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
-                        + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"voidable\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
-                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(map, n -> true));
+        assertEquals(List.of(), OpenEntry.parameterNames(map), "the container constructors carry no parameters");
+        assertTrue(TypeChain.supertypesOf(map).contains("top"), "a constructor: IS-A top");
+        assertEquals(List.of("product", "top", "type"), TypeChain.supertypesOf(map));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"product\" \"top\" \"type\" ] subtypes: [] } "
+                        + "fields: { chain => { type: type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "access_pattern => { type: product_access_type optional: true voidable: false role: "
+                        + "\"FIXED\" value: NAMED } size_type => { type: product_size_type optional: true voidable: "
+                        + "false role: \"FIXED\" value: VARIABLE } key_type => { type: type_kind optional: false "
+                        + "voidable: false role: \"FREE\" } value_type => { type: type_kind optional: false voidable: "
+                        + "false role: \"FREE\" } voidable => { type: boolean optional: true voidable: false role: "
+                        + "\"DEFAULT\" value: false } ordered => { type: boolean optional: true voidable: false "
+                        + "role: \"DEFAULT\" value: false } min_items => { type: non_negative_integer optional: true "
+                        + "voidable: false role: \"FREE\" } max_items => { type: non_negative_integer optional: true "
+                        + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] "
+                        + "parameters: [] }",
                 write(map));
     }
 
@@ -838,7 +751,7 @@ class DefinitionResolverTest {
         // "count" is inherited REQUIRED; tightening it to OPTIONAL is not a permitted transition
         // (§5.7's table: REQUIRED -> OPTIONAL is an error).
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   base => { count: integer }
                   loosened => base & { count?: integer? }
@@ -855,25 +768,19 @@ class DefinitionResolverTest {
         // "field: = value" with no type-ref restated inherits the source declaration's type
         // (§5.7's "Elided type-refs"), tightening only the value/state.
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   config => { host: text  port: integer }
                   production => config & { host?: = "prod.example.com" }
                 }""").parseSchemaDocument().body();
         resolved.put("config", resolver.resolve(schemaMap.declarations().get("config")));
 
-        TypeDefinition production = resolver.resolve(schemaMap.declarations().get("production"));
+        Top production = resolver.resolve(schemaMap.declarations().get("production"));
 
-        assertEquals("{ supertypes: [ \"config\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"config\" arguments: [] } ] fields: [ "
-                        + "{ name: \"host\" type: { name: \"text\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" "
-                        + ""
-                        + "value: \"prod.example.com\" } "
-                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" "
-                        + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals("{ chain: { parents: [] supertypes: [ \"config\" ] subtypes: [] } fields: { host => { type: "
+                        + "text optional: true voidable: false role: \"FIXED\" value: \"prod.example.com\" } port => "
+                        + "{ type: integer optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
+                        + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(production));
     }
 
@@ -915,35 +822,24 @@ class DefinitionResolverTest {
         // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
         resolveUpToArray();
 
-        TypeDefinition set = resolver.resolve(schemaMapFromFixture().declarations().get("set_type"));
+        Top set = resolver.resolve(schemaMapFromFixture().declarations().get("set_type"));
 
-        assertEquals(TypeKind.PRODUCT, set.kind());
-        assertEquals(List.of(), set.parameters(), "the container constructors carry no parameters");
-        assertTrue(set.supertypes().contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("array", "product", "top"), set.supertypes());
-        assertEquals("{ source: { name: \"array\" arguments: [] } "
-                        + ""
-                        + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: INDEX } "
-                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: VARIABLE } "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"voidable\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: false } "
-                        + "{ name: \"ordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: false } "
-                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: true } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FREE\" "
-                        + "} "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(set, n -> true));
+        assertEquals(List.of(), OpenEntry.parameterNames(set), "the container constructors carry no parameters");
+        assertTrue(TypeChain.supertypesOf(set).contains("top"), "a constructor: IS-A top");
+        assertEquals(List.of("array", "product", "top", "type"), TypeChain.supertypesOf(set));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"array\" \"product\" \"top\" \"type\" ] "
+                        + "subtypes: [] } fields: { chain => { type: type_chain optional: true voidable: false role: "
+                        + "\"FREE\" } access_pattern => { type: product_access_type optional: true voidable: false "
+                        + "role: \"FIXED\" value: INDEX } size_type => { type: product_size_type optional: true "
+                        + "voidable: false role: \"FIXED\" value: VARIABLE } element_type => { type: type_kind "
+                        + "optional: false voidable: false role: \"FREE\" } voidable => { type: boolean optional: "
+                        + "true voidable: false role: \"FIXED\" value: false } ordered => { type: boolean optional: "
+                        + "true voidable: false role: \"FIXED\" value: false } unique_items => { type: boolean "
+                        + "optional: true voidable: false role: \"FIXED\" value: true } min_items => { type: "
+                        + "non_negative_integer optional: true voidable: false role: \"FREE\" } max_items => { type: "
+                        + "non_negative_integer optional: true voidable: false role: \"FREE\" } } groups: [] extension: "
+                        + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(set));
     }
 
@@ -956,7 +852,7 @@ class DefinitionResolverTest {
     @Test
     void refinementRejectsABodyFieldThatAddsRatherThanTightens() throws IOException {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   base => { count: integer }
                   refined => base ^ { extra: text }
@@ -977,33 +873,29 @@ class DefinitionResolverTest {
     void resolvesEnumTypeAndEnumFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
-        TypeDefinition enumType = resolver.resolve(schemaMap.declarations().get("enum_type"));
+        Top enumType = resolver.resolve(schemaMap.declarations().get("enum_type"));
         resolved.put("enum_type", enumType);
-        TypeDefinition enumDef = resolver.resolve(schemaMap.declarations().get("enum"));
+        Top enumDef = resolver.resolve(schemaMap.declarations().get("enum"));
 
         // enum_type => atom & { type: type_name  members: enum_set }: the constructor, `type` required.
-        assertEquals(TypeKind.ATOM, enumType.kind());
-        assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
-                        + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" } "
-                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals(EntryKind.ATOM, EntryKind.of(enumType, n -> true));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
+                        + "fields: { chain => { type: type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "name_type => { type: identifier_kind optional: false voidable: false role: \"FREE\" } "
+                        + "members => { type: enum_set optional: false voidable: false role: \"FREE\" } } groups: [] "
+                        + "extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(enumType));
-        // enum => enum_type ^ { type?: = identifier }: a constructor tightening, `type` pinned and injected, so
+        // enum => enum_type ^ { name_type?: = identifier }: a constructor tightening, `name_type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
-        assertEquals(TypeKind.ATOM, enumDef.kind());
-        assertEquals(List.of("enum_type", "atom", "top"), enumDef.supertypes());
-        assertEquals("{ source: { name: \"enum_type\" arguments: [] } "
-                        + "supertypes: [ \"enum_type\" \"atom\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"type\" type: { name: \"type_name\" arguments: [] } "
-                        + "optional: true voidable: false role: \"FIXED\" value: identifier } "
-                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } "
-                        + "optional: false voidable: false role: \"FREE\" } "
-                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
+        assertEquals(EntryKind.ATOM, EntryKind.of(enumDef, n -> true));
+        assertEquals(List.of("atom", "enum_type", "top", "type"), TypeChain.supertypesOf(enumDef));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"enum_type\" \"top\" \"type\" ] "
+                        + "subtypes: [] } fields: { chain => { type: type_chain optional: true voidable: false role: "
+                        + "\"FREE\" } name_type => { type: identifier_kind optional: true voidable: false role: "
+                        + "\"FIXED\" value: identifier } members => { type: enum_set optional: false voidable: false "
+                        + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(enumDef));
     }
 
@@ -1017,6 +909,7 @@ class DefinitionResolverTest {
         // handles that for the whole file -- see its class Javadoc).
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
         resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
@@ -1025,14 +918,14 @@ class DefinitionResolverTest {
         // rather than from this test's own narrow `resolved` map, which holds none of the entries its
         // fields name.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        TypeDefinition accessType = definitionResolverFor(metaKernelParser, resolved::get).resolve(
-                schemaMap.declarations().get("product_access_type"));
+        DefinitionResolver accessResolver = definitionResolverFor(metaKernelParser, resolved::get);
+        Top accessType = accessResolver.resolve(schemaMap.declarations().get("product_access_type"));
 
-        assertEquals(TypeKind.ATOM, accessType.kind());
-        assertFalse(accessType.supertypes().contains("top"), "an instance: IS-A stops at construction");
-        assertEquals(List.of(), accessType.supertypes());
-        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("enum")), accessType.source());
-        assertEquals(new EnumBody(List.of("INDEX", "NAMED")), accessType.body());
+        assertEquals(EntryKind.ATOM, EntryKind.of(accessType, n -> true));
+        assertFalse(TypeChain.supertypesOf(accessType).contains("top"), "an instance: IS-A stops at construction");
+        assertEquals(List.of(), TypeChain.supertypesOf(accessType));
+        assertEquals(Optional.of("enum"), accessResolver.factsOf("product_access_type").constructor());
+        assertEquals(new EnumBody(List.of("INDEX", "NAMED")), accessType);
     }
 
     /**
@@ -1051,15 +944,16 @@ class DefinitionResolverTest {
     void booleanInstanceResolvesCorrectlyViaTheCompiledReader() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
         resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
 
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        TypeDefinition booleanDef = definitionResolverFor(metaKernelParser, resolved::get).resolve(
+        Top booleanDef = definitionResolverFor(metaKernelParser, resolved::get).resolve(
                 schemaMap.declarations().get("boolean"));
 
-        assertEquals(new EnumBody(List.of("true", "false")), booleanDef.body());
+        assertEquals(new EnumBody(List.of("true", "false")), booleanDef);
     }
 
     /**
@@ -1074,11 +968,11 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
 
-        TypeDefinition bytes = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE)
+        Top bytes = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE)
                 .resolve(schemaMap.declarations().get("bytes"));
 
-        assertEquals(BytesType.UNCONSTRAINED, bytes.body());
-        assertEquals(List.of(), bytes.supertypes());
+        assertEquals(BytesType.UNCONSTRAINED, bytes);
+        assertEquals(List.of(), TypeChain.supertypesOf(bytes));
     }
 
     @Test
@@ -1091,15 +985,15 @@ class DefinitionResolverTest {
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition float32 = instanceResolver.resolve(schemaMap.declarations().get("float32"));
-        TypeDefinition float64 = instanceResolver.resolve(schemaMap.declarations().get("float64"));
+        Top float32 = instanceResolver.resolve(schemaMap.declarations().get("float32"));
+        Top float64 = instanceResolver.resolve(schemaMap.declarations().get("float64"));
 
-        assertEquals(FloatType.FLOAT32, float32.body());
-        assertEquals(FloatType.FLOAT64, float64.body());
+        assertEquals(FloatType.FLOAT32, float32);
+        assertEquals(FloatType.FLOAT64, float64);
     }
 
     @Test
-    void resolvesCidrEmailAndMacInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+    void resolvesCidrEmailAndMacInstancesFromTheRealTypeLibraryFixtures() throws IOException {
         // cidr4 => !cidr4_type {}, cidr6 => !cidr6_type {}, email => !email_type {}, mac => !mac_type
         // {} -- all four constructors are record-only additions (Cidr4Type/Cidr6Type/EmailType/
         // MacType), no tson-compiler vocab compiler, added specifically so these real declarations
@@ -1107,19 +1001,20 @@ class DefinitionResolverTest {
         // (and friends) since Atom had no member for any of them at all. Each one's own `spec`
         // field is filled in by the compiled RecordBindReader from the schema's REQUIRED_FIXED
         // default, the same mechanism float32/float64 above rely on.
-        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        SchemaMap core = schemaMapFromFixture("core.tn");
+        SchemaMap net = schemaMapFromFixture("net.tn");
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition cidr4 = instanceResolver.resolve(schemaMap.declarations().get("cidr4"));
-        TypeDefinition cidr6 = instanceResolver.resolve(schemaMap.declarations().get("cidr6"));
-        TypeDefinition email = instanceResolver.resolve(schemaMap.declarations().get("email"));
-        TypeDefinition mac = instanceResolver.resolve(schemaMap.declarations().get("mac"));
+        Top cidr4 = instanceResolver.resolve(net.declarations().get("cidr4"));
+        Top cidr6 = instanceResolver.resolve(net.declarations().get("cidr6"));
+        Top email = instanceResolver.resolve(core.declarations().get("email"));
+        Top mac = instanceResolver.resolve(net.declarations().get("mac"));
 
-        assertEquals(Cidr4Type.UNCONSTRAINED, cidr4.body());
-        assertEquals(Cidr6Type.UNCONSTRAINED, cidr6.body());
-        assertEquals(EmailType.UNCONSTRAINED, email.body());
-        assertEquals(MacType.UNCONSTRAINED, mac.body());
+        assertEquals(Cidr4Type.UNCONSTRAINED, cidr4);
+        assertEquals(Cidr6Type.UNCONSTRAINED, cidr6);
+        assertEquals(EmailType.UNCONSTRAINED, email);
+        assertEquals(MacType.UNCONSTRAINED, mac);
     }
 
     /**
@@ -1134,7 +1029,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesRegexAndIriInstancesWithEveryComposedFieldBound() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { plain_regex   => !regex_type {}
                   bounded_regex => !regex_type { max_length: 40 }
                   plain_uri     => !iri_type {}
@@ -1143,16 +1038,16 @@ class DefinitionResolverTest {
                     schemes: [https] allow_fragment: false length: 19 } }""").parseSchemaDocument().body();
         DefinitionResolver resolver = definitionResolverFor(metaKernelCompiled(), EMPTY_NAMESPACE);
 
-        assertEquals(RegexType.UNCONSTRAINED, resolver.resolve(schemaMap.declarations().get("plain_regex")).body());
-        assertEquals(IriType.REFERENCE, resolver.resolve(schemaMap.declarations().get("plain_uri")).body());
-        assertEquals(IriType.IRI, resolver.resolve(schemaMap.declarations().get("schemed_uri")).body());
+        assertEquals(RegexType.UNCONSTRAINED, resolver.resolve(schemaMap.declarations().get("plain_regex")));
+        assertEquals(IriType.REFERENCE, resolver.resolve(schemaMap.declarations().get("plain_uri")));
+        assertEquals(IriType.IRI, resolver.resolve(schemaMap.declarations().get("schemed_uri")));
 
-        RegexType bounded = (RegexType) resolver.resolve(schemaMap.declarations().get("bounded_regex")).body();
+        RegexType bounded = (RegexType) resolver.resolve(schemaMap.declarations().get("bounded_regex"));
         assertEquals("https://www.rfc-editor.org/rfc/rfc9485", bounded.spec());
         assertEquals(Optional.of(40), bounded.maxLength());
 
         // length is the facet IriType declared no component for at all, so it had nowhere to bind.
-        IriType https = (IriType) resolver.resolve(schemaMap.declarations().get("https_uri")).body();
+        IriType https = (IriType) resolver.resolve(schemaMap.declarations().get("https_uri"));
         assertEquals("https://www.rfc-editor.org/rfc/rfc3987", https.spec());
         assertEquals(Optional.of(List.of("https")), https.schemes());
         assertFalse(https.allowFragment());
@@ -1160,18 +1055,18 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void resolvesIpv4AndIpv6InstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+    void resolvesIpv4AndIpv6InstancesFromTheRealNetTypeLibraryFixture() throws IOException {
         // ipv4 => !ipv4_type {}, ipv6 => !ipv6_type {} -- Ipv4Type/Ipv6Type, same treatment as
         // Cidr4Type/Cidr6Type above (record-only, no vocab compiler, flat String spec).
-        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        SchemaMap schemaMap = schemaMapFromFixture("net.tn");
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition ipv4 = instanceResolver.resolve(schemaMap.declarations().get("ipv4"));
-        TypeDefinition ipv6 = instanceResolver.resolve(schemaMap.declarations().get("ipv6"));
+        Top ipv4 = instanceResolver.resolve(schemaMap.declarations().get("ipv4"));
+        Top ipv6 = instanceResolver.resolve(schemaMap.declarations().get("ipv6"));
 
-        assertEquals(Ipv4Type.UNCONSTRAINED, ipv4.body());
-        assertEquals(Ipv6Type.UNCONSTRAINED, ipv6.body());
+        assertEquals(Ipv4Type.UNCONSTRAINED, ipv4);
+        assertEquals(Ipv6Type.UNCONSTRAINED, ipv6);
     }
 
     @Test
@@ -1186,12 +1081,12 @@ class DefinitionResolverTest {
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition complex = instanceResolver.resolve(schemaMap.declarations().get("complex"));
-        TypeDefinition declared = instanceResolver.resolve(schemaMap.declarations().get("declared"));
+        Top complex = instanceResolver.resolve(schemaMap.declarations().get("complex"));
+        Top declared = instanceResolver.resolve(schemaMap.declarations().get("declared"));
 
-        assertEquals(ComplexType.UNCONSTRAINED, complex.body());
-        assertEquals(TypeKind.SUM, declared.kind());
-        assertEquals(new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), declared.body());
+        assertEquals(ComplexType.UNCONSTRAINED, complex);
+        assertEquals(EntryKind.SUM, EntryKind.of(declared, n -> true));
+        assertEquals(new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), declared);
     }
 
     @Test
@@ -1202,10 +1097,10 @@ class DefinitionResolverTest {
         // and the diagnostic points at constructor application instead (§5.5). The test is whether the body
         // IS-A `Atom`, which neither the kind nor the `~` marker answers: `integer_type => atom & { ... }`
         // is ATOM-kinded too.
-        Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
+        Namespace<Top> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1217,10 +1112,10 @@ class DefinitionResolverTest {
     void atomRefinementRejectsANonAtomFamilySource() {
         // top resolves fine (a fresh record, kind PRODUCT by the structural default) but isn't
         // atom-family -- !top ^ {...} must be rejected (§5.5).
-        Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
+        Namespace<Top> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1255,11 +1150,11 @@ class DefinitionResolverTest {
         // "integer_type" (the constructor int8's own refinement source resolves through), which was
         // never something namespace lookup alone could provide.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> metaKernelEntries = metaKernelParser.schema().entries();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelEntries);
+        Namespace<Top> metaKernelEntries = metaKernelParser.schema().entries();
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelEntries.entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   int8    => !integer ^ { size: { bits: 8  signed: true } }
                   bounded => !int8 ^ { min: -100  max: 100 }
@@ -1268,25 +1163,25 @@ class DefinitionResolverTest {
         chainNamespace.put("int8", instanceResolver.resolve(schemaMap.declarations().get("int8")));
         chainNamespace.put("bounded", instanceResolver.resolve(schemaMap.declarations().get("bounded")));
 
-        TypeDefinition bounded = chainNamespace.get("bounded");
-        TypeDefinition tighter = instanceResolver.resolve(schemaMap.declarations().get("tighter"));
+        Top bounded = chainNamespace.get("bounded");
+        Top tighter = instanceResolver.resolve(schemaMap.declarations().get("tighter"));
 
         // bounded keeps int8's own size (untouched by bounded's own refinement) alongside its new bounds.
-        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), bounded.source());
-        assertEquals(List.of("int8"), bounded.supertypes());
+        assertEquals(Optional.of("integer_type"), instanceResolver.factsOf("bounded").constructor());
+        assertEquals(List.of("int8"), TypeChain.supertypesOf(bounded));
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
                 Optional.of(java.math.BigInteger.valueOf(-100)), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
-                bounded.body());
+                TypeChain.withoutChain(bounded));
 
         // tighter keeps int8's size AND bounded's min (neither touched by tighter's own refinement),
         // but overrides bounded's own max with its own.
-        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), tighter.source());
-        assertEquals(List.of("bounded"), tighter.supertypes());
+        assertEquals(Optional.of("integer_type"), instanceResolver.factsOf("tighter").constructor());
+        assertEquals(List.of("bounded"), TypeChain.supertypesOf(tighter));
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
                 Optional.of(java.math.BigInteger.valueOf(-100)), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(50)), Optional.empty(), Optional.empty()),
-                tighter.body());
+                TypeChain.withoutChain(tighter));
     }
 
     /**
@@ -1299,10 +1194,10 @@ class DefinitionResolverTest {
     @Test
     void atomRefinementRejectsBoundsThatWidenTheSource() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   uint8       => !integer ^ { size: { bits: 8  signed: false } }
                   percent     => !integer ^ { min: 0  max: 100 }
@@ -1331,10 +1226,10 @@ class DefinitionResolverTest {
     @Test
     void iriRefinementMayWithdrawRelativeReferencesButNotRestoreThem() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   reference => !iri_type {}
                   schemed   => !reference ^ { allow_relative: false }
@@ -1342,7 +1237,7 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument().body();
         chainNamespace.put("reference", instanceResolver.resolve(schemaMap.declarations().get("reference")));
 
-        assertEquals(IriType.IRI, instanceResolver.resolve(schemaMap.declarations().get("schemed")).body());
+        assertEquals(IriType.IRI, TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("schemed"))));
         SchemaValidationException relaxed = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("relaxed")));
         assertTrue(relaxed.getMessage().contains("allow_relative re-enables what the source forbids"),
@@ -1356,10 +1251,10 @@ class DefinitionResolverTest {
     @Test
     void iriRefinementNarrowsSchemesAndMayWithdrawFragmentsButNotRestoreThem() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   web      => !iri ^ { schemes: [http https] }
                   secure   => !web ^ { schemes: [HTTPS] }
@@ -1370,7 +1265,7 @@ class DefinitionResolverTest {
         chainNamespace.put("web", instanceResolver.resolve(schemaMap.declarations().get("web")));
         chainNamespace.put("whole", instanceResolver.resolve(schemaMap.declarations().get("whole")));
 
-        IriType secure = (IriType) instanceResolver.resolve(schemaMap.declarations().get("secure")).body();
+        IriType secure = (IriType) instanceResolver.resolve(schemaMap.declarations().get("secure"));
         // A scheme is a scheme_name, whose value is folded: `HTTPS` narrows to the source's `https`.
         assertEquals(Optional.of(List.of("https")), secure.schemes());
         SchemaValidationException ftp = assertThrows(SchemaValidationException.class,
@@ -1390,10 +1285,10 @@ class DefinitionResolverTest {
     @Test
     void atomRefinementAcceptsBoundsThatGenuinelyTighten() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   percent  => !integer ^ { min: 0  max: 100 }
                   restated => !percent ^ { max: 100 }
@@ -1405,19 +1300,19 @@ class DefinitionResolverTest {
         // Restating a bound at exactly the source's own value is a no-op, not a widening.
         assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
-                instanceResolver.resolve(schemaMap.declarations().get("restated")).body());
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("restated"))));
 
         // A width is compared against the source's own width, not its explicit bounds -- uint8's own
         // 0..255 reaches past percent's ceiling, yet adding it to a 0..100 source still narrows.
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, false)),
                 Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
-                instanceResolver.resolve(schemaMap.declarations().get("sized")).body());
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("sized"))));
 
         // Tightening one end leaves the other inherited, which must compare equal rather than as a drop.
         assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(50)), Optional.empty(), Optional.empty()),
-                instanceResolver.resolve(schemaMap.declarations().get("oneEnd")).body());
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("oneEnd"))));
     }
 
     /**
@@ -1433,10 +1328,10 @@ class DefinitionResolverTest {
     @Test
     void anAtomBodyWhoseOwnFacetsContradictEachOtherIsRejected() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   emptyByRefinement  => !integer ^ { min: 10  max: 3 }
                   emptyByApplication => !integer_type { min: 10  max: 3 }
@@ -1467,7 +1362,7 @@ class DefinitionResolverTest {
         // Emptiness is the rule, not narrowness -- a range admitting exactly one value pins a constant.
         assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.valueOf(5)), Optional.empty(),
                 Optional.of(java.math.BigInteger.valueOf(5)), Optional.empty(), Optional.empty()),
-                instanceResolver.resolve(schemaMap.declarations().get("pinnedToOneValue")).body());
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("pinnedToOneValue"))));
     }
 
     /**
@@ -1484,19 +1379,19 @@ class DefinitionResolverTest {
     @Test
     void atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed() throws IOException {
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaTn1Parser.schema().entries());
+        Map<String, Top> namespace = new LinkedHashMap<>(metaTn1Parser.schema().entries().entries());
         DefinitionResolver resolver = definitionResolverFor(metaTn1Parser, namespace::get);
         namespace.put("float32", resolver.resolve(schemaMapFromCoreFixture().declarations().get("float32")));
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 { probability => !float32 ^ { min: 0.0  max: 1.0 } }""").parseSchemaDocument().body();
 
-        TypeDefinition probability = resolver.resolve(schemaMap.declarations().get("probability"));
+        Top probability = resolver.resolve(schemaMap.declarations().get("probability"));
 
         assertEquals(new FloatType(FloatType.Format.BINARY32,
                 Optional.of(new java.math.BigDecimal("0.0")), Optional.empty(),
                 Optional.of(new java.math.BigDecimal("1.0")), Optional.empty(), true, true, true, true),
-                probability.body());
+                TypeChain.withoutChain(probability));
     }
 
     /**
@@ -1507,10 +1402,10 @@ class DefinitionResolverTest {
     @Test
     void atomRefinementChecksTextLengthsThroughTheTextFamilysOwnRule() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   short_text  => !text ^ { min_length: 1  max_length: 10 }
                   shorter     => !short_text ^ { max_length: 5 }
@@ -1519,7 +1414,7 @@ class DefinitionResolverTest {
         chainNamespace.put("short_text", instanceResolver.resolve(schemaMap.declarations().get("short_text")));
 
         assertEquals(new TextType(Optional.of(1), Optional.of(5), Optional.empty(), Optional.empty()),
-                instanceResolver.resolve(schemaMap.declarations().get("shorter")).body());
+                TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("shorter"))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("longer")));
@@ -1537,10 +1432,10 @@ class DefinitionResolverTest {
     @Test
     void aWrongTypedMemberInARefinementBodyIsASchemaErrorNotALibraryGap() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { bad => !integer ^ { min: "abc" } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1562,10 +1457,10 @@ class DefinitionResolverTest {
     @Test
     void aJsonSchemaShapedFacetInARefinementBodyIsRejectedAndAnsweredWithTheRealVocabulary() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { quantity_t => !integer ^ { minimum: 1  maximum: 100 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1583,16 +1478,16 @@ class DefinitionResolverTest {
     @Test
     void aSourceDeclarationApplyingTemplateDirectlyIsRejected() {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   sneaky => !template {
-                    parameters: [{ name: T  type: type_ref }]  template: "!array { element_type: T }"
+                    parameters: [{ name: T  type: type_kind }]  template: "!array { element_type: T }"
                   }
                   open_sneaky => <U> !template {
-                    parameters: [{ name: U  type: type_ref }]  template: "!array { element_type: U }"
+                    parameters: [{ name: U  type: type_kind }]  template: "!array { element_type: U }"
                   }
                 }""").parseSchemaDocument().body();
 
@@ -1613,9 +1508,9 @@ class DefinitionResolverTest {
     @Test
     void aMetaReaderFailureThatIsNotAReadDiagnosticStaysALibraryGap() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { bad => !integer ^ { min: 1 } }""").parseSchemaDocument().body();
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernelCompiled().schema().entries());
+        Map<String, Top> namespace = new LinkedHashMap<>(metaKernelCompiled().schema().entries().entries());
         DefinitionResolver gapResolver = new DefinitionResolver(NEVER_CALLED, namespace::get, namespace::get);
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
@@ -1634,7 +1529,7 @@ class DefinitionResolverTest {
         // an instance" (the constructor-rejection test above), which requires `I` to resolve first.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1644,23 +1539,35 @@ class DefinitionResolverTest {
     }
 
     private SchemaMap schemaMapFromCoreFixture() throws IOException {
-        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/core.tn").normalize());
-        return new TsonSchemaParser(source).parseSchemaDocument().body();
+        return schemaMapFromFixture("core.tn");
+    }
+
+    private SchemaMap schemaMapFromFixture(String name) throws IOException {
+        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/" + name).normalize());
+        return SchemaDesugarer.desugar(new TsonSchemaParser(source).parseSchemaDocument(), Set.of()).body();
     }
 
     /**
-     * Wraps a bare, already-resolved {@code Map<String, TypeDefinition>} into a compiled,
+     * Wraps a bare, already-resolved {@code Map<String, Top>} into a compiled,
      * object-binding-mode {@link TsonCompiledMetaSchema} -- what {@link #definitionResolverFor} needs to
      * build both a {@link DefinitionMetaReader} that can actually *bind* a constructor-application/
      * atom-refinement value, and the {@code DefinitionResolver} constructor's own structure-namespace
-     * parameter (a plain {@code TypeDefinition} lookup is all that one needs). Generic over whatever
+     * parameter (a plain {@code Top} lookup is all that one needs). Generic over whatever
      * map a caller already has in hand (a hand-built {@code resolved} map, meta-kernel's own entries,
-     * meta.tn's own registered/merged entries, ...) -- the header fields (id/meta/imports) are
-     * inert, {@code TsonCompiledMetaSchema}'s own {@code Compiler} never reads them, only {@code
-     * entries()}.
+     * meta.tn's own registered/merged entries, ...). Its identity is the meta-kernel's, so the kernel names it
+     * holds -- {@code top} and the base kinds -- are the kernel's, which is what a constructor is judged by.
      */
-    private static TsonCompiledMetaSchema compileAsMetaParser(Map<String, TypeDefinition> entries) {
-        TsonSchema synthetic = new TsonSchema("test", "", List.of(), entries);
+    private static TsonCompiledMetaSchema compileAsMetaParser(Map<String, Top> entries) {
+        return compileAsMetaParser(entries, Map.of());
+    }
+
+    /** The same, keeping the facts resolution recorded -- a tightened constructor binds through them. */
+    private static TsonCompiledMetaSchema compileAsMetaParser(Map<String, Top> entries,
+                                                              Map<String, TsonSchema.EntryFacts> facts) {
+        // Its own meta, as the real kernel is: the readers of a schema that governs schemas read names only.
+        TsonSchema synthetic = new TsonSchema(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_KERNEL_ID,
+                List.of(),
+                io.ltr8.annotation.AnnotatedMap.of(entries), false, Map.of(), facts);
         TsonLinkedSchema linkedSynthetic = new TsonLinkedSchema(synthetic);
         return new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()).bootstrap(linkedSynthetic);
     }
@@ -1672,7 +1579,7 @@ class DefinitionResolverTest {
     private static TsonCompiledMetaSchema metaKernelCompiled() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
-        return compileAsMetaParser(linked.schema().entries());
+        return compileAsMetaParser(linked.schema().entries().entries(), linked.schema().facts());
     }
 
     /**
@@ -1714,20 +1621,29 @@ class DefinitionResolverTest {
         TsonSchema meta = new SchemaResolver(throwawayLoader)
                 .resolveSchema(new TsonSchemaParser(source).parseSchemaDocument());
         TsonLinkedSchema registeredMeta = registry.register(TsonSchemaLinker.link(meta, registry));
-        return compileAsMetaParser(registeredMeta.schema().entries());
+        return compileAsMetaParser(registeredMeta.schema().entries().entries(), registeredMeta.schema().facts());
     }
 
     /** Populates the shared {@link #resolved} field up through {@code array} -- callers continue resolving against it via {@link #resolver} directly, no return value needed now that {@link #resolved} is a field, not a per-call local. */
     private void resolveUpToArray() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
         resolved.put("array", resolver.resolve(schemaMap.declarations().get("array")));
     }
 
     private SchemaMap schemaMapFromFixture() throws IOException {
-        return new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        return kernelDeclarations();
+    }
+
+    /**
+     * meta-kernel.tn's declarations, desugared as {@code SchemaResolver} desugars them: {@code type}'s own
+     * fields are {@code [type_ref]} and {@code [type_name]} sugar, and every constructor composes them in.
+     */
+    private SchemaMap kernelDeclarations() throws IOException {
+        return SchemaDesugarer.desugar(new TsonSchemaParser(readFixture()).parseSchemaDocument(), Set.of()).body();
     }
 
     /**
@@ -1737,13 +1653,13 @@ class DefinitionResolverTest {
      * needed because the binding record the desugarer emits is bound through that meta's own reader, the
      * same as any other {@code !C value}.
      */
-    private TypeDefinition resolveSnippet(String declaration) {
+    private Top resolveSnippet(String declaration) {
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { %s }""".formatted(declaration)).parseSchemaDocument();
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
         SchemaMap schemaMap = SchemaDesugarer.desugar(document, Set.of()).body();
-        return definitionResolverFor(metaKernel, resolved::get)
+        return definitionResolverFor(metaKernel, resolved::get, snippetFacts)
                 .resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
     }
 
@@ -1762,14 +1678,14 @@ class DefinitionResolverTest {
      */
     @Test
     void restatingAGroupInARefinementBodyTightensItsStateOnly() {
-        Map<String, TypeDefinition> entries = resolveAll(BOUNDS
+        Map<String, Top> entries = resolveAll(BOUNDS
                 + "  strict => bounds ^ { ( min: integer | exclusive_min: integer ) }");
 
         RecordBody body = bodyOf(entries.get("strict"));
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), false)), body.groups());
         assertEquals(List.of("a", "min", "exclusive_min"), fieldNames(entries.get("strict")));
-        assertEquals("optional", body.fields().get(1).describe());
-        assertEquals("optional", body.fields().get(2).describe());
+        assertEquals("optional", body.fields().values().stream().toList().get(1).describe());
+        assertEquals("optional", body.fields().values().stream().toList().get(2).describe());
         // the source keeps its own OPTIONAL group -- the restatement builds a new list, it does not edit it
         assertTrue(bodyOf(entries.get("bounds")).groups().get(0).optional());
     }
@@ -1781,7 +1697,7 @@ class DefinitionResolverTest {
      */
     @Test
     void restatingAGroupInACompositionBodyTightensItInPlace() {
-        Map<String, TypeDefinition> entries = resolveAll(BOUNDS
+        Map<String, Top> entries = resolveAll(BOUNDS
                 + "  strict => bounds & { ( min: integer | exclusive_min: integer )  extra: text }");
 
         RecordBody body = bodyOf(entries.get("strict"));
@@ -1793,7 +1709,7 @@ class DefinitionResolverTest {
     /** Restating at the same state is the identity case, and must not be mistaken for a new group. */
     @Test
     void restatingAGroupWithoutChangingItsStateIsANoOp() {
-        Map<String, TypeDefinition> entries = resolveAll(BOUNDS
+        Map<String, Top> entries = resolveAll(BOUNDS
                 + "  same => bounds ^ { ( min: integer | exclusive_min: integer )? }");
 
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), true)),
@@ -1852,7 +1768,7 @@ class DefinitionResolverTest {
     /** A composition body may still introduce a genuinely new group -- the false branch of the same check. */
     @Test
     void aCompositionBodyStillAddsAWhollyNewGroup() {
-        Map<String, TypeDefinition> entries = resolveAll("base => { a: text }"
+        Map<String, Top> entries = resolveAll("base => { a: text }"
                 + "  extended => base & { ( p: integer | q: integer )? }");
 
         assertEquals(List.of("a", "p", "q"), fieldNames(entries.get("extended")));
@@ -1878,18 +1794,24 @@ class DefinitionResolverTest {
                 }
                 """).get("config"));
 
-        assertEquals(RecordField.required("host", TypeRef.of("text")), body.fields().get(0));
-        assertEquals(RecordField.defaulted("port", TypeRef.of("integer"), new Token("8080", Token.Form.UNQUOTED)),
-                body.fields().get(1));
-        assertEquals(RecordField.fixed("debug", TypeRef.of("boolean"), new Token("false", Token.Form.UNQUOTED)),
-                body.fields().get(2));
-        assertEquals(RecordField.optionalVoidable("label", TypeRef.of("text")), body.fields().get(3));
-        assertEquals(RecordField.marker("version", TypeRef.of("text"), new Token("2.0", Token.Form.SINGLE_LINE_QUOTED)),
-                body.fields().get(4));
-        assertEquals(RecordField.voidable("note", TypeRef.of("text")), body.fields().get(5));
-        assertEquals(new RecordField("timeout", TypeRef.of("integer"), true, true, FieldRole.DEFAULT,
-                Optional.of(new Token("30", Token.Form.UNQUOTED))), body.fields().get(6));
-        assertEquals(RecordField.optionalVoidable("extra", TypeRef.of("void")), body.fields().get(7));
+        assertEquals(Map.entry("host", RecordField.required(TypeRef.of("text"))),
+                body.fields().entrySet().stream().toList().get(0));
+        assertEquals(Map.entry("port", RecordField.defaulted(TypeRef.of("integer"), new Token("8080", Token.Form.UNQUOTED))),
+                body.fields().entrySet().stream().toList().get(1));
+        assertEquals(Map.entry("debug", RecordField.fixed(TypeRef.of("boolean"), new Token("false", Token.Form.UNQUOTED))),
+                body.fields().entrySet().stream().toList().get(2));
+        assertEquals(Map.entry("label", RecordField.optionalVoidable(TypeRef.of("text"))),
+                body.fields().entrySet().stream().toList().get(3));
+        assertEquals(Map.entry("version", RecordField.marker(TypeRef.of("text"),
+                new Token("2.0", Token.Form.SINGLE_LINE_QUOTED))),
+                body.fields().entrySet().stream().toList().get(4));
+        assertEquals(Map.entry("note", RecordField.voidable(TypeRef.of("text"))),
+                body.fields().entrySet().stream().toList().get(5));
+        assertEquals(Map.entry("timeout", new RecordField(TypeRef.of("integer"), true, true, FieldRole.DEFAULT,
+                Optional.of(new Token("30", Token.Form.UNQUOTED)))),
+                        body.fields().entrySet().stream().toList().get(6));
+        assertEquals(Map.entry("extra", RecordField.optionalVoidable(TypeRef.of("void"))),
+                body.fields().entrySet().stream().toList().get(7));
     }
 
     /**
@@ -1922,15 +1844,15 @@ class DefinitionResolverTest {
      */
     @Test
     void restatesAnInheritedFieldAsVoid() {
-        Map<String, TypeDefinition> entries = resolveAll("""
+        Map<String, Top> entries = resolveAll("""
                 base => { name: text  nickname?: text? }
                 anonymous => base ^ { nickname?: void? }
                 """);
 
-        RecordField nickname = bodyOf(entries.get("anonymous")).fields().get(1);
-        assertEquals(RecordField.optionalVoidable("nickname", TypeRef.of("void")), nickname);
+        RecordField nickname = bodyOf(entries.get("anonymous")).fields().values().stream().toList().get(1);
+        assertEquals(RecordField.optionalVoidable(TypeRef.of("void")), nickname);
         // unlike removal (§5.9), IS-A survives -- the field is still in the contract
-        assertEquals(List.of("base"), entries.get("anonymous").supertypes());
+        assertEquals(List.of("base"), TypeChain.supertypesOf(entries.get("anonymous")));
         assertEquals(List.of("name", "nickname"), fieldNames(entries.get("anonymous")));
     }
 
@@ -1944,30 +1866,25 @@ class DefinitionResolverTest {
     }
 
     /**
-     * A parametric {@code = P} is FREE until materialisation closes it (§5.7's "Open modifiers"), and pins
-     * the field there. Its type slot is elided, so it inherits the source's voidability -- here none, the
-     * source being {@code bound?: integer}.
-     *
-     * <p>A refinement <b>template</b> holds its body, so the state is read off the wire record it holds. The
-     * body is the <em>flattened</em> form -- the refinement is resolved against its source first, which is
-     * what gives {@code bound: = MIN} a type at all -- and the parameter stands in the ordinary {@code value}
-     * slot, {@code value_param} having no producer left.
+     * A parametric {@code = P} pins the field where it is written, as a literal would ([TSON-SCHEMA] §5.7).
+     * Its type slot is elided, so it inherits the source's type -- here {@code integer}, the source being
+     * {@code bound?: integer} -- and the open record holds the flattened field with the parameter in the
+     * ordinary {@code value} slot.
      */
     @Test
-    void aParametricModifierOnAnInheritedOptionalFieldStillLandsInRequired() {
-        Map<String, TypeDefinition> entries = resolveAll("""
+    void aParametricPinOnAnInheritedOptionalFieldIsRequiredAndFixed() {
+        Map<String, Top> entries = resolveAll("""
                 base => { bound?: integer }
                 bounded => <MIN> base ^ { bound: = MIN }
                 """);
 
-        TemplateBody held = assertInstanceOf(TemplateBody.class, entries.get("bounded").body());
-        Set<String> names = HeldBody.of(held).names();
-        assertTrue(names.contains("MIN"), () -> "the parameter is in the body: " + names);
-        assertTrue(names.contains("integer"), () -> "the type came from the source: " + names);
-        // A required FREE field states none of its facts, `record_field`'s own defaults -- which is the
-        // assertion: the inherited optional did not survive, and no FIXED role was reached either.
-        assertFalse(names.contains("true"), names::toString);
-        assertFalse(names.contains("FIXED"), names::toString);
+        RecordBody open = assertInstanceOf(RecordBody.class, entries.get("bounded"));
+        RecordField bound = open.fields().get("bound");
+        assertEquals(TypeRef.of("integer"), bound.type(), "the type came from the source");
+        assertEquals("MIN", bound.value().orElseThrow().text(), "the parameter stands in the value slot");
+        // The name is unmarked, so the inherited optional did not survive; the pin is the modifier's.
+        assertFalse(bound.optional());
+        assertEquals(FieldRole.FIXED, bound.role());
     }
 
     // ── Restating a group member (§5.11) ──────────────────────────────────
@@ -1983,10 +1900,10 @@ class DefinitionResolverTest {
         RecordBody body = bodyOf(resolveAll(BOUNDS
                 + "  pinned => bounds ^ { min: = 0  exclusive_min: integer = 1 }").get("pinned"));
 
-        RecordField min = body.fields().get(1);
-        assertEquals(RecordField.fixed("min", TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
+        RecordField min = body.fields().values().stream().toList().get(1);
+        assertEquals(RecordField.fixed(TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
         assertEquals(RecordField.Omitted.NOTHING, min.omitted(true));
-        assertEquals("fixed", body.fields().get(2).describe());
+        assertEquals("fixed", body.fields().values().stream().toList().get(2).describe());
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), true)), body.groups());
     }
 
@@ -2015,7 +1932,7 @@ class DefinitionResolverTest {
         RecordBody body = bodyOf(resolveAll(FRAGMENT).get("fragment"));
         assertEquals(List.of(group(List.of(List.of("include"), List.of("name", "type")), List.of("name", "type"),
                 false)), body.groups());
-        assertTrue(body.fields().stream().allMatch(RecordField::optional), "members are optional fields");
+        assertTrue(body.fields().values().stream().allMatch(RecordField::optional), "members are optional fields");
     }
 
     /** {@code +} lowers to one REQUIRED option, every member optional within it. */
@@ -2031,7 +1948,7 @@ class DefinitionResolverTest {
     void aRestatedMemberWithoutItsMarkIsRequiredInItsOption() {
         RecordBody body = bodyOf(resolveAll(FRAGMENT + "  strict => fragment ^ { name: text }").get("strict"));
         assertEquals(List.of("type"), body.groups().getFirst().optionalMembers());
-        assertTrue(body.fields().stream().allMatch(RecordField::optional), "and still an optional field");
+        assertTrue(body.fields().values().stream().allMatch(RecordField::optional), "and still an optional field");
 
         RecordBody kept = bodyOf(resolveAll(FRAGMENT + "  same => fragment ^ { name?: text }").get("same"));
         assertEquals(List.of("name", "type"), kept.groups().getFirst().optionalMembers());
@@ -2066,7 +1983,7 @@ class DefinitionResolverTest {
      */
     @Test
     void aRemovalLeavesTheGroupItEquals() {
-        Map<String, TypeDefinition> entries = resolveAll(FRAGMENT + """
+        Map<String, Top> entries = resolveAll(FRAGMENT + """
                   no_include => fragment - { include }
                   no_type => fragment - { type }
                   endpoint => { ( host: text  port: text | socket: text ) }
@@ -2081,11 +1998,12 @@ class DefinitionResolverTest {
 
         RecordBody noSocket = bodyOf(entries.get("no_socket"));
         assertEquals(List.of(), noSocket.groups());
-        assertEquals(List.of("required", "required"), noSocket.fields().stream().map(RecordField::describe).toList());
+        assertEquals(List.of("required", "required"), noSocket.fields()
+                .values().stream().map(RecordField::describe).toList());
 
         RecordBody noB = bodyOf(entries.get("no_b"));
         assertEquals(List.of(), noB.groups());
-        assertEquals("optional", noB.fields().getFirst().describe());
+        assertEquals("optional", noB.fields().values().iterator().next().describe());
     }
 
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
@@ -2190,15 +2108,15 @@ class DefinitionResolverTest {
      * declaration can name a real atom instance ({@code integer => !integer_type {}}) as a source or
      * supertype -- the shapes §5.7/§5.8 reject, which need a non-record body to exist at all.
      */
-    private TypeDefinition resolveSnippetsAgainstMetaKernel(String body) {
+    private Top resolveSnippetsAgainstMetaKernel(String body) {
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { %s }""".formatted(body)).parseSchemaDocument();
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.schema().entries());
-        TypeDefinition last = null;
+        Map<String, Top> namespace = new LinkedHashMap<>(metaKernel.schema().entries().entries());
+        Top last = null;
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
-            last = definitionResolverFor(metaKernel, namespace::get).resolve(declaration);
+            last = definitionResolverFor(metaKernel, namespace::get, snippetFacts).resolve(declaration);
             namespace.put(declaration.name(), last);
         }
         return last;
@@ -2209,9 +2127,9 @@ class DefinitionResolverTest {
     private static final String ACCOUNT = "account => { name: text  email: text  password: text }";
 
     /** Resolves a whole hand-written schema body in declaration order, so a later entry can compose with an earlier one. */
-    private Map<String, TypeDefinition> resolveAll(String body) {
+    private Map<String, Top> resolveAll(String body) {
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 { %s }""".formatted(body)).parseSchemaDocument();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             resolved.put(declaration.name(), resolver.resolve(declaration));
@@ -2219,30 +2137,29 @@ class DefinitionResolverTest {
         return resolved;
     }
 
-    private static RecordBody bodyOf(TypeDefinition definition) {
-        return assertInstanceOf(RecordBody.class, definition.body());
+    private static RecordBody bodyOf(Top definition) {
+        return assertInstanceOf(RecordBody.class, definition);
     }
 
-    private static List<String> fieldNames(TypeDefinition definition) {
-        return bodyOf(definition).fields().stream().map(RecordField::name).toList();
+    private static List<String> fieldNames(Top definition) {
+        return bodyOf(definition).fields().keySet().stream().toList();
     }
 
     /**
-     * §5.9's headline: the removed field is gone and IS-A is <em>broken</em> -- the contract index
-     * ({@code type_definition.supertypes}) is empty, so §7.2's subsumption check will not let an
-     * {@code account_public} stand where an {@code account} is expected, while the body keeps {@code account}
-     * as authorial lineage. Getting only the field arithmetic right and leaving the supertypes alone would
-     * silently make a subtracted type substitutable for the thing it deliberately isn't.
+     * §5.9's headline: the removed field is gone and IS-A is <em>broken</em> -- the chain is empty, so §7.2's
+     * subsumption check will not let an {@code account_public} stand where an {@code account} is expected.
+     * Getting only the field arithmetic right and leaving the supertypes alone would silently make a
+     * subtracted type substitutable for the thing it deliberately isn't.
      */
     @Test
-    void subtractionRemovesTheFieldAndBreaksIsAWhileKeepingLineage() {
-        Map<String, TypeDefinition> entries = resolveAll(ACCOUNT + "  account_public => account - { password }");
+    void subtractionRemovesTheFieldAndLeavesAnEmptyChain() {
+        Map<String, Top> entries = resolveAll(ACCOUNT + "  account_public => account - { password }");
 
-        TypeDefinition subtracted = entries.get("account_public");
+        Top subtracted = entries.get("account_public");
         assertEquals(List.of("name", "email"), fieldNames(subtracted));
-        assertEquals(List.of(), subtracted.supertypes());              // contract: broken
-        assertEquals(List.of(TypeRef.of("account")), bodyOf(subtracted).supertypes()); // lineage: kept
-        assertEquals(TypeKind.PRODUCT, subtracted.kind());
+        // IS-A broken: a subtracted record is a record with an empty chain.
+        assertEquals(List.of(), bodyOf(subtracted).supertypes());
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(subtracted, n -> true));
         // the source is untouched -- removal builds a new field list, it does not edit the supertype's
         assertEquals(List.of("name", "email", "password"), fieldNames(entries.get("account")));
     }
@@ -2254,27 +2171,26 @@ class DefinitionResolverTest {
      */
     @Test
     void removalsApplyAfterTheSupertypesAndTheBody() {
-        Map<String, TypeDefinition> entries = resolveAll(ACCOUNT
+        Map<String, Top> entries = resolveAll(ACCOUNT
                 + "  user => { badge_id: text }"
                 + "  staff_public => account & user & { badge: text } - { password }");
 
-        TypeDefinition staff = entries.get("staff_public");
+        Top staff = entries.get("staff_public");
         // inherited in supertype order (minus the removal), then the body's genuinely new field
         assertEquals(List.of("name", "email", "badge_id", "badge"), fieldNames(staff));
-        assertEquals(List.of(), staff.supertypes());
-        assertEquals(List.of(TypeRef.of("account"), TypeRef.of("user")), bodyOf(staff).supertypes());
+        assertEquals(List.of(), TypeChain.supertypesOf(staff), "a subtracted record's chain is empty");
     }
 
     /** A body entry may tighten a field that survives the removal -- §5.9's own {@code account_view}. */
     @Test
     void aRemovalCoexistsWithATighteningOfADifferentField() {
-        Map<String, TypeDefinition> entries = resolveAll(ACCOUNT
+        Map<String, Top> entries = resolveAll(ACCOUNT
                 + "  account_view => account & { email?: text ~ \"n/a\" } - { password }");
 
-        TypeDefinition view = entries.get("account_view");
+        Top view = entries.get("account_view");
         assertEquals(List.of("name", "email"), fieldNames(view));
         // the tightening replaced the inherited field in place, and removal ran afterwards
-        assertEquals("defaulted", bodyOf(view).fields().get(1).describe());
+        assertEquals("defaulted", bodyOf(view).fields().values().stream().toList().get(1).describe());
     }
 
     /**
@@ -2315,15 +2231,15 @@ class DefinitionResolverTest {
      */
     @Test
     void removingAGroupMemberDissolvesAGroupLeftWithOne() {
-        Map<String, TypeDefinition> entries = resolveAll("""
+        Map<String, Top> entries = resolveAll("""
                 bounds => { a: text  ( min: integer | exclusive_min: integer ) }
                 one_bound => bounds - { exclusive_min }
                 """);
 
-        TypeDefinition dissolved = entries.get("one_bound");
+        Top dissolved = entries.get("one_bound");
         assertEquals(List.of("a", "min"), fieldNames(dissolved));
         assertEquals(List.of(), bodyOf(dissolved).groups());
-        assertEquals("required", bodyOf(dissolved).fields().get(1).describe());
+        assertEquals("required", bodyOf(dissolved).fields().values().stream().toList().get(1).describe());
         // the source still has both members and its group
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), false)),
                 bodyOf(entries.get("bounds")).groups());
@@ -2332,18 +2248,18 @@ class DefinitionResolverTest {
     /** An OPTIONAL group's survivor becomes an OPTIONAL field -- the group's state, not the member's. */
     @Test
     void aDissolvedOptionalGroupLeavesAnOptionalField() {
-        Map<String, TypeDefinition> entries = resolveAll("""
+        Map<String, Top> entries = resolveAll("""
                 bounds => { a: text  ( min: integer | exclusive_min: integer )? }
                 one_bound => bounds - { exclusive_min }
                 """);
 
-        assertEquals("optional", bodyOf(entries.get("one_bound")).fields().get(1).describe());
+        assertEquals("optional", bodyOf(entries.get("one_bound")).fields().values().stream().toList().get(1).describe());
     }
 
     /** Three members less one is still a group: two members left, state untouched. */
     @Test
     void aGroupWithMembersToSpareSurvivesTheRemoval() {
-        Map<String, TypeDefinition> entries = resolveAll("""
+        Map<String, Top> entries = resolveAll("""
                 stamps => { ( created: text | modified: text | accessed: text )? }
                 fewer => stamps - { accessed }
                 """);
@@ -2359,7 +2275,7 @@ class DefinitionResolverTest {
      */
     @Test
     void removingEveryMemberDropsTheGroupItself() {
-        Map<String, TypeDefinition> entries = resolveAll("""
+        Map<String, Top> entries = resolveAll("""
                 bounds => { a: text  ( min: integer | exclusive_min: integer ) }
                 unbounded => bounds - { min  exclusive_min }
                 """);
@@ -2377,7 +2293,7 @@ class DefinitionResolverTest {
      */
     @Test
     void compositionRejectsAnUnresolvedSupertype() throws IOException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = kernelDeclarations();
         // "top" deliberately left out of the resolved map -- atom's supertype resolves to nothing
         // (the shared resolved field starts empty, and nothing puts "top" into it before this call).
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -2401,7 +2317,7 @@ class DefinitionResolverTest {
     @Test
     void aSealedRecordLowersBothMarksIntoTheBody() {
         RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
-                "pet => abstract { pet_type: text =?  name: text }").body());
+                "pet => abstract { pet_type: text =?  name: text }"));
 
         assertEquals(RecordExtensionType.ABSTRACT, body.extension());
         assertEquals(List.of("pet_type"), body.discriminators(),
@@ -2411,12 +2327,12 @@ class DefinitionResolverTest {
     /** Consumed, not preserved: §8.1's author-annotation channel carries neither, so one carrier holds each fact. */
     @Test
     void aLoweredMarkLeavesNothingInTheAnnotationChannel() {
-        TypeDefinition pet = resolveSnippetsAgainstMetaKernel(
+        Top pet = resolveSnippetsAgainstMetaKernel(
                 "pet => abstract { pet_type: text =?  name: text }");
-        RecordBody body = assertInstanceOf(RecordBody.class, pet.body());
+        RecordBody body = assertInstanceOf(RecordBody.class, pet);
 
-        assertTrue(pet.annotations().isEmpty(), "the definition mark is gone from the channel");
-        assertTrue(body.fields().get(0).annotations().isEmpty(), "and so is the field mark");
+        assertTrue(snippetFacts.get("pet").annotations().isEmpty(), "the definition mark is gone from the channel");
+        assertTrue(body.fields().values().stream().toList().get(0).annotations().isEmpty(), "and so is the field mark");
     }
 
     /**
@@ -2428,7 +2344,7 @@ class DefinitionResolverTest {
         RecordBody holder = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
                 abstract => { a: text }
                 final => { b: text }
-                holder => { f: abstract  g: final }""").body());
+                holder => { f: abstract  g: final }"""));
 
         assertEquals(RecordExtensionType.OPEN, holder.extension(),
                 "the words are field types here, not marks");
@@ -2438,7 +2354,7 @@ class DefinitionResolverTest {
     @Test
     void anUnmarkedRecordIsOpenAndNoFieldDiscriminates() {
         RecordBody body = assertInstanceOf(RecordBody.class,
-                resolveSnippetsAgainstMetaKernel("plain => { a: text  b: text }").body());
+                resolveSnippetsAgainstMetaKernel("plain => { a: text  b: text }"));
 
         assertEquals(RecordExtensionType.OPEN, body.extension());
         assertTrue(body.discriminators().isEmpty());
@@ -2453,7 +2369,7 @@ class DefinitionResolverTest {
     void aSubtypeOfASealedBaseIsOpenUnlessItSaysOtherwise() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
                 pet => abstract { pet_type: text =?  name: text }
-                dog => pet & { pet_type?: = "dog"  breed: text }""").body());
+                dog => pet & { pet_type?: = "dog"  breed: text }"""));
 
         assertEquals(RecordExtensionType.OPEN, dog.extension());
     }
@@ -2473,9 +2389,10 @@ class DefinitionResolverTest {
     void aRestatedFieldPinsTheSelectorAndCarriesNoMark() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
                 pet => abstract { pet_type: text =?  name: text }
-                dog => pet & { pet_type?: = "dog"  breed: text }""").body());
+                dog => pet & { pet_type?: = "dog"  breed: text }"""));
 
-        RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
+        RecordField pinned = dog.fields().entrySet().stream().filter(f -> f.getKey().equals("pet_type"))
+                .map(Map.Entry::getValue).findFirst()
                 .orElseThrow();
         assertEquals("fixed", pinned.describe(), "the member pins the selector");
         assertTrue(dog.discriminators().isEmpty(), "and the mark stays with the base that declared it");
@@ -2494,22 +2411,20 @@ class DefinitionResolverTest {
 
 
     /**
-     * <b>{@code abstract} is a claim with a subject on a template</b> (§5.10): a
-     * template carrying {@code extension} takes part in IS-A, and {@code subtypes} holds its own
-     * instantiations -- which is exactly the set the claim ranges over. So the mark lowers into the held body
-     * like {@code abstract}, and {@code RecordExtension} judges it against the fields the way it does for a
-     * closed record.
+     * <b>A record template is a family base, and a selector makes it a member-dispatched one</b> (§5.10): the
+     * open record takes part in IS-A, {@code subtypes} holds its own instantiations, and {@code
+     * RecordExtension} judges the selector against the fields the way it does for a closed record.
      */
     @Test
     void aTemplateMayBeSealed() {
-        TypeDefinition box = resolveSnippetsAgainstMetaKernel(
+        Top box = resolveSnippetsAgainstMetaKernel(
                 "box => <T> { kind: text =?  v: T }");
 
-        assertInstanceOf(TemplateBody.class, box.body());
-        // The base's own extension, derived and stated on the entry -- never read back out of the held text,
-        // whose `extension` member is an instantiation's mark (§1.3, §5.10).
-        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), ((TemplateBody) box.body()).extension());
-        assertEquals(List.of("kind"), ((TemplateBody) box.body()).discriminators());
+        RecordBody open = assertInstanceOf(RecordBody.class, box);
+        assertEquals(List.of("T"), open.parameterNames());
+        // The base is ABSTRACT by construction; its own `extension` is each application's (§5.10).
+        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(box));
+        assertEquals(List.of("kind"), open.discriminators());
     }
 
     /**
@@ -2530,19 +2445,14 @@ class DefinitionResolverTest {
      * <b>{@code abstract} is the one mark a template takes</b>, the asymmetry being the marks' own: it
      * constrains the marked type alone -- no direct instances -- which holds of every instantiation
      * identically, so {@code result => abstract <T> { … }} is meaningful and is what a host language spells
-     * {@code abstract class Result<T>}. §5.10 holds the body as text, so the mark is stated <em>in</em> that
-     * text and travels with it; {@code SubtypeTemplateFamilyTest} is where the closed end is checked.
+     * {@code abstract class Result<T>}. It is the open record's own {@code extension}, each application's;
+     * {@code SubtypeTemplateFamilyTest} is where the closed end is checked.
      */
     @Test
-    void aTemplateIsAbstractByStatingTheMarkInItsHeldBody() {
-        TypeDefinition box = resolveSnippetsAgainstMetaKernel("box => abstract <T> { v: T }");
+    void aTemplateIsAbstractByMarkingItsOpenRecord() {
+        Top box = resolveSnippetsAgainstMetaKernel("box => abstract <T> { v: T }");
 
-        assertInstanceOf(TemplateBody.class, box.body());
-        assertTrue(((TemplateBody) box.body()).template().contains("extension:"),
-                () -> "the mark has to be in the text, there being nowhere else: "
-                        + ((TemplateBody) box.body()).template());
-        assertTrue(((TemplateBody) box.body()).template().contains("ABSTRACT"),
-                () -> ((TemplateBody) box.body()).template());
+        assertEquals(RecordExtensionType.ABSTRACT, assertInstanceOf(RecordBody.class, box).extension());
     }
 
     /** Only a record has an extension fact to state; the mark has nowhere to land on anything else. */

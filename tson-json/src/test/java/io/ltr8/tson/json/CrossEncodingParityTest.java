@@ -49,8 +49,8 @@ class CrossEncodingParityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/parity-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               person => {
                 name:   text
@@ -80,10 +80,10 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
-              port_label  => !text_enum ["80" "443"]
+              port_label  => !text_type { members: ["80" "443"] }
               port_slot   => ( port_label | int32 )
               ported      => { p: port_slot }
-              answer      => !text_enum ["true" "false"]
+              answer      => !text_type { members: ["true" "false"] }
               answer_slot => ( answer | boolean )
               answered    => { a: answer_slot }
               port_text   => ( port_label | text )
@@ -94,6 +94,10 @@ class CrossEncodingParityTest {
               figure    => abstract { area: int32 }
               disc      => figure & { side: int32 }
               kennel    => { p: pet }
+              verdict   => abstract { v_kind: text =? }
+              passed    => verdict & { v_kind?: = "pass" }
+              pending   => <T> verdict & { v_kind?: = "wait"  detail: T }
+              ruling    => { v: verdict }
               dog_of    => dog
               pet_of    => pet
               gallery   => { f: figure }
@@ -123,8 +127,11 @@ class CrossEncodingParityTest {
               pinned      => { h: header_name = Idempotency-Key }
               charset     => !text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
               encoded     => { c: charset }
-              safe_header => !enum_type { type: header_name  members: [Accept content-type] }
+              safe_header => !enum_type { name_type: header_name  members: [Accept content-type] }
               screened    => { h: safe_header }
+              stock_id    => !uuid_type {}
+              customer_id => !uuid_type {}
+              ided        => { id: kind<uuid_type> }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -421,6 +428,20 @@ class CrossEncodingParityTest {
     }
 
     /**
+     * A record template IS-A a sealed base is no member of it, though it pins the selector: it has no values,
+     * and its applications are the members. So {@code pending}'s {@code "wait"} selects nothing, and the
+     * refusal offers only the pins a document could write -- never a route to the template, whose own reader
+     * would refuse for want of a subtype, naming a type the position never offered.
+     */
+    @Test
+    void aRecordTemplateUnderASealedBaseIsNoMemberInBoth() {
+        sameRule("ruling", "{ v: { v_kind: \"wait\"  detail: 1 } }", """
+                {"v": {"v_kind": "wait", "detail": 1}}""");
+        assertEquals(List.of("pass"), jsonDiagnostics("ruling", """
+                {"v": {"v_kind": "wait", "detail": 1}}""").stream().map(Diagnostic::expected).toList());
+    }
+
+    /**
      * The same family over a <b>template</b>: {@code outcome<text>} is abstract and {@code won<text>} is its
      * one member. Every entry in it is minted, and §8.2 makes a minted name non-normative -- so the alias is
      * the only name either document has for the member, and both encodings have to flatten it (§7.2's "after
@@ -513,6 +534,28 @@ class CrossEncodingParityTest {
                 {"v": {"$schema": "https://example.test/other.tn", "$type": "robot", "serial": "R2"}}""");
         sameVerdict("extern_box", "{ v: !robot { serial: R2 } }", """
                 {"v": {"$type": "robot", "serial": "R2"}}""");
+    }
+
+    // ── Kind positions ([TSON-SCHEMA] §4.2): an atom whose values are member names ───────────────────
+
+    @Test
+    void aMemberNameAtAKindIsAcceptedByBoth() {
+        bothAccept("ided", "{ id: stock_id }", """
+                {"id": "stock_id"}""");
+    }
+
+    /** One rule with one code: a type built with another constructor is no member, in either encoding. */
+    @Test
+    void aNonMemberNameAtAKindIsRefusedByBoth() {
+        sameVerdict("ided", "{ id: text }", """
+                {"id": "text"}""");
+    }
+
+    /** A kind holds a name, so a value of one of its members is refused as no name, the same way in both. */
+    @Test
+    void aValueOfAMemberAtAKindIsRefusedByBoth() {
+        sameVerdict("ided", "{ id: \"7d3e5f8a-1b2c-4d5e-8f90-a1b2c3d4e5f6\" }", """
+                {"id": "7d3e5f8a-1b2c-4d5e-8f90-a1b2c3d4e5f6"}""");
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {
@@ -672,12 +715,12 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * An enum whose type is not an identifier family is string-class whatever its members spell ([TSON-SCHEMA]
-     * §7.4): {@code !text_enum ["80" "443"]} beside {@code int32}, and {@code !text_enum ["true" "false"]} beside
-     * {@code boolean}, are disjoint, and each value goes to the variant of its own class.
+     * A closed set of text values is string-class whatever its members spell ([TSON-SCHEMA] §5.4): {@code
+     * !text_type { members: ["80" "443"] }} beside {@code int32}, and {@code !text_type { members: ["true" "false"]
+     * }} beside {@code boolean}, are disjoint, and each value goes to the variant of its own class.
      */
     @Test
-    void aTextEnumIsStringClassInBoth() {
+    void aTextValueSetIsStringClassInBoth() {
         bothAccept("ported", """
                 { p: "80" }""", """
                 {"p": "80"}""");
@@ -694,7 +737,7 @@ class CrossEncodingParityTest {
 
     /** Beside {@code text} it shares the string class, so the choice is not disjoint and needs the tag in both. */
     @Test
-    void aTextEnumBesideTextNeedsTheTagInBoth() {
+    void aTextValueSetBesideTextNeedsTheTagInBoth() {
         sameVerdict("labelled", """
                 { l: 80 }""", """
                 {"l": 80}""");
@@ -937,7 +980,7 @@ class CrossEncodingParityTest {
         assertEquals("\"UTF-8\"", json.get("c").toString());
     }
 
-    /** An enum over a case-folding label type matches a member however it is cased, in both encodings. */
+    /** An enum over a case-folding name type matches a member however it is cased, in both encodings. */
     @Test
     void anEnumMatchesInItsLabelTypesForm() {
         bothAdmit("screened", "{ h: Content-Type }", "{\"h\": \"Content-Type\"}");

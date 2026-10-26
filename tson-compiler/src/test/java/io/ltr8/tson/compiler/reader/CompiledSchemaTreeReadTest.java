@@ -17,6 +17,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The whole pipeline, end to end, through the one entry point a real caller would actually use --
@@ -49,12 +50,12 @@ class CompiledSchemaTreeReadTest {
     }
 
     @Test
-    void readsBareTopInOneCall() {
+    void topIsAbstractSoABareValueThereIsRefused() {
         TsonCompiledSchema compiled = compiled();
 
-        Object result = read(compiled, "{}", "top");
+        ReadException refused = assertThrows(ReadException.class, () -> read(compiled, "{}", "top"));
 
-        assertEquals(Map.of(), result);
+        assertTrue(refused.getMessage().contains("'top' is abstract"), refused.getMessage());
     }
 
     @Test

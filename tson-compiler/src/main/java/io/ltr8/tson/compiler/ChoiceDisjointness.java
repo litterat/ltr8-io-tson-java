@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.reader.DiscriminationClass;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.EnumSet;
@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Derives a choice's {@code type_definition.disjoint} (Part 2 §5.4): {@code true} exactly when every
+ * Derives a choice's {@code choice.disjoint} (Part 2 §5.4): {@code true} exactly when every
  * variant has a {@link DiscriminationClass} and no class appears twice, {@code false} otherwise. A total,
  * two-valued decision -- there is no "unable to decide" state, because the question is not value-set
  * disjointness (a partial-prover problem over bound intervals, pattern emptiness and record inhabitation)
@@ -35,10 +35,10 @@ final class ChoiceDisjointness {
     private ChoiceDisjointness() {
     }
 
-    static boolean derive(ChoiceBody choice, Map<String, TypeDefinition> namespace, Set<String> textEnums) {
+    static boolean derive(ChoiceBody choice, Map<String, Top> namespace) {
         Set<DiscriminationClass> seen = EnumSet.noneOf(DiscriminationClass.class);
         for (TypeRef variant : choice.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), namespace, textEnums);
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), namespace::get);
             if (variantClass.isEmpty() || !seen.add(variantClass.get())) {
                 return false;
             }

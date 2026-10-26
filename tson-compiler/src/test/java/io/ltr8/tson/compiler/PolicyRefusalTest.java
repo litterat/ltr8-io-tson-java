@@ -1,11 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.policy.LimitsPolicy;
-import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.*;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.unicode.Xid;
+import io.ltr8.unicode.Xid;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -240,9 +238,9 @@ class PolicyRefusalTest {
                 .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.singleScript()).perSegment())
                 .processorPolicy();
 
-        assertEquals(ScriptPolicy.Level.SINGLE_SCRIPT, policy.identifierPolicy().scripts().level());
+        assertEquals(RestrictionLevel.SINGLE_SCRIPT, policy.identifierPolicy().scripts().level());
         assertTrue(policy.identifierPolicy().isPerSegment());
-        assertEquals(ScriptPolicy.Level.ASCII_ONLY, policy.tokenPolicy().level());
+        assertEquals(RestrictionLevel.ASCII_ONLY, policy.tokenPolicy().level());
         assertEquals(Xid.UNICODE_VERSION, policy.unicodeDataVersion());
         assertEquals(Xid.UNICODE_VERSION, ProcessorPolicy.dataVersion());
     }

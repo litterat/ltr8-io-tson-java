@@ -23,8 +23,8 @@ class FieldGroupInTemplateTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/grouped-template.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               fragment => <T> { ( include: T | name?: T  type?: T )? }
               contact => <T> { ( email: T | phone: T )+ }
@@ -45,7 +45,7 @@ class FieldGroupInTemplateTest {
     }
 
     private static List<FieldGroup> groupsOf(TsonCompiledSchema schema, String entry) {
-        return assertInstanceOf(RecordBody.class, schema.schema().entries().get(entry).body()).groups();
+        return assertInstanceOf(RecordBody.class, schema.schema().entries().get(entry)).groups();
     }
 
     @Test

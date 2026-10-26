@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/37/m/meta.tn?sha256=568b589bdb162f5390ca46f6a941339d7b92ecb236bf233f8ed992b359b47a90"
-!!meta:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f2c2b278405f4c02ae327f70df07d5778744916da613a814104af6a312fcc145"
-!!import:"https://tson.io/2026/37/m/meta-kernel.tn?sha256=f2c2b278405f4c02ae327f70df07d5778744916da613a814104af6a312fcc145"
+!!id:"https://tson.io/2026/38/m/meta.tn?sha256=62dde2f344853848cd0ce4f722a0305d979e5883c0dcd14308959ad6a01bff47"
+!!meta:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=9cc191d3390ba7c7495d016bfda63cfca861135b671804957bb216daafc1e95b"
+!!import:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=9cc191d3390ba7c7495d016bfda63cfca861135b671804957bb216daafc1e95b"
 @doc:"""
-  TSON meta-schema (2026 Revision 37 draft).
+  TSON meta-schema (2026 Revision 38 draft).
 
   The canonical meta-schema for user schemas: a schema governed by the
   meta-kernel that adds the type constructors the core type library (core.tn)
@@ -36,7 +36,8 @@
      `complex_type`, with the `complex_component` enum), temporal (`date_type`,
      `time_type`, `datetime_type`, `duration_type`, `period_type`), identifier
      (`uuid_type`, `uri_type`), network (`ipv4_type`, `ipv6_type`,
-     `cidr4_type`, `cidr6_type`, `mac_type`), and text (`email_type`).
+     `cidr4_type`, `cidr6_type`, `mac_type`, `hostname_type`, `host_type`,
+     `media_type_type`), and text (`email_type`).
 
   Plus annotation types — the classifying markers `ordering`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
@@ -56,7 +57,7 @@
 
   Constructors that bind to a governing specification compose with the kernel's
   atom_specification mixin and pin the spec field with `=`. Their instances in
-  core are empty, `float_type` aside, whose instances select a `format`.
+  core and net are empty, `float_type` aside, whose instances select a `format`.
 
   Constraint fields whose values are of an atom meta declares the constructor of
   but not the instance — a bound of the constrained atom's own family, or a
@@ -419,7 +420,7 @@
   }
 
   @doc:"""
-    IPv4 address constraint vocabulary. Instance is `ipv4` in core. The spec pin
+    IPv4 address constraint vocabulary. Instance is `ipv4` in net. The spec pin
     cites RFC 3986 for its `IPv4address` production — the normative dotted-quad
     grammar ([TSON-DATA] §5.5). `within` and `excluding` list IPv4 networks in
     CIDR text (quoted — the form contains `/`): the address must lie inside at
@@ -433,7 +434,7 @@
   }
 
   @doc:"""
-    IPv6 address constraint vocabulary. Instance is `ipv6` in core. `within` and
+    IPv6 address constraint vocabulary. Instance is `ipv6` in net. `within` and
     `excluding` list IPv6 networks in CIDR text (quoted): the address must lie
     inside at least one `within` network when the field is present, and inside
     no `excluding` network.
@@ -445,7 +446,7 @@
   }
 
   @doc:"""
-    IPv4 network constraint vocabulary. Instance is `cidr4` in core.
+    IPv4 network constraint vocabulary. Instance is `cidr4` in net.
     `min_prefix`/`max_prefix` narrow the prefix length within the family range
     0-32; bounds outside that range are invalid at the schema level. `within`
     lists IPv4 networks in CIDR text (quoted): the value must be a subnet of at
@@ -461,7 +462,7 @@
   }
 
   @doc:"""
-    IPv6 network constraint vocabulary. Instance is `cidr6` in core.
+    IPv6 network constraint vocabulary. Instance is `cidr6` in net.
     `min_prefix`/`max_prefix` narrow the prefix length within the family range
     0-128. `within` and `excluding` list IPv6 networks in CIDR text (quoted),
     with the semantics of `cidr4_type`: subnet-of for `within`, non-overlap for
@@ -475,9 +476,69 @@
     excluding?:  [value]
   }
 
-  @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in core."
+  @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in net."
   mac_type => atom & atom_specification & {
     spec?: = "https://www.rfc-editor.org/rfc/rfc9542"
+  }
+
+  @doc:"""
+    Host name constraint vocabulary. Instance is `hostname` in net. A domain
+    name as a host names it: labels of ASCII letters, digits and hyphens
+    (RFC 1123 §2.1), or internationalized labels judged by IDNA2008 (RFC 5890
+    to RFC 5893), written as U-labels or as their A-labels, in any mix. `A`-`Z`
+    read as `a`-`z`; nothing else is mapped, so uppercase beyond ASCII, a
+    U-label not in NFC and percent-encoding are not host names. A label is at
+    most 63 octets and the name at most 253, counted in the A-label form; no
+    label is empty, none begins or ends with `-`, and there is no trailing `.`.
+    The last label does not begin with a digit, so a dotted-quad is never a
+    host name. The value is the name: every spelling of one name is one value,
+    and its canonical text has each internationalized label as its U-label.
+    `allow_idn` false admits only names with no internationalized label, in
+    either spelling.
+    """
+  hostname_type => atom & atom_specification & {
+    spec?:      = "https://www.rfc-editor.org/rfc/rfc5890"
+    allow_idn?: boolean ~ true
+  }
+
+  @doc:"""
+    Host constraint vocabulary. Instance is `host` in net. RFC 3987's `ihost`
+    with a DNS name: a host name as `hostname_type` has it, an IPv4 address in
+    dotted-quad, or an IPv6 address, written with or without the brackets a
+    URI puts around one. No zone identifier. The value is the name or the
+    address, never both; a name compares by name, an address by its octets,
+    and an IPv4 address never equals an IPv6 one, IPv4-mapped included. The
+    canonical text is the member's: the name's U-labels, the dotted-quad, or
+    RFC 5952 text without brackets.
+    """
+  host_type => atom & atom_specification & {
+    spec?: = "https://www.rfc-editor.org/rfc/rfc3987"
+  }
+
+  @doc:"""
+    Media type constraint vocabulary. Instance is `media_type` in net. A media
+    type (RFC 6838) and its parameters (RFC 9110 §8.3.1): the type and subtype
+    are RFC 6838 §4.2's `restricted-name`, and each parameter is a token name,
+    `=` and a token or quoted-string value, after a `;` with optional
+    whitespace around it. Nothing beyond US-ASCII. A media range (`text/*`) is
+    not a media type. The value is the type, the subtype and a map of
+    parameters: the type, subtype and parameter names compare without ASCII
+    case, a quoted value equals its token form, parameter order carries no
+    meaning and a repeated name is a resolver error, and a parameter value
+    keeps its case except `charset`'s, which folds. The canonical text is
+    lowercase, with `charset` folded and parameters sorted by name, each value
+    a token where it is one, joined by `;` without whitespace.
+    `allow_parameters` admits parameters, false by default. `types` lists the
+    top-level types admitted. `suffixes` lists RFC 6839 structured suffixes: a
+    suffix admits a subtype ending `+` and the suffix, and the subtype that is
+    the suffix itself. A refinement withdraws `allow_parameters` and shrinks
+    `types` and `suffixes`; it never widens them.
+    """
+  media_type_type => atom & atom_specification & {
+    spec?:             = "https://www.rfc-editor.org/rfc/rfc6838"
+    allow_parameters?: boolean ~ false
+    types?:            [text]
+    suffixes?:         [text]
   }
 
   @doc:"""

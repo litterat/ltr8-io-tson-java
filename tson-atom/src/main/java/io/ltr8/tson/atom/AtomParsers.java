@@ -13,6 +13,11 @@ import io.ltr8.tson.atom.parser.EnumParser;
 import io.ltr8.tson.atom.parser.IdentifierParser;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
+import io.ltr8.tson.atom.parser.KindParser;
+import io.ltr8.tson.atom.parser.RefParser;
+import io.ltr8.tson.atom.parser.HostParser;
+import io.ltr8.tson.atom.parser.HostnameParser;
+import io.ltr8.tson.atom.parser.MediaTypeParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.MacParser;
@@ -24,7 +29,7 @@ import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -38,6 +43,11 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.RefBody;
+import io.ltr8.tson.schema.meta.HostType;
+import io.ltr8.tson.schema.meta.HostnameType;
+import io.ltr8.tson.schema.meta.MediaTypeType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
@@ -97,12 +107,47 @@ public final class AtomParsers {
     }
 
     /**
-     * {@link #forType(Top)}, with the form an enum matches its members in: its label type's {@code normalization}
-     * ([TSON-SCHEMA] §5.5), which the body does not carry -- {@code enum_type.type} names an entry the governing
+     * {@link #forType(Top)}, with the form an enum matches its members in: its name type's {@code normalization}
+     * ([TSON-SCHEMA] §5.5), which the body does not carry -- {@code enum_type.name_type} names an entry the governing
      * meta may hold, which only linking sees, so the caller supplies what linking recorded
      * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
+     *
+     * <p>A reference body is this library's gap here, an {@link UnsupportedOperationException}: these callers judge a
+     * value a schema writes ({@code ~}/{@code =}, a template argument) by its token, and a reference's value is judged
+     * by what its name reaches, which only a value body's recorded names are.
      */
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
+        if (body instanceof RefBody reference) {
+            throw new UnsupportedOperationException("a value a schema writes at a reference-typed position ('ref<"
+                    + reference.of() + ">') is not yet judged: a reference's value is judged by what its name reaches");
+        }
+        return forType(body, enumForm, false);
+    }
+
+    /**
+     * {@link #forType(Top, Normalization)} for a position read under a schema that {@code governsSchemas} -- a meta
+     * layer, whose documents are schemas or describe one. A name such a document writes at a kind-typed position
+     * resolves in the described schema's namespace and not in the closure the kind's members were computed over, so
+     * the kind reads the type-name grammar alone ({@link KindParser#namesOnly}) and that schema's link, or ingest,
+     * judges membership ([TSON-SCHEMA] §4.2, §8.1). Every other body is read as {@link #forType(Top, Normalization)}
+     * reads it.
+     *
+     * <p>A reference ({@code ref_type}) is read only here, with {@code governsSchemas} true: a reference names an
+     * entry holding a value, which only a kernel-governed schema has, so the linker refuses one declared anywhere
+     * else and a reference body reaching here under any other schema is a broken invariant.
+     */
+    public static Optional<AtomType<?>> forType(Top body, Normalization enumForm, boolean governsSchemas) {
+        if (governsSchemas && body instanceof KindBody kind) {
+            return Optional.of(KindParser.namesOnly(kind));
+        }
+        if (body instanceof RefBody reference) {
+            if (!governsSchemas) {
+                throw new IllegalStateException("a reference ('ref<" + reference.of() + ">') reached a schema the "
+                        + "meta-kernel does not govern: the linker refuses a reference declared outside a "
+                        + "kernel-governed schema");
+            }
+            return Optional.of(new RefParser(reference));
+        }
         return Optional.ofNullable(switch (body) {
             case ValueType ignored -> null;
             case VoidType ignored -> null;
@@ -128,8 +173,12 @@ public final class AtomParsers {
             case Cidr4Type t -> new Cidr4Parser(t);
             case Cidr6Type t -> new Cidr6Parser(t);
             case EnumBody t -> new EnumParser(t, enumForm);
+            case KindBody t -> new KindParser(t);
             case ComplexType ignored -> ComplexParser.UNCONSTRAINED;
             case Ipv4Type t -> Ipv4Parser.of(t);
+            case HostnameType t -> new HostnameParser(t);
+            case HostType t -> new HostParser(t);
+            case MediaTypeType t -> new MediaTypeParser(t);
             case Ipv6Type t -> Ipv6Parser.of(t);
             default -> null;
         });

@@ -14,7 +14,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -22,7 +22,7 @@ import java.util.List;
 
 /**
  * Object-binding mode's own {@code array} reader -- reads an array-shaped value into a real, bound
- * Java array/collection via {@code descriptor}, a {@code tson-bind} {@link DataClassArray} already
+ * Java array/collection via {@code descriptor}, a {@code ltr8-bind} {@link DataClassArray} already
  * resolved for this array's own target Java type (resolving one is this class's caller's job, not
  * this class's -- same division of responsibility as {@link RecordBindReader}'s own {@code
  * DataClassRecord}).
@@ -183,10 +183,10 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
         }
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof ArrayBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
+            if (!(typeDefinition instanceof ArrayBody body)) {
+                throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition);
             }
             Type elementType = resolveElementType(body.elementType().name());
             DataClass dataClass = descriptorFor(new DataParameterizedType(List.class, elementType));
@@ -194,8 +194,8 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't array-shaped -- can't bind '" + name + "' as one");
             }
-            return new ArrayBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
-                    context.locationOf(name, typeDefinition),
+            return new ArrayBindReader(name, context.authoredName(name, typeDefinition), body, descriptor, resolver,
+                    context.locationOf(name),
                     AnnotationTypes.of(context), elementsAreNames(body, context));
         }
 

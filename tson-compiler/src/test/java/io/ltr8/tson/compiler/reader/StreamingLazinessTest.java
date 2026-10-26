@@ -17,15 +17,13 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,14 +71,13 @@ class StreamingLazinessTest {
 
     @Test
     void aFailFastErrorOnAnEarlyFieldNeverPullsAHugeTrailingFieldOffTheStream() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), IntegerType.UNCONSTRAINED));
-        entries.put("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer"))));
-        entries.put("big_record", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("a", TypeRef.of("integer")),
-                RecordField.required("b", TypeRef.of("integer")),
-                RecordField.required("huge", TypeRef.of("numbers"))))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("integer", IntegerType.UNCONSTRAINED);
+        entries.put("numbers", ArrayBody.of(TypeRef.of("integer")));
+        entries.put("big_record", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("a", RecordField.required(TypeRef.of("integer"))),
+                Map.entry("b", RecordField.required(TypeRef.of("integer"))),
+                Map.entry("huge", RecordField.required(TypeRef.of("numbers"))))));
         TsonSchema schema = new TsonSchema("https://example.test/laziness.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));

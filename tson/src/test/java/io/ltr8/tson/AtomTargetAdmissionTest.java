@@ -43,8 +43,8 @@ class AtomTargetAdmissionTest {
     private static Tson tson(String decls, Class<?> bound) {
         String schema = """
                 !!id:"https://example.test/a-1.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -118,7 +118,7 @@ class AtomTargetAdmissionTest {
     }
 
     /**
-     * {@code java.net.URL} never reaches {@code boundTo}: {@code tson-bind} finds no conversion for it and
+     * {@code java.net.URL} never reaches {@code boundTo}: {@code ltr8-bind} finds no conversion for it and
      * refuses the class outright, a layer earlier. Worth pinning because the reason it is not admitted is a
      * different and older one than the reason it should not be -- {@code URI.toURL} is partial over this
      * family's value space, a {@code urn:}, a relative reference and a bare fragment all being valid

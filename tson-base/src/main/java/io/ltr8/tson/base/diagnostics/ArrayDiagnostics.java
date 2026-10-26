@@ -1,7 +1,7 @@
 package io.ltr8.tson.base.diagnostics;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.unicode.ConfusableNames;
+import io.ltr8.unicode.ConfusableNames;
 
 import java.math.BigInteger;
 
@@ -14,14 +14,19 @@ import java.math.BigInteger;
  * set the same element type, the same size facets and the same element state; what it adds is uniqueness over
  * the element type's value space. So the only rule here a plain array never reaches is {@link #repeatedElement}.
  *
- * @param typeName the array or set type being read, as the author wrote it
+ * <p><b>A type no author named has no name in the message.</b> {@code typeName} is {@code null} for a form with
+ * no spelling of its own -- {@code set<text>} at a use site is its expansion, a set no author named -- and
+ * each sentence then states the rule alone, the diagnostic's position saying where.
+ *
+ * @param typeName the array or set type being read, as the author wrote it, or {@code null} for none
  */
 public record ArrayDiagnostics(String typeName) {
 
     /** The value is not an array at all -- {@code found} is the encoding's description of what was there. */
     public Refusal notAnArray(String found) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "expected an array for '%s', found %s".formatted(typeName, found), "an array", found);
+                (typeName == null ? "expected an array, found %s".formatted(found)
+                        : "expected an array for '%s', found %s".formatted(typeName, found)), "an array", found);
     }
 
     /**
@@ -31,7 +36,7 @@ public record ArrayDiagnostics(String typeName) {
      */
     public Refusal voidElement(int index, String spelling) {
         return new Refusal(Diagnostic.Code.FIELD_REQUIRED,
-                "'%s' element [%d] is absent, but elements are required".formatted(typeName, index),
+                subject("element [%d] is absent, but elements are required".formatted(index)),
                 "a value", spelling);
     }
 
@@ -42,7 +47,8 @@ public record ArrayDiagnostics(String typeName) {
      */
     public Refusal repeatedElement(String rendered) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "'%s' requires unique elements, '%s' appears more than once".formatted(typeName, rendered),
+                (typeName == null ? "elements must be unique, '%s' appears more than once".formatted(rendered)
+                        : "'%s' requires unique elements, '%s' appears more than once".formatted(typeName, rendered)),
                 "each element once", rendered);
     }
 
@@ -54,7 +60,8 @@ public record ArrayDiagnostics(String typeName) {
      */
     public Refusal confusableElements(ConfusableNames.Collision collision) {
         return new Refusal(Diagnostic.Code.CONFUSABLE_NAMES,
-                "'%s' has elements that read alike: %s".formatted(typeName, collision.describe()),
+                (typeName == null ? "elements read alike: %s".formatted(collision.describe())
+                        : "'%s' has elements that read alike: %s".formatted(typeName, collision.describe())),
                 "elements a reader can tell apart", "'" + collision.second() + "'");
     }
 
@@ -67,14 +74,24 @@ public record ArrayDiagnostics(String typeName) {
      */
     public Refusal tooFewElements(BigInteger min, int size) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "'%s' has %d elements, fewer than the minimum %s".formatted(typeName, size, min),
+                subject("%d elements, fewer than the minimum %s".formatted(size, min), "has "),
                 ">= " + min, String.valueOf(size));
+    }
+
+    /** {@code rest} led by the type's name, or alone where it has none. */
+    private String subject(String rest) {
+        return subject(rest, "");
+    }
+
+    /** The same, with {@code verb} between a name and {@code rest}: {@code 'tags' has 3 elements, ...}. */
+    private String subject(String rest, String verb) {
+        return typeName == null ? rest : "'" + typeName + "' " + verb + rest;
     }
 
     /** §5.3's {@code max_items}, on the same terms. */
     public Refusal tooManyElements(BigInteger max, int size) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "'%s' has %d elements, more than the maximum %s".formatted(typeName, size, max),
+                subject("%d elements, more than the maximum %s".formatted(size, max), "has "),
                 "<= " + max, String.valueOf(size));
     }
 }

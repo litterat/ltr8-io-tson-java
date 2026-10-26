@@ -3,9 +3,9 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
-import io.ltr8.tson.base.unicode.IdentifierProfile.Base;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.IdentifierProfile.Base;
+import io.ltr8.unicode.IdentifierProfile;
+import io.ltr8.unicode.Normalization;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,10 +29,11 @@ import java.util.Optional;
  * {@link UriType}'s are. {@code continue} is a Java keyword, so its component is {@link #continueBase}.
  *
  * <p>{@code identifier => !identifier_type { continue_add: "-" }} is a constructor-application instance (§5.5)
- * whose resolved body is exactly {@link #IDENTIFIER}, and whose profile is {@link IdentifierProfile#NAME}.
+ * whose resolved body is exactly {@link #IDENTIFIER}, and whose profile is [TSON-DATA] §7.7's: {@code tson-atom}'s
+ * {@code IdentifierGrammar} builds the series' name grammar from it.
  */
 @Typename(name = "identifier_type")
-public record IdentifierType(
+public record IdentifierType(TypeChain chain,
         String spec,
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
@@ -49,7 +50,23 @@ public record IdentifierType(
 
     @Record
     public IdentifierType {
+        chain = TypeChain.orEmpty(chain);
         members = members.map(List::copyOf);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public IdentifierType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern, Optional<List<String>> members, Base start, Base continueBase,
+            Optional<String> startAdd, Optional<String> continueAdd, Optional<String> medial, Optional<String> exclude,
+            Normalization normalization) {
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, start, continueBase, startAdd,
+                continueAdd, medial, exclude, normalization);
+    }
+
+    @Override
+    public IdentifierType withChain(TypeChain chain) {
+        return new IdentifierType(chain, spec, minLength, maxLength, length, pattern, members, start,
+                continueBase, startAdd, continueAdd, medial, exclude, normalization);
     }
 
     /** {@code identifier_type.spec}'s pinned value. */
@@ -61,15 +78,14 @@ public record IdentifierType(
             Optional.of("-"), Optional.empty(), Optional.empty(), Normalization.NFC);
 
     /**
-     * {@code scheme_name => !identifier_type { start: NONE  continue: NONE  start_add: "a…z"
-     * continue_add: "a…z0…9+-."  normalization: ASCII_CASEFOLD }} -- RFC 3986 §3.1's scheme, the element of
-     * {@code uri_type.schemes}. Since the profile judges the folded value, it lists lowercase letters only and
-     * admits a scheme however its ASCII letters are cased, and nothing that is not ASCII.
+     * {@code scheme_name => !identifier_type { start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"
+     * normalization: ASCII_CASEFOLD }} -- RFC 3986 §3.1's scheme, the element of {@code uri_type.schemes}: a
+     * letter, then letters, digits, {@code + - .}. The profile judges the folded value, so it admits a scheme
+     * however its ASCII letters are cased, and nothing that is not ASCII.
      */
     public static final IdentifierType SCHEME_NAME = new IdentifierType(SPEC, Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty(), Base.NONE, Base.NONE,
-            Optional.of("abcdefghijklmnopqrstuvwxyz"), Optional.of("abcdefghijklmnopqrstuvwxyz0123456789+-."),
-            Optional.empty(), Optional.empty(), Normalization.ASCII_CASEFOLD);
+            Optional.empty(), Optional.empty(), Optional.empty(), Base.ASCII, Base.ASCII, Optional.empty(),
+            Optional.of("+-."), Optional.empty(), Optional.of("_"), Normalization.ASCII_CASEFOLD);
 
     /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
     public TextType textConstraints() {

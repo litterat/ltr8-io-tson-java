@@ -2,14 +2,15 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -34,7 +35,7 @@ class ChoiceSugarResolutionTest {
     private static TsonSchema resolve(String body) {
         String document = """
                 !!id:"https://example.test/choice-sugar.tn"
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                 %s
                 }
@@ -43,13 +44,13 @@ class ChoiceSugarResolutionTest {
         return resolver.resolveSchema(new TsonSchemaParser(document).parseSchemaDocument());
     }
 
-    private static List<String> variantNames(TypeDefinition definition) {
-        return assertInstanceOf(ChoiceBody.class, definition.body()).variants().stream().map(TypeRef::name).toList();
+    private static List<String> variantNames(Top definition) {
+        return assertInstanceOf(ChoiceBody.class, definition).variants().stream().map(TypeRef::name).toList();
     }
 
     /** The one entry whose name starts with the given prefix -- an injected declaration carries a derived hash suffix. */
-    private static Map.Entry<String, TypeDefinition> injected(TsonSchema schema, String prefix) {
-        List<Map.Entry<String, TypeDefinition>> matches = schema.entries().entrySet().stream()
+    private static Map.Entry<String, Top> injected(TsonSchema schema, String prefix) {
+        List<Map.Entry<String, Top>> matches = schema.entries().entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith(prefix)).toList();
         assertEquals(1, matches.size(), () -> "expected exactly one injected '" + prefix + "*' entry, got "
                 + matches.stream().map(Map.Entry::getKey).toList());
@@ -59,7 +60,7 @@ class ChoiceSugarResolutionTest {
     /**
      * At declaration position the sugar <em>is</em> the construction, so the entry itself carries the
      * {@code ChoiceBody} -- not a REFERENCE to an injected one. It resolves as the ordinary construction of
-     * {@code choice} it desugars to: {@code source} names the constructor, SUM kind comes from that
+     * {@code choice} it desugars to: its tag is the constructor, SUM kind comes from that
      * constructor, and {@code supertypes} stays empty because §5.5 transfers the target's kind and nothing
      * else -- which is also all §8.1's own Choice row claims.
      */
@@ -67,11 +68,12 @@ class ChoiceSugarResolutionTest {
     void aDeclaredChoiceIsASumEntryCarryingAChoiceBody() {
         TsonSchema schema = resolve("  contact => (text | integer)");
 
-        TypeDefinition contact = schema.entries().get("contact");
-        assertEquals(TypeKind.SUM, contact.kind());
+        Top contact = schema.entries().get("contact");
+        assertEquals(EntryKind.SUM, EntryKind.of(contact, n -> true));
         assertEquals(List.of("text", "integer"), variantNames(contact));
-        assertEquals("choice", contact.source().map(TypeRef::name).orElse(null));
-        assertTrue(contact.supertypes().isEmpty(), () -> "expected no supertypes, got " + contact.supertypes());
+        assertEquals(java.util.Optional.of("choice"), schema.constructorOf("contact"));
+        assertTrue(TypeChain.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got "
+                + TypeChain.supertypesOf(contact));
     }
 
     /** More than two variants: §5.4 sets a floor of two, not a ceiling, and the array field takes them positionally. */
@@ -92,11 +94,11 @@ class ChoiceSugarResolutionTest {
     void anInlineChoiceIsHoistedAndReferredToByName() {
         TsonSchema schema = resolve("  person => { contact: (text | integer) }");
 
-        Map.Entry<String, TypeDefinition> choice = injected(schema, "choice_text_integer_");
+        Map.Entry<String, Top> choice = injected(schema, "choice_text_integer_");
         assertEquals(List.of("text", "integer"), variantNames(choice.getValue()));
 
-        RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person").body());
-        assertEquals(choice.getKey(), person.fields().getFirst().type().name());
+        RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
+        assertEquals(choice.getKey(), person.fields().values().iterator().next().type().name());
     }
 
     /**
@@ -122,7 +124,7 @@ class ChoiceSugarResolutionTest {
                   person => { home: (text | integer)  work: (text | integer) }""");
 
         String choice = injected(schema, "choice_text_integer_").getKey();
-        RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person").body());
-        assertEquals(List.of(choice, choice), person.fields().stream().map(field -> field.type().name()).toList());
+        RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
+        assertEquals(List.of(choice, choice), person.fields().values().stream().map(field -> field.type().name()).toList());
     }
 }

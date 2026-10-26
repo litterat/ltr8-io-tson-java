@@ -30,8 +30,8 @@ class NumberIdentityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/identity-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               by_number  => { number => text }
               number_set => set<number>

@@ -11,6 +11,9 @@ import io.ltr8.tson.atom.parser.DecimalParser;
 import io.ltr8.tson.atom.parser.DurationParser;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
+import io.ltr8.tson.atom.parser.HostParser;
+import io.ltr8.tson.atom.parser.HostnameParser;
+import io.ltr8.tson.atom.parser.MediaTypeParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.PeriodParser;
@@ -20,6 +23,9 @@ import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
+import io.ltr8.net.Host;
+import io.ltr8.net.MediaType;
+import io.ltr8.net.HostName;
 import io.ltr8.net.CidrInet4Network;
 import io.ltr8.net.CidrInet6Network;
 import io.ltr8.tson.base.atom.Complex;
@@ -89,6 +95,9 @@ public final class HostAtoms {
             Map.entry(Iri.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
+            Map.entry(HostName.class, HostnameParser.UNCONSTRAINED),
+            Map.entry(Host.class, HostParser.UNCONSTRAINED),
+            Map.entry(MediaType.class, MediaTypeParser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
             Map.entry(CidrInet4Network.class, Cidr4Parser.UNCONSTRAINED),
             Map.entry(CidrInet6Network.class, Cidr6Parser.UNCONSTRAINED));
@@ -112,6 +121,9 @@ public final class HostAtoms {
             Map.entry(Iri.class, IriParser.REFERENCE),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
+            Map.entry(HostName.class, HostnameParser.UNCONSTRAINED),
+            Map.entry(Host.class, HostParser.UNCONSTRAINED),
+            Map.entry(MediaType.class, MediaTypeParser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
             Map.entry(CidrInet4Network.class, Cidr4Parser.UNCONSTRAINED),
             Map.entry(CidrInet6Network.class, Cidr6Parser.UNCONSTRAINED));
@@ -132,7 +144,7 @@ public final class HostAtoms {
      * is concerned, so a hole in one half of a pair is invisible until a caller happens to declare the
      * other. {@code HostAtomsTest} pins the pairing rather than the table. {@link Number} itself is
      * deliberately absent -- it is abstract and names no family, so there is nothing to answer with, and
-     * {@code tson-bind} refuses such a component a layer earlier in any case.
+     * {@code ltr8-bind} refuses such a component a layer earlier in any case.
      *
      * <p><b>It is an interpretation, and this is the one worth committing to.</b> Nothing says a Java
      * {@code int} means {@code int32} rather than an {@code integer} bounded to 32 bits; the two admit the

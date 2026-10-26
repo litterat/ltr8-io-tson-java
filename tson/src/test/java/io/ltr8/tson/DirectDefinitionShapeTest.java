@@ -3,8 +3,8 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -50,10 +50,12 @@ class DirectDefinitionShapeTest {
 
     @Test
     void aSugarFormAtDeclarationPositionIsTheEntryItself() {
-        TypeDefinition textList = resolve("dd1", "  text_list => [text]\n").schema().entries().get("text_list");
+        var schema = resolve("dd1", "  text_list => [text]\n").schema();
+        Top textList = schema.entries().get("text_list");
 
-        assertEquals(TypeKind.PRODUCT, textList.kind(), "the declaration is the array entry, not a hop to one");
-        assertEquals("array", textList.source().orElseThrow().name());
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(textList, n -> true),
+                "the declaration is the array entry, not a hop to one");
+        assertEquals(java.util.Optional.of("array"), schema.constructorOf("text_list"));
     }
 
     /**
@@ -67,7 +69,7 @@ class DirectDefinitionShapeTest {
                   holder    => { f: [text] }
                 """);
 
-        assertEquals(TypeKind.PRODUCT, linked.schema().entries().get("text_list").kind());
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("text_list"), n -> true));
         assertEquals(1, minted(linked, "array_").size(),
                 () -> "the use site mints its own: " + minted(linked, "array_"));
     }

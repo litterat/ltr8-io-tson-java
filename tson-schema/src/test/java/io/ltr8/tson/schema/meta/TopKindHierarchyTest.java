@@ -3,7 +3,9 @@ package io.ltr8.tson.schema.meta;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
@@ -30,7 +32,7 @@ class TopKindHierarchyTest {
 
     @Test
     void productFamilyVariantsAreProductAndTop() {
-        RecordBody record = RecordBody.of(List.of());
+        RecordBody record = RecordBody.of(RecordBody.fieldMap());
         ArrayBody array = ArrayBody.of(TypeRef.of("integer"));
         MapBody map = MapBody.of(TypeRef.of("text"), TypeRef.of("text"));
         TupleBody tuple = new TupleBody(List.of());
@@ -46,6 +48,29 @@ class TopKindHierarchyTest {
         ChoiceBody choice = new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone")));
         assertInstanceOf(Sum.class, choice);
         assertInstanceOf(Top.class, choice);
+    }
+
+    /** A kind is an atom whose values are names (Part 2 §4.2), as an enum is: a set of names, not a sum. */
+    @Test
+    void aKindIsAnAtom() {
+        KindBody kind = new KindBody("uuid_type");
+        assertInstanceOf(Atom.class, kind);
+        assertInstanceOf(Type.class, kind);
+    }
+
+    /**
+     * A kind's identity is the constructor it names: its members are derived over a closure, and one kind holds
+     * different ones in two schemas. A refinement may not name another constructor.
+     */
+    @Test
+    void aKindIsItsConstructor() {
+        KindBody linked = new KindBody("uuid_type").linked(List.of("stock_id", "customer_id"));
+
+        assertEquals(new KindBody("uuid_type"), linked);
+        assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
+        assertEquals(Optional.of(List.of("customer_id", "stock_id")), linked.members());
+        assertEquals(List.of(), linked.constraintsCheck(new KindBody("uuid_type")));
+        assertEquals(1, linked.constraintsCheck(new KindBody("text_type")).size());
     }
 
     @Test

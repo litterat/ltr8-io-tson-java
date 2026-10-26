@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
@@ -36,8 +37,6 @@ import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.lexer.TokenType;
-import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -62,7 +61,7 @@ import java.util.Optional;
  *
  * <p>This is a grammar-only compiler: it builds the AST of {@link io.ltr8.tson.compiler.ast.schema}
  * faithfully from source text and does not resolve, validate, or desugar anything (no namespace
- * lookups, no {@code type_definition} materialisation, no IS-A computation -- all §8 concerns).
+ * lookups, no resolved entries, no IS-A computation -- all §8 concerns).
  * "Building the schema" here means the grammar layer only.
  */
 public final class TsonSchemaParser extends TsonDataParser {
@@ -518,9 +517,9 @@ public final class TsonSchemaParser extends TsonDataParser {
         expect(TokenType.MINUS, "a removal clause's '-'");
         expect(TokenType.LBRACE, "a removal set's opening '{'");
         List<String> names = new ArrayList<>();
-        names.add(expectFieldNameToken("a removed field name").text());
+        names.add(expectDeclaredFieldName("a removed field name").text());
         while (consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
-            names.add(expectFieldNameToken("a removed field name").text());
+            names.add(expectDeclaredFieldName("a removed field name").text());
         }
         expect(TokenType.RBRACE, "a removal set's closing '}'");
         return new RemovalSet(names);
@@ -560,7 +559,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     private FieldDef parseFieldDef(List<Annotation> annotations) {
         // Taken before the token is consumed, exactly as a declaration's own name position is.
         Position namePosition = peek().start();
-        Token name = expectFieldNameToken("a record field name");
+        Token name = expectDeclaredFieldName("a record field name");
         // The name's `?`: the key may be omitted (§5.2). `?` is always a token of its own, so `a?:` needs no
         // lexer change, and adjacency is what keeps `a ?:` from reading as the same mark.
         boolean omittable = consumeAdjacentQuestion();
@@ -659,7 +658,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private GroupDef.Member parseGroupMember() {
         List<Annotation> annotations = parseAnnotationList();
-        Token name = expectFieldNameToken("a field group member's name");
+        Token name = expectDeclaredFieldName("a field group member's name");
         // Optional once the member's option is chosen: the option, not the record, is what the mark is about.
         boolean omittable = consumeAdjacentQuestion();
         expect(TokenType.COLON, "a field group member's ':'");
@@ -1012,10 +1011,19 @@ public final class TsonSchemaParser extends TsonDataParser {
         return t.text();
     }
 
+    /**
+     * A field name a schema declares: the shared {@code field-name} production, any single-line token. What the
+     * name may be is its record's field name type ([TSON-SCHEMA] §5.2), which the linker judges every declared
+     * name by once the record and the type it inherits are resolved.
+     */
+    private Token expectDeclaredFieldName(String construct) {
+        return expectFieldNameToken(construct);
+    }
+
     private void requireIdentifierName(Token t) {
         // isPresent/get rather than ifPresent: the lambda would capture `t`, which allocates once per
         // name on a path every document runs through. Optional.empty() is a singleton, so this is free.
-        Optional<String> violation = IdentifierProfile.validate(t.text());
+        Optional<String> violation = IdentifierGrammar.validate(t.text());
         if (violation.isPresent()) {
             throw new ParseException("'" + t.text() + "' is not a valid type name -- " + violation.get(),
                     t.start());

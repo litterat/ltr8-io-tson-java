@@ -33,8 +33,8 @@ class SchemaSourceConfigTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               order => { sku: text  quantity: int32 }
             }
@@ -96,24 +96,67 @@ class SchemaSourceConfigTest {
         assertEquals(List.of(), tson.validate(DOCUMENT.replace(SCHEMA_URI, otherUri)));
     }
 
-    /** Deny by default survives the short form -- a host not named is not served, and says so as a diagnostic. */
+    /**
+     * Deny by default survives the short form -- a host not named is not served, and says so as a diagnostic.
+     * The refusal names the host and the rule, never the hosts that are mapped ([TSON-SCHEMA] §11.2), and no
+     * failure names the directory behind a host.
+     */
     @Test
     void anUnnamedHostIsNotServed(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas("elsewhere.example.test", dir)));
 
-        assertTrue(tson.validate(DOCUMENT).stream()
-                .anyMatch(d -> d.message().contains("is not one of")), () -> tson.validate(DOCUMENT).toString());
+        String refusal = onlyMessage(tson.validate(DOCUMENT));
+        assertFalse(refusal.contains("elsewhere.example.test"), refusal);
+        assertFalse(refusal.contains(dir.toString()), refusal);
+        assertTrue(refusal.contains("host '" + HOST + "' is not an allowed host"), refusal);
+    }
+
+    /** A mapped host with no file behind the reference says so without naming the directory it looked in. */
+    @Test
+    void aMissingFileDoesNotNameItsDirectory(@TempDir Path dir) {
+        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas(HOST, dir)));
+
+        String missing = onlyMessage(tson.validate(DOCUMENT));
+        assertFalse(missing.contains(dir.toString()), missing);
+        assertTrue(missing.contains("no file backs it"), missing);
+    }
+
+    /** A reference resolving outside its host's directory is refused without naming either path. */
+    @Test
+    void anEscapeDoesNotNameTheDirectoryOrTheFile(@TempDir Path dir) throws IOException {
+        Path served = Files.createDirectory(dir.resolve("served"));
+        Path secret = Files.writeString(dir.resolve("secret.tn"), SCHEMA);
+        try {
+            Files.createSymbolicLink(served.resolve("order-1.tn"), secret);
+        } catch (UnsupportedOperationException | IOException noSymlinks) {
+            return; // a filesystem without symlinks has nothing to test here
+        }
+        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas(HOST, served)));
+
+        String refusal = onlyMessage(tson.validate(DOCUMENT));
+        assertFalse(refusal.contains(dir.toString()), refusal);
+        assertFalse(refusal.contains(dir.toRealPath().toString()), refusal);
+        assertTrue(refusal.contains("resolves outside the directory its host is mapped to"), refusal);
     }
 
     /** `httpSchemas` allows a host without fetching anything, so this needs no server to be worth asserting. */
     @Test
     void httpSchemasAllowsOnlyTheHostsItNames() {
-        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.httpSchemas("allowed.example.test")));
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.httpSchemas("allowed.example.test", "internal.corp.example")));
 
-        assertTrue(tson.validate("""
+        String refusal = onlyMessage(tson.validate("""
                 !!schema:"https://denied.example.test/order-1.tn"
-                !order { }""").stream().anyMatch(d -> d.message().contains("is not one of")));
+                !order { }"""));
+        assertFalse(refusal.contains("allowed.example.test"), refusal);
+        assertFalse(refusal.contains("internal.corp.example"), refusal);
+        assertTrue(refusal.contains("host 'denied.example.test' is not an allowed host"), refusal);
+    }
+
+    private static String onlyMessage(List<Diagnostic> problems) {
+        assertEquals(1, problems.size(), problems::toString);
+        return problems.getFirst().message();
     }
 
     // --- schemas a caller already holds ---

@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -22,11 +21,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>[TSON-SCHEMA] §8.3 flattens a type position past a {@code REFERENCE} entry and records the name the
  * author wrote as {@code @alias} on the type-ref, so {@code c: pct} over {@code pct => small} arrives at the
  * reader as {@code small} -- one shared reader, correctly named {@code small} for a position that names it
- * directly, and wrong for one that does not. The walk stops at a materialised instantiation instead, so
- * {@code e: b<10>} names an entry whose own content-derived key ({@code integer_type_10_100_786fbcfb})
- * appears nowhere in the author's file at all.
+ * directly, and wrong for one that does not. A minted application ({@code e: b<10>}) is its expansion, an
+ * entry whose content-derived key ({@code integer_type_10_100_786fbcfb}) appears nowhere in the author's file,
+ * so its message leads with no name at all.
  *
- * <p>Both are fixed the same way and in the same place: the name is chosen where a composite reader wires
+ * <p>The name is chosen where a composite reader wires
  * its children, which is <b>compile time</b>. Nothing is added to {@code TsonReadContext} and no per-read
  * allocation changes -- {@code AllocationHarnessTest} is the guard on that, and a position with no alias
  * gets the shared reader back unchanged.
@@ -49,8 +48,8 @@ class UseSiteNamingTest {
     private static List<String> messages(String declarations, String data) {
         String schema = """
                 !!id:"https://example.test/naming.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s%s
                 }
@@ -86,18 +85,32 @@ class UseSiteNamingTest {
     }
 
     /**
-     * <b>A materialised application names the application.</b> No {@code @alias} exists here -- §8.3's walk
-     * stops at an instantiation -- so the name comes from the other carrier: the instantiation entry's own
-     * {@code source} is {@code b<10>}, and the entry that refers is what names the reader it refers to.
+     * <b>An application nothing declares is its expansion, which no author named</b> (§5.10). {@code b<10>} is
+     * an atom instance with no spelling of its own, so the message is the atom family's alone, and the position
+     * the diagnostic carries says where -- never the content-derived name of the entry it landed on.
      */
     @Test
-    void aMaterialisedApplicationNamesTheApplicationTheAuthorWrote() {
+    void aMintedApplicationLeavesTheMessageToItsFamily() {
         List<String> found = messages("  r => { e: b<10> }", "!r { e: 5 }");
 
+        assertEquals(List.of("'5' is less than the minimum 10"), found);
+    }
+
+    /** A record application nothing declares expands to a record no author named, shown as its body. */
+    @Test
+    void aMintedRecordIsNamedByItsBody() {
+        List<String> found = messages("  bx => <T> { v: T }\n  r => { e: bx<int32> }", "!r { e: { v: 1  nope: 2 } }");
+
         assertEquals(1, found.size(), found::toString);
-        assertTrue(found.getFirst().startsWith("'b<10>':"), found.getFirst());
-        assertFalse(found.getFirst().matches("(?s).*\\w+_[0-9a-f]{8}.*"),
-                "no content-derived entry name: " + found.getFirst());
+        assertTrue(found.getFirst().startsWith("unknown field 'nope' on '{ v: int32 }'"), found.getFirst());
+    }
+
+    /** The same for a set: {@code set<text>} expands to a set no author named, which is not the array {@code [text]}. */
+    @Test
+    void aMintedSetIsNotNamedAsAnArray() {
+        List<String> found = messages("  r => { t: set<text> }", "!r { t: [a a] }");
+
+        assertEquals(List.of("elements must be unique, 'a' appears more than once"), found);
     }
 
     /**

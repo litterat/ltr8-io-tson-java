@@ -6,8 +6,8 @@ that runs before it. Current form only; history lives in git.
 
 **Invariants**
 
-- The pass runs over the **resolved** form after the driving loop, and only a closed entry is scanned — an entry with
-  a non-empty `parameters` list is skipped.
+- The pass runs over the **resolved** form after the driving loop. In an open record it closes only the field types that
+  name none of its parameters (`OpenEntry.parameterIn`, applied in `MetaRefs`); a held body is not scanned.
 - An application's arguments are dereferenced before it is closed, and only a reference is dereferenced — a refinement
   and a fresh instance keep their own applications.
 - A declaration naming an application **is** that entry (`closeApplicationInto`): no internal name is derived or
@@ -16,11 +16,21 @@ that runs before it. Current form only; history lives in git.
   substitution descends into arguments.
 - On-demand closing (a composition supertype, a refinement source) shares this same instance and publishes each entry
   into the namespace as it is built.
-- Which parents were applications is read off the **held** body, not off the closed one (§5.9 subtraction keeps named
-  lineage in a body whose contract was emptied).
-- `TypeDefinition.kind` is `@Unbound` and never written; an open entry is `TEMPLATE`. A closed entry whose chain
-  reaches `top` is a constructor and takes its chain's base kind; every other closed entry takes the branch of `Top`
-  its substituted body occupies (`kindOfClosed`).
+- Which parents were applications is read off the **held** tree's chain `parents`, not off the closed one, whose
+  `supertypes` are bare names; a closed type keeps no `parents` once the fold has run, and an open record keeps its
+  parents as written.
+- An application nothing declares is its expansion: the use site names the closed synthetic closing produced, named
+  for its binding record — a record (`mintedRecord`) like any other form — and no instantiation entry is minted. The
+  exception is an expansion that names its own application (the knot was tied on it, `TemplateMaterialiser.tied`),
+  which keeps an instantiation entry recording the application: the record itself, or a `Reference` to the synthetic.
+- A minted record is a member of nothing: one whose chain names a declared type is refused when it is minted
+  (`refuseMintedMember`), and the applied-parent fold gives it no edge.
+- An instantiation of any kind — a record member, a namespace entry, a self-reaching `Reference` hop — records the
+  application it closes in the map `SchemaResolver` shares with the materialiser, which writes it on the entry's key
+  as `@application`; that is what §8.2's identity and the applied-parent fold key on.
+- Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written; a held template is
+  `TEMPLATE`. A record, open or closed, takes the base kind its chain reaches; every other entry takes the branch of
+  `Top` its body occupies.
 - A template `TemplateRegularity` condemns is replaced with a placeholder in both the entry map and the namespace; the
   depth guard stays as a backstop for a hole in that check.
 
@@ -41,26 +51,33 @@ recorded open form, and replacing the application with a reference to the entry 
   at a scalar position, refused one layer of application up. **Only a reference is dereferenced**; a refinement
   (`!uuid ^ {}`, IS-A `uuid`) and a fresh instance (`!uuid_type {}`, related to neither) are ordinary entries
   and keep their own applications, which is what makes those two spellings mean something. **Identity is
-  normalised, not provenance**: the minted `source` becomes the canonical application, and the name the author
-  wrote survives at the use site, which states it as written — a division available because no pass rewrites
-  use sites (§8.3). `AliasedArgumentIdentityTest` pins it. **Every reference is a pure rename**, which is what
+  normalised, not provenance**: the canonical application is what the entry's key records (`@application`),
+  and the name the author wrote survives at the use site, which states it as written — a division available because no
+  pass rewrites use sites (§8.3). `AliasedArgumentIdentityTest` pins it. **Every reference is a pure rename**, which is what
   the rule rests on: nothing that changes how a value reads rides on a reference — a `bytes` alphabet is
   `bytes_type`'s own `encoding` selector (§5.5), so it is part of the type and travels with it.
 - **It runs over the resolved form, not the AST**, as a pass in `SchemaResolver` after the driving loop.
   Two reasons. An application arrives here as a `schema.meta.TypeRef` carrying `arguments` — the one thing
   that shape means, since a closed form is always an entry named by a bare reference — so substitution is a
-  walk over value types rather than a second AST rewrite. And the entry it mints can record its own
-  `source`, which is what §8.2 keys identity on; an injected `SchemaMap.Declaration` has no channel for one,
-  which is what rules out doing this in `SchemaDesugarer` alongside the sugar hoists. It also keeps that
+  walk over value types rather than a second AST rewrite. And the entry it mints records its application
+  on its key (`@application`), which is what §8.2 keys identity on; an injected
+  `SchemaMap.Declaration` has no channel for one, which is what rules out doing this in `SchemaDesugarer` alongside
+  the sugar hoists. It also keeps that
   phase purely syntactic.
-- **Only a closed entry is scanned.** A template's own body is *open* — `chain<T>` inside `chain` awaits
-  substitution and is not an application to close — so entries with a non-empty `parameters` list are
-  skipped. Closing them would mint an entry per level, keyed on the literal parameter name.
-- **Identity is the flattened application** recorded in `source` (§8.2), and the derived name is built from
-  it, so two `box<text>` anywhere in the schema land on one entry for free.
+- **An open body closes only what names none of its parameters.** `chain<T>` inside `chain` awaits substitution and is
+  not an application to close: closing it would mint an entry per level, keyed on the literal parameter name. A field
+  type that names no parameter, at any depth (`kind: bounded<9>`, `tags: [box<text>]`), means the same in every
+  application, so an open record's is closed in place and the base names the entry each member names — which is what
+  `FamilySelectors` reads a selector's type from, and what keeps the synthetic merge's renames reaching the base. A held
+  body maps nothing: its references are tokens until substitution.
+- **A minted entry's identity is its content** (§8.2): its name is derived from its binding record, so two
+  `box<text>` anywhere in the schema land on one entry for free, and so do `box<int32>` and `crate<int32>` over two
+  templates with one field list. A declared entry's identity is its name, and its key records the canonical
+  application (`@application`), so an ingested schema's declared applications unify with a later schema's use sites
+  (`ownedBy`).
 - **A declaration naming the application *is* that entry, and nothing is minted beside it**
-  (§8.2). `text_box => box<text>` resolves to the closed record itself, carrying the
-  canonical application in its own `source` — not a `Reference` to a content-named entry sitting beside it.
+  (§8.2). `text_box => box<text>` resolves to the closed record itself, its key
+  recording the canonical application — not a `Reference` to a content-named entry sitting beside it.
   `DefinitionResolver` reaches `closeApplicationInto`, which builds the body **under the declared name**: it
   derives no internal name and claims none (`MintedNames.claim` is never called) and publishes nothing, so
   the synthetic is never created rather than created and then collapsed. What it records instead is
@@ -76,11 +93,17 @@ recorded open form, and replacing the application with a reference to the entry 
     A composition absorbing an application takes its fields while the entry is still open, so the IS-A edge
     to the owning declaration cannot be written at close time — that declaration may not have resolved yet.
     The pass indexes entries by their own canonical application and folds each owner and its ancestors into
-    `supertypes` to a fixed point, so `dogs` reaches `pet` whether it is declared before or after it.
-  - **A synthetic still mints, and must.** Only a *declared* application closes into a name; a use-site sugar
-    form has no author-written name for identity to key on, so it keeps its content-derived one (§8.2). One
-    that composes onto a record would be an unnameable family member, and the linker refuses it
-    (`RecordExtension`, `design/linking-and-compilation.md`).
+    `supertypes` to a fixed point, so `dogs` reaches `pet` whether it is declared before or after it. A minted
+    expansion records no application, so the materialiser's `expansionsByApplication` stands in for it: a
+    declaration's `& box<int32>` reaches the entry `box<int32>` written at a use site expanded to. A minted record
+    gains no edge itself (above).
+  - **A synthetic still mints, and must.** Only a *declared* application closes into a name; a use-site
+    application, like a sugar form, has no author-written name for identity to key on, so it keeps a
+    content-derived one (§8.2). One whose chain names a declared type — a supertype, or a parent application a
+    declaration owns — would be an unnameable family member, and `refuseMintedMember` refuses it at minting, with
+    the application in hand to name and against the declaration that wrote it. The linker's check
+    (`RecordExtension`, `design/linking-and-compilation.md`) is left for the instantiation entry a self-reaching
+    expansion keeps.
 - **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names
   it, and no special case is needed for depth.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head
@@ -93,26 +116,15 @@ recorded open form, and replacing the application with a reference to the entry 
   repeat and never nests, so nothing reaching this pass should run away, but if the static check ever has a
   hole the alternative is a `StackOverflowError`, which is neither a diagnosis nor something the exception
   policy can classify.
-- **Substitution is where a routed `=` becomes fixed.** §5.7 puts a parametric `= P` in `REQUIRED` at the
-  declaration ("nothing is fixed at declaration — the value does not exist yet") and defers the rest to one
-  sentence, *fixation happens downstream, where values are concrete*. `fixRoutedValues` is that downstream: a bound
-  field arriving required and FREE becomes optional and FIXED with the argument as its value, so
-  `response<order, 201>` lands on exactly what the literal `status?: int32 = 201` beside it lands on. Carried
-  through unchanged instead, the closed entry held the right value on a field that did not enforce it — a
-  constraint the author wrote, silently absent from the type it governs, with no diagnostic anywhere because
-  nothing was wrong. **The two spellings are told apart by the role they arrive in**, which is the only
-  reason this is recoverable at all: §5.7 sends `= P` to FREE and `~ P` to DEFAULT, so a
-  routed default stays a default and data may still override it. §5.7 names the downstream: fixation happens
-  at materialisation, where a field whose routed parameter binds to a concrete argument takes the state its
-  literal spelling would have.
+- **Substitution changes no field fact.** A routed `= P` is FIXED where it is written and `~ P` DEFAULT, each with
+  `optional` as the name was marked (§5.7), so closing puts the argument in `value` and
+  `response<order, 201>` lands on exactly what the literal `status?: int32 = 201` beside it lands on. What closing
+  does change is the record-level selector list: the member names none (`asMember`), its pins being in place.
 - **An application whose head names nothing in scope is left whole, arguments and all.** This pass gives no
   verdict on an unresolvable head — that is the linker's, as an unresolved reference — but it still has to
-  hand the linker something faithful, and collapsing the application to its bare head is not that. The one
-  slot where the difference showed is `source`, whose lookup falls back to the governing meta's structure
-  namespace: a stripped head found a template the schema cannot name and was faulted for supplying no
-  arguments, when the author had written them. Keeping the list means the linker judges what was written.
-  The fallback's own half of the fix is in `design/class2-compilation.md` — it does not apply to an
-  argument-bearing `source` at all, a §5.10 head being resolved in the type-name namespace only (§3.3.1).
+  hand the linker something faithful, and collapsing the application to its bare head is not that: a stripped
+  head is faulted for supplying no arguments when the author wrote them. Keeping the list means the linker judges
+  what was written (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`).
 - **Kind checking falls out of substitution.** A value
   argument reaching a type position is the author's error
   — §5.10 infers a parameter's kind from its use, so the body's use and the applied argument are the two
@@ -144,38 +156,35 @@ recorded open form, and replacing the application with a reference to the entry 
     application (`a => b<text> & {}`, `b => <T> a & {}`) is reported as a circular composition rather than
     recursing. Pinned, because it is the one thing this wiring could have broken.
   - **An application still naming the declaration's own parameters absorbs without closing anything.**
-    `vip => <T> customer & box<T>` needs no materialisation: the operand's body is *held*, so its field set is
+    `vip => <T> customer & box<T>` needs no materialisation: the operand is an open record, so its field set is
     known while the application is open, and substituting its parameters with the arguments as written — here
-    the absorbing declaration's own — yields a held record still carrying them. Read back through the
+    the absorbing declaration's own — yields a held tree still carrying them. Read back through the
     `record` constructor, that is an ordinary field set whose types mention a parameter, which is what a
     template's fields are anyway. Inner applications are deliberately left unclosed: they close when the
     absorbing declaration does, one pass later.
-    - **The operand contributes no name to the open entry's contract index, and the application to its
-      body.** `box` is a template and §5.10 makes a template no type, so `vip`'s own `supertypes` names
-      `customer` and `box`'s ancestors and never `box` itself. The edge to the operand cannot be stated
-      until there is an instantiation to state it about, so what the declaration keeps instead is the
-      application: `record.supertypes` is typed `[type_ref]`, so `box<T>` is written into the held body and
-      substituted and closed with everything else in it, and `TemplateMaterialiser.contractOf` folds the
-      closed name — plus its own chain — into the instantiation's contract index. A closed `vip<text>`
-      therefore stands where `customer`, `base` **and** `box<text>` are expected, on the same entry the
-      hand-written `customer & box<text>` reaches. **Which parents were applications is read off the held
-      body, not off the closed one**, since closing reduces an application to a bare name and §5.9
-      subtraction keeps named lineage in a body whose contract was emptied — resurrecting that is what the
-      distinction prevents. `OpenOperandCompositionTest` pins all three rows and the argument specificity:
-      the edge is to `box<text>` and not to `box<int32>`, which is why the parent is carried as a reference
-      rather than as the head name §5.8 describes.
+    - **The operand contributes its ancestors and not its name.** An operand is flattened into the declaration,
+      not named by it, so `vip`'s own chain is its written parents, `customer` and `box<T>`, in `parents`
+      (`[type_ref]`), and the closed entries they reach, `customer` and `base`, in `supertypes`. The held body
+      writes the same parents, substituted and closed with everything else in it. Closing builds the chain from
+      those parents (`Ancestry.chainOf`, in `closeHeldRecord`): `customer` contributes itself and its own chain,
+      `box<text>` its template's ancestors and the application itself, which `SchemaResolver`'s
+      `appliedParentEdges` folds into the entry that application denotes, closing every chain to a fixed point;
+      `closeChains` then drops the parents of every closed type, keeping an open record's. A closed `vip<text>`
+      therefore stands where `customer`, `base` **and** `box<text>` are expected, on the same entry the hand-written
+      `customer & box<text>` reaches. **Which parents were applications is read off the held body, not off the
+      closed one**, since a closed chain's supertypes are bare names. `OpenOperandCompositionTest` pins all three rows
+      and the argument specificity: the edge is to `box<text>` and not to `box<int32>`, which is why the parent is
+      carried as a reference rather than as the head name §5.8 describes.
     - **A closed operand on a declaration with no parameters of its own states the edge at resolution.**
       `dog => pet<"dog"> & { breed: text }` is never held, so nothing later closes the application kept in
-      `record.supertypes` and no instantiation ever arrives to carry the edge — which is the same "no later
-      materialisation of this body" that makes §5.7's fixation run here rather than at closing. So the edge is
+      its chain and no instantiation ever arrives to carry the edge. So the edge is
       stated where the composition resolves, and to the *family base* rather than to the application: a
-      record-bodied template carries `extension` — always ABSTRACT, with `discriminators` beside it where a
-      selector survives —
-      which is what makes it a type a member can be IS-A (§5.10). That is what puts the member
-      in the base's `subtypes` and lets a position typed `pet` dispatch to it, by the discriminators or by a
-      tag. The application in between still mints nothing, and §5.9 is untouched: a removal empties the
-      contract index whatever was put in it. `ClosedOperandFamilyTest` pins it, `OpenOperandCompositionTest`
-      the boundary against the open case above.
+      record template is a family base (`OpenEntry.isFamilyBase`) — ABSTRACT by construction, with its
+      `discriminators` where a selector survives — which is what makes it a type a member can be IS-A (§5.10).
+      That is what puts the member in the base's `subtypes` and lets a position typed `pet` dispatch to it, by
+      the discriminators or by a tag. The application in between still mints nothing, and §5.9 is untouched: a
+      removal empties the chain whatever was put in it. `ClosedOperandFamilyTest` pins it,
+      `OpenOperandCompositionTest` the boundary against the open case above.
     - **An argument that is itself an application survives whole.** Substitution writes a bound reference
       through `WireForm.refValue` — positionally when it carries no arguments, in `type_ref`'s record
       form when it does — so `box<inner<T>>` keeps `inner<T>` and the absorbing declaration's own
@@ -188,37 +197,44 @@ recorded open form, and replacing the application with a reference to the entry 
       arity check, which reads the same accessor: materialisation runs first, and by then the parameter is
       gone — leaving either an arity error against a content-derived name nobody typed, or a wire-vocabulary
       mismatch, neither of which names what the author did.
-- **`kind` is the resolver's own, not resolver output.** It is derived from an entry's `supertypes` and body,
-  so writing it restates what the record already carries; `type_definition` declares no such field and the
-  kernel declares no `type_kind`. `TypeDefinition.kind` is an `@Unbound` component — computed at resolution,
-  carried for the resolver's use, and never written. The reader stack works the same way:
-  nothing in `reader/` consults it, and `Subsumption` says why — "using the body rather than `kind()` is
-  deliberate: a hand-built entry can carry a `ChoiceBody` under [another kind]".
+    - **A parameter is never an operand.** `<T> T & { … }` and `<T> T ^ { … }` are refused at the declaration
+      (`DefinitionResolver.refuseParameterOperand`, §5.8): both operators read the operand's field
+      set to flatten, and a parameter has none until applied. The check runs before the name is looked up, so a
+      parameter shadows an entry of the same name here as everywhere; an operand *applied to* a parameter
+      (`result<T>`) is the open-operand case above.
+    - **A template named without arguments is no operand either.** `x => box & { … }` is refused
+      (`DefinitionResolver.refuseUnappliedTemplate`): a record template is a type a position may name, but an
+      operand is flattened, and a template has fields only once its parameters are bound.
+- **`kind` is derived, never stored.** `EntryKind.of(value, kernel)` reads it off an entry's value — its chain and
+  its branch of `Top` — so writing it would restate what the value already carries; the kernel declares no
+  `type_kind`, and the model has no slot for one. A base kind in the chain counts only as the kernel's own entry
+  (`kernel` tests where the name is defined): a schema's own `namespace => { … }` composed into
+  `payload => namespace & { … }` leaves `payload` a PRODUCT. The reader stack branches on the body itself.
   - **Which is what the atom-refinement test rests on** (`DefinitionResolver`): an atom *instance's* body
     IS an atom (`integer` carries `!integer_type {}`), where its constructor's body is the vocabulary record
     describing one (`integer_type` carries a `!record { ... }`). So `body instanceof Atom` separates the pair
     and establishes atom-ness at once, where neither the kind nor the supertype chain does alone — a plain
     record has no supertypes either, and `integer_type` is ATOM-kinded exactly like its instances.
-- **Internally an open entry's `kind` is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes a
+- **A held template's `kind` is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes such a
   template not a type, so the entry that cannot validate anything does not claim the kind an application of
   it would take: `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than
   REFERENCE — it is a template whose closure is a reference, not a reference that happens to have parameters.
-  Like `REFERENCE` it is a derived `TypeDefinition.kind` and not a base kind (§4.1).
-  - **Which is where materialisation reads the closed entry's kind from instead** (`kindOfClosed`): the
-    branch of `Top` the substituted body occupies, §4.1's "construction transfers kind" asked of the
-    construction. Not the constructor's *name* — a held body's head is structure-namespace vocabulary the
-    governing meta declares, and this pass holds only the type-name namespace (§3.3.1 keeps them apart). For
-    everything that does not compose with `top`, kind is its body's branch.
+  Like `REFERENCE` it is a derived kind and not a base kind (§4.1). A record template is a type, the family base,
+  so it takes a record's kind like any record: PRODUCT, or the base kind its chain reaches.
+  - **The closed entry's kind is its substituted value's**: the branch of `Top` it occupies, §4.1's
+    "construction transfers kind" asked of the construction. Not the constructor's *name* — a held body's head
+    is structure-namespace vocabulary the governing meta declares, and this pass holds only the type-name
+    namespace (§3.3.1 keeps them apart).
   - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }`
     makes `listed<text>` a constructor: its `!record` body describes its instances, so the body's branch
     (PRODUCT) is the wrong answer, and its kind is the base kind its chain reaches (ATOM), by the rule a
-    declared entry follows (`DefinitionResolver.determineKind`). Construction then transfers that kind to
-    `!listed_text [...]`. `OpenEntryResolvedFormTest` covers `atom` and `data`.
+    declared entry follows (`EntryKind.ofChain`, which `DefinitionResolver.determineKind` guards). Construction then
+    transfers that kind to `!listed_text [...]`. `OpenEntryResolvedFormTest` covers `atom`, and `namespace`,
+    whose template (`payloads => <T> namespace & { … }`) closes to a namespace type the same way.
   - **And it makes the derivation total.** Every other entry's kind follows from what it already states —
     the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and an open
-    entry claiming its application's kind would be the one case needing a lookup outside itself. `OpenEntryResolvedFormTest`
-    asserts the whole
-    rule over every entry of every schema.
+    entry claiming its application's kind would be the one case needing a lookup outside itself.
+    `OpenEntryResolvedFormTest` asserts the whole rule over every entry of every schema.
 
 ## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
 

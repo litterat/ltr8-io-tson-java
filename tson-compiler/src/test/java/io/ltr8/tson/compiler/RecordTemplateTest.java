@@ -9,10 +9,11 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -48,8 +49,8 @@ class RecordTemplateTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/template.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -67,19 +68,31 @@ class RecordTemplateTest {
 
     /** The entry a field's type names -- how every fixture here reaches the materialised instantiation. */
     private static String fieldType(TsonCompiledSchema compiled, String record, String field) {
-        RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
-        return body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow()
+        RecordBody body = (RecordBody) compiled.schema().entries().get(record);
+        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
     }
 
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
-        RecordBody body = (RecordBody) compiled.schema().entries().get(entry).body();
-        return body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow();
+        RecordBody body = (RecordBody) compiled.schema().entries().get(entry);
+        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     /** Entry names that look materialised -- derived from {@code head} rather than declared. */
+    /**
+     * The records this schema minted for applications of {@code head}: an application nothing declares is its
+     * expansion, a synthetic record (§5.10), and one whose expansion names itself keeps an instantiation entry
+     * recording {@code head}. The fixtures apply one record template each, so every synthetic record is one.
+     */
     private static List<String> instantiationsOf(TsonCompiledSchema compiled, String head) {
-        return compiled.schema().entries().keySet().stream().filter(n -> n.startsWith(head + "_")).sorted().toList();
+        var schema = compiled.schema();
+        return schema.entries().keySet().stream()
+                .filter(n -> schema.entries().get(n) instanceof RecordBody && schema.positionOf(n).isEmpty()
+                        && (schema.factsOf(n).synthetic()
+                        || schema.applicationOf(n).filter(applied -> applied.name().equals(head)).isPresent()))
+                .sorted().toList();
     }
 
     @Test
@@ -92,25 +105,54 @@ class RecordTemplateTest {
         assertEquals(1, made.size(), () -> "expected one instantiation, got " + made);
         assertEquals(made.get(0), fieldType(compiled, "holder", "b"), "the field references it by name");
 
-        TypeDefinition entry = compiled.schema().entries().get(made.get(0));
-        assertEquals(List.of(), entry.parameters(), "closed -- §5.10");
+        Top entry = compiled.schema().entries().get(made.get(0));
+        assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
         assertEquals(TypeRef.of("text"), fieldOf(compiled, made.get(0), "v").type(), "T := text");
     }
 
     /**
-     * §8.2 keys an instantiation on the flattened application recorded in {@code source}, which is what a
-     * consumer compares by -- never the internal name.
+     * An application nothing declares is its expansion (§5.10): a synthetic record that records no
+     * application. A declaration naming the application records it, flattened, on its key (§8.2).
      */
     @Test
-    void anInstantiationRecordsTheFlattenedApplicationAsItsSource() {
+    void aMintedRecordIsItsExpansionAndADeclaredOneRecordsItsApplication() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
-                  holder => { b: box<text> }""");
+                  holder => { b: box<int32> }
+                  tb     => box<text>""");
 
-        TypeRef source = compiled.schema().entries().get(instantiationsOf(compiled, "box").get(0))
-                .source().orElseThrow();
+        String minted = instantiationsOf(compiled, "box").get(0);
+        assertTrue(compiled.schema().factsOf(minted).synthetic(), minted);
+        assertTrue(compiled.schema().applicationOf(minted).isEmpty(), "a minted expansion records no application");
+        TypeRef source = compiled.schema().applicationOf("tb").orElseThrow();
         assertEquals("box", source.name());
         assertEquals(List.of(new TypeArgument.Ref(TypeRef.of("text"))), source.arguments());
+    }
+
+    /**
+     * A minted record is a member of nothing, so composing an application only a use site mints gives it no edge
+     * to refuse: {@code vip<text>} beside a use site's {@code box<text>} loads, IS-A neither.
+     */
+    @Test
+    void aMintedRecordComposingAMintedApplicationIsAMemberOfNothing() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  vip    => <T> box<T> & { extra: text }
+                  holder => { u: vip<text>  w: box<text> }""");
+
+        RecordBody vip = (RecordBody) compiled.schema().entries().get(fieldType(compiled, "holder", "u"));
+        assertEquals(List.of(), vip.supertypes());
+    }
+
+    /** Two record templates with one field list expand to one record: the application is its expansion. */
+    @Test
+    void twoTemplatesExpandingToOneRecordShareOneEntry() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  crate  => <T> { v: T }
+                  holder => { a: box<int32>  b: crate<int32> }""");
+
+        assertEquals(fieldType(compiled, "holder", "a"), fieldType(compiled, "holder", "b"));
     }
 
     /** Two applications with the same arguments are one entry, wherever in the schema they appear (§8.2). */
@@ -321,9 +363,9 @@ class RecordTemplateTest {
                       tmpl => <T> { a: %s }
                       use  => { u: tmpl<text> }""".formatted(field));
 
-            TypeDefinition closed = compiled.schema().entries()
+            Top closed = compiled.schema().entries()
                     .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a"));
-            assertEquals(List.of(), closed.parameters(), () -> field + " closes to a usable entry");
+            assertEquals(List.of(), OpenEntry.parameterNames(closed), () -> field + " closes to a usable entry");
             assertNotNull(compiled.get(fieldType(compiled, "use", "u")), field);
         }
     }
@@ -372,7 +414,7 @@ class RecordTemplateTest {
                   holder => { t: tags<2> }""");
 
         ArrayBody closed = (ArrayBody) compiled.schema().entries()
-                .get(fieldType(compiled, fieldType(compiled, "holder", "t"), "xs")).body();
+                .get(fieldType(compiled, fieldType(compiled, "holder", "t"), "xs"));
 
         assertEquals(Optional.of(BigInteger.TWO), closed.minItems());
         assertEquals(Optional.of(BigInteger.TWO), closed.maxItems());
@@ -386,7 +428,7 @@ class RecordTemplateTest {
                   ids   => [order]""");
 
         assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
-                compiled.schema().entries().get("ids").body(), "the construction in place");
+                compiled.schema().entries().get("ids"), "the construction in place");
     }
 
     // ── The two field-absorbing positions (§5.7, §5.8) ───────────────────
@@ -575,7 +617,7 @@ class RecordTemplateTest {
                   uuid_pair => <B> pair<text, B>
                   holder    => { p: uuid_pair<int32>  q: pair<text, int32> }""");
 
-        assertEquals(List.of("B"), compiled.schema().entries().get("uuid_pair").parameters(),
+        assertEquals(List.of("B"), OpenEntry.parameterNames(compiled.schema().entries().get("uuid_pair")),
                 "the alias is itself a template");
         assertEquals(1, instantiationsOf(compiled, "pair").size(), "one entry for the one closed pair");
         String closed = fieldType(compiled, "holder", "p");
@@ -596,8 +638,9 @@ class RecordTemplateTest {
                   keyed2 => <C> keyed<C>
                   holder => { p: keyed2<int32> }""");
 
-        assertEquals(List.of(), instantiationsOf(compiled, "keyed"), "the alias hops mint nothing");
-        assertEquals(List.of(), instantiationsOf(compiled, "keyed2"));
+        assertTrue(compiled.schema().entries().keySet().stream()
+                        .noneMatch(n -> n.startsWith("keyed") && compiled.schema().positionOf(n).isEmpty()),
+                "the alias hops mint nothing");
         assertEquals(1, instantiationsOf(compiled, "pair").size());
         assertEquals(instantiationsOf(compiled, "pair").get(0), fieldType(compiled, "holder", "p"));
     }
@@ -622,14 +665,11 @@ class RecordTemplateTest {
                   triple => <T> rows<T, 3>
                   holder => { r: triple<int32> }""");
 
-        // `triple` itself mints nothing; the entry the field names is `rows<int32, 3>`, the open instance
-        // one hop in, which references the closed array synthetic that closing it produced.
-        String instantiation = fieldType(compiled, "holder", "r");
-        assertTrue(instantiation.startsWith("rows_"), instantiation);
-        String synthetic = assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                compiled.schema().entries().get(instantiation).body()).target().name();
+        // `triple` itself mints nothing, and neither does `rows<int32, 3>`, the open instance one hop in: the
+        // field names the closed array synthetic that closing it produced, the application being its expansion.
+        String synthetic = fieldType(compiled, "holder", "r");
         ArrayBody array = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(synthetic).body());
+                compiled.schema().entries().get(synthetic));
         assertEquals(TypeRef.of("int32"), array.elementType());
         assertEquals(Optional.of(BigInteger.valueOf(3)), array.minItems());
         assertEquals(Optional.of(BigInteger.valueOf(3)), array.maxItems());

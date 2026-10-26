@@ -23,13 +23,13 @@ import java.util.Optional;
  *
  * <p>The canonical (compact) constructor carries an explicit {@code @Record} -- required as soon
  * as a record has more than one public constructor (the convenience {@link
- * #IntegerType(IntegerSize)} one below is the second): {@code tson-bind}'s {@code
+ * #IntegerType(IntegerSize)} one below is the second): {@code ltr8-bind}'s {@code
  * DefaultRecordBinder.getConstructor} only auto-picks a bare class's sole constructor when exactly
  * one exists, and throws {@code CodeAnalysisException} ("Could not find constructor") otherwise
  * unless one is explicitly marked.
  */
 @Typename(name = "integer_type")
-public record IntegerType(
+public record IntegerType(TypeChain chain,
         Optional<IntegerSize> size,
         Optional<BigInteger> min,
         @Field("exclusive_min") Optional<BigInteger> exclusiveMin,
@@ -45,6 +45,7 @@ public record IntegerType(
 
     @Record
     public IntegerType {
+        chain = TypeChain.orEmpty(chain);
         members = members.map(List::copyOf);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
@@ -52,6 +53,18 @@ public record IntegerType(
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public IntegerType(Optional<IntegerSize> size, Optional<BigInteger> min, Optional<BigInteger> exclusiveMin,
+            Optional<BigInteger> max, Optional<BigInteger> exclusiveMax, Optional<BigInteger> multipleOf,
+            Optional<List<BigInteger>> members) {
+        this(TypeChain.EMPTY, size, min, exclusiveMin, max, exclusiveMax, multipleOf, members);
+    }
+
+    @Override
+    public IntegerType withChain(TypeChain chain) {
+        return new IntegerType(chain, size, min, exclusiveMin, max, exclusiveMax, multipleOf, members);
     }
 
     /**

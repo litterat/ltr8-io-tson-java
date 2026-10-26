@@ -30,7 +30,7 @@ final class AnnotationBoxing {
             Annotations annotations = AnnotationCapture.bound(ctx, annotationTypes);
             Object read = value.read(ctx);
             try {
-                // Built through the descriptor's own handle, never by naming the carrier class: tson-bind is
+                // Built through the descriptor's own handle, never by naming the carrier class: ltr8-bind is
                 // the only thing that constructs a bound object.
                 return box.constructor().invoke(read, annotations);
             } catch (RuntimeException e) {

@@ -7,6 +7,7 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.unicode.RestrictionLevel;
 import java.util.Objects;
 
 /**
@@ -104,7 +105,7 @@ public final class ProcessorConfig {
      * The {@link DataBindContext} a processor built from this configuration binds its object readers and
      * writers against -- defaults to {@link AtomContext#defaultContext()}.
      *
-     * <p><b>The vocabulary for building one is {@code tson-bind}'s, not this class's</b>, so there is one
+     * <p><b>The vocabulary for building one is {@code ltr8-bind}'s, not this class's</b>, so there is one
      * place to learn it and one place it can drift:
      *
      * <pre>{@code
@@ -129,9 +130,9 @@ public final class ProcessorConfig {
 
     /**
      * The names a consumer's own <b>meta layer</b> adds -- consulted when resolving a schema whose governing
-     * meta declares constructors of its own, so that {@code search => !operation { ... }} can bind to that
-     * consumer's own {@code @Typename("operation")} class. Defaults to unset: the kernel's own vocabulary
-     * alone, which is every schema governed by the bundled meta.tn.
+     * meta declares vocabulary of its own, so that each value of {@code api => !operations { search => { ... } }}
+     * can bind to that consumer's own class for {@code operation}, found by name. Defaults to unset: the kernel's
+     * own vocabulary alone, which is every schema governed by the bundled meta.tn.
      *
      * <p><b>Composed over the library's own binder, never replacing it</b> ({@code SchemaMetaNameBinder.contextExtendedWith}): {@code record}/{@code enum}/{@code integer_type} and the
      * rest resolve first, and this binder answers only for a name the kernel does not declare. So it adds
@@ -229,7 +230,7 @@ public final class ProcessorConfig {
      * compared at all. The per-string rule is what remains, which is the same reason it is right for a
      * browser judging a domain name.
      *
-     * <p>{@link ScriptPolicy.Level#MINIMALLY_RESTRICTIVE} and {@link ScriptPolicy.Level#UNRESTRICTED}
+     * <p>{@link RestrictionLevel#MINIMALLY_RESTRICTIVE} and {@link RestrictionLevel#UNRESTRICTED}
      * collapse here: §5.2 says so directly, a token that is not a name having no identifier profile to drop.
      *
      * <p>A level over the whole token, never per segment: {@code _} and {@code -} are word separators by

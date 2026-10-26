@@ -2,9 +2,9 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -36,18 +36,18 @@ class TemplateParentExtensionTest {
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static Optional<RecordExtensionType> parentOf(String id, String declarations, String entry) {
-        TypeDefinition definition = Tson.standard()
+        Top definition = Tson.standard()
                 .resolve(HEADER.formatted(id) + "{\n" + declarations + "}")
                 .schema().entries().get(entry);
-        return ((TemplateBody) definition.body()).extension();
+        return FamilySelectors.extensionOf(definition);
     }
 
     /** The selector names the same parent states -- what makes the family member-dispatched. */
     private static List<String> selectorsOf(String id, String declarations, String entry) {
-        TypeDefinition definition = Tson.standard()
+        Top definition = Tson.standard()
                 .resolve(HEADER.formatted(id) + "{\n" + declarations + "}")
                 .schema().entries().get(entry);
-        return ((TemplateBody) definition.body()).discriminators();
+        return FamilySelectors.namesOf(definition);
     }
 
     private static String refusal(String id, String declarations) {
@@ -116,5 +116,18 @@ class TemplateParentExtensionTest {
 
         assertTrue(refusal.contains("discriminator field 'kind'"), refusal);
         assertTrue(refusal.contains("typed by the type parameter 'K'"), refusal);
+    }
+
+    /** The same rule where the parameter is an argument of the selector's type, which varies with it just as much. */
+    @Test
+    void aDiscriminatorTypedByAnApplicationOfAParameterIsRefused() {
+        String refusal = refusal("p8", """
+                  bounded => <M> !integer_type { max: M }
+                  pet     => <M, N> { kind: bounded<M> = N  name: text }
+                  cat     => pet<9, 3>
+                """);
+
+        assertTrue(refusal.contains("discriminator field 'kind'"), refusal);
+        assertTrue(refusal.contains("typed by an application of the parameter 'M'"), refusal);
     }
 }

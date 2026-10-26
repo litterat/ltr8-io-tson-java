@@ -5,7 +5,6 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.FieldRole;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,14 +28,13 @@ final class FieldModifiers {
 
     /**
      * What §5.2 makes of one field's marks. {@code value} is absent exactly where the role is {@link
-     * FieldRole#FREE}, with one exception: a held template body's parametric {@code = P}, which is FREE and
-     * carries the parameter until materialisation closes it to FIXED.
+     * FieldRole#FREE}.
      *
-     * <p><b>A token naming a type parameter rides {@code value} like any other</b> (§5.7's "Open modifiers"),
-     * and nothing here labels it as one: §8.1's shadowing rule -- a token is a parameter exactly when its
-     * text resolves into the enclosing entry's own {@code parameters} -- is what tells the two apart wherever
-     * the question is asked. What a parametric modifier does decide is the role beside it, and {@link #of}
-     * decides it there.
+     * <p><b>A token naming a parameter rides {@code value} like any other</b> (§5.7's "Open modifiers"), and
+     * nothing here labels it as one: §8.1's shadowing rule -- a token is a parameter exactly when its text
+     * resolves into the enclosing entry's own {@code parameters} -- is what tells the two apart wherever the
+     * question is asked. The role is the modifier's either way, so {@code = P} is FIXED where it is written,
+     * as {@code = 201} is, and closing substitutes the value and changes no fact ([TSON-SCHEMA] §5.7).
      */
     record Resolved(boolean optional, boolean voidable, FieldRole role, Optional<TokenValue> value) {
     }
@@ -54,15 +52,13 @@ final class FieldModifiers {
     /**
      * §5.2's table for one field. {@code omittable} is the name's {@code ?}; {@code voidable} is the type's, or
      * (for a tightening entry that restates only a modifier, whose type slot is elided) the one the field it
-     * tightens carries. {@code parameters} is the enclosing declaration's type-parameter list, empty outside a
-     * template.
+     * tightens carries.
      *
      * @throws SchemaValidationException for the spellings the marks can form and §5.2 refuses: a default on a
      *     key that is always written, a pin on a voidable type, a pin or default to {@code _}, and a
      *     discriminator that may be omitted or written {@code _}.
      */
-    static Resolved of(String fieldName, boolean omittable, boolean voidable, Optional<FieldDef.Modifier> modifier,
-            List<String> parameters) {
+    static Resolved of(String fieldName, boolean omittable, boolean voidable, Optional<FieldDef.Modifier> modifier) {
         if (modifier.isEmpty()) {
             return new Resolved(omittable, voidable, FieldRole.FREE, Optional.empty());
         }
@@ -102,12 +98,6 @@ final class FieldModifiers {
             throw new SchemaValidationException("field '" + fieldName + "' pins a voidable type ('type? = "
                     + "value') -- a pin names the only value the field admits, and '_' is not it (§5.2). Drop "
                     + "the type's '?'");
-        }
-        // §5.7's "Open modifiers": a parametric modifier is fixed at no declaration -- the value arrives at
-        // application, and every application MUST bind every parameter -- so `= P` is a FREE field carrying
-        // the parameter until materialisation closes it to FIXED, and `~ P` is an ordinary default.
-        if (fixed && parameters.contains(token.text())) {
-            return new Resolved(omittable, false, FieldRole.FREE, Optional.of(token));
         }
         return new Resolved(omittable, voidable, fixed ? FieldRole.FIXED : FieldRole.DEFAULT, Optional.of(token));
     }

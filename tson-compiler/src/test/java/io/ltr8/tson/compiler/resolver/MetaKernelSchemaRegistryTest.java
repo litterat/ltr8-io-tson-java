@@ -13,7 +13,7 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
@@ -59,13 +59,13 @@ class MetaKernelSchemaRegistryTest {
         assertEquals(raw.entries().keySet(), linked.schema().entries().keySet());
 
         // One desugared entry per distinct sugar form: an `array` entry per distinct form of §5.3's `[X]`
-        // field-type sugar, repeated uses of one form deduplicating to one entry -- `[field_name; 1..]` serves
-        // both `discriminators`, `field_group.optional` and the options inside `field_group.members`. `enum`'s
+        // field-type sugar, repeated uses of one form deduplicating to one entry -- `[text; 1..]` serves both
+        // `discriminators`, `field_group.optional_members` and the options inside `field_group.members`. `enum`'s
         // member set is not among them: `enum_set` is a declaration the fixture writes, since `set` has no sugar
-        // of its own.
-        Set<String> expectedHeads = Set.of("array_tuple_element", "array_field_name",
+        // of its own, and nor is `record.fields`, the fixture's own ordered `field_map`.
+        Set<String> expectedHeads = Set.of("array_tuple_element", "array_text",
                 "array_type_ref", "array_type_name", "array_type_argument", "array_template_param",
-                "array_field_group", "array_record_field");
+                "array_field_group");
         Set<String> syntheticNames = new HashSet<>(linked.schema().entries().keySet());
         syntheticNames.removeIf(name -> expectedHeads.stream().noneMatch(head -> name.startsWith(head + "_")));
         assertEquals(expectedHeads.size(), syntheticNames.size(), syntheticNames.toString());
@@ -74,11 +74,11 @@ class MetaKernelSchemaRegistryTest {
                     "expected a synthetic entry with head '" + head + "', found: " + syntheticNames);
         }
 
-        TypeDefinition enumDef = linked.schema().entries().get("enum");
-        RecordBody enumBody = (RecordBody) enumDef.body();
-        RecordField membersField = enumBody.fields().stream()
-                .filter(f -> f.name().equals("members"))
-                .findFirst().orElseThrow();
+        Top enumDef = linked.schema().entries().get("enum");
+        RecordBody enumBody = (RecordBody) enumDef;
+        RecordField membersField = enumBody.fields().entrySet().stream()
+                .filter(f -> f.getKey().equals("members"))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
         assertEquals(TypeRef.of("enum_set"), membersField.type());
     }
 
@@ -115,8 +115,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.meta(), linked.schema().meta());
-        assertEquals(68, raw.entries().size());
-        assertEquals(68, linked.schema().entries().size());
+        assertEquals(77, raw.entries().size());
+        assertEquals(77, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
@@ -146,7 +146,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(68, registered.schema().entries().size());
+        assertEquals(77, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

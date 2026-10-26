@@ -4,6 +4,11 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Sum;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -17,6 +22,11 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.RefBody;
+import io.ltr8.tson.schema.meta.HostType;
+import io.ltr8.tson.schema.meta.HostnameType;
+import io.ltr8.tson.schema.meta.MediaTypeType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
@@ -27,17 +37,15 @@ import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.function.Function;
 
 /**
  * The granularity at which TSON text discriminates an untagged value: [TSON-DATA] §4's three scalar
@@ -68,27 +76,22 @@ public enum DiscriminationClass {
      * an alias and its target one type); a cycle, having no terminal, has no class. An empty result makes
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
      * stays required.
-     *
-     * <p>{@code textEnums} is linking's {@code TsonLinkedSchema.textEnums}: the enums whose members are texts
-     * rather than names, which are {@link #STRING} whatever their members' spellings ([TSON-SCHEMA] §7.4).
      */
-    public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace,
-                                                   Set<String> textEnums) {
+    public static Optional<DiscriminationClass> of(String name, Function<String, ? extends Top> namespace) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
-        return ReferenceChain.terminalDefinition(name, namespace).flatMap(definition ->
-                definition.body() instanceof EnumBody && textEnums.contains(ReferenceChain.terminal(name, namespace))
-                        ? Optional.of(STRING)
-                        : classify(definition));
+        return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
     }
 
-    private static Optional<DiscriminationClass> classify(TypeDefinition def) {
-        return switch (def.body()) {
+    private static Optional<DiscriminationClass> classify(Top def) {
+        return switch (def) {
             case IntegerType ignored -> Optional.of(NUMBER);
             case DecimalType ignored -> Optional.of(NUMBER);
             case FloatType ignored -> Optional.of(NUMBER);
             case TextType ignored -> Optional.of(STRING);
             case IdentifierType ignored -> Optional.of(STRING);
+            case RefBody ignored -> Optional.of(STRING); // a qualified name, written as a token
+            case KindBody ignored -> Optional.of(STRING); // a type name, written as an identifier is
             case UriType ignored -> Optional.of(STRING);
             case IriType ignored -> Optional.of(STRING);
             case RegexType ignored -> Optional.of(STRING);
@@ -101,6 +104,9 @@ public enum DiscriminationClass {
             case BytesType ignored -> Optional.of(STRING);
             case EmailType ignored -> Optional.of(STRING);
             case Ipv4Type ignored -> Optional.of(STRING);
+            case HostnameType ignored -> Optional.of(STRING);
+            case HostType ignored -> Optional.of(STRING);
+            case MediaTypeType ignored -> Optional.of(STRING);
             case Ipv6Type ignored -> Optional.of(STRING);
             case Cidr4Type ignored -> Optional.of(STRING);
             case Cidr6Type ignored -> Optional.of(STRING);
@@ -110,7 +116,11 @@ public enum DiscriminationClass {
             case MapBody ignored -> Optional.of(BRACE);
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
-            default -> Optional.empty(); // rational/complex (need a tag), value, void, unknown, choice, extern
+            case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
+            case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
+            case Reference ignored -> Optional.empty();
+            case TemplateBody ignored -> Optional.empty();
+            case Namespace<?> ignored -> Optional.empty();
         };
     }
 

@@ -180,9 +180,10 @@ decoder integration at all. It is the same reader the broader on-ramp needs — 
 converted to a TSON schema, validating documents already in flight unchanged — so the two use cases fund one
 piece of work. `design/json-encoding.md` states that goal and what it rules out of a converted schema.
 
-**A JSON member name that is not an identifier is refused where it is read.** A field name is an identifier at
-every layer ([TSON-DATA] §2.5), so `{"first name": 1}` fails before any schema is consulted — the largest single
-obstacle to the on-ramp. A projection annotation is the proposal, to be raised against Revision 38.
+**A JSON member name that is not an identifier is a value of the record's name type.** A field name is an
+identifier unless its record's `name_type` says otherwise ([TSON-SCHEMA] §5.2; [TSON-DATA] §2.5), so a converted
+schema declares an identifier type admitting what the vocabulary's names use (`json_name => !identifier_type {
+start_add: "@$" }`) and `{"first name": 1}` is read under a name type admitting the space; schemaless, it is refused.
 
 **Untagged unions.** Native TSON data announces a union member with `!typeName value` — the type-ref *is* the
 discriminator — and bare JSON has no such mechanism. [TSON-JSON] §8.2 lets a tag be omitted by exactly two

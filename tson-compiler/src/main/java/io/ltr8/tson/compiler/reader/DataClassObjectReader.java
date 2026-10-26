@@ -42,10 +42,10 @@ import java.util.Set;
 
 /**
  * Binds a TSON document to a Java object -- schemaless (Class 1) binding driven by the target Java
- * class's own {@code tson-bind} {@link DataClass} descriptor, which is in effect the schema the data
+ * class's own {@code ltr8-bind} {@link DataClass} descriptor, which is in effect the schema the data
  * must satisfy. The reflective, class-driven counterpart to the schema-driven {@link TsonTypeReader}
  * (which validates against a resolved TSON schema instead), and the read-side inverse of {@link
- * TsonObjectWriter}. {@code tson-bind}, what this is built on, has no dependency on {@code
+ * TsonObjectWriter}. {@code ltr8-bind}, what this is built on, has no dependency on {@code
  * tson-compiler}/{@code tson-schema} at all, so depending on it directly here is clean -- which is
  * also what lets schema resolution (constructor application, atom refinement, §5.5) use this binding
  * layer directly, in the same module, without a cycle.
@@ -57,18 +57,22 @@ import java.util.Set;
  * reported through {@code ctx} using the same model the compiled readers use: the context's own {@link
  * DiagnosticsReceiver} decides each problem's fate -- the fail-fast one throws
  * {@link ReadException} at the first, a collecting one accumulates every independent problem and reads
- * on. A {@code tson-bind} {@link DataBindException} thrown while narrowing a value or
+ * on. A {@code ltr8-bind} {@link DataBindException} thrown while narrowing a value or
  * invoking a constructor is caught and re-reported through {@code ctx} too, so a caller sees one
  * uniform error model regardless of which layer noticed the problem.
  *
  * <p><b>A type-ref must link to something</b>, by {@link TypeRefCheck}'s rules, wherever it is written --
  * not just at an atom leaf. A name {@link BuiltinTypeVocabulary} resolves (§5) is a built-in atom, so it
- * must sit on a token; any other name must name the target being bound, and one that names neither is a
- * binding error rather than a marker to ignore. That is not a contradiction of §5.1's "preserve an
- * unrecognized annotation as an uninterpreted marker": that rule is about passive preservation during
- * parsing, not about what an application actively binding to a caller-declared Java type should do with a
- * marker it can't interpret. {@link #preserving} is the opt-in passthrough for a caller who wants the
- * other reading.
+ * must sit on a token; any other name is {@code UNKNOWN_TYPE_REF}, a resolver error, exactly as {@code tson
+ * validate} reports it: a schemaless document has no source of type names but §5's vocabulary
+ * ([TSON-DATA] §3.2), and a verdict that changed with the class a caller binds into would not be one.
+ *
+ * <p><b>{@link #withHostTypes} makes the target classes a schema for tags</b>: a name that names the class
+ * being bound links to it, and a union's member is chosen by the tag naming it. That is what a schemaless
+ * bind into a sealed hierarchy needs, and it is the caller's statement that their classes stand in for the
+ * schema the document does not bind -- explicit on the reader, because with it on the reader accepts what
+ * the vocabulary alone would refuse. {@link #preservingUnknownTypeRefs} is the other control: it keeps a tag
+ * nothing resolves rather than reporting it. Built-in names are checked under both.
  *
  * <p>The two positions differ in how a name gets to "names the target". A <b>container</b> accepts the
  * target's {@link io.ltr8.annotation.Typename} or, failing that, its simple class name case-insensitively --
@@ -76,8 +80,9 @@ import java.util.Set;
  * union's members already get. An <b>atom</b> accepts a declared {@code @Typename} only: its vocabulary is
  * closed, so the loose match would let a UUID-targeted {@code !Uuid} through on the strength of the class
  * being called {@code UUID}, disabling the check §5.1's case-sensitivity exists for. This is why {@code
- * !tags [ "a" ]} bound to a {@code List<String>} is reported -- neither {@code List} nor {@code ArrayList}
- * answers to {@code tags} -- and {@link #preserving} is the way to ask for it anyway.
+ * !tags [ "a" ]} bound to a {@code List<String>} is reported even with host types -- neither {@code List} nor
+ * {@code ArrayList} answers to {@code tags} -- and {@link #preservingUnknownTypeRefs} is the way to ask for
+ * it anyway.
  *
  * <p>With no type-ref, binding falls through to plain untyped resolution: {@link BaseTypeResolver} (which
  * of boolean/number/string) then {@link AtomBinder} (that shape into whatever concrete Java type the
@@ -93,33 +98,49 @@ public final class DataClassObjectReader {
 
     private final DataBindContext context;
 
-    /** Whether a type-ref that links to nothing is ignored rather than reported -- see {@link #preserving}. */
+    /**
+     * Whether a type-ref that links to nothing is ignored rather than reported -- see {@link
+     * #preservingUnknownTypeRefs}.
+     */
     private final boolean preserveUnknownTypeRefs;
+
+    /** Whether a type-ref may name a target class or a union member -- see {@link #withHostTypes}. */
+    private final boolean hostTypes;
 
     /** Whether a field the target class does not declare is discarded rather than reported -- see {@link #ignoringUnknownFields}. */
     private final boolean ignoreUnknownFields;
 
     public DataClassObjectReader(DataBindContext context) {
-        this(context, false, false);
+        this(context, false, false, false);
     }
 
     public DataClassObjectReader() {
         this(AtomContext.defaultContext());
     }
 
-    private DataClassObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs,
+    private DataClassObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs, boolean hostTypes,
                                   boolean ignoreUnknownFields) {
         this.context = context;
         this.preserveUnknownTypeRefs = preserveUnknownTypeRefs;
+        this.hostTypes = hostTypes;
         this.ignoreUnknownFields = ignoreUnknownFields;
     }
 
     /**
-     * A reader that ignores a type-ref linking to nothing instead of reporting it -- §5.1's uninterpreted
-     * marker, for a caller who wants forward-compatible passthrough. Built-in names are still checked.
+     * This reader, ignoring a type-ref that links to nothing instead of reporting it -- for a caller reading a
+     * document's structure while setting its tags aside. Built-in names are still checked.
      */
-    public static DataClassObjectReader preserving(DataBindContext context) {
-        return new DataClassObjectReader(context, true, false);
+    public DataClassObjectReader preservingUnknownTypeRefs() {
+        return new DataClassObjectReader(context, true, hostTypes, ignoreUnknownFields);
+    }
+
+    /**
+     * This reader, resolving a type-ref against the classes being bound: a tag that names the target class
+     * links to it, and a union's member is the one its tag names. See the class Javadoc for why this is the
+     * caller's choice and not the default.
+     */
+    public DataClassObjectReader withHostTypes() {
+        return new DataClassObjectReader(context, preserveUnknownTypeRefs, true, ignoreUnknownFields);
     }
 
     /**
@@ -130,7 +151,7 @@ public final class DataClassObjectReader {
      * it to, and has decided that the parts they cannot see do not change the parts they can.
      */
     public DataClassObjectReader ignoringUnknownFields() {
-        return new DataClassObjectReader(context, preserveUnknownTypeRefs, true);
+        return new DataClassObjectReader(context, preserveUnknownTypeRefs, hostTypes, true);
     }
 
     // ── Entry points ─────────────────────────────────────────────────────
@@ -158,7 +179,7 @@ public final class DataClassObjectReader {
     }
 
     /**
-     * Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} cannot analyse (two
+     * Resolves {@code targetClass}'s own descriptor; a class {@code ltr8-bind} cannot analyse (two
      * {@code Annotations} components, say) is reported, not passed over silently. Consumes nothing on
      * failure -- each caller knows how much of the value's framing it has already taken, so the skip is
      * theirs to make.
@@ -233,8 +254,8 @@ public final class DataClassObjectReader {
         String name = typeRef.get();
         if (BuiltinTypeVocabulary.lookup(name).isPresent()) {
             TypeRefCheck.notScalar(ctx, name, ctx.peek());
-        } else if (!preserveUnknownTypeRefs && !TypeRefCheck.names(target.typeClass(), name)) {
-            TypeRefCheck.unknown(ctx, name, target.typeClass());
+        } else if (!(hostTypes && TypeRefCheck.names(target.typeClass(), name)) && !preserveUnknownTypeRefs) {
+            TypeRefCheck.unknown(ctx, name, target.typeClass(), hostTypes, TypeRefCheck.names(target.typeClass(), name));
         }
     }
 
@@ -263,8 +284,9 @@ public final class DataClassObjectReader {
             }
             // Not a built-in: only a name the target class declares outright gets through -- see the class
             // Javadoc on why an atom position takes `declares` rather than `names`.
-            if (!preserveUnknownTypeRefs && !TypeRefCheck.declares(dataClass.typeClass(), typeRef.get())) {
-                TypeRefCheck.unknown(ctx, typeRef.get(), dataClass.typeClass());
+            boolean declared = TypeRefCheck.declares(dataClass.typeClass(), typeRef.get());
+            if (!(hostTypes && declared) && !preserveUnknownTypeRefs) {
+                TypeRefCheck.unknown(ctx, typeRef.get(), dataClass.typeClass(), hostTypes, declared);
                 return null;
             }
         }
@@ -660,6 +682,11 @@ public final class DataClassObjectReader {
             EventSkip.coreValue(ctx);
             return null;
         }
+        if (!hostTypes && BuiltinTypeVocabulary.lookup(typeRef.get()).isEmpty()) {
+            TypeRefCheck.unknownUnionMember(ctx, typeRef.get(), dataClass.typeClass());
+            EventSkip.coreValue(ctx);
+            return null;
+        }
         Class<?> member = resolveUnionMember(dataClass, typeRef.get());
         if (member == null) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "no member of union " + dataClass.typeClass()
@@ -750,7 +777,7 @@ public final class DataClassObjectReader {
      * <p><b>What a non-sealed union's member list does not contain.</b> A union built over an open
      * permitted type cannot know its implementations at analysis time, so members are registered as they
      * are met -- and every route that registers one is holding an instance or a class already: the object
-     * writer, {@code tson-bind}'s mappers, and the analysis of the member itself. A read holds a name, so
+     * writer, {@code ltr8-bind}'s mappers, and the analysis of the member itself. A read holds a name, so
      * before this the list only ever grew as a side effect of something else in the process, and the same
      * document bound or failed depending on whether anything had written that member first.
      *

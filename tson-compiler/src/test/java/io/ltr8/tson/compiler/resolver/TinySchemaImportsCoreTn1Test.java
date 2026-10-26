@@ -15,8 +15,8 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -51,8 +51,8 @@ class TinySchemaImportsCoreTn1Test {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tiny-core-import.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               my_int => int32
               my_percentage => !integer ^ { min: 1  max: 100 }
@@ -97,10 +97,10 @@ class TinySchemaImportsCoreTn1Test {
         // entries() -- only the three local declarations should be here.
         assertEquals(Set.of("my_int", "my_percentage", "my_record"), resolvedTiny.entries().keySet());
 
-        TypeDefinition myInt = resolvedTiny.entries().get("my_int");
-        assertEquals(TypeKind.REFERENCE, myInt.kind());
-        TypeDefinition myRecord = resolvedTiny.entries().get("my_record");
-        assertEquals(TypeKind.PRODUCT, myRecord.kind());
+        Top myInt = resolvedTiny.entries().get("my_int");
+        assertEquals(EntryKind.REFERENCE, EntryKind.of(myInt, n -> true));
+        Top myRecord = resolvedTiny.entries().get("my_record");
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(myRecord, n -> true));
 
         // Links (merging core.tn's own entries in, via the shared schemaRegistry this time --
         // TsonSchemaLinker's own import-merge, a separate pass from resolveSchema's own above) and

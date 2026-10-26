@@ -8,14 +8,14 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class ChoiceUntaggedRecoveryTest {
 
-    private final Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+    private final Map<String, Top> entries = new LinkedHashMap<>();
 
     /** Each variant's stub reader consumes its value and echoes the variant name it was dispatched to. */
     private final TsonTypeReaderResolver readers = new TsonTypeReaderResolver() {
@@ -49,15 +49,13 @@ class ChoiceUntaggedRecoveryTest {
         }
     };
 
-    private void variant(String name, TypeKind kind, Top body) {
-        entries.put(name, new TypeDefinition(Optional.empty(), kind, 
-                List.of(), List.of(), body));
+    private void variant(String name, EntryKind kind, Top body) {
+        entries.put(name, body);
     }
 
     private TsonTypeReader<?> choice(Optional<Boolean> disjoint, String... variants) {
         List<TypeRef> refs = List.of(variants).stream().map(TypeRef::of).toList();
-        TypeDefinition choiceDef = new TypeDefinition(Optional.empty(), TypeKind.SUM, 
-                List.of(), List.of(), new ChoiceBody(refs, disjoint));
+        Top choiceDef = new ChoiceBody(refs, disjoint);
         entries.put("contact", choiceDef);
         ValueReaderContext context = new ValueReaderContext(
                 new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), entries)), readers,
@@ -71,8 +69,8 @@ class ChoiceUntaggedRecoveryTest {
 
     @Test
     void recoversAnUntaggedScalarByItsBaseTypeClass() {
-        variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
-        variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
+        variant("int32", EntryKind.ATOM, new IntegerType(new IntegerSize(32, true)));
+        variant("text", EntryKind.ATOM, TextType.UNCONSTRAINED);
         TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "text");
 
         assertEquals("int32", read(reader, "42"));       // number class -> int32
@@ -81,8 +79,8 @@ class ChoiceUntaggedRecoveryTest {
 
     @Test
     void anExplicitTagStillDispatchesEvenWhenRecoveryIsAvailable() {
-        variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
-        variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
+        variant("int32", EntryKind.ATOM, new IntegerType(new IntegerSize(32, true)));
+        variant("text", EntryKind.ATOM, TextType.UNCONSTRAINED);
         TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "text");
 
         assertEquals("int32", read(reader, "!int32 42"));
@@ -91,8 +89,8 @@ class ChoiceUntaggedRecoveryTest {
 
     @Test
     void anUntaggedValueOfNoVariantsClassIsAnError() {
-        variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
-        variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
+        variant("int32", EntryKind.ATOM, new IntegerType(new IntegerSize(32, true)));
+        variant("text", EntryKind.ATOM, TextType.UNCONSTRAINED);
         TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "text");
 
         // 'true' is the boolean class; the choice has no boolean variant.
@@ -101,8 +99,8 @@ class ChoiceUntaggedRecoveryTest {
 
     @Test
     void aChoiceNotProvedDisjointKeepsTheTagRequired() {
-        variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
-        variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
+        variant("int32", EntryKind.ATOM, new IntegerType(new IntegerSize(32, true)));
+        variant("text", EntryKind.ATOM, TextType.UNCONSTRAINED);
         TsonTypeReader<?> reader = choice(Optional.empty(), "int32", "text");
 
         assertThrows(ReadException.class, () -> read(reader, "42"));
@@ -111,8 +109,8 @@ class ChoiceUntaggedRecoveryTest {
 
     @Test
     void aNonScalarVariantKeepsTheTagRequired() {
-        variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
-        variant("point", TypeKind.PRODUCT, RecordBody.of(List.of()));
+        variant("int32", EntryKind.ATOM, new IntegerType(new IntegerSize(32, true)));
+        variant("point", EntryKind.PRODUCT, RecordBody.of(RecordBody.fieldMap()));
         // Disjoint (different kinds), but a record isn't a base-type-class scalar -- no structural recovery here.
         TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "point");
 

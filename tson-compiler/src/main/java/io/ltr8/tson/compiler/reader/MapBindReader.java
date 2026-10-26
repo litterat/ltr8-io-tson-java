@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -13,8 +14,10 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
@@ -22,7 +25,7 @@ import java.util.Map;
 
 /**
  * Object-binding mode's own {@code map} reader -- reads a map-shaped value into a real, bound Java
- * map via {@code descriptor}, a {@code tson-bind} {@link DataClassMap} already resolved for this
+ * map via {@code descriptor}, a {@code ltr8-bind} {@link DataClassMap} already resolved for this
  * map's own target Java type (same division of responsibility as {@link RecordBindReader}'s {@code
  * DataClassRecord}/{@link ArrayBindReader}'s {@code DataClassArray}).
  *
@@ -30,7 +33,7 @@ import java.util.Map;
  * to allocate the target with a known capacity, then {@code descriptor.put().invoke(mapData, key,
  * value)} per decoded entry -- no iterator needed, unlike {@link DataClassMap}'s own *reading* side,
  * since writing a map only ever needs {@code put}. Unlike {@link ArrayBindReader}, there's no fixed-
- * size-target concern here at all -- every map {@code tson-bind} constructs is growable, so this always
+ * size-target concern here at all -- every map {@code ltr8-bind} constructs is growable, so this always
  * constructs empty ({@code invoke(0)}) and appends incrementally, one entry at a time, with no
  * buffer-then-allocate step. As with {@link
  * ArrayBindReader}, there's no narrowing at this level either -- each key and value's own binding
@@ -52,9 +55,16 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     private final DataClassMap descriptor;
 
+    /**
+     * The namespace constructor a value read here is an instance of, where the map is a namespace type's: what a
+     * position whose host holds a {@link Namespace} wraps the map in ({@link BindTargets}). {@code null} for a
+     * map that is no namespace.
+     */
+    final String namespace;
+
     public MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor,
                          TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
-                         AnnotationTypes annotationTypes, boolean keysAreNames) {
+                         AnnotationTypes annotationTypes, boolean keysAreNames, String namespace) {
         super(name, displayName, body,
                 ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()),
                         descriptor.keyDataClass(), annotationTypes), descriptor.keyDataClass()),
@@ -62,13 +72,15 @@ final class MapBindReader extends MapAbstractReader<Object> {
                         descriptor.valueDataClass(), annotationTypes), descriptor.valueDataClass()),
                 schemaLocation, keysAreNames);
         this.descriptor = descriptor;
+        this.namespace = namespace;
     }
 
     /** Over key and value readers already bound to {@code descriptor}'s own -- {@link BindTargets}' rebuild. */
     MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor, TsonTypeReader<?> key,
-                  TsonTypeReader<?> value, SchemaLocation schemaLocation, boolean keysAreNames) {
+                  TsonTypeReader<?> value, SchemaLocation schemaLocation, boolean keysAreNames, String namespace) {
         super(name, displayName, body, key, value, schemaLocation, keysAreNames);
         this.descriptor = descriptor;
+        this.namespace = namespace;
     }
 
 
@@ -109,7 +121,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     /**
      * Validates {@code typeDefinition} is map-shaped before ever constructing one, and resolves a
-     * {@code descriptor} to build it with -- a {@code LinkedHashMap} for an ordered map, so the order the
+     * {@code descriptor} to build it with -- an {@link AnnotatedMap} for a namespace type's value, keeping its
+     * keys' annotations and order, a {@code LinkedHashMap} for an ordered map, so the order the
      * document wrote is kept, and a {@code Map} otherwise -- making a real effort to
      * get the key/value types right: the schema's own {@code key_type}/{@code value_type} names are
      * each resolved to a real bound Java class the same way any other schema type name is (falling
@@ -129,22 +142,27 @@ final class MapBindReader extends MapAbstractReader<Object> {
         }
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof MapBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
+            if (!(typeDefinition instanceof MapBody body)) {
+                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
             Type keyType = resolveType(body.keyType().name());
             Type valueType = resolveType(body.valueType().name());
-            Class<?> mapClass = body.ordered() ? LinkedHashMap.class : Map.class;
+            // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
+            // an instance of the constructor holds (NamespaceInstanceReader).
+            String terminal = ReferenceChain.terminal(name, context.schema().entries()::get);
+            String namespace = context.linked().namespace(terminal).isPresent() ? terminal : null;
+            Class<?> mapClass = namespace != null ? AnnotatedMap.class
+                    : body.ordered() ? LinkedHashMap.class : Map.class;
             DataClass dataClass = descriptorFor(mapClass, new DataParameterizedType(mapClass, keyType, valueType));
             if (!(dataClass instanceof DataClassMap descriptor)) {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
-            return new MapBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
-                    context.locationOf(name, typeDefinition), AnnotationTypes.of(context),
-                    keysAreNames(body, context));
+            return new MapBindReader(name, context.displayName(name, typeDefinition), body, descriptor, resolver,
+                    context.locationOf(name), AnnotationTypes.of(context),
+                    keysAreNames(body, context), namespace);
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

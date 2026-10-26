@@ -8,6 +8,8 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -76,10 +78,24 @@ import java.util.stream.Collectors;
  * consults it on the one path that isn't already record-shaped, and {@link #readPositional} then
  * reads whatever's already sitting at the cursor directly as that single field's own value, with no
  * synthetic wrapping needed at all.
+ *
+ * <p><b>In a schema document, a bare token is a positional fill only where the positional field is atom-typed</b>
+ * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
+ * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
+ * ReferenceNameReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
+ * positional field is <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code type_name}, and {@code
+ * record_field}'s {@code type}, a {@code type_kind}, so {@code !record { fields: { p => text } }} fills {@code type}
+ * -- and loses it where that field is a product or a sum, where the explicit record is the only spelling. The record
+ * reader refuses a name it does not take as no record, since a component that holds the name is read by {@link
+ * ReferenceNameReader} instead and never reaches this class. A data document has no namespace to resolve a name in,
+ * so its reads are untouched: there a bare token fills the positional field whatever its type. Whether the positional
+ * field is atom-typed is read off its own compiled reader ({@link #bareTokenFillsPositionally}), the one this class
+ * was built with.
  */
 abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
-    record CompiledField(RecordField schema, TsonTypeReader<?> parser) {
+    /** One declared field: its name, its facts, and the reader its values go through. */
+    record CompiledField(String name, RecordField schema, TsonTypeReader<?> parser) {
     }
 
     /**
@@ -119,6 +135,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     final List<CompiledField> fields;
     final Map<String, Integer> fieldIndex;
+
+    /**
+     * The slot a document's field name fills, keyed in the name type's form (§5.5): {@link #fieldIndex} itself
+     * where that form is NFC, the form every name already arrives in, and otherwise each declared name put into
+     * it, so a name the type holds equal to a declared one is that field.
+     */
+    private final Map<String, Integer> matchIndex;
+    private final io.ltr8.unicode.Normalization nameForm;
     final List<FieldGroup> groups;
 
     /** Each field group as field indexes, compiled once ({@link GroupPlan}). */
@@ -128,7 +152,20 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final RecordField.Omitted[] omitted;
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
+
+    /**
+     * The positional field's reader as this class was built with it, before a subclass rebinds the field to a
+     * Java target -- what {@link #bareTokenFillsPositionally} asks whether the field is atom-typed; {@code null}
+     * where the record has no positional field.
+     */
+    private final TsonTypeReader<?> positionalReader;
     final SchemaLocation schemaLocation;
+
+    /**
+     * What this record's field names are judged by as they are read ({@link TsonReadContext#nextFieldName}):
+     * its name type, the kernel's {@code field_name} where it states none.
+     */
+    private final TsonReadContext.FieldNameRule fieldNames;
     /**
      * This type's declared field names in <em>schema</em> order, rendered once for the closure diagnostic
      * ({@link #readFields}) -- both its message and its machine-readable {@code expected}. Schema order, not
@@ -141,8 +178,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final RecordDiagnostics rules;
 
     RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
-                          SchemaLocation schemaLocation) {
+                          SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames) {
         this.name = name;
+        this.fieldNames = fieldNames;
         this.displayName = displayName;
         this.schemaLocation = schemaLocation;
         this.fields = buildFields(body, readers);
@@ -156,11 +194,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         for (int i = 0; i < fields.size(); i++) {
             CompiledField field = fields.get(i);
             RecordField schema = field.schema();
-            fieldIndex.put(schema.name(), i);
+            fieldIndex.put(field.name(), i);
             if (schema.value().isPresent()) {
                 precomputedValue[i] = readSchemaDefault(field);
             }
-            omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.hasMember(schema.name())));
+            omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.hasMember(field.name())));
             if (schema.role() == FieldRole.FIXED) {
                 fixedChecks[i] = new FixedCheck(precomputedValue[i], field.parser());
             }
@@ -170,9 +208,17 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
         }
         this.fixedCheck = fixedChecks;
+        this.nameForm = fieldNames.form();
+        if (nameForm == io.ltr8.unicode.Normalization.NFC) {
+            this.matchIndex = fieldIndex;
+        } else {
+            this.matchIndex = new HashMap<>();
+            fieldIndex.forEach((declared, at) -> matchIndex.put(nameForm.apply(declared), at));
+        }
         this.groupPlans = groups.stream().map(group -> GroupPlan.of(group, fieldIndex)).toArray(GroupPlan[]::new);
         this.positionalFieldIndex = requiredCount == 1 ? solePositionalField : -1;
-        this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
+        this.positionalReader = positionalFieldIndex >= 0 ? fields.get(positionalFieldIndex).parser() : null;
+        this.declaredFields = fields.stream().map(field -> field.name()).collect(Collectors.joining(" | "));
         this.rules = new RecordDiagnostics(displayName, declaredFields);
     }
 
@@ -190,7 +236,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     @FunctionalInterface
     interface FieldReaders {
 
-        TsonTypeReader<?> forField(RecordField field);
+        TsonTypeReader<?> forField(String name, RecordField field);
 
         /**
          * By the field's declared schema type, named as the author wrote it here ({@link UseSite}).
@@ -203,15 +249,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
          * two readers by this rule alone.
          */
         static FieldReaders byType(TsonTypeReaderResolver resolver) {
-            return field -> resolver.resolve(field.type().name());
+            return (name, field) -> resolver.resolve(field.type().name());
         }
     }
 
     private static List<CompiledField> buildFields(RecordBody body, FieldReaders readers) {
         List<CompiledField> fields = new ArrayList<>(body.fields().size());
-        for (RecordField field : body.fields()) {
-            fields.add(new CompiledField(field, readers.forField(field)));
-        }
+        body.fields().forEach((name, field) -> fields.add(new CompiledField(name, field, readers.forField(name, field))));
         return fields;
     }
 
@@ -221,9 +265,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * EmptyBraceEvent} ({@link Shape#EMPTY}, consumed -- every non-fixed field falls straight to
      * its own default/required handling), a value eligible for {@link #positionalFieldIndex}
      * ({@link Shape#POSITIONAL}, nothing consumed -- {@link #readPositional} reads the value
-     * directly), or neither ({@link Shape#MISMATCH}: {@code TYPE_MISMATCH} reported, whatever was
-     * actually there discarded). A caller seeing {@link Shape#MISMATCH} must stop processing this
-     * record entirely rather than also reporting every one of its own fields as separately missing.
+     * directly; a value by name is not eligible where the positional field is product- or sum-typed),
+     * or neither ({@link Shape#MISMATCH}: {@code TYPE_MISMATCH} reported, whatever was actually there
+     * discarded). A caller seeing {@link Shape#MISMATCH} must stop processing this record entirely
+     * rather than also reporting every one of its own fields as separately missing.
      */
     final ShapeResult expectRecordShape(TsonReadContext ctx) {
         EventSkip.annotationsAndTypeRef(ctx);
@@ -237,12 +282,79 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ctx.next();
             return new ShapeResult(Shape.EMPTY, anchor);
         }
-        if (positionalFieldIndex >= 0) {
+        Optional<String> byName = ctx.readsSchemaDocument() ? ReferenceNameReader.nameIn(e) : Optional.empty();
+        if (positionalFieldIndex >= 0 && (byName.isEmpty() || bareTokenFillsPositionally())) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
-        ctx.report(rules.notARecord(TypeRefCheck.describe(e)));
+        ctx.report(rules.notARecord(byName.map(written -> "the name '" + written + "'")
+                .orElseGet(() -> TypeRefCheck.describe(e))));
         EventSkip.coreValue(ctx);
         return new ShapeResult(Shape.MISMATCH, anchor);
+    }
+
+    /**
+     * Whether a bare token at this record's position fills its one positional field (§5.6) in a schema document --
+     * false where the record has none, and where that field is product- or sum-typed, so a token well-formed as a
+     * qualified name there is a value by name ([TSON-SCHEMA] §5.6). {@link BindTargets} asks it before giving a
+     * {@code TypeRef} component at a slot of this type a {@link ReferenceNameReader}: a type whose bare token is
+     * positional binds the reference through its own reader, as {@code type_ref} does.
+     *
+     * <p>Asked of the field's own reader rather than of its declaration, at the read rather than at construction:
+     * a recursive schema hands this class a {@link DeferredTypeReader} for a field still being built, which can
+     * say what it stands for only once compilation has finished.
+     */
+    final boolean bareTokenFillsPositionally() {
+        return positionalReader != null && readsAnAtom(positionalReader);
+    }
+
+    /**
+     * Whether {@code reader} reads an atom, looking through a §7.2 subsumption guard and a deferred reader. A reader
+     * this cannot see through -- a gap -- answers true, which keeps the positional form as it was.
+     */
+    static boolean readsAnAtom(TsonTypeReader<?> reader) {
+        TsonTypeReader<?> inner = unwrapped(reader);
+        return switch (inner) {
+            case null -> true;
+            case AtomTypeReader<?> ignored -> true;
+            case AtomTreeReader ignored -> true;
+            case VoidReader ignored -> true;
+            case VoidTreeReader ignored -> true;
+            case ErrorReader ignored -> true;
+            default -> false;
+        };
+    }
+
+    /** {@code reader} with any subsumption guard and finished deferral removed; {@code null} for an unfinished one. */
+    static TsonTypeReader<?> unwrapped(TsonTypeReader<?> reader) {
+        TsonTypeReader<?> current = reader;
+        while (true) {
+            if (current instanceof VariantSchemaReader guard) {
+                current = guard.wrapped();
+            } else if (current instanceof DeferredTypeReader<?> deferred) {
+                current = deferred.resolved();
+                if (current == null) {
+                    return null;
+                }
+            } else {
+                return current;
+            }
+        }
+    }
+
+    /**
+     * The rule entry {@code name}'s field names are judged by, from what linking recorded of its name type, or
+     * {@link TsonReadContext.FieldNameRule#FIELD_NAME} where it has the kernel's default.
+     */
+    static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
+        return context.linked().nameType(name).map(type -> {
+            if (!(type instanceof IdentifierType identifiers)) {
+                throw new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName() + "' reached a "
+                        + "reader as no identifier family; the linker admits only one");
+            }
+            return new TsonReadContext.FieldNameRule(body.nameTypeName(), AtomParsers.forType(identifiers)
+                    .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName()
+                            + "' has no reader of its own")), identifiers.profile(), context.linked().nameForm(name));
+        }).orElse(TsonReadContext.FieldNameRule.FIELD_NAME);
     }
 
     /**
@@ -259,29 +371,47 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     final boolean[] readFields(TsonReadContext ctx, FieldSink sink) {
         boolean[] seen = new boolean[fields.size()];
+        // Under a folding name type a repeat may be another spelling, so its report names the first statement and
+        // where it stands; under NFC the spellings are one and nothing is kept, so an ordinary read allocates none.
+        FieldName[] firstGiven = matchIndex == fieldIndex ? null : new FieldName[fields.size()];
         while (!(ctx.peek() instanceof RecordEnd)) {
             // A name [TSON-DATA] §8.2 refused was never read, so nothing here can hold a verdict about it:
             // reporting it unrecognised would be claiming to have looked it up, which this processor
             // declined to do. Without this a homoglyph draws both the refusal and "unknown field 'x' -- the
             // type declares (x)", which tells a sender to add a field that is already there when the fix is
-            // one character. The refusal is reported by `ctx.next()` itself (name hygiene runs as the event
+            // one character. The refusal is reported by `ctx.nextFieldName` itself (name hygiene runs as the event
             // is pulled), so the delta across that one pull is exactly "this name was refused" -- nothing
             // else reports during it.
             int reportedBeforeName = ctx.reported();
-            FieldName fieldName = (FieldName) ctx.next();
+            FieldName fieldName = ctx.nextFieldName(fieldNames);
             boolean nameRefused = ctx.reported() > reportedBeforeName;
 
-            Integer schemaIndex = fieldIndex.get(fieldName.name());
+            Integer schemaIndex = matchIndex.get(matchIndex == fieldIndex ? fieldName.name()
+                    : nameForm.apply(fieldName.name()));
             if (schemaIndex == null) {
                 if (!nameRefused) {
-                    ctx.field(fieldName.name()).report(rules.unrecognizedField(fieldName.name()));
+                    // Under the default the message is the plain one, as for any undeclared identifier; only an
+                    // author's own name type is named, with its reason, since its rules are the ones to look up.
+                    String stated = fieldName.name();
+                    Optional<String> notAName = fieldNames == TsonReadContext.FieldNameRule.FIELD_NAME
+                            ? Optional.empty() : fieldNames.refusal(stated);
+                    ctx.field(stated).report(notAName.isEmpty() ? rules.unrecognizedField(stated)
+                            : rules.unrecognizedField(stated, fieldNames.typeName(), notAName.get()));
                 }
-                EventSkip.scopedValue(ctx);
+                TsonReadContext.skipUnjudged(ctx);
                 continue;
             }
+            // The data path spells the name as written, the schema pointer as declared: under a folding name type
+            // the two differ, and only the written one is a pointer into the document (schemaField).
+            RecordField declared = fields.get(schemaIndex).schema();
+            String declaredName = fields.get(schemaIndex).name();
             if (seen[schemaIndex]) {
-                ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position())
-                        .report(rules.duplicateField(fieldName.name()));
+                FieldName first = firstGiven == null ? null : firstGiven[schemaIndex];
+                ctx.schemaField(fieldName.name(), declaredName, declared.position()).report(first == null
+                        ? rules.duplicateField(fieldName.name())
+                        : rules.duplicateField(fieldName.name(), declaredName, first.name(), first.position()));
+            } else if (firstGiven != null) {
+                firstGiven[schemaIndex] = fieldName;
             }
             if (fixedCheck[schemaIndex] != null) {
                 // A FIXED field's value comes from the schema, never the data -- but the data may still
@@ -295,8 +425,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
             SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
             if (push != null) {
-                ScopePush.refuse(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()),
-                        fields.get(schemaIndex).schema().type().name(), push);
+                ScopePush.refuse(ctx.schemaField(fieldName.name(), declaredName, declared.position()),
+                        declared.type().name(), push);
             }
             Object decoded;
             if (ctx.peek() instanceof VoidEvent) {
@@ -304,7 +434,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 decoded = valueForVoidField(schemaIndex, ctx);
             } else {
                 decoded = fields.get(schemaIndex).parser()
-                        .read(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()));
+                        .read(ctx.schemaField(fieldName.name(), declaredName, declared.position()));
             }
             sink.accept(schemaIndex, decoded);
             seen[schemaIndex] = true;
@@ -318,7 +448,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         boolean[] seen = new boolean[fields.size()];
         int index = positionalFieldIndex;
         Object decoded = fields.get(index).parser()
-                .read(ctx.schemaField(fields.get(index).schema().name(), fields.get(index).schema().position()));
+                .read(ctx.schemaField(fields.get(index).name(), fields.get(index).name(),
+                        fields.get(index).schema().position()));
         sink.accept(index, decoded);
         seen[index] = true;
         return seen;
@@ -349,8 +480,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 chosen++;
                 for (int at : plan.required[o]) {
                     if (at >= 0 && !seen[at]) {
-                        ctx.report(rules.optionNeeds(fields.get(by).schema().name(), plan.optionText[o],
-                                fields.get(at).schema().name()));
+                        ctx.report(rules.optionNeeds(fields.get(by).name(), plan.optionText[o],
+                                fields.get(at).name()));
                     }
                 }
             }
@@ -416,6 +547,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     final Object valueForVoidField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
+        String schemaName = fields.get(schemaIndex).name();
         if (schema.voidable()) {
             // [TSON-DATA] §2.9: "A field or entry set to `_` is present with a void value -- distinct from
             // not appearing at all." Answering `valueForMissingField`'s `null` here would collapse the two,
@@ -424,16 +556,16 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return statedVoidValue();
         }
         if (schema.role() == FieldRole.DEFAULT) {
-            ctx.schemaField(schema.name(), schema.position())
-                    .report(rules.voidAtDefaultedField(schema.name(), VOID));
+            ctx.schemaField(schemaName, schemaName, schema.position())
+                    .report(rules.voidAtDefaultedField(schemaName, VOID));
             return precomputedValue[schemaIndex];
         }
         // A required field: the document *stated* absence, so it is not missing. Delegating to
         // valueForMissingField reported "missing required field", which tells an author they forgot a field
         // they can see themselves writing -- §5.2's rule is that `_` asserts absence at a position the schema
         // always fills, and that is what the diagnostic should say.
-        ctx.schemaField(schema.name(), schema.position())
-                .report(rules.voidAtRequiredField(schema.name(), VOID));
+        ctx.schemaField(schemaName, schemaName, schema.position())
+                .report(rules.voidAtRequiredField(schemaName, VOID));
         return null;
     }
 
@@ -465,10 +597,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     final Object valueForMissingField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
+        String schemaName = fields.get(schemaIndex).name();
         return switch (omitted[schemaIndex]) {
             case MISSING -> {
-                ctx.schemaField(schema.name(), schema.position())
-                        .report(rules.missingRequiredField(schema.name()));
+                ctx.schemaField(schemaName, schemaName, schema.position())
+                        .report(rules.missingRequiredField(schemaName));
                 yield null;
             }
             // §5.2's Default injection: "the decoder injects the default (or fixed) value".
@@ -496,7 +629,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
         FixedCheck check = fixedCheck[schemaIndex];
         RecordField schema = fields.get(schemaIndex).schema();
-        TsonReadContext fieldCtx = ctx.schemaField(fieldName, schema.position());
+        String schemaName = fields.get(schemaIndex).name();
+        TsonReadContext fieldCtx = ctx.schemaField(fieldName, schemaName, schema.position());
         if (push != null) {
             // A FIXED field's type is an atom or an enum (§5.2), so it is never scoped and the directive is
             // always refused here -- but it is refused rather than ignored, which is the point.
@@ -547,7 +681,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     Object readSchemaDefault(CompiledField field) {
         RecordField schema = field.schema();
-        Token token = schema.value().orElseThrow(() -> new IllegalStateException("'" + schema.name() + "' on '"
+        String schemaName = field.name();
+        Token token = schema.value().orElseThrow(() -> new IllegalStateException("'" + schemaName + "' on '"
                 + displayName + "' is " + schema.describe() + " but the schema carries no value for it -- "
                 + "DefinitionResolver should never produce this"));
         TokenEvent event = new TokenEvent(token.text(), TokenForm.valueOf(token.form().name()), new Position(0, 0, 0));

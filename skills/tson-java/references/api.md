@@ -39,8 +39,8 @@ public final class Tson {
 }
 ```
 
-`Tson.standard()` bootstraps the four bundled schemas — meta-kernel, meta.tn, core.tn and policy.tn — and returns an
-immutable instance.
+`Tson.standard()` bootstraps the five bundled schemas — meta-kernel, meta.tn, core.tn, net.tn and policy.tn — and returns
+an immutable instance.
 Resolution is **always bind-anchored** (meta instances bind to `schema.meta.Top`), so `resolve` takes no
 mode; only the final compile picks one, which is why **the read mode is which registry you hold**.
 
@@ -251,16 +251,16 @@ public final class ScriptPolicy {                          // the token policy, 
 
 - `io.ltr8.tson.base.atom` — the **host values** that are TSON's own: `Rational` and `Complex`. What you hold
   after reading `!rational` or `!complex`, and what a component declares to bind one. The network atoms read to
-  `tson-net`'s values (`Iri`, `CidrInet4Network`/`CidrInet6Network`, below) and to the JDK's `Inet4Address`/
+  `ltr8-net`'s values (`Iri`, `CidrInet4Network`/`CidrInet6Network`, below) and to the JDK's `Inet4Address`/
   `Inet6Address`.
 - `io.ltr8.tson.base.bind` — `AtomContext`: `hostTypes()` (the list to `registerAtoms` on a builder) and
   `defaultContext()`, the context both front doors start from.
 - `io.ltr8.tson.base.io` — `ByteSource`/`ByteSink`: bytes, never characters; closing releases only what was
   acquired, and closing is not flushing.
-- `io.ltr8.tson.base.unicode` — the UCD-derived tables (`Xid`, the identifier profile, scripts,
-  confusables) the §8.2 rules read, and the text forms a value is compared in: `Normalization` (`NONE`, `NFC`,
-  `NFKC`, `NFKC_CASEFOLD`, `ASCII_CASEFOLD`; `apply(text)`, `holds(text)`), `Nfc.of(text)` and
-  `NfkcCasefold.apply(text)`.
+- `io.ltr8.unicode` (module `ltr8-unicode`) — the Unicode mechanisms beneath it, TSON-free: `RestrictionLevel`
+  (the levels a `ScriptPolicy` states), `Normalization` (`NONE`, `NFC`, `NFKC`, `NFKC_CASEFOLD`, `ASCII_CASEFOLD`;
+  `apply(text)`, `holds(text)`), `IdentifierProfile`, `ConfusableNames`, `Xid`, `Nfc.of(text)`,
+  `NfkcCasefold.apply(text)`, `IdentifierStatus`, `Confusables.skeleton(text)`, `JoiningControls`.
 - `io.ltr8.tson.base.diagnostics` — the rule classes whose prose and `expected` both encodings report.
 
 ---
@@ -278,6 +278,9 @@ public final class VocabularyAtoms {                // the atom host classes, an
 public sealed abstract class AtomTypeException extends RuntimeException
         permits AtomParseException, AtomValidationException { public String expected(); }
 ```
+
+`IdentifierGrammar` is §7.7's name grammar: `PROFILE` (the kernel `identifier`'s `IdentifierProfile`),
+`validate(text)` and §8.2's `hygiene(text)`, each the violation or empty.
 
 `AtomParseException` is a token outside the atom's grammar (`ATOM_FORM_INVALID`); `AtomValidationException`
 a token that parsed and broke a declared constraint (`ATOM_CONSTRAINT_VIOLATION`). `expected()` is the
@@ -318,6 +321,7 @@ public final class TsonObjectReader {
     public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext context);
     // the same derivations and policy accessors, plus:
     public TsonObjectReader ignoringUnknownFields();          // schemaless only: drop, don't report
+    public TsonObjectReader withHostTypes();                  // schemaless only: tags name the bound classes
     public <T> T                    read(source, Class<T> targetClass);
     public <T> TsonObjectDocument<T> readDocument(source, Class<T> targetClass);
     public <T> T                    readWithoutSchema(source, Class<T> targetClass);
@@ -474,7 +478,7 @@ everything, are fail-fast by design.
 
 ## `io.ltr8.tson.tree` (module `tson-tree`)
 
-A true leaf — depends on **nothing**, not even `tson-annotation`.
+A true leaf — depends on **nothing**, not even `ltr8-annotation`.
 
 ```java
 public sealed interface TsonValue
@@ -522,12 +526,24 @@ public record TsonDocument(Optional<String> id, Optional<String> schema, TsonVal
 
 ```java
 public record TsonSchema(String id, String meta, List<String> imports,
-                         AnnotatedMap<String, TypeDefinition> entries, boolean bootstrap) {}
+                         AnnotatedMap<String, Top> entries, boolean bootstrap,
+                         Map<String, List<ValueByName>> valuesByName, Map<String, EntryFacts> facts) {
+    public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
+                             Optional<String> constructor, Optional<String> refines) {}
+    public EntryFacts factsOf(String name);              // NONE for a name with no facts
+    public Optional<SourcePosition> positionOf(String name); // absent for an entry the resolver minted
+    public Optional<String> constructorOf(String name);  // the constructor tag the entry's value applies
+    public Optional<TypeRef> applicationOf(String name); // the @application on its key (§8.2)
+}
 
-public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins, Set<String> textEnums,
-                               Map<String, Normalization> enumForms) {
+public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
+                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
     public String originOf(String entryName);       // which document declared it, transitively
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
+    public Optional<Top> nameType(String entryName); // a record's name_type, where not field_name
+    public boolean isKernel(String entryName);      // the meta-kernel's own entry, judged by origin
+    public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
+    public boolean isConstructor(String name, Top value); // IS-A the kernel's top
 }
 
 public final class TsonSchemaRegistry implements TsonSchemaLoader {
@@ -551,27 +567,38 @@ public final class TsonBundledSchemas {
 shape; the CLI's `diagnostics.tn` imports it for its report's `policy` field. No document selects the policy it is
 judged under.
 
-`textEnums` and `enumForms` are what linking alone knows about the enums of the closure: which are text enums
-(string-class whatever their members spell), and the form each matches its members in.
+`enumForms` and `nameTypes` are what linking alone knows about the closure's names: the form each enum matches its
+members in, and the identifier type each record with a `name_type` of its own judges its field names by.
 
 `register` rejecting a duplicate identity, plus an unmodifiable `entries()`, **is** the "locked"
-guarantee. `CanonicalIdentity` (§2.2.1's algorithm — strip scheme, strip query, nothing else) is
-`tson-base`'s, `io.ltr8.tson.base.CanonicalIdentity`. It reads the reference as an RFC 3987 IRI-reference
-(through `Iri`, not `java.net.URI`), so a host or path beyond US-ASCII is held and compared as written; and an
-identity with no host must have an absolute path, so `/local/orders.tn`, `file:/local/orders.tn` and
-`file:///local/orders.tn` are one identity.
+guarantee. `CanonicalIdentity` (§2.2.1's algorithm) is `tson-base`'s, `io.ltr8.tson.base.CanonicalIdentity`:
+`canonicalize(reference)` reads a reference in any spelling of its identity -- scheme and query stripped, the host a
+`Host` value (so `Example.COM`, `xn--bcher-kva.example` and `bücher.example` spellings meet), the path read back from
+its URI spelling and NFC; `validate(id)` requires a document's own `!!id` to be written in that canonical form;
+`toUri(reference)` is the URI spelling for a fetch. An identity with no host must have an absolute path, so
+`/local/orders.tn`, `file:/local/orders.tn` and `file:///local/orders.tn` are one identity.
 
 The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
-value model — pure records, sealed interfaces and enums, §8's `TypeDefinition` et al. The host values the atoms read to
-are not here (see `tson-base`'s `atom` package and `tson-net`). `Top` is sealed except for its one deliberately open branch,
-**`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance of a meta-schema's own
-constructor lives when the thing it describes is not a data type. A consumer registers such a class by carrying
-`@Typename` and being findable by the `metaNameBinder`; `Data.references()` is how its own type references reach the
-linker, declared rather than discovered.
+value model — pure records, sealed interfaces and enums, §8's `Top` and its bodies. A schema map's entry is its value:
+a `Type` carries its own chain (`Type.chain()`, a `TypeChain` of `parents`, `supertypes` and
+`subtypes`, with accessors for each on `Type`, and `TypeChain.supertypesOf(top)` and its siblings for any
+value); the application an entry is the instantiation of is the derived
+`@application` on its key (`TsonSchema.applicationOf`); and what is not part of the value — where it was declared, its
+value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
+host values the atoms read to
+are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down. A meta-schema's own
+vocabulary is a record it declares and a namespace type holding it (`operations => namespace & { key_type: =
+identifier  value_type: = operation }`); an entry built with one, `api => !operations { search => { … } }`, is a
+**`Namespace`** — a value, never a type — whose map holds each value bound to the consumer's own class, a plain
+record found by the `metaNameBinder` (by name, or by `@Typename`). The class declares none of its references. A slot
+typed by a kind (`request: kind<record>`) binds a `TypeRef` holding a type's name; a slot typed by a reference
+(`method: ref<method>`) binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and
+then a key of its namespace) and, once the schema has linked, the value it names (`method().get()`), or a `TypeRef`
+for the name alone. The resolver records each with its slot as it reads the value, and the linker judges it there.
 
 ---
 
-## `io.ltr8.bind` (module `tson-bind`)
+## `io.ltr8.bind` (module `ltr8-bind`)
 
 ```java
 public class DataBindContext {
@@ -593,7 +620,7 @@ Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bi
 
 ---
 
-## `io.ltr8.annotation` (module `tson-annotation`)
+## `io.ltr8.annotation` (module `ltr8-annotation`)
 
 `@Typename`, `@Field`, `@Record`, `@Tuple`, `@Union`, `@Atom`, `@Transparent`, `@Profile`, `@Unbound`,
 `@FieldOrder`, `@Namespace`, plus `Annotations` / `Annotation` (the wire-annotation carrier),
@@ -601,7 +628,7 @@ Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bi
 
 ---
 
-## `io.ltr8.regex` (module `tson-regex`)
+## `io.ltr8.regex` (module `ltr8-regex`)
 
 A native RFC 9485 I-Regexp engine — a true leaf, no TSON dependency.
 
@@ -621,7 +648,7 @@ how a choice is judged — §5.4 decides choice disjointness by class, never by 
 
 ---
 
-## `io.ltr8.net` (module `tson-net`)
+## `io.ltr8.net` (module `ltr8-net`)
 
 Network text formats, each recognised natively to its RFC — no TSON dependency, usable on its own. `tson-base`
 requires it transitively, so every TSON consumer can name these.
@@ -650,6 +677,23 @@ public final class InternetAddress {                 // functions, not a value
     public static String ipv4Text(byte[] octets);  public static String ipv6Text(byte[] octets);
 }
 public final class MacAddress { public static byte[] eui48(String text); }   // six octets, or null
+
+public sealed interface Host permits HostName, Host.Address {   // what !host reads to
+    String text();                                   // canonical: U-labels, dotted-quad, RFC 5952 unbracketed
+    static Host parse(String text);                  // a name, IPv4, or IPv6 bare or in brackets; or HostSyntaxException
+    record Address(InetAddress address) implements Host { }   // equal by family and octets
+}
+public final class HostName implements Host {        // what !hostname reads to; IDNA2008, nothing mapped
+    public static HostName parse(String text);       // either label form, ASCII case folded; or HostSyntaxException
+    public String unicode();  public String ascii();  public boolean isIdn();   // equal by name
+}
+public final class HostSyntaxException extends IllegalArgumentException { public String text(); public String reason(); }
+public final class Punycode { public static String encode(String s); public static String decode(String s); }  // or null
+public final class MediaType {                       // what !media_type reads to; RFC 6838, RFC 9110 parameters
+    public static MediaType parse(String text);      // or MediaTypeSyntaxException; a media range is refused
+    public String type();  public String subtype();  public Optional<String> suffix();
+    public Map<String, String> parameters();         // names lowercase and sorted; charset's value folded
+}                                                    // equal by value; toString() is the canonical text
 ```
 
 `Iri` is the value the four URI atoms read to. `InternetAddress` is strict where `java.net.InetAddress` is not

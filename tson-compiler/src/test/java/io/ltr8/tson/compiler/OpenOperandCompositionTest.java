@@ -5,7 +5,9 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 
@@ -25,11 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * arguments as written yields a held record still carrying them, and absorbing that is an ordinary flattened
  * record that mentions {@code T}.
  *
- * <p><b>The IS-A edge is the half that has to wait.</b> A template is not a type (§5.10), so the open
- * declaration's contract index names {@code customer} and {@code box}'s own ancestors and never {@code box}
- * -- there is no instantiation of it yet to be IS-A. What the declaration <em>can</em> do is keep the
- * application: {@code record.supertypes} is a reference channel, so {@code box<T>} is written into the held
- * body and closes with everything else in it. {@code vip<text>} is therefore IS-A {@code box<text>} and not
+ * <p><b>The IS-A edge is the half that has to wait.</b> A template is not a type (§5.10), so the chain an
+ * application of the open declaration closes to names {@code customer} and {@code box}'s own ancestors and
+ * never {@code box} -- there is no instantiation of it yet to be IS-A. What the declaration <em>can</em> do is
+ * keep the application: {@code supertypes} is a reference channel, so {@code box<T>} is written into the held
+ * body as a parent and closes with everything else in it. {@code vip<text>} is therefore IS-A {@code box<text>} and not
  * {@code box<int32>}, which a name-level edge to {@code box} could not have distinguished.
  *
  * <p><b>The membership table is the real claim</b>, since a schema-driven read admits a value by the IS-A
@@ -51,8 +53,8 @@ class OpenOperandCompositionTest {
      * <b>A closed application at an operand takes the same route, and mints nothing either.</b> The template
      * is a macro at both ends: it contributes its fields and its own ancestors, and the type the composition
      * produces is the composing declaration. What minting gave instead was an entry nothing else named --
-     * one subtype, no referent, no reader -- standing in this declaration's contract index in place of the
-     * ancestors that are really there. An application some other position names is still minted by that
+     * one subtype, no referent, no reader -- standing in this declaration's chain in place of the ancestors
+     * that are really there. An application some other position names is still minted by that
      * position, §8.2 keying identity on the application, so both land on one entry.
      *
      * <p><b>{@code box<text>} is still no type to be IS-A; {@code box} is.</b> A record-bodied template is a
@@ -75,22 +77,21 @@ class OpenOperandCompositionTest {
                 () -> "nothing names box<text>, so no entry is minted for it: "
                         + compiled.schema().entries().keySet());
 
-        TypeDefinition c = compiled.schema().entries().get("c");
-        assertEquals(List.of("base", "box"), c.supertypes(),
+        Top c = compiled.schema().entries().get("c");
+        assertEquals(List.of("base", "box"), TypeChain.supertypesOf(c),
                 "the ancestors arrive by value, and the edge runs to the family base the operand applies");
         assertEquals(List.of("tag", "item", "extra"),
-                ((RecordBody) c.body()).fields().stream().map(f -> f.name()).toList(),
+                ((RecordBody) c).fields().keySet().stream().toList(),
                 "the operand's fields flatten in, left to right, with the body's own appended");
-        assertEquals(List.of("box"), ((RecordBody) c.body()).supertypes().stream()
-                        .map(io.ltr8.tson.schema.meta.TypeRef::name).toList(),
-                "record.supertypes keeps the application as written -- the reference channel, arguments and all");
+        assertEquals(List.of(), ((RecordBody) c).parents(),
+                "a closed type keeps no parents: the application, which nothing names, reaches no edge");
     }
 
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/open-operand.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -120,7 +121,7 @@ class OpenOperandCompositionTest {
         // A `name => head<args>` declaration *is* the instantiation entry (§8.2), so
         // the entry every use site reaches is the declaration itself -- or, where an earlier declaration
         // already named the same application, the one it aliases.
-        return compiled.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
                 ? ref.target().name() : alias;
     }
 
@@ -135,27 +136,31 @@ class OpenOperandCompositionTest {
                 """);
 
         RecordBody closed = (RecordBody) compiled.schema().entries()
-                .get(aliasTarget(compiled, "use")).body();
-        assertEquals(List.of("id", "tag", "value"), closed.fields().stream().map(f -> f.name()).toList(),
+                .get(aliasTarget(compiled, "use"));
+        assertEquals(List.of("id", "tag", "value"), closed.fields().keySet().stream().toList(),
                 "customer's field, then box's flattened field set, in composition order");
-        assertEquals("text", closed.fields().get(2).type().name(),
-                () -> "the parameter absorbed from box<T> closes with vip: " + closed.fields().get(2));
+        assertEquals("text", closed.fields().values().stream().toList().get(2).type().name(),
+                () -> "the parameter absorbed from box<T> closes with vip: "
+                        + closed.fields().values().stream().toList().get(2));
     }
 
     /**
      * The open operand contributes its ancestors and not itself. {@code base} is a type and its fields
-     * arrived, so the IS-A edge is real; {@code box} is a template, and §5.10 makes a template no type.
+     * arrived, so the IS-A edge is real; {@code box} is a template, and §5.10 makes a template no type. The
+     * template's chain says so: its parents as written, and the closed entries they reach.
      */
     @Test
     void anOpenOperandContributesItsOwnSupertypesButNotItsOwnName() {
         TsonCompiledSchema compiled = compile(LATTICE);
 
-        TypeDefinition vip = compiled.schema().entries().get("vip");
+        Top vip = compiled.schema().entries().get("vip");
 
-        assertEquals(List.of("customer", "base"), vip.supertypes(),
-                () -> "customer directly, base through the open operand: " + vip.supertypes());
-        assertFalse(vip.supertypes().contains("box"),
-                () -> "a template is not a type, so nothing is IS-A one: " + vip.supertypes());
+        assertEquals(List.of("base", "customer"), TypeChain.supertypesOf(vip),
+                () -> "customer directly, base through the open operand: " + TypeChain.supertypesOf(vip));
+        assertFalse(TypeChain.supertypesOf(vip).contains("box"),
+                () -> "a template is not a type, so nothing is IS-A one: " + TypeChain.supertypesOf(vip));
+        assertEquals(List.of("customer", "box"), TypeChain.parentsOf(vip).stream().map(TypeRef::name).toList(),
+                "and it keeps its parents as written");
     }
 
     /** Rows one and two of the membership table, read off the index a schema-driven read actually consults. */
@@ -164,10 +169,10 @@ class OpenOperandCompositionTest {
         TsonCompiledSchema compiled = compile(LATTICE);
         String vipText = aliasTarget(compiled, "vip_text");
 
-        assertTrue(compiled.schema().entries().get("customer").subtypes().contains(vipText),
-                () -> "customer: " + compiled.schema().entries().get("customer").subtypes());
-        assertTrue(compiled.schema().entries().get("base").subtypes().contains(vipText),
-                () -> "base: " + compiled.schema().entries().get("base").subtypes());
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get("customer")).contains(vipText),
+                () -> "customer: " + TypeChain.subtypesOf(compiled.schema().entries().get("customer")));
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get("base")).contains(vipText),
+                () -> "base: " + TypeChain.subtypesOf(compiled.schema().entries().get("base")));
     }
 
     /**
@@ -182,10 +187,10 @@ class OpenOperandCompositionTest {
         String vipText = aliasTarget(compiled, "vip_text");
         String boxText = aliasTarget(compiled, "text_box");
 
-        assertTrue(compiled.schema().entries().get(boxText).subtypes().contains(vipText),
-                () -> boxText + ": " + compiled.schema().entries().get(boxText).subtypes());
-        assertTrue(compiled.schema().entries().get(vipText).supertypes().contains(boxText),
-                () -> vipText + ": " + compiled.schema().entries().get(vipText).supertypes());
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get(boxText)).contains(vipText),
+                () -> boxText + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(boxText)));
+        assertTrue(TypeChain.supertypesOf(compiled.schema().entries().get(vipText)).contains(boxText),
+                () -> vipText + ": " + TypeChain.supertypesOf(compiled.schema().entries().get(vipText)));
     }
 
     /**
@@ -199,8 +204,8 @@ class OpenOperandCompositionTest {
         String vipText = aliasTarget(compiled, "vip_text");
         String intBox = aliasTarget(compiled, "int_box");
 
-        assertFalse(compiled.schema().entries().get(intBox).subtypes().contains(vipText),
-                () -> intBox + ": " + compiled.schema().entries().get(intBox).subtypes());
+        assertFalse(TypeChain.subtypesOf(compiled.schema().entries().get(intBox)).contains(vipText),
+                () -> intBox + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(intBox)));
     }
 
     /** §5.7 against an open source: the same absorption, and the same two omissions. */
@@ -213,17 +218,18 @@ class OpenOperandCompositionTest {
                   use  => vip<text>
                 """);
 
-        TypeDefinition vip = compiled.schema().entries().get("vip");
-        assertEquals(List.of("base"), vip.supertypes(),
-                () -> "box is not a type and contributes no name to the open entry's contract index; its "
-                        + "own base does: " + vip.supertypes());
-        assertTrue(vip.source().isEmpty(),
-                () -> "an open source names no entry, so there is none to record: " + vip.source());
+        List<String> chain = TypeChain.supertypesOf(compiled.schema().entries().get(aliasTarget(compiled, "use")));
+        assertTrue(chain.contains("base") && !chain.contains("box"),
+                () -> "box is not a type and contributes no name to the chain; its own base does: " + chain);
+        assertTrue(compiled.schema().applicationOf("vip").isEmpty(),
+                () -> "an open source names no entry, so there is none to record: "
+                        + compiled.schema().factsOf("vip"));
 
         RecordBody closed = (RecordBody) compiled.schema().entries()
-                .get(aliasTarget(compiled, "use")).body();
-        assertEquals(List.of("tag", "note", "value"), closed.fields().stream().map(f -> f.name()).toList());
-        assertEquals("text", closed.fields().get(2).type().name(), "the parameter survived the refinement");
+                .get(aliasTarget(compiled, "use"));
+        assertEquals(List.of("tag", "note", "value"), closed.fields().keySet().stream().toList());
+        assertEquals("text", closed.fields().values().stream().toList().get(2).type().name(),
+                "the parameter survived the refinement");
     }
 
     /**
@@ -244,14 +250,15 @@ class OpenOperandCompositionTest {
                 """);
 
         RecordBody closed = (RecordBody) compiled.schema().entries()
-                .get(aliasTarget(compiled, "use")).body();
-        String v = closed.fields().stream().filter(f -> f.name().equals("v")).findFirst().orElseThrow()
+                .get(aliasTarget(compiled, "use"));
+        String v = closed.fields().entrySet().stream().filter(f -> f.getKey().equals("v"))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
                 .type().name();
 
-        RecordBody held = (RecordBody) compiled.schema().entries().get(v).body();
-        assertEquals(List.of("u"), held.fields().stream().map(f -> f.name()).toList(),
+        RecordBody held = (RecordBody) compiled.schema().entries().get(v);
+        assertEquals(List.of("u"), held.fields().keySet().stream().toList(),
                 () -> "'v' should name the inner<text> instantiation, not bare 'inner': " + v);
-        assertEquals("text", held.fields().get(0).type().name(),
+        assertEquals("text", held.fields().values().stream().toList().get(0).type().name(),
                 "the argument list survived, so U closed to text");
     }
 

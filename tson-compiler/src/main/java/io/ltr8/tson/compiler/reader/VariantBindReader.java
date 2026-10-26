@@ -13,7 +13,7 @@ import java.util.Optional;
 /**
  * Object-binding mode's own record-subtype/union dispatcher -- the {@code DataClassUnion}-bounded
  * counterpart to {@code reader.VariantParser}. That class dispatches by {@code !typeName} over
- * {@code TypeDefinition.subtypes()} -- purely schema-derived, with each subtype's own target Java
+ * {@code Top.subtypes()} -- purely schema-derived, with each subtype's own target Java
  * class found by convention via {@code DataNameBinder} once dispatch reaches {@code resolver}. This
  * class exists for the same reason {@link RecordBindReader} exists alongside {@code
  * reader.RecordParser}: a caller with an *independently designed* Java sealed interface (not
@@ -21,7 +21,7 @@ import java.util.Optional;
  * dispatch bounded by that real Java type, the same way {@link RecordBindReader} takes a real {@code
  * DataClassRecord} instead of deriving one by convention.
  *
- * <p><b>Record-scoped, deliberately, for now.</b> {@code TypeDefinition.subtypes()} is non-empty for
+ * <p><b>Record-scoped, deliberately, for now.</b> {@code Top.subtypes()} is non-empty for
  * any composed kind with real subtypes, not just records ({@code reader.VariantParser} handles array's own
  * {@code set} too) -- but a container subtype is not meant to be dispatched to by an explicit {@code !set
  * [...]} type-ref the way a record subtype is; whether/how the spec should even allow that is still open. Only {@link

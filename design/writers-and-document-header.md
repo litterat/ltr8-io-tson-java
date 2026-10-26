@@ -16,6 +16,18 @@ keeps the rest of the document. Current form only; history lives in git.
   writer only the schema, and the root type-ref is not part of `TsonDocumentHeader`.
 - `TsonDataEmitter.typeRef` refuses a second type-ref on one value — a writer cannot emit a document that
   will not read back.
+- `TsonDataEmitter.field` writes a name that is no identifier as a quoted string: a relaxed `name_type`
+  ([TSON-SCHEMA] §5.2) admits `"@id"`, which written bare would not lex back.
+- `DataClassObjectWriter` writes a `type_ref` value (`schema.meta.TypeRef`) with no arguments as its bare name, as
+  [TSON-SCHEMA] §8.1 writes it positionally and as a value written by name has only that spelling
+  ([TSON-SCHEMA] §5.12); an application keeps the explicit `{ name: … arguments: [ … ] }` record. A name some
+  segment of which is no identifier is written as the record too, so it never comes back as text.
+- `DataClassObjectWriter` writes a `Namespace` as the map it holds: each key keeps its annotations and is bare where
+  it is an identifier, quoted otherwise; a value is tagged only where its class carries `@Typename`, which is what
+  selects a subtype of the value type on the way back in. Where the position admits more than one constructor
+  (`top`, a union) the map carries its `type` as the tag, `!api { key => value … }`, written through `Top`'s
+  descriptor since no class carries it; at a slot whose host types it as a `Namespace` the slot's type already names
+  the constructor, and the map is written untagged (`fields: { name => … }`).
 - `TsonDocumentPeek` performs no second header scan and rewinds nothing; a continuing reader whose lexical
   policy (token policy, limits) disagrees with the peek's is refused.
 - A peek is total: a malformed header yields nothing rather than throwing, never a schema the document does

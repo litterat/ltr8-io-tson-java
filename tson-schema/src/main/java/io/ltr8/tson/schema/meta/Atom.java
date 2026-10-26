@@ -3,18 +3,21 @@ package io.ltr8.tson.schema.meta;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code atom => top & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
+ * The meta-kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
  * Top} variant IS-A this. {@link ValueType} and {@link VoidType} back {@code value} and {@code void}, the
  * two atoms with no constraint vocabulary; {@link EnumBody} backs {@code boolean} and the kernel's other
- * internal enumerations; the remaining variants are the atom constraint-vocabulary families, one
- * per {@code *_type} constructor. {@link Scoped} is the sibling SUM-kind case -- see {@link Sum}, not
+ * internal enumerations, a listed set of names; {@link KindBody} backs {@code kind_type}, a computed one -- the
+ * names of the types built with one constructor; the remaining variants are the atom constraint-vocabulary
+ * families, one per {@code *_type} constructor. {@link Scoped} is the sibling SUM-kind case -- see {@link Sum}, not
  * here.
  */
-public sealed interface Atom extends Top permits ValueType, VoidType, EnumBody, IntegerType, TextType, IdentifierType,
+public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody, KindBody, RefBody, IntegerType, TextType,
+        IdentifierType,
         UriType, IriType, RegexType,
         DecimalType, FloatType, RationalType, UuidType, BytesType, DateType, TimeType, DateTimeType, DurationType,
         PeriodType,
-        Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, ComplexType {
+        Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, HostnameType, HostType, MediaTypeType,
+        ComplexType {
 
     /**
      * Reports how {@code refined} fails to narrow this atom's own constraints -- an empty list

@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import java.util.Optional;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -12,6 +12,9 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.ValueParser;
@@ -40,7 +43,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     /**
      * <b>One factory for every atom family</b>, because the mapping from a resolved body to the parser that
      * reads it is {@link AtomParsers}' and there is no second opinion to have about it. A constant per family doing
-     * {@code new XParser((XType) definition.body())} would be a table restating {@code AtomParsers.forType}
+     * {@code new XParser((XType) definition)} would be a table restating {@code AtomParsers.forType}
      * entry for entry, and two tables are what lets a family be present in one and missing from the other.
      *
      * <p>{@link ValueReaderFactoryRegistry} registers it under each constructor name: what is shared is the
@@ -48,11 +51,13 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * fault rather than an author error -- the registry only routes here for names that are atoms.
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
-            .forType(definition.body(), context.linked().enumForm(name))
-            .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(name, parser,
-                    context.locationOf(name, definition), namesProfile(definition.body())))
+            .forType(definition, context.linked().enumForm(name), context.linked().governsSchemas())
+            .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(context.authoredName(name, definition), parser,
+                    context.locationOf(name), namesProfile(definition),
+                    definition instanceof KindBody kind ? kind.of() : null,
+                    definition instanceof RefBody reference ? reference.of() : null))
             .orElseThrow(() -> new IllegalStateException(
-                    "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
+                    "'" + name + "' is registered as an atom but its body has no parser: " + definition));
 
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean},
@@ -71,7 +76,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) -> "boolean".equals(name)
             ? AtomTypeReader.of(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
                     () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
-                    context.locationOf(name, definition))
+                    context.locationOf(name))
             : ATOM.create(name, definition, context);
     /**
      * {@code void_type}: not a scalar at all -- its contract admits only the void sentinel {@code _}, never a
@@ -79,7 +84,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * kernel's {@code void} and core's sibling read alike.
      */
     static final ValueReaderFactory VOID = (name, definition, context) ->
-            new VoidReader(context.locationOf(name, definition));
+            new VoidReader(context.locationOf(name));
 
     /**
      * {@code value_type}: decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted token
@@ -87,7 +92,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * {@code AtomParsers} declines it and {@link ValueParser} answers here.
      */
     static final ValueReaderFactory VALUE = (name, definition, context) ->
-            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition), null);
+            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name), null, null, null);
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a
@@ -95,6 +100,10 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * my_percentage}, which is what its author wrote and can act on. There is no name on {@link AtomType} to
      * use instead (one {@code IntegerParser} serves {@code int8}..{@code int256} and every refinement of
      * them), so it has to come from the entry, which every {@link ValueReaderFactory} is handed anyway.
+     *
+     * <p><b>{@code null} for a form no author named</b> -- an application nothing declares, expanded to an atom
+     * instance ({@link ValueReaderContext#authoredName}). The family's own sentence then stands alone, and the
+     * position the diagnostic carries says where.
      *
      * <p><b>It is not what a constraint violation reports as {@code expected}.</b> Naming the type there
      * says strictly less than the message already does -- a consumer wanting the bound has to recover it by
@@ -115,15 +124,56 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     private final IdentifierProfile names;
 
+    /**
+     * The constructor a kind's values are built with ({@code kind<C>}'s {@code C}), or {@code null} for every other
+     * atom.
+     */
+    private final String kindOf;
+
+    /** The type a reference's values are of ({@code ref<T>}'s {@code T}), or {@code null} for every other atom. */
+    private final String refOf;
+
     /** {@code body}'s profile when it is an identifier family -- its constructor IS-A {@code identifier_type}. */
     private static IdentifierProfile namesProfile(Top body) {
         return body instanceof IdentifierType identifier ? identifier.profile() : null;
     }
 
 
+    /** Whether this reads a kind, whose value is a type's name -- a position a {@code TypeRef} target holds by name. */
+    boolean readsAKind() {
+        return kindOf != null;
+    }
+
+    /** Whether this reads a reference, whose value is a value's qualified name --
+     * held by a {@code Ref} or a {@code TypeRef}. */
+    boolean readsARef() {
+        return refOf != null;
+    }
+
+    /** The type a reference's values are of, for a message: {@code method}. */
+    String refOf() {
+        return refOf;
+    }
+
+    /**
+     * The declared type of the slot this reads, for the name read there to be recorded with
+     * ({@link io.ltr8.tson.compiler.TsonReadContext#heldByName}): a kind's {@code of} or a reference's {@code T},
+     * named as the author wrote it where they did.
+     */
+    TsonSchema.SlotType slotType() {
+        if (kindOf != null) {
+            return TsonSchema.SlotType.kind(kindOf, name);
+        }
+        if (refOf != null) {
+            return TsonSchema.SlotType.reference(refOf, name);
+        }
+        throw new IllegalStateException("'" + name + "' reads neither a kind nor a reference, so no name is held "
+                + "there");
+    }
+
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
-        return new AtomTypeReader<>(name, delegate, schemaLocation, null);
+        return new AtomTypeReader<>(name, delegate, schemaLocation, null, null, null);
     }
 
     /**
@@ -132,7 +182,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     @Override
     public TsonTypeReader<?> renamed(String displayName) {
-        return new AtomTypeReader<>(displayName, delegate, schemaLocation, names);
+        return new AtomTypeReader<>(displayName, delegate, schemaLocation, names, kindOf, refOf);
     }
 
     /**
@@ -162,7 +212,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * the entry's own is {@code value}, which names the escape hatch rather than anything the author wrote.
      */
     TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
-        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null);
+        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null, null, null);
     }
 
     /**
@@ -176,15 +226,18 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * case that does rename, its entry naming the escape hatch rather than anything in the schema.
      */
     Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
-        return delegate.boundTo(wire).map(bound -> new AtomTypeReader<>(name, bound, schemaLocation, names));
+        return delegate.boundTo(wire).map(bound -> new AtomTypeReader<>(name, bound, schemaLocation, names, kindOf,
+                refOf));
     }
 
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation,
-                           IdentifierProfile names) {
+                           IdentifierProfile names, String kindOf, String refOf) {
         this.name = name;
         this.delegate = delegate;
         this.schemaLocation = schemaLocation;
         this.names = names;
+        this.kindOf = kindOf;
+        this.refOf = refOf;
     }
 
 
@@ -194,8 +247,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
         if (!(e instanceof TokenEvent token)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for '" + name + "', found "
-                    + TypeRefCheck.describe(e), "a token for " + name, TypeRefCheck.describe(e));
+            String expected = name == null ? "a token" : "a token for " + name;
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected " + (name == null ? "a token" : "a token for '"
+                    + name + "'") + ", found " + TypeRefCheck.describe(e), expected, TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -218,7 +272,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             // The entry's own name leads the sentence -- see `name` above -- and AtomRefusal decides the
             // code: §8.1 files a contract rejection apart from a range violation, and this reader is not a
             // second opinion about which is which.
-            AtomRefusal refusal = AtomRefusal.of(ex, token.text(), Object.class).named(name);
+            AtomRefusal refusal = AtomRefusal.of(ex, token.text(), Object.class);
+            refusal = name == null ? refusal : refusal.named(name);
             ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
             return null;
         }

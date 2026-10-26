@@ -1,6 +1,7 @@
 package io.ltr8.tson.base.diagnostics;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.SourcePosition;
 
 /**
  * What a record's rules say when a document breaks one -- stated once, for every encoding.
@@ -19,8 +20,8 @@ import io.ltr8.tson.base.Diagnostic;
  * vocabulary. The encoding's own spelling is not lost -- it rides in {@link Refusal#actual}, which echoes
  * what the document literally held and is data rather than prose.
  *
- * <p><b>What is not here</b> is any rule one encoding has and the other does not: JSON's reserved member
- * namespace ([TSON-JSON] §3.2) and TSON's positional record form have no counterpart across the wire, so
+ * <p><b>What is not here</b> is any rule one encoding has and the other does not: JSON's annotation
+ * members ([TSON-JSON] §3.2) and TSON's positional record form have no counterpart across the wire, so
  * each stays with the reader that owns it. A shared class that grew those would be a second switch
  * responsible for rules it cannot name.
  *
@@ -42,12 +43,39 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
                         .formatted(field, typeName, declaredFields), declaredFields, field);
     }
 
+    /**
+     * {@link #unrecognizedField(String)} for a name that is no value of the record's name type {@code nameType}
+     * ([TSON-SCHEMA] §5.2), which {@code reason} says why: no declared field can be it, so it is unknown on
+     * the same terms, and the field list is the repair either way.
+     */
+    public Refusal unrecognizedField(String field, String nameType, String reason) {
+        return new Refusal(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                ("unknown field '%s' on '%s' -- it is not a value of the record's name type '%s' (%s), and a record "
+                        + "is closed under its type (§7.2), whose fields are (%s)")
+                        .formatted(field, typeName, nameType, reason, declaredFields), declaredFields, field);
+    }
+
     /** [TSON-DATA] §2.5: a record states each field at most once, and the repeat states a value for nothing. */
     public Refusal duplicateField(String field) {
         return new Refusal(Diagnostic.Code.DUPLICATE_FIELD,
                 "duplicate field '%s' on '%s' -- a record states each field at most once (§2.5), and the repeat "
                         .formatted(field, typeName) + "states a value for nothing",
                 "each field stated once", "'" + field + "' stated again");
+    }
+
+    /**
+     * {@link #duplicateField(String)} under a name type that folds case, where the repeat {@code stated} and the
+     * first statement {@code first} may be two spellings of the field {@code declared}: the message names the
+     * field and where it was first given, so a repair finds the other spelling without searching for it. The
+     * position is written {@code line:column:byteOffset}, as every position a report carries is.
+     */
+    public Refusal duplicateField(String stated, String declared, String first, SourcePosition firstAt) {
+        return new Refusal(Diagnostic.Code.DUPLICATE_FIELD,
+                ("duplicate field '%s' on '%s' -- the field '%s' is already given, as '%s' at %d:%d:%d, and a "
+                        + "record states each field at most once (§2.5)")
+                        .formatted(stated, typeName, declared, first, firstAt.line(), firstAt.column(),
+                                firstAt.byteOffset()),
+                "each field stated once", "'" + stated + "' stated again");
     }
 
     /** A required field the document never mentioned. */

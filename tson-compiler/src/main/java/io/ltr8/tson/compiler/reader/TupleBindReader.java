@@ -17,12 +17,12 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 
 /**
  * Object-binding mode's own {@code tuple} reader -- reads a tuple's own array-shaped value into a
- * real, bound Java object via {@code descriptor}, a {@code tson-bind} {@link DataClassTuple} already
+ * real, bound Java object via {@code descriptor}, a {@code ltr8-bind} {@link DataClassTuple} already
  * resolved for this tuple's own target Java type (same division of responsibility as {@link
  * RecordBindReader}'s {@code DataClassRecord}).
  *
@@ -150,17 +150,17 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         }
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof TupleBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
+            if (!(typeDefinition instanceof TupleBody body)) {
+                throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition);
             }
-            String displayName = EntryDisplayName.of(name, typeDefinition);
+            String displayName = context.displayName(name, typeDefinition);
             DataClass dataClass;
             try {
                 dataClass = descriptorFor(name, typeDefinition, context);
             } catch (MissingBindingException missing) {
-                return unbound(name, displayName, body, missing, resolver, context.locationOf(name, typeDefinition),
+                return unbound(name, displayName, body, missing, resolver, context.locationOf(name),
                         AnnotationTypes.of(context));
             }
             if (!(dataClass instanceof DataClassTuple descriptor)) {
@@ -173,11 +173,11 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                         + " do not agree: " + String.join("; ", mismatches));
             }
             return new TupleBindReader(name, displayName, body, descriptor, resolver,
-                    context.locationOf(name, typeDefinition),
+                    context.locationOf(name),
                     AnnotationTypes.of(context));
         }
 
-        private DataClass descriptorFor(String name, TypeDefinition definition, ValueReaderContext vctx) {
+        private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
             DataBindException first = null;
             StringBuilder tried = new StringBuilder();
             for (String candidate : vctx.bindingNamesFor(name, definition)) {

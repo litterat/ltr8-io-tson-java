@@ -6,7 +6,16 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 **Invariants**
 
 - The token policy is the stream's, not the context's: a context rewinds, a stream produces each token exactly once.
-- The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one.
+- The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one. A
+  field name a lookahead pulls is the one deferral: it is judged when a reader reads it, under that reader's rule.
+- A record reader pulls its own names through `nextFieldName(rule)`, its name type (`FieldNameRule.FIELD_NAME` where
+  it states none, never `null`); every other pull of a field name — schemaless readers, `EventSkip` — judges it as a
+  schemaless record's, an identifier or `ATOM_FORM_INVALID`, except a root value a read abandons, which
+  `discardUnjudged` skips with no name rule at all, the value of a field its record does not declare, which
+  `TsonReadContext.skipUnjudged` skips the same way (as the JSON reader skips the member), and a document that names
+  a schema read without it (`leavingFieldNamesToTheSchema`), whose field names are that schema's to judge.
+- A name its record's type refuses is reported nothing at the pull: the reader reports it `UNRECOGNIZED_FIELD` with
+  the type's reason (`FieldNameRule.refusal`), in both encodings. A field name's refusals are at the field's pointer.
 - A refused name draws no verdict beside its refusal: both record readers checkpoint `ctx.reported()` across the pull
   and skip their `UNRECOGNIZED_FIELD`.
 - Both surfaces are allocation-free when nothing is refused: `IdentifierPolicy.judge` answers a passing name with the
@@ -26,6 +35,15 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 `design/name-hygiene-and-minted-names.md`.
 
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
+
+**The look-alike rule is decidable because the series names its scopes.** `ConfusableNames` (`ltr8-unicode`) is
+UTS #39's skeleton relation over a set the caller supplies; a relation answers nothing about one name, which is why
+a general-purpose language can only "consider it". TSON supplies the sets: the fields of one record, the members of
+one enum, the variants of one choice, the declared names of one schema, the merged namespace at an `!!import`, and
+the keys of one identifier-keyed map ([TSON-SCHEMA] §11.4, met one at a time through a `ConfusableNames.Scope` and
+reported at the second name's own position, as §8.2's detection rule asks). Each is closed, and known when the check
+runs. A relation has no false positives on a lone name — `id_пользователя` collides with nothing — which is why it
+is the rule and a per-name restriction level is an option.
 
 **The token policy is the stream's, not the context's.** Both `TsonDataStream` and `JsonStream` apply it as
 an event leaves them; neither read context takes one, and `TsonReadContext.of` has no parameter for
@@ -72,6 +90,23 @@ failure really is a parse error.
 `AnnotationCapture` builds a probe context over events already seen — so checking every event would report
 one name once per lookahead that crossed it. `NameHygieneTest` counts every shape an annotation takes,
 because that is the failure that would survive every other test.
+
+**A field name is judged by the record that reads it** ([TSON-SCHEMA] §5.2). The grammar admits any single-line
+token in name position, and the match against the record's `name_type` is here: a name the type refuses meets no
+hygiene rule and is reported nothing at the pull, since it can match no declared field and `RecordAbstractReader`
+reports it `UNRECOGNIZED_FIELD` — plain under the default, naming the type and its reason under a declared one; one it
+admits meets the per-name rules under the type's profile, an identifier family's, at the field's pointer. The JSON
+reader's `RecordPlan.unmatched` gives the same verdicts in the same order, so the two encodings agree on one code.
+Only a schemaless record, with no field list to be unknown against, reports a name that is no identifier as
+`ATOM_FORM_INVALID`. The default rule asks §7.7's grammar rather than the identifier parser, so the check on every
+name of an ordinary document allocates nothing. The rule is the reading record's, passed on the one pull
+(`TsonReadContext.nextFieldName`), so a record nested in a relaxed one keeps identifier names. A name it admits is
+matched against the declared ones in the type's `normalization` (`FieldNameRule.form`, from
+`TsonLinkedSchema.nameForm`), the equality the linker judged them distinct under; under NFC, every name's form
+already, the index is the declared names themselves. A lookahead — `RecordMemberDispatchReader`'s discriminator scan —
+crosses a member's names before the member is chosen, so a field name pulled while one is running is held in the
+cursor's `unjudged` set and judged when a reader outside any lookahead reads it. The set is allocated only when a
+lookahead crosses a field name.
 
 **Not in `TsonDataStream`**, which is where the *token* surface's policy runs and gets exactly-once
 for free by sitting upstream of the rewind. The two surfaces sit on opposite sides of the rewind because they
@@ -157,7 +192,7 @@ name two things — and neither is a set of `text`. **An element that fails to r
 
 **The restricted-character rule is gated on the level, as the restricted-script rule is.** §8.2's
 Unrestricted "drops the
-profile too", taking that rule with it, so `appliesIdentifierProfile()` guards the `IdentifierProfile.hygiene`
+profile too", taking that rule with it, so `appliesIdentifierProfile()` guards the `IdentifierGrammar.hygiene`
 call at both walks — the read context's and the linker's. Every other level keeps the profile, the
 restricted-script rule gating itself inside `violation()`.
 

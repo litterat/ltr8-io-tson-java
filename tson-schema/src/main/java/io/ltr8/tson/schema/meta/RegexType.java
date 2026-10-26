@@ -1,8 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,10 +37,27 @@ import java.util.Optional;
  * is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "regex_type")
-public record RegexType(String spec, @Field("min_length") Optional<Integer> minLength,
+public record RegexType(TypeChain chain,
+        String spec, @Field("min_length") Optional<Integer> minLength,
                         @Field("max_length") Optional<Integer> maxLength,
                         Optional<Integer> length, Optional<String> pattern,
                         Optional<List<String>> members, Normalization normalization) implements Atom, TextFamily {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public RegexType {
+        chain = TypeChain.orEmpty(chain);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public RegexType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, normalization);
+    }
+
+    @Override
+    public RegexType withChain(TypeChain chain) {
+        return new RegexType(chain, spec, minLength, maxLength, length, pattern, members, normalization);
+    }
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
     public static final RegexType UNCONSTRAINED = new RegexType(

@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -58,17 +58,17 @@ final class TemplateRegularity {
      *         instantiations long. Always empty when {@code reporter} is {@code null}, that mode having
      *         thrown at the first failure.
      */
-    static Set<String> check(Map<String, TypeDefinition> entries, Reporter reporter) {
+    static Set<String> check(Map<String, Top> entries, Reporter reporter) {
         Set<String> irregular = new LinkedHashSet<>();
         Map<String, List<Application>> applications = new LinkedHashMap<>();
-        for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
-            if (!entry.getValue().parameters().isEmpty()) {
+        for (Map.Entry<String, Top> entry : entries.entrySet()) {
+            if (!OpenEntry.parameterNames(entry.getValue()).isEmpty()) {
                 applications.put(entry.getKey(), applicationsIn(entry.getValue()));
             }
         }
         for (Map.Entry<String, List<Application>> template : applications.entrySet()) {
             String name = template.getKey();
-            List<String> parameters = entries.get(name).parameters();
+            List<String> parameters = OpenEntry.parameterNames(entries.get(name));
             for (Application application : template.getValue()) {
                 if (!reaches(application.head(), name, applications)) {
                     continue; // not on a cycle back to this declaration -- nothing to keep regular
@@ -159,16 +159,16 @@ final class TemplateRegularity {
      * unchanged -- one place knows the shape of a body, so a new body type cannot be handled here and
      * forgotten there.
      */
-    private static List<Application> applicationsIn(TypeDefinition template) {
+    private static List<Application> applicationsIn(Top template) {
         List<Application> found = new ArrayList<>();
         // A held body is not rewritable, so it answers for itself: `applications()` is the same kind of
         // declared question as `names()`, and returning the applications the wire tree holds is what keeps
         // this rule at the declaration now that every open body is held.
-        if (template.body() instanceof TemplateBody held) {
-            HeldBody.of(held).applications().forEach(ref -> collect(ref, found));
+        if (OpenEntry.isOpen(template)) {
+            HeldBody.of(template).applications().forEach(ref -> collect(ref, found));
             return found;
         }
-        MetaRefs.mapBodyRefs(template.body(), ref -> {
+        MetaRefs.mapBodyRefs(template, ref -> {
             collect(ref, found);
             return ref;
         });

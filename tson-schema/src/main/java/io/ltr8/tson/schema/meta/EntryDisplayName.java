@@ -1,9 +1,12 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.TsonSchema;
 
 import java.math.BigInteger;
-import java.util.Map;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -18,66 +21,137 @@ import java.util.stream.Collectors;
  * this project's own rule that a diagnostic never names what the author did not write, and now doubly so
  * where diagnostics travel to a reader who cannot open the schema at all.
  *
- * <p><b>A missing source position is what tells them apart</b>, and it is exact rather than a heuristic on
+ * <p><b>A missing source position is what tells them apart</b> ({@link TsonSchema.EntryFacts#position}), and it is exact
+ * rather than a heuristic on
  * the name's shape: a declaration parsed from a document carries the position of its own name token, and an
  * entry the resolver mints has nothing to carry. So {@code tag_list => [text; 1..2]} keeps {@code tag_list},
  * which is what its author would look for, while the anonymous form inside it renders as the form.
  *
  * <p>The rendering is the sugar the author would have written, not a description of it: {@code
- * [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)},
- * {@code paged&lt;order&gt;}. Anything with no sugar spelling falls back to the entry name -- honest rather
- * than invented, and unreachable in practice, since a form with no spelling is a form nobody wrote.
+ * [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)}, and {@code
+ * paged&lt;order&gt;} for an application that keeps an entry of its own, and a synthetic record as the body a
+ * record is written with, <code>{ v: text }</code>. <b>A synthetic form with no sugar spelling has no authored
+ * name</b> ({@link #authored}, read off the key's {@code @synthetic}, {@link TsonSchema.EntryFacts#synthetic}):
+ * an application nothing declares is its expansion (§5.10), so {@code b<10>} over {@code b => <N> !integer_type {
+ * min: N  max: 100 }} is an atom instance no author named, and a message about it is the family's own, located by
+ * its position. An entry with no position and no mark is a declaration, and keeps its name. {@link #of} falls back
+ * to the entry name for a caller that must name something.
  */
 public final class EntryDisplayName {
 
     private EntryDisplayName() {
     }
 
-    /** {@code name} if the author wrote it, else the form that produced this entry. */
-    public static String of(String name, TypeDefinition definition) {
-        return of(name, definition, Map.of());
+    /**
+     * {@code name} if the author wrote it, else the form that produced this entry -- {@code application} being the
+     * one its key carries ({@link TsonSchema#applicationOf(String)}).
+     */
+    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application) {
+        return of(name, value, facts, application, ignored -> null, ignored -> TsonSchema.EntryFacts.NONE,
+                ignored -> Optional.empty());
     }
 
     /**
-     * The same, resolving the names <em>inside</em> a form through {@code namespace} as well, so a form built
-     * over another derived entry renders whole -- {@code [tree<text>; 1..]} rather than
-     * {@code [tree_text_a7f070f6; 1..]}. A caller with no namespace to hand gets the one-level rendering,
-     * which is what a reader already has and enough for the value it is reporting on.
+     * The same, resolving the names <em>inside</em> a form through {@code schema} as well, so a form built over
+     * another derived entry renders whole -- {@code [tree<text>; 1..]} rather than {@code [tree_text_a7f070f6;
+     * 1..]}.
      */
-    public static String of(String name, TypeDefinition definition, Map<String, TypeDefinition> namespace) {
-        if (definition.position().isPresent()) {
-            return name;
+    public static String of(String name, TsonSchema schema) {
+        Top value = schema.entries().get(name);
+        return value == null ? name : of(name, value, schema.factsOf(name), schema.applicationOf(name),
+                schema.entries()::get, schema::factsOf, schema::applicationOf);
+    }
+
+    /**
+     * The same over a namespace, its facts and its applications held apart -- the linker's merged view, which is
+     * no one schema. A caller with no namespace to hand gets the one-level rendering ({@link #of(String, Top,
+     * TsonSchema.EntryFacts, Optional)}), which is what a reader already has and enough for the value it is
+     * reporting on.
+     */
+    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application,
+                            Function<String, ? extends Top> namespace,
+                            Function<String, TsonSchema.EntryFacts> factsOf,
+                            Function<String, Optional<TypeRef>> applicationOf) {
+        Lookup lookup = new Lookup(namespace, factsOf, applicationOf);
+        lookup.rendering().add(name);
+        return authored(name, value, facts, application, lookup).orElse(name);
+    }
+
+    /**
+     * What the author wrote that names entry {@code name}: its own name, the sugar form, or the application it
+     * records -- or empty for a form with no spelling, which a message leaves unnamed. One level deep, as {@link
+     * #of(String, Top, TsonSchema.EntryFacts, Optional)} is.
+     */
+    public static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
+                                            Optional<TypeRef> application) {
+        return authored(name, value, facts, application,
+                new Lookup(ignored -> null, ignored -> TsonSchema.EntryFacts.NONE, ignored -> Optional.empty()));
+    }
+
+    private static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
+                                             Optional<TypeRef> application, Lookup lookup) {
+        if (facts.position().isPresent()) {
+            return Optional.of(name);
         }
-        return application(definition).orElseGet(() -> switch (definition.body()) {
-            case ArrayBody array -> "[" + shown(array.elementType(), namespace)
-                    + size(array.minItems(), array.maxItems()) + "]";
-            case MapBody map -> "{" + shown(map.keyType(), namespace) + " => " + shown(map.valueType(), namespace)
-                    + size(map.minItems(), map.maxItems()) + "}";
+        return applied(application).or(() -> Optional.ofNullable(switch (value) {
+            // `[T]` is an ordered array that admits repeats; a set is the same body with neither, and has no sugar.
+            case ArrayBody array when array.ordered() && !array.uniqueItems() -> "["
+                    + shown(array.elementType(), lookup) + size(array.minItems(), array.maxItems()) + "]";
+            case MapBody map -> "{" + shown(map.keyType(), lookup) + " => "
+                    + shown(map.valueType(), lookup) + size(map.minItems(), map.maxItems()) + "}";
             case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)
-                    .map(ref -> shown(ref, namespace)).collect(Collectors.joining(", ", "[", "]"));
-            case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, namespace))
+                    .map(ref -> shown(ref, lookup)).collect(Collectors.joining(", ", "[", "]"));
+            case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, lookup))
                     .collect(Collectors.joining(" | ", "(", ")"));
-            default -> name;
-        });
+            // A record application nothing declares is its expansion, a record no author named, shown as the
+            // body a record is written with.
+            case RecordBody record when facts.synthetic() && record.fields().isEmpty() -> "{}";
+            case RecordBody record when facts.synthetic() -> record.fields().entrySet().stream()
+                    .map(field -> field.getKey() + (field.getValue().optional() ? "?" : "") + ": "
+                            + shown(field.getValue().type(), lookup))
+                    .collect(Collectors.joining("  ", "{ ", " }"));
+            // An entry nobody marked as minted is declared, wherever its position went.
+            default -> facts.synthetic() ? null : name;
+        }));
+    }
+
+    /**
+     * The three views a rendering resolves an inner name through, and the names being rendered: a recursive
+     * form ({@code { v: text  next: <itself>? }}) names itself inside its own rendering, and is shown there by
+     * its entry name rather than unrolled.
+     */
+    private record Lookup(Function<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
+                          Function<String, Optional<TypeRef>> applicationOf, Set<String> rendering) {
+
+        Lookup(Function<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
+               Function<String, Optional<TypeRef>> applicationOf) {
+            this(namespace, factsOf, applicationOf, new HashSet<>());
+        }
     }
 
     /** One name inside a form, itself display-rendered when the namespace knows it and it is derived. */
-    private static String shown(TypeRef ref, Map<String, TypeDefinition> namespace) {
-        TypeDefinition referenced = namespace.get(ref.name());
-        return referenced == null ? ref.name() : of(ref.name(), referenced, namespace);
+    private static String shown(TypeRef ref, Lookup lookup) {
+        Top referenced = lookup.namespace().apply(ref.name());
+        if (referenced == null || !lookup.rendering().add(ref.name())) {
+            return ref.name();
+        }
+        try {
+            return authored(ref.name(), referenced, lookup.factsOf().apply(ref.name()),
+                    lookup.applicationOf().apply(ref.name()), lookup).orElse(ref.name());
+        } finally {
+            lookup.rendering().remove(ref.name());
+        }
     }
 
     /**
-     * {@code head<arg, arg>} for an entry a template application materialised. An instantiation entry keys
-     * its identity on the application it closes (§8.2), so {@code source} holds exactly what the author
-     * wrote at the site; a construction's {@code source} is a bare constructor name and carries no
-     * arguments, which is what distinguishes the two here.
+     * {@code head<arg, arg>} for an entry a template application materialised: an instantiation entry keys its
+     * identity on the application it closes (§8.2), which its key carries.
      */
-    private static Optional<String> application(TypeDefinition definition) {
-        return definition.source()
-                .filter(source -> !source.arguments().isEmpty())
-                .map(source -> source.name() + source.arguments().stream().map(EntryDisplayName::argument)
-                        .collect(Collectors.joining(", ", "<", ">")));
+    private static Optional<String> applied(Optional<TypeRef> application) {
+        return application
+                .filter(applied -> !applied.arguments().isEmpty())
+                .map(applied -> applied.name() + applied.arguments().stream()
+                        .map(EntryDisplayName::argument).collect(Collectors.joining(", ", "<", ">")));
     }
 
     private static String argument(TypeArgument argument) {

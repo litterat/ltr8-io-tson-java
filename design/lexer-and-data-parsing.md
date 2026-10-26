@@ -16,6 +16,9 @@ form only; history lives in git.
 - NFC normalization applies to *unquoted* tokens only; `Pattern_White_Space` is the spec's fixed 11-character set,
   hardcoded.
 - `TsonDataStream` is the only thing that walks source text; `TsonDataParser` holds no grammar logic of its own.
+- `_id` lexes as the void sentinel then `id`, and the lexer never refuses it: the failure is a parse error at whichever
+  half the grammar trips on, which `TsonDataStream.mismatch`/`parseError` extend with "quote it" (`underscored`).
+  Refusing in the lexer would move a parser-category error into the lexer's.
 - Neither tier dedupes fields or keys, resolves `EmptyBrace`, or interprets token text — intentional gaps (§1.2). A name
   is the exception: type-ref, annotation and field names are matched against `IdentifierProfile`, after NFC
   normalisation for a field name.
@@ -91,8 +94,8 @@ fixed rather than kept.
   .isUnicodeIdentifierStart/Part` is `ID_Start`/`ID_Continue`, and the `Part` half is additionally unioned
   with everything `Character.isIdentifierIgnorable` covers — all of `Cf` plus the non-whitespace C0/C1
   controls. Standing it in unmodified would put a BOM, a soft hyphen, a raw control and every bidi override
-  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, with every ASCII test still passing. `Xid` (`tson-base`'s
-  `base.unicode`, which `Lexer` asks) subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points
+  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, with every ASCII test still passing. `Xid` (`ltr8-unicode`'s,
+  which `Lexer` asks) subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points
   for start, 20 for continue — the characters XID drops for not being NFKC-closed), which is **exact** against Unicode
   16.0: zero over-, zero under-acceptance on both predicates across all 1,112,064 non-surrogate code points.
   `Xid.UNICODE_VERSION` declares the version, as §7.1 asks.
@@ -193,13 +196,16 @@ Key points:
   token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
   because names and values share one lexical class. So `!42x` and `@x.y` are syntax errors rather than a
   reference to an undeclared type and an annotation carrying a name the format reserves — the dot being
-  reserved as a future identifier separator. **`field-name` reaches the same check** (`requireFieldName`), and
-  its production's two spellings are two spellings of one name: `unquoted-token / single-line-token`
-  (`isFieldNameTokenType`, narrower than the map key's `isBareTokenType`, a key being a value and not a name,
-  §2.6) is the *token* rule, and the decoded text is matched against the profile whichever form carried it. So
-  `{"first name": 1}` is a parse error, and the diagnostic names the remedy the format already has: a key that
-  is not a name belongs in a map. A record's fields are the named members of a shape, which is what makes them
-  declarable.
+  reserved as a future identifier separator. **`field-name` does not reach that check** ([TSON-DATA] §2.5,
+  [TSON-SCHEMA] §5.2): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`, narrower than
+  the map key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because what a
+  field name may be is its record's to say. The stream NFC-normalises the name and delivers it; `DefaultTsonReadContext`
+  judges each freshly pulled `FieldName` by the record's name type. A schemaless record's is the identifier, and a
+  failure there is `ATOM_FORM_INVALID`, a resolver error; under a schema a name the type refuses is the record
+  reader's `UNRECOGNIZED_FIELD` (`design/name-hygiene-read-path.md`). So schemaless
+  `{"first name": 1}` parses and is refused, and the diagnostic names the remedy the format already has: a key that
+  is not a name belongs in a map. A name declared in a schema is read by the same production
+  (`expectDeclaredFieldName`) and judged at link by its record's name type, a resolver error.
   **Normalisation runs before the match**, which is the one thing the profile does not decide here.
   `IdentifierProfile` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a
   field name its identity by NFC-normalised comparison — a decomposed spelling is the same name, and a

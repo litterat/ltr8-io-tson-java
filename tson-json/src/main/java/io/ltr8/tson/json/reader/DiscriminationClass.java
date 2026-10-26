@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.Optional;
 
@@ -38,20 +38,13 @@ enum DiscriminationClass {
 
     BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
 
-    /**
-     * The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none.
-     * An enum linking listed in {@link TsonLinkedSchema#textEnums} has texts for members and is {@link #STRING}
-     * whatever their spellings ([TSON-SCHEMA] §7.4).
-     */
+    /** The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none. */
     static Optional<DiscriminationClass> of(TsonLinkedSchema linked, String name) {
-        return ReferenceChain.terminal(linked.schema(), name).flatMap(resolved ->
-                resolved.definition().body() instanceof EnumBody && linked.textEnums().contains(resolved.name())
-                        ? Optional.of(STRING)
-                        : classify(resolved.definition()));
+        return ReferenceChain.terminal(linked.schema(), name).flatMap(resolved -> classify(resolved.definition()));
     }
 
-    private static Optional<DiscriminationClass> classify(TypeDefinition definition) {
-        return switch (definition.body()) {
+    private static Optional<DiscriminationClass> classify(Top definition) {
+        return switch (definition) {
             case IntegerType ignored -> Optional.of(NUMBER);
             case DecimalType ignored -> Optional.of(NUMBER);
             case FloatType ignored -> Optional.of(NUMBER);
@@ -65,6 +58,8 @@ enum DiscriminationClass {
             // they can only be reached with a tag.
             case io.ltr8.tson.schema.meta.TextType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.IdentifierType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.RefBody ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.KindBody ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.UriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.IriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.RegexType ignored -> Optional.of(STRING);
@@ -77,6 +72,9 @@ enum DiscriminationClass {
             case io.ltr8.tson.schema.meta.BytesType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.EmailType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.Ipv4Type ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.HostnameType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.HostType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.MediaTypeType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.Ipv6Type ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.Cidr4Type ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.Cidr6Type ignored -> Optional.of(STRING);
@@ -141,7 +139,7 @@ enum DiscriminationClass {
      * the object kind. A type with no class is not unstable -- it is unreachable by the untagged route either way.
      */
     static boolean stable(TsonSchema schema, String name) {
-        return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition().body()) {
+        return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition()) {
             case FloatType floats -> !floats.allowNan() && !floats.allowInfinity();
             case MapBody map -> MapPlan.isObjectForm(schema, map);
             default -> true;

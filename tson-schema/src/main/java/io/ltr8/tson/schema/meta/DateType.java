@@ -18,25 +18,38 @@ import java.util.Optional;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "date_type")
-public record DateType(Optional<LocalDate> min, @Field("exclusive_min") Optional<LocalDate> exclusiveMin,
+public record DateType(TypeChain chain,
+        Optional<LocalDate> min, @Field("exclusive_min") Optional<LocalDate> exclusiveMin,
                        Optional<LocalDate> max, @Field("exclusive_max") Optional<LocalDate> exclusiveMax)
         implements Atom {
 
     /**
      * Carries {@code @Record} because the inclusive-bounds convenience constructor below is a second
-     * public one, and {@code tson-bind}'s constructor selection fails outright without it (see {@link
+     * public one, and {@code ltr8-bind}'s constructor selection fails outright without it (see {@link
      * IntegerSize}). Mutual exclusion within each side is this constructor's, as for {@link IntegerType}:
      * the field group ([TSON-SCHEMA] §5.11) makes it unrepresentable in the schema and this makes it
      * unconstructable here.
      */
     @Record
     public DateType {
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public DateType(Optional<LocalDate> min, Optional<LocalDate> exclusiveMin, Optional<LocalDate> max,
+            Optional<LocalDate> exclusiveMax) {
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax);
+    }
+
+    @Override
+    public DateType withChain(TypeChain chain) {
+        return new DateType(chain, min, exclusiveMin, max, exclusiveMax);
     }
 
     /** The inclusive bounds alone, for the callers that state no exclusive one. */

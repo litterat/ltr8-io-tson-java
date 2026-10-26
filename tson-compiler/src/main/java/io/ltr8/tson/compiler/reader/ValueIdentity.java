@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.annotation.Annotated;
-import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonAtom;
 

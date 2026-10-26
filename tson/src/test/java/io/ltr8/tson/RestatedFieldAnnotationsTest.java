@@ -42,8 +42,8 @@ class RestatedFieldAnnotationsTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               account => {
                 @doc:"Pre-2020 registry identifier."
@@ -75,8 +75,9 @@ class RestatedFieldAnnotationsTest {
 
     private static RecordField field(String type, String name) {
         TsonLinkedSchema linked = Tson.standard().resolve(SCHEMA);
-        RecordBody body = (RecordBody) linked.schema().entries().get(type).body();
-        return body.fields().stream().filter(f -> f.name().equals(name)).findFirst().orElseThrow();
+        RecordBody body = (RecordBody) linked.schema().entries().get(type);
+        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(name))
+                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     private static List<String> names(String type, String field) {

@@ -11,6 +11,9 @@ form only; history lives in git.
 - A failure reaching or resolving the schema is a diagnostic, not an exception — and a schema's own
   diagnostics go to the facade's receiver, never through `ctx.report`, which would stamp a data position on
   them.
+- A root value a read abandons — its schema not obtained, not loaded, or declaring no type the root names — is
+  skipped unjudged (`DefaultTsonReadContext.discardUnjudged`): parsed, so a syntax error still reports, and held to
+  no name rule, since no schema is judging it and the schemaless rule would refuse names the schema may admit.
 - A `TsonReadContext` always carries an identifier policy: `of(events, receiver)` defaults it to Highly Restrictive
   and `of(events, receiver, policy)` refuses `null`. The token policy is applied by the stream, not the context,
   because the context rewinds and a check there would report one token twice.
@@ -19,8 +22,9 @@ form only; history lives in git.
   value's annotations.
 - The whole-document entry points own framing, including the `requireDocumentEnd` pull that makes the lazy
   stream check for trailing content.
-- A schemaless read checks type-refs by `TypeRefCheck`'s three rules; `preservingUnknownTypeRefs()` opts out
-  of rule 3 only, and an atom position takes `declares` (`@Typename` only), never the loose `names` match.
+- A schemaless read checks type-refs by `TypeRefCheck`'s three rules. Rule 2 (a tag naming the bound class or
+  a union member) applies only under `withHostTypes()`; `preservingUnknownTypeRefs()` opts out of rule 3 only;
+  an atom position takes `declares` (`@Typename` only), never the loose `names` match.
 - Reporting never abandons the value: a reported type-ref still yields its node and its children are read.
 - An annotation is checked wherever it is written and kept only where there is room (`capture()` vs
   `validating()`); a field the target class does not declare is `UNRECOGNIZED_FIELD`, with
@@ -45,7 +49,7 @@ forces the schemaless path on a schema-aware reader.
 **These two are the whole document-reading surface**, and both derive Jackson-`ObjectReader`-style rather
 than taking parameters, so source form, error policy and schema selection stay orthogonal instead of
 multiplying overloads: `withDiagnostics(receiver)` swaps fail-fast for any other receiver,
-`preservingUnknownTypeRefs()` relaxes the schemaless type-ref rules below,
+`withHostTypes()` and `preservingUnknownTypeRefs()` relax the schemaless type-ref rules below,
 `withTokenPolicy(policy)` applies UTS #39 §5.2 to every token the read pulls (see below), and
 `withSchema(uri).readAs(source, typeName)` covers data that *isn't* self-describing — the caller supplies
 what a `!!schema` plus a root type-ref would have said, and validation is identical either way. Each returns
@@ -149,15 +153,21 @@ admit UTS #39's own `Toys-Я-Us`.
   both engines. Given `!X` on a value: (1) `X` **is** a `BuiltinTypeVocabulary` name → it must sit on a
   token (`TYPE_MISMATCH` otherwise) and that token must satisfy the atom
   (`ATOM_FORM_INVALID` for a token of the wrong form, `ATOM_CONSTRAINT_VIOLATION` for a value out of
-  range); (2) `X` **names the target** being bound → accepted, object-binding
-  only, a tree read having no target; (3) otherwise it links to nothing → `UNKNOWN_TYPE_REF`.
-  **Rule 3 is a reader policy, not a parsing one** — the parse step still preserves every marker per §5.1;
-  what a reader *type-checking* a value does with one it can't link is the layer above, where a
-  case-sensitive typo (`!Uuid`) silently disabling the author's intended validation is the worse failure
-  (a reader policy: §7.1 asks only that an unresolved type annotation be treated as informational, and
-  reporting it is the stricter reading). `preservingUnknownTypeRefs()` on either
-  facade opts out of rule 3 only — built-in names stay checked — and is what round-tripping through
-  `TsonTreeWriter`, or reading the wire of a document whose `!!schema` is deliberately out of scope, wants.
+  range); (2) `X` **names the target** being bound, on an object reader given `withHostTypes()` → accepted,
+  a tree read having no target; (3) otherwise it links to nothing → `UNKNOWN_TYPE_REF`.
+  **Rule 3 is a resolver error**: a schemaless document has no source of type names but §5's vocabulary, so a
+  name outside it names no type at any processor ([TSON-DATA] §3.2), and a case-sensitive typo (`!Uuid`)
+  never silently disables the validation its author intended. The parse step still keeps every name, which is
+  what lets a reader report one at its position.
+  **Rule 2 is the caller's, not the default**, so a schemaless bind and `tson validate` reach one verdict on
+  one document. `withHostTypes()` makes the bound classes the schema for tags — a tag naming the target links
+  to it, and `bindUnion` chooses a member by the tag naming it, which a schemaless bind into a sealed
+  hierarchy cannot do otherwise — and without it a tag the classes would answer to is reported with a message
+  naming the control. It is the same move as `withSchema`: the caller supplies the schema the document does
+  not bind, here as classes. `preservingUnknownTypeRefs()` on either facade opts out of rule 3 only —
+  built-in names stay checked — and is what round-tripping through `TsonTreeWriter`, or reading the wire of a
+  document whose `!!schema` is deliberately out of scope, wants. The two controls compose, as
+  `ignoringUnknownFields()` does with both.
 - **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,
   else the simple class name case-insensitively — the same match `bindUnion` gives union members) is what
   lets `!point { x: 3  y: 4 }` bind to a Java `Point` with nothing annotated. An atom position takes
@@ -172,7 +182,9 @@ admit UTS #39's own `Toys-Я-Us`.
   scopes `ctx.field`/`ctx.index` as it descends, so a diagnostic carries a real RFC 6901 path.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
-  reported *before* the value is read, not a cast failure after.
+  reported *before* the value is read, not a cast failure after. A root typed by a namespace type reads as its map;
+  asked for `Namespace.class`, the map is delivered as an instance of the constructor the root names
+  (`NamespaceInstanceReader`).
 - **Both tree read paths capture wire annotations** onto each node's `annotations()`, at every position §3.1
   permits one (root, record field value, array element, both sides of a map entry, and recursively an
   annotation's own value). `AnnotationCapture` (in `reader`) is the shared helper: an annotation's value
@@ -230,7 +242,7 @@ admit UTS #39's own `Toys-Я-Us`.
       rest on a property of the reading application rather than of the document.
 - **`DataClassObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
-  `ReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /
+  `ReadException`; collecting accumulates), and a `ltr8-bind` `DataBindException` while narrowing /
   applying a bridge / invoking a constructor is caught and re-reported through `ctx`, so a caller sees one
   uniform error model regardless of which layer noticed. **No positional form and no schema-composed
   defaults** — both are schema-layer concepts a class-driven bind has no equivalent for (a record must be

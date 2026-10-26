@@ -3,8 +3,7 @@ package io.ltr8.tson.schema;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueType;
 import org.junit.jupiter.api.Test;
@@ -23,12 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TsonSchemaRegistryTest {
 
     private static TsonSchema schemaWithARecordField() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), new ValueType()));
-        entries.put("set_token", TypeDefinition.product(RecordBody.of(List.of())));
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("members", TypeRef.of("set_token"))))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("token", new ValueType());
+        entries.put("set_token", RecordBody.of(RecordBody.fieldMap()));
+        entries.put("container", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("members", RecordField.required(TypeRef.of("set_token"))))));
         return new TsonSchema("https://example.test/registry-test.tn",
                 "https://example.test/meta.tn", List.of(), entries);
     }

@@ -5,16 +5,18 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.Data;
+import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
-import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -99,7 +101,7 @@ class OpenEntryResolvedFormTest {
      * and §5.10 introduces value parameters with precisely this shape -- "a parameter in a value slot
      * ({@code min_items: N}) ... is a token like any other". Its resolved body is a {@code !template} whose
      * {@code template} field is the application as written, so there is no value slot for {@code N} to fail
-     * against and the entry is a {@code type_definition} like any other.
+     * against and the entry's value is a {@code top} like any other.
      *
      * <p>Before the {@code template} constructor this failed with two {@code ATOM_CONSTRAINT_VIOLATION}s --
      * {@code N} is not a {@code non_negative_integer} -- which is the case §8.1 names when it says a body
@@ -113,14 +115,11 @@ class OpenEntryResolvedFormTest {
     @Test
     void anOpenEntryWithAValueParameterValidates() {
         assertEquals(List.of(), tson().validate("""
-                !!schema:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!schema:"https://tson.io/2026/38/m/meta-kernel.tn"
                 !schema {
-                  vector => !type_definition {
-                    source: array
-                    body: !template {
-                      parameters: [ { name: T  type: type_ref } { name: N  type: non_negative_integer } ]
-                      template: "!array { element_type: T  min_items: N  max_items: N }"
-                    }
+                  vector => !template {
+                    parameters: [ { name: T  type: type_ref } { name: N  type: non_negative_integer } ]
+                    template: "!array { element_type: T  min_items: N  max_items: N }"
                   }
                 }
                 """), "a value parameter has no slot to fail against once the body is held as text");
@@ -140,61 +139,48 @@ class OpenEntryResolvedFormTest {
     void aHeldBodyReadsBackAsTheApplicationItHolds() {
         Tson tson = metaBoundTson();
         String resolved = """
-                !!schema:"https://tson.io/2026/37/m/meta.tn"
+                !!schema:"https://tson.io/2026/38/m/meta.tn"
                 !schema {
-                  extern_of => !type_definition {
-                    source: scoped
-                    body: !template {
-                      parameters: [ { name: S  type: schema_identity } ]
-                      template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }"
-                    }
+                  extern_of => !template {
+                    parameters: [ { name: S  type: schema_identity } ]
+                    template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }"
                   }
-                  e => !type_definition {
-                    source: enum
-                    body: !template {
-                      parameters: [ { name: M  type: text } ]
-                      template: "!enum { members: [a b M] }"
-                    }
+                  e => !template {
+                    parameters: [ { name: M  type: text } ]
+                    template: "!enum { members: [a b M] }"
                   }
                 }
                 """;
         assertEquals(List.of(), tson.validate(resolved), "both open entries are valid data");
 
-        Map<String, TypeDefinition> read = ResolvedForm.readResolved(tson, resolved);
+        Map<String, Top> read = ResolvedForm.readResolved(tson, resolved);
 
-        TemplateBody externOf = assertInstanceOf(TemplateBody.class, read.get("extern_of").body());
+        TemplateBody externOf = assertInstanceOf(TemplateBody.class, read.get("extern_of"));
         assertEquals(List.of(new TemplateParam("S", TypeRef.of("schema_identity"))), externOf.parameters());
         assertEquals("!scoped { scope: [EXTERN]  schemas: { S => _ } }", externOf.template(),
                 "the application as written -- no URI named 'S' anywhere");
 
-        TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e").body());
+        TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e"));
         assertEquals("!enum { members: [a b M] }", e.template(),
                 "the application as written -- no third enum member spelled 'M'");
     }
 
-    // ── The biconditional `type_definition.parameters` rests on ─────────
+    // ── The biconditional an entry's parameters rest on ─────────────────
 
     /**
-     * <b>An entry declares parameters exactly when its body is held, and the two lists agree.</b>
-     * [TSON-SCHEMA] §5.10's "Closed entries are parameter-free" is structural now rather than a MUST anyone
-     * can violate: {@code TypeDefinition.parameters()} reads the held body's own list, so a closed entry has
-     * nowhere to put one. This asks it of every entry of every schema -- the three bundled ones and a schema
-     * exercising each template shape -- which is the population the rule is about, and it is what would catch
-     * the derivation silently answering {@code []} for an entry that is genuinely open.
-     *
-     * <p><b>It is a property of a published entry, not of every {@code TypeDefinition} ever built.</b>
-     * Resolution legitimately constructs an un-held intermediate and converts it: {@code holdIfOpen} takes a
-     * resolved record body and replaces it with the held form, and is handed the parameter list separately
-     * for exactly that reason. So the invariant cannot be an assertion in the constructor -- it would fire on
-     * the value about to be converted -- and belongs here, over entries a schema actually holds.
+     * <b>A record template is a record with parameters, and every other open entry is held.</b> [TSON-SCHEMA]
+     * §5.10's two kinds of template, asked of every entry of every schema -- the three bundled ones and a schema
+     * exercising each template shape: an entry with parameters is either a {@code RecordBody} or a {@code
+     * TemplateBody}, a held body never applies {@code record}, and every {@code TemplateBody} declares
+     * parameters.
      */
     @Test
-    void anEntryDeclaresParametersExactlyWhenItsBodyIsHeld() {
+    void aRecordTemplateIsARecordAndEveryOtherTemplateIsHeld() {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   base           => { id: text }
                   pair           => <A, B> { first: A  second: B }
@@ -212,39 +198,40 @@ class OpenEntryResolvedFormTest {
         List<String> broken = new ArrayList<>();
         int open = 0;
         for (String id : ids) {
-            for (Map.Entry<String, TypeDefinition> entry
+            for (Map.Entry<String, Top> entry
                     : tson.bindRegistry().core().resolveLinked(id).schema().entries().entrySet()) {
-                TypeDefinition definition = entry.getValue();
-                boolean held = definition.body() instanceof TemplateBody;
-                if (held) {
+                Top definition = entry.getValue();
+                boolean declares = !OpenEntry.parameterNames(definition).isEmpty();
+                if (declares) {
                     open++;
                 }
-                if (definition.parameters().isEmpty() == held) {
-                    broken.add(id + "#" + entry.getKey() + ": parameters " + definition.parameters()
-                            + " with a " + definition.body().getClass().getSimpleName() + " body");
+                boolean shape = definition instanceof TemplateBody held
+                        ? !held.template().startsWith("!record") && declares
+                        : !declares || definition instanceof RecordBody;
+                if (!shape) {
+                    broken.add(id + "#" + entry.getKey() + ": parameters " + OpenEntry.parameterNames(definition)
+                            + " with a " + definition.getClass().getSimpleName() + " body");
                 }
             }
         }
 
         int openEntries = open;
-        assertEquals(List.of(), broken, "§5.10: only template entries are open");
+        assertEquals(List.of(), broken, "§5.10: a record template is a record, every other template is held");
         assertTrue(openEntries >= 8, () -> "not enough open entries to mean anything: " + openEntries);
     }
 
     // ── §8.1: a kind is derived, never recorded ─────────────────────────
 
     /**
-     * <b>{@code type_definition.kind} agrees with what the entry's own {@code supertypes} and {@code body}
-     * determine</b>, over every entry of the three bundled schemas plus a schema exercising each declaration
-     * form. §8.1 derives the field at resolution and never asks anything to verify it -- it appears nowhere
-     * in the Ingest paragraph's list of what must be discarded, recomputed or verified -- so nothing but this
-     * test stands between the derivation and a resolver that quietly stops agreeing with it.
+     * <b>{@code EntryKind.of} agrees with what the entry's own value determines</b>, over every entry of the
+     * three bundled schemas plus a schema exercising each declaration form. An entry's kind is its value's
+     * type's kind ([TSON-SCHEMA] §4.1), derived and never written, so nothing but this test stands between
+     * the derivation and a model that quietly stops agreeing with the rule it states.
      *
-     * <p><b>The rule has four branches and two of them are special cases</b>, which is the argument for
-     * keeping the field rather than deleting it as redundant: branch 4 is a namespace lookup, and it reaches
-     * the <em>governing meta</em> rather than the entry's own schema for most of core.tn -- {@code integer}
-     * is {@code !integer_type {}} and {@code integer_type} is meta.tn's. A consumer holding one schema's
-     * resolved output cannot derive what this field states.
+     * <p><b>The rule has four branches and two of them are special cases</b>: branch 4 is a namespace lookup,
+     * and it reaches the <em>governing meta</em> rather than the entry's own schema for most of core.tn --
+     * {@code integer} is {@code !integer_type {}} and {@code integer_type} is meta.tn's -- which the value's
+     * Java shape answers on its own, a body's class being the branch of {@code Top} its constructor builds.
      *
      * <p><b>The rule is total.</b> An open entry is {@code TEMPLATE}, which is the branch that used to have
      * no answer from the entry alone -- its kind was inherited from the constructor its held body applies,
@@ -256,8 +243,8 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/kinds.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   port   => !integer_type { min: 0  max: 65535 }
                   age    => !int32 ^ { min: 0  max: 150 }
@@ -277,23 +264,23 @@ class OpenEntryResolvedFormTest {
         // whose kind is its chain's base kind and not its !record body's PRODUCT.
         tson.resolve("""
                 !!id:"https://example.com/kind-constructors.tn"
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/38/m/meta.tn"
                 {
                   listed      => <T> atom & { members: [T] }
                   listed_text => listed<text>
-                  payload     => <T> data & { value: T }
-                  payload_iri => payload<iri>
+                  payloads     => <T> namespace & { key_type: = identifier  value_type: = T }
+                  iri_payloads => payloads<iri>
                 }
                 """);
         List<String> ids = List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
                 TsonBundledSchemas.CORE_ID, "https://example.com/kinds.tn",
                 "https://example.com/kind-constructors.tn");
 
-        Map<String, TypeDefinition> universe = new LinkedHashMap<>();
-        Map<String, Map<String, TypeDefinition>> perSchema = new LinkedHashMap<>();
+        Map<String, Top> universe = new LinkedHashMap<>();
+        Map<String, Map<String, Top>> perSchema = new LinkedHashMap<>();
         for (String id : ids) {
-            Map<String, TypeDefinition> entries = tson.bindRegistry().core().resolveLinked(id).schema().entries();
+            Map<String, Top> entries = tson.bindRegistry().core().resolveLinked(id).schema().entries().entries();
             perSchema.put(id, entries);
             entries.forEach(universe::putIfAbsent);
         }
@@ -303,20 +290,20 @@ class OpenEntryResolvedFormTest {
         int open = 0;
         int neededTheGoverningMeta = 0;
         for (String id : ids) {
-            for (Map.Entry<String, TypeDefinition> entry : perSchema.get(id).entrySet()) {
-                TypeDefinition definition = entry.getValue();
-                if (definition.body() instanceof TemplateBody) {
+            for (Map.Entry<String, Top> entry : perSchema.get(id).entrySet()) {
+                Top definition = entry.getValue();
+                if (OpenEntry.isOpen(definition)) {
                     open++;
                 }
                 closed++;
-                if (!definition.supertypes().contains("top") && !(definition.body() instanceof Reference)
-                        && !(definition.body() instanceof TemplateBody)
-                        && !perSchema.get(id).containsKey(headOf(definition.body()))) {
+                if (!TypeChain.supertypesOf(definition).contains("top") && !(definition instanceof Reference)
+                        && !OpenEntry.isOpen(definition)
+                        && !perSchema.get(id).containsKey(headOf(definition))) {
                     neededTheGoverningMeta++;
                 }
-                TypeKind derived = derive(definition, universe);
-                if (derived != definition.kind()) {
-                    mismatches.add(id + "#" + entry.getKey() + ": states " + definition.kind()
+                EntryKind derived = derive(definition, universe);
+                if (derived != EntryKind.of(definition, n -> true)) {
+                    mismatches.add(id + "#" + entry.getKey() + ": states " + EntryKind.of(definition, n -> true)
                             + " but derives " + derived);
                 }
             }
@@ -333,33 +320,34 @@ class OpenEntryResolvedFormTest {
     }
 
     /** §4.1's rule, read off what the entry already states. Four branches; see the test's own note. */
-    private static TypeKind derive(TypeDefinition definition, Map<String, TypeDefinition> universe) {
-        if (definition.body() instanceof TemplateBody) {
-            // A template is not a type (§5.10), so its kind says that and nothing about what applying it
-            // produces -- that is the kind of the entry materialisation mints, from its own closed body.
-            return TypeKind.TEMPLATE;
+    private static EntryKind derive(Top definition, Map<String, Top> universe) {
+        if (definition instanceof TemplateBody) {
+            // A held template is not a type (§5.10), so its kind says that and nothing about what applying it
+            // produces -- that is the kind of the entry materialisation mints, from its own closed body. A record
+            // template is a type, the family base, and falls to the record rules below.
+            return EntryKind.TEMPLATE;
         }
-        if (definition.body() instanceof Reference) {
+        if (definition instanceof Reference) {
             // §4.1 gives an alias REFERENCE, a type_kind and not a base kind -- and the kernel's `reference`
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
-            return TypeKind.REFERENCE;
+            return EntryKind.REFERENCE;
         }
-        if (definition.supertypes().contains("top")) {
+        if (TypeChain.supertypesOf(definition).contains("top")) {
             // A constructor: its kind states what its *instances* will be, not what its own body is --
             // `integer_type => atom & { ... }` has a !record body and kind ATOM.
-            for (String supertype : definition.supertypes()) {
+            for (String supertype : TypeChain.supertypesOf(definition)) {
                 switch (supertype) {
-                    case "atom" -> { return TypeKind.ATOM; }
-                    case "sum" -> { return TypeKind.SUM; }
-                    case "data" -> { return TypeKind.DATA; }
+                    case "atom" -> { return EntryKind.ATOM; }
+                    case "sum" -> { return EntryKind.SUM; }
+                    case "namespace" -> { return EntryKind.NAMESPACE; }
                     default -> { }
                 }
             }
-            return TypeKind.PRODUCT;
+            return EntryKind.PRODUCT;
         }
-        TypeDefinition constructor = universe.get(headOf(definition.body()));
-        assertNotNull(constructor, "no entry for the body's constructor head " + headOf(definition.body()));
-        return constructor.kind();
+        Top constructor = universe.get(headOf(definition));
+        assertNotNull(constructor, "no entry for the body's constructor head " + headOf(definition));
+        return EntryKind.of(constructor, n -> true);
     }
 
     /** The constructor name a body identifies as -- the {@code !head} a resolved document writes on it. */
@@ -369,8 +357,8 @@ class OpenEntryResolvedFormTest {
             case Product product -> product.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Sum sum -> sum.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Reference reference -> "reference";
-            case Data data -> data.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case TemplateBody held -> "template";
+            case io.ltr8.tson.schema.meta.Namespace<?> namespace -> namespace.type();
         };
     }
 }

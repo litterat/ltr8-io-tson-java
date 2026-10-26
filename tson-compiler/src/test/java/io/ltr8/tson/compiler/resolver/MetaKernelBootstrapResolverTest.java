@@ -11,13 +11,13 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.IriType;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -36,8 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code iri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
- * resolve to the expected kind/body -- all 58 of the real fixture's declarations resolve, alongside the
- * nine entries {@link SchemaDesugarer} injects for their argument-bearing applications.
+ * resolve to the expected kind/body -- all 60 of the real fixture's declarations resolve, alongside the
+ * eight entries {@link SchemaDesugarer} injects for their argument-bearing applications.
  */
 class MetaKernelBootstrapResolverTest {
 
@@ -74,11 +74,11 @@ class MetaKernelBootstrapResolverTest {
         Map<String, Top> expected = Map.of("value", new ValueType(), "void", new VoidType(),
                 "identifier", IdentifierType.IDENTIFIER);
         expected.forEach((name, body) -> {
-            TypeDefinition resolved = schema.entries().get(name);
-            assertEquals(TypeKind.ATOM, resolved.kind());
-            assertEquals(body, resolved.body());
-            assertEquals(List.of(), resolved.supertypes());
-            assertEquals(name + "_type", resolved.source().orElseThrow().name());
+            Top resolved = schema.entries().get(name);
+            assertEquals(EntryKind.ATOM, EntryKind.of(resolved, n -> true));
+            assertEquals(body, resolved);
+            assertEquals(List.of(), TypeChain.supertypesOf(resolved));
+            assertEquals(java.util.Optional.of(name + "_type"), schema.constructorOf(name));
         });
     }
 
@@ -86,9 +86,9 @@ class MetaKernelBootstrapResolverTest {
     void integerResolvesToAnUnconstrainedIntegerTypeBodyWithAtomKind() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        TypeDefinition integer = schema.entries().get("integer");
-        assertEquals(TypeKind.ATOM, integer.kind());
-        assertEquals(IntegerType.UNCONSTRAINED, integer.body());
+        Top integer = schema.entries().get("integer");
+        assertEquals(EntryKind.ATOM, EntryKind.of(integer, n -> true));
+        assertEquals(IntegerType.UNCONSTRAINED, integer);
     }
 
     @Test
@@ -97,19 +97,19 @@ class MetaKernelBootstrapResolverTest {
         // isn't declared until much later -- the two-pass design exists precisely for this.
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        TypeDefinition booleanDef = schema.entries().get("boolean");
-        assertEquals(TypeKind.ATOM, booleanDef.kind());
-        assertEquals(new EnumBody(List.of("true", "false")), booleanDef.body());
+        Top booleanDef = schema.entries().get("boolean");
+        assertEquals(EntryKind.ATOM, EntryKind.of(booleanDef, n -> true));
+        assertEquals(new EnumBody(List.of("true", "false")), booleanDef);
     }
 
     @Test
     void everyEnumInstanceInTheFixtureResolves() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("product_access_type").body());
-        assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("product_size_type").body());
+        assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("product_access_type"));
+        assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("product_size_type"));
         for (String name : List.of("field_role", "record_extension_type")) {
-            assertInstanceOf(EnumBody.class, schema.entries().get(name).body());
+            assertInstanceOf(EnumBody.class, schema.entries().get(name));
         }
     }
 
@@ -117,41 +117,41 @@ class MetaKernelBootstrapResolverTest {
     void textIriRegexResolveToTheirUnconstrainedTypeBodiesWithAtomKind() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        TypeDefinition text = schema.entries().get("text");
-        assertEquals(TypeKind.ATOM, text.kind());
-        assertEquals(TextType.UNCONSTRAINED, text.body());
+        Top text = schema.entries().get("text");
+        assertEquals(EntryKind.ATOM, EntryKind.of(text, n -> true));
+        assertEquals(TextType.UNCONSTRAINED, text);
 
-        TypeDefinition iri = schema.entries().get("iri");
-        assertEquals(TypeKind.ATOM, iri.kind());
-        assertEquals(IriType.IRI, iri.body());
+        Top iri = schema.entries().get("iri");
+        assertEquals(EntryKind.ATOM, EntryKind.of(iri, n -> true));
+        assertEquals(IriType.IRI, iri);
 
-        TypeDefinition regex = schema.entries().get("regex");
-        assertEquals(TypeKind.ATOM, regex.kind());
-        assertEquals(RegexType.UNCONSTRAINED, regex.body());
+        Top regex = schema.entries().get("regex");
+        assertEquals(EntryKind.ATOM, EntryKind.of(regex, n -> true));
+        assertEquals(RegexType.UNCONSTRAINED, regex);
 
         // The kernel's second identifier_type instance, told apart from `identifier` by its entry name.
-        TypeDefinition schemeName = schema.entries().get("scheme_name");
-        assertEquals(TypeKind.ATOM, schemeName.kind());
-        assertEquals(IdentifierType.SCHEME_NAME, schemeName.body());
+        Top schemeName = schema.entries().get("scheme_name");
+        assertEquals(EntryKind.ATOM, EntryKind.of(schemeName, n -> true));
+        assertEquals(IdentifierType.SCHEME_NAME, schemeName);
     }
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is the 59 declarations the fixture writes plus one injected declaration per distinct sugar form
-     * within them -- nine {@code array} entries from §5.3's {@code [X]} field-type sugar. They are the same
-     * entries the linker used to synthesize; producing them here is what leaves the linker with nothing to
-     * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is not among them:
-     * it is the fixture's own {@code enum_set} declaration, since {@code set} has no sugar and a {@code !}
-     * form stays prohibited at a field position (§5.2).
+     * output is the 67 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar. Producing them here
+     * is what leaves the linker with nothing to materialize (see {@code MetaKernelSchemaRegistryTest}).
+     * {@code enum}'s member set is not among them: it is the fixture's own {@code enum_set} declaration, since
+     * {@code set} has no sugar and a {@code !} form stays prohibited at a field position (§5.2) -- and {@code
+     * record.fields} is the fixture's own
+     * {@code field_map} for the same reason, an ordered map having no sugar either.
      */
     @Test
-    void theFixtureDeclarationsResolveAlongsideNineDesugaredEntries() {
+    void theFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(68, schema.entries().size());
-        for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
-                "array_type_name", "array_type_argument", "array_template_param", "array_field_group",
-                "array_record_field")) {
+        assertEquals(77, schema.entries().size());
+        for (String head : List.of("array_tuple_element", "array_text", "array_type_ref",
+                "array_type_name", "array_type_argument", "array_template_param", "array_field_group")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
                     "expected a desugared entry with head '" + head + "'");
         }

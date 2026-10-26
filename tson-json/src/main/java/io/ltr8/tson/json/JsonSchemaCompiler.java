@@ -7,9 +7,12 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -99,7 +102,7 @@ public final class JsonSchemaCompiler {
                 return new DeferredTypeReader(name, finished);
             }
             try {
-                TypeDefinition definition = schema.entries().get(name);
+                Top definition = schema.entries().get(name);
                 if (definition == null) {
                     throw new IllegalStateException("'" + name + "' is referenced but not present in the schema -- "
                             + "linking should already have rejected this before compilation ever started");
@@ -126,25 +129,39 @@ public final class JsonSchemaCompiler {
             }
         }
 
-        private JsonTypeReader<?> build(String name, TypeDefinition definition) {
+        private JsonTypeReader<?> build(String name, Top definition) {
             ValueReaderContext context = new ValueReaderContext(linked, readers, foreign);
-            Top body = definition.body();
+            Top body = definition;
             if (body instanceof Reference reference) {
                 // [TSON-SCHEMA] §8.3: a processor MAY collapse a reference chain when it compiles for
                 // reading, and this is that moment -- the reader is its target's, reached once here rather
                 // than walked on every value.
                 return resolve(reference.target().name());
             }
-            ValueReaderFactory factory = factories.resolve(constructorOf(body));
-            return factory.create(name, definition, context);
+            // A namespace type resolves to a record of the facets it states, and a value of it is the map they
+            // describe, never a record of those facets. Its keys are read under a pinned key family, and by their
+            // spelling alone where the family is a default the host supplies (MapBody.Namespace#read): a record's
+            // field names, which linking judges by the record's name_type.
+            Top read = linked.namespace(name).<Top>map(MapBody.Namespace::read).orElse(body);
+            ValueReaderFactory factory = factories.resolve(constructorOf(read));
+            return factory.create(name, read, context);
         }
     }
 
-    /** Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries. */
+    /**
+     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, and the one a
+     * namespace value names itself. An open entry reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape
+     * holds it, so it takes the template's reader. A namespace value names a meta layer's own
+     * constructor, which has no factory: nothing is typed by such an entry, and its reader is the refusal.
+     */
     private static String constructorOf(Top body) {
-        Typename typename = body.getClass().getAnnotation(Typename.class);
+        if (body instanceof Namespace<?> value) {
+            return value.type();
+        }
+        Class<?> leaf = OpenEntry.isOpen(body) ? TemplateBody.class : body.getClass();
+        Typename typename = leaf.getAnnotation(Typename.class);
         if (typename == null) {
-            throw new IllegalStateException(body.getClass() + " has no @Typename -- every Top leaf must carry one");
+            throw new IllegalStateException(leaf + " has no @Typename -- every Top leaf must carry one");
         }
         return typename.name();
     }

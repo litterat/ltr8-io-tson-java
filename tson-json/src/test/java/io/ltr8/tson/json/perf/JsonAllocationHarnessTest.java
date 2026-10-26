@@ -73,8 +73,8 @@ class JsonAllocationHarnessTest {
     /** The order's shape as a schema, for the schema-directed read: every record here is concrete. */
     private static final String SCHEMA = """
             !!id:"https://example.test/orders.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               line  => { sku: text  quantity: int32  price: float64 }
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
@@ -158,7 +158,7 @@ class JsonAllocationHarnessTest {
      *
      * <p><b>The assertion here is not what guards either.</b> A ceiling tight enough to catch a tenth is a
      * budget that the next JDK breaks, so the exact properties are pinned where they are cheap to state --
-     * {@code DataClassRecordFieldIndexTest} in {@code tson-bind} for the index, and
+     * {@code DataClassRecordFieldIndexTest} in {@code ltr8-bind} for the index, and
      * {@code JsonObjectReaderTest} for the repeat a set is still needed to catch. This is the
      * gross-regression ratchet the rest of the harness is: work that returns per field rather than per
      * record, or a descriptor lookup that stopped being cached, moves it by a multiple.
@@ -178,7 +178,7 @@ class JsonAllocationHarnessTest {
      *
      * <p>[TSON-JSON] §3.3 and §6.1.5 put every selector at the front of its object, so a record with no
      * subtypes decides nothing ahead of its members and this figure holds no lookahead buffer. Scanning each
-     * object for reserved members, which is what the rule removed, cost about 350 bytes for this three-field
+     * object for annotation members, which is what the rule removed, cost about 350 bytes for this three-field
      * record -- too little for a ceiling to catch without becoming a budget, so the assertion is the harness's
      * usual ratchet against work that returns per field rather than per record.
      */

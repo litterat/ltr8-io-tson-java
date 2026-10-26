@@ -21,7 +21,7 @@ import java.util.*;
 
 /**
  * Object-binding mode's own {@code record} reader -- reads a record-shaped value into a real, bound
- * Java object via {@code descriptor}, a {@code tson-bind} {@link DataClassRecord} already resolved
+ * Java object via {@code descriptor}, a {@code ltr8-bind} {@link DataClassRecord} already resolved
  * for this record's own schema type name (resolving one is this class's caller's job, not this
  * class's).
  *
@@ -79,7 +79,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                              SchemaLocation schemaLocation,
                              AnnotationTypes annotationTypes) {
         super(name, displayName, body, tokenAware(name, descriptor.fields(),
-                descriptor.annotationsCarrier().orElse(null), resolver, context, schemaLocation), schemaLocation);
+                descriptor.annotationsCarrier().orElse(null), resolver, context, schemaLocation), schemaLocation,
+                fieldNameRule(name, body, context));
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
@@ -88,7 +89,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         List<String> mismatches = new ArrayList<>();
         for (int i = 0; i < fields.size(); i++) {
             CompiledField field = fields.get(i);
-            DataClassField target = findTargetField(descriptor.fields(), field.schema().name());
+            DataClassField target = findTargetField(descriptor.fields(), field.name());
             targetField[i] = target;
             if (target == null) {
                 // The one exemption is FIXED (either state): the schema settles the value, so a component
@@ -102,24 +103,24 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 // the first time a caller sends it, which is the bug this check exists to prevent. One rule
                 // for every field beats two that differ on when the developer finds out.
                 if (field.schema().role() != FieldRole.FIXED) {
-                    mismatches.add("no component for field '" + field.schema().name() + "'");
+                    mismatches.add("no component for field '" + field.name() + "'");
                 }
                 continue;
             }
             String deliversNull = deliversNull(field.schema(), omitted(i));
             if (deliversNull != null && target.dataClass().typeClass().isPrimitive()) {
-                mismatches.add("field '" + field.schema().name() + "' " + deliversNull + ", and component '"
+                mismatches.add("field '" + field.name() + "' " + deliversNull + ", and component '"
                         + target.name() + "' binds " + target.dataClass().typeClass().getName()
                         + ", which has no null to hold it");
             }
             // The component is the target at every depth below the field too (BindTargets), and the bridge and box
-            // are applied here because this reader builds its constructor arguments itself -- tson-bind's binder,
+            // are applied here because this reader builds its constructor arguments itself -- ltr8-bind's binder,
             // which collects a record's arguments through their bridges, is the step a schema-driven read replaces.
             TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
-                    "field '" + field.schema().name() + "'", "component '" + target.name() + "'",
-                    new BindTargets.Site(field.schema().name(), resolver, this.annotationTypes, mismatches), true);
+                    "field '" + field.name() + "'", "component '" + target.name() + "'",
+                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches), true);
             if (rebound != field.parser()) {
-                field = new CompiledField(field.schema(), rebound);
+                field = new CompiledField(field.name(), field.schema(), rebound);
                 fields.set(i, field);
             }
             if (field.schema().value().isPresent()) {
@@ -162,7 +163,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * binding actually matches on.
      *
      * <p>Read here by reflection rather than carried on {@link DataClassField}, because it answers a
-     * <em>TSON</em> question -- "is a schema field expected to fill this?" -- that {@code tson-bind}'s
+     * <em>TSON</em> question -- "is a schema field expected to fill this?" -- that {@code ltr8-bind}'s
      * generic descriptor has no notion of: the descriptor knows components, not schemas. Both the record
      * component and its accessor are consulted, so the marker works wherever a class can put it.
      */
@@ -223,8 +224,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private static FieldReaders tokenAware(String name, DataClassField[] classFields, DataClassField carrier,
                                             TsonTypeReaderResolver resolver, ValueReaderContext context,
                                             SchemaLocation location) {
-        return field -> {
-            DataClassField target = findTargetField(classFields, carrier, field.name());
+        return (fieldName, field) -> {
+            DataClassField target = findTargetField(classFields, carrier, fieldName);
             if (target != null && target.type() == io.ltr8.tson.schema.meta.Token.class) {
                 return AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
             }
@@ -338,7 +339,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * every entry a given compiled schema binds, the same way a {@link Factory} instance gets
      * created once and reused across a whole compile, not once per entry.
      *
-     * <p><b>Three real shapes, not two.</b> When {@code typeDefinition.subtypes()} is empty, {@code
+     * <p><b>Three real shapes, not two.</b> When {@code context.subtypesOf(name, typeDefinition)} is empty, {@code
      * name} must resolve to a {@link DataClassRecord} -- the ordinary case, no dispatch wrapper at
      * all. When it's non-empty, two further shapes exist, told apart by what {@code name} itself
      * resolves to: a {@link DataClassUnion} is the real fixture's own shape for a pure marker root
@@ -363,32 +364,33 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
 
         @Override
-        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
-            if (!(typeDefinition.body() instanceof RecordBody body)) {
+            if (!(typeDefinition instanceof RecordBody body)) {
                 throw new IllegalArgumentException(
-                        "'" + name + "' is not record-shaped: " + typeDefinition.body());
+                        "'" + name + "' is not record-shaped: " + typeDefinition);
             }
             DataClass dataClass = descriptorFor(name, typeDefinition, context);
 
-            if (typeDefinition.subtypes().isEmpty()) {
+            if (context.subtypesOf(name, typeDefinition).isEmpty()) {
                 Map<String, DataClassRecord> labelled = labelledChoice(body, dataClass);
                 if (labelled != null) {
-                    SchemaLocation location = context.locationOf(name, typeDefinition);
-                    return new GroupUnionBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
-                            labelled, resolver, location);
+                    SchemaLocation location = context.locationOf(name);
+                    return new GroupUnionBindReader(name, context.displayName(name, typeDefinition), body,
+                            labelled, resolver, location, fieldNameRule(name, body, context));
                 }
-                return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
+                return new RecordBindReader(name, context.displayName(name, typeDefinition), body,
                         requireRecord(name, dataClass), resolver, context,
-                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
+                        context.locationOf(name), AnnotationTypes.of(context));
             }
 
             if (dataClass instanceof DataClassUnion union) {
                 TsonTypeReader<?> noOwnData = ctx -> {
                     ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                             "'" + name + "' has no data of its own to bind -- provide an explicit type annotation "
-                                    + "(!typeName) naming one of its subtypes " + typeDefinition.subtypes(),
-                            "an explicit type annotation naming one of " + typeDefinition.subtypes(), "(none)");
+                                    + "(!typeName) naming one of its subtypes " + context.subtypesOf(name, typeDefinition),
+                            "an explicit type annotation naming one of " + context.subtypesOf(name, typeDefinition),
+                                    "(none)");
                     return null;
                 };
                 // Membership is decided through this context's own binder, which is the only thing that
@@ -399,9 +401,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
 
             if (dataClass instanceof DataClassRecord record) {
-                RecordBindReader ownParser = new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition),
+                RecordBindReader ownParser = new RecordBindReader(name, context.displayName(name, typeDefinition),
                         body, record, resolver, context,
-                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
+                        context.locationOf(name), AnnotationTypes.of(context));
                 return Subsumption.dispatching(name, typeDefinition, ownParser, context.namesMeaning(), resolver);
             }
 
@@ -481,7 +483,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * never mapped the type that this library cannot do the job, and that reading travels: a downstream
          * service turns it into a 501.
          */
-        private DataClass descriptorFor(String name, TypeDefinition definition, ValueReaderContext vctx) {
+        private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
             DataBindException first = null;
             StringBuilder tried = new StringBuilder();
             for (String candidate : vctx.bindingNamesFor(name, definition)) {

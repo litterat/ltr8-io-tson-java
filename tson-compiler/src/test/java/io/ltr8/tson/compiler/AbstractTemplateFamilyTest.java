@@ -7,6 +7,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,8 +62,8 @@ class AbstractTemplateFamilyTest {
     private static TsonCompiledSchemaRegistry compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/abstract-template.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -86,12 +87,12 @@ class AbstractTemplateFamilyTest {
      * already named the same application.
      */
     private static String target(TsonCompiledSchemaRegistry registry, String alias) {
-        return registry.get(ID).schema().entries().get(alias).body()
+        return registry.get(ID).schema().entries().get(alias)
                 instanceof io.ltr8.tson.schema.meta.Reference ref ? ref.target().name() : alias;
     }
 
     private static RecordBody bodyOf(TsonCompiledSchemaRegistry registry, String alias) {
-        return (RecordBody) registry.get(ID).schema().entries().get(target(registry, alias)).body();
+        return (RecordBody) registry.get(ID).schema().entries().get(target(registry, alias));
     }
 
     private static List<Diagnostic> read(TsonCompiledSchemaRegistry registry, String rootType, String document) {
@@ -133,7 +134,7 @@ class AbstractTemplateFamilyTest {
 
         assertEquals(RecordExtensionType.ABSTRACT, bodyOf(registry, "result_int").extension());
         assertEquals(List.of(target(registry, "ok_int")),
-                registry.get(ID).schema().entries().get(target(registry, "result_int")).subtypes());
+                TypeChain.subtypesOf(registry.get(ID).schema().entries().get(target(registry, "result_int"))));
     }
 
     // ── Reading against it ──────────────────────────────────────────────────

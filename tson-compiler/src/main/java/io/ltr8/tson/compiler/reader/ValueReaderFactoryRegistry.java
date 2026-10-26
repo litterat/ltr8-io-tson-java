@@ -24,7 +24,8 @@ import java.util.function.UnaryOperator;
  * a *lookup-by-constructor-name* convenience only -- it says nothing about whether an {@code
  * array}-typed position should ever dispatch to {@code !set [...]} at read time, which {@link
  * RecordBindReader.Factory}'s own Javadoc deliberately does not attempt for any composite kind but
- * {@code record}.
+ * {@code record}. {@code namespace} registers to the {@code map} factory on the same footing: it composes
+ * {@code map} and adds no field.
  *
  * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
  * #bind} (dispatching {@code boolean} to a real {@code Boolean} via the vocabulary's own
@@ -103,11 +104,12 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
             // meta-kernel.tn
-            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type",
+            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type", "kind_type", "ref_type",
             // meta.tn
             "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
             "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
-            "iri_type", "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
+            "iri_type", "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type",
+            "hostname_type", "host_type", "media_type_type");
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,

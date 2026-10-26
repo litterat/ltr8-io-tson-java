@@ -12,6 +12,8 @@ rules are walked. Current form only; history lives in git.
 - A skip is not a pass: CI sets `TSON_REQUIRE_TEST_SUITE`, and the pin is a commit, never a branch.
 - At the schema and link layers the category is the phase's; each diagnostic must be a verdict (`Code.verdict()`).
 - Add vectors in the same session as lexer/parser/resolver work; the corpus moves before `SUITE_PIN`.
+- A record a fixture's namespace types hold is bound to a host class of the runner's own (`SuiteBindings`, one record
+  per meta record in `io.ltr8.tson.suite.data`), the same binding in both runners and in `SidecarSchemasTest`.
 
 Related: `design/name-hygiene-and-minted-names.md`, `design/name-hygiene-read-path.md`, `design/json-unicode-policies.md`.
 
@@ -61,7 +63,7 @@ mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.
 **The grammar runs where a name is read; the policy runs once per layer, over scopes.** That split is
 §8.2's own — §7.7 is validity, stable across Unicode versions, and a failure is a parse error; §8.2's three
 name-hygiene rules are policy over *named scopes*, read unstable data, and a failure is a refusal. So
-`IdentifierProfile.validate` is the grammar and `IdentifierProfile.hygiene` the restricted-character rule;
+`IdentifierGrammar.validate` is the grammar and `IdentifierGrammar.hygiene` the restricted-character rule;
 **both report a violation and neither throws**, so what a failure becomes is the caller's — a parse error
 where the grammar is read, a refusal where the policy is applied — and **no position that reads a name
 applies a policy**. The joiners belong to the grammar despite
@@ -121,6 +123,23 @@ whole-name (§8.2's SHOULD) and relaxes through `withIdentifierPolicy`, which §
 than ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
 may legitimately be anything.
 
+**A meta layer's own records need host classes, and the runner supplies them.** A value of a meta layer's namespace
+type reads each value of its map into a class the reading application binds ([TSON-SCHEMA] §4.1,
+`design/meta-layer-namespaces.md`), so a vector whose schema applies one — the link layer's values-by-name vectors
+over `fixtures/meta-service.tn`'s `interface` and `bindings` — cannot be judged by a runner that binds nothing. The
+corpus states the records in a fixture meta-schema and stays language-agnostic; the host side is the runner's:
+`SuiteBindings` (`tson-compiler/src/testShared`) carries a plain record per meta record (`Method`, `RpcMethod`,
+`Binding`, `HeaderSet`, `Route`), named for it so the name binder's package convention finds it, composed onto the
+library's own binder (`ProcessorConfig.withMetaNameBinder` at the front door, `SchemaMetaNameBinder.contextExtendedWith`
+where a registry is built directly). `SidecarSchemasTest` resolves the fixtures under the same binding, since a fixture
+applying a namespace type would otherwise fail there for want of a class rather than for anything about the fixture.
+A new fixture record is a new host record beside them; the fixture's `@doc` lists the records its namespace types hold,
+which is the corpus's half of the contract (`RUNNER.md`, "A meta layer's own records").
+**A `schema/` vector's expected side is read under the subject's own `meta`** (`ResolvedForm.readResolved` with the
+sidecar's `meta` resolved), and the object reader binds through `SuiteBindings` too: a fixture meta imports meta.tn
+and adds its constructors, and a namespace entry in resolved output is typed by that layer alone, so a vector
+showing a value by name written back as written reads only there. For a subject under meta.tn it is the same read.
+
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist
 for. `SidecarSchemasTest` checks the schemas themselves resolve — every `.tn` in `schemas/`, listed rather
@@ -153,8 +172,9 @@ valid vector's subject is a schema document and its expected side is that docume
 own form, read back through `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question
 of `spec/m/*-resolved.tn`) and compared entry for entry, `@synthetic` key markers included. `link/` states
 individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived disjointness, §8.2's
-`subtypes` index. `validate/` is a data document against a schema that loaded, where the expected side of a
-failure is §8.1's category plus the RFC 6901 pointer into the data and nothing else.
+`subtypes` index, a kind's derived `members` (compared as a set, minted names normalised). `validate/` is a data
+document against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901
+pointer into the data and nothing else.
 
 **At the schema and link layers the category is the phase's, not the diagnostic code's.** §8.1 says every
 error that makes a schema fail to load or ingest is a resolver error "however value-like the violated rule",
@@ -165,7 +185,7 @@ letting one satisfy an error vector is how a corpus comes to pass on the strengt
 
 **No `class2/schema/` subject declares a template yet, and nothing stops one now.** An open entry's body is
 the kernel's `template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
-`type_definition` like any other and reads back as ordinary data — where §8.1's older shape wrote the
+schema-map value like any other and reads back as ordinary data — where §8.1's older shape wrote the
 application as though it were a value of the constructor's own vocabulary, which no reader could apply
 (§8.1). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one
 spelling being about the application and not the whitespace, so the layer needs no expectation format of its

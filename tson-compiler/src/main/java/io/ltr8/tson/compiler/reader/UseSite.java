@@ -47,10 +47,9 @@ public final class UseSite {
      * nothing to give it to.
      *
      * <p><b>A {@code REFERENCE} entry is the caller.</b> Its reader is its target's, so without this a
-     * message at a {@code pct}-typed position would name {@code small}. The same applies to a materialised
-     * instantiation, named for its own content ({@code integer_type_10_100_786fbcfb}) where the entry
-     * referring to it records the application the author wrote ({@code b<10>}), which {@code
-     * EntryDisplayName} renders -- so the name comes from the entry doing the referring.
+     * message at a {@code pct}-typed position would name {@code small}. The same applies to an instantiation
+     * entry an expansion that names its own application keeps: the synthetic is named for its content, and
+     * the entry referring to it records the application, which {@code EntryDisplayName} renders.
      */
     public static TsonTypeReader<?> named(TsonTypeReader<?> reader, String displayName) {
         return displayName != null && reader instanceof Renamed renameable

@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  * pins that the JSON front door starts from it rather than from a bare context.
  *
  * <p><b>What this does not claim</b> is that a schemaless read can convert one. A host type is registered so
- * that {@code tson-bind} treats it as a scalar rather than taking it apart structurally; the
+ * that {@code ltr8-bind} treats it as a scalar rather than taking it apart structurally; the
  * string-to-host-value conversion is the position's own atom parser's, under a schema. A schemaless bind of
  * a {@code UUID} component fails on both encodings alike -- which is the point, since they fail alike --
  * and {@code BACKLOG.md}'s "Binding" section carries the shared conversion that would close it.

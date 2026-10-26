@@ -4,8 +4,8 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.List;
 import java.util.Set;
@@ -30,10 +30,9 @@ import java.util.Set;
  *
  * <p><b>Both dispatchers are the ones a closed base uses</b> ({@link RecordDispatch}), so a family whose base
  * is a template and one whose base is a hand-written record read identically and report identically. The
- * selectors come from {@code FamilySelectors} either way -- a closed base declares them, and a template's are
- * recovered from its members at the base's own declared type -- which is the same derivation {@code
- * RecordExtension} checks the family against, since a check and a dispatch that disagreed about the selectors
- * would admit a family no reader could place.
+ * selectors come from {@code FamilySelectors} either way -- each base declares them in its own fields --
+ * which is the same derivation {@code RecordExtension} checks the family against, since a check and a dispatch
+ * that disagreed about the selectors would admit a family no reader could place.
  *
  * <p>{@link Subsumption.Applied} because the dispatcher it holds decides §7.2 at this position itself. The
  * marker changes nothing today -- {@code Subsumption.guard} runs past the template branch and never sees one
@@ -44,17 +43,16 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
     private final TsonTypeReader<Object> dispatcher;
 
     @SuppressWarnings("unchecked")
-    public AbstractTemplateReader(String name, TypeDefinition definition, ValueReaderContext context,
+    public AbstractTemplateReader(String name, Top definition, ValueReaderContext context,
                                    TsonTypeReaderResolver readers) {
-        TemplateBody held = (TemplateBody) definition.body();
-        held.extension().orElseThrow(() -> new IllegalStateException(
-                "'" + name + "' is not a family base: only a template carrying `extension` dispatches, and "
-                        + "OpenTemplateReader is what every other template compiles to (§5.10)"));
-        // Reported under the template's own name, never the application its `source` records: a marked
-        // template keeps the `source` of whatever it composed, and EntryDisplayName renders that in
-        // preference to a name it takes for derived. The author wrote this one, which is the whole point of
-        // the template being the base -- naming `pet_base<…>` would name something the schema never declares.
+        if (!OpenEntry.isFamilyBase(definition)) {
+            throw new IllegalStateException("'" + name + "' is not a family base: only a record template "
+                    + "dispatches, and OpenTemplateReader is what every other template compiles to (§5.10)");
+        }
+        // Reported under the template's own name: the author wrote this one, which is the whole point of the
+        // template being the base -- naming `pet_base<…>` would name something the schema never declares.
         Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
+        Set<String> admitted = Subsumption.admitting(context.subtypesOf(name, definition), context.namesMeaning());
 
         this.dispatcher = (TsonTypeReader<Object>) (FamilySelectors.dispatchesOnMembers(definition)
                 // The selectors are the base's, at the types the base declares -- the one set known before a
@@ -62,10 +60,11 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
                 // from any member, and handed to the same dispatcher a closed base uses: one dispatch, two
                 // sources for its inputs.
                 ? new RecordMemberDispatchReader(selfNames, name,
-                        FamilySelectors.of(definition, context.schema().entries()),
-                        Set.copyOf(definition.subtypes()), context, readers)
-                : new RecordTagDispatchReader(selfNames, name,
-                        Subsumption.admitting(definition.subtypes(), context.namesMeaning()), readers));
+                        FamilySelectors.of(definition),
+                        Set.copyOf(context.subtypesOf(name, definition)), context, readers)
+                : new RecordTagDispatchReader(selfNames, name, admitted,
+                        context.instantiableSubtypesOf(name, definition),
+                        RecordTagDispatchReader.namespaces(admitted, context), readers));
     }
 
     @Override

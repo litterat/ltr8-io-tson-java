@@ -1,6 +1,6 @@
 package io.ltr8.tson.json.reader;
 
-import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.json.tree.JsonArray;
 import io.ltr8.tson.json.tree.JsonNumber;
 import io.ltr8.tson.json.tree.JsonObject;

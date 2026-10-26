@@ -28,8 +28,8 @@ class TsonTest {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tson-test.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               my_int => int32
               my_percentage => !integer ^ { min: 1  max: 100 }
@@ -49,7 +49,7 @@ class TsonTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> tson.resolve("""
                         !!id:"https://example.test/oops.tn"
-                        !!meta:"https://tson.io/2026/37/m/core.tn"
+                        !!meta:"https://tson.io/2026/38/m/core.tn"
                         {
                           my_thing => uuid
                         }
@@ -63,10 +63,10 @@ class TsonTest {
         Tson tson = Tson.standard();
 
         TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
-        // Merged view: the two local declarations, plus core.tn's own 56 imported entries --
+        // Merged view: the two local declarations, plus core.tn's own 44 imported entries --
         // TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved TsonSchema
         // resolve()'s own resolution step produces internally, which stays local-only.
-        assertEquals(50, linked.schema().entries().size());
+        assertEquals(46, linked.schema().entries().size());
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 
@@ -86,7 +86,7 @@ class TsonTest {
      * Every resolved definition carries where it was declared. {@code PositionalReadErrorsTest} proves the
      * pieces connect by handing {@code DefinitionResolver} a position itself; this is the production path,
      * where {@code Tson.resolve} passes {@code TsonSchemaParser.declarationPositions()} through. Without
-     * that hop {@code TypeDefinition.position()} is empty for every entry, and so is the {@code
+     * that hop {@code Top.position()} is empty for every entry, and so is the {@code
      * schemaPosition} on every read diagnostic derived from it.
      */
     @Test
@@ -94,8 +94,8 @@ class TsonTest {
         TsonLinkedSchema linked = Tson.standard().resolve(TINY_DOCUMENT);
 
         // Declared on lines 5 and 6 of TINY_DOCUMENT (1-based, counting the three header lines and `{`).
-        assertEquals(5, linked.schema().entries().get("my_int").position().orElseThrow().line());
-        assertEquals(6, linked.schema().entries().get("my_percentage").position().orElseThrow().line());
+        assertEquals(5, linked.schema().positionOf("my_int").orElseThrow().line());
+        assertEquals(6, linked.schema().positionOf("my_percentage").orElseThrow().line());
     }
 
     /** An imported entry keeps its *own* schema's position, not one relative to the importer. */
@@ -104,7 +104,7 @@ class TsonTest {
         TsonLinkedSchema linked = Tson.standard().resolve(TINY_DOCUMENT);
 
         // int32 comes from core.tn, which declares it far below this three-line document could reach.
-        int int32Line = linked.schema().entries().get("int32").position().orElseThrow().line();
+        int int32Line = linked.schema().positionOf("int32").orElseThrow().line();
         assertTrue(int32Line > 10, "expected core.tn's own line for int32, got " + int32Line);
     }
 
@@ -146,7 +146,10 @@ class TsonTest {
         assertEquals(new Point(1, 2), point);
     }
 
-    /** Public, not local/package-private -- {@code tson-bind}'s own reflective binding only ever finds *public* constructors (see {@code CliDiagnostic}'s own Javadoc in {@code tson-cli} for the identical gotcha). */
+    /**
+     * Public, not local or package-private: {@code ltr8-bind}'s reflective binding finds only <em>public</em>
+     * constructors, as {@code tson-cli}'s {@code CliDiagnostic} also notes.
+     */
     public record Point(int x, int y) {
     }
 }

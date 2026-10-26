@@ -24,7 +24,8 @@ import java.util.Set;
  * the command list, since what a caller needs there is the shape of the invocation they got wrong.
  *
  * <p>Exit codes are Unix-conventional and answer who acts: 0 accepted (or an explicit {@code --help}), 1 rejected
- * and the document is the fix, 2 a usage error (bad arguments, a file that can't be read), 69 ({@code
+ * and the document is the fix, 2 a usage error (bad arguments, a file that can't be read) or a schema file that does
+ * not load -- the documents naming it are each UNDETERMINED and every other document is still judged, 69 ({@code
  * EX_UNAVAILABLE}) a schema not obtained that no rerun obtains -- the reference is the fix, and where this run
  * would not supply it ({@code SCHEMA_NOT_PERMITTED}) the outcome is {@code REJECTED} -- 75 ({@code EX_TEMPFAIL})
  * a schema that could not be reached, 78 ({@code EX_CONFIG}) a type with no Java class here, and 70 ({@code
@@ -130,8 +131,9 @@ public final class TsonCli {
             """ + POLICY_OPTIONS + """
 
 
-            exit codes: 0 every data file valid, 1 at least one checked and rejected, 2 usage error,
-                        69 a schema nothing would supply, 75 a schema that could not be reached,
+            exit codes: 0 every data file valid, 1 at least one checked and rejected, 2 usage error
+                        or a schema file that does not load (documents naming it are not checked, the
+                        rest are), 69 a schema nothing would supply, 75 a schema that could not be reached,
                         78 a type with no Java class in this tool, 70 a gap in this library or a fault""";
 
     private static final String COMPILE_USAGE =
@@ -216,14 +218,14 @@ public final class TsonCli {
             tokens as the syntax allows, for a reader that reads the schema rather than loading it -- a
             language model given it in a prompt. The !!id, every !!meta and !!import pin, and every @doc,
             @title, @examples and @comment are removed; a reference to the spec's own library is shortened
-            to its revision and name (!!import:"37/core"). Each directive and each declaration gets one
+            to its revision and name (!!import:"38/core"). Each directive and each declaration gets one
             line, with whitespace inside it collapsed to single spaces. Other annotations stay, and other
             references keep their URLs.
 
             options:
               --keep-docs    keep @doc, @title and @examples; @comment, a note for maintainers, still goes
 
-            The output is valid syntax but not a loadable schema -- nothing resolves "37/core" -- so the
+            The output is valid syntax but not a loadable schema -- nothing resolves "38/core" -- so the
             file is never rewritten.
 
             exit codes: 0 printed, 1 not a well-formed schema document, 2 usage error or unreadable file""";

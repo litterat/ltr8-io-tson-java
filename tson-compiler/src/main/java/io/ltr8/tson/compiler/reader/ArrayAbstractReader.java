@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.diagnostics.ArrayDiagnostics;
-import io.ltr8.tson.base.unicode.ConfusableNames;
+import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  * tolerating (or rejecting) a void element per {@code voidable}, and rejecting a duplicate
  * *decoded* element when {@code unique_items} says to -- handing each decoded element to a {@link
  * Consumer} rather than assembling a result itself, since how a decoded element gets stored (a plain
- * {@code List.add}, or a {@code tson-bind} {@code DataClassArray}'s own {@code put()} {@link
+ * {@code List.add}, or a {@code ltr8-bind} {@code DataClassArray}'s own {@code put()} {@link
  * java.lang.invoke.MethodHandle}) differs completely between the two subclasses. Array elements have
  * no default/fixed-value concept at all ({@code voidable} is the element's one fact, where a record field
  * carries a role and a value), so there's nothing here
@@ -47,9 +47,10 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
     final String name;
 
     /**
-     * What to call this entry in a message -- {@link #name} where the author wrote it, and the form they
-     * wrote where they did not (see {@link EntryDisplayName}). Separate from {@code name}, which stays the
-     * entry's real name: that is what a type-ref resolves against and what a tree node carries.
+     * What to call this entry in a message -- {@link #name} where the author wrote it, the form they wrote
+     * where they did not, and {@code null} for a form with no spelling, such as a set an application expanded
+     * to (see {@link EntryDisplayName#authored}). Separate from {@code name}, which stays the entry's real name:
+     * that is what a type-ref resolves against and what a tree node carries.
      */
     final String displayName;
 
@@ -96,8 +97,8 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      */
     static boolean elementsAreNames(ArrayBody body, ValueReaderContext context) {
         return body.uniqueItems() && ReferenceChain.terminalDefinition(body.elementType().name(),
-                        context.schema().entries())
-                .map(element -> element.body() instanceof IdentifierType)
+                        context.schema().entries()::get)
+                .map(element -> element instanceof IdentifierType)
                 .orElse(false);
     }
 

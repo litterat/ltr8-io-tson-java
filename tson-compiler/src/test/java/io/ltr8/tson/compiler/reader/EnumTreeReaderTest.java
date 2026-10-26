@@ -12,7 +12,7 @@ import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -41,9 +41,10 @@ class EnumTreeReaderTest {
         // names "enum", "enum" composes with "atom", and so on transitively; cherry-picking just
         // "boolean" drags in most of meta-kernel anyway via SchemaValidator's own reference checks,
         // so there's nothing simpler about trying to trim it down. One extra local entry on top.
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries());
-        entries.put("flag_holder", TypeDefinition.product(
-                RecordBody.of(List.of(RecordField.required("flag", TypeRef.of("boolean"))))));
+        Map<String, Top> entries =
+                new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries().entries());
+        entries.put("flag_holder", RecordBody.of(RecordBody.fieldMap(Map.entry("flag",
+                RecordField.required(TypeRef.of("boolean"))))));
         // !!meta must be the real meta-kernel identity, not a placeholder -- this schema's own
         // locals are meta-kernel's real constructor vocabulary verbatim, plus one extra entry, so
         // TsonSchemaLinker's own "only a meta-kernel-governed schema may declare constructors" check

@@ -1,7 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.meta.TextType;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -51,7 +51,7 @@ class TextParserTest {
 
     @Test
     void patternMatchesWithIRegexpSemantics() {
-        // The pattern constraint is matched through tson-regex (RFC 9485 I-Regexp), so a Unicode category
+        // The pattern constraint is matched through ltr8-regex (RFC 9485 I-Regexp), so a Unicode category
         // class works with I-Regexp's own \p{...} semantics rather than java.util.regex's.
         TextParser type = new TextParser(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of("\\p{Nd}+"));

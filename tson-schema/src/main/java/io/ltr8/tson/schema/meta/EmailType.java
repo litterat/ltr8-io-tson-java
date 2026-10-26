@@ -1,8 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,10 +20,27 @@ import java.util.Optional;
  * spec} is fixed to.
  */
 @Typename(name = "email_type")
-public record EmailType(String spec, @Field("min_length") Optional<Integer> minLength,
+public record EmailType(TypeChain chain,
+        String spec, @Field("min_length") Optional<Integer> minLength,
                          @Field("max_length") Optional<Integer> maxLength,
                          Optional<Integer> length, Optional<String> pattern,
                          Optional<List<String>> members, Normalization normalization) implements Atom, TextFamily {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public EmailType {
+        chain = TypeChain.orEmpty(chain);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public EmailType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, normalization);
+    }
+
+    @Override
+    public EmailType withChain(TypeChain chain) {
+        return new EmailType(chain, spec, minLength, maxLength, length, pattern, members, normalization);
+    }
 
     /** {@code email => !email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */
     public static final EmailType UNCONSTRAINED = new EmailType(

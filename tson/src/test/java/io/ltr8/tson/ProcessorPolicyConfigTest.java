@@ -2,10 +2,8 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
-import io.ltr8.tson.base.policy.LimitsPolicy;
-import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.*;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -67,7 +65,7 @@ class ProcessorPolicyConfigTest {
                 .processorPolicy();
 
         assertEquals(8, stated.limits().maxDepth(), "the limit stated first survives the policy stated after it");
-        assertEquals(ScriptPolicy.Level.ASCII_ONLY, stated.identifierPolicy().scripts().level());
+        assertEquals(RestrictionLevel.ASCII_ONLY, stated.identifierPolicy().scripts().level());
         assertEquals(ProcessorPolicy.defaults().tokenPolicy(), stated.tokenPolicy(),
                 "the component nothing stated keeps its default");
     }
@@ -93,8 +91,8 @@ class ProcessorPolicyConfigTest {
     void theIdentifierHalfOfAWholePolicyReachesTheLinker() {
         List<Diagnostic> refused = Tson.of(ProcessorConfig.defaults().withProcessorPolicy(TIGHTENED)).validateSchema("""
                 !!id:"https://example.test/whole-policy.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 { p%sy => text }
                 """.formatted(CYR_A));
 

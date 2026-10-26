@@ -29,8 +29,8 @@ import java.util.Optional;
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
  * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(ProcessorConfig)}, or
- * {@link #standard()} for the defaults, which bootstraps the four bundled schemas (meta-kernel, meta, core,
- * policy) into a fresh, governed environment:
+ * {@link #standard()} for the defaults, which bootstraps the five bundled schemas (meta-kernel, meta, core,
+ * net, policy) into a fresh, governed environment:
  *
  * <pre>{@code
  * Tson tson = Tson.standard();
@@ -65,8 +65,9 @@ import java.util.Optional;
  * already-resolved, already-linked schema (a registry's own {@code compile}/{@code get}) picks a mode.
  *
  * <p><b>What that fixes is the mode, not the vocabulary.</b> The resolution core's own binder knows the
- * kernel's names; a governing meta of a consumer's own may declare constructors beyond them ({@code
- * operation => ~data & { ... }}), and {@link ProcessorConfig#metaNameBinder} adds the classes those bind to --
+ * kernel's names; a governing meta of a consumer's own may declare vocabulary beyond them (a record {@code
+ * operation => { ... }} held in a namespace type, {@code api => namespace & { ... }}), and {@link
+ * ProcessorConfig#metaNameBinder} adds the classes its values bind to --
  * composed over the library's binder, so the mode and every kernel name stand.
  *
  * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link SchemaSource#registeredOnly()}
@@ -256,8 +257,7 @@ public final class Tson {
         TsonSchemaParser parser = new TsonSchemaParser(schemaText);
         SchemaDocument document = parser.parseSchemaDocument();
         TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document, parser.schemaPositions());
-        return core.register(
-                TsonSchemaLinker.link(resolved, core.schemaRegistry(), core.identifierPolicy()), schemaText);
+        return core.register(core.link(resolved), schemaText);
     }
 
     /**
@@ -348,8 +348,7 @@ public final class Tson {
             if (!problems.isEmpty()) {
                 return problems.diagnostics();
             }
-            TsonLinkedSchema linked = TsonSchemaLinker.link(resolved, core.schemaRegistry(), problems,
-                    core.identifierPolicy());
+            TsonLinkedSchema linked = core.link(resolved, problems);
             if (!problems.isEmpty()) {
                 return problems.diagnostics();
             }
@@ -362,8 +361,8 @@ public final class Tson {
             // obtained and whose doing that was.
             problems.report(TsonDiagnostics.ofSchemaUnavailable("", "", e, Optional.empty()));
         } catch (BindMismatchException e) {
-            // A class bound to this schema's governing meta cannot work with it -- a Data body returning null
-            // from references(), say. The schema may be perfectly good and this call cannot say either way,
+            // A class bound to this schema's governing meta cannot work with it -- a record component
+            // the binder cannot analyse, say. The schema may be perfectly good and this call cannot say either way,
             // so it reports the wiring mistake rather than letting a bare runtime exception past a caller who
             // asked for a list of problems, which would read as a fault in this library.
             problems.report(TsonDiagnostics.ofSchemaBindMismatch("", "", e, Optional.empty()));

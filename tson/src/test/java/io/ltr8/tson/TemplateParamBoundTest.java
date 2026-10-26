@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
@@ -24,8 +24,8 @@ class TemplateParamBoundTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/bounds-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             """;
 
     private static final String SCHEMA = HEADER + """
@@ -44,15 +44,15 @@ class TemplateParamBoundTest {
     private static Map<String, List<TemplateParam>> parameters() {
         Map<String, List<TemplateParam>> parameters = new LinkedHashMap<>();
         Tson.standard().resolve(SCHEMA).schema().entries().forEach((name, definition) -> {
-            if (definition.body() instanceof TemplateBody held) {
-                parameters.put(name, held.parameters());
+            if (OpenEntry.isOpen(definition)) {
+                parameters.put(name, OpenEntry.parameters(definition));
             }
         });
         return parameters;
     }
 
     private static TemplateParam bounded(String name, String bound) {
-        return new TemplateParam(name, TemplateParam.TYPE_REF, Optional.of(TypeRef.of(bound)));
+        return new TemplateParam(name, TemplateParam.TYPE_KIND, Optional.of(TypeRef.of(bound)));
     }
 
     private static List<Diagnostic> problems(String declarations) {

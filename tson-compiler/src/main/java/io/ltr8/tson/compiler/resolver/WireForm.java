@@ -1,11 +1,13 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
@@ -28,12 +30,12 @@ import java.util.function.Function;
 
 /**
  * How schema vocabulary is spelled as data, in both directions -- the one place that knows what a {@code
- * type_ref} and a held {@code !record { ... }} look like on the wire, and the one that rewrites a parameter
- * standing inside one.
+ * type_ref} and a held application look like on the wire, an open record's tree included, and the one that
+ * rewrites a parameter standing inside one.
  *
  * <p><b>Why one class rather than a producer over here and a consumer over there.</b> A held body is written
- * by two phases and read by four: {@code SchemaDesugarer} lifts a sugar form and {@code DefinitionResolver}
- * holds a composition or refinement template; {@code TemplateMaterialiser} closes one, {@link HeldBody}
+ * by two phases and read by four: {@code SchemaDesugarer} lifts a sugar form and {@link HeldBody} writes an open
+ * record's tree ({@link #heldRecord}); {@code TemplateMaterialiser} closes one, {@link HeldBody}
  * answers §5.10's declaration-time questions about one, {@code SyntheticMerge} asks whether one holds an
  * application, and {@code ParameterTypes} walks one for §5.10's parameter types. A second opinion about what
  * an application looks like is what makes one of those wrong.
@@ -58,10 +60,8 @@ final class WireForm {
     // ── The vocabulary's own member names ────────────────────────────────────────────────────────
 
     /**
-     * The {@code name} member. One constant for the two records that spell it alike -- {@code type_ref.name},
-     * carrying a reference, and {@code record_field.name}, carrying a field name. What tells an application
-     * from anything else is never this member alone but its pairing with {@link #ARGUMENTS}; see
-     * {@link #isApplication}.
+     * {@code type_ref.name}, carrying a reference. What tells an application from anything else is never this
+     * member alone but its pairing with {@link #ARGUMENTS}; see {@link #isApplication}.
      */
     static final String NAME = "name";
 
@@ -71,7 +71,7 @@ final class WireForm {
     /** {@code record_field.value} and {@code type_argument.value}: §8.1's literal channel. */
     static final String VALUE = "value";
 
-    /** The constructor a held record body carries. */
+    /** The constructor an open record's held tree applies. */
     static final String RECORD = "record";
 
     static final String REFERENCE = "reference";
@@ -86,25 +86,31 @@ final class WireForm {
     static final String OPTIONAL_MEMBERS = "optional_members";
     static final String VOIDABLE = "voidable";
     static final String ROLE = "role";
-    static final String SUPERTYPES = "supertypes";
+    static final String CHAIN = "chain";
+    static final String PARENTS = "parents";
 
     /**
      * {@code record.discriminators} -- the fields a sealed family dispatches on (§5.2), in the order their
      * pins are compared as a tuple. Written only where the record states one, the constructor's own default
      * being absent, on {@link #EXTENSION}'s terms.
      *
-     * <p><b>Both producers of a held record write it, and that is the point of the constant.</b> A
-     * composition or refinement template reaches the wire form through {@link #heldRecord} and a plain
-     * {@code <T> { … }} through {@code SchemaDesugarer}, so a list only one of them spelled would be a family
-     * that survives one spelling of a template and not the other.
+     * <p>An open record's held tree states it ({@link #heldRecord}), so each application closes with the base's
+     * selectors in hand.
      */
     static final String DISCRIMINATORS = "discriminators";
 
     /**
      * {@code record.extension} -- how the record may be realised (§5.2). Written only where it is not
-     * {@code OPEN}, the constructor's own default, so a held body states a mark exactly when one was made.
+     * {@code OPEN}, the constructor's own default, so an open record's tree states a mark exactly when one was
+     * made.
      */
     static final String EXTENSION = "extension";
+
+    /**
+     * {@code record.name_type} -- the type a record's field names are values of ([TSON-SCHEMA] §5.2). Written
+     * exactly where the record states one, so a held body keeps the difference between stating and not.
+     */
+    static final String NAME_TYPE = "name_type";
 
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
@@ -127,7 +133,21 @@ final class WireForm {
 
     /** A list of field names as the array of bare names a resolved document writes. */
     private static ArrayValue names(List<String> names) {
-        return new ArrayValue(names.stream().map(name -> scoped(new TokenValue(name, TokenForm.UNQUOTED))).toList());
+        return new ArrayValue(names.stream().map(name -> scoped(declaredName(name))).toList());
+    }
+
+    /**
+     * {@code record.fields} as a held body writes it: a map from each field's declared name ({@link
+     * #declaredName}) to its {@code record_field}, in declaration order. An empty one is the empty brace, which
+     * is what the text parses back to.
+     */
+    static CoreValue fieldMap(List<MapValue.MapEntry> entries) {
+        return entries.isEmpty() ? new EmptyBrace() : new MapValue(entries);
+    }
+
+    /** One {@link #fieldMap} entry: the field's declared name as the key, its facts as the value. */
+    static MapValue.MapEntry fieldEntry(String name, ScopedValue field) {
+        return new MapValue.MapEntry(new DataValue(List.of(), Optional.empty(), declaredName(name)), field);
     }
 
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
@@ -165,6 +185,18 @@ final class WireForm {
         return new RecordValue.Field(name, scoped(new TokenValue(text, TokenForm.UNQUOTED)));
     }
 
+    /**
+     * A declared field name -- in {@code fields}, a group, {@code discriminators} -- as an author writes one:
+     * unquoted where it is an identifier, quoted where it is not. A record's names are its name type's values
+     * ([TSON-SCHEMA] §5.2), so {@code "@id"} or {@code "first name"} is a field name, and written unquoted
+     * it is not one token: a held body would not parse back. Quoting is safe for the parameter channel, which
+     * keys on unquoted tokens, because a parameter's name is an identifier and so is never quoted here.
+     */
+    static TokenValue declaredName(String name) {
+        return new TokenValue(name, IdentifierGrammar.validate(name).isEmpty() ? TokenForm.UNQUOTED
+                : TokenForm.SINGLE_LINE_QUOTED);
+    }
+
     static TokenForm tokenForm(Token.Form form) {
         return switch (form) {
             case UNQUOTED -> TokenForm.UNQUOTED;
@@ -178,8 +210,7 @@ final class WireForm {
     /**
      * The held body of an <b>open alias</b> -- {@code <B> !reference { target: pair<uuid, B> }}, the form
      * [TSON-SCHEMA] §8.1 says a partial application denotes. Spellable because {@code reference.target} is a
-     * {@code type_ref}, so an alias that still binds arguments states them in its own body and {@code source}
-     * is never asked to hold them (§8.1).
+     * {@code type_ref}, so an alias that still binds arguments states them in its own body (§8.1).
      *
      * <p>The target goes through {@link #refValue} like every other reference this package writes, so a
      * no-argument target is a bare token and only an application carries {@code arguments} -- the one
@@ -191,33 +222,11 @@ final class WireForm {
     }
 
     /**
-     * The held body an <b>error placeholder</b> carries -- {@code !record { fields: [] }}, the zero-field
-     * record both absorbing stand-ins already stood for, now held like every other open body.
-     *
-     * <p><b>It exists so that "an open entry's body is held or a {@code Reference}" has no exceptions.</b>
-     * A placeholder keeps its declaration's type parameters on purpose (answering "how many?" with zero
-     * sends a downstream {@code bl<text>} to fix the wrong declaration), which used to make it the last
-     * producer of a parameterised {@code RecordBody} -- and so kept a whole second substitution path alive
-     * to serve a body that has no fields to substitute into.
-     *
-     * <p>Built structurally rather than through {@link #heldRecord}: a placeholder is what a <em>reported</em>
-     * declaration leaves behind, so the one thing it must not do is fail again, and an empty record needs
-     * neither a namespace nor a writer to state.
-     */
-    static DataValue heldEmptyRecord() {
-        return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(List.of(
-                new RecordValue.Field(FIELDS, scoped(new ArrayValue(List.of()))))));
-    }
-
-    /**
-     * The same {@code !record { … }} held body, built from a body that is <b>already resolved</b> -- the form
-     * a composition or refinement template arrives in, since both absorb fields from a source and so cannot
-     * be rewritten before there is a namespace to absorb from.
-     *
-     * <p><b>Two producers of the held wire form are fine; two spellings of it are not.</b> This one and
-     * {@code SchemaDesugarer}'s record binding both go through {@link #refValue} and {@link #nameField},
-     * which is what makes them one spelling by construction rather than by two authors agreeing -- the class
-     * Javadoc has why that matters.
+     * An open record's held tree ({@code HeldBody.of}): the {@code !record { … }} application closing substitutes
+     * into and reads back through {@code record}'s own reader, written from the record value -- its parents as
+     * written, its fields, groups, selectors, a non-default {@code name_type}, and its own {@code extension} where
+     * it is not OPEN, the constructor's default. Through {@link #refValue} and {@link #nameField}, the spelling
+     * every other wire form here shares.
      *
      * <p><b>{@code annotationValue} is the one thing this cannot do itself.</b> A resolved annotation carries
      * its value as a <em>bound object</em> ({@code Annotation.value} is {@code Optional<Object>}), and
@@ -225,30 +234,34 @@ final class WireForm {
      * everything structural stays here.
      */
     static DataValue heldRecord(RecordBody body, Function<Object, DataValue> annotationValue) {
-        List<ScopedValue> fields = new ArrayList<>();
-        for (RecordField field : body.fields()) {
+        List<MapValue.MapEntry> fields = new ArrayList<>();
+        for (Map.Entry<String, RecordField> declared : body.fields().entrySet()) {
+            RecordField field = declared.getValue();
             List<RecordValue.Field> members = new ArrayList<>();
-            members.add(nameField(NAME, field.name()));
             members.add(new RecordValue.Field(TYPE, scoped(refValue(field.type()))));
             addFacts(members, field.optional(), field.voidable(), field.role());
             // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
             // is a bare name standing where the literal would.
             field.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE,
                     scoped(new TokenValue(token.text(), tokenForm(token.form()))))));
-            fields.add(scoped(new RecordValue(members), annotations(field.annotations(), annotationValue)));
+            fields.add(fieldEntry(declared.getKey(),
+                    scoped(new RecordValue(members), annotations(field.annotations(), annotationValue))));
         }
         List<ScopedValue> groups = new ArrayList<>();
         for (FieldGroup group : body.groups()) {
             groups.add(group(group, List.of()));
         }
         List<RecordValue.Field> binding = new ArrayList<>();
-        if (!body.supertypes().isEmpty()) {
-            // Through refValue like every other reference: a closed parent is a bare token and only a parent
-            // still applied to a parameter carries `arguments`, which is what lets substitution close it.
-            binding.add(new RecordValue.Field(SUPERTYPES, scoped(new ArrayValue(body.supertypes().stream()
-                    .map(supertype -> scoped(refValue(supertype))).toList()))));
+        if (!body.parents().isEmpty()) {
+            // Held text's one chain slot, the parents as written (TypeChain.parents). Through refValue like every
+            // other reference: a closed parent is a bare token and only a parent still applied to a parameter
+            // carries `arguments`, which is what lets substitution close it.
+            binding.add(new RecordValue.Field(CHAIN, scoped(new RecordValue(List.of(new RecordValue.Field(PARENTS,
+                    scoped(new ArrayValue(body.parents().stream().map(parent -> scoped(refValue(parent)))
+                            .toList()))))))));
         }
-        binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
+        body.nameType().ifPresent(stated -> binding.add(nameField(NAME_TYPE, stated)));
+        binding.add(new RecordValue.Field(FIELDS, scoped(fieldMap(fields))));
         if (!groups.isEmpty()) {
             binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
         }
@@ -257,138 +270,12 @@ final class WireForm {
         if (!body.discriminators().isEmpty()) {
             binding.add(new RecordValue.Field(DISCRIMINATORS, scoped(new ArrayValue(
                     body.discriminators().stream()
-                            .map(name -> scoped(new TokenValue(name, TokenForm.UNQUOTED))).toList()))));
+                            .map(name -> scoped(declaredName(name))).toList()))));
+        }
+        if (body.extension() != RecordExtensionType.OPEN) {
+            binding.add(nameField(EXTENSION, body.extension().name()));
         }
         return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(binding));
-    }
-
-    /**
-     * A held {@code !record { … }} with {@code extension} stated -- §5.2's mark on a <b>template</b>, which
-     * is where a body is text by the time the mark is read.
-     *
-     * <p><b>Applied to the held form rather than written by {@link #heldRecord}.</b> A mark belongs to the
-     * declaration and not to the body: a plain record template is held by {@code SchemaDesugarer} where
-     * §5.2 rewrites {@code { x: T }}, and a composition or refinement template by {@code
-     * DefinitionResolver.holdIfOpen} one phase later, so neither producer has the mark in hand and both
-     * reach the same shape once they are done. One function over the result is what keeps the member's
-     * spelling in one place across the two.
-     *
-     * <p>{@code OPEN} states nothing, being the constructor's own default -- so a held body carries the
-     * member exactly when a mark was made, and the text of every template written before this existed is
-     * unchanged.
-     */
-    static DataValue heldWithExtension(DataValue held, RecordExtensionType extension) {
-        if (extension == RecordExtensionType.OPEN || !(held.coreValue() instanceof RecordValue binding)) {
-            return held;
-        }
-        List<RecordValue.Field> members = new ArrayList<>(binding.fields());
-        members.add(nameField(EXTENSION, extension.name()));
-        return new DataValue(held.annotations(), held.typeRef(), new RecordValue(members));
-    }
-
-    /**
-     * The <b>parent's</b> extension for a held body, read off the payload (§5.10).
-     *
-     * <p><b>Absent unless the body is a record</b>, which is the one shape with a parent at all: a container,
-     * a constructor application and a reference template are no types, so there is nothing for an extension
-     * to describe and a type position naming one stays the error it is today. Present, it is ABSTRACT, or
-     * SEALED where a discriminator survives erasure -- never OPEN or FINAL, a parent having no direct
-     * instances (nothing can write a value whose type is the template rather than one of its applications)
-     * and its applications being subtypes by construction.
-     *
-     * <p><b>Derived rather than stated</b>, in the manner of {@code choice.disjoint}: SEALED is ABSTRACT with
-     * at least one discriminator, which is a fact of the body. The author's {@code abstract} mark is the
-     * <em>instantiation's</em> and rides inside this same payload as {@code extension}, so the two levels
-     * never collide.
-     *
-     * <p><b>Read from the structure the resolver just built, never from the text.</b> The payload is in hand
-     * before it is written out, so this parses nothing -- which is the property §1.3 rests on, a
-     * resolved-output consumer never having to read a held body to learn what a template is.
-     *
-     * <p>A discriminator's declared type may not be a parameter: a position typed by the template reads the
-     * selector before it knows which member it has, so a type that varies per application is one it cannot
-     * read. The <em>pin</em> varying is the whole point, and does.
-     */
-    static Optional<RecordExtensionType> parentExtension(DataValue application, List<String> parameters) {
-        if (!RECORD.equals(application.typeRef().orElse(null))
-                || !(application.coreValue() instanceof RecordValue binding)) {
-            return Optional.empty();
-        }
-        // Always ABSTRACT: nothing writes a value whose type is the template rather than one of its
-        // applications, and its applications are subtypes by construction, so OPEN and FINAL are both false
-        // of a base. Whether its members are placed by a tag or by their pins is `discriminators` beside
-        // this, never a second member here. An `extension` member in the payload is the *instantiation's*
-        // (spliced by `heldWithExtension`), and only FINAL could disagree -- which `withExtension` refuses on
-        // a template before it reaches here.
-        parentDiscriminators(binding, parameters);   // the same pass refuses a parameter-typed selector
-        return Optional.of(RecordExtensionType.ABSTRACT);
-    }
-
-    /**
-     * The <b>names</b> of the marked fields a held record body carries -- {@code template.discriminators}
-     * (§5.10), in the order the body declares them.
-     *
-     * <p>Read off the payload rather than the text below it, on {@link #parentExtension}'s own terms: this is
-     * the one door every open entry passes through, and the structure is in hand there. Stating the names on
-     * the entry is what lets a consumer holding only resolved output dispatch a sealed template family
-     * without parsing the held body -- the parse §1.3 rules out, and the one {@code tson-json} cannot make
-     * at all.
-     *
-     * <p>A discriminator's declared type may not be a parameter: a position typed by the template reads the
-     * selector before it knows which member it has, so a type that varies per application is one it cannot
-     * read. The <em>pin</em> varying is the whole point, and does.
-     */
-    static List<String> parentDiscriminators(RecordValue binding, List<String> parameters) {
-        List<String> names = new ArrayList<>();
-        for (RecordValue.Field member : binding.fields()) {
-            if (!DISCRIMINATORS.equals(member.name())
-                    || !(member.value().value().coreValue() instanceof ArrayValue stated)) {
-                continue;
-            }
-            for (ScopedValue element : stated.elements()) {
-                if (element.value().coreValue() instanceof TokenValue name) {
-                    names.add(name.text());
-                }
-            }
-        }
-        // The types are still read off the fields, which is where they are: a selector's *declared* type may
-        // not be a parameter, since a position typed by this template reads it before it knows which member
-        // it has. The pin varying per application is the whole design; the type cannot.
-        for (String name : names) {
-            String type = declaredType(binding, name);
-            if (type != null && parameters.contains(type)) {
-                throw new SchemaValidationException("discriminator field '" + name + "' is typed by the type "
-                        + "parameter '" + type + "', and a position typed by this template reads a "
-                        + "discriminator before it knows which member it has -- so its type cannot vary per "
-                        + "application (§5.10). The value it is pinned to is what an argument supplies; its "
-                        + "type is the base's own");
-            }
-        }
-        return List.copyOf(names);
-    }
-
-    /** The declared type of the held body's field {@code name}, or {@code null} where it declares none. */
-    private static String declaredType(RecordValue binding, String name) {
-        for (RecordValue.Field member : binding.fields()) {
-            if (!FIELDS.equals(member.name())
-                    || !(member.value().value().coreValue() instanceof ArrayValue fields)) {
-                continue;
-            }
-            for (ScopedValue element : fields.elements()) {
-                if (element.value().coreValue() instanceof RecordValue field
-                        && name.equals(memberToken(field, NAME))) {
-                    return memberToken(field, TYPE);
-                }
-            }
-        }
-        return null;
-    }
-
-    /** The held body's discriminator names, or none where it is not a record application at all. */
-    static List<String> parentDiscriminators(DataValue application, List<String> parameters) {
-        return RECORD.equals(application.typeRef().orElse(null))
-                && application.coreValue() instanceof RecordValue binding
-                        ? parentDiscriminators(binding, parameters) : List.of();
     }
 
     /** {@link #memberToken} for a caller in this package that reads a held field's own members. */
@@ -489,6 +376,29 @@ final class WireForm {
         CoreValue name = field(argument, NAME).orElseThrow();
         return new TypeArgument.Ref(name instanceof TokenValue token ? TypeRef.of(token.text())
                 : typeRefOf((RecordValue) name));
+    }
+
+    /**
+     * The parents a held {@code !record { chain: { parents: [...] } ... }} tree writes, as references -- empty for a
+     * held body that is no record or writes none. They are the parents as written ([TSON-SCHEMA] §5.10), a bare
+     * name or an application, which is what closing a record template completes into a chain.
+     */
+    static List<TypeRef> writtenParents(DataValue held) {
+        if (!(held.coreValue() instanceof RecordValue record)
+                || !(field(record, CHAIN).orElse(null) instanceof RecordValue chain)
+                || !(field(chain, PARENTS).orElse(null) instanceof ArrayValue parents)) {
+            return List.of();
+        }
+        List<TypeRef> written = new ArrayList<>();
+        for (ScopedValue parent : parents.elements()) {
+            switch (parent.value().coreValue()) {
+                case TokenValue token -> written.add(TypeRef.of(token.text()));
+                case RecordValue application when isApplication(application) -> written.add(typeRefOf(application));
+                default -> {
+                }
+            }
+        }
+        return List.copyOf(written);
     }
 
     static Optional<CoreValue> field(RecordValue record, String name) {

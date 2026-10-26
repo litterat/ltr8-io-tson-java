@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.ast.schema;
 
 /**
  * {@code type-def} (Part 2 §12.1) -- the right-hand side of a declaration (§5.1). Every
- * type-definition form resolves to a {@code type_definition} value (§8, not implemented at this
- * grammar-only stage); this sealed hierarchy models the surface syntax the resolver would consume,
+ * type-definition form resolves to the value its entry maps to (§8, not computed at this grammar-only
+ * stage); this sealed hierarchy models the surface syntax the resolver would consume,
  * one variant per top-level ABNF alternative:
  *
  * <ul>

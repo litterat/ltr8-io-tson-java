@@ -20,9 +20,9 @@ Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the 
 |---|---|
 | **Lexing and data parsing** | `lexer-and-data-parsing.md` (lexer, Tier 2 stream, Tier 3 AST) · `base-types-and-atom-vocabulary.md` (§4 resolution, `tson-atom`) |
 | **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, lifts) · `desugaring-open-forms-and-templates.md` |
-| **Resolution** | `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, reference hops, `@synthetic`, meta-kernel bootstrap) |
+| **Resolution** | `references.md` (the forms a name takes; which slot is typed `type_kind`, `type_ref` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, reference hops, `@synthetic`, meta-kernel bootstrap) |
 | **Templates (§5.10)** | `held-template-bodies.md` (`TemplateBody`, parameter kinds) · `template-materialisation.md` (`TemplateMaterialiser`, `SyntheticMerge`, regularity) |
-| **Linking** | `linking-and-compilation.md` (registry, identity, import merge, inhabitance, `record.extension`) · `choice-disjointness.md` · `meta-layer-data-kind.md` (`Data`) · `name-hygiene-and-minted-names.md` (`checkNames`, `InternalName`) |
+| **Linking** | `linking-and-compilation.md` (registry, identity, import merge, inhabitance, `record.extension`) · `choice-disjointness.md` · `meta-layer-namespaces.md` (a meta layer's vocabulary, `Namespace`) · `name-hygiene-and-minted-names.md` (`checkNames`, `InternalName`) |
 | **Compilation** | `class2-compilation.md` (`TsonSchemaCompiler`, `CompiledReaders`, `ErrorReader`, untagged choices) · `compiled-registries.md` (the two registries, `ForeignSchemas`, concurrency) |
 | **Reading** | `readers-and-diagnostics.md` (`TsonReadContext`, the read rules, tree/bind asymmetry) · `record-dispatch.md` · `scope-push.md` (§7.8) · `reader-naming-and-schema-location.md` · `name-hygiene-read-path.md` |
 | **Diagnostics and policy** | `diagnostic-model.md` (`Diagnostic`, `Code`, the component rule) · `diagnostic-rules-and-messages.md` (`base.diagnostics`, `expected`) · `schema-side-diagnostics.md` (reporting overloads, `validateSchema`, bind agreement) · `processor-policy.md` (`ProcessorPolicy`, `LimitsPolicy`) |
@@ -42,13 +42,13 @@ consumer-facing `README.md`, `STATUS.md` (the implemented checklist) and `CONFOR
 A from-scratch Java implementation of TSON (Typed Schema Object Notation), built directly against the TSON spec series
 (2026 revision), and the spec's first implementation:
 
-- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/37/tson-part1-data.md
-- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/37/tson-part2-schema.md
+- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/38/tson-part1-data.md
+- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/38/tson-part2-schema.md
 - Part 3 — the JSON encoding, **drafted in this repo**: `spec/tson-part3-json.md`
 
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
-and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 37, not
-edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core,policy}.tn` are packaged from here at
+and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 38, not
+edited here) with **two exceptions that are live**: `spec/m/{meta-kernel,meta,core,net,policy}.tn` are packaged from here at
 build time, and `spec/tson-part3-json.md` is edited in place.
 
 **Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
@@ -57,10 +57,12 @@ build time, and `spec/tson-part3-json.md` is edited in place.
 table in `spec/` is the one pin it does not write. Keep `spec/m/*-resolved.tn` in step — `ResolvedFixtureTest` checks
 them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
 
-**Branches.** `main` is the reference implementation of the *published* revision (37): identities `/2026/37/m/`,
-version `0.37.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`), each added
-when the next revision merges. Work the published spec cannot carry goes on a proposal branch, `r2026-NN-proposal`, with
-a corpus branch of the same name; none is open. `design/process.md` has the procedure.
+**Branches.** `main` is the reference implementation of the *published* revision (38): identities `/2026/38/m/`,
+version `0.38.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`),
+each added when the next revision merges. **No proposal branch is open.** Work the published spec cannot carry goes
+on `r2026-NN-proposal`, with a corpus branch of the same name, carrying the next revision's identities and version
+from its first commit and merging when the spec lands and not before; work the published revision can carry goes
+to `main`. Check the branch before quoting identities or the version. `design/process.md` has the procedure.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
 `-SNAPSHOT`. So correctness wins over stability every time: a wrong rule gets fixed, a bad name changed rather than
@@ -81,14 +83,15 @@ Schema documents: **parse → desugar → resolve → link → register → comp
 
 | Module | Holds |
 |---|---|
-| `tson-base` | Shared by every encoding: `Diagnostic`, policies, schema sources, host atom values, byte I/O, UCD tables |
-| `tson-annotation` | Binding annotations and the `Annotations` carrier |
-| `tson-bind` | Generic `DataValue`↔object binding engine; knows nothing of schemas |
+| `tson-base` | Shared by every encoding: `Diagnostic`, policies, schema sources, host atom values, byte I/O |
+| `ltr8-annotation` | Binding annotations and the `Annotations` carrier |
+| `ltr8-bind` | Generic `DataValue`↔object binding engine; knows nothing of schemas |
 | `tson-schema` | `schema.meta` resolved-schema value model, registry, `TsonBundledSchemas` |
-| `tson-atom` | The built-in atom vocabulary, over `String`, shared by both encodings |
+| `tson-atom` | The built-in atom vocabulary, over `String`, and §7.7's name grammar, shared by both encodings |
 | `tson-tree` | `TsonValue` data tree model; depends on nothing |
-| `tson-regex` | RFC 9485 I-Regexp engine; depends on nothing |
-| `tson-net` | Network text formats (`io.ltr8.net`: URIs/IRIs, IP addresses, CIDR, EUI-48), each to its RFC; depends on nothing |
+| `ltr8-regex` | RFC 9485 I-Regexp engine; depends on nothing |
+| `ltr8-net` | Network text formats (`io.ltr8.net`: URIs/IRIs, IP addresses, CIDR, EUI-48, IDNA2008 host names, media types), each to its RFC; depends on `ltr8-unicode` |
+| `ltr8-unicode` | Unicode properties and algorithms (`io.ltr8.unicode`: XID, normalization, UAX #31 profiles, UTS #39); depends on nothing |
 | `tson-compiler` | The engine: lexer, grammars, resolver, linker, compiler, readers, writers, facades |
 | `tson` | The front door: `Tson` |
 | `tson-json` | The JSON encoding, a separate stack with no dependency on `tson-compiler` |
@@ -129,15 +132,15 @@ fact that must survive its entry goes in the note, the Javadoc or the test that 
 
 **`Tson` is a prefix, never an infix** (`TsonCompiledSchema`, never `CompiledTsonSchema`), and only on types a consumer
 names in their own code; internal machinery is bare (`Lexer`, `SchemaResolver`). `tson-base` drops it; `tson-json`
-uses `Json` on the same terms. A module that knows nothing of TSON carries no prefix and lives at `io.ltr8.<name>`
-(`tson-bind` → `io.ltr8.bind`, `tson-net` → `io.ltr8.net`, `tson-regex` → `io.ltr8.regex`), usable on its own.
+uses `Json` on the same terms. A module that knows nothing of TSON is named `ltr8-<name>`, carries no prefix and lives
+at `io.ltr8.<name>` (`ltr8-bind`, `ltr8-net`, `ltr8-regex`, `ltr8-unicode`), usable on its own.
 
 **Exception classification is a policy.** `SchemaValidationException`: the author's schema is wrong and the spec
 says so. `UnsupportedOperationException`: this library has not implemented that yet. `IllegalStateException`: an
 internal invariant broke. The test: *a schema error's verdict doesn't change when this library improves; a gap's does.*
 A gap travels as `Diagnostic.Code.NOT_IMPLEMENTED`, and the CLI's exit 1 vs 70 rides on that code.
 
-**Project-owned schema `!!id`:** `https://tson.io/2026/37/io/ltr8/<group>/<name>.tn`. Between releases the schema is
+**Project-owned schema `!!id`:** `https://tson.io/2026/38/io/ltr8/<group>/<name>.tn`. Between releases the schema is
 edited in place; a release fixes the document under its identity (§10). Use `.tn`, never `.tn1`.
 
 **Line wrapping:** 125 characters, comments and code. Count characters, not bytes (`scripts/check-line-length.sh`).
@@ -178,7 +181,7 @@ No system Gradle — always the wrapper. `build` also runs javadoc (doclint), so
 ./gradlew :tson-base:test :tson-json:test
 ./gradlew :tson-cli:installDist      # then tson-cli/build/install/tson/bin/tson validate ...
 ./gradlew :tson:allocationReport     # allocation harness, numbers on stdout
-./gradlew publishToMavenLocal        # io.ltr8:<module>:0.37.0-SNAPSHOT; no remote repository, deliberately
+./gradlew publishToMavenLocal        # io.ltr8:<module>:0.38.0-SNAPSHOT; no remote repository, deliberately
 scripts/restamp-bundled-schemas.sh --check
 ```
 

@@ -3,7 +3,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -43,8 +43,8 @@ class ResolvedFixtureTest {
 
     // ── The comparison ───────────────────────────────────────────────────
 
-    private record Comparison(String label, Map<String, TypeDefinition> fixture,
-                               Map<String, TypeDefinition> ours, String text) {
+    private record Comparison(String label, Map<String, Top> fixture,
+                               Map<String, Top> ours, String text) {
 
     }
 
@@ -53,15 +53,15 @@ class ResolvedFixtureTest {
                 Files.readString(specDirectory().resolve(fixtureFile)));
     }
 
-    private static Map<String, TypeDefinition> fixtureEntries(String file) throws Exception {
-        Map<String, TypeDefinition> bound =
+    private static Map<String, Top> fixtureEntries(String file) throws Exception {
+        Map<String, Top> bound =
                 ResolvedForm.readResolved(tson(), Files.readString(specDirectory().resolve(file)));
         assertNotNull(bound, file + " did not read back at all");
         return bound;
     }
 
     /** This schema's OWN entries -- the fixture is resolver output, from before an import merged anything in. */
-    private static Map<String, TypeDefinition> ourEntries(String id) {
+    private static Map<String, Top> ourEntries(String id) {
         return ResolvedForm.ownEntries(tson(), id);
     }
 
@@ -83,6 +83,7 @@ class ResolvedFixtureTest {
     private static List<Comparison> all() throws Exception {
         return List.of(
                 compare("core.tn", "core-resolved.tn", TsonBundledSchemas.CORE_ID),
+                compare("net.tn", "net-resolved.tn", TsonBundledSchemas.NET_ID),
                 compare("meta.tn", "meta-resolved.tn", TsonBundledSchemas.META_ID),
                 compare("meta-kernel.tn", "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID));
     }
@@ -91,8 +92,8 @@ class ResolvedFixtureTest {
 
     /**
      * Every entry of every fixture binds into this model. Absolute, and the property that was missing for
-     * most of this project's life: nothing consumed a {@code type_definition} document, so the value model
-     * had drifted from the schema it mirrors in four separate ways without anything noticing.
+     * most of this project's life: nothing consumed a resolved document, so the value model had drifted from
+     * the schema it mirrors in four separate ways without anything noticing.
      */
     @Test
     void everyFixtureEntryReadsBackIntoTheValueModel() throws Exception {
@@ -127,10 +128,10 @@ class ResolvedFixtureTest {
 
     /**
      * <b>And every entry resolves to the same thing.</b> No category of difference is expected or tolerated:
-     * this resolver's output and the spec's own published resolver output agree, entry for entry, over
-     * {@code kind}, {@code source}, {@code parameters}, {@code constructor}, {@code supertypes}, {@code
-     * subtypes}, {@code disjoint} and {@code body}. An entry's annotations sit on its schema-map key, which
-     * binding drops, so they are not compared here: {@link #everyKeyCarriesTheSameAnnotations} compares them.
+     * this resolver's output and the spec's own published resolver output agree, entry for entry, over each
+     * value -- its body, its chain and, for a choice, {@code disjoint}. An entry's annotations sit on its
+     * schema-map key and on its value, which binding drops, so they are not compared here: {@link
+     * #everyKeyCarriesTheSameAnnotations} and {@link #everyValueCarriesTheSameAnnotations} compare them.
      *
      * <p>What the agreement rests on is worth knowing before changing any of it: {@code array}, {@code set}
      * and {@code map} carry no parameter lists ([TSON-SCHEMA] §4.2), so a container form is never an
@@ -156,7 +157,8 @@ class ResolvedFixtureTest {
         Map<String, String> fixtures = Map.of(
                 "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID,
                 "meta-resolved.tn", TsonBundledSchemas.META_ID,
-                "core-resolved.tn", TsonBundledSchemas.CORE_ID);
+                "core-resolved.tn", TsonBundledSchemas.CORE_ID,
+                "net-resolved.tn", TsonBundledSchemas.NET_ID);
         for (Map.Entry<String, String> fixture : fixtures.entrySet()) {
             Map<String, List<String>> written = ResolvedForm.fixtureKeyAnnotations(
                     Files.readString(specDirectory().resolve(fixture.getKey())));
@@ -169,11 +171,35 @@ class ResolvedFixtureTest {
     }
 
     /**
+     * <b>And every entry's value carries the same annotations</b> -- {@code @annotation} on the kernel's and
+     * core's annotation types, {@code @ordering}/{@code @bounded} on meta's -- read from the fixture's text and
+     * from this resolver's entry facts, a value's Java shape having no slot for them.
+     */
+    @Test
+    void everyValueCarriesTheSameAnnotations() throws Exception {
+        Map<String, String> fixtures = Map.of(
+                "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID,
+                "meta-resolved.tn", TsonBundledSchemas.META_ID,
+                "core-resolved.tn", TsonBundledSchemas.CORE_ID,
+                "net-resolved.tn", TsonBundledSchemas.NET_ID);
+        for (Map.Entry<String, String> fixture : fixtures.entrySet()) {
+            Map<String, List<String>> written = ResolvedForm.fixtureValueAnnotations(
+                    Files.readString(specDirectory().resolve(fixture.getKey())));
+            Map<String, List<String>> ours = ResolvedForm.ourValueAnnotations(tson(), fixture.getValue());
+            assertEquals(written, ours, fixture.getKey() + ": a value's annotations differ from this resolver's");
+        }
+        // Non-vacuous: the kernel marks its annotation types on their values.
+        assertTrue(ResolvedForm.fixtureValueAnnotations(Files.readString(specDirectory()
+                .resolve("meta-kernel-resolved.tn"))).get("doc").contains("@annotation"),
+                "meta-kernel-resolved.tn marks doc's value @annotation");
+    }
+
+    /**
      * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
      * {@code @synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
      * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark nine keys
-     * in meta-kernel and three in meta.tn; core.tn writes no inline form and has none, which is as much a
-     * statement as the other two.
+     * in meta-kernel and four in meta.tn; core.tn and net.tn write no inline form and have none, which is as
+     * much a statement as the other two.
      *
      * <p>This is the one assertion here that does not go through the bound document -- see {@link
      * ResolvedForm#markedSynthetics}.
@@ -183,7 +209,7 @@ class ResolvedFixtureTest {
         // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
         // scan that stopped matching or a resolver that stopped marking.
         assertEquals(9, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks nine keys");
-        assertEquals(3, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks three keys");
+        assertEquals(4, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks four keys");
 
         assertEquals(fixtureSynthetics("meta-kernel-resolved.tn"),
                 ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_KERNEL_ID), "meta-kernel.tn");
@@ -191,5 +217,7 @@ class ResolvedFixtureTest {
                 ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_ID), "meta.tn");
         assertEquals(fixtureSynthetics("core-resolved.tn"),
                 ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.CORE_ID), "core.tn");
+        assertEquals(fixtureSynthetics("net-resolved.tn"),
+                ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.NET_ID), "net.tn");
     }
 }

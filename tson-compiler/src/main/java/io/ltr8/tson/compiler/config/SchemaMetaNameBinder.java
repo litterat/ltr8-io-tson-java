@@ -24,14 +24,15 @@ import java.util.Set;
  * io.ltr8.tson.schema.meta.RecordBody}, {@link io.ltr8.tson.schema.meta.ArrayBody}, {@link
  * io.ltr8.tson.schema.meta.MapBody}, {@link io.ltr8.tson.schema.meta.TupleBody}, {@link
  * io.ltr8.tson.schema.meta.EnumBody}, {@link io.ltr8.tson.schema.meta.ChoiceBody}, {@link
- * io.ltr8.tson.schema.meta.TemplateBody}) -- but each of those classes' own {@code @Typename} is the
- * *bare* constructor name (matching the instance side,
+ * io.ltr8.tson.schema.meta.KindBody}, {@link io.ltr8.tson.schema.meta.TemplateBody}) -- but each of those
+ * classes' own {@code @Typename} is the *bare* constructor name (matching the instance side,
  * e.g. {@code RecordBody}'s own is {@code "record"}, not {@code "record_body"}), so this forward
  * (schema-name -> Class) direction needs the {@code "_body"} suffix added explicitly; nothing
  * recovers it mechanically from the bare name alone. A constructor that tightens another -- {@code set_type}
- * over {@code array}, {@code enum} and {@code text_enum} over {@code enum_type} -- needs no entry here: it
+ * over {@code array}, {@code enum} over {@code enum_type} -- needs no entry here: it
  * restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
- * tightens ({@code ValueReaderContext.bindingNamesFor}).
+ * tightens ({@code ValueReaderContext.bindingNamesFor}). {@code namespace => map & {}} composes rather than
+ * tightens, so the fallback does not reach it, and it is mapped here to {@code map}'s body, whose shape it has.
  *
  * <p><b>A handful of real entries resolve to a genuine Java class that isn't a record at all</b> --
  * {@code atom}/{@code product}/{@code sum}/{@code top} (meta-kernel's own empty-bodied base-kind
@@ -61,6 +62,8 @@ public final class SchemaMetaNameBinder {
             Map.entry("map", "map_body"),
             Map.entry("tuple", "tuple_body"),
             Map.entry("choice", "choice_body"),
+            Map.entry("kind_type", "kind_body"),
+            Map.entry("ref_type", "ref_body"),
             Map.entry("enum_type", "enum_body"),
             Map.entry("template", "template_body"),
             Map.entry("datetime_type", "date_time_type"),
@@ -87,8 +90,9 @@ public final class SchemaMetaNameBinder {
 
     /**
      * {@link #defaultContext()} extended with the names a consumer's own <b>meta layer</b> adds -- the
-     * context to resolve a schema against when its governing meta declares constructors of its own
-     * ({@code operation => ~data & { ... }}), whose instances bind to that consumer's Java classes.
+     * context to resolve a schema against when its governing meta declares vocabulary of its own -- a record
+     * {@code operation => { ... }} and a namespace of it, {@code api => namespace & { key_type: = identifier
+     * value_type: = operation }} -- whose values bind to that consumer's Java classes.
      * {@code ProcessorConfig.metaNameBinder} is the front-door route to it.
      *
      * <p>Composition, never replacement: {@link #INSTANCE} answers first and {@code additional} is asked
@@ -96,8 +100,9 @@ public final class SchemaMetaNameBinder {
      * record}/{@code enum}, and cannot lose {@link ResolverBindContext}'s registrations by building a context
      * that forgets them -- what the extension adds is names, and nothing else.
      *
-     * <p>This is the whole seam. A meta-layer constructor needs three things and no more: the meta schema
-     * declaring it, a class carrying {@code @Typename} for it, and a binder that can find that class.
+     * <p>This is the whole seam. A meta layer's record needs three things and no more: the meta schema
+     * declaring it, a class for it ({@code @Typename} only where the binder's convention would not find it),
+     * and a binder that can find that class.
      */
     public static DataBindContext contextExtendedWith(DataNameBinder additional) {
         return context(extendedWith(additional));

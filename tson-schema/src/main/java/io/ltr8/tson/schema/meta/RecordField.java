@@ -15,6 +15,9 @@ import java.util.Optional;
  * role} and {@code value}; a field never written reads {@code optional}, then {@code value} -- and nothing
  * stores what omission yields, which is derived from those two.
  *
+ * <p><b>A field's name is not one of its facts.</b> It is the field's key in {@code record.fields}, an ordered
+ * map ({@link RecordBody#fields}), so the name is said once, by the position that declares it.
+ *
  * <p>Each fact is one mark of §5.2's spelling {@code name?: type? ~ value}: the name's {@code ?} is {@code
  * optional}, the type's is {@code voidable}, and {@code ~}/{@code =} give a {@link FieldRole#DEFAULT} or
  * {@link FieldRole#FIXED} value. Two combinations have no spelling: a FIXED voidable field, whose {@code _}
@@ -24,11 +27,9 @@ import java.util.Optional;
  * <p><b>{@code value} is one slot, and carries a parameter as readily as a literal.</b> Inside a template
  * body a token there is a parameter exactly when its text resolves into the enclosing entry's {@code
  * parameters} (§8.1's shadowing rule), and a closed entry has no parameters for one to resolve into -- so
- * the same slot is unambiguous at both ends and needs no label. A held body is not read as this vocabulary
- * until materialisation has substituted, which is what makes that true; §5.7's fixation (a parametric
- * {@code = P} is a required {@link FieldRole#FREE} field carrying the parameter until its value is concrete,
- * then becomes optional and FIXED) is what the single channel costs and where it is paid. That held state
- * is the one place a FREE field carries a value.
+ * the same slot is unambiguous at both ends and needs no label. The role beside it is the modifier's either
+ * way: {@code = P} is {@link FieldRole#FIXED} where it is written, as {@code = 201} is, and closing substitutes
+ * the value without changing a fact. So a {@link FieldRole#FREE} field never carries a value.
  *
  * <p><b>A field never says it is a discriminator.</b> Which fields a sealed family dispatches on is the
  * enclosing record's own statement ({@code record.discriminators}), because §5.8 flattens a base's fields
@@ -36,8 +37,8 @@ import java.util.Optional;
  * simply states none. What the linker checks of a named field -- required, not voidable, no group member, an
  * atom or enum type, no value of its own, and every subtype pinning it distinctly -- is §5.2's and §5.7's.
  *
- * <p><b>{@code position} is {@code @Unbound}</b>, for the reason {@code TypeDefinition}'s own is: §8.1's
- * {@code record_field} declares no such field, so nothing fills it and the strict binding check would call
+ * <p><b>{@code position} is {@code @Unbound}</b>: §8.1's {@code record_field} declares no such field, so nothing fills it
+ * and the strict binding check would call
  * it a mismatch. It is this implementation's own, kept for diagnostics -- a read reporting against a field
  * locates the pointer at the field ({@code /person/age}) and, without this, could pair it only with the
  * enclosing declaration's line, so six broken fields of one record all pointed at the record. It is
@@ -46,11 +47,12 @@ import java.util.Optional;
  * source position.
  *
  * <p>Excluded from {@link #equals}/{@link #hashCode} on the same footing as {@code annotations}, and for
- * {@code TypeDefinition}'s stated reason: the resolver test suite compares hand-built expected values
+ * the same reason an entry's own position is kept apart from its value ({@code TsonSchema.EntryFacts}): the
+ * resolver test suite compares hand-built expected values
  * against really-resolved ones, and a position in equality would stop two representations of one logical
  * field comparing equal.
  */
-public record RecordField(String name, TypeRef type, boolean optional, boolean voidable, FieldRole role,
+public record RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
                            Optional<Token> value, Annotations annotations,
                            @Unbound Optional<SourcePosition> position) {
 
@@ -61,50 +63,50 @@ public record RecordField(String name, TypeRef type, boolean optional, boolean v
     }
 
     /** Same as the canonical constructor with no position -- every caller that does not know its own source. */
-    public RecordField(String name, TypeRef type, boolean optional, boolean voidable, FieldRole role,
+    public RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
                         Optional<Token> value, Annotations annotations) {
-        this(name, type, optional, voidable, role, value, annotations, Optional.empty());
+        this(type, optional, voidable, role, value, annotations, Optional.empty());
     }
 
     /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
-    public RecordField(String name, TypeRef type, boolean optional, boolean voidable, FieldRole role,
+    public RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
                         Optional<Token> value) {
-        this(name, type, optional, voidable, role, value, Annotations.empty(), Optional.empty());
+        this(type, optional, voidable, role, value, Annotations.empty(), Optional.empty());
     }
 
     /** {@code a: T} -- the key must be written, and {@code _} is refused. */
-    public static RecordField required(String name, TypeRef type) {
-        return new RecordField(name, type, false, false, FieldRole.FREE, Optional.empty());
+    public static RecordField required(TypeRef type) {
+        return new RecordField(type, false, false, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T} -- the key may be omitted, and {@code _} is refused. */
-    public static RecordField optional(String name, TypeRef type) {
-        return new RecordField(name, type, true, false, FieldRole.FREE, Optional.empty());
+    public static RecordField optional(TypeRef type) {
+        return new RecordField(type, true, false, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a: T?} -- the key must be written, and may be written {@code _}. */
-    public static RecordField voidable(String name, TypeRef type) {
-        return new RecordField(name, type, false, true, FieldRole.FREE, Optional.empty());
+    public static RecordField voidable(TypeRef type) {
+        return new RecordField(type, false, true, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T?} -- the key may be omitted, and may be written {@code _}. */
-    public static RecordField optionalVoidable(String name, TypeRef type) {
-        return new RecordField(name, type, true, true, FieldRole.FREE, Optional.empty());
+    public static RecordField optionalVoidable(TypeRef type) {
+        return new RecordField(type, true, true, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T ~ value} -- omission injects {@code value}, and a written value overrides it. */
-    public static RecordField defaulted(String name, TypeRef type, Token value) {
-        return new RecordField(name, type, true, false, FieldRole.DEFAULT, Optional.of(value));
+    public static RecordField defaulted(TypeRef type, Token value) {
+        return new RecordField(type, true, false, FieldRole.DEFAULT, Optional.of(value));
     }
 
     /** {@code a?: T = value} -- omission injects {@code value}, and a written value must equal it. */
-    public static RecordField fixed(String name, TypeRef type, Token value) {
-        return new RecordField(name, type, true, false, FieldRole.FIXED, Optional.of(value));
+    public static RecordField fixed(TypeRef type, Token value) {
+        return new RecordField(type, true, false, FieldRole.FIXED, Optional.of(value));
     }
 
     /** {@code a: T = value} -- a marker: the key must be written, and its value must equal {@code value}. */
-    public static RecordField marker(String name, TypeRef type, Token value) {
-        return new RecordField(name, type, false, false, FieldRole.FIXED, Optional.of(value));
+    public static RecordField marker(TypeRef type, Token value) {
+        return new RecordField(type, false, false, FieldRole.FIXED, Optional.of(value));
     }
 
     /** What a field yields when a document never writes it -- see {@link #omitted}. */
@@ -141,7 +143,7 @@ public record RecordField(String name, TypeRef type, boolean optional, boolean v
 
     /** A copy of this field with {@code annotations} replaced -- every other component unchanged. */
     public RecordField withAnnotations(Annotations annotations) {
-        return new RecordField(name, type, optional, voidable, role, value, annotations, position);
+        return new RecordField(type, optional, voidable, role, value, annotations, position);
     }
 
     /**
@@ -153,24 +155,23 @@ public record RecordField(String name, TypeRef type, boolean optional, boolean v
      * comparing resolved values can catch, since it is excluded from equality.
      */
     public RecordField withType(TypeRef type) {
-        return new RecordField(name, type, optional, voidable, role, value, annotations, position);
+        return new RecordField(type, optional, voidable, role, value, annotations, position);
     }
 
     /** A copy of this field with its presence and role replaced -- every other component unchanged. */
     public RecordField withFacts(boolean optional, boolean voidable, FieldRole role) {
-        return new RecordField(name, type, optional, voidable, role, value, annotations, position);
+        return new RecordField(type, optional, voidable, role, value, annotations, position);
     }
 
     /** A copy of this field with {@code position} replaced -- every other component unchanged. */
     public RecordField withPosition(Optional<SourcePosition> position) {
-        return new RecordField(name, type, optional, voidable, role, value, annotations, position);
+        return new RecordField(type, optional, voidable, role, value, annotations, position);
     }
 
-    /** Excludes {@code annotations}/{@code position} -- neither changes a field's identity, as on {@code TypeDefinition}. */
+    /** Excludes {@code annotations}/{@code position} -- neither changes a field's identity. */
     @Override
     public boolean equals(Object o) {
         return o instanceof RecordField other
-                && Objects.equals(name, other.name)
                 && Objects.equals(type, other.type)
                 && optional == other.optional
                 && voidable == other.voidable
@@ -181,6 +182,6 @@ public record RecordField(String name, TypeRef type, boolean optional, boolean v
     /** Excludes {@code annotations}/{@code position} -- see {@link #equals}. */
     @Override
     public int hashCode() {
-        return Objects.hash(name, type, optional, voidable, role, value);
+        return Objects.hash(type, optional, voidable, role, value);
     }
 }

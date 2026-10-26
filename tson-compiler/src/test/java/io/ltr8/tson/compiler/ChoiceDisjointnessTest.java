@@ -13,12 +13,11 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -26,7 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -43,22 +41,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ChoiceDisjointnessTest {
 
-    private final Map<String, TypeDefinition> namespace = new LinkedHashMap<>();
+    private final Map<String, Top> namespace = new LinkedHashMap<>();
 
     private TypeRef atom(String name, Top body, String... supertypes) {
-        namespace.put(name, new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(supertypes), List.of(), body));
+        namespace.put(name, ((Type) (body)).withSupertypes(List.of(supertypes)));
         return TypeRef.of(name);
     }
 
     private TypeRef product(String name, Top body) {
-        namespace.put(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of(), List.of(), body));
+        namespace.put(name, body);
         return TypeRef.of(name);
     }
 
     private boolean disjoint(TypeRef... variants) {
-        return ChoiceDisjointness.derive(new ChoiceBody(List.of(variants)), namespace, Set.of());
+        return ChoiceDisjointness.derive(new ChoiceBody(List.of(variants)), namespace);
     }
 
     private static IntegerType boundedInteger(Long min, Long max) {
@@ -79,14 +75,14 @@ class ChoiceDisjointnessTest {
     @Test
     void aContainerAndAScalarAreDisjoint() {
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
-        TypeRef p = product("point", RecordBody.of(List.of()));
+        TypeRef p = product("point", RecordBody.of(RecordBody.fieldMap()));
         assertTrue(disjoint(i, p));
     }
 
     @Test
     void aBraceAndABracketVariantAreDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef record = product("point", RecordBody.of(List.of()));
+        TypeRef record = product("point", RecordBody.of(RecordBody.fieldMap()));
         TypeRef array = product("names", new ArrayBody(TypeRef.of("text"), false, true, false,
                 Optional.empty(), Optional.empty()));
         assertTrue(disjoint(record, array));
@@ -177,10 +173,10 @@ class ChoiceDisjointnessTest {
     @Test
     void twoRecordsAreNotDisjointHoweverTheirFieldsDiffer() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef circle = product("circle", RecordBody.of(List.of(
-                RecordField.required("radius", TypeRef.of("text")))));
-        TypeRef square = product("square", RecordBody.of(List.of(
-                RecordField.required("side", TypeRef.of("text")))));
+        TypeRef circle = product("circle", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("radius", RecordField.required(TypeRef.of("text"))))));
+        TypeRef square = product("square", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("side", RecordField.required(TypeRef.of("text"))))));
         assertFalse(disjoint(circle, square));
     }
 
@@ -188,7 +184,7 @@ class ChoiceDisjointnessTest {
     @Test
     void aRecordAndAMapAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
-        TypeRef record = product("point", RecordBody.of(List.of()));
+        TypeRef record = product("point", RecordBody.of(RecordBody.fieldMap()));
         TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), false, false,
                 Optional.empty(), Optional.empty()));
         assertFalse(disjoint(record, map));
@@ -249,10 +245,8 @@ class ChoiceDisjointnessTest {
     void aNestedChoiceVariantMakesTheChoiceNotDisjoint() {
         atom("integer", IntegerType.UNCONSTRAINED);
         atom("text", TextType.UNCONSTRAINED);
-        namespace.put("inner", new TypeDefinition(Optional.empty(), TypeKind.SUM, 
-                List.of(), List.of(),
-                new ChoiceBody(List.of(TypeRef.of("integer"), TypeRef.of("text")))));
-        TypeRef record = product("point", RecordBody.of(List.of()));
+        namespace.put("inner", new ChoiceBody(List.of(TypeRef.of("integer"), TypeRef.of("text"))));
+        TypeRef record = product("point", RecordBody.of(RecordBody.fieldMap()));
         assertFalse(disjoint(TypeRef.of("inner"), record));
     }
 
@@ -262,7 +256,7 @@ class ChoiceDisjointnessTest {
     @Test
     void anAliasVariantClassifiesAsItsTarget() {
         atom("integer", IntegerType.UNCONSTRAINED);
-        namespace.put("my_int", TypeDefinition.reference("integer"));
+        namespace.put("my_int", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("integer")));
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertTrue(disjoint(TypeRef.of("my_int"), t));
         assertFalse(disjoint(TypeRef.of("my_int"), TypeRef.of("integer")));
@@ -270,8 +264,8 @@ class ChoiceDisjointnessTest {
 
     @Test
     void aReferenceCycleHasNoClassSoItsChoiceIsNotDisjoint() {
-        namespace.put("a", TypeDefinition.reference("b"));
-        namespace.put("b", TypeDefinition.reference("a"));
+        namespace.put("a", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("b")));
+        namespace.put("b", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("a")));
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertFalse(disjoint(TypeRef.of("a"), t));
     }

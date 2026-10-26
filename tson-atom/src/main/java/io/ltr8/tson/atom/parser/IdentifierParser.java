@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.schema.meta.IdentifierType;
 
 import java.util.Optional;

@@ -4,8 +4,9 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Reference;
 
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -38,8 +40,8 @@ class ApplicabilityIsIsATopTest {
     private static List<Diagnostic> problems(String declarations) {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s }
                 """.formatted(declarations);
@@ -74,8 +76,8 @@ class ApplicabilityIsIsATopTest {
     void everySpellingOfAnAliasDenotesTheSameEntry() {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   bare    => int32
                   closed  => !reference { target: int32 }
@@ -87,14 +89,14 @@ class ApplicabilityIsIsATopTest {
                 .resolve(source).schema().entries();
 
         for (String name : List.of("bare", "closed", "applied")) {
-            TypeDefinition definition = entries.get(name);
-            assertEquals(TypeKind.REFERENCE, definition.kind(), name);
-            assertEquals("int32", definition.source().orElseThrow().name(), name);
+            Top definition = entries.get(name);
+            assertEquals(EntryKind.REFERENCE, EntryKind.of(definition, n -> true), name);
+            assertEquals("int32", ((Reference) definition).target().name(), name);
         }
         // The open one is a template until it closes, and its kind says so: a template is not a type
         // (§5.10), so it is TEMPLATE rather than the REFERENCE its closure produces. `applied` above is
         // where the REFERENCE appears -- the entry closing it mints.
-        assertEquals(TypeKind.TEMPLATE, entries.get("open").kind());
+        assertEquals(EntryKind.TEMPLATE, EntryKind.of(entries.get("open"), n -> true));
     }
 
     /**
@@ -103,17 +105,15 @@ class ApplicabilityIsIsATopTest {
      * alias. Everything the head is asked (is it a template, is it applicable, what kind does construction
      * transfer, whose vocabulary reads the payload) is a question about the terminal entry.
      *
-     * <p>Asking the alias instead answered every one of them from an empty supertype chain and a {@code
-     * REFERENCE} kind, which is what a hop looks like rather than what it points at. The old {@code
-     * constructor: true} flag had the same hole — it was hardcoded {@code false} on a reference — so this is
-     * a defect the predicate inherited rather than one it introduced.
+     * <p>Asking the alias instead would answer every one of them from an empty supertype chain and a {@code
+     * REFERENCE} kind, which is what a hop looks like rather than what it points at.
      */
     @Test
     void applicationFollowsAnAliasToItsTarget() {
         String meta = """
                 !!id:"https://example.test/m.tn"
-                !!meta:"https://tson.io/2026/37/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
                 {
                   alias_array => array
                   two_hops    => alias_array
@@ -123,8 +123,8 @@ class ApplicabilityIsIsATopTest {
             String user = """
                     !!id:"https://example.test/u.tn"
                     !!meta:"https://example.test/m.tn"
-                    !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
-                    { tags => !%s { element_type: identifier } }
+                    !!import:"https://tson.io/2026/38/m/core.tn"
+                    { tags => !%s { element_type: text } }
                     """.formatted(head);
             List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
                     .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(
@@ -158,15 +158,62 @@ class ApplicabilityIsIsATopTest {
     }
 
     /**
-     * A base kind is admitted by the predicate and refused by its own reader, which is the better answer:
-     * it names the subtypes that would satisfy the position instead of saying the head was the wrong kind
-     * of thing.
+     * A base kind is admitted by the predicate and refused as abstract ([TSON-SCHEMA] §4.1), which is the
+     * better answer: it names the instantiable subtypes that would satisfy the position instead of saying the head
+     * was the wrong kind of thing.
      */
     @Test
     void aBaseKindIsAdmittedAndThenRefusesItself() {
         List<Diagnostic> problems = problems("  bad => !product {}");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("has no data of its own to bind"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("'!product' names an abstract entry"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("(record | array | set_type | map | tuple)"),
+                problems::toString);
+        assertFalse(problems.getFirst().message().contains("constraint vocabulary"),
+                "one sentence, not the applicability clause beside the abstract one: " + problems);
+    }
+
+    /** {@code top}'s refusal names only what can be constructed: {@code type} and the base kinds are abstract too. */
+    @Test
+    void topNamesOnlyItsInstantiableSubtypes() {
+        String message = problems("  bad => !top {}").getFirst().message();
+
+        assertTrue(message.contains("record"), message);
+        for (String abstractKind : List.of("type", "atom", "product", "sum", "namespace", "template")) {
+            assertFalse(message.matches("(?s).*[(| ]" + abstractKind + "[ |)].*"),
+                    () -> abstractKind + " is no answer: " + message);
+        }
+    }
+
+    /**
+     * With nothing in scope composing it, an abstract constructor's refusal says so rather than naming an empty
+     * list: a meta layer's own {@code marker => abstract top & {}}, which nothing composes, applied in a schema it
+     * governs.
+     */
+    @Test
+    void anAbstractConstructorWithNothingComposingItSaysSo() {
+        String meta = """
+                !!id:"https://example.test/marker-meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/38/m/meta.tn"
+                {
+                  marker => abstract top & {}
+                }
+                """;
+        String user = """
+                !!id:"https://example.test/marked.tn"
+                !!meta:"https://example.test/marker-meta.tn"
+                { bad => !marker {} }
+                """;
+        List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(
+                        "https://example.test/marker-meta.tn", meta, "https://example.test/marked.tn", user)))))
+                .validateSchema(user);
+        assertEquals(1, problems.size(), problems::toString);
+        String message = problems.getFirst().message();
+
+        assertTrue(message.contains("no constructor in scope composes 'marker'"), message);
+        assertFalse(message.contains("()"), message);
     }
 }

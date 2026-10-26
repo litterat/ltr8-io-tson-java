@@ -20,7 +20,7 @@ form only; history lives in git.
 - A cache hit takes no lock; a read canonicalizes its schema URI once.
 - A compile with no registry behind it passes `ForeignSchemas.none()`, whose every lookup is `SCHEMA_NOT_PERMITTED`.
 
-Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/meta-layer-data-kind.md`,
+Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/meta-layer-namespaces.md`,
 `design/cli-config-hashing.md`, `design/facades-and-tree.md`.
 
 ## The registries (`tson-compiler/{TsonCompiledMetaRegistry,TsonCompiledSchemaRegistry}.java`)
@@ -36,8 +36,8 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   be compiled — its `!enum`/`!integer` instances are read into `schema.meta` objects during a governed
   schema's resolution) and `resolveLinked(uri) → TsonLinkedSchema` (an `!!import` target or a user schema
   — fetched/resolved/linked/registered but **never compiled** here). `withStandardLibrary(context,
-  source)` builds a core with the four bundled schemas loaded (meta-kernel, meta, core, policy); **core.tn
-  is not a meta** (its `!!meta` is meta.tn) so it is resolve-only here, as policy.tn is — its readers are
+  source)` builds a core with the five bundled schemas loaded (meta-kernel, meta, core, net, policy); **core.tn
+  is not a meta** (its `!!meta` is meta.tn) so it is resolve-only here, as net.tn and policy.tn are — its readers are
   compiled per mode in a read registry when a user schema importing it is read, never standalone in the core.
 - **`TsonCompiledSchemaRegistry`** is a **per-mode registry of compiled user schemas** over a core, built
   via `TsonCompiledSchemaRegistry.tree(core)` / `bind(core, context)`. **The read mode is which registry

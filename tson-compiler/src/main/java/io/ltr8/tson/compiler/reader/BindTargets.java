@@ -5,10 +5,14 @@ import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassMap;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TupleElement;
 
 import java.util.ArrayList;
@@ -32,8 +36,24 @@ import java.util.Optional;
  *       and {@code Map<String, SequencedMap<String, Long>>} each receive what they declare. A void element
  *       cannot reach a primitive array, an ordered map needs a map that keeps insertion order, and a tuple
  *       class needs the tuple's arity and somewhere for each voidable position's void value.</li>
+ *   <li><b>A namespace type's map at a {@link Namespace} target</b> -- a record's {@code fields}, a value of {@code
+ *       field_map} -- is read for the target's {@code entries} and delivered as an instance of the constructor
+ *       ({@link NamespaceInstanceReader}). A map that is no namespace has no constructor to name and cannot fill
+ *       one; a {@code Map} target at a namespace type receives the map.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt.</li>
+ *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
+ *       to judge, whatever the target holds. A {@code Ref} or {@code TypeRef} target at a reference-typed slot
+ *       ({@code ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives
+ *       the value when the schema links, a {@code TypeRef} the name alone. A {@code TypeRef} target at a kind-typed
+ *       slot ({@code record_field.type} is {@code type_kind}, a meta's {@code request: kind<record>}) reads through
+ *       a {@link KindSlotReader}: a type's name, or in a kernel body an application still to close. Any other target
+ *       there is bound as at an atom and wrapped in a {@link RecordedNameReader}, which records the name it read.
+ *       A {@code TypeRef} target at a {@code type_ref} slot is bound by the record reader, its bare token filling
+ *       {@code name} positionally ({@link RecordAbstractReader#bareTokenFillsPositionally}), and recorded in a value
+ *       body ({@link RecordedApplicationReader}). The slot declares the spelling, so a {@code TypeRef} or {@code
+ *       Ref} target is a mismatch at a record-typed slot, which holds the record's value inline, and at any other
+ *       atom, where a token is a literal and never a reference.</li>
  * </ul>
  * The target's bridge, then its {@code Annotated} box, wrap whatever comes out. Anything else -- a dispatcher, a
  * choice, a gap -- is read as it is.
@@ -64,8 +84,84 @@ final class BindTargets {
     static TsonTypeReader<?> to(TsonTypeReader<?> reader, DataClass target, String what, String where, Site site,
                                 boolean top) {
         DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
-        TsonTypeReader<?> bound = shaped(reader, payload, what, where, site, top);
+        TsonTypeReader<?> bound;
+        boolean byName = payload.typeClass() == TypeRef.class || payload.typeClass() == Ref.class;
+        if (byName && readsARef(reader)) {
+            // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
+            // TypeRef -- so the atom's own bridge (Ref's name form) is not applied on top of it.
+            TsonTypeReader<?> named = new ReferenceNameReader(expectedAt(reader, what), payload.typeClass() == Ref.class,
+                    slotAtom(reader).slotType());
+            return AnnotationBoxing.wrap(named, target, site.annotationTypes());
+        } else if (payload.typeClass() == TypeRef.class && readsAKind(reader)) {
+            bound = new KindSlotReader(slotAtom(reader), site.resolver());
+        } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
+            site.mismatches().add(what + " is not a reference, and " + where + " holds a "
+                    + payload.typeClass().getSimpleName() + " -- a value stands by name only at a position typed "
+                    + "ref<T> (and a type's name at one typed by a kind); a position typed by a record holds the "
+                    + "record's value inline, so declare that record's class");
+            bound = reader;
+        } else {
+            bound = shaped(reader, payload, what, where, site, top);
+            if (payload.typeClass() == TypeRef.class) {
+                // A type_ref slot, the application form: in a value body its name or application is recorded for
+                // the linker to judge by resolution and arity, as a kernel body's is judged by the resolver.
+                bound = new RecordedApplicationReader(bound);
+            } else if (readsAKind(reader) || readsARef(reader)) {
+                // A name at a kind or reference is judged whatever the host holds: the host receives its value,
+                // and the name is recorded as a TypeRef host's would be.
+                AtomTypeReader<?> atom = slotAtom(reader);
+                TsonTypeReader<?> refusing = readsARef(reader)
+                        ? new ReferenceNameReader(expectedAt(reader, what), false, atom.slotType())
+                        : new KindSlotReader(atom, site.resolver());
+                bound = new RecordedNameReader(bound, atom.slotType(), refusing);
+            }
+        }
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
+    }
+
+    /** Whether {@code reader} reads a reference ({@code ref<T>}): a token there is a value's qualified name. */
+    private static boolean readsARef(TsonTypeReader<?> reader) {
+        return RecordAbstractReader.unwrapped(reader) instanceof AtomTypeReader<?> atom && atom.readsARef();
+    }
+
+    /**
+     * Whether {@code reader} reads a record position a {@code TypeRef} or {@code Ref} target cannot hold: a record
+     * whose bare token is not positional, or a record position this compile cannot see into (a dispatcher, an
+     * unbuildable type). A {@code type_ref} slot, whose bare token fills {@code name} positionally, is not one.
+     */
+    private static boolean recordHeldByName(TsonTypeReader<?> reader) {
+        return switch (RecordAbstractReader.unwrapped(reader)) {
+            case RecordAbstractReader<?> record -> !record.bareTokenFillsPositionally();
+            case ErrorReader ignored -> true;
+            case RecordTagDispatchReader ignored -> true;
+            case RecordMemberDispatchReader ignored -> true;
+            case null, default -> false;
+        };
+    }
+
+    /** The kind or reference atom {@code reader} reads, through any wrapper. */
+    private static AtomTypeReader<?> slotAtom(TsonTypeReader<?> reader) {
+        return (AtomTypeReader<?>) RecordAbstractReader.unwrapped(reader);
+    }
+
+    /** Whether {@code reader} reads a kind: a token there is a type's name. */
+    private static boolean readsAKind(TsonTypeReader<?> reader) {
+        return RecordAbstractReader.unwrapped(reader) instanceof AtomTypeReader<?> atom && atom.readsAKind();
+    }
+
+    /** Whether {@code reader} reads an atom: a token there is a literal, which no reference can hold. */
+    private static boolean readsAnAtom(TsonTypeReader<?> reader) {
+        return RecordAbstractReader.unwrapped(reader) instanceof AtomTypeReader<?>
+                || RecordAbstractReader.unwrapped(reader) instanceof VoidReader;
+    }
+
+    /** What a position holding a reference by name expects, as its refusal says it: {@code a 'method' value}. */
+    private static String expectedAt(TsonTypeReader<?> reader, String what) {
+        return switch (RecordAbstractReader.unwrapped(reader)) {
+            case RecordAbstractReader<?> record -> "a '" + record.displayName + "' value";
+            case AtomTypeReader<?> atom when atom.readsARef() -> "a '" + atom.refOf() + "' value";
+            case null, default -> "a value for " + what;
+        };
     }
 
     private static TsonTypeReader<?> shaped(TsonTypeReader<?> reader, DataClass target, String what, String where,
@@ -135,6 +231,9 @@ final class BindTargets {
 
     private static TsonTypeReader<?> map(MapBindReader map, DataClass target, String what, String where, Site site,
                                          boolean top) {
+        if (target.typeClass() == Namespace.class) {
+            return namespace(map, target, what, where, site, top);
+        }
         if (!(target instanceof DataClassMap keyed)) {
             site.mismatches().add(what + " is a map, and " + where + " binds " + target.typeClass().getName());
             return map;
@@ -149,7 +248,27 @@ final class BindTargets {
         TsonTypeReader<?> value = to(site.resolver().resolve(map.body.valueType().name()), keyed.valueDataClass(),
                 what + "'s value", targetName + "'s value", site, false);
         return new MapBindReader(top ? site.field() : map.name, top ? site.field() : map.displayName, map.body,
-                keyed, key, value, map.schemaLocation, map.keysAreNames);
+                keyed, key, value, map.schemaLocation, map.keysAreNames, map.namespace);
+    }
+
+    /**
+     * A namespace type's value at a target holding a {@link Namespace}: the map read for the namespace's own
+     * {@code entries}, as an instance of the constructor the position names. A map that is no namespace has no
+     * constructor to name, so a {@code Namespace} target there is a mismatch.
+     */
+    private static TsonTypeReader<?> namespace(MapBindReader map, DataClass target, String what, String where,
+                                               Site site, boolean top) {
+        if (map.namespace == null) {
+            site.mismatches().add(what + " is a map that is no namespace, and " + where + " binds "
+                    + Namespace.class.getName() + ", a value of a namespace type -- declare a map");
+            return map;
+        }
+        if (!(target instanceof DataClassRecord record) || !record.fieldIndex().containsKey("entries")) {
+            throw new IllegalStateException(Namespace.class.getName() + " binds as " + target
+                    + ", which has no 'entries' to read the map into");
+        }
+        DataClass entries = record.fields()[record.fieldIndex().get("entries")].dataClass();
+        return new NamespaceInstanceReader(map.namespace, map(map, entries, what, where, site, top));
     }
 
     /**

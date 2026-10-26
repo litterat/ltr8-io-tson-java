@@ -70,6 +70,21 @@ class SchemalessValidationTest {
         assertEquals(List.of(), validate("{ name: \"a\"  hallucinated_field: \"nope\" }"));
     }
 
+    /**
+     * A document naming a schema has field names of that schema's types ([TSON-DATA] §2.5), which a Class 1
+     * read cannot know, so it holds them to no name rule -- where a schemaless document's field names are
+     * identifiers, and {@code "@id"} there is a resolver error at its own pointer.
+     */
+    @Test
+    void aClass1ReadLeavesASchemaBoundDocumentsFieldNamesToTheSchema() {
+        assertEquals(List.of(), validate("""
+                !!schema:"https://example.test/names.tn"
+                { "@id": "x"  "first name": "y"  inner: { "$ref": "z" } }"""));
+        List<Diagnostic> schemaless = validate("{ \"@id\": \"x\" }");
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID), schemaless.stream().map(Diagnostic::code).toList());
+        assertEquals("/@id", schemaless.getFirst().path().orElseThrow());
+    }
+
     @Test
     void aBadBuiltinAtomIsRefusedByItsOwnFamilyWithAPath() {
         List<Diagnostic> diagnostics = validate("{ id: !uuid nope  count: !int32 twelve }");
@@ -220,7 +235,7 @@ class SchemalessValidationTest {
     void aSchemaDocumentWhereDataWasExpectedIsADiagnostic() {
         List<Diagnostic> diagnostics = validate("""
                 !!id:"https://example.test/s-1.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 point => { x: int32 }""");
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, diagnostics.getFirst().code());

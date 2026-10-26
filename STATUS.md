@@ -2,8 +2,8 @@
 
 ← back to the [README](README.md)
 
-Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/37/tson-part1-data.md,
-and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/37/tson-part2-schema.md
+Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/38/tson-part1-data.md,
+and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/38/tson-part2-schema.md
 
 This is the spec's first implementation. Issues and ambiguities found in the spec while implementing are
 tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
@@ -17,11 +17,21 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, and `integer` with its bounds
 - [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`
 - [x] Identifier/network/text types — `uuid`, `uri`, `uri_reference`, `iri`, `iri_reference`, `ipv4`, `ipv6`, `cidr4`,
-      `cidr6`, `mac`, `email`, `text`, `regex` (RFC 9485 I-Regexp)
+      `cidr6`, `mac`, `hostname`, `host`, `media_type`, `email`, `text`, `regex` (RFC 9485 I-Regexp); the network
+      types, `hostname`, `host` and `media_type` are `net.tn`'s, a library a schema imports beside core
+      (Part 1 §5.5, §5.6; Part 2 §9), `hostname` is IDNA2008's, in either label form, and `media_type` is RFC 6838's,
+      with RFC 9110 parameters
 - [x] Binary type — `bytes`, with its encoding (`base64`, `base64url`, `base32`, `hex`) chosen by the type
 - [x] Temporal types — `date`, `time`, `datetime`, `duration`, `period`
 - [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain
       enums, sealed interfaces/unions
+- [x] Typed field names — `record.name_type` names the identifier family a record's field names belong to, as
+      `enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
+      judged under its own name type in both encodings (Part 2 §5.2)
+- [x] Kinds — `kind<uuid_type>`, or `!kind_type { of: uuid_type }`, is the atom whose values are the names of the
+      types in the schema's closure built with a constructor: its members are computed at link, never listed, and a
+      value is a type name that must name one, in both encodings. The kernel types `enum_type.name_type` and
+      `record.name_type` by its `identifier_kind`, and judges a name type by membership (Part 2 §4.2)
 - [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
       opt-in carrier component
 - [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above,
@@ -52,7 +62,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       the specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
       directives during resolution, flattens argument-bearing type references into real named
-      entries, merges `!!import`s, validates every reference in a schema actually resolves, and
+      entries, merges `!!import`s (each standing at the importer's governing level, kernel-governed or
+      ordinary), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated

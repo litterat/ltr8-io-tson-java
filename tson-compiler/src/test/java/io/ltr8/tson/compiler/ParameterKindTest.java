@@ -9,7 +9,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.List;
 
@@ -39,8 +38,8 @@ class ParameterKindTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -62,9 +61,9 @@ class ParameterKindTest {
 
     /** An entry's body with every {@code REFERENCE} hop followed. */
     private static Top bodyOf(TsonCompiledSchema compiled, String name) {
-        Top body = compiled.schema().entries().get(name).body();
+        Top body = compiled.schema().entries().get(name);
         while (body instanceof Reference reference) {
-            body = compiled.schema().entries().get(reference.target().name()).body();
+            body = compiled.schema().entries().get(reference.target().name());
         }
         return body;
     }
@@ -88,7 +87,7 @@ class ParameterKindTest {
     }
 
     /**
-     * And the classification reaches {@code source}, which is what the linker validates: an argument recorded
+     * And the classification reaches the application the instantiation records: an argument recorded
      * as a value is not a name anything looks up. §8.2 records a value argument "as written", so the token
      * keeps its spelling.
      */
@@ -98,12 +97,12 @@ class ParameterKindTest {
                   e   => <M> !enum { members: [a b M] }
                   use => e<c>""");
 
-        // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose `source`
-        // records the application. Following its body would be wrong here: an open-instance template closes
+        // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose facts
+        // record the application. Following its body would be wrong here: an open-instance template closes
         // to a *synthetic* named for the form, which the instantiation references, and a synthetic's source
         // is the bare constructor with no arguments at all.
         String instantiation = "use";
-        TypeArgument argument = compiled.schema().entries().get(instantiation).source().orElseThrow()
+        TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 
         assertEquals("c", assertInstanceOf(TypeArgument.Value.class, argument).value().text());
@@ -116,12 +115,12 @@ class ParameterKindTest {
                   arr => <T> !array { element_type: T }
                   use => arr<int32>""");
 
-        // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose `source`
-        // records the application. Following its body would be wrong here: an open-instance template closes
+        // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose facts
+        // record the application. Following its body would be wrong here: an open-instance template closes
         // to a *synthetic* named for the form, which the instantiation references, and a synthetic's source
         // is the bare constructor with no arguments at all.
         String instantiation = "use";
-        TypeArgument argument = compiled.schema().entries().get(instantiation).source().orElseThrow()
+        TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 
         assertEquals("int32", assertInstanceOf(TypeArgument.Ref.class, argument).ref().name());
@@ -141,7 +140,7 @@ class ParameterKindTest {
             String message = rejected(declaration);
 
             assertTrue(message.contains("parameter 'T' stands where"), message);
-            assertTrue(message.contains("neither a type reference nor a scalar"), message);
+            assertTrue(message.contains("neither a kind of type nor a scalar"), message);
         }
     }
 
@@ -175,9 +174,9 @@ class ParameterKindTest {
                   weird => <T> [weird<T>]
                   use   => { w: weird<text> }""");
 
-        String instantiation = ((RecordBody) compiled.schema().entries().get("use").body())
-                .fields().getFirst().type().name();
-        TypeArgument argument = compiled.schema().entries().get(instantiation).source().orElseThrow()
+        String instantiation = ((RecordBody) compiled.schema().entries().get("use"))
+                .fields().values().iterator().next().type().name();
+        TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 
         assertEquals("text", assertInstanceOf(TypeArgument.Ref.class, argument).ref().name());
@@ -203,8 +202,8 @@ class ParameterKindTest {
                   t  => <M> { a?: st ~ M }
                   x  => t<red> & { b: text }""");
 
-        TypeDefinition composed = compiled.schema().entries().get("x");
-        assertEquals(List.of("a", "b"), ((RecordBody) composed.body()).fields()
-                .stream().map(io.ltr8.tson.schema.meta.RecordField::name).toList());
+        Top composed = compiled.schema().entries().get("x");
+        assertEquals(List.of("a", "b"), ((RecordBody) composed).fields()
+                .keySet().stream().toList());
     }
 }

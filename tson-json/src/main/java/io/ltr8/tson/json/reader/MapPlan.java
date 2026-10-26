@@ -3,7 +3,7 @@ package io.ltr8.tson.json.reader;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.base.diagnostics.MapDiagnostics;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
+import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -12,7 +12,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.math.BigInteger;
 import java.util.Optional;
@@ -36,7 +36,7 @@ import java.util.Optional;
  *       §8.3's class-stability leaks.</li>
  * </ul>
  *
- * <p><b>Nothing is reserved at a map position</b> (§3.2): keys are data, not names, so {@code "$schema"} under
+ * <p><b>The three mean nothing at a map position</b> (§3.2): keys are data, not names, so {@code "$schema"} under
  * {@code {text => text}} is an ordinary key. §8.3.1's escape is for a map standing as a choice variant, and
  * belongs to the choice reader.
  */
@@ -45,13 +45,13 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
                JsonTypeReader<?> schemaKey, JsonTypeReader<?> schemaValue, MapDiagnostics rules,
                IdentifierProfile keyProfile) {
 
-    static MapPlan of(String name, TypeDefinition definition, ValueReaderContext context) {
-        MapBody body = (MapBody) definition.body();
+    static MapPlan of(String name, Top definition, ValueReaderContext context) {
+        MapBody body = (MapBody) definition;
         // The name the author wrote, not the entry the resolver minted: `{text => int32}` rather than a
         // content-derived `map_text_int32_...`, which appears in neither the schema nor the document.
-        String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
+        String displayName = EntryDisplayName.of(name, context.schema());
         AtomType<?> keyParser = scalarKeyParser(context.linked(), body.keyType().name()).orElse(null);
-        return new MapPlan(displayName, context.locationOf(name, definition),
+        return new MapPlan(displayName, context.locationOf(name),
                 body.voidable(), body.ordered(), body.minItems(), body.maxItems(), keyParser,
                 keyParser == null ? context.readers().resolve(body.keyType().name()) : null,
                 context.readers().resolve(body.valueType().name()), new MapDiagnostics(displayName),
@@ -70,7 +70,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
     /** {@code K}'s identifier profile when it is an identifier family, else {@code null}. */
     private static IdentifierProfile keyProfile(TsonSchema schema, String keyTypeName) {
         return ReferenceChain.terminal(schema, keyTypeName)
-                .map(terminal -> terminal.definition().body() instanceof IdentifierType identifier
+                .map(terminal -> terminal.definition() instanceof IdentifierType identifier
                         ? identifier.profile() : null)
                 .orElse(null);
     }
@@ -94,7 +94,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
     private static Optional<AtomType<?>> scalarKeyParser(TsonLinkedSchema linked, String keyTypeName) {
         ReferenceChain.Resolved terminal = ReferenceChain.terminal(linked.schema(), keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
-        return terminal.definition().body() instanceof Atom atom
+        return terminal.definition() instanceof Atom atom
                 ? AtomParsers.forType(atom, linked.enumForm(terminal.name()))
                 : Optional.empty();
     }

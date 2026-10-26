@@ -20,18 +20,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class VoidVocabularyTest {
 
-    private static final String ID = "https://example.test/2026/37/void-vocabulary-1.tn";
+    private static final String ID = "https://example.test/2026/38/void-vocabulary-1.tn";
     private static final String SCHEMA = """
-            !!id:"https://example.test/2026/37/void-vocabulary-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!id:"https://example.test/2026/38/void-vocabulary-1.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               slots   => !array { element_type: int32  voidable: true }
               entries => !map { key_type: text  value_type: int32  voidable: true }
               pair    => !tuple { elements: [{ element_type: int32 } { element_type: text  voidable: true }] }
               one     => { only: voidable_tuple1<int32> }
-              contact => !record { fields: [ { name: email  type: text  optional: true }
-                                             { name: phone  type: text  optional: true } ]
+              contact => !record { fields: { email => { type: text  optional: true }
+                                             phone => { type: text  optional: true } }
                                    groups: [ { members: [[email] [phone]]  optional: true } ] }
             }
             """;

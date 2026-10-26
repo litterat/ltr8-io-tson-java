@@ -1,6 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 
 /**
  * A family whose constructor composes {@code text_type}: its value is a token's text put into the

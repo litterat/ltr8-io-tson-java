@@ -13,8 +13,7 @@ import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -44,11 +43,10 @@ class DuplicateFieldTest {
 
     @Test
     void aMalformedFirstOccurrenceStillReportsEvenThoughTheValidSecondOccurrenceWins() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), new IntegerType(new IntegerSize(8, true))));
-        entries.put("holder", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("value", TypeRef.of("int8"))))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("int8", new IntegerType(new IntegerSize(8, true)));
+        entries.put("holder", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("value", RecordField.required(TypeRef.of("int8"))))));
         TsonSchema schema = new TsonSchema("https://example.test/dup-field.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
@@ -75,11 +73,10 @@ class DuplicateFieldTest {
      */
     @Test
     void everyRepeatIsReported() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), new IntegerType(new IntegerSize(8, true))));
-        entries.put("holder", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("value", TypeRef.of("int8"))))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("int8", new IntegerType(new IntegerSize(8, true)));
+        entries.put("holder", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("value", RecordField.required(TypeRef.of("int8"))))));
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(new TsonSchema(
                 "https://example.test/dup-field.tn", "https://example.test/meta.tn", List.of(), entries)));
         DiagnosticsCollector problems = new DiagnosticsCollector();

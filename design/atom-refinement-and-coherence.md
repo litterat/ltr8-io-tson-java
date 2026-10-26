@@ -25,7 +25,7 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   what a token means rather than narrowing the values, so no refinement moves it. Its members are judged as values in
   the form, and two that are one value are refused.
 - `members` against `pattern` is checked on the family with the length facets — one rule, one place. `tson-schema`
-  depends on `tson-regex` for it; the engine is an internal library like any other.
+  depends on `ltr8-regex` for it; the engine is an internal library like any other.
 
 Related: `design/schema-resolution.md` (the resolution phase and its exception boundary),
 `design/constructor-application.md` (what makes an entry an atom instance), `design/template-materialisation.md`
@@ -106,7 +106,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   - **`text_type.members` answers to every facet beside it, in one place.** `TextType.coherenceCheck` judges
     every member against the length facets and against the `pattern` — one rule ("every member satisfies the
     other facets on the same body"), not split by which engine each half needs, which is why `tson-schema`
-    depends on `tson-regex`. `uri_type`/`regex_type`/`email_type` reach it through `textConstraints()`, the
+    depends on `ltr8-regex`. `uri_type`/`regex_type`/`email_type` reach it through `textConstraints()`, the
     same delegation their length rule already uses.
   - Unchecked by design, each documented on its class and matching that family's existing narrowing gap:
     `pattern` emptiness and selector facets. `duration_type` and `period_type` bounds are compared as the values
@@ -115,7 +115,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     `AtomCoherence.checkNetworks`: the facets are typed `[value]` in meta.tn and must stay so (they list
     networks, and meta declares no network instance to type them by — core.tn does, and core imports meta),
     so they arrive as text and the family that owns the rule is the only place that can judge them. That is
-    why the `CidrNetwork` pair and `InternetAddress` sit beneath `tson-schema`, in `tson-net`: a check in the linker or the
+    why the `CidrNetwork` pair and `InternetAddress` sit beneath `tson-schema`, in `ltr8-net`: a check in the linker or the
     resolver would be a second home for one family's rule, which is what `Atom.coherenceCheck` exists to
     prevent. **The pair's own emptiness is judged there too** (`checkAdmitsAValue`): an `excluding` set
     covering every network `within` permits admits nothing, which is `{ min: 10 max: 3 }` with a different

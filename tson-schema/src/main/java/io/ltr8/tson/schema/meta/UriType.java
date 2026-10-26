@@ -1,8 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,13 +39,33 @@ import java.util.Optional;
  * !uri_reference ^ { allow_relative: false }} to {@link #URI}.
  */
 @Typename(name = "uri_type")
-public record UriType(String spec, @Field("min_length") Optional<Integer> minLength,
+public record UriType(TypeChain chain,
+        String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
                       Optional<Integer> length, Optional<String> pattern,
                       Optional<List<String>> members, Optional<List<String>> schemes,
                       @Field("allow_relative") boolean allowRelative,
                       @Field("allow_fragment") boolean allowFragment,
                       Normalization normalization) implements Atom, TextFamily {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public UriType {
+        chain = TypeChain.orEmpty(chain);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public UriType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+            Optional<String> pattern, Optional<List<String>> members, Optional<List<String>> schemes, boolean allowRelative,
+            boolean allowFragment, Normalization normalization) {
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, schemes, allowRelative,
+                allowFragment, normalization);
+    }
+
+    @Override
+    public UriType withChain(TypeChain chain) {
+        return new UriType(chain, spec, minLength, maxLength, length, pattern, members, schemes,
+                allowRelative, allowFragment, normalization);
+    }
 
     /** RFC 3986, the one {@code spec} every {@code uri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3986";

@@ -4,7 +4,9 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 
@@ -21,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * has nothing to do with {@code result<int32>}.
  *
  * <p><b>The edge cannot be minted where the author writes it.</b> At {@code ok}'s declaration {@code
- * result<T>} denotes no entry -- a template is not a type (§5.10) -- so the contract index has nothing to
- * name. What the declaration keeps is the application itself, {@code record.supertypes} being a
+ * result<T>} denotes no entry -- a template is not a type (§5.10) -- so there is nothing to name in a chain.
+ * What the held body keeps is the application itself as a written parent, {@code supertypes} being a
  * {@code [type_ref]} channel, and materialisation substitutes and closes it with the rest of the held body.
  *
  * <p><b>Why a reference and not the head name.</b> §5.8 describes {@code supertypes} as recording head names
@@ -38,8 +40,8 @@ class SubtypeTemplateFamilyTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/subtype-template.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -61,7 +63,7 @@ class SubtypeTemplateFamilyTest {
      * already named the same application.
      */
     private static String target(TsonCompiledSchema compiled, String alias) {
-        return compiled.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
                 ? ref.target().name() : alias;
     }
 
@@ -80,39 +82,37 @@ class SubtypeTemplateFamilyTest {
         String base = target(compiled, "result_of");
 
         assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "err_of")),
-                compiled.schema().entries().get(base).subtypes(),
-                () -> base + ": " + compiled.schema().entries().get(base).subtypes());
-        // Each is also a declared member of its own template's family (§8.2's entry shape).
-        assertEquals(List.of(base, "ok"), compiled.schema().entries().get(target(compiled, "ok_of")).supertypes());
-        assertEquals(List.of(base, "err"), compiled.schema().entries().get(target(compiled, "err_of")).supertypes());
+                TypeChain.subtypesOf(compiled.schema().entries().get(base)),
+                () -> base + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(base)));
+        // Each is also a declared member of its own template's family (§8.2's entry shape), and the chain is
+        // complete: IS-A result_of, which is a member of result's family, so IS-A result too.
+        assertEquals(List.of("ok", "result", base),
+                TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))));
+        assertEquals(List.of("err", "result", base),
+                TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "err_of"))));
     }
 
     /**
-     * <b>A family-base template <em>is</em> one of its base's subtypes</b> (§5.10).
-     * A template carrying {@code extension} is a type by the only test that matters -- something can stand
-     * at it, namely a value of one of its instantiations -- so the reverse index credits it beside the
-     * instantiations that close from it, and a position typed {@code base} admits a value tagged as the
-     * template's family.
-     *
-     * <p>The instantiations are indexed too, through their own {@code supertypes}: both edges exist and they
-     * say different things. The template's says "this family composes onto base"; each instantiation's says
-     * "this closed type does".
+     * <b>A family-base template is IS-A its parents, and so are its instantiations</b> ([TSON-SCHEMA] §4.1). A
+     * record template carries a chain: it holds {@code base} as written and as reached, which puts the
+     * template in {@code base.subtypes} as any record composing {@code base} is, and every instantiation closing
+     * from it completes the same parents into a chain naming {@code base}.
      */
     @Test
-    void aFamilyBaseTemplateIsIndexedAsASubtypeOfItsBase() {
+    void aFamilyBaseTemplatesInstantiationsAreIndexedUnderItsBase() {
         TsonCompiledSchema compiled = compile("""
                   base     => { x: int32 }
                   box      => <V> base & { item: V }
                   box_text => box<text>
                 """);
-        TypeDefinition baseEntry = compiled.schema().entries().get("base");
+        Top baseEntry = compiled.schema().entries().get("base");
 
-        assertTrue(baseEntry.subtypes().contains(target(compiled, "box_text")),
-                () -> "the instantiation is indexed: " + baseEntry.subtypes());
-        assertTrue(baseEntry.subtypes().contains("box"),
-                () -> "and so is the family base it closes from: " + baseEntry.subtypes());
-        assertEquals(List.of("base"), compiled.schema().entries().get("box").supertypes(),
-                "the template keeps its own composition edge -- materialisation reads it");
+        assertTrue(TypeChain.subtypesOf(baseEntry).contains(target(compiled, "box_text")),
+                () -> "the instantiation is indexed: " + TypeChain.subtypesOf(baseEntry));
+        assertTrue(TypeChain.subtypesOf(baseEntry).contains("box"),
+                () -> "the template is IS-A its parent too: " + TypeChain.subtypesOf(baseEntry));
+        assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(compiled.schema().entries().get("box")),
+                "the open record keeps its parent as written, which closing completes");
     }
 
     /**
@@ -129,11 +129,11 @@ class SubtypeTemplateFamilyTest {
         String intBase = target(compiled, "result_int");
 
         assertFalse(textBase.equals(intBase), "two instantiations, two entries");
-        assertTrue(compiled.schema().entries().get(intBase).subtypes().contains(target(compiled, "ok_int")));
-        assertFalse(compiled.schema().entries().get(intBase).subtypes().contains(target(compiled, "ok_of")),
-                () -> intBase + ": " + compiled.schema().entries().get(intBase).subtypes());
-        assertFalse(compiled.schema().entries().get(textBase).subtypes().contains(target(compiled, "ok_int")),
-                () -> textBase + ": " + compiled.schema().entries().get(textBase).subtypes());
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get(intBase)).contains(target(compiled, "ok_int")));
+        assertFalse(TypeChain.subtypesOf(compiled.schema().entries().get(intBase)).contains(target(compiled, "ok_of")),
+                () -> intBase + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(intBase)));
+        assertFalse(TypeChain.subtypesOf(compiled.schema().entries().get(textBase)).contains(target(compiled, "ok_int")),
+                () -> textBase + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(textBase)));
     }
 
     /** Three levels deep, each hop minted as its own instantiation closes -- the chain is transitive. */
@@ -148,10 +148,10 @@ class SubtypeTemplateFamilyTest {
                   great_of  => great<text>
                 """);
 
-        assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "result_of"), "great"),
-                compiled.schema().entries().get(target(compiled, "great_of")).supertypes(),
-                "the direct parent, then the chain it already carried");
-        assertTrue(compiled.schema().entries().get(target(compiled, "result_of")).subtypes()
+        assertEquals(List.of("great", "ok", target(compiled, "ok_of"), "result", target(compiled, "result_of")),
+                TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "great_of"))),
+                "the direct parent, then the chain it already carried, complete");
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get(target(compiled, "result_of")))
                 .contains(target(compiled, "great_of")), "and the base indexes the grandchild");
     }
 
@@ -166,15 +166,15 @@ class SubtypeTemplateFamilyTest {
                   ok_of     => ok<text>
                 """);
 
-        assertEquals(List.of("tagged", target(compiled, "result_of"), "ok"),
-                compiled.schema().entries().get(target(compiled, "ok_of")).supertypes(),
+        assertEquals(List.of("ok", "result", target(compiled, "result_of"), "tagged"),
+                TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
                 "tagged arrives with the template's own chain; the instantiation is minted here");
     }
 
     /**
      * §5.9 against a subtype template. Subtraction revokes IS-A for every parent, so the closed entry gets no
-     * edge -- and the application is not kept as lineage either, where a name would be: a name in a body whose
-     * contract was emptied is inert, and an application closes into a live edge one pass later.
+     * edge to it -- and the application is not kept either: a subtracted record is a record with an empty chain,
+     * and an application kept would close into a live edge one pass later.
      */
     @Test
     void subtractionRevokesTheEdgeAnApplicationWouldOtherwiseMint() {
@@ -186,13 +186,12 @@ class SubtypeTemplateFamilyTest {
                 """);
         String thin = target(compiled, "thin_of");
 
-        assertEquals(List.of("payload"), ((RecordBody) compiled.schema().entries().get(thin).body()).fields()
-                .stream().map(f -> f.name()).toList(), "the subtraction really ran");
+        assertEquals(List.of("payload"), ((RecordBody) compiled.schema().entries().get(thin)).fields()
+                .keySet().stream().toList(), "the subtraction really ran");
         // Not IS-A result: the only edge is to thin, whose declared member thin_of is (§8.2's entry shape).
-        assertEquals(List.of("thin"), compiled.schema().entries().get(thin).supertypes(), "contract: broken");
-        assertEquals(List.of(), ((RecordBody) compiled.schema().entries().get(thin).body()).supertypes(),
-                "and nothing left in the body to close into one");
-        assertEquals(List.of(), compiled.schema().entries().get(target(compiled, "result_of")).subtypes());
+        assertEquals(List.of("thin"), ((RecordBody) compiled.schema().entries().get(thin)).supertypes(),
+                "contract: broken, and no application left in the chain to close into an edge");
+        assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get(target(compiled, "result_of"))));
     }
 
     /** The template itself is untouched: it has no instantiation of its parent to be IS-A. */
@@ -200,8 +199,8 @@ class SubtypeTemplateFamilyTest {
     void theOpenTemplateNamesNoParentInItsOwnContractIndex() {
         TsonCompiledSchema compiled = compile(FAMILY);
 
-        TypeDefinition ok = compiled.schema().entries().get("ok");
-        assertEquals(List.of(), ok.supertypes(),
-                () -> "result is a template and nothing is IS-A one: " + ok.supertypes());
+        Top ok = compiled.schema().entries().get("ok");
+        assertEquals(List.of(), TypeChain.supertypesOf(ok),
+                () -> "result is a template and nothing is IS-A one: " + TypeChain.supertypesOf(ok));
     }
 }

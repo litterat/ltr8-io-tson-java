@@ -6,12 +6,12 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.base.BindMismatchException;
-import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +35,7 @@ import java.util.List;
 final class BindGroupUnionBuilder implements RecordBuilder {
 
     /** The record at {@code name} bound to {@code union} as a labelled choice, or the mismatch that stops it. */
-    static JsonTypeReader<?> reader(String name, TypeDefinition definition, ValueReaderContext context,
+    static JsonTypeReader<?> reader(String name, Top definition, ValueReaderContext context,
                                    DataBindContext binding, DataClassUnion union) {
         RecordPlan plan = new RecordPlan(name, definition, context);
         DataClassRecord[] members = new DataClassRecord[plan.names.length];
@@ -71,7 +71,7 @@ final class BindGroupUnionBuilder implements RecordBuilder {
             for (int i = 0; i < readers.length; i++) {
                 String component = members[i].fields()[0].name();
                 readers[i] = BindTargets.to(readers[i], members[i].fields()[0].dataClass(), "field '"
-                        + plan.fields[i].name() + "'", "component '" + component + "' of "
+                        + plan.declaredNames[i] + "'", "component '" + component + "' of "
                         + members[i].typeClass().getSimpleName(), mismatches);
             }
         }
@@ -86,8 +86,8 @@ final class BindGroupUnionBuilder implements RecordBuilder {
     }
 
     /** What stops the record's own shape being a labelled choice for {@code union}, or null where nothing does. */
-    private static String shapeMismatch(RecordPlan plan, TypeDefinition definition, DataClassUnion union) {
-        List<FieldGroup> groups = ((RecordBody) definition.body()).groups();
+    private static String shapeMismatch(RecordPlan plan, Top definition, DataClassUnion union) {
+        List<FieldGroup> groups = ((RecordBody) definition).groups();
         if (groups.size() != 1) {
             return "the record has " + groups.size() + " groups";
         }

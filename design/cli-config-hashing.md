@@ -27,8 +27,8 @@ Related: `design/readers-and-diagnostics.md` (the `Diagnostic` model and codes t
 
 ## Bundled schema documents (`tson-schema/TsonBundledSchemas.java`)
 
-The published identities of the four bundled schemas (`META_KERNEL_ID`/`META_ID`/`CORE_ID`/`POLICY_ID`) **and** their
-raw source text (`fetch(uri)`), off `tson-schema`'s classpath — the `.tn` resources are copied from
+The published identities of the five bundled schemas (`META_KERNEL_ID`/`META_ID`/`CORE_ID`/`NET_ID`/`POLICY_ID`) **and**
+their raw source text (`fetch(uri)`), off `tson-schema`'s classpath — the `.tn` resources are copied from
 `spec/m/` at build time (`processResources`), so there's one copy on disk to keep in sync with the spec.
 `fetch` is a static method rather than a `SchemaSource` instance (`tson-base`'s `base.source`, a functional
 interface of the same shape), so a caller needing one passes the method reference
@@ -66,7 +66,7 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
   never change so the pin stays valid).
 - **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read, never
   to load: the `!!id`, header pins and the documentary annotations go — `@doc`, `@title`, `@examples` and `@comment` — the
-  spec library's `!!meta`/`!!import` shorten to `"37/core"`, and each directive and declaration gets one line.
+  spec library's `!!meta`/`!!import` shorten to `"38/core"`, and each directive and declaration gets one line.
   `--keep-docs` (`stripKeepingDocs`) keeps the three written for the schema's readers and still drops `@comment`, which is
   for its maintainers. It never re-pins and never rewrites the file — the output claims no identity, because its bytes are
   not the published document's. **Whitespace collapses to one space and is never removed**, so tokens that touched still
@@ -84,10 +84,16 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 
 ## CLI (`tson-cli`)
 
-`tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
-as schema or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document),
-exposes the schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
-`!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless.
+`tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each as schema
+or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document), exposes the
+schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the `!!schema` URI
+selects the schema, the root type-ref selects the type, no `!!schema` means schemaless. **Every schema file loads
+before any document is read** (`Tson.validateSchema`), so a schema that does not load is known to be the schema's
+fault, not a document's. A document naming it is skipped unread, and its report is `UNDETERMINED`, carrying the
+schema's diagnostics — reporting them as the document's `REJECTED` would claim a check never made — while every other
+document is judged as usual, so one broken schema in a batch costs only the documents that need it. Such a run exits
+2, ranked below 70 and 78 only: the schema file is the runner's to fix before anything else means much. A `--schema`
+that does not load binds every JSON input, so it fails the run before any is read.
 **A TSON data document is fully self-describing, so it takes no `--type`**; `--schema`/`--type` exist for JSON
 inputs alone, which can name neither for themselves ("JSON inputs" below).
 
@@ -128,7 +134,7 @@ reading messages. `compile` renders a bare `ValidationReport` instead, having on
 name. Every file's report is collected before anything prints, since the envelope's outcome is taken across
 them: `REJECTED` if any file is, else `UNDETERMINED` if any file is, else `ACCEPTED`.
 
-**`outcome` answers "will this be accepted" (SPEC-FEEDBACK.md #1)**: `ACCEPTED`; `REJECTED` for an invalidity
+**`outcome` answers "will this be accepted" ([TSON-DATA] §8.1)**: `ACCEPTED`; `REJECTED` for an invalidity
 or a refusal under this processor's §8.2 policy or §9.1 limits, one rejection settling it whatever else went
 unjudged; `UNDETERMINED` where nothing rejected the document but something could not be judged. Which kind a
 rejection was is each diagnostic's code (`Code.verdict()`, `Code.isRefusal()`).

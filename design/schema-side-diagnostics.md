@@ -96,7 +96,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
   javac's error-type contract (it answers every question) rather than Swift's (every questioner must check
   first), and the choice is load-bearing: a `Sum`-bodied placeholder makes `parent => child & { ... }` fail
   *because* `child` did, reporting a consequence beside its cause. Swift's other half is kept — producing one
-  means a diagnostic was already reported. It never escapes a reporting resolve, so it needs no `TypeKind`
+  means a diagnostic was already reported. It never escapes a reporting resolve, so it needs no `EntryKind`
   of its own.
     - **It keeps the declaration's own type parameters**, which is the one declaration-specific thing it
       carries. Answering every question is not answering them all with nothing: with the arity dropped, an
@@ -117,8 +117,8 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
   `box => <T> { v: T  w: no_such_type }` would be reported against `holder => { b: box<text> }` — a line that is
   not wrong and does not contain the name — once per applier, each naming a different application. Deferred
   checking is what holding buys, and it is survivable only if the author is sent to the line they can edit.
-    - **The offending name is the evidence, not the entry.** Walking a derived entry's own lineage cannot
-      answer this: a sugar lift's `source` is the bare constructor it applies, and an alias composes its
+    - **The offending name is the evidence, not the entry.** Walking a derived entry's own provenance cannot
+      answer this: a sugar lift records only the bare constructor it applies, and an alias composes its
       argument into someone else's application (`half => <B> pair<no_such_type, B>` closes to a `pair`
       instantiation, and `pair` is faultless). Asking which *held body mentions the name* reaches `half`
       directly — and reaches nothing when the name came from the argument list, so `box<3>` and
@@ -184,18 +184,22 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
     - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap`
       that is not a `SortedMap`, or `AnnotatedMap`), or the order the document wrote is lost; a bare `Map` is
       built as a `HashMap` and does not. The check runs one way only: an unordered map binds to either kind,
-      since keeping its order loses nothing, and `TsonSchema.entries` is exactly that case. Both readers make it
+      since keeping its order loses nothing, and the schema map's `AnnotatedMap` is exactly that case. Both readers make it
       at every depth (`BindTargets` in the TSON reader, `BindMapBuilder.forTarget` in `tson-json`), and a map
       read with no component to declare a class is built as a `LinkedHashMap` when it is ordered.
+    - **A `Namespace` component binds a namespace type's map, and nothing else** (`BindTargets`): the map is read
+      for the component's own `entries` and delivered as an instance of the constructor the position names. A map
+      that is no namespace has no constructor to name, so a `Namespace` there is a mismatch; a `Map` component at a
+      namespace type receives the map, since a host declaring a map asks for one.
     - The converse — a component no field fills — is refused at compile too: it reaches the constructor as
       `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
-      needed exactly once here (`TypeDefinition.position`, this implementation's own addition for
+      needed exactly once here (`RecordField.position`, this implementation's own addition for
       diagnostics).
     - **The check is raised at bind-mode compile — startup, not first read — except for a type with no class to
       build.** That is the `MissingBindingException` subclass, deferred to the first read of that type, since a
       schema legitimately declares types a consumer never binds. It covers two causes the message tells apart:
-      a name the binder resolves to no class (`tson-bind`'s `UnboundNameException`), and a class it does resolve
-      to that cannot be analysed — the kernel's `data` kind is mapped to a marker interface nothing builds.
+      a name the binder resolves to no class (`ltr8-bind`'s `UnboundNameException`), and a class it does resolve
+      to that cannot be analysed — the kernel's base kinds map to sealed marker interfaces nothing builds.
     - **There is no wholesale opt-out**, and that is deliberate: accepting fewer fields without saying *which* is the
       defect §7.2 refuses on the wire, and a class that means to read one version of a schema while another is current
       declares a `@Profile` constructor for it. Reaching a read as a diagnostic instead (a schema compiled on demand),
@@ -208,7 +212,7 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       reader that reported would return `null` for exactly the documents it exists to accept — and a
       diagnostic the guard is told to ignore is a severity axis under another name, and [TSON-DATA] §8.1
       states there is no such axis: a conforming processor has one severity.
-    - **An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.** A class `tson-bind` cannot analyse
+    - **An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.** A class `ltr8-bind` cannot analyse
       is a misconfiguration in the reading application and says nothing about the document — the distinction
       `Code.verdict()` exists to carry, and the same line `BindMismatchException` draws at compile time.
       Reporting it as `SCHEMA_ERROR` would tell a caller routing on the answer that the document is wrong when
@@ -230,9 +234,10 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       reason. Both throw sites keep it clear of their catch-alls (`bindAtomInstance` and
       `bindAnnotationValue`, which carry the same arm): relabelling it `UnsupportedOperationException`
       rebuilds the shape `MissingBindingException` exists to retire, a missing line of wiring reading as
-      *this library cannot do that*. An annotation naming a type the consumer never bound — the kernel's own
-      `data` among them — is the reachable case, and `BindMismatchClassificationTest` pins it in both §6
-      positions plus the constructor case beside them.
+      *this library cannot do that*. A meta layer's own record the consumer never bound a class for
+      (`pings => !notifications { ping => … }` with none for `notification`) is the reachable case, reported at the
+      entry, and `BindMismatchClassificationTest` pins it beside an annotation typed by an abstract base kind
+      (`@sum:_`), which is the author's error in both §6 positions.
     - A gap that escapes some *other* way still throws and still exits 70 unchanged — compilation and the
       lexer are fail-fast, and `TsonCli.notImplemented` remains for anything that reaches it.
 - **A read that cannot get its schema classifies the failure the same way (`SchemaFailure`).** Both facades
@@ -271,9 +276,10 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       (`Code.isRefusal()`). The CLI's exit codes follow — 70, 78, and 69 or 75 by whether a rerun could help,
       a name or limit refusal exiting 1 because the runner can act — and a mixed run ranks by who must act
       first: 70 > 78 > 69 > 1 > 75, a rerun last since every other fix ends in one.
-- **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
-  govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
-  cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather
+- **What still throws even with a receiver:** an `!!import` that won't load or stands at another governing level
+  (`TsonSchemaLinker.checkImportLevel`), a `!!meta` that may not govern, or a reference whose target owns a
+  different `!!id` than it was fetched under (§2.2.1's cross-check, `TsonCompiledMetaRegistry.crossCheckId`).
+  Those make the namespace itself unusable rather
   than one entry wrong, and continuing would report a page of unresolved references that are all
   consequences of the one real problem. Each is a `SchemaValidationException` — an authoring or
   publishing error, not a library fault, which is what lets `Tson.validateSchema` catch them and report

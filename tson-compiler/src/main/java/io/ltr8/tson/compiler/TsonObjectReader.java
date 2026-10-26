@@ -11,10 +11,13 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.reader.DataClassObjectReader;
+import io.ltr8.tson.compiler.reader.NamespaceInstanceReader;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.schema.meta.Namespace;
 
 import java.io.InputStream;
 import java.util.Objects;
@@ -38,7 +41,7 @@ import java.util.Optional;
  * without validating it -- e.g. when its schema is unavailable and the class is the intended contract).
  *
  * <p>Either way the class-driven binding itself is done by {@link DataClassObjectReader}, driven by the
- * target class's own {@code tson-bind} {@link DataClass} descriptor: it streams events off a {@link
+ * target class's own {@code ltr8-bind} {@link DataClass} descriptor: it streams events off a {@link
  * TsonReadContext} (never materializing a whole {@code DataValue} tree first, so a large document need not
  * be buffered before binding begins), reports through that context's one error model, and has no positional
  * form or schema-composed defaults (a record must be written braced; an absent required field is a {@code
@@ -55,8 +58,9 @@ import java.util.Optional;
  * is inspectable and a bound object is application data whose existence implies the document was good.
  *
  * <p>A schemaless bind also holds a wire type-ref to account: a built-in name must sit on a token and
- * satisfy its atom, and any other name must name the target being bound. {@link #preservingUnknownTypeRefs}
- * is the passthrough opt-out.
+ * satisfy its atom, and any other name is {@code UNKNOWN_TYPE_REF}, as {@code tson validate} reports it.
+ * {@link #withHostTypes} lets a name the bound classes answer to link to them, and {@link
+ * #preservingUnknownTypeRefs} keeps one nothing resolves.
  */
 public final class TsonObjectReader {
 
@@ -216,16 +220,33 @@ public final class TsonObjectReader {
      * This reader, ignoring a type-ref that links to nothing instead of reporting it -- a new reader, leaving
      * this one unchanged, sharing its compiled-schema registry.
      *
-     * <p>A schemaless bind reports a type-ref naming neither a built-in type nor the target being bound,
-     * rather than treating it as a marker to skip past -- §7.1's "informational" is the floor, not a ceiling.
-     * {@link #preservingUnknownTypeRefs} is the forward-compatible passthrough: a document tagged with
-     * names this reader knows
-     * nothing about still binds on the strength of the target class alone. Built-in names are still checked,
-     * so {@code !uuid nope} remains a problem. Affects the schemaless path only.
+     * <p>A schemaless bind reports a type-ref naming no built-in type: §5's vocabulary is a schemaless
+     * document's only source of type names ([TSON-DATA] §3.2). This keeps such a tag instead, so a
+     * document tagged with names this reader knows nothing about still binds on the strength of the target
+     * class alone -- a reading of its structure that sets its tags aside, and so not a verdict on it. Built-in
+     * names are still checked, so {@code !uuid nope} remains a problem. Affects the schemaless path only.
      */
     public TsonObjectReader preservingUnknownTypeRefs() {
-        return new TsonObjectReader(dataBindContext, DataClassObjectReader.preserving(dataBindContext),
+        return new TsonObjectReader(dataBindContext, schemaless.preservingUnknownTypeRefs(),
                 bind, receiver, schemaUri, policy);
+    }
+
+    /**
+     * This reader, resolving a type-ref against the classes being bound -- a new reader, leaving this one
+     * unchanged, sharing its compiled-schema registry.
+     *
+     * <p><b>The bound classes become the schema for tags.</b> A tag naming the target class links to it
+     * ({@code !order} into an {@code Order}, by its {@code @Typename} or else its simple name), and a union's
+     * member is the one its tag names ({@code !circle} into a sealed {@code Shape}) -- which is what a
+     * schemaless bind into a sealed hierarchy needs to choose a member at all. Without it, a schemaless bind
+     * judges a document exactly as {@code tson validate} does, and such a tag is {@code UNKNOWN_TYPE_REF}: a
+     * schemaless document has no source of type names but §5's vocabulary ([TSON-DATA] §3.2). With it,
+     * the reader accepts what the vocabulary alone refuses, which is why it is the caller's explicit choice
+     * and never the default. Built-in names are still checked. Affects the schemaless path only; under a
+     * schema, the schema names the types.
+     */
+    public TsonObjectReader withHostTypes() {
+        return new TsonObjectReader(dataBindContext, schemaless.withHostTypes(), bind, receiver, schemaUri, policy);
     }
 
     /**
@@ -695,14 +716,21 @@ public final class TsonObjectReader {
         // /order_response/items rather than naming the entry the resolver minted. TsonTreeReader does the
         // same; see TsonCompiledSchema.rootDeclaration for why the reader itself cannot know this.
         ctx = root.rootDeclaration().map(ctx::underDeclaration).orElse(ctx);
+        TsonTypeReader<?> reader = root.reader();
         Class<?> bound = boundClass(root.typeName());
+        if (type == Namespace.class && root.namespace() != null) {
+            // A namespace type reads as its map; asked for the value itself, the map is an instance of the
+            // constructor the root names.
+            reader = new NamespaceInstanceReader(root.namespace(), reader);
+            bound = Namespace.class;
+        }
         if (bound != null && !type.isAssignableFrom(bound)) {
             return abandon(ctx, Diagnostic.Code.TYPE_MISMATCH,
                     "the schema's root type `" + root.typeName() + "` binds to " + bound.getName()
                             + ", which is not assignable to the requested " + type.getName(),
                     type.getName(), bound.getName());
         }
-        Object value = root.reader().read(ctx);
+        Object value = reader.read(ctx);
         if (value != null && !type.isInstance(value)) {
             // The value is already consumed, so there is nothing left to skip -- just report and yield none.
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
@@ -714,7 +742,8 @@ public final class TsonObjectReader {
     }
 
     /**
-     * Reports {@code code}/{@code message}, discards the root value, and yields no object -- see {@link
+     * Reports {@code code}/{@code message}, discards the root value unjudged ({@link
+     * DefaultTsonReadContext#discardUnjudged}), and yields no object -- see {@link
      * #readAgainstSchema}. There is deliberately no overload that omits {@code expected}/{@code actual}: a
      * facade-level failure is exactly the kind a machine consumer must be able to act on without reading
      * prose, and the omitting overload this used to have is how three of them ended up with a blank
@@ -723,7 +752,7 @@ public final class TsonObjectReader {
     private static <T> T abandon(TsonReadContext ctx, Diagnostic.Code code, String message, String expected,
             String actual) {
         ctx.report(code, message, expected, actual);
-        EventSkip.dataValue(ctx);
+        DefaultTsonReadContext.discardUnjudged(ctx);
         return null;
     }
 
@@ -736,7 +765,7 @@ public final class TsonObjectReader {
      */
     private static <T> T abandon(TsonReadContext ctx, SchemaFailure failure, String message, String actual) {
         ctx.report(failure.code(), message, failure.expected(), actual);
-        EventSkip.dataValue(ctx);
+        DefaultTsonReadContext.discardUnjudged(ctx);
         return null;
     }
 
@@ -764,7 +793,7 @@ public final class TsonObjectReader {
             return abandon(ctx, failure, e.getMessage(), schemaUri);
         }
         if (compiled == null) {
-            EventSkip.dataValue(ctx);
+            DefaultTsonReadContext.discardUnjudged(ctx);
             return null;
         }
         String name = typeName;
@@ -788,10 +817,13 @@ public final class TsonObjectReader {
             return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, compiled.unknownTypeMessage(name),
                     compiled.declaredTypeNames(), name);
         }
-        return new RootReader(reader, name, compiled.rootDeclaration(name));
+        String terminal = ReferenceChain.terminal(name, compiled.schema().entries()::get);
+        String namespace = compiled.linkedSchema().namespace(terminal).isPresent() ? terminal : null;
+        return new RootReader(reader, name, compiled.rootDeclaration(name), namespace);
     }
 
+    /** {@code namespace} is the namespace constructor the root type is, {@code null} where it is none. */
     private record RootReader(TsonTypeReader<?> reader, String typeName,
-                               Optional<SchemaLocation> rootDeclaration) {
+                               Optional<SchemaLocation> rootDeclaration, String namespace) {
     }
 }

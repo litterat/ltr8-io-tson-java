@@ -8,10 +8,14 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.suite.SuiteBindings;
 import io.ltr8.tson.suite.SuiteCheckout;
 import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
@@ -58,7 +62,8 @@ import static org.junit.jupiter.api.Assertions.fail;
  *       its serialization, so a valid vector states the resolved output in the spec's own form and this
  *       compares entry for entry, through {@link ResolvedForm}'s normalisations.</li>
  *   <li>{@code link/} -- individual facts about the linked namespace: §2.2.3's import closure, §5.4's
- *       derived disjointness, §8.2's {@code subtypes} index.</li>
+ *       derived disjointness, §8.2's {@code subtypes} index, and a kind's {@code members} index
+ *       (§4.2).</li>
  *   <li>{@code validate/} -- a data document against a schema that loaded, where the expected side of a
  *       failure is §8.1's category and the RFC 6901 pointer into the data, and nothing else.</li>
  * </ul>
@@ -86,13 +91,17 @@ class Class2ConformanceSuiteTest {
 
     private static Tson newTson() {
         // The schema.meta-resolving context, because a `schema/` vector binds a resolved-form document back
-        // into the value model to compare it. It changes nothing for the other two layers.
+        // into the value model to compare it. It changes nothing for the other two layers. Both it and the meta
+        // name binder add a host class for each record a corpus fixture's namespace types hold (SuiteBindings): a
+        // value of one reads only into a class, when the resolver binds it and when its resolved output is
+        // read back.
         //
         // The source serves the corpus's own schemas beside the bundled ones, which is what lets a subject
         // `!!import` a fixture: the link layer's §2.2.3 vectors need a second schema document, and the
         // corpus publishes those under its own identity prefix rather than inventing a file convention.
         return Tson.of(ProcessorConfig.defaults()
-                .withDataBindContext(SchemaMetaNameBinder.defaultContext())
+                .withDataBindContext(SuiteBindings.context())
+                .withMetaNameBinder(SuiteBindings.names())
                 .withSchemaAccess(SchemaAccess.of(Class2ConformanceSuiteTest::fetchSuiteSchema)));
     }
 
@@ -130,9 +139,12 @@ class Class2ConformanceSuiteTest {
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 assertEquals(List.of(), problems, "a valid schema vector must load cleanly");
-                Map<String, TypeDefinition> ours = ResolvedForm.ownEntries(tson, identityOf(source));
-                Map<String, TypeDefinition> expected =
-                        ResolvedForm.readResolved(tson, fieldText(outcomePayload(sidecar), "resolved"));
+                Map<String, Top> ours = ResolvedForm.ownEntries(tson, identityOf(source));
+                // Under the subject's own meta, which an instance of its namespace type needs (RUNNER.md).
+                Map<String, Top> expected = ResolvedForm.readResolved(tson,
+                        fieldText(outcomePayload(sidecar), "resolved"),
+                        hasField(sidecar, "meta") ? Sidecar.resolveShortName(fieldText(sidecar, "meta"))
+                                : TsonBundledSchemas.META_ID);
                 assertEquals(new TreeSet<>(expected.keySet()), new TreeSet<>(ours.keySet()),
                         "the resolved schema does not declare the entries the vector states");
                 expected.forEach((name, definition) -> assertEquals(
@@ -145,6 +157,10 @@ class Class2ConformanceSuiteTest {
                 assertEquals(ResolvedForm.markedSynthetics(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourSynthetics(tson, identityOf(source)),
                         "the entries marked @synthetic are not the ones the vector marks");
+                // §8.2's second key annotation: each instantiation states, on its key, the application it is.
+                assertEquals(ResolvedForm.markedApplications(fieldText(outcomePayload(sidecar), "resolved")),
+                        ResolvedForm.ourApplications(tson, identityOf(source)),
+                        "the entries' @application are not the ones the vector states");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
             case "refused" -> assertRefused(sidecar, problems, "schema");
@@ -253,9 +269,9 @@ class Class2ConformanceSuiteTest {
         if (hasField(expected, "disjoint")) {
             for (RecordValue claim : Sidecar.fieldRecordArray(expected, "disjoint")) {
                 String name = fieldText(claim, "name");
-                TypeDefinition definition = definitionOf(entries, name);
+                Top definition = definitionOf(entries, name);
                 assertEquals(Boolean.parseBoolean(fieldText(claim, "value")),
-                        definition.disjoint().orElseThrow(() ->
+                        ((ChoiceBody) definition).disjoint().orElseThrow(() ->
                                 new AssertionError(name + " has no derived disjointness at all")),
                         "§5.4 disjointness of " + name);
             }
@@ -265,18 +281,34 @@ class Class2ConformanceSuiteTest {
                 String name = fieldText(claim, "name");
                 // Normalised on both sides, and on both ends of the claim: a subtype family over template
                 // instantiations names minted entries at the index *and* inside it (RUNNER.md rule 6, which
-                // reaches "a list of names a sidecar states").
+                // reaches "a list of names a sidecar states"). A family base template carries no slot of its
+                // own, so its index is the entries whose chain names it.
+                Top definition = definitionOf(entries, name);
                 assertEquals(new TreeSet<>(fieldTextArray(claim, "subtypes").stream()
                                 .map(ResolvedForm::withoutHash).toList()),
-                        new TreeSet<>(definitionOf(entries, name).subtypes().stream()
+                        new TreeSet<>(TypeChain.subtypesOf(definition).stream()
                                 .map(ResolvedForm::withoutHash).toList()),
                         "§8.2 subtypes index of " + name);
             }
         }
+        if (hasField(expected, "members")) {
+            for (RecordValue claim : Sidecar.fieldRecordArray(expected, "members")) {
+                String name = fieldText(claim, "name");
+                // A kind's derived index, compared as a set and normalised as the subtypes index is: an
+                // instantiation a kind lists carries a minted name (RUNNER.md rule 6).
+                if (!(definitionOf(entries, name) instanceof KindBody kind)) {
+                    throw new AssertionError(name + " is not a kind, so it has no members index");
+                }
+                assertEquals(new TreeSet<>(fieldTextArray(claim, "members").stream()
+                                .map(ResolvedForm::withoutHash).toList()),
+                        new TreeSet<>(kind.memberNames().stream().map(ResolvedForm::withoutHash).toList()),
+                        "the members index of " + name);
+            }
+        }
     }
 
-    private static TypeDefinition definitionOf(Map<String, TypeDefinition> entries, String name) {
-        TypeDefinition definition = entries.get(name);
+    private static Top definitionOf(Namespace<Top> entries, String name) {
+        Top definition = entries.get(name);
         if (definition != null) {
             return definition;
         }

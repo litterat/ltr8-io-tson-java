@@ -5,7 +5,6 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigInteger;
-
 import java.time.OffsetTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,22 +25,35 @@ import java.util.Optional;
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "time_type")
-public record TimeType(Optional<OffsetTime> min, @Field("exclusive_min") Optional<OffsetTime> exclusiveMin,
+public record TimeType(TypeChain chain,
+        Optional<OffsetTime> min, @Field("exclusive_min") Optional<OffsetTime> exclusiveMin,
                      Optional<OffsetTime> max, @Field("exclusive_max") Optional<OffsetTime> exclusiveMax,
                      Optional<BigInteger> precision) implements Atom {
 
     /**
-     * Carries {@code @Record} because a second constructor exists below, and {@code tson-bind}'s own
+     * Carries {@code @Record} because a second constructor exists below, and {@code ltr8-bind}'s own
      * constructor selection fails outright without it (see {@link IntegerSize}).
      */
     @Record
     public TimeType {
+        chain = TypeChain.orEmpty(chain);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
         if (max.isPresent() && exclusiveMax.isPresent()) {
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public TimeType(Optional<OffsetTime> min, Optional<OffsetTime> exclusiveMin, Optional<OffsetTime> max,
+            Optional<OffsetTime> exclusiveMax, Optional<BigInteger> precision) {
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision);
+    }
+
+    @Override
+    public TimeType withChain(TypeChain chain) {
+        return new TimeType(chain, min, exclusiveMin, max, exclusiveMax, precision);
     }
 
     /** The inclusive bounds alone, for the many callers that set neither an exclusive bound nor a precision. */

@@ -27,9 +27,9 @@ source of truth — with **two** standing exceptions. The three `.tn` schemas ar
 time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
 place**: see "Part 3 is drafted here" below.
 
-On `main` the bundled schemas carry **Revision 37 identities** (`https://tson.io/2026/37/m/*.tn`); a proposal branch
-carries the next revision's. `spec/` holds
-**Revision 37** of Parts 1 and 2, the published cache, not edited here except for §13.2's four artifact rows,
+On `main` the bundled schemas carry **Revision 38 identities** (`https://tson.io/2026/38/m/*.tn`); a proposal
+branch carries the next revision's. `spec/` holds
+**Revision 38** of Parts 1 and 2, a cache, not edited here except for §13.2's four artifact rows,
 so the table names the bytes beside it and stays checkable; its Part 1 and Guide rows stay at the revision
 those documents actually are. **§13.2 is a fourth pin to move** whenever the artifacts change.
 `scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins, and the spec
@@ -39,11 +39,12 @@ document is a cache — so §13.2 is re-stamped by hand and is the one that sile
 The bundled schemas and the spec agree on shape: `reference.target` is typed `type_ref`; there is no
 `instance_template`/`template_argument`/`value_param` (§5.10's held bodies carry an open body); `map`'s `state`
 field sits behind `{K => V?}` (§5.3). An open entry's body is an instance of the kernel's `template`
-constructor — the parameter names and the application as text (§8.1) — so `type_definition` carries no
-`parameters` (they are the body's), no `disjoint` (derived over the choice body, §5.4) and no `kind`: a kind is
-derived from an entry's own supertypes and body (§4.1, §8.1's four-branch rule), and the kernel declares no
-`type_kind`. `TypeDefinition.kind` is an `@Unbound` component, computed at resolution for this resolver's own
-use and never written.
+constructor — the parameter names and the application as text (§8.1). A schema map's entry is its value
+(`schema => namespace & { key_type: = type_name  value_type: = top }`): a type carries its own chain
+(`type => abstract top & { chain?: type_chain }`), and nothing carries `parameters` (they are the template body's),
+`disjoint` (derived over the choice body, §5.4) or `kind`: a kind is derived from an entry's own chain and body (§4.1,
+`EntryKind.of`, judged by where each base kind is defined), and the kernel's `type_kind` is the kind of the types, not
+that derivation. `top`, `type`, the three base kinds and `namespace` are `abstract` (§4.1).
 
 **Changing a bundled schema means re-stamping all three digests bottom-up**, moving the matching
 `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the
@@ -96,22 +97,20 @@ so the argument can land in Part 2. The `*-resolved.tn` fixtures carry none of t
 
 ## Branches and revisions
 
-**`main` is the reference implementation of the published revision, which is Revision 37.** Each published
+**`main` is the reference implementation of the published revision, which is Revision 38.** Each published
 revision's implementation stays reachable at the point it was the whole of `main`, by tag: `r2026-32`,
-`r2026-34`, `r2026-35`, `r2026-36` — tagged before the next proposal merges, and in the corpus repo too where the pair is
-wanted. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus
+`r2026-34`, `r2026-35`, `r2026-36`, `r2026-37` — tagged before the next proposal merges, and in the corpus repo too where
+the pair is wanted. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus
 branch of the same name and `SUITE_PIN` following it — where the register's entries state what is *running* rather
 than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
 merging a divergence early costs `main` the one signal it exists to give. The bundled schemas carry the
 revision's own identities from the start, so a content change lands on artifacts named for the revision
 proposing it rather than being re-identified at the end.
 
-**No proposal branch is open.** Revision 37's — the meta-kernel changes Revision 36 could not carry — merged to
-`main` when the spec landed. The next opens as `r2026-38-proposal` with its corpus twin, carrying the Revision 38
-identities and the next version from its first commit. Kernel work lands through PR branches off it; work the
-published revision can carry still lands on `main`, which the proposal merges in to keep up. While one is open,
-`Closes #N` in a PR into it does not close the issue (GitHub fires it only on the default branch), so each is closed
-by hand.
+**No proposal is open.** When one is, it carries the next revision's identities and version from its first commit;
+proposal work lands through PR branches off it, and work the published revision can carry still lands on `main`,
+which the proposal merges in to keep up. While a proposal is open, `Closes #N` in a PR into it does not close the
+issue (GitHub fires it only on the default branch), so each is closed by hand.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
 revision, this is its first implementation, and the artifact has no published releases and no remote
@@ -227,7 +226,7 @@ keeps it apart; the exception's class is what picks the code.
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/37/io/ltr8/<group>/<name>.tn` — `/2026/37` is the spec revision, `io/ltr8` the publisher,
+`https://tson.io/2026/38/io/ltr8/<group>/<name>.tn` — `/2026/38` is the spec revision, `io/ltr8` the publisher,
 `<group>` the subsystem (`cli`), `<name>` the schema. Between releases — while the build version carries
 `-SNAPSHOT`, so nothing has published the identity — the schema is edited in place. §10's immutability rule
 binds a *published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed.

@@ -12,7 +12,6 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
  * A field's schema-stated value, resolved once at compile time: the host value it denotes, and the JSON node
@@ -41,15 +40,15 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
         String name = fieldTypeName;
         Top body = null;
         for (int hops = 0; hops < MAX_REFERENCE_HOPS; hops++) {
-            TypeDefinition definition = schema.entries().get(name);
+            Top definition = schema.entries().get(name);
             if (definition == null) {
                 throw new IllegalStateException("'" + name + "' is not declared -- linking should have refused this");
             }
-            if (definition.body() instanceof Reference reference) {
+            if (definition instanceof Reference reference) {
                 name = reference.target().name();
                 continue;
             }
-            body = definition.body();
+            body = definition;
             break;
         }
         if (!(body instanceof Atom atom)) {
@@ -60,10 +59,7 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
                 "'" + fieldTypeName + "' carries a schema-stated value but has no parser to read it with"));
         AtomForm form = AtomForm.of(atom);
         Object pinned = parser.read(token.text());
-        // An enum whose members are texts spells every member as a string, `"true"` included (§5.2).
-        JsonValue node = linked.textEnums().contains(name)
-                ? new JsonString(token.text())
-                : node(form, pinned, token.text());
+        JsonValue node = node(form, pinned, token.text());
         return new FieldValue(parser, form, pinned, node, token.text());
     }
 

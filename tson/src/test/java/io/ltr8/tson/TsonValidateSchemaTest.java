@@ -26,8 +26,8 @@ class TsonValidateSchemaTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/validate-schema-test.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             """;
 
     private static List<Diagnostic> check(String body) {
@@ -50,7 +50,7 @@ class TsonValidateSchemaTest {
         };
         List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(refusing))).validateSchema("""
                 !!id:"https://example.test/importer.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 !!import:"https://example.test/nowhere.tn"
                 { t => text }
                 """);
@@ -133,8 +133,8 @@ class TsonValidateSchemaTest {
      * unchanged, a closed body being the template's own with its parameters replaced.
      *
      * <p>The <b>alias</b> case is the one that decides how this is implemented. {@code half<text>} composes
-     * to {@code pair<no_such_type, text>} and mints an entry sourced on {@code pair} -- so walking a derived
-     * entry's lineage lands on {@code pair}, which is faultless. The offending <em>name</em> is the evidence
+     * to {@code pair<no_such_type, text>} and mints an instantiation of {@code pair} -- so walking a derived
+     * entry's derivation lands on {@code pair}, which is faultless. The offending <em>name</em> is the evidence
      * instead: {@code half} is the held body that mentions it.
      */
     @Test
@@ -217,7 +217,7 @@ class TsonValidateSchemaTest {
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
         assertStaysWithTheApplier("box<3>",
                 "'box<...>' substitutes into a body that is not valid data for 'record', the constructor's "
-                        + "own constraint vocabulary -- 'type_name': '3': U+0033 at index 0 cannot start an "
+                        + "own constraint vocabulary -- 'type_kind': '3': U+0033 at index 0 cannot start an "
                         + "identifier -- an identifier never begins with a digit or a sign");
     }
 
@@ -225,7 +225,7 @@ class TsonValidateSchemaTest {
     @Test
     void anUnresolvedArgumentStaysWithTheApplier() {
         assertStaysWithTheApplier("box<some_typo>",
-                "'box<some_typo>' source has an unresolved reference 'some_typo'");
+                "'{ v: some_typo }' field 'v' has an unresolved reference 'some_typo'");
     }
 
     private static void assertStaysWithTheApplier(String application, String message) {
@@ -476,7 +476,7 @@ class TsonValidateSchemaTest {
     void anUnloadableImportIsReportedAgainstTheDocument() {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/bad-import.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 !!import:"https://example.test/nothing-here.tn"
                 { my_int => int32 }
                 """);
@@ -495,7 +495,7 @@ class TsonValidateSchemaTest {
     void anImportWhoseTargetOwnsAnotherIdentityIsReportedAgainstTheDocument() {
         String lib = """
                 !!id:"https://example.test/its-real-name.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 { widget => { name: text } }
                 """;
         Tson tson = Tson.of(ProcessorConfig.defaults()
@@ -508,7 +508,7 @@ class TsonValidateSchemaTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/mismatched-import.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
                 !!import:"https://example.test/fetched-as.tn"
                 { holder => { w: widget } }
                 """);

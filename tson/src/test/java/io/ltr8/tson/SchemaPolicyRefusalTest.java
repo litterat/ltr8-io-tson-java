@@ -4,6 +4,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.unicode.RestrictionLevel;
 import io.ltr8.tson.base.policy.ScriptPolicy;
 import org.junit.jupiter.api.Test;
 
@@ -38,8 +39,8 @@ class SchemaPolicyRefusalTest {
     private static List<Diagnostic> refusals(String declarations) {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/refusal.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                 %s
                 }
@@ -114,12 +115,12 @@ class SchemaPolicyRefusalTest {
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, tson.validateSchema("""
                 !!id:"https://example.test/refusal-policy.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 { p%sy => text }
                 """.formatted(CYR_A)).getFirst().code());
 
-        assertEquals(ScriptPolicy.Level.ASCII_ONLY,
+        assertEquals(RestrictionLevel.ASCII_ONLY,
                 tson.processorPolicy().identifierPolicy().scripts().level());
         assertEquals(ProcessorPolicy.dataVersion(), tson.processorPolicy().unicodeDataVersion());
     }

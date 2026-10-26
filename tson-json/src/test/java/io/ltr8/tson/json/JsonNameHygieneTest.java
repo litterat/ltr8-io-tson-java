@@ -45,8 +45,8 @@ class JsonNameHygieneTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/hygiene-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               account => { password: text  note?: text? }
               circle  => { radius: float64 }
@@ -109,7 +109,21 @@ class JsonNameHygieneTest {
     @Test
     void aRestrictedCharacterInAFieldNameIsRefused() {
         assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER,
-                read("account", "{\"password\": \"s3cret\", \"no te\": 1}").refusal().code());
+                read("account", "{\"password\": \"s3cret\", \"a\u0132b\": 1}").refusal().code());
+    }
+
+    /**
+     * A member name that is no value of the record's name type is no name, so no name rule reaches it: it can be
+     * no field, and is unknown. Under the default the message is the plain one any undeclared name draws.
+     */
+    @Test
+    void aMemberNameOutsideTheNameTypeIsUnknownNotRefused() {
+        List<Diagnostic> problems = read("account", "{\"password\": \"s3cret\", \"no te\": 1}").problems();
+        assertEquals(1, problems.size(), problems::toString);
+        Diagnostic refusal = problems.getFirst();
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, refusal.code());
+        assertEquals("/no te", refusal.path().orElseThrow());
+        assertTrue(!refusal.message().contains("name type"), refusal.message());
     }
 
     /** §9.4 reaches every {@code $type} too: a look-alike variant name is refused, not called no variant. */

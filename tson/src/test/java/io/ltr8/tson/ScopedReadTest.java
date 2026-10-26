@@ -43,8 +43,8 @@ class ScopedReadTest {
     private static final Map<String, String> SCHEMAS = Map.of(
             HOST, """
                     !!id:"https://example.test/scope-host.tn"
-                    !!meta:"https://tson.io/2026/37/m/meta.tn"
-                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    !!meta:"https://tson.io/2026/38/m/meta.tn"
+                    !!import:"https://tson.io/2026/38/m/core.tn"
                     {
                       note      => { body: text }
                       memo      => { body: text  urgent: boolean }
@@ -58,8 +58,8 @@ class ScopedReadTest {
                     """,
             CLAIM, """
                     !!id:"https://example.test/scope-claim.tn"
-                    !!meta:"https://tson.io/2026/37/m/meta.tn"
-                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    !!meta:"https://tson.io/2026/38/m/meta.tn"
+                    !!import:"https://tson.io/2026/38/m/core.tn"
                     {
                       claim  => { id: text  amount: int32 }
                       remark => { text: text }
@@ -67,31 +67,31 @@ class ScopedReadTest {
                     """,
             REPORT, """
                     !!id:"https://example.test/scope-report.tn"
-                    !!meta:"https://tson.io/2026/37/m/meta.tn"
-                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    !!meta:"https://tson.io/2026/38/m/meta.tn"
+                    !!import:"https://tson.io/2026/38/m/core.tn"
                     {
                       report => { study: text }
                     }
                     """,
             WIDE, "!!id:\"" + WIDE + "\"\n" + """
-                    !!meta:"https://tson.io/2026/37/m/meta.tn"
-                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    !!meta:"https://tson.io/2026/38/m/meta.tn"
+                    !!import:"https://tson.io/2026/38/m/core.tn"
                     {
                       order => { n: int32 }
                     }
                     """,
             LIBRARY, """
                     !!id:"/local/scope-orders.tn"
-                    !!meta:"https://tson.io/2026/37/m/meta.tn"
-                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    !!meta:"https://tson.io/2026/38/m/meta.tn"
+                    !!import:"https://tson.io/2026/38/m/core.tn"
                     {
                       order => { n: int32 }
                     }
                     """,
             IDENTITY_HOST, """
                     !!id:"https://example.test/scope-identity-host.tn"
-                    !!meta:"https://tson.io/2026/37/m/meta.tn"
-                    !!import:"https://tson.io/2026/37/m/core.tn"
+                    !!meta:"https://tson.io/2026/38/m/meta.tn"
+                    !!import:"https://tson.io/2026/38/m/core.tn"
                     {
                       routed => { wide: extern_of<"%s">  library: extern_of<"%s"> }
                     }
@@ -291,8 +291,8 @@ class ScopedReadTest {
     void externOfRefusesAFragmentNoIdentityCarries() {
         List<Diagnostic> problems = tson().validateSchema("""
                 !!id:"https://example.test/scope-fragment.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   routed => { one: extern_of<"https://example.test/scope-claim.tn#part"> }
                 }

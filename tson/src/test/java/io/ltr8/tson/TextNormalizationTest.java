@@ -23,8 +23,8 @@ class TextNormalizationTest {
     private static final String ID = "https://example.test/normalized-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/normalized-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               header_name => !identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
@@ -34,7 +34,7 @@ class TextNormalizationTest {
               name => !identifier_type { continue_add: "-" }
               request => { headers?: {header_name => text}  host?: host  charset?: charset  label?: name }
               idempotent => { header: header_name = Idempotency-Key }
-              safe_header => !enum_type { type: header_name  members: [Accept content-type] }
+              safe_header => !enum_type { name_type: header_name  members: [Accept content-type] }
               allowed => { h: safe_header }
               chosen => { h: safe_header = Content-Type }
               typed_by => <T, N> { w?: T ~ N }
@@ -167,16 +167,16 @@ class TextNormalizationTest {
         assertTrue(refused.getFirst().message().contains("requires unique elements"), refused.toString());
     }
 
-    /** An enum's members match in NFC as well, whatever its label type's form. */
+    /** An enum's members match in NFC as well, whatever its name type's form. */
     @Test
     void anEnumMatchesADecomposedSpellingOfItsMember() {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/normalized-enum.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
-                  accented => !text_enum ["caf\u00e9" tea]
+                  accented => !enum ["caf\u00e9" tea]
                   order    => { drink: accented }
                 }
                 """);
@@ -192,7 +192,7 @@ class TextNormalizationTest {
         assertTrue(refused.getFirst().message().contains("are one value under NFKC_CASEFOLD"), refused.toString());
     }
 
-    /** An enum matches its members in its label type's form: here a case-folding identifier's. */
+    /** An enum matches its members in its name type's form: here a case-folding identifier's. */
     @Test
     void anEnumMatchesInItsLabelTypesForm() {
         assertEquals(List.of(), codes("!allowed { h: Content-Type }"));
@@ -219,7 +219,7 @@ class TextNormalizationTest {
         assertEquals(1, tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]", "schemes: [\"ht tp\"]")).size());
     }
 
-    /** A template's value argument of an enum type is a value of the enum, matched in the label type's form. */
+    /** A template's value argument of an enum type is a value of the enum, matched in the name type's form. */
     @Test
     void aTemplateValueArgumentOfAnEnumTypeIsMatchedInTheLabelTypesForm() {
         assertEquals(List.of(), tson().validateSchema(SCHEMA));

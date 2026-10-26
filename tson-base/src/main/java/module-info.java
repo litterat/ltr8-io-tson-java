@@ -2,7 +2,7 @@
  * What every encoding and every phase of this library reports through, and what a deployment constrains it
  * with.
  *
- * <p>Six packages, and <b>the root names none of them</b> --
+ * <p>Five packages, and <b>the root names none of them</b> --
  * every dependency runs inward, so a subpackage may be read on its own and the vocabulary at the centre
  * stays free of the machinery around it.
  *
@@ -14,7 +14,6 @@
  *       algorithm for how a schema is named; and the exceptions.
  *   <li>{@code io.ltr8.tson.base.policy} -- what this processor will admit and spend.
  *   <li>{@code io.ltr8.tson.base.source} -- where it will obtain a schema.
- *   <li>{@code io.ltr8.tson.base.unicode} -- the UCD tables the engines read.
  *   <li>{@code io.ltr8.tson.base.atom} -- the host values the built-in atoms read to.
  *   <li>{@code io.ltr8.tson.base.bind} -- what a deployment binds with.
  * </ul>
@@ -40,7 +39,7 @@
  * which encoding carried the document.
  *
  * <p><b>The two engines it rests on are system libraries, not layers above it.</b> {@code java.net.http}
- * and {@code io.ltr8.bind} are both general and both know nothing of TSON -- {@code tson-bind} binds a
+ * and {@code io.ltr8.bind} are both general and both know nothing of TSON -- {@code ltr8-bind} binds a
  * {@code DataValue} to a Java object and has never heard of a schema. Depending on them is the same kind of
  * thing as depending on the JDK, which is why it does not make this module a layer in the stack: nothing
  * here knows what a TSON document or a JSON one looks like, and that is the property that matters.
@@ -56,13 +55,17 @@ module io.ltr8.tson.base {
     requires transitive java.net.http;
 
     // A dependency-free binding engine that knows nothing about TSON -- system-library standing, like
-    // java.net.http above and tson-regex elsewhere. What this module adds is the TSON-side configuration:
+    // java.net.http above and ltr8-regex elsewhere. What this module adds is the TSON-side configuration:
     // which host types bind as atoms, and (in time) the rest of what a deployment states about binding.
     requires transitive io.ltr8.bind;
 
     // Network text formats, recognised natively -- system-library standing again. CanonicalIdentity and
     // SchemaReference split a reference with Iri, and the formats' values are host types AtomContext binds.
     requires transitive io.ltr8.net;
+
+    // Unicode properties and algorithms -- system-library standing again. The policies are built on its profiles
+    // and restriction levels, and the engines above read its normalization forms and identifier profiles directly.
+    requires transitive io.ltr8.unicode;
 
     exports io.ltr8.tson.base;
     exports io.ltr8.tson.base.io;
@@ -87,9 +90,9 @@ module io.ltr8.tson.base {
      * One package because a deployment states one policy, and §8.2 requires a relaxation be code rather
      * than ambient: this is where that code points.
      *
-     * <p>{@code ScriptPolicy} is here rather than beside the tables it reads, because the line between the
-     * two Unicode packages is who touches them. A consumer names this to configure a processor and never
-     * names {@code unicode}; the engines read {@code unicode} and never name this.
+     * <p>The mechanisms the policies configure -- UTS #39's restriction levels, skeleton distinctness, the
+     * identifier profiles -- are {@code io.ltr8.unicode}'s; what is here is the choice a deployment makes with
+     * them. A consumer names this, with {@code RestrictionLevel} for a level, to configure a processor.
      */
     exports io.ltr8.tson.base.policy;
 
@@ -104,13 +107,6 @@ module io.ltr8.tson.base {
      * three classes that share it and to nothing else in the module.
      */
     exports io.ltr8.tson.base.source;
-
-    /**
-     * The UCD-16.0 tables and the UTS #39 rules over them, exported because two engines read them:
-     * {@code tson-compiler}'s lexer and identifier parser, and whatever a second encoding needs to know
-     * what an identifier is. Pure Unicode -- nothing here knows what a TSON document looks like.
-     */
-    exports io.ltr8.tson.base.unicode;
 
     /**
      * The host values the built-in atoms read to that are TSON's own -- {@code Rational}, {@code Complex}; the

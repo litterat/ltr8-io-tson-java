@@ -1,21 +1,29 @@
 # Held template bodies
 
-What an open entry's body is — text, carried by the kernel's `template` constructor (`schema.meta.TemplateBody`,
-`HeldBody`) — and how each held shape closes: a record template, an open instance, an alias, an application at a
-container position; with the synthetic merge and parameter kinds that closing relies on. Current form only; history
-lives in git.
+What an open entry's body is — a record template is a `record` with `parameters` (`schema.meta.RecordBody`), and
+every other open body is text, carried by the kernel's `template` constructor (`schema.meta.TemplateBody`) — and how
+each shape closes through its held tree (`HeldBody`): a record template, an open instance, an alias, an application
+at a container position; with the synthetic merge and parameter kinds that closing relies on. Current form only;
+history lives in git.
 
 **Invariants**
 
-- Every open entry's body is held (a `TemplateBody`), an error placeholder included (`WireForm.heldEmptyRecord`);
-  `close` dispatches on the constructor head — `record` closes to the instantiation, `reference` to a name, everything
-  else to a synthetic — and any other body shape is an `IllegalStateException`.
-- A held body is text; the parsed form is a working value that is never retained, and nothing outside `resolver` sees a
-  `DataValue`.
+- A phase asks whether an entry is open, what it binds and whether it is a family base through `schema.meta.OpenEntry`,
+  and reads its held tree through `HeldBody.of(Top)`. Nothing else tests for `TemplateBody` except the code that mints
+  one, so which kernel shape carries an open entry is decided in those two places.
+- An open record is never held text: `HeldBody.held` refuses a `record` head, and `HeldBody.of` writes an open record's
+  tree through `WireForm.heldRecord`. Every other open entry's body is a `TemplateBody`. An
+  error placeholder is an open empty record (`SchemaResolver.unresolved`).
+- `close` dispatches on the held tree's constructor head — `record` closes to the instantiation, `reference` to a name,
+  everything else to a synthetic — and any other body shape is an `IllegalStateException`.
+- A held tree is a working value that is never retained, and nothing outside `resolver` sees a `DataValue`.
+- A declared field name that is no identifier (`"@id"`, `"first name"`) is written quoted (`WireForm.declaredName`), or
+  the text does not parse back; quoting never hides a parameter, whose name is an identifier. A record's non-default
+  `name_type` is written too.
 - Substitution is one rule at every depth: an **unquoted** token in a tree, rewritten when its text resolves into the
   entry's `parameters` (§8.1's shadowing rule); a quoted token is a literal.
-- §5.7's fixation happens at closing (`fixRoutedValues`): a routed `= P` arrives required and FREE and becomes
-  optional and FIXED; a `~ P` arrives a DEFAULT and stays one.
+- A routed `= P` is FIXED where it is written and `~ P` DEFAULT, `optional` as the name was marked; closing substitutes
+  the value and changes no fact. A FREE field never carries a value.
 - Applications inside a held body close before the entry is named, and in the synthetic merge the closed-record name
   wins; only a form whose binding held an application moves.
 - A closed form is named for itself through `DerivedName.ofBinding`, the application gets a second `Reference` entry,
@@ -26,16 +34,23 @@ lives in git.
 
 Related: `design/template-materialisation.md` (the pass itself, kind checking, regularity),
 `design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `@synthetic`), `design/schema-resolution.md`
-(`holdIfOpen`, marks spliced into a held body), `design/constructor-application.md`,
+(`parameterised`, `openRecord`, marks on an open record), `design/constructor-application.md`,
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
 
 ## Held bodies and how they close (`schema.meta.TemplateBody`, `tson-compiler/.../resolver/HeldBody.java`)
 
-- **A held body is text, and the kernel's `template` constructor is what carries it.** `schema.meta.TemplateBody`
-  is a record over `parameters` and `template`, the application as written — so `set` resolves to
+- **A record template is the record it is.** Every slot a record template admits a parameter in already holds a name
+  or an uninterpreted token (§5.10) — a field's `type`, its `value`, an application's arguments — so
+  the open record is a value of the vocabulary as it stands: a `RecordBody` with `parameters`, its chain keeping the
+  parents as written. `HeldBody.of` writes its tree through `WireForm.heldRecord`, the record's own `extension` (each
+  application's) stated where it is not OPEN, so closing reads one tree shape whichever kind of open entry it came
+  from.
+- **Every other held body is text, and the kernel's `template` constructor is what carries it.**
+  `schema.meta.TemplateBody` is a record over `parameters` and `template`, the application as written — so `set`
+  resolves to
   `body: !template { parameters: [T]  template: "!set_type { element_type: T }" }`. It is an ordinary body of
   the value model: `Top` is sealed over it, the binder finds it by the same `template` → `template_body` alias
-  `record` → `record_body` already uses, and `type_definition.body` is a `top` with no exception.
+  `record` → `record_body` already uses, and a schema map's value is a `top` with no exception.
   - **Why text and not a value of the constructor's own vocabulary.** A parameter stands wherever a token
     stands — `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a
     collection — so a body carrying one is typed by no constructor's record shape until it closes. Writing it
@@ -53,29 +68,26 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     an open entry compares like every other entry.
 - **A held body closes by one process, whatever wrote it** (`closeHeld`). `<T> [T]` and `<T> { x: T }` are both
   an application with a parameter standing in a slot — `!array { element_type: T }` and
-  `!record { fields: [ { name: x  type: T } ] }` — so both substitute by the same walk and are then bound
+  `!record { fields: { x => { type: T } } }` — so both substitute by the same walk and are then bound
   through **their own constructor's compiled reader**, the same one a written `!array { … }` or `!record { … }`
   binds through. Once its parameters go concrete a held body is no longer a template at all, but the
   constructor body those bindings always described, and the entry carries an ordinary
   `ArrayBody`/`MapBody`/`RecordBody`.
-  - **What differs between the shapes is only what the result *is*.** A **record** template's closure is the
-    instantiation entry itself (`closeHeldRecord`): a substituted record is the type the author named by
-    writing the application, so there is nothing for an extra hop to record and the entry carries the
-    application in its own `source` the way §8.2 says every instantiation does. Every other held form closes
-    to a **synthetic** named for the form, which the instantiation then references — a form has no
-    author-written name for identity to key on. That is the whole of the divergence; everything before it is
-    shared.
-  - **There is no other body shape.** Every open entry's body is held — an *error
-    placeholder* included, which holds an empty record (`WireForm.heldEmptyRecord`) rather than being the one
-    parameterised `RecordBody` in the system. A placeholder of that shape would oblige `TemplateMaterialiser`
-    to keep a general substitution over *resolved* bodies beside the held one, to serve an entry with no
-    fields to substitute into. Holding it makes `close` total over held bodies, with any other shape an
-    `IllegalStateException` naming the invariant.
-  - **§5.7's fixation happens here** (`fixRoutedValues`), which is what a held record body's retirement of
-    the single `value` channel costs and where §5.7 says to pay it: a field routed by `= P` is held required
-    and FREE with the parameter standing in `value`, and a FREE field carrying a value is that and nothing
-    else — a closed FREE field has none. Closing makes it optional and FIXED, what the literal spelling gives.
-    A `~ P` default arrives as a DEFAULT and stays one: data may still override it.
+  - **What differs between the shapes is only what the result *is*.** A **record** template's closure is a
+    record (`closeHeldRecord`), every other held form's a construction; either is a **synthetic** named for its
+    binding record, and an application nothing declares *is* that synthetic: the use site names it, and no
+    instantiation entry is minted. A declaration naming the application is the closure under its own name, its key
+    recording the application (`@application`). The one exception is an expansion that names its own application
+    (`tree => <T> { children: [tree<T>] }`, `nested => <T> ( T | [nested<T>] )`), whose content cannot be written
+    without a name: the knot is tied on the application-derived name, so that application keeps an instantiation
+    entry — the record itself, or a `Reference` to the synthetic. That is the whole of the divergence; everything
+    before it is shared.
+  - **There is no other body shape.** Every open entry has a held tree — an *error placeholder* included, which is
+    an open empty record, so it closes by the same process as any record template. `close` is total over held
+    trees, with any other shape an `IllegalStateException` naming the invariant.
+  - **Closing changes no field fact.** A field routed by `= P` is FIXED where it is written, as `= 201` is, with
+    the parameter standing in `value`; closing substitutes the argument there. What closing does change is the
+    record's selector list, which the member does not carry (`asMember`).
   - **Substitution is one rule, at every depth.** The body was never read against constructor vocabulary, so
     a parameter in a slot, one inside an application a slot holds (`tree<p0>` becoming `tree<text>`), and one
     inside a collection are the same thing here: an unquoted token in a tree, rewritten when its text resolves
@@ -107,10 +119,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     use"): a TYPE parameter exactly when that type is `type_ref`. §12.1 decides the channel by token shape, so an
     unquoted non-numeric argument arrives as a reference — the right default with nothing else known, and wrong for `e =>
     <M> !enum { members: [a b M] }` applied as `e<c>`, where `c` is a member. What settles it is the **declared type of
-    the slot the parameter stands in**, read from the constructor's own vocabulary: `type_ref` for a type slot, and the
-    slot's own type (`non_negative_integer` for `min_items`) for a slot resolving to an `Atom`. §9 makes that general
-    rather than a table of kernel names — a slot holding a type reference MUST be typed `type_ref` — so an extension
-    meta-schema's constructors classify by the same walk. Two more sources: a **routed default or fixed value** (a
+    the slot the parameter stands in**, read from the constructor's own vocabulary: `type_kind` for a type slot, or
+    `type_ref` where an application may stand (an operand, an argument), and the slot's own type
+    (`non_negative_integer` for `min_items`) for a slot resolving to an `Atom`. §9 makes that general rather than a
+    table of kernel names — a slot naming a type is typed `type_kind`, one holding an application `type_ref` — so an
+    extension meta-schema's constructors classify by the same walk
+    (`ParameterTypes.typePosition`). Two more sources: a **routed default or fixed value** (a
     parameter at `record_field.value`) is read as the field's own declared type, from the sibling `type` slot — `c?:
     percent ~ C` gives `percent`, and `w?: T ~ N` gives `N` the type `T`, an earlier parameter — and a payload in
     **§5.6's positional form** (`!enum [a b M]`) is walked as the one unmarked field it binds (`members`).
@@ -123,11 +137,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       by IS-A are refused at the declaration. A slot's type is looked up in the governing meta, a routed type in
       the schema's own namespace. A core copy and its kernel original (same name, same body) count as one type.
     - **The template's form decides where its value types are read** (`ParameterTypes.readsInStructure`, §5.10).
-      A template applying a meta constructor other than `record` (`!array`, `!scoped`, `!integer_type`, …) reads
-      every value parameter's type, written ones included, in the structure namespace, and the materialiser's
-      call-site check resolves it there: a schema's own `non_negative_integer` never stands in for the meta's at
-      `min_items: N`. A record template reads its parameters in the schema's namespace; a reference template
-      takes its callee's form; a type parameter's bound is the schema's in every form.
+      A template applying a meta constructor other than `record` (`!array`, `!scoped`, `!kind_type`, `!integer_type`,
+      …) reads every value parameter's type, written ones included, in the structure namespace, and the
+      materialiser's call-site check resolves it there: a schema's own `non_negative_integer` never stands in for the
+      meta's at `min_items: N`, and `kind<T>`'s `T` is the kernel's `type_name`, read as a literal and resolved as a
+      constructor by the linker. A record template reads its parameters in the schema's namespace; a reference
+      template takes its callee's form; a type parameter's bound is the schema's in every form.
     - **A written type narrows, read by the derived kind** (`<T: text, N: int8>`, carried on
       `SchemaMap.Declaration.parameterTypes`): on a value parameter it replaces `type` and must IS-A the derived
       one; on a type parameter it is `template_param.bound`, and must IS-A every bound the uses inherit. Bounds
@@ -162,9 +177,17 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       source close during resolution's driving loop, before the batch pass can run; the template in hand has
       resolved by then, which is all the walk needs, so only a parameter awaiting the cross-template fixed
       point is left undetermined there.
-    - **The slot types are the constructor's own vocabulary.** `array.element_type` is typed `type_ref`,
-      `enum.members` a set of `identifier`, `record_field.value` a `value` — so a `type_ref` slot gives a TYPE
-      parameter, one resolving to an `Atom` a VALUE parameter, and anything else (a parameter standing for a whole
+    - **A record template confines its parameters to three places** (§5.10): a field's type, a
+      field's default or fixed value, and an argument of an application. The walk carries the slot it is in as
+      `constructor.field`, and in a body headed `record` a whole-token parameter anywhere but `record_field.type`
+      is refused, naming the slot (`parameter 'K' stands at a key of record.fields`) -- a field name, a group
+      member, `optional`, `voidable`, `role`, `extension`, `name_type`, `discriminators`, a bare parent. Each would
+      leave the family base without a shape its applications share. The general kind check runs first, so
+      `<T> !record { fields: T }` keeps its "neither a kind of type nor a scalar" verdict. A template over any
+      other constructor keeps every scalar slot (`<V> !tuple { … voidable: V }`).
+    - **The slot types are the constructor's own vocabulary.** `array.element_type` is typed `type_kind`,
+      `enum.members` a set of `identifier`, `record_field.value` a `value` — so a `type_kind` or `type_ref` slot gives
+      a TYPE parameter, one resolving to an `Atom` a VALUE parameter, and anything else (a parameter standing for a whole
       collection or record) is refused at the declaration, along with a parameter standing in both kinds of position.
       §5.10 has an argument "read by the position it lands in", and the kind is what makes that position known at the
       application.
@@ -178,12 +201,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     — and would leave `[text]` written directly and `[T]` closed to `text` on two entries for one type. Both
     go through `DerivedName.ofBinding` over the same binding record, so the two channels dedupe
     against each other and the closing usually finds the entry desugaring already injected.
-  - **So the application gets a second entry**, a `Reference` to the form whose `source` is the application
-    itself. One entry cannot carry two identities: the closure is a closed synthetic *and* an instantiation
-    of the template, and §8.2 keys those on different things. Without it nothing in resolver output records
-    that `grid<pixel, 3>` was written — the field would name the array and the template's name would vanish.
-    The record shape needs no second entry, since substituting a record yields a record, structurally
-    distinct from any synthetic.
+  - **So the application gets a second entry**, a `Reference` to the form, whose key records the application
+    itself (`@application`, which any kind of entry carries). One entry cannot carry two
+    identities: the closure is a closed synthetic *and* an instantiation of the template, and §8.2 keys those on
+    different things. Without it nothing in resolver output records that `grid<pixel, 3>` was written — the field would
+    name the array and the template's name would vanish. The record shape needs no second entry, since substituting a
+    record yields a record, structurally distinct from any synthetic.
     - **A generated head mints none.** Closing `array_p0_…<pixel, 3>` is an open synthetic closing its own
       intermediate form; nobody wrote that application, and an entry named for it would carry an internal
       name into identity. `SchemaResolver` tells the two apart by the plainest fact available — the
@@ -204,13 +227,13 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     apart by the constructor head: the body shape does not distinguish them, every open entry's being held.
   - **`reference`'s kind is not a base kind**, so `DefinitionResolver`
     dispatches the head instead of judging it by the generic `!C value` rule: §4.1 gives an alias
-    `kind: REFERENCE`, a derived kind (`TypeDefinition.kind`, this resolver's `@Unbound` component — the
+    `kind: REFERENCE`, a derived kind (`EntryKind.of`; the
     kernel declares no `type_kind`) with nothing in the supertype chain to supply it, because `reference`
     describes no value. The
     binding check still runs — `reference`'s vocabulary is a record like any other. §5.10 is explicit that this mints no
   intermediate entry per
-  alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's own
-  `source`. The degenerate spelling closes the same way: `ident => <T> T` applied to `text` is `text`.
+  alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's
+  recorded application. The degenerate spelling closes the same way: `ident => <T> T` applied to `text` is `text`.
   - **A self-applying alias is the author's error, not a knot.** The knot-tying memo answers a recursive
     application with the name of the entry under construction, and this path constructs none — so
     `loop => <T> loop<T>`, applied, would hand a field a name nothing ever defines. A second set tracks
@@ -251,7 +274,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
 values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T
 min_items: N }`. An open instance's body is **held** as text — the application as written, unread
 until materialisation substitutes its parameters away (`schema.meta.TemplateBody` carries it, `HeldBody`
-parses it)
+parses it), where a record template is an open record
 — which is what makes §5.10's "collection-valued slots are parameterizable" work: `result => <T>
 ( T | error )` (the spec's own example), `<T> [T, text]` and `<T> { v: (T | text) }` all resolve. A
 container position holding an
@@ -268,17 +291,18 @@ argument keeps its token, so `[vector<float32, 3>]` closes to a nested array wit
 and `<0xFF>` are one application while `1` and `1.0` stay two, §4 resolving them to different base types —
 §8.2's rule exactly, recorded as written and compared as the value denoted.
 
-**Every template holds its body**, so one process closes them all.
-§5.2 says `{ x: T }` denotes `!record { fields: [ { name: x  type: T } ] }`, and `SchemaDesugarer` rewrites
-it there, where the body is written; a **composition or refinement** template is held one phase later
-(`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the
-*flattened* one — but through `WireForm.heldRecord`, so two producers of the wire form share one
-spelling. **An alias is written the same way**, and is: `uuid_pair => <B> pair<text, B>` leaves the desugar
-phase as `<B> !reference { target: pair<text, B> }`, spellable because the kernel's `reference.target` is a
-`type_ref`. So **every** open entry's body is held, with no exception — which is what lets materialisation
-dispatch on the constructor head (`record` closes to the instantiation, `reference` to a name, everything
-else to a synthetic) rather than on what shape the body arrived in.
+**Every open entry has a held tree**, so one process closes them all.
+§5.2 says `{ x: T }` denotes `!record { fields: { x => { type: T } } }`, and `SchemaDesugarer` rewrites
+it there, where the body is written; `DefinitionResolver.openRecord` binds that payload through `record`'s own
+reader once `ParameterTypes.checkSlots` has confined its parameters, giving the open record. A **composition or
+refinement** template is the *flattened* record resolution builds, with its parameters stated
+(`DefinitionResolver.parameterised`), because both absorb fields from a source. Either way a selector typed by a
+parameter is refused (`refuseParameterTypedSelector`). **An alias is held**: `uuid_pair => <B> pair<text, B>`
+leaves the desugar phase as `<B> !reference { target: pair<text, B> }`, spellable because the kernel's
+`reference.target` is a `type_ref`. So every open entry yields a held tree, with no exception — which is what lets
+materialisation dispatch on the constructor head (`record` closes to the instantiation, `reference` to a name,
+everything else to a synthetic) rather than on which kernel shape holds the entry.
 The kernel has no `record_field.value_param`, `instance_template` or `template_argument`: a
-routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, and §5.7's fixation
-happens at materialisation. What a held body cannot enforce is half of §5.10's argument-kind rule —
+routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, beside the role its modifier
+gives. What a held body cannot enforce is half of §5.10's argument-kind rule —
 `design/template-materialisation.md`, under kind checking.

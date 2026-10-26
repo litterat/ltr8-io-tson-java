@@ -3,12 +3,15 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -49,7 +52,7 @@ class TemplateIsAFamilyBaseTest {
      * already named the same application.
      */
     private static String target(TsonLinkedSchema schema, String alias) {
-        return schema.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
                 ? ref.target().name() : alias;
     }
 
@@ -74,9 +77,9 @@ class TemplateIsAFamilyBaseTest {
     // ── Gap 1: a marked template takes part in the IS-A chain ────────────
 
     /**
-     * A subtype template is a subtype of its base. The instantiations already index under the base through
-     * their own {@code supertypes}; what was missing is the template, which {@code computeSubtypes} skipped
-     * outright for having parameters.
+     * A subtype template is a subtype of its base, and so are the members its applications close to: a template
+     * carries a chain like any record composing the base ([TSON-SCHEMA] §4.1), so {@code computeSubtypes}
+     * credits it.
      */
     @Test
     void aMarkedTemplateIsIndexedUnderItsBase() {
@@ -87,9 +90,9 @@ class TemplateIsAFamilyBaseTest {
                   dogpet   => pet<"dog", dog_type>
                 """);
 
-        assertTrue(schema.schema().entries().get("pet_base").subtypes().contains("pet"),
-                () -> "the template is a member of its base: "
-                        + schema.schema().entries().get("pet_base").subtypes());
+        List<String> members = TypeChain.subtypesOf(schema.schema().entries().get("pet_base"));
+        assertTrue(members.contains("pet"), () -> "the template is a member of its base: " + members);
+        assertTrue(members.contains(target(schema, "dogpet")), () -> "and so is the member: " + members);
     }
 
     /** And it keeps its own instantiations, which is what #506 already gives it. */
@@ -98,7 +101,7 @@ class TemplateIsAFamilyBaseTest {
         TsonLinkedSchema schema = linked("f2", SEALED_FAMILY);
 
         assertEquals(List.of(target(schema, "dogpet"), target(schema, "catpet")),
-                schema.schema().entries().get("pet").subtypes());
+                TypeChain.subtypesOf(schema.schema().entries().get("pet")));
     }
 
     // ── Gap 2: abstract on a template is a claim with a subject ───────────
@@ -194,6 +197,63 @@ class TemplateIsAFamilyBaseTest {
                 """).stream().anyMatch(d -> d.message().contains("is a template taking")));
     }
 
+    // ── A base names the entries its members name ────────────────────────
+
+    private static String fieldType(TsonLinkedSchema schema, String entry, String field) {
+        return ((RecordBody) schema.schema().entries().get(entry)).fields().get(field).type().name();
+    }
+
+    /**
+     * A field type naming none of the base's parameters means the same in every application, so the base names
+     * the entry its members do -- and the selector a base position reads is that entry, not an application.
+     */
+    @Test
+    void aSelectorTypedByAnApplicationIsTheEntryEveryMemberNames() {
+        String declarations = """
+                  bounded => <M> !integer_type { max: M }
+                  pet     => <N> { kind: bounded<9> = N  name: text }
+                  cat     => pet<3>
+                  dog     => pet<4>
+                  holder  => { p: pet }
+                """;
+        TsonLinkedSchema schema = linked("f13", declarations);
+
+        String closed = fieldType(schema, "cat", "kind");
+        assertEquals(closed, fieldType(schema, "pet", "kind"), "the base names the member's entry");
+        assertEquals(closed, ((RecordBody) schema.schema().entries().get("pet")).parameters().getFirst().type().name(),
+                "and N's derived type is that entry too");
+        assertEquals(List.of(), read("f14", declarations, "!holder { p: { kind: 4  name: \"rex\" } }"));
+    }
+
+    /**
+     * A form the desugar phase lifted inside a base, with an application in a slot, is renamed onto the entry the
+     * materialised channel publishes -- in the base as everywhere else, so the base names an entry the schema has.
+     */
+    @Test
+    void aLiftedFormInABaseNamesTheEntryTheSchemaPublishes() {
+        TsonLinkedSchema schema = linked("f15", """
+                  box    => <T> { v: T }
+                  pet    => <N> { kind: text = N  tags: [box<text>] }
+                  cat    => pet<"cat">
+                """);
+
+        String tags = fieldType(schema, "pet", "tags");
+        assertEquals(fieldType(schema, "cat", "tags"), tags);
+        assertTrue(schema.schema().entries().containsKey(tags), () -> tags + " is not an entry of the schema");
+    }
+
+    /** A family no declaration has a member of still has its selectors, which is what the refusal offers. */
+    @Test
+    void aFamilyWithNoMemberStillNamesItsSelector() {
+        List<Diagnostic> problems = read("f16", """
+                  pet    => <N> { kind: text = N  name: text }
+                  holder => { p: pet }
+                """, "!holder { p: { kind: cat  name: x } }");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals("(no cat, and none to name)", problems.getFirst().actual());
+    }
+
     // ── A family's members are the applications a declaration names ────────────
 
     /**
@@ -209,8 +269,8 @@ class TemplateIsAFamilyBaseTest {
                   holder => { any: box  k: box<text> }
                 """;
         TsonLinkedSchema schema = linked("f11", declarations);
-        assertEquals(List.of("bt"), schema.schema().entries().get("box").subtypes());
-        assertEquals(List.of("box"), schema.schema().entries().get("bt").supertypes());
+        assertEquals(List.of("bt"), TypeChain.subtypesOf(schema.schema().entries().get("box")));
+        assertEquals(List.of("box"), TypeChain.supertypesOf(schema.schema().entries().get("bt")));
 
         assertEquals(List.of(), read("f11", declarations, "!holder { any: !bt { v: 1 }  k: { v: x } }"));
         List<Diagnostic> untagged = read("f11", declarations, "!holder { any: { v: 1 }  k: { v: x } }");

@@ -2,13 +2,13 @@
 name: tson-java
 description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its `tson`
   command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`, `io.ltr8.tson.tree`,
-  `io.ltr8.tson.base`, `io.ltr8.tson.json`, `io.ltr8.bind`, `io.ltr8.net` or `io.ltr8.regex`; whenever names like `Tson`,
-  `Json`, `ProcessorConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`,
-  `SchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the `ltr8-io-tson-java`
-  repository; and whenever someone wants to check, compile or hash `.tn` files (or validate `.json` against a TSON schema)
-  from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step — whatever language
-  the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for *schema*
-  documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
+  `io.ltr8.tson.base`, `io.ltr8.tson.json`, `io.ltr8.bind`, `io.ltr8.net`, `io.ltr8.regex` or `io.ltr8.unicode`; whenever
+  names like `Tson`, `Json`, `ProcessorConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`,
+  `ReadException`, `SchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the
+  `ltr8-io-tson-java` repository; and whenever someone wants to check, compile or hash `.tn` files (or validate `.json`
+  against a TSON schema) from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step
+  — whatever language the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for
+  *schema* documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
 ---
 
 # `io.ltr8:tson` — the Java implementation
@@ -29,10 +29,10 @@ Twelve JPMS modules, all published together as `io.ltr8:<module>`:
 | `tson-atom`      | `io.ltr8.tson.atom`       | the built-in atom vocabulary: which tokens each atom accepts, what Java value results |
 | `tson-tree`      | `io.ltr8.tson.tree`       | `TsonValue` and its node types — the read output of tree mode   |
 | `tson-schema`    | `io.ltr8.tson.schema`     | the resolved-schema value model and the registry                |
-| `tson-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
-| `tson-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
-| `tson-regex`     | `io.ltr8.regex`           | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
-| `tson-net`       | `io.ltr8.net`             | network text formats to their RFCs — `Iri` (RFC 3986/3987), IP addresses, CIDR, EUI-48 (no TSON dependency) |
+| `ltr8-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
+| `ltr8-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
+| `ltr8-regex`     | `io.ltr8.regex`           | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
+| `ltr8-net`       | `io.ltr8.net`             | network text formats to their RFCs — `Iri` (RFC 3986/3987), IP addresses, CIDR, EUI-48 (no TSON dependency) |
 | `tson-json`      | `io.ltr8.tson.json`       | the JSON encoding: `Json`, its readers and writers, `JsonValue` — no dependency on `tson-compiler` |
 | `tson-cli`       | `io.ltr8.tson.cli`        | the `tson` command (`validate`, `compile`, `policy`, `hash`, …) |
 
@@ -41,22 +41,22 @@ TypeScript port is [ltr8-io-tson-typescript](https://github.com/litterat/ltr8-io
 the shared conformance vectors both are tested against are
 [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite).
 
-**Versioning is `0.<spec revision>.<patch>`.** `0.37.x` implements **2026 Revision 37**: its bundled schemas
-carry Revision 37 identities (`https://tson.io/2026/37/m/…`). A new revision moves the minor, and the spec is a working draft
+**Versioning is `0.<spec revision>.<patch>`.** `0.38.x` implements **2026 Revision 38**: its bundled schemas
+carry Revision 38 identities (`https://tson.io/2026/38/m/…`). A new revision moves the minor, and the spec is a working draft
 with no compatibility guarantee between revisions — so a schema `!!id` pinned at
-`https://tson.io/2026/37/m/core.tn` is revision-specific and must match the library's own revision.
+`https://tson.io/2026/38/m/core.tn` is revision-specific and must match the library's own revision.
 
 > **Not on Maven Central**, deliberately — publishing needs signed artifacts and a fuller POM, which is a
 > separate decision. To use it from another project on the same machine: clone, `./gradlew
-> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.37.0-SNAPSHOT` (the front
+> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.38.0-SNAPSHOT` (the front
 > door pulls the rest in). The jars carry real `module-info.class`es, so class path or module path both
 > work.
 
 ## Workflow
 
 1. **Decide whether you need a schema at all.** Reading one document with no schema is one
-   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the four
-   bundled schemas (meta-kernel, meta, core, policy) and is what you need only once a *schema* is in play.
+   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the five
+   bundled schemas (meta-kernel, meta, core, net, policy) and is what you need only once a *schema* is in play.
 2. **Pick the reader from the matrix below** — the two questions are *what drives the interpretation*
    (the wire alone, your Java class, or a TSON schema) and *what you want out* (a `TsonValue` tree, or
    a bound Java object).
@@ -106,12 +106,12 @@ import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetchi
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
 
-Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn, core.tn and policy.tn
+Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn, core.tn, net.tn and policy.tn
 
 String schema = """
-        !!id:"https://example.com/2026/37/app/order-1.tn"
-        !!meta:"https://tson.io/2026/37/m/meta.tn"
-        !!import:"https://tson.io/2026/37/m/core.tn"
+        !!id:"https://example.com/2026/38/app/order-1.tn"
+        !!meta:"https://tson.io/2026/38/m/meta.tn"
+        !!import:"https://tson.io/2026/38/m/core.tn"
         {
           order => {
             order_id: int32
@@ -124,7 +124,7 @@ String schema = """
 tson.resolve(schema);                 // registers it under its own !!id
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/37/app/order-1.tn")
+        .withSchema("https://example.com/2026/38/app/order-1.tn")
         .readAs("""
                 { order_id: 1042  customer: "Ada Lovelace"  placed: !date 2026-07-01  total: 149.95 }""",
                 "order");
@@ -293,7 +293,7 @@ project shipped exactly that bug.
 
 ## Fetching schemas
 
-Out of the box a `Tson` serves only the four bundled schemas (meta-kernel, meta, core, policy):
+Out of the box a `Tson` serves only the five bundled schemas (meta-kernel, meta, core, net, policy):
 `SchemaAccess.registeredOnly()` is the default, so anything else must be registered first or reachable through a
 configured source. Two fetching sources ship, plus a non-fetching third:
 
@@ -454,6 +454,32 @@ the policy flags (§8.2's name hygiene and §9.1's `--max-depth`) for the three 
 **`references/cli.md` has the rest** — every flag, the policy options and the rules that keep one from
 meaning nothing, the `--output json`/`tson` shapes field by field, and the CLI's own pitfalls.
 
+## Field names that are not identifiers
+
+A record's field names are identifiers by default. A schema translated from JSON-LD, JSON Schema or OpenAPI
+has members such as `@id`, `@type` or `$ref`, and a record can declare them as written by naming a **name
+type**: an `identifier_type` whose profile admits the extra characters. State it once, on a fieldless abstract
+base, and compose that base; a composition takes its supertypes' one name type (Part 2 §5.2):
+
+```
+json_name   => !identifier_type { start_add: "@$" }
+json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
+node        => json_record & { "@id": text  "$ref"?: text  label: text }
+```
+
+- **In TSON text a relaxed name is quoted** (`!node { "@id": "urn:x"  label: "y" }`); the writer quotes it for you.
+- **In JSON it is an ordinary member** (`{"@id": "urn:x", "label": "y"}`), and `$ref`/`$id` are field names: only
+  `$schema`, `$type` and `$value` mean anything to the encoding, so a record should not declare those three.
+- **Bind it through the component that states it**: `public record Node(@Field("@id") String id,
+  @Field("$ref") String ref, String label) {}`.
+- **Other name types**: words with a space (`!identifier_type { continue_add: "-"  medial: " " }`), names compared
+  without case (`normalization: NFKC_CASEFOLD`, so `NAME` is the field `name`), HTTP-style header names (`start:
+  ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD`). A name type's normalization must imply NFC.
+- **Records that inherit share one name type**, the default included: a plain record composed into a `json_record`
+  is refused, so declare it over the same base.
+- **What still needs a map**: a key that is no name at all -- empty, leading or trailing spaces, invisible
+  characters -- and an open set of keys. A name type admits names, not arbitrary strings.
+
 ## The JSON encoding
 
 `tson-json` reads and writes JSON as a TSON encoding ([TSON-JSON]): the same data model, the same schemas,
@@ -509,7 +535,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | catching `ParseException` around a facade read              | a facade routes base syntax through the receiver                    | catch `ReadException`, or read `.diagnostic()`          |
 | expecting a collecting read to throw on a syntax error          | it collects; an empty list is the only "valid"                      | check `problems.diagnostics().isEmpty()`                    |
 | matching diagnostic `message` text                              | messages are not API                                                | switch on `Diagnostic.Code`                                 |
-| `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, or `preservingUnknownTypeRefs()`        |
+| `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, `withHostTypes()`, or `preserving…()`   |
 | treating `TsonMissing` and `TsonVoid` as the same             | `TsonVoid` was written (`_`); `TsonMissing` is a failed lookup    | `isVoid()` / `isMissing()`, or `missingPath()`            |
 | `asInt()` to assert which host type a read produced             | it converts; `234.56E2` answers too                                 | `as(Integer.class)`                                         |
 | `as(URI.class)` on a `!uri`/`!iri` value                        | the four URI atoms read to `io.ltr8.net.Iri`; a cast finds nothing  | `as(Iri.class)`; a bound component may still declare `URI`  |
@@ -517,6 +543,8 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | `SchemaAccess.httpSchemas()` with no host                       | deny by default means nothing is permitted                          | name the hosts explicitly                                   |
 | a `LIMIT_EXCEEDED` read as "invalid document"                   | this deployment's depth bound refused it; the bytes may be fine     | raise `LimitsPolicy.maxDepth` if the depth is legitimate    |
 | a schemaless bind failing on `UNRECOGNIZED_FIELD`               | a schemaless bind is closed, as a schema-driven one is              | declare the field, or `ignoringUnknownFields()` deliberately |
+| `"@id"` refused in a record, or a map for JSON-LD members       | a record's field names are identifiers unless it names a name type   | compose a base with `name_type` (Field names that are not identifiers) |
+| a plain record composed with a `json_record`                    | supertypes must share one name type, the default included           | declare the reused record over the same base                |
 | a `FetchPolicy` beside `SchemaAccess.of(…)`                     | that source carries its own, set on its own builder; refused        | state it on the builder that makes the source               |
 | a `SCHEMA_*` fetch code read as "invalid document"              | nothing was checked                                                 | route on the code; only `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are worth a retry |
 | your own copy of the "not a verdict" code set                   | two consumers drift apart over the same diagnostic                  | ask `Diagnostic.Code.verdict()`                             |
@@ -558,8 +586,8 @@ outstanding work, `SPEC-FEEDBACK.md` the spec issues still open against the curr
 
 ## Specification
 
-- Part 1 — Text Data Format: https://tson.io/raw/2026/37/tson-part1-data.md
-- Part 2 — Type System and Schema: https://tson.io/raw/2026/37/tson-part2-schema.md
+- Part 1 — Text Data Format: https://tson.io/raw/2026/38/tson-part1-data.md
+- Part 2 — Type System and Schema: https://tson.io/raw/2026/38/tson-part2-schema.md
 - Part 3 — JSON Encoding: drafted in the repository, `spec/tson-part3-json.md`
 
 Both are working revisions and change without compatibility guarantees. Re-fetch and check the revision

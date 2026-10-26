@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 /**
  * An enum inside a collection binds to the enum, not to the {@code String} the enum reader produced.
  *
- * <p>A record field needs nothing for this: {@code tson-bind} collects a record's constructor arguments
+ * <p>A record field needs nothing for this: {@code ltr8-bind} collects a record's constructor arguments
  * through their bridges, so a scalar enum field arrives as the enum. A collection's elements do not go
  * through a constructor -- they are appended through the collection's own access bridge, which converts
  * nothing -- so the element reader has to apply the bridge itself ({@link ElementBridging}).

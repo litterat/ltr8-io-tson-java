@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and whose bridge crosses to the consumer's own class, so what a reader owes at such a position is the
  * wire value put through that bridge.
  *
- * <p>The schemaless readers get this from {@code tson-bind}, which collects a record's constructor
+ * <p>The schemaless readers get this from {@code ltr8-bind}, which collects a record's constructor
  * arguments through their bridges. A schema-driven read builds its own arguments from the compiled field
  * readers, so it applies the bridge itself, in the same field-wiring step that rebinds a {@code value} slot
  * and a container -- {@code RecordBindReader} over {@code ElementBridging}, the wrapper an array's and a
@@ -46,8 +46,8 @@ class AtomBoundClassUnderSchemaTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/invoice-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               money => text
               invoice => { total: money }
@@ -154,7 +154,7 @@ class AtomBoundClassUnderSchemaTest {
         assertEquals(new Sku("12.34"), invoice.total());
     }
 
-    /** And a collecting read of a good document reports nothing -- it used to throw straight past the receiver. */
+    /** And a collecting read of a good document reports nothing, and never throws past the receiver. */
     @Test
     void aCollectingReadOfAGoodDocumentReportsNothing() {
         DiagnosticsCollector collector = new DiagnosticsCollector();
@@ -183,13 +183,13 @@ class AtomBoundClassUnderSchemaTest {
 
     /**
      * A schema reaching {@code value} imports meta-kernel.tn, which is why this is a meta-layer facility
-     * rather than something a consumer adopts: meta-kernel.tn and core.tn both declare {@code void}, so a
-     * schema reaching the escape hatch gives up the standard library to do it.
+     * rather than something a consumer adopts: an import stands at the importer's governing level (§2.2.3),
+     * so a schema reaching the escape hatch is one the meta-kernel governs.
      */
     private static final String VALUE_SCHEMA = """
             !!id:"https://example.test/holder-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
             {
               holder => { slot: value }
             }

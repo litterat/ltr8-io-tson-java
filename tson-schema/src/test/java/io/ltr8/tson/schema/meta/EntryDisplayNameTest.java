@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.schema.TsonSchema;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -29,13 +30,9 @@ class EntryDisplayNameTest {
         }
     };
 
-    /** An entry the resolver minted: no position, because there is no declaration to have one. */
-    private static TypeDefinition synthetic(io.ltr8.tson.schema.meta.Top body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT,  List.of(), List.of(), body, Optional.empty());
-    }
-
-    private static TypeDefinition synthetic(io.ltr8.tson.schema.meta.Top body, TypeRef source) {
-        return new TypeDefinition(Optional.of(source), TypeKind.PRODUCT,  List.of(), List.of(), body, Optional.empty());
+    /** An entry the resolver minted, rendered: no position, because there is no declaration to have one. */
+    private static String minted(String name, Top value) {
+        return EntryDisplayName.of(name, value, TsonSchema.EntryFacts.NONE, Optional.empty());
     }
 
     private static ArrayBody array(Optional<BigInteger> min, Optional<BigInteger> max) {
@@ -44,25 +41,20 @@ class EntryDisplayNameTest {
 
     @Test
     void aDeclarationKeepsItsOwnNameWhateverItsShape() {
-        TypeDefinition declared = new TypeDefinition(Optional.of(TypeRef.of("array")), TypeKind.PRODUCT,
-                 List.of(), List.of(),
-                array(Optional.of(BigInteger.ONE), Optional.empty()), Optional.of(SOMEWHERE));
+        Top declared = array(Optional.of(BigInteger.ONE), Optional.empty());
 
-        assertEquals("tag_list", EntryDisplayName.of("tag_list", declared));
+        assertEquals("tag_list", EntryDisplayName.of("tag_list", declared,
+                TsonSchema.EntryFacts.at(Optional.of(SOMEWHERE)), Optional.empty()));
     }
 
     @Test
     void anArrayRendersAsItsSugarWithEverySizeForm() {
-        assertEquals("[order]",
-                EntryDisplayName.of("x", synthetic(array(Optional.empty(), Optional.empty()))));
-        assertEquals("[order; 1..]",
-                EntryDisplayName.of("x", synthetic(array(Optional.of(BigInteger.ONE), Optional.empty()))));
-        assertEquals("[order; ..5]",
-                EntryDisplayName.of("x", synthetic(array(Optional.empty(), Optional.of(BigInteger.valueOf(5))))));
-        assertEquals("[order; 1..2]", EntryDisplayName.of("x",
-                synthetic(array(Optional.of(BigInteger.ONE), Optional.of(BigInteger.TWO)))));
-        assertEquals("[order; 3]", EntryDisplayName.of("x",
-                synthetic(array(Optional.of(BigInteger.valueOf(3)), Optional.of(BigInteger.valueOf(3))))));
+        assertEquals("[order]", minted("x", array(Optional.empty(), Optional.empty())));
+        assertEquals("[order; 1..]", minted("x", array(Optional.of(BigInteger.ONE), Optional.empty())));
+        assertEquals("[order; ..5]", minted("x", array(Optional.empty(), Optional.of(BigInteger.valueOf(5)))));
+        assertEquals("[order; 1..2]", minted("x", array(Optional.of(BigInteger.ONE), Optional.of(BigInteger.TWO))));
+        assertEquals("[order; 3]",
+                minted("x", array(Optional.of(BigInteger.valueOf(3)), Optional.of(BigInteger.valueOf(3)))));
     }
 
     @Test
@@ -70,7 +62,7 @@ class EntryDisplayNameTest {
         MapBody body = new MapBody(TypeRef.of("text"), TypeRef.of("order"), false, false,
                 Optional.of(BigInteger.ONE), Optional.empty());
 
-        assertEquals("{text => order; 1..}", EntryDisplayName.of("x", synthetic(body)));
+        assertEquals("{text => order; 1..}", minted("x", body));
     }
 
     @Test
@@ -79,33 +71,33 @@ class EntryDisplayNameTest {
                 TupleElement.required(TypeRef.of("int32"))));
         ChoiceBody choice = new ChoiceBody(List.of(TypeRef.of("text"), TypeRef.of("int32")));
 
-        assertEquals("[text, int32]", EntryDisplayName.of("x", synthetic(tuple)));
-        assertEquals("(text | int32)", EntryDisplayName.of("x", synthetic(choice)));
+        assertEquals("[text, int32]", minted("x", tuple));
+        assertEquals("(text | int32)", minted("x", choice));
     }
 
     /**
-     * An instantiation entry renders as the application it closes, from its own {@code source} -- which is
-     * what §8.2 keys its identity on, so it is exactly what the author wrote at the site.
+     * An instantiation entry renders as the application it closes, from its key -- which is what §8.2 keys
+     * its identity on, so it is exactly what the author wrote at the site.
      */
     @Test
     void anInstantiationEntryRendersAsTheApplication() {
         TypeRef application = new TypeRef("paged", List.of(new TypeArgument.Ref(TypeRef.of("order")),
                 new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED))));
 
-        assertEquals("paged<order, 3>",
-                EntryDisplayName.of("paged_order_3_abc", synthetic(RecordBody.of(List.of()), application)));
+        assertEquals("paged<order, 3>", EntryDisplayName.of("paged_order_3_abc", RecordBody.of(RecordBody.fieldMap()),
+                TsonSchema.EntryFacts.NONE, Optional.of(application)));
     }
 
-    /** A construction's source is a bare constructor name, which is not an application and renders as the body. */
+    /** A construction's tag is a bare constructor name, which is not an application and renders as the body. */
     @Test
     void aConstructionIsNotAnApplication() {
-        assertEquals("[order]", EntryDisplayName.of("x",
-                synthetic(array(Optional.empty(), Optional.empty()), TypeRef.of("array"))));
+        assertEquals("[order]", EntryDisplayName.of("x", array(Optional.empty(), Optional.empty()),
+                TsonSchema.EntryFacts.constructedBy("array"), Optional.empty()));
     }
 
     /** No sugar spelling and no application: the name, honestly, rather than something invented. */
     @Test
     void anythingElseFallsBackToTheName() {
-        assertEquals("mystery", EntryDisplayName.of("mystery", synthetic(RecordBody.of(List.of()))));
+        assertEquals("mystery", minted("mystery", RecordBody.of(RecordBody.fieldMap())));
     }
 }

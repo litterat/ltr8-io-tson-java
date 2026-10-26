@@ -6,8 +6,8 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -36,8 +36,8 @@ class ValueParamFixedFieldTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/value-param.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               order    => { id: text }
               literal  => { status?: int32 = 201  body: order }
@@ -59,11 +59,12 @@ class ValueParamFixedFieldTest {
     /** The field of the entry {@code created} resolves to, following its alias hop to the instantiation. */
     private static RecordField statusOf(TsonLinkedSchema linked, String entry) {
         var definition = linked.schema().entries().get(entry);
-        if (definition.body() instanceof Reference alias) {
+        if (definition instanceof Reference alias) {
             definition = linked.schema().entries().get(alias.target().name());
         }
-        return ((RecordBody) definition.body()).fields().stream()
-                .filter(field -> field.name().equals("status")).findFirst().orElseThrow();
+        return ((RecordBody) definition).fields().entrySet().stream()
+                .filter(field -> field.getKey().equals("status"))
+                        .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
     private static List<Diagnostic> validate(Tson tson, String type) {
@@ -71,37 +72,33 @@ class ValueParamFixedFieldTest {
     }
 
     /**
-     * The declaration is <b>right</b>, and deliberately so: §5.7 says a parametric {@code = P} places the
-     * field in REQUIRED, "because nothing is fixed at declaration -- the value does not exist yet". Pinned
-     * because the obvious fix for the defect below is to make this REQUIRED_FIXED, which would put this
-     * implementation at odds with the one sentence the spec is explicit about.
+     * The role is the modifier's, settled where the field is written: {@code status?: int32 = S} is an optional
+     * FIXED field exactly as {@code status?: int32 = 201} is, and only the value waits for an application
+     * ([TSON-SCHEMA] §5.7).
      *
-     * <p>The template's body is <b>held</b>, so the state and the parameter are read off the application the
-     * entry holds rather than off a {@code RecordField}: {@code record_field.value_param} is gone, the
-     * parameter standing in the ordinary {@code value} slot with §8.1's shadowing rule to tell it from a
-     * literal.
+     * <p>A record template is the record it is, so the role and the parameter are read off its own {@code
+     * RecordField}: the parameter stands in the ordinary {@code value} slot, with §8.1's shadowing rule to tell it
+     * from a literal.
      */
     @Test
-    void anOpenTemplatesParametricFixedFieldStaysRequiredWithTheParameterRecorded() {
+    void anOpenTemplatesParametricPinIsFixedWhereDeclared() {
         TsonLinkedSchema linked = tson().resolve(SCHEMA);
 
-        TemplateBody held = assertInstanceOf(TemplateBody.class,
-                linked.schema().entries().get("response").body());
+        RecordBody open = assertInstanceOf(RecordBody.class,
+                linked.schema().entries().get("response"));
+        RecordField status = open.fields().get("status");
 
-        assertEquals(List.of("T", "S"), held.parameterNames(), "the entry's own parameter list, as declared");
+        assertEquals(List.of("T", "S"), open.parameterNames(), "the entry's own parameter list, as declared");
         assertEquals(List.of(TemplateParam.typeParameter("T"), new TemplateParam("S", TypeRef.of("int32"))),
-                held.parameters(), "S is routed into an int32 field, so an argument for it is read as an int32");
-        assertTrue(held.template().contains("value: S"),
-                () -> "the parameter stands in the ordinary value slot: " + held.template());
-        assertFalse(held.template().contains("FIXED"),
-                () -> "nothing is fixed at declaration: " + held.template());
+                open.parameters(), "S is routed into an int32 field, so an argument for it is read as an int32");
+        assertEquals("S", status.value().orElseThrow().text(), "the parameter stands in the ordinary value slot");
+        assertEquals(FieldRole.FIXED, status.role(), "the pin is fixed where it is written");
+        assertTrue(status.optional(), "and the name's mark is as written");
     }
 
     /**
-     * Substitution is where §5.7's "fixation happens downstream, where values are concrete" applies: the
-     * argument arrives, so the field is fixed to it, and the templated form lands on exactly the state the
-     * literal form beside it has. Before this, the closed entry carried the right value on a field whose
-     * state no longer said it was fixed.
+     * Closing substitutes the argument and changes no fact, so the templated form lands on exactly the state
+     * the literal form beside it has.
      */
     @Test
     void aMaterialisedValueParameterFieldIsFixedToItsArgument() {
@@ -115,9 +112,8 @@ class ValueParamFixedFieldTest {
     }
 
     /**
-     * A routed <em>default</em> is not promoted: §5.7 sends {@code ~ P} to REQUIRED_DEFAULT, and a default
-     * that data may override is the whole difference between the two spellings. The promotion above reads
-     * the state to tell them apart, so this is the half that says it reads it correctly.
+     * A routed <em>default</em> stays a default: {@code ~ P} is DEFAULT where it is written, as {@code ~ 201}
+     * is, and a default that data may override is the whole difference between the two spellings.
      */
     @Test
     void aMaterialisedValueParameterDefaultStaysADefault() {
@@ -152,8 +148,8 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeFixesARoutedValueTheSameWay() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }
@@ -189,8 +185,8 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeResolvesAgainstTheSingleValueChannel() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }

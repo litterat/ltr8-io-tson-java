@@ -60,8 +60,8 @@ class AllocationHarnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/orders-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
               line => { sku: text  quantity: int32  price: float64 }
@@ -117,8 +117,9 @@ class AllocationHarnessTest {
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
         reader = tson.objectReader();
-        // The same bind context, so what separates this from `reader` is the schema and nothing else.
-        schemalessReader = new TsonObjectReader(tson.dataBindContext());
+        // The same bind context, so what separates this from `reader` is the schema and nothing else -- the
+        // classes stand in for it, which is what lets the root's `!order` link to Order.
+        schemalessReader = new TsonObjectReader(tson.dataBindContext()).withHostTypes();
 
         // Everything a first read builds -- the compiled schema, the reader graph, the bind descriptors --
         // is startup state under this design, so it is built here rather than measured as a read's cost.
@@ -335,7 +336,7 @@ class AllocationHarnessTest {
      * schemaless record costs what a schema-driven one does, though it reaches its slots by name where the
      * other was told them.
      *
-     * <p>{@code DataClassRecordFieldIndexTest} in {@code tson-bind} pins that the index is built once, and
+     * <p>{@code DataClassRecordFieldIndexTest} in {@code ltr8-bind} pins that the index is built once, and
      * {@code TsonObjectReaderTest} the repeat that still needs remembering; this reports what a record costs
      * and catches a regression by a multiple rather than by a fraction.
      */

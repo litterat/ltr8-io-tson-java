@@ -2,7 +2,7 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.base.unicode.Normalization;
+import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.meta.EmailType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

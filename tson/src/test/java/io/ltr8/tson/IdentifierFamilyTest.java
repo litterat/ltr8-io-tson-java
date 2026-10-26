@@ -25,8 +25,8 @@ class IdentifierFamilyTest {
     private static final String ID = "https://example.test/names-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/names-1.tn"
-            !!meta:"https://tson.io/2026/37/m/meta.tn"
-            !!import:"https://tson.io/2026/37/m/core.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
             {
               identifier => !identifier_type { continue_add: "-" }
               snake_name => !identifier ^ { pattern: "[a-z][a-z0-9_]*" }
@@ -126,8 +126,8 @@ class IdentifierFamilyTest {
     private static String schemaWith(String declaration) {
         return """
                 !!id:"https://example.test/profiles-1.tn"
-                !!meta:"https://tson.io/2026/37/m/meta.tn"
-                !!import:"https://tson.io/2026/37/m/core.tn"
+                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/38/m/core.tn"
                 {
                   identifier => !identifier_type { continue_add: "-" }
                   %s

@@ -11,15 +11,13 @@ import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,14 +46,13 @@ class MultiErrorCollectionTest {
 
     @Test
     void threeIndependentProblemsInOneFileAllSurfaceInOnePass() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), new IntegerType(new IntegerSize(8, true))));
-        entries.put("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer"))));
-        entries.put("my_record", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("value", TypeRef.of("integer")),
-                RecordField.required("tag", TypeRef.of("integer")),
-                RecordField.required("items", TypeRef.of("numbers"))))));
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("integer", new IntegerType(new IntegerSize(8, true)));
+        entries.put("numbers", ArrayBody.of(TypeRef.of("integer")));
+        entries.put("my_record", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("value", RecordField.required(TypeRef.of("integer"))),
+                Map.entry("tag", RecordField.required(TypeRef.of("integer"))),
+                Map.entry("items", RecordField.required(TypeRef.of("numbers"))))));
         TsonSchema schema = new TsonSchema("https://example.test/multi-error.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));

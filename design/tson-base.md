@@ -14,14 +14,13 @@ the Unicode tables — package by package, with why each thing is here. Current 
   `Diagnostic.ofLimitExceeded` stays on the record.
 - `ByteSource`/`ByteSink` carry bytes, never characters; closing releases what was acquired and nothing handed in,
   and closing is not flushing.
-- `IdentifierProfile.validate`/`hygiene` report a violation and never throw.
 
 Related: `design/modules.md`, `design/readers-and-diagnostics.md`, `design/json-encoding.md`.
 
 ## The packages
 
-**`tson-base`** — eight packages (the root, `io`, `diagnostics`, `policy`, `source`, `unicode`, `atom`, `bind`), and
-**the root names none of the other seven** apart from `ProcessorConfig`, which composes them: every other
+**`tson-base`** — seven packages (the root, `io`, `diagnostics`, `policy`, `source`, `atom`, `bind`), and
+**the root names none of the other six** apart from `ProcessorConfig`, which composes them: every other
 dependency runs inward, so a subpackage reads on its own and the vocabulary at the centre stays free of the machinery
 around it. `io.ltr8.tson.base` is how a problem is stated — `Diagnostic` (the record and its closed `Code`
 enum), the three diagnostics receivers, `SourcePosition`, `CanonicalIdentity` (§2.2.1's algorithm, how a
@@ -77,19 +76,20 @@ deployment states -- the policy, the schema access, the bind context, and the on
 vocabulary -- with every setting returning a new instance, so a configuration may be handed out and
 derived from without the holder losing what they stated. Construction is not here and cannot be: it names
 the compiler's registry, which is why `Tson.of(config)` lives with the engine.
-**`CanonicalIdentity` reads a reference as an IRI-reference** through `tson-net`'s `Iri`, so a host or path beyond
-US-ASCII is an identity, compared as written. An identity with no host — path-only or `file:`-style — is its
-path, which must be absolute ([TSON-DATA] §2.2.1), so it can never equal a host-and-path identity: a relative
-`tson.io/…` would be `https://tson.io/…`'s. `SchemaReference`, the fetching sources' check, still requires a host:
-a library entry is never fetched.
+**`CanonicalIdentity` reads a reference as an IRI-reference** through `ltr8-net`'s `Iri`, so a host or path beyond
+US-ASCII is an identity; its host is a `Host` value and its path read back from its URI spelling, so every spelling of
+one identity is one string (`design/linking-and-compilation.md`). An identity with no host — path-only or
+`file:`-style — is its path, which must be absolute ([TSON-DATA] §2.2.1), so it can never equal a host-and-path
+identity: a relative `tson.io/…` would be `https://tson.io/…`'s. `SchemaReference`, the fetching sources' check, still
+requires a host: a library entry is never fetched.
 
 **`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to that are TSON's own — `Rational` and
 `Complex` — the question a consumer arrives with rather than part of §8's model, and pure values depending on
-nothing. The network values (`Iri`, the `CidrNetwork` pair) are `tson-net`'s, a library usable without TSON,
+nothing. The network values (`Iri`, the `CidrNetwork` pair) are `ltr8-net`'s, a library usable without TSON,
 which this module requires transitively. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
 `AtomContext` registers those host values, and the JDK ones beside them, with a `DataBindContext`, so a
 class binds the same under every encoding ([TSON-JSON] §5.1). **That is why this module requires
-`tson-bind`, and why doing so costs it nothing**: `tson-bind` is a general engine that binds a `DataValue`
+`ltr8-bind`, and why doing so costs it nothing**: `ltr8-bind` is a general engine that binds a `DataValue`
 to a Java object and has never heard of a schema — system-library standing, like the `java.net.http` this
 module already rests on. The property that matters holds: nothing here knows what a TSON document or
 a JSON one looks like.
@@ -125,21 +125,8 @@ distinction is load-bearing: bytes sit in a block until pushed, so a document ne
 never written, and a sink cannot tell a caller who finished from one who abandoned the write. Every writer
 flushes explicitly. What stays smaller is the *target* set, not the contract: `Appendable` is a genuinely
 different target rather than one spelled twice, so `toTson`'s char path is untouched.
-**`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
-`IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc`, `NfkcCasefold` — and the
-UTS #39 rules over them, read by two engines and knowing nothing about either format. The two policies are
-in `policy` rather than beside the tables they read, because the line between the two Unicode packages is
-**who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
-engines read `unicode` and never name `policy`.
-**`IdentifierProfile` is here too**, beside the tables it reads: a UAX #31 R1 profile (`of`, `check`), with
-[TSON-DATA] §7.7's as `NAME` (`validate`), and §8.2's restricted-character rule (`hygiene`), all **reporting** a
-violation rather than throwing one. Its `Base` enum is the meta-kernel's `identifier_base`, and the top-level
-`Normalization` is `normalization`, which every `schema.meta` text family binds directly rather than mirroring; it
-applies its form (`apply`) as well as testing for it (`holds`), the parsers putting a value into the form and the
-profile then requiring it.
-That is what lets one check serve a caller that owes a parse error and one that owes a diagnostic — the
-identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
-that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a
-host value, and the `identifier_type` atom is a wrapper over `check` living with the rest of the vocabulary
-(`atom.parser.IdentifierParser`). It leaves `tson-compiler`'s `lexer` package exactly `Lexer`, `LexException`, `Token` and
-`TokenType`.
+**The Unicode mechanisms the policies configure are `ltr8-unicode`'s** — the restriction levels, skeleton
+distinctness, the identifier profiles and normalization forms — and what `policy` holds is the choice a deployment
+makes with them; the line is mechanism versus choice (`design/modules.md`). A consumer names `policy` to configure a
+processor, with `RestrictionLevel` for its level. The series' own name grammar is `tson-atom`'s `IdentifierGrammar`
+(`design/base-types-and-atom-vocabulary.md`).
