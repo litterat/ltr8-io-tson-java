@@ -17,19 +17,20 @@
     name, closed to a fixed point through applied parents; `subtypes`
     is its inverse over the entries of this map only (inverse edges
     from schemas that import this one are not represented here);
-    `parents` is a record template's, the parents as written. Both name lists are written lexically
-    sorted; a resolver's native ordering is implementation-defined,
-    so comparison tools canonicalise both lists before comparing.
-    Set-typed fields are compared as written, in source declaration
-    order (Part 2 Sections 7.5, 8). An empty chain is omitted.
+    `parents` is a record template's, the parents as written. Both
+    name lists are written lexically sorted; a resolver's native
+    ordering is implementation-defined, so comparison tools
+    canonicalise both lists before comparing. Set-typed fields are
+    compared as written, in source declaration order (Part 2
+    Sections 7.5, 8). An empty chain is omitted.
   - A `!reference` and a `!template` compose `top` and carry no
     chain.
   - A record's `fields` are flattened: a composition's fields are
     its operands' and its own, merged, so every record composing
     `type` (through `atom`, `product` or `sum`) states `chain` among
     its fields first.
-  - `top`, `type` and the four base kinds are `abstract`, so each
-    states `extension: ABSTRACT`.
+  - `top`, `type`, the three base kinds and `namespace` are
+    `abstract`, so each states `extension: ABSTRACT`.
   - Source annotations are preserved in their authored positions,
     except `@doc`: a conforming resolver carries every source @doc
     verbatim, and these fixtures, which exist to be compared, leave
@@ -41,12 +42,13 @@
     readers, after linking, not in resolved output.
   - A slot that names a type (`record_field.type`,
     `tuple_element.element_type`, a container's type slots, choice
-    variants, a parameter's `type` and `bound`) is typed `type_kind`, the kind of the types, and holds a bare
-    name: a type's name, judged a member of the kind when the schema
-    links. `type_ref` is the application form and stands only where
-    one may: `type_chain.parents`, `type_argument.name`, the
-    `application` annotation, held text, and `reference.target`, which
-    may name a constructor (Part 2 Section 8.1).
+    variants, a parameter's `type` and `bound`) is typed `type_kind`,
+    the kind of the types, and holds a bare name: a type's name,
+    judged a member of the kind when the schema links. `type_ref` is
+    the application form and stands only where one may:
+    `type_chain.parents`, `type_argument.name`, the `application`
+    annotation, held text, and `reference.target`, which may name a
+    constructor (Part 2 Section 8.1).
   - The container constructors carry no parameters: their type
     slots are plain required `type_kind`-typed fields, filled by the
     construction (or by a sugar form's desugaring) like any other
@@ -54,26 +56,30 @@
     parameter, unlabelled: a token there is a parameter exactly when
     its text resolves into the enclosing entry's `parameters`
     (Part 2 Section 5.10's shadowing rule), and a closed entry has
-    none for one to resolve into. A parametric `= P` or `~ P` fixes
-    nothing until materialisation makes the value concrete, when the
-    field takes the role its literal spelling has, FIXED or DEFAULT;
-    its `optional` is the name's mark as written (Part 2 Section 5.7).
+    none for one to resolve into. A parametric `= P` is FIXED and
+    `~ P` DEFAULT where it is written, the parameter in `value`;
+    materialisation substitutes the argument into `value` and changes
+    no other fact, and `optional` is the name's mark as written
+    (Part 2 Section 5.7).
   - `arguments` elements are type_argument records: `{ name: ... }`
     is a reference — including, in template bodies, parameter
     references of either kind, read against `parameters` — and
     `{ value: ... }` is a concrete literal.
-  - Every open entry is written as the constructor application it
-    denotes, `<params> !C core-value` — a record template as
-    `!record`, a container as `!array`/`!map`/`!choice`, an alias as
-    `!reference` — and its body is held unread until materialisation
-    substitutes the parameters away. A held record's `chain` holds
-    only `parents`, as written, one of which may be an application;
-    closing it completes the chain. Instantiation entries are
-    internally named (implementation-chosen, non-normative), and each
-    carries the derived `@application` at its schema-map key, the
-    application it is the instantiation of, read as stated on ingest;
-    none appear here, as nothing in this schema applies a
-    non-constructor template.
+  - An open entry is one of two values (Part 2 Sections 5.10, 8.1).
+    A record template is a `!record` with `parameters`, read as the
+    vocabulary and not held: a parameter stands at a field's type, a
+    field's value or an application's argument, and its `chain`
+    holds `parents` as written, one of which may be an application.
+    Every other open entry is held: a `!template` carrying its
+    `parameters` and, as text in `template`, the constructor
+    application as written — a container as
+    `!array`/`!map`/`!tuple`/`!choice`, an atom constructor as
+    `!integer_type`, an alias as `!reference` — unread until
+    materialisation substitutes the parameters away. An entry that
+    closes a template application carries the derived `@application`
+    at its schema-map key, the application it is the instantiation
+    of, read as stated on ingest; none appear here, as nothing in
+    this schema applies a non-constructor template.
   - Synthetic entries — the closed forms the sugar lifts to (Part 2
     Section 5.3) — are instances of the constructor they build, are
     referenced by the field that wrote the sugar, and carry the

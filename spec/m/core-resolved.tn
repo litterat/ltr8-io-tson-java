@@ -23,8 +23,8 @@
   `voidable_tuple1`) hold their bodies — the application as written,
   unread until materialisation substitutes the parameters away — so a
   token in one is a parameter reference rather than a value of the
-  slot's declared type (Section 8.1's shadowing rule). A processor comparing these compares wire
-  form, not bound values.
+  slot's declared type (Part 2 Section 5.10's shadowing rule). A
+  processor comparing these compares wire form, not bound values.
   """
 !schema {
   void => !void_type {}

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=44c9268cd1d42875fe7eb002e4968a51be6b18cc7ba3409e8a558f54b718760f"
+!!id:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=9cc191d3390ba7c7495d016bfda63cfca861135b671804957bb216daafc1e95b"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 38 draft).
@@ -18,26 +18,28 @@
     The structural root, and what a schema map's entries are: `schema` maps a
     name to a `top`, an entry being its value. Every constructor transitively
     IS-A `atom`, `product` or `sum`, except `reference`, `template` and
-    `namespace`, which compose with `top` directly. `atom`, `product` and
-    `sum` IS-A `type`, which IS-A `top`; `namespace` IS-A `top` alone.
-    Construction transfers kind, not IS-A, so instances and fresh
-    records sit under the kinds with empty chains; a namespace type is
-    declared by composition, which is what places it in the order. `top` and
-    the kinds beneath it are abstract: none has instances of its own, so a
-    direct application of one is refused as any abstract record's is, naming
-    the subtypes that would satisfy it.
+    `namespace`, which compose with `top` directly, and the namespace types,
+    which compose with `namespace` (`schema`, `field_map`). `atom`, `product`
+    and `sum` IS-A `type`, which IS-A `top`; `namespace` IS-A `top` alone.
+    Construction transfers kind, not IS-A, so instances and fresh records sit
+    under the kinds with empty chains; a namespace type is declared by
+    composition, which is what places it in the order. `top` and the kinds
+    beneath it are abstract: none has instances of its own, so a direct
+    application of one is refused as any abstract record's is, naming the
+    subtypes that would satisfy it.
     """
   top       => abstract {}
 
   @doc:"""
     Where an entry sits in the IS-A order. `parents` is what was written: the
-    parents of a record template, one of which may be an application (`<T>
-    result<T> & { ... }`), kept after it closes; it is
-    the only list that ever holds an application. `supertypes` is the closed
-    chain: every entry this one IS-A, complete to a fixed point through applied
-    parents ([TSON-SCHEMA] §5.8), each a bare name, sorted, and empty for a
-    fresh record, an instance and a subtracted record alike. `subtypes` is the
-    inverse, over the entries of this map only ([TSON-SCHEMA] §3.3.4).
+    parents of a record template, one of which may be an application
+    (`<T> result<T> & { ... }`), kept on the template entry once they resolve;
+    a closed instantiation keeps none. It is the only list that ever holds an
+    application. `supertypes` is the closed chain: every entry this one IS-A,
+    complete to a fixed point through applied parents ([TSON-SCHEMA] §5.8),
+    each a bare name, sorted, and empty for a fresh record, an instance and a
+    subtracted record alike. `subtypes` is the inverse, over the entries of
+    this map only ([TSON-SCHEMA] §3.3.4).
     """
   type_chain => {
     parents?:    [type_ref]
@@ -50,10 +52,11 @@
     `product` and `sum` IS-A `type`, and nothing else does. An entry whose
     value is a body whose constructor IS-A `type` is a type; a `reference`
     or a `template` is not, composing `top`. A `namespace` composes `top`
-    too, and is a type of another kind: a value of it is a map, so it is
-    the one constructor `type_kind` holds. An entry whose value is an
-    instance of a namespace type is a value, never a type: it is how a meta
-    layer puts its own vocabulary in a schema map.
+    too, and is a type of another kind: a value of it is a map, so `namespace`
+    and the namespace types composing it (`schema`, `field_map`) are the
+    constructors `type_kind` holds. An entry whose value is an instance of a
+    namespace type is a value, never a type: it is how a meta layer puts its
+    own vocabulary in a schema map.
 
     A type carries its IS-A chain. A declaration never writes `chain`, and a
     constructor never declares a field of that name: the resolver computes the
@@ -608,12 +611,12 @@
     application the entry is the instantiation of ([TSON-SCHEMA] §8.2). An
     entry of any kind can be one, so it is a fact about the entry and not
     about a type: the resolver writes it wherever an entry closes an
-    application — a record template's member, a DATA entry, the alias a
-    template's application closes to. On ingest it is read as
-    stated, unlike `synthetic`, which is recomputed: it is the one fact the
-    entry's value does not state, and what lets an imported schema's
-    instantiations unify with a later schema's. A declaration never writes
-    it, as it never writes `chain`.
+    application — a record template's member, a namespace entry closed from a
+    templated instance, the alias a template's application closes to. On
+    ingest it is read as stated, unlike `synthetic`, which is recomputed: it
+    is the one fact the entry's value does not state, and what lets an
+    imported schema's instantiations unify with a later schema's. A
+    declaration never writes it, as it never writes `chain`.
     """
   application => @annotation type_ref
 
@@ -884,17 +887,24 @@
     governing schema's closure is a member when, past its alias hops
     ([TSON-SCHEMA] §8.3), the constructor its value applies is `of` or IS-A
     `of`, a constructor template followed to the constructor it applies, and
-    it is not itself a constructor (it is not IS-A `top`). A record written in
-    braces is built with `record`, and so is a record template, which is a
-    type, and so is `top` itself: a fresh abstract record IS-A nothing, so it
-    is a member of every kind whose `of` is `record` or above it. A template
-    over another constructor is no type and no member; an application of one
-    is, as the type it expands to, and so is an alias of a member.
+    it is not itself a constructor whose instances are types: it is not IS-A
+    `top` unless it is a namespace constructor, whose instances are maps. A
+    record written in braces is built with `record`, and so is a record
+    template, which is a type, and so is `top` itself: a fresh abstract record
+    IS-A nothing, so it is a member of every kind whose `of` is `record` or
+    above it. A template over another constructor is no type and no member; an
+    application of one is, as the type it expands to, and so is an alias of a
+    member. A namespace type is a member of `type_kind` and of the namespace
+    kinds (`kind<namespace>`) and of no other: a value of it is a map, so
+    `kind<record>` and `kind<product>` exclude it. Membership is by
+    construction, so a kind holds an abstract type: `kind<record>` holds
+    `pet => abstract { ... }`, and `kind<namespace>` holds `namespace` itself.
 
     `of` names a constructor of the writer's structure namespace
     ([TSON-SCHEMA] §3.3.1), as a constructor role does, and never a type of its
-    type-name namespace. It is `type` or at or below it; any other `of` is a
-    resolver error at the declaration.
+    type-name namespace. It is `type` or `namespace`, or a constructor at or
+    below either; any other `of` (`kind<reference>`) is a resolver error at the
+    declaration.
 
     A value is a type name ([TSON-DATA] §7.7), and conforms when it resolves to
     a member. In a data document it resolves in the type-name namespace of the

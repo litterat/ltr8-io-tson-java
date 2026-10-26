@@ -313,14 +313,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   host with "host '…' is not one of [the allowed hosts]", and the file source's not-found and outside-root messages
   name the local mapped directory; [TSON-SCHEMA] §11.2 says the report SHOULD NOT disclose the allowlist. Name the
   host and the rule only; `SchemaSourceConfigTest` pins the wording and moves with it.
-- [ ] **Artifact doc lines to take with the next re-stamp** (each moves every pin and Part 2 §13.2's table, so they
-  go together): the kernel's `application` doc says "a DATA entry" for a namespace entry; its `kind_type` doc says
-  `of` is `type` or below it, where §4.2 admits `namespace` or a constructor below either, and says a kind is "not
-  IS-A `top`" with no namespace-constructor exception; its `type` doc says "the one constructor `type_kind` holds"
-  where the fixture also lists `top`, `field_map` and `schema`; its `top` doc omits the namespace types; its
-  `type_chain` doc says `parents` are "kept after it closes"; `core.tn`'s header lists `uri` among the same-named
-  siblings where the sibling is `iri`; and `meta-kernel-resolved.tn`'s conventions note still says a parametric
-  `= P` "fixes nothing until materialisation", counts "the four base kinds", and describes a held record's `chain`.
 - [ ] **No test pins [TSON-SCHEMA] §5.9 rule 8.** A subtracted construction whose head is a constructor
   (`my_record => record - { groups }` in a meta layer) resolves with an empty chain and `!my_record { … }` is refused
   as not IS-A `top`, which is the rule; nothing in the suite or the corpus exercises it, and the refusal's hint
