@@ -59,6 +59,8 @@ class JsonContainerReadTest {
               maybe_tags => [text?]
               sized      => [text; 2..3]
               unique     => set<text>
+              identities => set<identity>
+              titles     => { identity => text }
               pair       => [text, int32]
               maybe_pair => [text?, int32]
               nested     => { who: person  labels: [text] }
@@ -356,6 +358,22 @@ class JsonContainerReadTest {
                 ["a", "a"]""").refusal();
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertEquals("/1", refusal.path().orElseThrow());
+    }
+
+    /**
+     * §5.6: an {@code identity} is a canonical identity, so two references naming one are one set element and one
+     * map key, whatever their scheme, pin or host case.
+     */
+    @Test
+    void twoSpellingsOfOneIdentityAreOneValue() {
+        read("identities", """
+                ["https://tson.io/2026/38/m/core.tn", "tson.io/2026/38/m/meta.tn"]""").accepted();
+        Diagnostic repeat = read("identities", """
+                ["https://tson.io/2026/38/m/core.tn", "http://TSON.io/2026/38/m/core.tn"]""").refusal();
+        assertEquals("/1", repeat.path().orElseThrow());
+        Diagnostic key = read("titles", """
+                {"https://example.com/people.tn": "People", "example.com/people.tn": "People"}""").refusal();
+        assertEquals("/example.com~1people.tn", key.path().orElseThrow());
     }
 
     // ── §6.4 tuples ──────────────────────────────────────────────────────

@@ -65,7 +65,7 @@
   diagnostic => {
     path?: text?
     schema_pointer?: text?
-    schema_id?: text?
+    schema_id?: identity?
     code: diagnostic_code
     message: text
     expected?: text?

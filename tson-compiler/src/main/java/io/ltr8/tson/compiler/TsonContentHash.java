@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.ContentHashMismatchException;
 
 import java.security.MessageDigest;
@@ -87,34 +88,16 @@ public final class TsonContentHash {
     }
 
     /**
-     * The {@code sha256} content-hash pin declared on a reference URI's query ({@code ?sha256=<hex>}),
-     * or empty if the URI carries no query. Per [TSON-DATA] §2.2.1 a content-address query may contain
-     * *only* recognized hash-algorithm parameters, and the value is full-length (64) lowercase hex.
+     * The {@code sha256} content-hash pin declared on a reference URI's query ({@code ?sha256=<hex>}), or empty if
+     * the URI carries no query -- {@link CanonicalIdentity#declaredSha256}, the one statement of [TSON-DATA]
+     * §2.2.1's rule that a content-address query holds only recognised hash-algorithm parameters, the value
+     * full-length lowercase hex.
      *
      * @throws IllegalArgumentException if the query carries an unrecognized parameter name or a
      *     malformed {@code sha256} value (never silently retained)
      */
     public static Optional<String> declaredSha256(String uri) {
-        int q = uri.indexOf('?');
-        if (q < 0 || q == uri.length() - 1) {
-            return Optional.empty();
-        }
-        String sha256 = null;
-        for (String param : uri.substring(q + 1).split("&")) {
-            int eq = param.indexOf('=');
-            String name = eq < 0 ? param : param.substring(0, eq);
-            if (!name.equals("sha256")) {
-                throw new IllegalArgumentException("unrecognized query parameter '" + name + "' in \"" + uri
-                        + "\" -- a content-address query may contain only hash-algorithm parameters ([TSON-DATA] §2.2.1)");
-            }
-            String value = eq < 0 ? "" : param.substring(eq + 1);
-            if (!isFullLowercaseHex(value)) {
-                throw new IllegalArgumentException("malformed sha256 pin \"" + value + "\" in \"" + uri
-                        + "\" -- expected 64 lowercase hex digits ([TSON-DATA] §2.2.1)");
-            }
-            sha256 = value;
-        }
-        return Optional.ofNullable(sha256);
+        return CanonicalIdentity.declaredSha256(uri);
     }
 
     /**
@@ -133,19 +116,6 @@ public final class TsonContentHash {
                         + actual + " -- refusing to use mismatched content ([TSON-DATA] §2.2.1)");
             }
         });
-    }
-
-    private static boolean isFullLowercaseHex(String value) {
-        if (value.length() != 64) {
-            return false;
-        }
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static MessageDigest sha256Digest() {

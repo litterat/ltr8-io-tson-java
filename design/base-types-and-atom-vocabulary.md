@@ -143,6 +143,17 @@ internationalized name is a constraint violation, the name being one, as are a m
 `allow_parameters` is false and a type or suffix outside `types` or `suffixes`. Only `charset`'s parameter value
 folds: a closed list, since which other registrations fold is the registry's to say.
 
+core.tn's `identity` (`identity_type`, SPEC-FEEDBACK.md #26) is [TSON-DATA] §2.2.1's canonical identity as a family:
+`IdentityParser` reads to `tson-base`'s `Identity` through `Identity.parse`, so the atom and every schema reference
+the library resolves share one reading (`CanonicalIdentity.read`) and one set of refusals, quoted in the same
+words. It is string-class, and a `String` target receives the canonical identity — `tson.io/2026/38/m/core.tn`,
+`/local/orders.tn` — the string the registries key by and `Diagnostic.schemaId` carries, so a `schema_id` field
+binds the library's own string unchanged. The lexical space is a reference in any spelling, or the canonical text
+itself: text beginning with `/` or a scheme is a reference, any other is read through its `https://` spelling, the
+absolute path-only identity keeping the two disjoint. Unlike `canonicalize`, the atom refuses a query that is not
+hash parameters, as the loader does (`CanonicalIdentity.declaredSha256`). Every refusal is a parse failure: the
+family has no facets.
+
 **`boolean` is in that table** ([TSON-DATA] §5.5): the tokens `true` and `false`, case-sensitive, over
 meta-kernel's `!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and
 `!boolean true` are one value — §4.2's special status for the two tokens is a base-resolution rule a typed

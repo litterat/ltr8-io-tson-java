@@ -16,7 +16,7 @@ public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody,
         UriType, IriType, RegexType,
         DecimalType, FloatType, RationalType, UuidType, BytesType, DateType, TimeType, DateTimeType, DurationType,
         PeriodType,
-        Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, HostnameType, HostType, MediaTypeType,
+        Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, HostnameType, HostType, MediaTypeType, IdentityType,
         ComplexType {
 
     /**

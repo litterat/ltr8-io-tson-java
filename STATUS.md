@@ -16,11 +16,12 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       sentinel `_`
 - [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, and `integer` with its bounds
 - [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`
-- [x] Identifier/network/text types — `uuid`, `uri`, `uri_reference`, `iri`, `iri_reference`, `ipv4`, `ipv6`, `cidr4`,
-      `cidr6`, `mac`, `hostname`, `host`, `media_type`, `email`, `text`, `regex` (RFC 9485 I-Regexp); the network
-      types, `hostname`, `host` and `media_type` are `net.tn`'s, a library a schema imports beside core
-      (SPEC-FEEDBACK.md #2), `hostname` is IDNA2008's, in either label form (#5), and `media_type` is RFC 6838's,
-      with RFC 9110 parameters (#8)
+- [x] Identifier/network/text types — `uuid`, `uri`, `uri_reference`, `iri`, `iri_reference`, `identity`, `ipv4`,
+      `ipv6`, `cidr4`, `cidr6`, `mac`, `hostname`, `host`, `media_type`, `email`, `text`, `regex` (RFC 9485 I-Regexp);
+      the network types, `hostname`, `host` and `media_type` are `net.tn`'s, a library a schema imports beside core
+      (SPEC-FEEDBACK.md #2), `hostname` is IDNA2008's, in either label form (#5), `media_type` is RFC 6838's, with
+      RFC 9110 parameters (#8), and `identity` is core's, a [TSON-DATA] §2.2.1 canonical identity read from any
+      reference naming it (#26)
 - [x] Binary type — `bytes`, with its encoding (`base64`, `base64url`, `base32`, `hex`) chosen by the type
 - [x] Temporal types — `date`, `time`, `datetime`, `duration`, `period`
 - [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain

@@ -47,6 +47,7 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.HostType;
+import io.ltr8.tson.schema.meta.IdentityType;
 import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.MediaTypeType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
@@ -1548,6 +1549,8 @@ public final class TsonSchemaLinker {
             case HostType ignored -> {
             }
             case MediaTypeType ignored -> {
+            }
+            case IdentityType ignored -> {
             }
             case ComplexType ignored -> {
             }

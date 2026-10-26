@@ -179,6 +179,24 @@ class OutputFormatTest {
     }
 
     /**
+     * {@code schema_id} is typed {@code identity}, and the library's own string -- the canonical identity every
+     * diagnostic carries, hosted or path-only -- reads back through it unchanged.
+     */
+    @Test
+    void aSchemaIdIsACanonicalIdentityThatRoundTrips() {
+        for (String identity : List.of("example.test/s.tn", "b\u00FCcher.example/sch\u00E9mas/s.tn", "/local/s.tn")) {
+            ValidationReport original = new ValidationReport(Outcome.REJECTED, POLICY, List.of(CliDiagnostic.from(
+                    TsonDiagnostics.ofSchemaError(identity, "", "cannot load !!import", Optional.empty()))));
+            assertEquals(Optional.of(identity), original.errors().getFirst().schemaId());
+
+            Object reread = DiagnosticsSchema.compiled().get("validation_report")
+                    .read(TestDocuments.document(OutputFormat.TSON.render(original)));
+
+            assertEquals(original, reread, identity);
+        }
+    }
+
+    /**
      * <b>A fetch reason survives the round trip as the enum it is</b>, which is what makes carrying it
      * structurally worth anything: a consumer of {@code --output tson} reads back {@code NOT_PERMITTED}
      * and routes on it, where a rendered string would leave it matching on text. This is also the check

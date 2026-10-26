@@ -75,6 +75,7 @@ enum DiscriminationClass {
             case io.ltr8.tson.schema.meta.HostnameType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.HostType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.MediaTypeType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.IdentityType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.Ipv6Type ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.Cidr4Type ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.Cidr6Type ignored -> Optional.of(STRING);

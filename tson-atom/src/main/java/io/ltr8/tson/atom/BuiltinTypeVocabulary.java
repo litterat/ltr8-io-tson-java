@@ -15,6 +15,7 @@ import io.ltr8.tson.atom.parser.IntegerParser;
 import io.ltr8.tson.atom.parser.HostParser;
 import io.ltr8.tson.atom.parser.HostnameParser;
 import io.ltr8.tson.atom.parser.MediaTypeParser;
+import io.ltr8.tson.atom.parser.IdentityParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.MacParser;
@@ -54,7 +55,8 @@ import java.util.Optional;
  * uri_type} ({@code uri} and {@code uri_reference}, §5.5) -- see {@link UriParser}'s Javadoc for why it's the
  * one atom here that doesn't validate its own shape ahead of the JDK type it delegates to. And with {@code
  * iri_type} ({@code iri} and {@code iri_reference}, RFC 3987), judged through the URI each maps to (see {@link
- * IriParser}). And with {@code ipv4_type}
+ * IriParser}). And with {@code identity_type} ({@code identity}, [TSON-DATA] §2.2.1's canonical identity, see
+ * {@link IdentityParser}). And with {@code ipv4_type}
  * ({@code ipv4}, §5.5) -- see {@link Ipv4Parser}'s Javadoc for why its JDK leniency gap is a real
  * SSRF-adjacent concern, not just a spec-fidelity one, and how that's handled. And with {@code
  * ipv6_type} ({@code ipv6}, §5.5) -- a hand-rolled RFC 4291 §2.2 compiler for the same reason, see
@@ -114,6 +116,7 @@ public final class BuiltinTypeVocabulary {
         types.put(UriParser.REFERENCE_TYPENAME, UriParser.REFERENCE);
         types.put(IriParser.TYPENAME, IriParser.UNCONSTRAINED);
         types.put(IriParser.REFERENCE_TYPENAME, IriParser.REFERENCE);
+        types.put(IdentityParser.TYPENAME, IdentityParser.UNCONSTRAINED);
 
         types.put(MacParser.TYPENAME, MacParser.UNCONSTRAINED);
         types.put(EmailParser.TYPENAME, EmailParser.UNCONSTRAINED);

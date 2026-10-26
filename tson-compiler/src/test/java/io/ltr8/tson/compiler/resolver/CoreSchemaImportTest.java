@@ -75,7 +75,7 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(44, core.entries().size(), "expected every core.tn declaration to resolve");
+        assertEquals(45, core.entries().size(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements
         // (int32/positive_integer) and constructor applications (hex, float32, email, complex, unknown) --
@@ -113,7 +113,7 @@ class CoreSchemaImportTest {
 
     /**
      * {@link TsonCompiledMetaRegistry#register} (reached via {@code loader.load}, inside {@link
-     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own 44 entries as a side
+     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own 45 entries as a side
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone

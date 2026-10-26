@@ -83,6 +83,16 @@ one identity is one string (`design/linking-and-compilation.md`). An identity wi
 identity: a relative `tson.io/…` would be `https://tson.io/…`'s. `SchemaReference`, the fetching sources' check, still
 requires a host: a library entry is never fetched.
 
+**`Identity` is that reading as a value**, what core's `identity` atom reads to: an optional `Host` and the path,
+equal by canonical identity, its `text()` exactly `canonicalize`'s string. `CanonicalIdentity.read` is the one
+reading and both are built on it — `canonicalize`, `validate` and `toUri` translate its `IdentitySyntaxException`
+into a `SchemaValidationException` with the same text, since a reference they read is a schema's own. The atom's
+lexical space is wider by one form and stricter by one rule: `Identity.parse` also reads the canonical text itself (no
+scheme, beginning with a host or `/`; text not beginning with `/` or a scheme is read through its `https://`
+spelling), and refuses a query that is not hash parameters (`declaredSha256`, the loader's rule), where
+`canonicalize` strips the query unread. `IdentitySyntaxException` sits at the root with the other exceptions; its
+`reason()` is a predicate on the text, as `HostSyntaxException`'s is.
+
 **`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to that are TSON's own — `Rational` and
 `Complex` — the question a consumer arrives with rather than part of §8's model, and pure values depending on
 nothing. The network values (`Iri`, the `CidrNetwork` pair) are `ltr8-net`'s, a library usable without TSON,

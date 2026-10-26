@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/meta.tn?sha256=1c1d87b4b41d22e6443ebee0137faa266cf95fd37446296030f1ed1ef1797d3f"
+!!id:"https://tson.io/2026/38/m/meta.tn?sha256=51b2698e6acea7db8a23821693440e8b5b566a703fdb4fca77ca826c363a5eec"
 !!meta:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=44c9268cd1d42875fe7eb002e4968a51be6b18cc7ba3409e8a558f54b718760f"
 !!import:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=44c9268cd1d42875fe7eb002e4968a51be6b18cc7ba3409e8a558f54b718760f"
 @doc:"""
@@ -35,9 +35,9 @@
      `ieee_format` enum; `decimal_type` for the exact tier; `rational_type`;
      `complex_type`, with the `complex_component` enum), temporal (`date_type`,
      `time_type`, `datetime_type`, `duration_type`, `period_type`), identifier
-     (`uuid_type`, `uri_type`), network (`ipv4_type`, `ipv6_type`,
-     `cidr4_type`, `cidr6_type`, `mac_type`, `hostname_type`, `host_type`,
-     `media_type_type`), and text (`email_type`).
+     (`uuid_type`, `uri_type`, `identity_type`), network (`ipv4_type`,
+     `ipv6_type`, `cidr4_type`, `cidr6_type`, `mac_type`, `hostname_type`,
+     `host_type`, `media_type_type`), and text (`email_type`).
 
   Plus annotation types — the classifying markers `ordering`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
@@ -407,6 +407,28 @@
     allow_relative?: boolean ~ true
     allow_fragment?: boolean ~ true
     normalization?:  = NONE
+  }
+
+  @doc:"""
+    Canonical identity constraint vocabulary ([TSON-DATA] §2.2.1). Instance is
+    `identity` in core. A value is a canonical identity: a host as `host_type`
+    has it followed by a path, or an absolute path alone. The path is in NFC,
+    each percent-encoded UTF-8 sequence of a character beyond US-ASCII read as
+    that character and every other percent-encoding written in uppercase hex.
+    Two values are equal when their canonical identities are byte-for-byte
+    identical: a scheme and a hash query are no part of a value, a host
+    compares as a `host_type` value does, and a hosted identity never equals a
+    path-only one. The canonical text is the identity: the host's canonical
+    text, an IPv6 address in brackets, then the path, as in
+    `tson.io/2026/38/m/core.tn` and `/local/orders.tn`. TSON text spells a value
+    as its canonical text or as any reference naming it; text beginning with `/`
+    or with a scheme is a reference, and other text is read as the identity of
+    its `https://` reference. A fragment, userinfo, a port, a dot-segment, a
+    query parameter that is not a hash parameter, and a path with no IRI form or
+    not in NFC are outside the family.
+    """
+  identity_type => atom & atom_specification & {
+    spec?: = "https://tson.io/2026/38/tson-part1-data"
   }
 
   @doc:"""

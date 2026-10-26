@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/38/m/core.tn?sha256=11e69386274d7e79760a0df757685590dc66fda4912ee66664c5d7a586be22d7"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=1c1d87b4b41d22e6443ebee0137faa266cf95fd37446296030f1ed1ef1797d3f"
+!!id:"https://tson.io/2026/38/m/core.tn?sha256=a4a47b40ae2dbb46c7c1dcaa7d34337a547968947ea2f66c787c69cf165d5138"
+!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=51b2698e6acea7db8a23821693440e8b5b566a703fdb4fca77ca826c363a5eec"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 38 draft).
@@ -196,6 +196,16 @@
   @doc:"An IRI (RFC 3987 §2.2): the scheme is required."
   @ordering:NONE @bounded:false
   iri => !iri_reference ^ { allow_relative: false }
+
+  @doc:"""
+    The name of a published document: a canonical identity ([TSON-DATA]
+    §2.2.1), a host and its path or an absolute path alone. Every reference
+    naming one identity is one value: `https://tson.io/2026/38/m/core.tn`, its
+    `http://` and pinned spellings, and `tson.io/2026/38/m/core.tn`, its
+    canonical text. See `identity_type` in meta.
+    """
+  @ordering:NONE @bounded:false
+  identity => !identity_type {}
 
   @doc:"""
     Octet sequence. The universal binary type, and the only one: a field is

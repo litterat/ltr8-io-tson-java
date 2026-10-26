@@ -106,6 +106,9 @@
   iri => !iri_type { chain: { supertypes: [iri_reference] }  allow_relative: false }
 
   @ordering:NONE @bounded:false
+  identity => !identity_type {}
+
+  @ordering:NONE @bounded:false
   bytes => !bytes_type {}
 
   @ordering:TOTAL @bounded:true

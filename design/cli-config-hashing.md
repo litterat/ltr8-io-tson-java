@@ -46,9 +46,10 @@ terminator* (the `!!id` line, grammar-required first, is excluded so a document 
 its own id line without circularity; a leading BOM is stripped, never hashed). `TsonContentHash.verify(bytes,
 referenceUri)` parses a reference's `?sha256=` pin (§2.2.1: only hash-algorithm parameters, never silently
 retained — an unrecognized query parameter or malformed hex throws) and checks it, throwing
-`ContentHashMismatchException` on mismatch. Both carry the `Tson` prefix as consumer-facing types whose
-bare names (`ContentHash`, a `hash` mismatch) a consumer plausibly has their own version of — and "content
-hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash".
+`ContentHashMismatchException` on mismatch. The query rule itself is `tson-base`'s
+`CanonicalIdentity.declaredSha256`, so the `identity` atom refuses a query the loader would. Both carry the `Tson`
+prefix as consumer-facing types whose bare names (`ContentHash`, a `hash` mismatch) a consumer plausibly has their
+own version of — and "content hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash".
 
 - **The pin is verification metadata, not identity** — a pinned `!!id` resolves against a plain (or
   differently-pinned) reference because everything keys by canonical identity (scheme+query stripped).

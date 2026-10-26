@@ -14,6 +14,7 @@ import io.ltr8.tson.atom.parser.IntegerParser;
 import io.ltr8.tson.atom.parser.HostParser;
 import io.ltr8.tson.atom.parser.HostnameParser;
 import io.ltr8.tson.atom.parser.MediaTypeParser;
+import io.ltr8.tson.atom.parser.IdentityParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.PeriodParser;
@@ -25,6 +26,7 @@ import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.net.Host;
 import io.ltr8.net.MediaType;
+import io.ltr8.tson.base.Identity;
 import io.ltr8.net.HostName;
 import io.ltr8.net.CidrInet4Network;
 import io.ltr8.net.CidrInet6Network;
@@ -98,6 +100,7 @@ public final class HostAtoms {
             Map.entry(HostName.class, HostnameParser.UNCONSTRAINED),
             Map.entry(Host.class, HostParser.UNCONSTRAINED),
             Map.entry(MediaType.class, MediaTypeParser.UNCONSTRAINED),
+            Map.entry(Identity.class, IdentityParser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
             Map.entry(CidrInet4Network.class, Cidr4Parser.UNCONSTRAINED),
             Map.entry(CidrInet6Network.class, Cidr6Parser.UNCONSTRAINED));
@@ -124,6 +127,7 @@ public final class HostAtoms {
             Map.entry(HostName.class, HostnameParser.UNCONSTRAINED),
             Map.entry(Host.class, HostParser.UNCONSTRAINED),
             Map.entry(MediaType.class, MediaTypeParser.UNCONSTRAINED),
+            Map.entry(Identity.class, IdentityParser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
             Map.entry(CidrInet4Network.class, Cidr4Parser.UNCONSTRAINED),
             Map.entry(CidrInet6Network.class, Cidr6Parser.UNCONSTRAINED));

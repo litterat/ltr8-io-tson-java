@@ -66,6 +66,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `date` / `time` / `datetime`                    | `LocalDate` / `OffsetTime` / `OffsetDateTime`   |
 | `duration` / `period`                           | `java.time.Duration` / `java.time.Period`       |
 | `uri` / `uri_reference` / `iri` / `iri_reference` | `io.ltr8.net.Iri`                             |
+| `identity`                                      | `io.ltr8.tson.base.Identity`, or `String` (the canonical identity) |
 | `ipv4` / `ipv6`                                 | `Inet4Address` / `Inet6Address`                 |
 | `cidr4` / `cidr6`                               | `io.ltr8.net.CidrInet4Network` / `CidrInet6Network` |
 | `hostname`                                      | `io.ltr8.net.HostName`, or `String` (lowercase U-labels) |

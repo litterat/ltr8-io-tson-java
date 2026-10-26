@@ -190,6 +190,11 @@
     allow_fragment => !record_field { type: boolean     optional: true  role: DEFAULT  value: true }
   } }
 
+  identity_type => !record { chain: { supertypes: [atom atom_specification top type] }  fields: {
+    chain => !record_field { type: type_chain  optional: true }
+    spec  => !record_field { type: iri  optional: true  role: FIXED  value: "https://tson.io/2026/38/tson-part1-data" }
+  } }
+
   email_type => !record { chain: { supertypes: [atom atom_specification text_type top type] }  fields: {
     chain         => !record_field { type: type_chain  optional: true }
     min_length    => !record_field { type: non_negative_integer  optional: true }

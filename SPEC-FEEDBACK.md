@@ -2090,6 +2090,12 @@ wanting a keyed collection writes `{K => V}`, which a qualified name does not en
 collection a `ref<T>` reaches into. The alternative, a composition operand resolving in the structure namespace as a
 third constructor role of §3.3.1, lost: it puts constructors in ordinary schemas, which §2.2.2 exists to keep out.
 
+**Two things the HTTP layer asks of a namespace are not proposed here.** A namespace keyed by text is refused, a
+qualified name's segment being an identifier, so that layer's path-and-verb map stays a plain map no name enters, and
+an entry in it is reached by location, not by name. And `&` over two namespace values, merging their maps so that an
+interface extends another, has no rule: composition is over types, and an interface's `extends` stays a list of names
+the layer checks itself. Both may be revisited with a reference in a data document, which Revision 38 does not reach.
+
 **Breaking changes, against Revision 37:** `meta-kernel.tn` gains `namespace` and loses `data`; `schema` and
 `field_map` are written as compositions over `namespace`, and their resolved form is a record carrying the facets they
 state. A meta layer composing `data` declares its vocabulary as a record and a namespace type of it instead, and the
@@ -2268,3 +2274,77 @@ constructors only through its `!!meta`."
 **Status against Revision 37:** open; running on `r2026-38-proposal`: the linker's
 import merge and the resolver's, one phase earlier, refuse an edge at another level in one wording naming both
 documents and both `!!meta`s. The corpus states both refusals as link-layer vectors.
+
+---
+
+## 26. A document's identity is an atom: `identity_type`, with `identity` in core
+
+**Section:** [TSON-DATA] §2.2.1 (canonical identity; the canonical form of an identifying reference), §5.5 (the
+built-in vocabulary); [TSON-SCHEMA] §4.2 (the atoms), §5.5 (equality over values), §7.5 (set uniqueness), §9 (what core
+holds); [TSON-JSON] §3.5 (the `TSON-Schema` field); #4 (an identity's host).
+
+**Kind:** proposal, running. Raised by the HTTP layer in `ltr8-io-tson-java-http` (its `UPSTREAM.md`, "formats this
+project needs and the vocabulary cannot state"), whose `problem.tn` carries a diagnostic's `schema_id` as `text`.
+
+**The problem.** §2.2.1 defines the series' own format, a reference's canonical identity, and the type system cannot
+state it. `https://x/a.tn`, `http://x/a.tn?sha256=…` and `HTTPS://X/a.tn` name one document, and under `text`, `uri` or
+`iri` they are three values: a set of schema references cannot dedupe, a map keyed by them holds one document three
+times, and no `text_type` fold reaches an equality that folds the host, keeps the path's case and drops the scheme and
+the pin. A field holding the identity in the form the series itself reports it, `example.com/people.tn`, is no URI at
+all, so `uri_reference` refuses the series' own canonical string. The HTTP layer's `schema_id`, and this
+implementation's `diagnostic.schema_id` in the CLI's `diagnostics.tn`, are typed `text` for that reason.
+
+**Proposed, and running.** A meta constructor beside `uri_type`, and an instance in core, the series' own format
+belonging with `uri` and `iri` rather than in `net.tn`:
+
+```
+identity_type => atom & atom_specification & { spec?: = "https://tson.io/2026/38/tson-part1-data" }
+identity      => !identity_type {}
+```
+
+- **Value:** a canonical identity (§2.2.1): a host, as `host` reads one (#4, #6), plus an absolute path, or an
+  absolute path alone, resolved only against a library. Equality is byte-for-byte over the canonical identity, so
+  two spellings of one host (`Example.COM`, `xn--bcher-kva.example` and `bücher.example`), two spellings of one path
+  (`sch%c3%a9mas` and `schémas`), the `http` and `https` schemes, and a pinned and an unpinned reference are one
+  value. A hosted identity never equals a path-only one.
+- **Lexical space, one rule:** a value is written as its canonical identity and is read from that text or from any
+  reference naming it. A reference is any spelling §2.2.1 admits — a scheme, a host in any spelling `host` admits, a
+  path in its URI spelling, a `?sha256=` pin, `file:/x` or `/x`. The canonical identity itself is text with no scheme
+  beginning with a host or with `/`; §2.2.1 made a path-only identity absolute so that the two are disjoint by their
+  first character, and a directive, which takes a reference, does not admit the scheme-less form. What §2.2.1 refuses
+  is refused here with the same wording: a fragment, userinfo, a port, a dot-segment, an IPvFuture host or a zone, a
+  relative path, a percent-encoding with no IRI form, a path not in NFC, and a query that is not a `sha256` pin of 64
+  hex digits, the rule a `!!schema` reference is already held to.
+- **Canonical text:** the canonical identity — `tson.io/2026/38/m/core.tn`, `[::1]/x.tn`, `/local/orders.tn` — the
+  string every identity-bearing seam of a processor already carries: a registry's key, a diagnostic's schema
+  identity, a schema source's lookup. A `String` component binds it unchanged; a wire that needs a URI takes the
+  `https` spelling of a hosted identity, which names the same document (§2.2.1's transport hint). Scheme-less text
+  beginning with a name is a hosted identity by the first-character rule, so `orders.tn` is the host `orders.tn` with
+  an empty path, as `https://orders.tn` already is.
+- **No facets.** A position wanting only hosted or only local identities, or a pinned reference as written, declares
+  what it needs when a use appears; a pinned reference is a reference, and this type holds what it names.
+- **Schemaless `!identity`** joins §5.5's vocabulary on #2's terms, denoting core's instance.
+
+**Not proposed: a `json_pointer` atom.** The same consumer asks for one, with a profile of RFC 6901 over TSON's map
+keys (a non-text key's token, a compound key's). Nothing in the series names a pointer today — a diagnostic's location
+is a processor's own contract — so the profile is withheld until an implementation has one to state.
+
+**Breaking changes, against Revision 37:** `meta.tn` gains `identity_type` and `core.tn` gains `identity`, a name no
+schema importing core may now declare; every bundled schema's `!!id` pin changes (§13.2).
+
+**Suggested resolution.** [TSON-SCHEMA] §4.2, beside `uri_type`: "`identity_type` is the atom of [TSON-DATA] §2.2.1's
+canonical identities: a value is read from a canonical identity or from any reference naming one, written as the
+canonical identity, and compared byte-for-byte over it; its instance in core is `identity`." §9's inventory names it.
+[TSON-DATA] §5.5 gains a row: "`!identity` — a document's canonical identity (§2.2.1), read from any reference naming
+it; equal by identity, so the scheme, the pin and the host's spelling do not distinguish two values; host value an
+identity, canonical text the canonical identity". [TSON-JSON] §3.5 may then type the `TSON-Schema` field's value as
+one.
+
+**Status against Revision 37:** open; running on `r2026-38-proposal`. Meta's `identity_type` and core's `identity`,
+read by `tson-atom`'s `IdentityParser` through `tson-base`'s `Identity`, the one reading `CanonicalIdentity` and every
+schema reference already use; the `sha256` query rule moved beside it so the atom and the loader share it. A `String`
+component binds the canonical text and an `Identity` component the value; the writer emits the canonical text, so a
+pinned reference is written without its pin. The CLI's `diagnostics.tn` types `schema_id` by it. Corpus vectors in
+`class1/vocabulary` (each spelling read to its canonical text, and the refusals) and `class2/validate` (untagged at a
+field; two spellings of one identity a duplicate set element and a duplicate map key). [TSON-JSON] is edited in place:
+`identity` joins its family table and §5.6, and two spellings are one set element or map key there too.

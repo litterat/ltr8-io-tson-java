@@ -577,6 +577,23 @@ guarantee. `CanonicalIdentity` (§2.2.1's algorithm) is `tson-base`'s, `io.ltr8.
 its URI spelling and NFC; `validate(id)` requires a document's own `!!id` to be written in that canonical form;
 `toUri(reference)` is the URI spelling for a fetch. An identity with no host must have an absolute path, so
 `/local/orders.tn`, `file:/local/orders.tn` and `file:///local/orders.tn` are one identity.
+`declaredSha256(reference)` is the `?sha256=` pin, refusing a query parameter that is not a hash algorithm.
+
+`io.ltr8.tson.base.Identity` is the same reading as a value, what core's `!identity` reads to:
+
+```java
+public record Identity(Optional<Host> host, String path) {   // equal by canonical identity
+    public static Identity parse(String text);       // a reference, or the canonical text; or IdentitySyntaxException
+    public static Identity ofReference(String reference);   // a reference only, the query unread: canonicalize's
+    public String text();                            // the canonical identity: tson.io/2026/38/m/core.tn, /local/x.tn
+    public String toUri();                           // https:// spelling of a hosted identity, else the path
+}
+public final class IdentitySyntaxException extends IllegalArgumentException { public String text(); public String reason(); }
+```
+
+A field `schema_id: identity` binds a `String` component to the canonical identity, the string the registries key
+by and `Diagnostic.schemaId` carries; `http://`, `https://`, pinned and canonical spellings of one identity are one
+value, so a `set<identity>` or a map keyed by `identity` holds a document once.
 
 The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
 value model — pure records, sealed interfaces and enums, §8's `Top` and its bodies. A schema map's entry is its value:

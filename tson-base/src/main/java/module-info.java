@@ -11,7 +11,8 @@
  *       record for every problem the library states, with the closed {@code Code} enum a consumer routes on;
  *       the receivers that decide a diagnostic's fate; {@link io.ltr8.tson.base.SourcePosition}, the three
  *       coordinates a report points at; {@link io.ltr8.tson.base.CanonicalIdentity}, [TSON-DATA] §2.2.1's
- *       algorithm for how a schema is named; and the exceptions.
+ *       algorithm for how a schema is named, and {@link io.ltr8.tson.base.Identity}, the same reading as the value
+ *       core's {@code identity} atom reads to; and the exceptions.
  *   <li>{@code io.ltr8.tson.base.policy} -- what this processor will admit and spend.
  *   <li>{@code io.ltr8.tson.base.source} -- where it will obtain a schema.
  *   <li>{@code io.ltr8.tson.base.atom} -- the host values the built-in atoms read to.

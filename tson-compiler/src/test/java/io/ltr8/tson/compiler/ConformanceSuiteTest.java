@@ -746,10 +746,9 @@ class ConformanceSuiteTest {
                 String actual = (String) atomType.boundTo(String.class).orElseThrow().read(token);
                 assertEquals(((TokenValue) payload).text(), actual, "vocabulary value");
             }
-            case "hostname", "host", "media_type" -> {
-                // A name or an address, one value per name however it was spelled: the vector states its
-                // canonical text -- lowercase U-labels, a dotted-quad, unbracketed RFC 5952 -- which a String
-                // target receives.
+            case "hostname", "host", "media_type", "identity" -> {
+                // One value however it was spelled: the vector states its canonical text -- lowercase U-labels,
+                // a dotted-quad, unbracketed RFC 5952, a canonical identity -- which a String target receives.
                 String actual = (String) atomType.boundTo(String.class).orElseThrow().read(token);
                 assertEquals(((TokenValue) payload).text(), actual, "vocabulary value");
             }
