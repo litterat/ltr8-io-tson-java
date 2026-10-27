@@ -101,6 +101,15 @@ spec-required case:
   which reads the alias in the schema's namespace like `box`. Either `readsInStructure` follows the applied template
   through the alias, or the spec says which reading holds; `design/held-template-bodies.md` gives the example.
 
+- [ ] **The linker gives a class to the two straddling kinds [TSON-SCHEMA] §5.4 denies one.** §5.4 gives no class to
+  an approximate atom whose `allow_nan` or `allow_infinity` is true, or to a map whose key type forces the pairs form,
+  so a choice listing one is not disjoint in any encoding. `DiscriminationClass.of` (`tson-compiler` reader) classes
+  every `FloatType` `NUMBER` and every `MapBody` `BRACE`, so `( float64 | text )` links `disjoint: true` and the TSON
+  reader dispatches it untagged where §5.4 requires a tag. `tson-json`'s `DiscriminationClass.stable` is the
+  compensating check on its side and goes once the linker is right; `JsonChoiceReadTest`'s unstable-choice cases then
+  become link-time facts (the choice is not disjoint), and the corpus gets the `( float64 | text )` vector. See
+  `SPEC-FEEDBACK.md` #2.
+
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with
