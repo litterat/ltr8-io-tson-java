@@ -22,31 +22,31 @@ import java.util.Optional;
  * §2.6's map-key identity ("the decoded host value, type-ref and annotations stripped"), §5.2's check of a
  * stated FIXED value against its declared one, and the distinctness of a sealed family's pins ({@code
  * RecordExtension}, which is why this is visible outside its own package) are four questions with one answer,
- * so they ask it here rather than each at its own call site. §4.3 writes the contract down for one family; this is where the others get
- * theirs.
+ * so they ask it here rather than each at its own call site. §4.3 writes the contract down for one family;
+ * this is where the others get theirs.
  *
  * <p><b>Five host types do not compare as themselves.</b> A {@code String} compares NFC-normalised, which
- * §2.6 makes the minimum a processor must relate and which the lexer applies to unquoted tokens only -- so a
- * quoted {@code "café"} and an unquoted {@code café} are one value and must not both be admitted
- * to a set. A {@code byte[]} carries Java's identity equality, so without this no two decoded binary values
- * are ever equal: a set admits every duplicate there is, a map admits a key twice, and a FIXED field rejects
- * the one value it exists to accept.
+ * §2.6 makes the minimum a processor must relate. The lexer holds only unquoted tokens to NFC, rejecting one
+ * that is not already normalised, and leaves a quoted string as written -- so a quoted {@code "café"}
+ * (decomposed) and an unquoted {@code café} are one value and must not both be admitted to a set. A {@code byte[]}
+ * carries Java's identity equality, so without this no two decoded binary values are ever equal: a set admits
+ * every duplicate there is, a map admits a key twice, and a FIXED field rejects the one value it exists to
+ * accept.
  *
  * <p><b>The two temporal families compare as instants, because [TSON-SCHEMA] §5.5 makes the offset a
  * spelling</b>: a {@code datetime} is the instant on the UTC timeline and a {@code time} is the time of day
  * in UTC, so {@code 2026-01-01T10:00:00+01:00} and {@code 2026-01-01T09:00:00Z} are one value, {@code -00:00}
  * is the same instant as {@code Z}, and {@code 23:30:00-02:00} is {@code 01:30:00Z}. {@link
  * OffsetDateTime#equals}/{@link OffsetTime#equals} compare the offset instead, which is a narrower relation
- * than the value space, so all three rules above were wrong here at once. Ordering needs nothing: both host
+ * than the value space, and would answer every rule above wrongly at once. Ordering needs nothing: both host
  * types' {@code compareTo} already compares the instant. §5.5 has TSON text preserve the offset as written,
  * so this is an identity and never what a reader hands back.
  *
  * <p><b>The exact tier compares by value, because §5.5 makes scale a spelling too.</b> {@code 1} and
  * {@code 1.0} are one {@code number}, and so are {@code 199.90} and {@code 199.9} -- "every comparison, bound
  * and {@code members} check is over that one value". {@link java.math.BigDecimal#equals} separates them by
- * scale, which is the same shape of mistake the temporal families carry and was wrong in the same three
- * places. The FIXED check is where it bit hardest: a field declared {@code = 1.0} turned away a document
- * writing {@code 1}, refusing a conforming document rather than admitting a malformed one.
+ * scale, the same shape of mistake as the temporal one: a field declared {@code = 1.0} would turn away a
+ * document writing {@code 1}, refusing a conforming document rather than admitting a malformed one.
  * {@code stripTrailingZeros} normalises both directions, {@code 100} and {@code 1E+2} included. §5.3 has the
  * encodings preserve the digits as written, so this is an identity and never what a reader hands back.
  *

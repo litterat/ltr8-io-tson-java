@@ -11,10 +11,10 @@ import java.util.Optional;
  * argument for it is read as, and -- for a type parameter -- the bound an argument's type must IS-A.
  *
  * <p><b>{@link #type} is derived from the positions the parameter stands in</b>: a type slot gives
- * {@code type_ref}, a scalar slot of the applied constructor gives that slot's declared type, a routed default or
+ * {@code type_kind}, a scalar slot of the applied constructor gives that slot's declared type, a routed default or
  * fixed value gives the field's own declared type, and a parameter riding another template's argument list takes
  * that template's recorded type for the position. So the parameter's kind is not a separate field: it is a type
- * parameter exactly when {@link #type} is {@code type_ref}.
+ * parameter exactly when {@link #type} is {@code type_kind}.
  *
  * <p><b>A declaration may narrow what it derives</b>, {@code <T: text, N: int8>}, read by the kind the positions
  * give: on a value parameter it narrows {@link #type}; on a type parameter it is {@link #bound}. The two kinds

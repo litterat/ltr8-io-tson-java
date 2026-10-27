@@ -193,9 +193,9 @@ class AllocationHarnessTest {
     /**
      * Transient garbage per read, reported and loosely bounded. The ceiling is a ratchet against a gross
      * regression (a per-character {@code Matcher}, a document buffered twice), not a budget to tune against
-     * -- it sits at about twice what this measures today, which is far inside a real regression and far
+     * -- it sits at about twice what this measures, which is far inside a real regression and far
      * outside the measurement's own variance. Most of what it allows is fixed cost rather than the
-     * document's: see {@link #whereAReadsBytesGo} and the decoder item in {@code BACKLOG.md}.
+     * document's: see {@link #whereAReadsBytesGo}.
      */
     @Test
     void transientAllocationPerReadIsBounded() {

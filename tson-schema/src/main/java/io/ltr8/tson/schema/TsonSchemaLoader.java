@@ -13,11 +13,12 @@ import java.util.Optional;
  * <p>{@link TsonSchemaRegistry}'s own no-arg constructor uses a default implementation that only ever
  * finds an *already-registered* schema (nothing is fetched from anywhere) -- matching Part 2
  * §10.1's own precedence order, where "fetched" population is opt-in and disabled by default. A
- * caller wanting to resolve an import that isn't registered yet (e.g. fetching schema content over
- * the network, or reading it from a local file) supplies their own {@code TsonSchemaLoader} instead;
- * {@code TsonSchemaRegistry} doesn't merge a loaded import's entries into an importer's namespace yet
- * (see {@code TsonSchemaRegistry}'s own Javadoc for the current boundary) -- this interface exists so
- * that later work doesn't need an API change once it does.
+ * caller wanting to resolve an import from elsewhere (fetching schema content over the network, or reading
+ * it from a local file) supplies their own {@code TsonSchemaLoader} instead.
+ *
+ * <p>The linker ({@code TsonSchemaLinker}, in {@code tson-compiler}) is what calls this: once per {@code
+ * !!import}, merging the loaded schema's whole namespace -- its own imports included -- into the importer's
+ * (Part 2 §2.2.3), and once for the governing {@code !!meta}, whose namespace it consults and never merges.
  */
 @FunctionalInterface
 public interface TsonSchemaLoader {

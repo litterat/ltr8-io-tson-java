@@ -17,11 +17,12 @@ package io.ltr8.tson.base;
  * by mistake. It is deliberately not caught into an {@code ErrorReader} the way an ordinary build failure is
  * -- deferring it to first read is exactly the behaviour that makes it expensive.
  *
- * <p>Two shapes reach here, both meaning "this document's value cannot survive the round trip":
+ * <p>The two field-set shapes, both meaning "this document's value cannot survive the round trip":
  * <ul>
- *   <li>a schema field the class has no component for, where the field is always present (required, or
- *       defaulted) -- so every document of the type loses it. An <em>optional</em> field is not this:
- *       it is lost only when written, so it is reported at the read that writes it;</li>
+ *   <li>a schema field the class has no component for, whatever its state. An <em>optional</em> field is
+ *       refused here too, though nothing is lost until a document writes one: it is the field that works in
+ *       development and fails the first time a caller sends it, so it is reported when the schema compiles,
+ *       not at that read;</li>
  *   <li>a component no schema field fills, which reaches the constructor as {@code null} on every document.
  *       {@code @Unbound} is how a class says a component is its own and not the wire's.</li>
  * </ul>

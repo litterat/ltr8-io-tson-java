@@ -191,9 +191,9 @@ class JsonObjectWriterTest {
 
         @Test
         void a_choice_is_refused_because_no_reader_here_could_dispatch_it() {
-            // The exact mirror of the reader's own refusal: §8.2 admits an untagged choice by a declared
-            // discriminator or by class-stable disjoint variants, both facts a schema states. Writing one
-            // would produce a document this library cannot read back, so it is not written.
+            // The exact mirror of the reader's own refusal: §8.2 admits an untagged choice only where the schema
+            // derives the choice disjoint, a fact no class states. Writing one would produce a document this
+            // library cannot read back, so it is not written.
             String message = assertThrows(WriteException.class,
                     () -> WRITER.toJson(new Drawing(new Circle(2)))).getMessage();
             assertTrue(message.contains("is a choice"), message);

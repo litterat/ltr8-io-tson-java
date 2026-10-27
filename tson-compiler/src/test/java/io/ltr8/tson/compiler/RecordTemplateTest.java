@@ -353,7 +353,7 @@ class RecordTemplateTest {
      * A form written over the declaration's own parameter closes with it: the open synthetic it lifted to is
      * closed innermost-out as the application that reaches it is, so the field ends up naming an ordinary
      * container entry. {@code ContainerSugarEndToEndTest} carries the shape of what it closes into; here the
-     * point is only that applying the template is no longer refused.
+     * point is only that applying the template is accepted.
      */
     @Test
     void aParameterBearingSugarFormClosesWithTheApplication() {
@@ -450,9 +450,9 @@ class RecordTemplateTest {
     }
 
     /**
-     * Refinement previously copied the template's body with its parameters <em>unbound</em>, and the author
-     * was told about an unresolved reference to a parameter they never wrote -- silently wrong rather than
-     * loudly unimplemented, which is why this is pinned rather than merely enabled.
+     * Refining an application refines the closed entry, so the template's parameters are bound before the body
+     * tightens anything: the field carries the argument, never an unresolved reference to a parameter the
+     * author did not write.
      */
     @Test
     void refiningAnApplicationTightensTheClosedEntrysFields() {
@@ -497,9 +497,10 @@ class RecordTemplateTest {
     }
 
     /**
-     * Closing on demand resolves the head through {@code SchemaResolver}'s namespace getter -- which is also
-     * the memo the circular-composition guard rides on. A cycle reached *through* an application must still
-     * be caught there rather than recursing.
+     * A composition operand that is an application is absorbed by value, never closed, and absorbing it
+     * resolves the head through {@code SchemaResolver}'s namespace getter -- which is also the memo the
+     * circular-composition guard rides on. A cycle reached *through* an application must still be caught there
+     * rather than recursing.
      */
     @Test
     void aCycleThroughAnApplicationIsStillCaughtAsACircularComposition() {
@@ -725,8 +726,7 @@ class RecordTemplateTest {
     /**
      * The mistake the target use case invites: "a page of orders" names {@code paged}, the thing the schema
      * declares. It is a data diagnostic like any other -- collectible, and located at the type-ref the
-     * author wrote -- where it used to reach the lifted synthetic and exit on the library's own fault code
-     * complaining about a missing {@code instance_template} factory.
+     * author wrote, not at a lifted synthetic.
      */
     @Test
     void namingATemplateAsADataTypeIsADataDiagnostic() {
@@ -755,8 +755,7 @@ class RecordTemplateTest {
 
     /**
      * The same for a template whose body needs no lifting at all: {@code box}'s field type is the parameter
-     * itself, which used to compile to an {@link io.ltr8.tson.compiler.reader.ErrorReader} whose message
-     * blamed the linker for not rejecting {@code T}. The entry is refused before any of that.
+     * itself, and the base is refused as selecting nothing before any reader for {@code T} is reached.
      *
      * <p><b>And the member is accepted</b>, which is the other half of the rule: {@code !box} names the base
      * and selects nothing, {@code !int_box} names a member and reads.

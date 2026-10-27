@@ -135,8 +135,8 @@ enum DiscriminationClass {
      *       brace-class value in bracket clothing.</li>
      * </ol>
      *
-     * <p>Everything else is stable, records with a rest field included, absorption changing members and never
-     * the object kind. A type with no class is not unstable -- it is unreachable by the untagged route either way.
+     * <p>Everything else is stable, a record included: whatever members it carries, it is an object. A type with
+     * no class is not unstable -- it is unreachable by the untagged route either way.
      */
     static boolean stable(TsonSchema schema, String name) {
         return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition()) {

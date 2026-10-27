@@ -38,10 +38,12 @@ import java.util.Set;
  * ({@code dup => <A, B> { x: dup<A, A> } }) still reaches finitely many instantiations. Positional identity
  * is what §5.10's cited precedent uses (ML restricts polymorphic recursion the same way) and what the
  * change report proposes, and an over-restriction that is simple to state can be loosened later; the
- * reverse cannot. Recorded rather than silently narrowed -- {@code BACKLOG.md} carries the finding.
+ * reverse cannot. {@code design/template-materialisation.md} records the narrowing, and
+ * {@code TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate} pins it.
  *
- * <p>Arity is <em>not</em> checked here. A never-applied template's arity is still unverified, which is its
- * own gap; this compares positionally only where the arity already matches.
+ * <p>Arity is <em>not</em> checked here: {@code TsonSchemaLinker} checks it over every application a held body
+ * writes, whether or not the template is ever applied. This compares positionally only where the arity already
+ * matches.
  */
 final class TemplateRegularity {
 

@@ -12,14 +12,14 @@ import java.util.Optional;
 
 /**
  * The meta-kernel's {@code time_type} constructor (§5.4's {@code time} atom, RFC 3339 {@code
- * full-time}). Pure constraint values, no parsing/validation behavior -- {@code tson-compiler}'s
+ * full-time}). Pure constraint values, no parsing/validation behavior -- {@code tson-atom}'s
  * {@code TimeParser} holds one of these and does the actual reading/writing.
  *
- * <p>{@code precision} bounds the fractional-second digits from above (§5.5): a token's fractional part
- * may carry at most that many, judged on the token as written, and {@code precision: 0} admits none. It
- * is an ordered bound like {@code min}/{@code max} and refines the same way. The family carries no
- * timezone facet -- RFC 3339 {@code full-time}, which {@code spec} pins, already makes the offset
- * mandatory.
+ * <p>{@code precision} is a constraint on the value, not on its spelling (§5.5): {@code precision: N} admits a
+ * value that is a whole number of 10<sup>-N</sup> seconds, so {@code 12:00:00.500} passes at {@code precision: 1}
+ * and {@code precision: 0} admits whole seconds only. It is an ordered bound like {@code min}/{@code max} and
+ * refines the same way. The family carries no timezone facet -- RFC 3339 {@code full-time}, which {@code spec}
+ * pins, already makes the offset mandatory.
  *
  * <p>Also an {@link Atom} variant: {@code time => !time_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.

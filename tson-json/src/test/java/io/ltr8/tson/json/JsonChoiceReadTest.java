@@ -18,9 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * [TSON-JSON] §8.2's discrimination predicate and §8.3's class stability.
  *
- * <p>Two routes and no third. Route 1 is a declared discriminator (§8.4) and is unbuilt, so every
- * case here is the untagged route — {@code disjoint: true} with class-stable variants, dispatching on the JSON value
- * kind — or the tagged form, or the refusal that follows when neither recovers the variant.
+ * <p>One condition and no second (§8.4 says why a choice has no discriminator). Every case here is the untagged
+ * route — {@code disjoint: true}, whose classed variants are class-stable by [TSON-SCHEMA] §5.4, dispatching on the
+ * JSON value kind — or the tagged form, or the refusal that follows when neither recovers the variant.
  */
 class JsonChoiceReadTest {
 

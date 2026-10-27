@@ -33,11 +33,12 @@ import java.util.Map;
  * leaf, and nothing here inspects a value to guess. That is what makes a {@code Map} an object and a tuple
  * an array without either being ambiguous at the point it is written.
  *
- * <p><b>What it refuses, it refuses because the reader could not take it back.</b> A choice with no
- * discriminator has no schemaless dispatch (§8.2 admits exactly two routes to an untagged one, both facts a
- * schema states), so writing a union member would produce a document this library cannot read; a non-finite
- * {@code double} at a position with no string spelling has no JSON number form (§3.1). Both are {@link
- * WriteException}. Refusing beats emitting something that only looks like a document.
+ * <p><b>What it refuses, it refuses because the reader could not take it back.</b> A choice has no
+ * schemaless dispatch (§8.2 admits an untagged one under a single condition, {@code disjoint: true}, which a
+ * schema derives), so writing a union member would produce a document this library cannot read, and is a
+ * {@link WriteException}. Refusing beats emitting something that only looks like a document. A non-finite
+ * {@code double} is not refused: it has no JSON number form (§3.1), so it is written as the string
+ * {@code ".inf"}, {@code "-.inf"} or {@code ".nan"} (§5.4).
  *
  * <p>Stateless past its atom table, so one instance serves every write.
  */
@@ -130,9 +131,9 @@ public final class DataClassObjectWriter {
             case DataClassTuple tuple -> writeTuple(value, tuple, out);
             case DataClassUnion union -> throw new WriteException(
                     ("%s is a choice, and JSON has no schemaless way to say which member this is -- "
-                            + "[TSON-JSON] §8.2 admits an untagged choice by a declared discriminator or by "
-                            + "class-stable disjoint variants, both of which a schema states. Writing one "
-                            + "here would produce a document this library could not read back.")
+                            + "[TSON-JSON] §8.2 admits an untagged choice only where the schema derives the choice "
+                            + "disjoint, which no Java class states. Writing one here would produce a document "
+                            + "this library could not read back.")
                             .formatted(union.typeClass().getSimpleName()));
             default -> throw new WriteException(
                     "no rule for writing " + dataClass.getClass().getSimpleName() + " as JSON");

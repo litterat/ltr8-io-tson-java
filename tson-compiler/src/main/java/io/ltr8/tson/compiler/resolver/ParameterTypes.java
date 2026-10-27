@@ -34,20 +34,20 @@ import java.util.function.Function;
 /**
  * [TSON-SCHEMA] §5.10's parameters, typed by use: each parameter of an open entry gets the type an argument for it
  * is read as ({@code template_param.type}), derived from the positions it stands in, and its kind follows -- a
- * parameter is a {@code TYPE} parameter exactly when that type is {@code type_ref}.
+ * parameter is a {@code TYPE} parameter exactly when that type is {@code type_kind}.
  *
  * <p><b>The slot's declared type is what says which.</b> A held body is the constructor application as written,
  * so the body alone cannot tell a parameter naming a type from one standing for an enum member -- both are bare
  * tokens. What separates them is the constructor's own vocabulary: {@code array.element_type} is typed
- * {@code type_ref}, {@code array.min_items} {@code non_negative_integer}, {@code enum.members} a set of
- * {@code text}. §9 makes that reading general rather than a table of kernel names -- a slot holding a type
- * reference MUST be typed {@code type_ref} -- so an extension meta-schema's own constructors classify by the same
- * walk with nothing added here.
+ * {@code type_kind}, {@code array.min_items} {@code non_negative_integer}, {@code enum.members} a set of
+ * {@code text}. §4.2 makes that reading general rather than a table of kernel names -- every slot that names the
+ * type of a value is typed {@code type_kind}, and {@code type_ref} is the application form -- so an extension
+ * meta-schema's own constructors classify by the same walk with nothing added here.
  *
  * <p><b>Four sources of a use type</b>, and the last is why this is not one pass over one declaration:
  *
  * <ul>
- *   <li>a slot typed {@code type_ref} gives {@code type_ref};</li>
+ *   <li>a slot typed {@code type_kind} or {@code type_ref} gives a type use, recorded as {@code type_kind};</li>
  *   <li>a slot whose type resolves to an {@link Atom} gives that declared type;</li>
  *   <li>a <b>routed default or fixed value</b> -- a parameter at {@code record_field.value} -- gives the field's
  *   own declared type, read from the sibling {@code type} slot, and not {@code record_field.value}'s own type
