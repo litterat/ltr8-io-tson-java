@@ -440,20 +440,23 @@ class DefinitionResolverTest {
     // ── A sugar form must be lifted before resolution ────────────────────
 
     /**
-     * The resolver builds no container type-ref of its own. It used to: an unlifted {@code [T]} became a
-     * structural {@code array<T>}, which is the representation the change report rejects (§11) and which the
-     * linker now reports as an arity error against a constructor the author never wrote. Refusing says what
-     * is actually wrong -- the form reached resolution unlifted, either because a caller skipped
-     * {@code SchemaDesugarer} (this fixture's case) or because a position inside it is an application, which
-     * has no entry to name until it is materialised.
+     * The resolver builds no container type-ref of its own: a container sugar form reaching it is a broken
+     * invariant, not a gap. {@code SchemaDesugarer} lifts every one to an entry before the resolver runs, so only
+     * a caller resolving raw AST without that phase -- as this test does -- can produce one, at a declaration or
+     * inside a field. No author's schema can, which is what keeps it out of {@code NOT_IMPLEMENTED}.
      */
     @Test
-    void aSugarFormReachingResolutionUnliftedIsRefused() throws IOException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+    void anUnliftedSugarFormIsABrokenInvariantNotAGap() {
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+                { names => [text]
+                  holder => { tags: [text] } }""").parseSchemaDocument().body();
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> resolver.resolve(schemaMap.declarations().get("type_ref")));
-        assertTrue(thrown.getMessage().contains("must be lifted"), thrown.getMessage());
+        for (String declaration : List.of("names", "holder")) {
+            IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                    () -> resolver.resolve(schemaMap.declarations().get(declaration)), declaration);
+            assertTrue(thrown.getMessage().contains("reached resolution unlifted"), thrown.getMessage());
+        }
     }
 
     // ── Declaration-level sized-array sugar (§5.3, §5.6) ──
