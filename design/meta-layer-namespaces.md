@@ -232,6 +232,16 @@ typed by such an entry.
 
 ## What a meta layer is not
 
+**A namespace is a constructor, not a map type or a base kind.** `Top` is the union of the bodies an entry can
+hold, so a namespace value is one of its branches only as the instance of a constructor, as a `RecordBody` is an
+instance of `record`. That decided the shape against three alternatives: a map type (`namespace => map & {}`, an
+entry a value of it) would have made `myapi` a value with no constructor to be an instance of and needed a grammar
+sentence of its own for the value entry; a base kind with a `members` field would have kept the kernel's own
+`schema` and `fields` as maps beside the new kind and put a `.members` hop in every path; and `data` with a map field
+was the interim that did the same with a `.methods` hop and a third family of constructors. The constructor gives
+one reading rule, a value of a type IS-A `namespace` is written and read as a map from `key_type` to `value_type`,
+and makes the kernel's namespaces and a meta layer's one type.
+
 **A meta layer is not a vocabulary channel, and this is the first thing an author tries.** The instinct on declaring
 `method` in a meta layer is to put the shared types beside it — a `status_code` atom, an envelope template — and let
 the governed schemas name them. They cannot: `!!meta` says where this schema's *constructors* come from and merges

@@ -1,8 +1,9 @@
 # References: the forms a name takes, and the two facts a reference carries
 
 Design notes for every position in a schema that holds a name: which are references, what a reference's store and
-judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The plan that
-extends this account (the `ref` atom, qualified type names, namespace values) is in `namespace-sketch/REFERENCES.md`.
+judgement are, and which kernel slot is typed by what. Current form only; history lives in git. What extends this
+account, qualified type names and one reference atom over `kind_type`, `ref_type` and the name-only `type_ref`, is
+`BACKLOG.md`'s parameter-channel entry and a Revision 40 direction.
 
 **Invariants**
 
@@ -71,6 +72,22 @@ extends this account (the `ref` atom, qualified type names, namespace values) is
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter
 positions), `design/meta-layer-namespaces.md` (a meta's own slots), `design/record-dispatch.md` (the positional form).
+
+**Why two facts, and why the store is positional.** Store and judgement are Strachey's environment and typed
+pointer: under immutable, alias-free data the environment maps a name to an address, `(namespace, key)`, and a
+reference is a pointer whose type names what the address must hold, so resolution is a load and equality is by
+address. The systems that let a schema slot hold the name of a schema element (Xtext, Smithy, LinkML, TypeSpec,
+Protobuf) all grew the same three constraints, token grammar, store and referent predicate, and differ only in where
+they write them. The lesson they settle is to name the predicate on a reusable type, never per slot: LinkML and Xtext
+repeat it at every slot, and a per-slot annotation was this design's own `bound` mistake. A symbol-space system (XSD,
+LinkML, Xtext) selects the store from the referent's kind, which needs a closed metamodel; a meta-declared namespace
+has no kind to key on, so here the store is positional, the kind is the slot's, and no slot states where its first
+segment resolves. A kind is a predicate on type codes, a set of *names* and not a sum of types: the sum reading
+(`kind<uuid_type>` as a computed choice) admitted an identifier token where a family's name was wanted, and the two
+are indistinguishable on the wire. Deferred, not decided against: a `scope` facet stating a reference's store on
+the slot (a reference into a sibling's referent), which no kernel row wants; a named value of atom type
+(`max_items: default_limit`), where the token is ambiguous between a literal and a name and would need a marker on
+that case alone; and the value-level case, a choice whose variants are computed over the entries of one atom type.
 
 ## The five forms
 

@@ -31,6 +31,18 @@ Related: `design/linking-and-compilation.md` (the link order), `design/reference
 `design/name-hygiene-and-minted-names.md` (the per-name rules a name type's profile feeds),
 `design/meta-layer-namespaces.md`.
 
+**What a kind is not.** Eight shapes were tried before `kind_type`, and each fell for one reason, so none is worth
+re-proposing: a refined `schema` type carrying the checks (§5.7 gives entry-membership only and tightens no field to
+a choice of subtypes); per-slot checked annotations (`@fields_of`, `@typed_by`), which put the referent predicate on
+every slot; naming roles (`type_name`, `method_name` as instances of one constructor, "a role-keyed map declares,
+any other slot references"), which fused token family, store and referent and broke at `field_name`, whose family is
+the record's; a namespace kind with a role lattice, the same fusion plus an alias rule letting a family widen a role
+against §5.7; `name_type` with `target` and `relation` facets, where `relation` was two stores wearing one enum; the
+predicate as facets on the name atom; `kind<T>` with `of` resolving in the writer's namespace, which sent `of` to two
+namespaces depending on who wrote it; and the kind as a sum over its members' values, which admitted an identifier
+token where a family's name was wanted. A kind is an atom whose values are names, `of` resolves in the structure
+namespace, and the members are computed.
+
 ## The types built with a constructor (`KindMembers`, §4.2)
 
 A `kind_type` instance (`!kind_type { of: uuid_type }`, or `kind<uuid_type>` through the kernel's template) is an atom
