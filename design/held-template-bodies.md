@@ -39,6 +39,25 @@ open record), `design/constructor-application.md`, `design/linking-and-compilati
 
 ## The two shapes of an open entry
 
+**Why the line falls between a record and everything else.** Every language with parameterised types draws the same
+line: an *abbreviation* (a C++ alias template, a Haskell `type` synonym, an ML type abbreviation) is a λ over types or
+values whose application is substitution and nothing more, so its open form denotes nothing and is not a type; a
+*family* (a class template, a `data` declaration, a Scala `sealed trait`) has an open form that is a type, which its
+applications are IS-A. TSON's `template` is the abbreviation and a parameterised record is the family, and only a
+record can be one, because three things must survive abstracting over the parameters and all three are record
+properties: a residual shape (the fields that mention no parameter are the interface the base exposes), somewhere for
+ABSTRACT to live, and somewhere for the discriminators member dispatch reads. The near misses confirm it: `<N>
+!integer ^ { max: N }` collapses to `integer` once the facet holding `N` is abstracted away (its applications' IS-A
+edge comes from the `^`, not the parameter list); `<T> [T]` would be `List<?>`, but containers have no IS-A and
+`vector<float32, 3>` and `vector<float32, 4>` erase to one host type; a choice body mints no edge to its variants. A
+bare base at a position (`r: result`) reads as the existential, "some `result<X>`", well-defined because no value is
+ever read against the base: a value there is a member's, selected by its tag or its discriminators, and every member
+is closed (§5.10). Neither kind has variance, since construction transfers kind and not IS-A: `box<cat>` is not IS-A
+`box<animal>`, `bounded<100>` not IS-A `bounded<255>`. So the kind follows the body, with no key-side spelling
+(`box<T> => …`), and §8.2's identities reduce to four facts: a declaration creates identity, `^` and `&` create IS-A
+edges in every application, a parameter list creates the one further edge (declared applications of a record IS-A
+its base), and an application nothing declares is its expansion.
+
 - **A record template is the record it is.** Every slot a record template admits a parameter in already holds a name
   or an uninterpreted token — a field's `type` (a `type_ref` while open, §4.2), its `value`, an application's
   arguments — so the open record is a value of the vocabulary as it stands: a `RecordBody` with `parameters`, its
