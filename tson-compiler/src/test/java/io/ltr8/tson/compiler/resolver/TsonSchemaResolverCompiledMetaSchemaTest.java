@@ -299,13 +299,15 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             }
             """;
 
+    /** A missing {@code !!id} is the author's error ([TSON-DATA] §2.2.1), never a fault in this library. */
     @Test
-    void resolveSchemaThrowsClearlyWhenIdIsAbsent() {
+    void resolveSchemaRefusesAnAbsentIdAsASchemaError() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument noIdDocument = new TsonSchemaParser(MINI_DOCUMENT_NO_ID).parseSchemaDocument();
 
         assertTrue(noIdDocument.id().isEmpty());
-        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> resolver.resolveSchema(noIdDocument));
+        SchemaValidationException thrown =
+                assertThrows(SchemaValidationException.class, () -> resolver.resolveSchema(noIdDocument));
         assertTrue(thrown.getMessage().contains("!!id"));
         assertTrue(thrown.getMessage().contains("absent"));
     }
