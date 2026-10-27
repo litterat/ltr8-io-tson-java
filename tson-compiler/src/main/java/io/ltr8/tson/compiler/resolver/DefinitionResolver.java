@@ -75,7 +75,7 @@ import java.util.function.Predicate;
  *   <li><b>Composition</b> ({@code A & B & { ... }}, §5.8, {@link #resolveComposition}) -- each supertype's
  *   fields and groups absorbed left to right, a body entry naming an inherited field being a
  *   <em>tightening</em> entry (§5.7, {@link #resolveTighteningField}) that replaces it in place, checked
- *   against §5.7's transition table ({@link #isValidTighteningTransition}), with an elided type-ref inheriting
+ *   against §5.7's transition table ({@link #refines}), with an elided type-ref inheriting
  *   the source field's type. A supertype may be an application: a closed one is closed to the entry it
  *   denotes ({@link #closedApplication}), one naming the declaration's own parameters contributes its fields
  *   while still open ({@link #openOperand}).</li>

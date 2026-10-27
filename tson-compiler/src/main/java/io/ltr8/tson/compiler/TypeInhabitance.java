@@ -53,8 +53,8 @@ import java.util.Set;
  * to stay total, this needs no such trade. There is no third answer to report.
  *
  * <p><b>Scope is structural.</b> An atom whose own facets admit nothing ({@code int8 ^ { min: 300 }}) is
- * uninhabited too, but that is a question for the constraint family that owns those facets, next to {@code
- * AtomNarrowing} -- see {@code BACKLOG.md}. Every atom body counts as inhabited here.
+ * uninhabited too, but that is a question for the family that owns those facets, and the resolver asks it
+ * ({@code Atom.coherenceCheck}). Every atom body counts as inhabited here.
  */
 final class TypeInhabitance {
 
@@ -83,14 +83,10 @@ final class TypeInhabitance {
     /**
      * Whether one definition is satisfied by the entries marked so far.
      *
-     * <p><b>An open entry is judged too, with its parameters assumed inhabited.</b> A template is not a type
-     * and no document ever has one, so the question could have been left to its closures -- but then a
-     * template nobody applies would ship broken, which is the failure {@code TemplateRegularity} exists to
-     * prevent for the neighbouring rule. Assuming the parameters inhabited makes the verdict sound in the
-     * direction that matters: if the body cannot be satisfied even when every argument can, then no
-     * application of it can be either. A parameter is not an entry, so {@link #refInhabited} already treats
-     * one as inhabited, and an application {@code tree<p0>} already depends on {@code tree} -- both fall out
-     * of looking the reference's own name up.
+     * <p><b>An open entry counts as inhabited, unjudged.</b> A template is not a type and no document ever
+     * has one; its closures are ordinary entries in this map by the time linking runs, and each is judged on
+     * its own. A template nobody applies is judged nowhere -- §5.10: "an unapplied template is checked no
+     * further and receives no verdict".
      */
     private static boolean isInhabited(Top definition, Map<String, Top> namespace,
             Set<String> inhabited) {

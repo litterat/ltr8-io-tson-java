@@ -15,19 +15,16 @@ import java.util.Optional;
 
 /**
  * The result of {@code TsonSchemaLinker.link} ({@code tson-compiler}) -- proof, at the type level, that a
- * {@link TsonSchema} has been through import merging, argument-bearing {@code type_ref} synthesis, and
- * reference validation, and is therefore self-contained (no dangling references) and safe to {@link
- * TsonSchemaRegistry#register}.
+ * {@link TsonSchema} has been through import merging and reference validation, and is therefore
+ * self-contained (no dangling references) and safe to {@link TsonSchemaRegistry#register}.
  *
- * <p><b>Wraps a {@link TsonSchema} rather than duplicating its fields</b> -- a {@code TsonLinkedSchema}
- * *is* a {@code TsonSchema} (the post-link {@code id}/{@code meta}/{@code imports}/{@code entries}/{@code
- * bootstrap}), plus the extra type-level fact "this one has been linked." Not a subtype ({@link
- * TsonSchema} is a record, and records are implicitly final, so extending it was never on the
- * table anyway) and not interchangeable with one -- a plain {@code TsonSchema} means "resolved, but
- * not necessarily linked"; a {@code TsonLinkedSchema} means "linked." Keeping them nominally
- * distinct means {@link TsonSchemaRegistry#register} can declare it only accepts a {@code
- * TsonLinkedSchema} and the compiler enforces "you must link before you register" -- no flag to
- * check, no way to forget.
+ * <p><b>Wraps a {@link TsonSchema} rather than duplicating its fields</b> -- a {@code TsonLinkedSchema} *is* a {@code
+ * TsonSchema} (the post-link {@code id}/{@code meta}/{@code imports}/{@code entries}/{@code bootstrap}), plus the
+ * extra type-level fact "this one has been linked." Not a subtype ({@link TsonSchema} is a record, and records are
+ * implicitly final) and not interchangeable with one -- a plain {@code TsonSchema} means "resolved, but not
+ * necessarily linked"; a {@code TsonLinkedSchema} means "linked." Keeping them nominally distinct means {@link
+ * TsonSchemaRegistry#register} can declare it only accepts a {@code TsonLinkedSchema} and the compiler enforces "you
+ * must link before you register" -- no flag to check, no way to forget.
  *
  * <p><b>{@link TsonSchemaRegistry} stores this type directly</b> -- every entry it ever holds arrived
  * via {@link TsonSchemaRegistry#register}, so every entry is, by construction, linked; there's no other

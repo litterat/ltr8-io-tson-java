@@ -58,7 +58,7 @@ import java.util.UUID;
  * cannot write {@code min: duration}. A slot typed {@code value} is decoded by [TSON-DATA] §4 base type
  * resolution and by nothing else, which resolves three classes and none of them is a duration -- so {@code
  * min: PT30M} arrives as the string {@code PT30M} and the position's own type is the only thing that says
- * what it meant. This table is how {@code TokenValue, Class)}
+ * what it meant. This table is how {@code tson-compiler}'s {@code ValueParser#read(TokenValue, Class)}
  * asks.
  *
  * <p>{@code java.net.URI} answers with {@code iri_reference}, the widest of the four atoms it holds: every
@@ -188,22 +188,21 @@ public final class HostAtoms {
      * {@code text} for {@code String} and {@code boolean} for the two boolean types. Its two siblings above
      * are split by [TSON-JSON] §5's per-family <em>kinds</em>, because JSON's grammar tells a string from a
      * number and §5's table admits one or the other per family. TSON's does not: at a typed position a token
-     * is a token, [TSON-SCHEMA] §4.2 giving every value "typed by its position or by its tag" and
+     * is a token, [TSON-SCHEMA] §7.3 giving every value "typed by its position or by its tag" and
      * {@link AtomType} reading text rather than a token -- so {@code 12} and {@code "12"} are one
      * {@code int32}, and {@code .nan} and {@code ".nan"} one {@code float64}. One index, because the target
      * is the only question.
      *
      * <p><b>What a reader asks when the class is what types the position</b> -- an object-binding read of a
      * document with no {@code !!schema}, where the target class fixes the shape of every record, array and
-     * atom under it. [TSON-DATA] §4.1's base type resolution is for a position nothing types, which after
-     * this is exactly tree mode; a declared host type naming a §5 family types the position, and that
+     * atom under it. [TSON-DATA] §4.1's base type resolution is for a position nothing types, which leaves
+     * exactly tree mode; a declared host type naming a §5 family types the position, and that
      * family's own parsing contract reads the token.
      *
      * <p><b>What is deliberately absent</b> is every class no single family names: {@code char} and
      * {@code Object} (no family at all), the sealed {@code CidrNetwork} supertype (both {@code cidr4} and
      * {@code cidr6} produce a member of it), and {@code Rational}/{@code Complex}, which bind structurally
-     * rather than as atoms. A caller falls back to base type resolution for those, which is what it did for
-     * everything before.
+     * rather than as atoms. A caller falls back to base type resolution for those.
      *
      * <p><b>An ambiguity here is answered by a schema, and by nothing else this index could carry.</b> The
      * inverse exists only where one family produces a class, and {@code mac}, {@code email}, {@code regex}

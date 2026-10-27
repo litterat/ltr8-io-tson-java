@@ -111,16 +111,16 @@ import java.util.stream.Collectors;
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
  * link a schema before registering it, same as any other caller. Identities are canonicalized through
- * {@link CanonicalIdentity}, which stays in {@code tson-schema} beside the registry that keys on it.
+ * {@link CanonicalIdentity}, which lives in {@code tson-base}, shared with the registries that key on it.
  *
  * <p><b>No materialization.</b> An argument-bearing {@code type_ref} does not become a synthesized entry
- * here -- {@code SchemaDesugarer} has already turned every sugar form and generic application into a real
- * declaration plus a bare reference, one phase earlier, where the AST and the governing meta's own
- * constructor vocabulary are both still in hand. That is what lets it bind the constructor generically and
- * so cover every shape, rather than the per-shape assemblers a linker-side materialization would need. What
- * survives into an entry the linker sees is therefore a bare name in every position except one: a
- * parameterized declaration's own body, which legitimately references its own parameters ({@code array<T>})
- * and is validated, not rewritten.
+ * here. {@code SchemaDesugarer} turns every sugar form into a real declaration plus a bare reference, where
+ * the AST and the governing meta's own constructor vocabulary are both still in hand -- which is what lets it
+ * bind the constructor generically and so cover every shape, rather than the per-shape assemblers a
+ * linker-side materialization would need -- and the resolver's {@code TemplateMaterialiser} closes every
+ * template application into an entry. What survives into an entry the linker sees is therefore a bare name in
+ * every position except one: a parameterized declaration's own body, which legitimately references its own
+ * parameters ({@code array<T>}) and is validated, not rewritten.
  *
  * <p><b>Type-parameter exception:</b> a bare name is valid if it resolves in the schema's own
  * namespace, or if it's one of the checked entry's own declared {@code parameters} -- load-bearing
@@ -514,8 +514,8 @@ public final class TsonSchemaLinker {
      * <p><b>Linker-internal, and never escapes.</b> It is caught in the one place it is thrown from and
      * re-stated as a {@link SchemaValidationException}, whose classification this shares: an unresolved
      * reference is the author's error, and a verdict this library will not change its mind about. It is not
-     * a subclass of it because that type is deliberately {@code final} and lives in {@code tson-schema},
-     * which holds no pipeline machinery.
+     * a subclass of it because that type is sealed in {@code tson-base}, permitting only {@code
+     * SchemaRefusalException}.
      */
     private static final class UnresolvedReference extends RuntimeException {
 
@@ -1314,7 +1314,7 @@ public final class TsonSchemaLinker {
      * through several routes -- the diamond every practical schema forms by importing core.tn -- is one set
      * of entries, so re-arrival is unification, not conflict. Two *different* schemas declaring one name is
      * the real collision, and it is still an error: distinct types cannot share a name in a flat namespace.
-     * That is also what makes a revision mismatch (one route reaching {@code /2026/32/m/core.tn}, another
+     * That is also what makes a revision mismatch (one route reaching {@code /2026/37/m/core.tn}, another
      * {@code /2026/38/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
      * conflict between two identically-spelled types much later.
      *

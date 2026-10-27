@@ -14,8 +14,9 @@
  * <ul>
  *   <li>{@code io.ltr8.tson.atom} -- what a caller names: {@code AtomType}, the two indices over it
  *       ({@code BuiltinTypeVocabulary} by name, {@code HostAtoms} by host class), {@code AtomParsers} from
- *       a resolved body, the exceptions a refusal arrives as, and {@code IdentifierProfile}, which is
- *       [TSON-DATA] §7.7's name profile as much as it is an atom.</li>
+ *       a resolved body, the exceptions a refusal arrives as, and {@code IdentifierGrammar}, which is
+ *       [TSON-DATA] §7.7's name grammar as much as it is an atom, built over {@code ltr8-unicode}'s
+ *       {@code IdentifierProfile}.</li>
  *   <li>{@code io.ltr8.tson.atom.number} -- §4's number production and the narrowing over it, exported
  *       because base type resolution stays with the text encoding and reads it.</li>
  *   <li>{@code io.ltr8.tson.atom.parser} -- the family implementations, <b>unexported</b>. A caller asks an

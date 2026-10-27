@@ -294,9 +294,9 @@ final class SchemaDesugarer {
      *
      * <p><b>The substitution is not optional.</b> Leaving the declaration un-expanded would hand {@code
      * DefinitionResolver} the very {@code ContainerTypeDef} this phase exists to remove, and it answers that
-     * with an {@code UnsupportedOperationException} -- which {@code SchemaResolver} deliberately does not
-     * catch, since a library gap is not a verdict on the author's schema. So passing through would convert a
-     * reported author error into an unreported abort: worse than failing fast.
+     * with an {@code UnsupportedOperationException}, which {@code SchemaResolver} reports as {@code
+     * NOT_IMPLEMENTED} -- a gap in this library, not a verdict on the author's schema. So passing through would
+     * turn the author's error into a claimed library gap: the wrong diagnosis, and the wrong CLI exit code.
      *
      * <p><b>A gap is reported too, and absorbed the same way</b> -- as {@code Diagnostic.Code.NOT_IMPLEMENTED},
      * not as an author error. Thrown instead, it would take every other declaration's verdict with it: one

@@ -47,9 +47,8 @@ import java.util.function.Function;
  * points, framing, and the configuration a read is judged under -- where an engine owns one value and stops.
  *
  * <p><b>Streams the events, never a tree.</b> Memory held is proportional to nesting depth rather than
- * to document size, and {@link io.ltr8.tson.json.stream.JsonStream} 's §10.1 bound refuses a document before this descends
- * into
- * it.
+ * to document size, and {@link io.ltr8.tson.json.stream.JsonStream}'s §10.1 bound refuses a document before this
+ * descends into it.
  *
  * <p><b>Every problem goes through a {@link DiagnosticsReceiver}</b>, so this read's own receiver decides
  * its fate exactly as it does for the TSON readers: {@link DiagnosticsReceiver#throwing()} -- the default --
@@ -60,9 +59,11 @@ import java.util.function.Function;
  *
  * <p>Each problem carries a {@link io.ltr8.tson.base.Diagnostic.Code} from the same closed vocabulary the
  * TSON readers use ([TSON-JSON] §9.4 adds no category of its own), an RFC 6901 pointer to where in the
- * document it is, and the position. Two of those codes are deliberately not verdicts on the document:
- * {@code BIND_MISMATCH} for a class this context cannot analyse or cannot receive a JSON object's keys
- * into, which is a misconfiguration in the reading application rather than anything about the document.
+ * document it is, and the position. Not every code is a verdict on the document ({@link
+ * io.ltr8.tson.base.Diagnostic.Code#verdict()}): {@code BIND_MISMATCH}, for a class this context cannot analyse
+ * or cannot receive a JSON object's keys into, is a misconfiguration in the reading application, and a name
+ * refused under [TSON-DATA] §8.2's identifier policy is this processor declining rather than the document
+ * failing.
  *
  * <p><b>A member the class does not declare refuses the document.</b> This is the one place the reader is
  * stricter than a JSON consumer expects, and the reason is not tidiness: <b>a member added in a later
@@ -77,10 +78,10 @@ import java.util.function.Function;
  * field set, not a JSON syntactic category, and one rule with two names is a rule two readers can drift on.
  *
  * <p>The cost is real and is worth stating: a converted JSON Schema whose {@code additionalProperties}
- * defaults to true describes documents this reader refuses. That is §6.2's rest field's job to fix, and
- * it fixes it properly by <em>keeping</em> the extra members rather than by ignoring them — which is the
- * difference between a document read wholly and one read partly, and why the schema-directed decode is
- * where the accommodation belongs rather than here.
+ * defaults to true describes documents this reader refuses. [TSON-JSON] §6.1.1 draws the same boundary
+ * under a schema, with no flattened tail: open-ended data is declared where the model holds it, in a map-typed
+ * field, which <em>keeps</em> what it carries rather than ignoring it — the difference between a document read
+ * wholly and one read partly. A class declares it the same way, as a {@code Map} component.
  *
  * <p><b>What {@link #read} is not.</b> It is not validation against a TSON schema, and it is not §1.3
  * principle 1's schema-directed decode: nothing there consults facets, field states, defaults, fixed values,
@@ -248,9 +249,8 @@ public final class JsonObjectReader {
      * that what they cannot see does not change what they can. Deliberately the derived reader rather than
      * the default: the safe reading is the one nobody has to know to ask for.
      *
-     * <p>It is also, today, the closest thing this module has to §6.2's rest field — with the difference
-     * that a rest field <em>keeps</em> what it collects, where this drops it. A schema is what tells the
-     * two apart, and the schema-directed decode is where the keeping form arrives.
+     * <p>What it discards is lost. Open-ended data meant to be kept belongs in a map-typed field ([TSON-JSON]
+     * §6.1.1), which a class binds as a {@code Map} component.
      */
     public JsonObjectReader ignoringUnknownFields() {
         return new JsonObjectReader(context, true, receiver, policy, schemas, schemaUri);

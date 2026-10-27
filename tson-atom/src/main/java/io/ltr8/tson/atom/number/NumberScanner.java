@@ -9,17 +9,17 @@ import java.util.Optional;
  * <p><b>Why hand-written rather than a regex.</b> This is the reference implementation, and a grammar stated
  * as a {@code java.util.regex} pattern with named groups is stated in a dialect no other language shares --
  * an unspecified host dependency in the one artifact that should carry the spec's own algorithm. TSON pins
- * I-Regexp for a schema's {@code pattern} facets and says nothing about how a number is recognized, so the
- * regex here was this implementation's private choice leaking into what others copy. Each method below reads
- * as its ABNF rule, and ports as one. It is also what a number costs: matching a token against nine anchored
- * patterns in turn allocated a {@code Matcher} and its internals per attempt -- 47 matchers per read of a
- * document holding seven numbers, about a fifth of everything a read allocated.
+ * I-Regexp for a schema's {@code pattern} facets and says nothing about how a number is recognized, so a
+ * regex here would be this implementation's private choice leaking into what others copy. Each method below
+ * reads as its ABNF rule, and ports as one. It also costs less: a token tried against anchored patterns in
+ * turn allocates a {@code Matcher} and its internals per attempt.
  *
- * <p><b>The cursor is single-pass with explicit backtracking</b> ({@link #mark()}/{@link #reset(int)}) at the
- * two places the grammar is genuinely optional -- a float's fraction and its exponent -- because a regex
- * backtracks there and the results must agree. Everywhere else the grammar is decided by the character at
- * the cursor, so no lookahead is needed: a digit run is maximal-munch and nothing that may follow one is a
- * digit. {@code NumberScannerEquivalenceTest} holds the old patterns as an oracle and fuzzes both.
+ * <p><b>The cursor is single-pass with explicit backtracking</b> ({@link #mark()}/{@link #reset(int)}) wherever
+ * the grammar has a part that can begin and then fail -- an exponent, a radix prefix, a fraction, a complex
+ * number's two-part form -- because a regex backtracks there and the results must agree. Everywhere else the
+ * grammar is decided by the character at the cursor, so no lookahead is needed: a digit run is maximal-munch
+ * and nothing that may follow one is a digit. {@code NumberScannerEquivalenceTest} holds the grammar as
+ * regular expressions, as an oracle, and fuzzes both.
  *
  * <p>Not thread-safe, single-use, and package-private: {@link NumberGrammar} is the door.
  */

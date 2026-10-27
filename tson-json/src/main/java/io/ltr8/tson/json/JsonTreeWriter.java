@@ -10,12 +10,11 @@ import java.io.OutputStream;
  * Writes a {@link JsonValue} tree back out as JSON -- the inverse of {@link JsonTreeReader}, and the JSON
  * peer of {@code TsonTreeWriter}.
  *
- * <p><b>The round trip is total, which is what separates this from its TSON counterpart.</b> {@code
- * TsonTreeWriter} has documented losses (integer width, tuple-ness) because TSON text spells one value
- * several ways and a tree does not record which; RFC 8259 has six kinds and one spelling each, and the
- * tree holds the literal a number was read from, so a document read by {@code JsonTreeReader} and written
- * here is the same document. The only thing not preserved is whitespace, which [TSON-JSON] §9.3 does not
- * make part of a value.
+ * <p><b>The round trip is total, which is what separates this from its TSON counterpart.</b> {@code TsonTreeWriter}'s
+ * is value-preserving but not byte-identical, because TSON text spells one value several ways (a vocabulary value
+ * quoted or bare) and a tree does not record which; RFC 8259 has six kinds and one spelling each, and the tree holds
+ * the literal a number was read from, so a document read by {@code JsonTreeReader} and written here is the same
+ * document. The only thing not preserved is whitespace, which [TSON-JSON] §9.3 does not make part of a value.
  *
  * <p><b>Derivations, not settings.</b> {@link #indented(String)} returns a new writer, leaving this one
  * unchanged, so a writer may be handed out and derived from -- the shape every reader in this library

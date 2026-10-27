@@ -481,9 +481,9 @@ class JsonObjectReaderTest {
 
         @Test
         void a_union_target_is_refused_and_says_why_rather_than_guessing() {
-            // §8.2 admits a tag-free choice by exactly two routes -- a declared discriminator, or a derived
-            // disjointness fact -- and forbids extending them. A Java union states neither, and trying each
-            // member in turn is what §8.2 rules out in as many words.
+            // §8.2 admits a tag-free choice under exactly one condition -- the schema's derived disjointness
+            // fact -- and forbids extending it. A Java union states no such fact, and trying each member in
+            // turn is what §8.2 rules out in as many words.
             String message = refused("{\"shape\": {\"radius\": 1}}", Drawing.class).message();
             assertTrue(message.contains("is a union"), message);
             assertTrue(message.contains("no selector"), message);

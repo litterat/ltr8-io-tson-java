@@ -92,9 +92,9 @@ public final class AtomParsers {
     /**
      * The parser for an entry with body {@code body}, or empty if that entry is not a scalar type.
      *
-     * <p>{@code complex}/{@code ipv4}/{@code ipv6} hand back their unconstrained singletons: their bodies
-     * carry facets these parsers do not model (see each parser's own Javadoc), so the body selects the
-     * parser without configuring it. Every other family is constructed from the body it was given.
+     * <p>{@code complex} hands back its unconstrained singleton: its body's {@code component} facet is one the
+     * parser does not model (see {@code ComplexParser}), so the body selects the parser without configuring it.
+     * Every other family is constructed from the body it was given.
      *
      * <p><b>{@code value} and {@code void} yield nothing.</b> {@code void} is the type with no value, so no token
      * is one, and {@code value} is read by base type resolution, which is the <em>encoding's</em> ([TSON-DATA]

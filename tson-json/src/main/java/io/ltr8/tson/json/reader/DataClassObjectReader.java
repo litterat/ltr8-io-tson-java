@@ -137,19 +137,18 @@ public final class DataClassObjectReader {
     /**
      * §8's dispatch has no schemaless form, and refusing is the honest answer rather than inventing one.
      *
-     * <p>§8.2 lets a choice go untagged by exactly two routes and forbids extending them: a declared
-     * discriminator, or a disjoint choice whose variants are class-stable. Both are facts a <em>schema</em>
-     * derives, and a Java union declares neither — so there is nothing here to dispatch on, and trying
-     * each member in turn is what §8.2 rules out in as many words. The TSON side reaches this case
+     * <p>§8.2 lets a choice go untagged under exactly one condition and forbids extending it: the choice is
+     * {@code disjoint: true}. That is a fact a <em>schema</em> derives, and a Java union declares nothing of
+     * the kind — so there is nothing here to dispatch on, and trying each member in turn is what §8.2 rules
+     * out in as many words. The TSON side reaches this case
      * through {@code !variant}, which JSON has no counterpart for outside §3.3's annotation object, and
      * that object is meaningful only at a typed position §8 recognises.
      */
     private static void reportUnion(JsonReadContext ctx, DataClassUnion union) {
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, ("%s is a union, and a JSON document carries no selector for one "
-                + "without a schema -- [TSON-JSON] §8.2 admits a tag-free choice only where a declared "
-                + "discriminator or a derived disjointness fact picks the variant, and neither is "
-                + "something a Java class states. Read the members' own types, or use the "
-                + "schema-directed decode when it lands.").formatted(union.typeClass().getSimpleName()),
+                + "without a schema -- [TSON-JSON] §8.2 admits a tag-free choice only where the schema's derived "
+                + "disjointness fact picks the variant, which no Java class states. Read the members' own types, "
+                + "or use the schema-directed decode.").formatted(union.typeClass().getSimpleName()),
                 "a selector for the variant", "a union with none");
     }
 
@@ -249,8 +248,8 @@ public final class DataClassObjectReader {
         if (ctx.reported() > mark) {
             // Bind mode is all-or-nothing: a record whose members failed is not constructed, because a
             // constructor handed nulls for components that never arrived would either throw out of the
-            // collecting read or hand back an object nobody wrote. The rule every read keeps, and
-            // ConstructionGuard's on the TSON side.
+            // collecting read or hand back an object nobody wrote. The rule every read keeps, in this
+            // encoding and in TSON text's readers alike.
             return null;
         }
         return construct(ctx, target.constructor(), construct, target.typeClass(), Handed.VALUE);
@@ -321,8 +320,8 @@ public final class DataClassObjectReader {
      * unchanged): the document is not invalid, it is declined by this processor under a policy reading data
      * the UCD does not freeze, and it MUST NOT be reported in any of §8.1's four categories. That is what
      * the code carries -- {@code RESTRICTED_CHARACTER} and {@code RESTRICTED_SCRIPT}, one per rule, because
-     * the two want different fixes. It is still a {@link Diagnostic.Code#verdict()}: the processor looked
-     * and declined, and the sender holds the fix, which is the question a consumer routes on.
+     * the two want different fixes. Neither is a {@link Diagnostic.Code#verdict()}: the processor looked and
+     * declined, asserting nothing about the document's validity, which is the question a consumer routes on.
      *
      * <p><b>The third rule has nowhere here to run.</b> Names that read alike is a property of a
      * <em>set</em>, and {@code tson-compiler} asks it of a record's field names in its schemaless

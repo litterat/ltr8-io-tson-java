@@ -13,12 +13,12 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code datetime_type} constructor (§5.4's {@code datetime} atom, RFC 3339
  * {@code date-time}). Pure constraint values, no parsing/validation behavior -- {@code
- * tson-compiler}'s {@code DateTimeParser} holds one of these and does the actual reading/writing.
+ * tson-atom}'s {@code DateTimeParser} holds one of these and does the actual reading/writing.
  *
- * <p>{@code precision} bounds the fractional-second digits from above (§5.5), exactly as it does on
- * {@link TimeType}: at most that many digits on the token as written, and {@code precision: 0} admits
- * none. The family carries no timezone facet -- RFC 3339 {@code date-time} already makes the offset
- * mandatory.
+ * <p>{@code precision} constrains the value exactly as it does on {@link TimeType} (§5.5): {@code precision: N}
+ * admits a value that is a whole number of 10<sup>-N</sup> seconds, whatever digits the token spells it with, and
+ * {@code precision: 0} admits whole seconds only. The family carries no timezone facet -- RFC 3339 {@code
+ * date-time} already makes the offset mandatory.
  *
  * <p>Also an {@link Atom} variant: {@code datetime => !datetime_type {}} is a
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.

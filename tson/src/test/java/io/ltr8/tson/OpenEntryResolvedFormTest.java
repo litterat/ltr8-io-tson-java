@@ -39,10 +39,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * validate, §5.10's own {@code vector} example validates, and a held body reads back as the application it
  * holds rather than as the constructor it names.
  *
- * <p><b>Each was written against the shape that preceded it and inverted when this one landed</b>, which is
- * what makes them a guard rather than a description: the value-parameter case failed with two
- * {@code ATOM_CONSTRAINT_VIOLATION}s, and the case that now reads back as text used to bind {@code S} as a
- * relative URI -- the two failures §8.1 cites as the reason the shape changed.
+ * <p><b>Each pins a failure the text form exists to prevent</b>, which is what makes them a guard rather than a
+ * description: read as the constructor it names, the value-parameter case fails with two
+ * {@code ATOM_CONSTRAINT_VIOLATION}s, and the held case binds {@code S} as a relative URI -- the two failures
+ * §8.1 cites as the reason a held body is text.
  */
 class OpenEntryResolvedFormTest {
 
@@ -91,7 +91,7 @@ class OpenEntryResolvedFormTest {
         }
     }
 
-    // ── What §5.10's own example does, now that a held body is text ──────
+    // ── What §5.10's own example does, with a held body as text ──────
 
     /**
      * <b>§5.10's {@code vector} example validates in §8.1's own prescribed form.</b> The declaration is
@@ -103,8 +103,8 @@ class OpenEntryResolvedFormTest {
      * {@code template} field is the application as written, so there is no value slot for {@code N} to fail
      * against and the entry's value is a {@code top} like any other.
      *
-     * <p>Before the {@code template} constructor this failed with two {@code ATOM_CONSTRAINT_VIOLATION}s --
-     * {@code N} is not a {@code non_negative_integer} -- which is the case §8.1 names when it says a body
+     * <p>Read as the {@code !array} it names, the body would fail with two {@code ATOM_CONSTRAINT_VIOLATION}s
+     * -- {@code N} is not a {@code non_negative_integer} -- which is the case §8.1 names when it says a body
      * carrying a parameter in a value slot "is not a value of any constructor's record shape".
      *
      * <p>The document is hand-authored in §8.1's form rather than produced by this library's writer,
@@ -126,13 +126,13 @@ class OpenEntryResolvedFormTest {
     }
 
     /**
-     * <b>And a held body is read back as held, not as the constructor it names.</b> Before the
-     * {@code template} constructor these two validated clean and bound as something else -- {@code S} as a
+     * <b>And a held body is read back as held, not as the constructor it names.</b> Read as the constructors
+     * they name, these two would validate clean and bind as something else -- {@code S} as a
      * schema identity literally named {@code S}, {@code M} as a third enum member spelled {@code M} -- which
      * is what §8.1 names as {@code extern_of} resolving to "a schema whose {@code S} was a relative URI" --
      * accepted, and wrong, with no diagnostic anywhere.
      *
-     * <p>{@code extern_of} is core.tn's own declaration. What comes back now is the application as text,
+     * <p>{@code extern_of} is core.tn's own declaration. What comes back is the application as text,
      * with nothing having tried to read it.
      */
     @Test
@@ -233,9 +233,9 @@ class OpenEntryResolvedFormTest {
      * {@code integer} is {@code !integer_type {}} and {@code integer_type} is meta.tn's -- which the value's
      * Java shape answers on its own, a body's class being the branch of {@code Top} its constructor builds.
      *
-     * <p><b>The rule is total.</b> An open entry is {@code TEMPLATE}, which is the branch that used to have
-     * no answer from the entry alone -- its kind was inherited from the constructor its held body applies,
-     * which is a fact about an application of it rather than about the template. {@link #derive} is
+     * <p><b>The rule is total.</b> An open entry is {@code TEMPLATE}, answered from the entry alone rather than
+     * inherited from the constructor its held body applies -- that would be a fact about an application of it,
+     * not about the template. {@link #derive} is
      * therefore the whole rule, and the one §8.1 states under "Kind is derived".
      */
     @Test

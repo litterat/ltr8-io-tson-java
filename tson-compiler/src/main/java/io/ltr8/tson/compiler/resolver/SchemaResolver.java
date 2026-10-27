@@ -529,17 +529,16 @@ public final class SchemaResolver {
      * rewritten declaration is carried onto. Every caller has the node, and asking for it is what stops the
      * lookup being spelled out at each site.
      *
-     * <p><b>The code is chosen by the project's own exception classification</b>, which has three outcomes
-     * and not two. A {@code SchemaValidationException} is the author's error and an {@code
-     * UnsupportedOperationException} is this library's gap -- one says fix your schema, the other says this
-     * could not be checked. A {@link BindMismatchException} is neither: it says the reading application
-     * is wired wrong, and it is the one a caller most easily acts on, the message naming one of their own
-     * classes. Collapsing it into either of the others is what {@code MissingBindingException} exists to
-     * prevent -- its Javadoc records a downstream service turning the library-gap shape into a 501 for what
-     * was a missing line of configuration. A {@link SchemaRefusalException} is the author's schema declined
-     * under the identifier policy rather than called wrong, and keeps the §8.2 rule's code.
+     * <p><b>The code is chosen by the project's own exception classification</b>, which has four outcomes and not
+     * two. A {@code SchemaValidationException} is the author's error and an {@code UnsupportedOperationException}
+     * is this library's gap -- one says fix your schema, the other says this could not be checked. A {@link
+     * BindMismatchException} is neither: it says the reading application is wired wrong, and it is the one a
+     * caller most easily acts on, the message naming one of their own classes. Collapsing it into either of the
+     * others is what {@code MissingBindingException} exists to prevent -- read as a library gap, a missing line of
+     * configuration is what a downstream service maps to a 501. A {@link SchemaRefusalException} is the author's
+     * schema declined under the identifier policy rather than called wrong, and keeps the §8.2 rule's code.
      *
-     * <p>All three are reported per declaration and all three leave a placeholder, so one failing
+     * <p>All four are reported per declaration and all four leave a placeholder, so one failing
      * declaration does not cost every other declaration its verdict.
      */
     private record Problems(String schemaId, SchemaPositions positions, DiagnosticsReceiver receiver) {
