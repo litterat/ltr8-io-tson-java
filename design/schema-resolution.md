@@ -233,6 +233,12 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
   position comes from `SchemaResolver`'s catch.
 - **`IllegalStateException`** is for an invariant only a malformed resolved value could break — an applicable head
   with a non-record body, a constructor not record-shaped (§7.2).
+- **The header is the author's too.** A document with no `!!id` (optional in the grammar, [TSON-DATA] §2.2; required
+  of a schema registered under its own name, §2.2.1) and a malformed `!!id` are refused up front as
+  `SchemaValidationException`, before any declaration resolves, and `Tson.validateSchema` reports either as a schema
+  error against the document as a whole (`SchemaWithoutIdTest`). The refusal is this library's, not the corpus's:
+  §10.1 lets an id-less schema be registered under an application-supplied identity, a route no front door here
+  offers, so a conforming processor may load the same document cleanly and no vector states the refusal.
 
 **No gap reaches a read either:** every constructor `meta-kernel.tn` and `meta.tn` declare builds a real reader, and
 `CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReader`. The machinery stays because §2.2.2's

@@ -429,10 +429,3 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   still needs deciding per limit is only *where it is counted*: the ones that bound shape are per-container state
   the stream does not keep, where depth was a counter it already had, and the two aggregates (total values,
   foreign schemas) need their own counter since §9.1 is explicit that the total is not bounded by the parts.
-
-- [ ] **`Tson.validateSchema` throws on a schema with no `!!id`.** `!!id` is optional in the grammar ([TSON-DATA]
-  §2.2), but `SchemaResolver.resolve` throws `IllegalStateException` when it is missing; in `validateSchema` that falls
-  to the `RuntimeException` catch and `TsonDiagnostics.ofSchemaSyntaxError` rethrows it, against the method's promise
-  never to throw for a bad input document, and against its own comment listing "a document with no `!!id`" among the
-  `SchemaValidationException` cases. No test covers it. Fix: report it as a schema error, and pin it with a test shown
-  to fail without the fix.

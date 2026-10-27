@@ -106,14 +106,15 @@ public final class SchemaResolver {
      *
      * <p><b>Two things are validated up front, before any declaration is resolved</b>, rather than
      * silently proceeding (or failing confusingly deep inside some unrelated declaration): (1)
-     * {@code document.id()} must be present -- required by policy for a publishable schema (§2.2.1:
-     * "publishing a schema... REQUIRES !!id"), and this resolver is about to treat {@code document}
-     * as one that's going to *be* registered; (2) that {@code !!id} must be a well-formed
-     * canonical-identity candidate ({@link CanonicalIdentity#validate}) -- the same check
-     * {@link TsonSchemaRegistry#register} would run anyway, just surfaced here, before resolution
-     * work is spent on a document that could never actually be registered. Both throw {@link
-     * IllegalStateException} (or, for (2), {@link SchemaValidationException}, in an already-
-     * established shape) naming the actual problem. {@code document.meta()} itself is then resolved
+     * {@code document.id()} must be present -- optional in the grammar ([TSON-DATA] §2.2), required of a schema
+     * registered under its own name (§2.2.1: "publishing a schema... REQUIRES !!id"), which is what this resolver
+     * is about to do with {@code document}; §10.1's registration of an id-less schema under an application-supplied
+     * identity is not a route this resolver offers; (2) that {@code !!id} must be a well-formed canonical-identity candidate
+     * ({@link CanonicalIdentity#validate}) -- the same check {@link TsonSchemaRegistry#register} would run anyway,
+     * just surfaced here, before resolution work is spent on a document that could never actually be registered.
+     * Both are the author's error, so both throw {@link SchemaValidationException} naming the actual problem,
+     * which the collecting front door reports as a schema error against the document as a whole.
+     * {@code document.meta()} itself is then resolved
      * via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped/compiled on
      * demand if it wasn't already available, rather than requiring it to pre-exist) -- and its
      * resolved entries become the structure namespace every declaration resolves against.
@@ -204,8 +205,10 @@ public final class SchemaResolver {
     private TsonSchema resolve(SchemaDocument document,
                                SchemaPositions declarationPositions,
                                DiagnosticsReceiver receiver) {
-        String id = document.id().orElseThrow(() -> new IllegalStateException(
-                "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
+        String id = document.id().orElseThrow(() -> new SchemaValidationException(
+                "!!id is required to register this schema under its own name, but is absent -- an id-less schema "
+                        + "is a development artifact ([TSON-SCHEMA] §2.2.1, §10.1), and this schema, governed by '"
+                        + document.meta() + "', has no name to be registered under"));
         CanonicalIdentity.validate(id);
         for (String importUri : document.imports()) {
             CanonicalIdentity.canonicalize(importUri);
