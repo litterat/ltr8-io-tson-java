@@ -86,21 +86,6 @@ spec-required case:
   `kind_type`, `ref_type` and the name-only `type_ref` into one reference atom, a Revision 39 direction, which needs
   exactly that, and with what `@application` means on a declared entry that is no record.
 
-- [ ] **A closed refinement source mints its application.** [TSON-SCHEMA] §8.2's trigger positions say an application
-  at a composition target or a refinement source is subsumed as an operand and mints nothing (§5.8). Composition does
-  that (`DefinitionResolver.openOperand` absorbs by value); a closed refinement source (`x => box<text> ^ {…}`) goes
-  through `resolveRefinementSource` → `closedApplication` → `TemplateMaterialiser.close` → `instantiate`, which mints
-  the expansion through `mintedRecord` and publishes it, and which entry it gets depends on whether the owning
-  declaration resolved first. Decide whether the code follows §8.2 (absorb the closed body as an operand) or the spec
-  needs the refinement case stated differently; `design/template-materialisation.md` states what runs.
-
-- [ ] **An alias of a schema-namespace template is read in the structure namespace.** `ParameterTypes.readsInStructure`
-  treats an alias as a structure-namespace template because its held head, `reference`, is a meta constructor, so
-  `rb => <N: int8> box<N>` with `box => <N> { w?: integer ~ N }` is refused ("`'int8' is not in the structure
-  namespace`"). [TSON-SCHEMA] §5.10 says a template whose body applies another template takes that template's form,
-  which reads the alias in the schema's namespace like `box`. Either `readsInStructure` follows the applied template
-  through the alias, or the spec says which reading holds; `design/held-template-bodies.md` gives the example.
-
 - [ ] **The linker gives a class to the two straddling kinds [TSON-SCHEMA] §5.4 denies one.** §5.4 gives no class to
   an approximate atom whose `allow_nan` or `allow_infinity` is true, or to a map whose key type forces the pairs form,
   so a choice listing one is not disjoint in any encoding. `DiscriminationClass.of` (`tson-compiler` reader) classes

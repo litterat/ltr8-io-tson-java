@@ -12,8 +12,8 @@ resolution where there is one.
 closes.** It is an input to the next revision's adjudication, so its numbering is the numbering that revision's
 change log will answer against — a stable index of the open set, not an archive of everything ever raised.
 
-**Nothing is open against Revision 38.** The entries Revision 38 adjudicated are gone, and the spec carries their
-rules; the change log in `spec/` keeps them under their numbers.
+**The entries Revision 38 adjudicated are gone**, and the spec carries their rules; the change log in `spec/` keeps
+them under their numbers. What is below was found on Revision 38.
 **This file is the as-built record**, not a pointer to one: where an entry proposes a design this implementation
 has built, the entry states the design, what is running, and what is not, so that a reviewer editing the spec needs
 nothing beside it. **Where the evidence is a consumer of this library rather than this library** — the HTTP layer
@@ -78,3 +78,60 @@ generality"; once the linker follows §5.4, `stable` is redundant and goes, and 
 
 **Resolution.** For Part 3, remove the revision phrasing from §8.2 and §8.3 and state §8.3's rule in the present
 tense; no rule changes. This entry closes with that edit and the linker fix.
+
+## 3. [TSON-SCHEMA] §5.7, §8.2 — a closed refinement source: "mints nothing" against "IS-A the source"
+
+**Problem.** §8.2's trigger positions say an application at a composition target or a refinement source "is subsumed
+as an operand and mints nothing (§5.8)". §5.7 says a refinement produces "a new definition with its own identity that
+IS-A the source". For `x => box<text> ^ { n: integer }` the two cannot both hold: an IS-A edge needs an entry at its
+far end, and §8.2 says the source application has none. §5.8's operand rule is written for composition, where the
+operand contributes its fields and its template's ancestors and no edge to itself is owed; a refinement owes exactly
+that edge.
+
+**What is running.** A composition operand is absorbed by value and mints nothing, as §8.2 says. A closed refinement
+source is closed on demand through the same path a type-position application takes, so it reuses a declaration that
+owns the application or mints the expansion — and which of the two happens depends on declaration order. Against
+`box => <T> { w: T  n?: integer }`:
+
+- `tb => box<text>` declared before `x`: `x` has `supertypes: [box, tb]` and nothing is minted.
+- `x` declared before `tb`: a synthetic `record_w_text_n_integer_true_…` entry is minted, `x` has `supertypes:
+  [record_w_text_n_integer_true_…]` — `box` is not in its chain — and `tb` resolves to a second entry for the same
+  application, with `supertypes: [box]` and no edge to the minted one.
+
+So the resolved output of one schema varies with the order of two unrelated declarations, and in one of the orders
+§8.2's "a declaration naming the application *is* that entry" does not hold either. `design/template-materialisation.md`
+("Operands and on-demand closing") states the mechanism.
+
+**Resolution to decide.** Either (a) §8.2 states that a refinement source *is* a trigger position — the application is
+materialised (or unified with the declaration that owns it, in either order) and the refinement IS-A the entry it
+denotes, which is what §5.7 already promises and what the declaration-first order already produces; or (b) §5.7 says
+a refinement of an application IS-A the application's template and nothing else, the source is absorbed as a
+composition operand is, and no entry is minted. (a) keeps §5.7's identity rule and asks the resolver to make the
+closing order-independent, which §8.2's content identity is for. (b) keeps §8.2's sentence as written and loses the
+edge from `x` to `box<text>`, so `x` would not be admissible where `box<text>` is expected. The implementation follows
+(a) once this closes; until then the behaviour above is what runs.
+
+## 4. [TSON-SCHEMA] §5.10 — an alias of a schema-namespace template: which namespace its value parameters read in
+
+**Problem.** §5.10 says a template whose body applies a constructor of the governing meta other than `record` reads
+its value parameters' types in the structure namespace, a record template reads them in the schema's own namespace,
+and "a template whose body applies another template takes that template's form". An alias is a template whose body
+applies another template — `rb => <N: int8> box<N>` against `box => <N> { w?: integer ~ N }` — so by the third
+sentence it takes `box`'s form and reads `int8` in the schema's namespace. But an alias's resolved entry is a
+`reference`, a meta constructor, which by the first sentence makes it a structure-namespace template. The section
+does not say which sentence wins for an alias.
+
+**What is running.** The resolved entry decides: `rb`'s held head is `reference`, not `record` and not an open
+template, so `ParameterTypes.readsInStructure` answers true and the written type is checked in the structure
+namespace. The schema above is refused at `rb`: "parameter 'N' is declared 'N: int8', and this template applies a
+constructor of the governing meta, so its value parameters are the meta's types and a written type names one there --
+'int8' is not in the structure namespace (§5.10)". The same alias with no written type (`rb => <N> box<N>`) resolves,
+`N`'s type being derived from `box`'s use rather than written. `design/held-template-bodies.md` ("The template's form
+decides where value types are read") states the rule as built.
+
+**Resolution to decide.** The third sentence is the one an author relies on — an alias of a record template is used
+exactly like the record template — so the proposal is that §5.10 says an alias takes the form of the template its
+target applies, following aliases through to the first non-alias head, and that `reference` is never itself a form.
+The implementation then follows the target through `reference.target` in `readsInStructure`. The alternative, that
+the resolved entry's constructor is the form in every case, is what runs and should then be stated in §5.10 with the
+alias named, since the third sentence reads against it.
