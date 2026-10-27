@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
+import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
@@ -23,6 +24,7 @@ import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
+import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
@@ -104,7 +106,9 @@ import java.util.function.Predicate;
  * <p><b>The exception types are the classification.</b> A {@link io.ltr8.tson.base.SchemaValidationException}
  * says the author's schema is wrong and the spec says so; an {@link UnsupportedOperationException} says this
  * library could not do something, and travels as {@code NOT_IMPLEMENTED}; an {@link IllegalStateException}
- * says an internal invariant broke. The test for which is which: <b>a schema error's verdict does not change
+ * says an internal invariant broke -- a container sugar form reaching resolution unlifted ({@link #unlifted}),
+ * which only a caller that skipped {@link SchemaDesugarer} can produce, or a resolved value no well-formed
+ * pipeline builds. The test for which is which: <b>a schema error's verdict does not change
  * when this library improves; a gap's does.</b> Misfiling an author error as a gap tells the author their
  * correct understanding of the spec is this library's fault. Schema errors include: an atom refinement that
  * loosens its source ({@link #checkNarrows}); a name in a {@code !} position that resolves in neither
@@ -126,9 +130,6 @@ import java.util.function.Predicate;
   *   <li><b>A failed write round-trip</b> -- re-serialising an atom refinement's source
  *   ({@link #sourceSerializedFields}). The value was bound by this library, so failing to write it back is
  *   no verdict on the schema.</li>
- *   <li><b>A {@code TypeDef} shape {@link #resolveTypeDef} does not dispatch, or a container sugar form
- *   reaching {@link #resolveTypeRef}</b> -- the desugar phase was skipped, or left a form it should have
- *   lifted.</li>
  *   <li><b>A closed application at a supertype or refinement-source position with no
  *   {@link ApplicationCloser}</b> ({@link #closedApplication}) -- a resolver built standalone, without the
  *   whole-schema materialiser {@link SchemaResolver} supplies.</li>
@@ -497,54 +498,54 @@ final class DefinitionResolver {
     }
 
     private Top resolveTypeDef(String name, TypeDef typeDef) {
-        if (typeDef instanceof StructuralTypeDef structural) {
-            List<String> parameters = structural.typeParams();
-            if (structural.body() instanceof RecordDef recordDef) {
-                RecordBody body = resolveRecordBody(recordDef.entries());
-                // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
-                // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
-                // denotes, which `openRecord` binds.
-                return parameterised(parameters, body);
+        return switch (typeDef) {
+            case StructuralTypeDef structural -> {
+                List<String> parameters = structural.typeParams();
+                yield parameterised(parameters, switch (structural.body()) {
+                    // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
+                    // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
+                    // denotes, which `openRecord` binds.
+                    case RecordDef recordDef -> resolveRecordBody(recordDef.entries());
+                    case ConstructionDef construction -> resolveComposition(name, construction, parameters);
+                    case RefinedDef refined -> resolveRefinement(name, refined, parameters);
+                });
             }
-            if (structural.body() instanceof ConstructionDef construction) {
-                return parameterised(parameters, resolveComposition(name, construction, parameters));
+            case ReferenceTypeDef referenceTypeDef -> {
+                // A parameter list here is §5.10's partial application -- `uuid_pair => <B> pair<uuid, B>`, a
+                // reference that leaves parameters open and re-declares them, which makes the alias itself a
+                // template. It threads straight through; substituting into the recorded application is
+                // materialisation's job, and until then the open form is what the entry records.
+                List<String> parameters = referenceTypeDef.typeParams();
+                yield switch (referenceTypeDef.ref()) {
+                    case SimpleRef simple -> openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
+                    case GenericRef generic -> resolveTemplateApplication(name, generic, parameters);
+                    // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a
+                    // sized array into the `!array { ... }` construction it denotes with min_items/max_items bound
+                    // directly (§5.3), a size-less one into the same without them (§5.6), a voidable element as
+                    // `voidable: true`, and a tuple into `!tuple { ... }` -- so one here is that phase not having run.
+                    case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _ ->
+                            throw unlifted("'" + name + "'", referenceTypeDef.ref());
+                };
             }
-            if (structural.body() instanceof RefinedDef refined) {
-                return parameterised(parameters, resolveRefinement(name, refined, parameters));
-            }
-        }
-        if (typeDef instanceof ReferenceTypeDef referenceTypeDef) {
-            // A parameter list here is §5.10's partial application -- `uuid_pair => <B> pair<uuid, B>`, a
-            // reference that leaves parameters open and re-declares them, which makes the alias itself a
-            // template. It threads straight through; substituting into the recorded application is
-            // materialisation's job, and until then the open form is what the entry records.
-            List<String> parameters = referenceTypeDef.typeParams();
-            if (referenceTypeDef.ref() instanceof SimpleRef simple) {
-                return openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
-            }
-            if (referenceTypeDef.ref() instanceof GenericRef generic) {
-                return resolveTemplateApplication(name, generic, parameters);
-            }
-        }
-        // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a sized
-        // array into the `!array { ... }` construction it denotes with min_items/max_items bound directly
-        // (§5.3), a size-less one into the same without them (§5.6), and a tuple into `!tuple { ... }`.
-        // A nested bracket form at either position is expanded there too, innermost first. Anything still
-        // here holds an optional array element (`[T?]`), the one shape that phase does not build, and falls
-        // through below.
-        if (typeDef instanceof Instance instance) {
             // The parameter list is the whole difference: with one, the payload is held rather than bound,
             // and stays that way until materialisation substitutes it away (§5.10).
-            return instance.typeParams().isEmpty() ? resolveInstance(name, instance)
+            case Instance instance -> instance.typeParams().isEmpty() ? resolveInstance(name, instance)
                     : resolveInstanceTemplate(name, instance);
-        }
-        if (typeDef instanceof AtomRefinement refinement) {
-            return resolveAtomRefinement(name, refinement);
-        }
-        throw new UnsupportedOperationException(
-                "'" + name + "': only fresh record constructions, composition, simple type references, "
-                        + "declaration-level sized arrays, constructor application, and atom refinement are "
-                        + "resolved so far, got " + typeDef.getClass().getSimpleName());
+            case AtomRefinement refinement -> resolveAtomRefinement(name, refinement);
+        };
+    }
+
+    /**
+     * A container sugar form that reached resolution. {@link SchemaDesugarer} lifts every one -- closed or open, at
+     * any depth, an element that is itself an application included (written in {@code type_ref}'s record form and
+     * rewritten to its entry at materialisation) -- to an entry before this resolver runs, so no schema an author
+     * writes can produce one here: it is a caller resolving raw AST without that phase, an invariant of the pipeline
+     * rather than a gap in it.
+     */
+    private static IllegalStateException unlifted(String where, TypeRef ref) {
+        return new IllegalStateException(where + ": a container sugar form reached resolution unlifted: " + ref
+                + " -- SchemaDesugarer lifts every sugar form to an entry before DefinitionResolver runs (§5.3), so "
+                + "this declaration was resolved from raw AST without that phase");
     }
 
     /**
@@ -2441,37 +2442,21 @@ final class DefinitionResolver {
      * {@link SimpleRef}, or a {@link GenericRef} -- a §5.10 application, or a constructor's own generic
      * vocabulary such as meta's {@code scoped.scope: set<scope_kind>}.
      *
-     * <p><b>A container sugar form is the third case and is refused</b>, because by this phase every one of
-     * them should already be an entry: {@link SchemaDesugarer} lifts each to a declaration and leaves a bare
-     * reference behind. One arriving here means either that the phase was skipped, or that the form holds a
-     * position the desugar table cannot reduce to a name -- see the branch's own comment.
+     * <p><b>A container sugar form is the third case and a broken invariant</b>, because by this phase every one
+     * of them is an entry: {@link SchemaDesugarer} lifts each to a declaration and leaves a bare reference behind
+     * ({@link #unlifted}).
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeRef ref) {
-        if (ref instanceof SimpleRef simple) {
-            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-        }
-        if (ref instanceof GenericRef generic) {
-            List<TypeArgument> args = new ArrayList<>();
-            for (TypeArg arg : generic.args()) {
-                args.add(typeArgument(arg));
+        return switch (ref) {
+            case SimpleRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
+            case GenericRef generic -> {
+                List<TypeArgument> args = new ArrayList<>();
+                for (TypeArg arg : generic.args()) {
+                    args.add(typeArgument(arg));
+                }
+                yield new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
             }
-            return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
-        }
-        if (ref instanceof ArrayRef || ref instanceof io.ltr8.tson.compiler.ast.schema.TupleRef
-                || ref instanceof io.ltr8.tson.compiler.ast.schema.MapRef
-                || ref instanceof io.ltr8.tson.compiler.ast.schema.ChoiceRef) {
-            // Every sugar form is lifted to an entry by `SchemaDesugarer` before resolution, closed or open,
-            // so one reaching here was not: either a caller resolved raw AST without running that phase, or
-            // the form holds a position the desugar table cannot reduce to a name -- an element that is
-            // itself an application (`[box<text>]`), whose entry does not exist until materialisation has
-            // run, one phase later. Refusing names that, where building a structural `array<T>` would be the
-            // representation §11 rejects, which the linker reports as an arity error against a constructor
-            // the author never wrote.
-            throw new UnsupportedOperationException("a container sugar form must be lifted to an entry "
-                    + "before resolution (§5.3); this one was not, which means either the desugar phase was "
-                    + "skipped or a position inside it is an application, which has no entry to name until "
-                    + "it is materialised: " + ref);
-        }
-        throw new IllegalStateException("unhandled type-ref shape: " + ref);
+            case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _ -> throw unlifted("a type-ref position", ref);
+        };
     }
 }

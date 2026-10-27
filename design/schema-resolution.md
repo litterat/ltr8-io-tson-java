@@ -224,15 +224,18 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
 
 - **No schema construct reaches `NOT_IMPLEMENTED`.** The `UnsupportedOperationException` sites left are the
   catch-alls around the compiled meta reader (an exception none of the classified ones), a failed re-serialisation
-  of an atom refinement's source, shape guards an ordinary pipeline never trips (an undispatched `TypeDef`, a
-  container sugar form arriving unlifted, a missing `ApplicationCloser`), and the bootstrap's closed switch over
-  `meta-kernel.tn`'s own declarations.
+  of an atom refinement's source, a closed application with no `ApplicationCloser` (a resolver built standalone),
+  and the bootstrap's closed switch over `meta-kernel.tn`'s own declarations.
 - **A body the constructor's vocabulary rejects** arrives as a `ReadException` and is restated as a schema error
   (`bodyIsNotValidData`, `payloadFailure`). The read `Diagnostic` is dropped: it was produced against a
   `DataValueEvents` replay whose positions are placeholders and whose path points into a synthetic body. The real
   position comes from `SchemaResolver`'s catch.
-- **`IllegalStateException`** is for an invariant only a malformed resolved value could break — an applicable head
-  with a non-record body, a constructor not record-shaped (§7.2).
+- **`IllegalStateException`** is for an invariant only a malformed resolved value or a skipped phase could break —
+  an applicable head with a non-record body, a constructor not record-shaped (§7.2), and a container sugar form
+  reaching resolution unlifted (`DefinitionResolver.unlifted`). `TypeDef`, `StructuralDef` and the AST `TypeRef`
+  are sealed and `resolveTypeDef`/`resolveTypeRef` switch over them exhaustively, so the sugar case is the only
+  arm left, and only a caller resolving raw AST without `SchemaDesugarer` reaches it
+  (`DefinitionResolverTest.anUnliftedSugarFormIsABrokenInvariantNotAGap`).
 - **The header is the author's too.** A document with no `!!id` (optional in the grammar, [TSON-DATA] §2.2; required
   of a schema registered under its own name, §2.2.1) and a malformed `!!id` are refused up front as
   `SchemaValidationException`, before any declaration resolves, and `Tson.validateSchema` reports either as a schema

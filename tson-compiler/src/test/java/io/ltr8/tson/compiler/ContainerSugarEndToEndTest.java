@@ -111,12 +111,9 @@ class ContainerSugarEndToEndTest {
      * <b>A collection-valued slot holds an application like every other {@code type_ref}-typed slot.</b>
      * {@code variants} is a {@code [type_ref]}, so a §5.10 application standing in one is spelled in {@code
      * type_ref}'s record form and rewritten to the entry it denotes one pass later -- the same route a field
-     * type, an {@code element_type} and a map's {@code key_type}/{@code value_type} already took.
-     *
-     * <p>{@code choiceBinding} refused a variant that was not a bare name instead, which did not fail where
-     * it decided: refusing left the <em>whole</em> choice unlifted, so what reached {@code DefinitionResolver}
-     * was a {@code ChoiceRef} it has no case for, and the author of a closed, ordinary type was told that
-     * only "fresh record constructions, composition, simple type references ... are resolved so far".
+     * type, an {@code element_type} and a map's {@code key_type}/{@code value_type} already took. Refusing the
+     * variant in {@code choiceBinding} instead would leave the <em>whole</em> choice unlifted, and an unlifted
+     * sugar form at {@code DefinitionResolver} is a broken invariant, never a verdict on the author's schema.
      */
     @Test
     void anApplicationIsAChoiceVariantLikeAnyOtherReference() {
