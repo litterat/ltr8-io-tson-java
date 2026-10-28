@@ -80,7 +80,6 @@ class RecordTemplateTest {
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
-    /** Entry names that look materialised -- derived from {@code head} rather than declared. */
     /**
      * The records this schema minted for applications of {@code head}: an application nothing declares is its
      * expansion, a synthetic record (§5.10), and one whose expansion names itself keeps an instantiation entry

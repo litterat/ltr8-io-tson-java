@@ -40,11 +40,6 @@ final class ReferenceChain {
     }
 
     /**
-     * The entry {@code name} resolves to with every reference followed, or empty if the chain runs past
-     * {@link #MAX_HOPS} or names something the schema does not declare -- neither of which a linked schema
-     * should contain.
-     */
-    /**
      * The inverse of {@link #terminal}: for each entry, every <em>written</em> name that means it -- the
      * aliases whose chain ends there. [TSON-SCHEMA] §7.2 compares "after reference flattening of
      * <b>both</b>", so a reader matching a written {@code $type} against a set of entry names has to hold
@@ -83,6 +78,11 @@ final class ReferenceChain {
         return admitted;
     }
 
+    /**
+     * The entry {@code name} resolves to with every reference followed, or empty if the chain runs past
+     * {@link #MAX_HOPS} or names something the schema does not declare -- neither of which a linked schema
+     * should contain.
+     */
     static Optional<Resolved> terminal(TsonSchema schema, String name) {
         String at = name;
         for (int hop = 0; hop < MAX_HOPS; hop++) {

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/38/m/policy.tn?sha256=fc9208c720cfc28bacb33b6824b955df0627b4aa217f41f40b582ecd857295f6"
+!!id:"https://tson.io/2026/38/m/policy.tn?sha256=2346ad7dd5867ecbab830aedc1e8e0d594dcc31fff7defb39684b1d081783c84"
 !!meta:"https://tson.io/2026/38/m/meta.tn?sha256=62dde2f344853848cd0ce4f722a0305d979e5883c0dcd14308959ad6a01bff47"
 !!import:"https://tson.io/2026/38/m/core.tn?sha256=95f66505cf74dd2d64d0b6cffd07538fa45b8c7096c556c87423b56b03423497"
 @doc:"""
@@ -14,7 +14,7 @@
   document may name, import or otherwise select the policy it is judged under.
 
   `identifier_policy` and `token_policy` are §8.2's two policies, and `limits`
-  is §9.1's. A script is named by its Unicode Script property value alias
+  is §9.1's and [TSON-SCHEMA] §11.5's. A script is named by its Unicode Script property value alias
   (UAX #24), `Latin`, `Cyrillic`, `Han`.
   """
 {
@@ -45,11 +45,43 @@
   }
 
   @doc:"""
-    [TSON-DATA] §9.1's resource limits: what a processor will spend reading
-    one document, as against what it admits as a name. A limit refusal is not
-    a verdict on the document.
+    [TSON-DATA] §9.1's resource limits and [TSON-SCHEMA] §11.5's: what a
+    processor will spend reading one document, and resolving one schema, as
+    against what it admits as a name. Every limit defaults to the spec's own
+    value, set at the tight end so that a document fitting it fits every
+    processor above, and a deployment writes only what it raises. A limit
+    refusal names the limit and the threshold, and is not a verdict on the
+    document.
+
+    The §9.1 limits bound a document, a schema document among them. Sizes in
+    code points, octets or bytes are `int64`; counts and depths are `int32`.
+    The §11.5 limits bound the work resolution adds over a schema: the
+    schemas one header reaches through `!!meta` and `!!import`, the
+    declarations in one schema map (synthetic and instantiation entries
+    included), the hops from a use site to a terminal entry, the length of
+    one type's supertype chain, and the nested open synthetics closed for
+    one application. A data document's own scope pushes are counted under
+    `max_foreign_schemas`, on the document side.
     """
-  limits => { max_depth: int32 }
+  limits => {
+    max_depth?:                 int32 ~ 64
+    max_token_length?:          int64 ~ 1048576
+    max_text_length?:           int64 ~ 1048576
+    max_numeric_literal_length?: int32 ~ 4096
+    max_binary_size?:           int64 ~ 16777216
+    max_document_size?:         int64 ~ 16777216
+    max_elements?:              int32 ~ 1048576
+    max_entries?:               int32 ~ 1048576
+    max_fields?:                int32 ~ 65536
+    max_annotations?:           int32 ~ 64
+    max_values?:                int32 ~ 16777216
+    max_foreign_schemas?:       int32 ~ 16
+    max_import_closure?:        int32 ~ 64
+    max_schema_entries?:        int32 ~ 65536
+    max_reference_chain?:       int32 ~ 64
+    max_supertype_chain?:       int32 ~ 64
+    max_materialisation_depth?: int32 ~ 64
+  }
 
   @doc:"""
     The policy a processor judges a document under: §8.2's identifier and

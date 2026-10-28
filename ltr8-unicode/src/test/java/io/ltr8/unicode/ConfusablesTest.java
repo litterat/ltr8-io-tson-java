@@ -71,7 +71,6 @@ class ConfusablesTest {
         }
     }
 
-    /** A name is confusable with itself, whatever normalisation form it arrived in. */
     /**
      * The pairs that are confusable without leaving ASCII -- and the reason {@link Confusables#skeleton}
      * may never take a "pure ASCII, nothing to do" shortcut.

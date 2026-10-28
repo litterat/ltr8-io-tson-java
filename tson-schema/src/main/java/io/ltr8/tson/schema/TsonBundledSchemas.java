@@ -74,7 +74,7 @@ public final class TsonBundledSchemas {
      * policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String POLICY_SHA256 = "fc9208c720cfc28bacb33b6824b955df0627b4aa217f41f40b582ecd857295f6";
+    public static final String POLICY_SHA256 = "2346ad7dd5867ecbab830aedc1e8e0d594dcc31fff7defb39684b1d081783c84";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",

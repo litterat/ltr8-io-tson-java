@@ -329,10 +329,10 @@ class TsonCliTest {
     @Test
     void policyPrintsTheProcessorPolicyThisBuildApplies() throws IOException {
         String text = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"policy"})));
-        assertTrue(text.contains("identifier policy: HIGHLY_RESTRICTIVE"), text);
-        assertTrue(text.contains("token policy:      UNRESTRICTED"), text);
-        assertTrue(text.contains("unicode data:      " + ProcessorPolicy.dataVersion()), text);
-        assertTrue(text.contains("max depth:         " + LimitsPolicy.DEFAULT_MAX_DEPTH), text);
+        assertTrue(text.contains("identifier policy:          HIGHLY_RESTRICTIVE"), text);
+        assertTrue(text.contains("token policy:               UNRESTRICTED"), text);
+        assertTrue(text.contains("unicode data:               " + ProcessorPolicy.dataVersion()), text);
+        assertTrue(text.contains("max depth:                  " + LimitsPolicy.DEFAULT_MAX_DEPTH), text);
 
         String json = captureStdout(() ->
                 assertEquals(0, TsonCli.run(new String[] {"policy", "--output", "json"})));
@@ -359,9 +359,9 @@ class TsonCliTest {
                 "policy", "--identifier-policy", "moderately-restrictive", "--identifier-per-segment",
                 "--token-scripts", "Latin+Greek"})));
 
-        assertTrue(out.contains("identifier policy: MODERATELY_RESTRICTIVE per segment"), out);
+        assertTrue(out.contains("identifier policy:          MODERATELY_RESTRICTIVE per segment"), out);
         // The token list brought its own level: Unrestricted scans nothing, so the list would have been inert.
-        assertTrue(out.contains("token policy:      SINGLE_SCRIPT permitting [Greek+Latin]"), out);
+        assertTrue(out.contains("token policy:               SINGLE_SCRIPT permitting [Greek+Latin]"), out);
     }
 
     /**

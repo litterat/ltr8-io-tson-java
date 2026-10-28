@@ -615,14 +615,31 @@ policy options (validate, compile, policy):
 
 **`tson policy`** prints what this build applies — the [TSON-DATA] §8.2 restriction level for names and for
 values, whether it applies per `_`/`-` segment, any script combinations specially admitted, the Unicode data
-version behind them, and §9.1's resource limits:
+version behind them, and the resource limits of [TSON-DATA] §9.1 and [TSON-SCHEMA] §11.5 — every one stated,
+nesting depth the only one this build counts so far:
 
 ```
 $ tson policy
-identifier policy: HIGHLY_RESTRICTIVE
-token policy:      UNRESTRICTED
-unicode data:      16.0
-max depth:         64
+identifier policy:          HIGHLY_RESTRICTIVE
+token policy:               UNRESTRICTED
+unicode data:               16.0
+max depth:                  64
+max token length:           1048576
+max text length:            1048576
+max numeric literal length: 4096
+max binary size:            16777216
+max document size:          16777216
+max elements:               1048576
+max entries:                1048576
+max fields:                 65536
+max annotations:            64
+max values:                 16777216
+max foreign schemas:        16
+max import closure:         64
+max schema entries:         65536
+max reference chain:        64
+max supertype chain:        64
+max materialisation depth:  64
 ```
 
 **A limit refusal is not a verdict on your document's validity.** A document nested deeper than

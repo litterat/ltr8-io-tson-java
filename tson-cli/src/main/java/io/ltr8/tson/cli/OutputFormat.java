@@ -6,6 +6,7 @@ import io.ltr8.tson.base.WriteException;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -201,15 +202,54 @@ enum OutputFormat {
     }
 
     /**
-     * {@code tson policy}'s own rendering: both surfaces and the data version, one line each. Deliberately
-     * the same wording as the note a refusal prints, so the two read as one fact stated twice rather than
-     * as two things to reconcile.
+     * {@code tson policy}'s own rendering: both surfaces, the data version, and every limit, one line each,
+     * the limits in {@code policy.tn}'s order. Deliberately the same wording as the note a refusal prints, so
+     * the two read as one fact stated twice rather than as two things to reconcile.
      */
     private static String renderText(CliPolicy policy) {
-        return "identifier policy: " + summary(policy.identifierPolicy()) + System.lineSeparator()
-                + "token policy:      " + summary(policy.tokenPolicy()) + System.lineSeparator()
-                + "unicode data:      " + policy.unicodeDataVersion() + System.lineSeparator()
-                + "max depth:         " + policy.limits().maxDepth();
+        StringBuilder text = new StringBuilder();
+        textLine(text, "identifier policy", summary(policy.identifierPolicy()));
+        textLine(text, "token policy", summary(policy.tokenPolicy()));
+        textLine(text, "unicode data", policy.unicodeDataVersion());
+        for (Map.Entry<String, Long> limit : limits(policy.limits())) {
+            textLine(text, limit.getKey().replace('_', ' '), Long.toString(limit.getValue()));
+        }
+        return text.toString();
+    }
+
+    /** The widest label {@link #renderText} prints, with its colon and one space. */
+    private static final int LABEL_WIDTH = "max numeric literal length: ".length();
+
+    private static void textLine(StringBuilder text, String label, String value) {
+        if (!text.isEmpty()) {
+            text.append(System.lineSeparator());
+        }
+        text.append(label).append(':').append(" ".repeat(LABEL_WIDTH - label.length() - 1)).append(value);
+    }
+
+    /**
+     * Every limit by its {@code policy.tn} field name, in that record's order -- the one listing both {@link
+     * #renderText} and {@link #renderJson} walk, so the two cannot disagree about which limits there are.
+     */
+    private static List<Map.Entry<String, Long>> limits(CliPolicy.CliLimits limits) {
+        return List.of(
+                Map.entry("max_depth", (long) limits.maxDepth()),
+                Map.entry("max_token_length", limits.maxTokenLength()),
+                Map.entry("max_text_length", limits.maxTextLength()),
+                Map.entry("max_numeric_literal_length", (long) limits.maxNumericLiteralLength()),
+                Map.entry("max_binary_size", limits.maxBinarySize()),
+                Map.entry("max_document_size", limits.maxDocumentSize()),
+                Map.entry("max_elements", (long) limits.maxElements()),
+                Map.entry("max_entries", (long) limits.maxEntries()),
+                Map.entry("max_fields", (long) limits.maxFields()),
+                Map.entry("max_annotations", (long) limits.maxAnnotations()),
+                Map.entry("max_values", (long) limits.maxValues()),
+                Map.entry("max_foreign_schemas", (long) limits.maxForeignSchemas()),
+                Map.entry("max_import_closure", (long) limits.maxImportClosure()),
+                Map.entry("max_schema_entries", (long) limits.maxSchemaEntries()),
+                Map.entry("max_reference_chain", (long) limits.maxReferenceChain()),
+                Map.entry("max_supertype_chain", (long) limits.maxSupertypeChain()),
+                Map.entry("max_materialisation_depth", (long) limits.maxMaterialisationDepth()));
     }
 
     /**
@@ -322,7 +362,15 @@ enum OutputFormat {
         json.append(",\"token_policy\":");
         jsonScriptPolicy(json, policy.tokenPolicy());
         json.append(",\"unicode_data_version\":").append(jsonString(policy.unicodeDataVersion()));
-        json.append(",\"limits\":{\"max_depth\":").append(policy.limits().maxDepth()).append("}}");
+        json.append(",\"limits\":{");
+        List<Map.Entry<String, Long>> limits = limits(policy.limits());
+        for (int i = 0; i < limits.size(); i++) {
+            if (i > 0) {
+                json.append(',');
+            }
+            json.append(jsonString(limits.get(i).getKey())).append(':').append(limits.get(i).getValue());
+        }
+        json.append("}}");
     }
 
     private static void jsonScriptPolicy(StringBuilder json, CliPolicy.CliScriptPolicy policy) {

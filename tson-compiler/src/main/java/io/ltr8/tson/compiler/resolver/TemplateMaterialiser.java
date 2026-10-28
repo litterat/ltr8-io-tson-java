@@ -101,16 +101,16 @@ final class TemplateMaterialiser {
     private final Map<String, Top> materialised = new LinkedHashMap<>();
 
     /**
-     * The facts of every entry this pass mints or closes into a declaration -- the constructor its value applies
-     * and the application it closes. {@code SchemaResolver}'s own map, shared so a minted entry's facts are
-     * there the moment it is published.
-     */
-    /**
      * The application each instantiation this pass closed is the instantiation of, by entry name (§8.2) -- shared
      * with {@code SchemaResolver}, which keys the applied-parent fold on it and writes it on the entry's key.
      */
     private final Map<String, TypeRef> applications;
 
+    /**
+     * The facts of every entry this pass mints or closes into a declaration -- the constructor its value applies
+     * and the application it closes. {@code SchemaResolver}'s own map, shared so a minted entry's facts are
+     * there the moment it is published.
+     */
     private final Map<String, TsonSchema.EntryFacts> facts;
 
     /** The constructor an entry's value applies, through the schema's facts and then its own class. */
@@ -198,11 +198,11 @@ final class TemplateMaterialiser {
      * failure, if that check ever has a hole, is a {@link StackOverflowError} -- not a diagnosis, and not
      * something the exception policy can classify. One comparison for that is worth paying.
      *
-     * <p><b>It is a bare constant rather than a stated policy</b>, and it is [TSON-SCHEMA] §11.5's
-     * materialisation-depth limit at that section's own default. §11.5 states the schema-side limits as part
-     * of [TSON-DATA] §9.1's one limits policy, reported through the same surfaces, so this belongs on {@code
-     * LimitsPolicy} beside {@code maxDepth}; nothing yet bounds the other four §11.5 names -- an import
-     * closure, a schema's entry count, a reference chain, or a supertype chain.
+     * <p><b>It is a bare constant rather than the stated policy</b>, and it is [TSON-SCHEMA] §11.5's
+     * materialisation-depth limit at that section's own default. {@code LimitsPolicy} states that limit as
+     * {@code maxMaterialisationDepth}, beside the other four §11.5 limits, and this is the one of the five
+     * that anything bounds; it does not yet read the policy's value, so a configured depth is reported and
+     * not applied here.
      *
      * <p>Distinct from §5.10.1's productivity rule, which is about a type with no finite <em>data</em>
      * model; the regularity rule is about one with no finite <em>type</em> model.

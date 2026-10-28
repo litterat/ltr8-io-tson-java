@@ -43,10 +43,6 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
     }
 
     /**
-     * The {@link TsonLinkedSchema} this was compiled from -- package-private, so the {@link
-     * TsonCompiledMetaSchema} subtype can pass it to {@code super} when built from an existing base schema.
-     */
-    /**
      * {@code name}'s kind ([TSON-SCHEMA] §4.1), judged by where each base kind its chain names is defined --
      * {@code null} for a name this schema lacks.
      */
@@ -59,6 +55,10 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
         return linkedSchema.isKernel(name);
     }
 
+    /**
+     * The {@link TsonLinkedSchema} this was compiled from -- package-private, so the {@link
+     * TsonCompiledMetaSchema} subtype can pass it to {@code super} when built from an existing base schema.
+     */
     TsonLinkedSchema linkedSchema() {
         return linkedSchema;
     }

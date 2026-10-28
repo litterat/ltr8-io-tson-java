@@ -962,12 +962,6 @@ public final class SchemaResolver {
     }
 
     /**
-     * One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names},
-     * as a read of a schema document's value ({@link TsonReadContext#readsSchemaDocument()}): a bare name at a
-     * record position is a value by name here and nowhere else. The references the read produced by name are put in
-     * {@code heldByName} under the body it returns, for the schema to carry to the linker.
-     */
-    /**
      * Whether {@code constructor}'s instances are value bodies: a namespace type, whose payload is a map of values
      * the resolver reads into the consumer's host classes. Nothing in one is ever lifted or minted, so a kind-typed
      * slot there holds a bare name and a braced application is refused rather than left for a closer that will not
@@ -977,6 +971,12 @@ public final class SchemaResolver {
         return metaParser.kindOf(constructor) == EntryKind.NAMESPACE;
     }
 
+    /**
+     * One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names},
+     * as a read of a schema document's value ({@link TsonReadContext#readsSchemaDocument()}): a bare name at a
+     * record position is a value by name here and nowhere else. The references the read produced by name are put in
+     * {@code heldByName} under the body it returns, for the schema to carry to the linker.
+     */
     private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
                                IdentifierPolicy names, Map<Object, List<TsonSchema.ValueByName>> heldByName,
                                boolean valueBody) {
