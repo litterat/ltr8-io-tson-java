@@ -115,7 +115,7 @@ The implementation then follows the target through `reference.target` in `readsI
 the resolved entry's constructor is the form in every case, is what runs and should then be stated in §5.10 with the
 alias named, since the third sentence reads against it.
 
-## 4. [TSON-DATA] §2.4, [TSON-SCHEMA] §5.4 — at a disjoint choice a token's form selects the variant, and no emitter rule says so
+## 4. [TSON-DATA] §2.4, [TSON-SCHEMA] §5.4 — at a disjoint choice the form selects the variant, with no emitter rule
 
 **Problem.** [TSON-DATA] §2.4 says a token's form is consulted exactly once, by base type resolution, that
 "quoting is a lexical necessity, not a semantic signal", and that content inside the profile "may be written in
