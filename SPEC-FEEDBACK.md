@@ -114,3 +114,37 @@ target applies, following aliases through to the first non-alias head, and that 
 The implementation then follows the target through `reference.target` in `readsInStructure`. The alternative, that
 the resolved entry's constructor is the form in every case, is what runs and should then be stated in §5.10 with the
 alias named, since the third sentence reads against it.
+
+## 4. [TSON-DATA] §2.4, [TSON-SCHEMA] §5.4 — at a disjoint choice a token's form selects the variant, and no emitter rule says so
+
+**Problem.** [TSON-DATA] §2.4 says a token's form is consulted exactly once, by base type resolution, that
+"quoting is a lexical necessity, not a semantic signal", and that content inside the profile "may be written in
+any form"; §5.2 makes `!date 2025-03-13` and `!date "2025-03-13"` one value. [TSON-SCHEMA] §5.4 makes `disjoint`
+mean that the same single pass recovers an untagged value's variant, so at a disjoint choice the one consultation
+§2.4 allows is the one that picks the type. There, form is meaning, and §2.4's freedom changes the value:
+
+- the text `42` written bare at `( int8 | text )` reads as the number 42, with no diagnostic, since the reader
+  cannot know;
+- the text `42` written bare at `( small | text )`, `small` an `int8` capped at 10, is refused by `small` — the
+  variant its class selected — with no second attempt at `text`;
+- the text `true` written bare at `( boolean | abc )` dispatches to `boolean`;
+- the number 42 written `"42"` at `( int8 | text )` reads as text, where §2.4 says `!number "10.2"` is a number.
+
+§5.4's emitter sentence — "if two variants share a class, tag every value of the choice; a tag is never wrong" —
+covers the non-disjoint case only. Nothing tells an emitter what form to give an untagged value at a disjoint
+choice, and nothing in §2.4 warns that there is a position where its freedom does not hold. [TSON-JSON] has no
+counterpart problem: kind is meaning at every typed position there (§5.3, §5.6), so its encoder sentence in §8.2
+is complete.
+
+**What is running.** The readers do exactly what §5.4 says: an untagged value at a disjoint choice goes to the
+variant of its token's class and is validated as that variant, with no fallback. The schemaless writers comply
+without knowing the schema — `AtomWriter` quotes every host `String` and writes every number and boolean bare —
+so a value written by this library round-trips through a disjoint choice to the variant it came from. The misread
+is a hand-written document's, or a producer's that quotes everything or nothing, which is where the
+structured-output case lives.
+
+**Resolution, a proposal.** One sentence in §5.4's tagging paragraph, the twin of the one it has: *at a disjoint
+choice an emitter writes each untagged value in the form of its variant's class — a text value whose content would
+resolve to another class is quoted, and a value of a boolean or number variant is written bare; a tag is never
+wrong.* And one clause in [TSON-DATA] §2.4 after "consulted exactly once": at a disjoint choice that consultation
+selects the variant, so the form an emitter chooses there is its tag. No reader rule changes.
