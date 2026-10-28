@@ -58,7 +58,7 @@ drop annotations without configuration, stating so in its contract. (b) is the s
 schemaless reader already does with the carrier; (a) keeps one rule for both encoders. `BACKLOG.md` carries the
 code half under "JSON encoding".
 
-## 3. [TSON-SCHEMA] §5.7, §8.2 — a closed refinement source: "mints nothing" against "IS-A the source"
+## 2. [TSON-SCHEMA] §5.7, §8.2 — a closed refinement source: "mints nothing" against "IS-A the source"
 
 **Problem.** §8.2's trigger positions say an application at a composition target or a refinement source "is subsumed
 as an operand and mints nothing (§5.8)". §5.7 says a refinement produces "a new definition with its own identity that
@@ -90,7 +90,7 @@ closing order-independent, which §8.2's content identity is for. (b) keeps §8.
 edge from `x` to `box<text>`, so `x` would not be admissible where `box<text>` is expected. The implementation follows
 (a) once this closes; until then the behaviour above is what runs.
 
-## 4. [TSON-SCHEMA] §5.10 — an alias of a schema-namespace template: which namespace its value parameters read in
+## 3. [TSON-SCHEMA] §5.10 — an alias of a schema-namespace template: which namespace its value parameters read in
 
 **Problem.** §5.10 says a template whose body applies a constructor of the governing meta other than `record` reads
 its value parameters' types in the structure namespace, a record template reads them in the schema's own namespace,
