@@ -16,8 +16,8 @@ Design notes for `tson-json`'s front door — `Json` and its two readers — the
 - Numbers convert exactly or error, each by its family's own contract; `float`/`double` round by theirs.
 - A union target is refused on read and a choice on write, because nothing in a Java class states §8.2's condition.
 - `JsonDataEmitter` owns every separator; every byte sink is UTF-8, each `write` to one flushes, and none is closed here.
-- An absent field is left out rather than written `null`; an `Annotations` carrier is filled empty on read and not
-  written.
+- An absent field is left out rather than written `null`; an `Annotations` carrier is filled empty on read and never
+  written: a non-empty one, or a non-empty annotated box, is refused unless `strippingAnnotations()` (§4.3).
 
 Related: `design/json-encoding.md` (configuration, atom vocabulary, rationale), `design/json-lexer-stream-tree.md`
 (the duplicate-member rule, `JsonDiagnostics`' classification), `design/json-schema-directed-reading.md`,
@@ -111,7 +111,8 @@ Three rules are §7-shaped, as far as a Java class can express §7:
 - **JSON null anywhere else is the void value**, which a bound object spells `null`, having no third state — so an
   omitted member and a null member are indistinguishable in the result, which [TSON-JSON] §7.2 states of bound
   output. It is the treatment `tson-compiler`'s engine gives `_`.
-- **An `Annotations` carrier is filled with `Annotations.empty()`**, §4.3 giving the JSON wire no annotation channel.
+- **An `Annotations` carrier is filled with `Annotations.empty()`**, §4.3 giving the JSON wire no annotation channel —
+  the empty set the writer writes back without configuration.
 
 **A member the class does not declare refuses the document** (`UNRECOGNIZED_FIELD`), the one place this reader is
 stricter than a JSON consumer expects. A member added in a later version can change what the members this class does
@@ -225,12 +226,18 @@ after its bridge.
 **A `Namespace` writes as the map it holds**, its `entries` through their own descriptor: the schema position typing it
 names the constructor, as at a TSON slot (`design/writers-and-document-header.md`).
 
-**Refused rather than approximated** (`WriteException`), because no reader here could take it back:
+**Refused rather than approximated** (`WriteException`):
 
-- **a choice.** §8.2's one condition is a fact a schema derives; a Java union states nothing of the kind. The mirror of
-  the reader's refusal.
+- **a value carrying annotations** — a non-empty `Annotations` carrier, or a non-empty annotated box — because §4.3
+  gives annotations no JSON carrier and makes encoding one an encode error. The message names the position, rooted at
+  the written class (`Widget.colour`, `Order.items[0].annotations`), and the annotations. `strippingAnnotations()` is
+  §4.3's explicit code-level configuration: a derived writer that drops them and writes the value. An empty carrier is
+  never an error, so what the reader fills a carrier with writes back without configuration. The position is gathered
+  as the refusal unwinds, each container prefixing its own step, so a write that succeeds builds no path.
+- **a choice**, which no reader here could take back. §8.2's one condition is a fact a schema derives; a Java union
+  states nothing of the kind. The mirror of the reader's refusal.
 - **a host value with no JSON spelling**, a map whose key type a member name cannot spell, and a `null` map key — the
-  write side of the reader's `BIND_MISMATCH` on the same shapes.
+  write side of the reader's `BIND_MISMATCH` on the same shapes, refused for the same reason.
 
 Non-finite `double`s and `float`s are not refused: §5.4 spells them `".inf"`, `"-.inf"` and `".nan"`, the strings the
 same family parser reads back.
@@ -240,9 +247,8 @@ same family parser reads back.
 - **an absent field** (a `null` component), rather than written `null` — §7 makes JSON null the void sentinel at a typed
   position, so the two say the same thing for every declaration that admits both (§6.1.2), and omission is what an
   encoder without the schema writes;
-- **an `Annotations` carrier and an annotated box's annotations**, which the writer drops. §4.3 makes encoding a value
-  that carries annotations an encode error, with stripping permitted only as explicit configuration; this writer strips
-  unconditionally, and it is the class-directed reader's mirror, which fills every carrier empty.
+- **an `Annotations` carrier**, which is never a member: an empty one carries nothing, and a non-empty one is refused
+  or, under `strippingAnnotations()`, dropped with an annotated box's annotations.
 
 **`WriteException` is `tson-base`'s**, shared by both encodings: a value the encoding cannot take is the processor's
 fact rather than one format's, and each throw site names its encoding ("cannot write X as JSON"). `DataBindException`
@@ -252,5 +258,5 @@ way a write can fail; an `UncheckedIOException` from the sink passes through as 
 **Every byte sink is UTF-8 and none is closed here.** `write(value, ByteSink)` encodes UTF-8 itself, so a document
 reaches a `ByteBuffer`, a channel or a file without existing as a `String` first, and each such `write` flushes what it
 emitted, because closing is the caller's and a sink cannot tell a caller who finished from one who abandoned the write.
-`indented(indent)` is a derivation, not a setting; the compact form is the default and the one to send, and the
-indented form equals `JsonValue.toDisplayString(indent)` (`JsonTreeWriterTest`).
+`indented(indent)` and `strippingAnnotations()` are derivations, not settings, and compose; the compact form is the
+default and the one to send, and the indented form equals `JsonValue.toDisplayString(indent)` (`JsonTreeWriterTest`).

@@ -36,28 +36,6 @@ When an entry closes, its citations become spec citations and the entry is delet
 
 ---
 
-## 1. [TSON-JSON] §4.3 — annotations: encode error in the text, silent strip in the schemaless writer
-
-**Problem.** §4.3 makes encoding a value that carries annotations an **encode error**, with stripping admitted only
-"as an explicit code-level configuration". The schemaless object writer (`Json.objectWriter()`) strips
-unconditionally: a bound class's `Annotations` carrier and an annotated box's annotations are dropped and the value
-is written. The schema-directed path has no writer yet, so nothing in this library raises the error §4.3 requires.
-
-**What is running.** Unconditional stripping, with no configuration surface. The schemaless reader binds every
-carrier to `Annotations.empty()`, so a document the writer produces reads back to what was written minus the
-annotations; nothing is misread, only lost.
-
-**Why the text says error.** Principle 5 (a categorized error, never a silent drop) is stated against a *typed*
-encoder, where an annotation at a typed position may be the information the tag carries (§3.3). At a schemaless
-position no reader can give an annotation meaning, so a refusal there protects nothing a reader could recover.
-
-**Resolution to decide, author's call.** Either (a) the writer refuses an annotated value with a `WriteException`
-naming the position unless a `strippingAnnotations()` configuration is set, matching the text; or (b) §4.3 says the
-rule binds the schema-directed encoder, and a schemaless encoder, having no annotation channel on either side, MAY
-drop annotations without configuration, stating so in its contract. (b) is the smaller change and matches what the
-schemaless reader already does with the carrier; (a) keeps one rule for both encoders. `BACKLOG.md` carries the
-code half under "JSON encoding".
-
 ## 2. [TSON-SCHEMA] §5.7, §8.2 — a closed refinement source: "mints nothing" against "IS-A the source"
 
 **Problem.** §8.2's trigger positions say an application at a composition target or a refinement source "is subsumed
