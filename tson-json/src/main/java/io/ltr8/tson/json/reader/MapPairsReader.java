@@ -14,8 +14,8 @@ import java.util.Map;
 /**
  * [TSON-JSON] §6.4's <b>pairs form</b>, in every read mode: a map whose key type is a record, tuple, array, map or
  * choice -- the compound keys [TSON-DATA] §2.6 admits, which a JSON object's string-only member names cannot spell.
- * The map is a JSON array of two-element arrays, which is the second of §8.3's class-stability leaks. The mode's
- * {@link MapBuilder} builds the value once.
+ * The map is a JSON array of two-element arrays, so [TSON-SCHEMA] §5.4 gives it no discrimination class (§8.3). The
+ * mode's {@link MapBuilder} builds the value once.
  *
  * <p>A compound key compares as a value too, through {@link ValueIdentity}'s recursive reduction -- member order
  * carries no meaning (§6.1.6), and a {@code JsonNumber} keeps its literal, so two keys §5.3 makes one value would

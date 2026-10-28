@@ -141,7 +141,7 @@ Three things this document once anticipated did not land as drafted and are reco
 - A **tag** is an in-band record of a variant or subtype selection — the JSON counterpart of TSON text's `!name` annotation, carried by `$type` or by a discriminator member.
 - A position's **effective type** is the position's declared type after following its reference chain ([TSON-SCHEMA] §8.3), or the type a tag at that position selects, once admitted.
 - A **scoped position** is one whose effective type is a `scoped` instance ([TSON-SCHEMA] §7.8) — core's `declared`, `extern` or `dynamic`, or an application of `extern_of`/`extern_type`.
-- **Class-stable** describes a type every one of whose values encodes in that type's own discrimination class — which, since Revision 36, is every type that has a class (§8.3).
+- **Class-stable** describes a type every one of whose values encodes in that type's own discrimination class — which is every type that has a class (§8.3).
 
 
 ## 2. A Complete Example
@@ -531,7 +531,7 @@ In TSON text the tag is the out-of-band `!variant` annotation. In JSON it is in-
 
 A value at a choice-typed position MAY omit the tag **if and only if** one condition recovers the variant from the schema and the JSON form alone:
 
-- **The choice is `disjoint: true`.** Selection is by the JSON value kind: the arriving value's kind names a discrimination class (§4.2), and the variant bearing that class is selected. The `disjoint` fact guarantees at most one variant per class and that every variant has one ([TSON-SCHEMA] §5.4) — and since Revision 36 a class is given only to types whose every value lands in it in every encoding, so the fact carries class stability itself (§8.3) and this encoding needs no second condition. Enum-classed variants dispatch by kind like any other — content matching against the member set is that variant's ordinary validation, not a second dispatch.
+- **The choice is `disjoint: true`.** Selection is by the JSON value kind: the arriving value's kind names a discrimination class (§4.2), and the variant bearing that class is selected. The `disjoint` fact guarantees at most one variant per class and that every variant has one ([TSON-SCHEMA] §5.4) — and a class is given only to types whose every value lands in it in every encoding, so the fact carries class stability itself (§8.3). Enum-classed variants dispatch by kind like any other — content matching against the member set is that variant's ordinary validation, not a second dispatch.
 
 Where it does not hold, the tag is REQUIRED, and a value without one is a validation error at the position. The predicate consumes the derived `disjoint` fact and the schema's declared facets; it MUST NOT be extended by implementation cleverness — no member-shape matching among record variants, no value-set separation (disjoint bounds, disjoint patterns), no trying variants in order. [TSON-SCHEMA] §5.4's closed derivation has an exact counterpart here: a decoder proves neither more nor less than this one condition.
 
@@ -544,14 +544,14 @@ For an encoder the rule is one sentence, and it is text's sentence: *if the choi
 
 ### 8.3 Class Stability
 
-This section is informative from Revision 36: it records why two kinds of type have no discrimination class, which [TSON-SCHEMA] §5.4 now states.
+This section is informative.
 
-A type is **class-stable** when every JSON encoding of every one of its values is of its own discrimination class's value kind — when the §4.2 mapping does not leak for it. Through the draft against Revision 35 this encoding carried a second condition on the untagged route, because two kinds of type were disjoint by class in the model and unstable on this wire:
+A type is **class-stable** when every JSON encoding of every one of its values is of its own discrimination class's value kind — when the §4.2 mapping does not leak for it. [TSON-SCHEMA] §5.4 gives no discrimination class to the two kinds of type whose values would leak on this wire:
 
-1. **Approximate atoms with special values enabled.** A `float_type` instance with `allow_nan` or `allow_infinity` still true has values (`.nan`, the infinities) that encode as JSON strings (§5.4) — number-class values in string clothing.
+1. **Approximate atoms with special values enabled.** A `float_type` instance with `allow_nan` or `allow_infinity` true has values (`.nan`, the infinities) that encode as JSON strings (§5.4) — number-class values in string clothing. Narrowing both facets to `false` restores the instance's class.
 2. **Maps in pairs form.** A map whose key type forces the pairs form (§6.4) encodes as a JSON array — a brace-class value in bracket clothing.
 
-Revision 36 moved both into [TSON-SCHEMA] §5.4's no-class list, on the ground that neither is special to JSON in kind — any encoding without a number spelling for the specials, or without a delimiter pair for compound-keyed maps, meets the same two, exactly as `rational` and `complex` straddle classes in every encoding — so `disjoint` is false for any choice that lists one, in every encoding, and the untagged values of a choice are one set wherever it is read. Narrowing both float facets to `false` restores the instance's class; a compound-keyed map keeps none. Every type that has a class is therefore class-stable here: booleans, the exact numeric families, every string-content family (§5.6), identifier families among them, enums (§5.2), records, object-form maps, arrays, sets, and tuples. Types with no discrimination class (`rational`, `complex`, the two classless kinds above, `value`, nested choices, the `scoped` instances) never reach the untagged route: a choice containing one is not disjoint.
+Neither is special to JSON in kind: an encoding without a number spelling for the specials, or without a delimiter pair for compound-keyed maps, meets the same two, as `rational` and `complex` straddle classes in every encoding. So `disjoint` is false for any choice that lists one, in every encoding, and a choice's untagged values are one set wherever it is read. Every type that has a class is therefore class-stable here: booleans, the exact numeric families, every string-content family (§5.6), identifier families among them, enums (§5.2), records, object-form maps, arrays, sets, and tuples. Types with no discrimination class (`rational`, `complex`, the two kinds above, `value`, nested choices, the `scoped` instances) never reach the untagged route: a choice containing one is not disjoint.
 
 The predicate's verdict is a fact of the schema, and an implementation SHOULD read it per choice at schema load, in the manner of [TSON-SCHEMA] §5.11's compiled group lookup — the wire decision is then a table hit, not a per-value derivation.
 

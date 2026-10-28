@@ -88,6 +88,8 @@ class CrossEncodingParityTest {
               answered    => { a: answer_slot }
               port_text   => ( port_label | text )
               labelled    => { l: port_text }
+              loose_slot  => ( float64 | text )
+              loosened    => { f: loose_slot }
               pet       => abstract { pet_type: text =?  name: text }
               dog       => pet & { pet_type?: = "dog"  breed: text }
               cat       => pet & { pet_type?: = "cat"  indoor: boolean }
@@ -697,7 +699,7 @@ class CrossEncodingParityTest {
     // where the predicate itself can be compared.
 
     /**
-     * A disjoint, class-stable choice dispatches untagged in both encodings -- on [TSON-SCHEMA] §5.4's
+     * A disjoint choice dispatches untagged in both encodings -- on [TSON-SCHEMA] §5.4's
      * discrimination class in text, on the JSON value kind here. The class derivation is written twice (the
      * TSON one lives in an unexported package), so this is the case where that duplication would show.
      */
@@ -744,6 +746,21 @@ class CrossEncodingParityTest {
         sameVerdict("labelled", """
                 { l: "80" }""", """
                 {"l": "80"}""");
+    }
+
+    /**
+     * Core's {@code float64} admits NaN and the infinities, which straddle classes across the encodings, so
+     * [TSON-SCHEMA] §5.4 gives it no class and {@code ( float64 | text )} is not disjoint: an untagged value is
+     * refused in both, a finite number and a string alike.
+     */
+    @Test
+    void aFloatAdmittingSpecialsNeedsTheTagInBoth() {
+        sameVerdict("loosened", """
+                { f: 1.5 }""", """
+                {"f": 1.5}""");
+        sameVerdict("loosened", """
+                { f: "hi" }""", """
+                {"f": "hi"}""");
     }
 
     /** The variant is selected, then validated as itself -- so an out-of-range value is refused in both. */

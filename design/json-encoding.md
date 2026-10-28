@@ -116,13 +116,13 @@ source for it, or because reaching it would break documents already on the wire.
 
 - **Non-text map keys.** JSON Schema's `additionalProperties`/`patternProperties` are string-keyed, so
   `{K => V}` with a compound `K` never arises. §6.4's **pairs form is therefore unreachable**, and with it one
-  of §8.3's two class-stability leaks.
+  of the two kinds [TSON-SCHEMA] §5.4 gives no discrimination class (§8.3).
 - **Annotations on data values.** No JSON carrier exists (§4.3) and JSON Schema has no source for one, so the
   encode-side refusal never fires. It stays implemented, for values that arrive from the text encoding.
 - **Approximate atoms admitting the special values.** `.nan` and the infinities encode as JSON *strings*
   (§5.4) and no JSON document carries one, JSON having no spelling for them. A converted `type: number`
-  should narrow `allow_nan`/`allow_infinity` to false — which closes §8.3's other leak, so **every type in a
-  converted schema is class-stable** and §8.2's untagged route is available wherever the choice is disjoint.
+  should narrow `allow_nan`/`allow_infinity` to false, which keeps the float's number class ([TSON-SCHEMA] §5.4),
+  so a choice listing it can be disjoint and take §8.2's untagged route.
 - **Scoped positions.** `dynamic`/`extern` require an annotation object naming the type (§5.7, §8.5), which
   existing JSON does not carry. `additionalProperties: true` converts to the recursive `json` choice of §5.7,
   which is tag-free, never to `dynamic`.

@@ -19,8 +19,8 @@ JSON inputs are in `design/cli-config-hashing.md`.
 - `CompiledReaders` is rebound exactly once, from the in-progress compilation to the finished schema.
 - The map form is chosen by the factory from `K` and the record reader from `record.extension`, once at compile, never by
   inspecting a value.
-- A choice value may omit its tag only when the choice is disjoint **and** class-stable; no member-shape matching, no
-  trying variants in order. A missing required tag is `TYPE_MISMATCH`.
+- A choice value may omit its tag only when the choice is disjoint; no member-shape matching, no trying variants in
+  order. A missing required tag is `TYPE_MISMATCH`.
 - A kind (`kind_type`) is an atom, read by `AtomReader` from a string naming a member, and never a discrimination case
   ([TSON-JSON] §5.6). Under a meta layer (`TsonLinkedSchema.governsSchemas`) it reads the name's grammar alone: the
   document is a schema, and its names are judged members where that schema links.
@@ -242,17 +242,17 @@ class.
 
 §8.2's predicate is the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived `disjoint`
 fact, and it is closed: a value may omit its tag by exactly one condition, and it "MUST NOT be extended by
-implementation cleverness". `DispatchChoiceReader` implements the whole of it — disjoint plus class-stable, selecting
-on the arriving value's kind. **Member dispatch is not a choice mechanism** (§8.4): a choice position has no expected
+implementation cleverness". `DispatchChoiceReader` implements the whole of it — the choice is disjoint, selecting on
+the arriving value's kind. **Member dispatch is not a choice mechanism** (§8.4): a choice position has no expected
 record type whose selector fields a decoder could know before reading, so a choice of records requires the tag, and
 member dispatch belongs to a sealed family (§6.1.5), in `DispatchMemberReader`.
 
 **The verdict is computed once per choice, at compile** (§8.3's "table hit"); the table is empty exactly when the tag is
-required. **Both halves are needed and neither implies the other.** `disjoint` guarantees at most one variant per class;
-class stability guarantees the arriving kind lands in its variant's class. The unstable set is closed to two members
-(`DiscriminationClass.stable`): an approximate atom still admitting `.nan` or infinity, whose values arrive as JSON
-strings (§5.4), and a map forced into pairs form (§6.4). Narrowing `allow_nan`/`allow_infinity` restores the untagged
-route, which is the checkable reason §8.3 gives an API author to narrow.
+required. `disjoint` guarantees at most one variant per class, and it carries class stability too (§8.3): [TSON-SCHEMA]
+§5.4 gives no class to the two kinds whose values would arrive in another class's kind — an approximate atom still
+admitting `.nan` or an infinity, whose specials arrive as JSON strings (§5.4), and a map in pairs form (§6.4) — so a
+choice listing one is not disjoint and no class table is built for it. Narrowing `allow_nan`/`allow_infinity` restores
+the float's class and the untagged route, which is the checkable reason §8.3 gives an API author to narrow.
 
 `DiscriminationClass` duplicates the TSON reader's derivation (unexported there); the parity test carries the cases.
 

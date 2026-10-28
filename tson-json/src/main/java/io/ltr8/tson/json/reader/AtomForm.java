@@ -36,7 +36,8 @@ enum AtomForm {
     /**
      * §5.4's approximate families: a JSON number for the finite grid, and a JSON string for the specials
      * ({@code ".inf"}, {@code "-.inf"}, {@code ".nan"}) and the hex-float production, which JSON's number
-     * grammar cannot spell. The first of §8.3's two class-stability leaks.
+     * grammar cannot spell. An instance admitting the specials has no discrimination class ([TSON-SCHEMA] §5.4,
+     * §8.3).
      */
     NUMBER_OR_STRING,
 

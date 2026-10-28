@@ -32,8 +32,8 @@ import java.util.Optional;
  *       atom family, every enum, and {@code identifier}. A JSON object, each member name a key token faced to
  *       {@code K}'s own contract ({@link #keyParser}).</li>
  *   <li><b>Pairs form</b> -- when {@code K} is anything else, the compound keys [TSON-DATA] §2.6 admits. A JSON
- *       array of two-element arrays, each key read at {@code K}'s reader ({@link #schemaKey}), and the second of
- *       §8.3's class-stability leaks.</li>
+ *       array of two-element arrays, each key read at {@code K}'s reader ({@link #schemaKey}), and so without a
+ *       discrimination class ([TSON-SCHEMA] §5.4, §8.3).</li>
  * </ul>
  *
  * <p><b>The three mean nothing at a map position</b> (§3.2): keys are data, not names, so {@code "$schema"} under
@@ -80,7 +80,10 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
         return keyParser != null;
     }
 
-    /** Whether {@code body} takes the object form -- §8.3 asks the same question to judge class stability. */
+    /**
+     * Whether {@code body} takes the object form -- [TSON-SCHEMA] §5.4 asks the same question to give a map its
+     * discrimination class, so a map in pairs form has none.
+     */
     static boolean isObjectForm(TsonSchema schema, MapBody body) {
         return scalarKeyParser(new TsonLinkedSchema(schema), body.keyType().name()).isPresent();
     }

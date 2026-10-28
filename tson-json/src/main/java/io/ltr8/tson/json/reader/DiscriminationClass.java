@@ -16,18 +16,20 @@ import io.ltr8.tson.schema.meta.Top;
 import java.util.Optional;
 
 /**
- * [TSON-SCHEMA] §5.4's discrimination classes, and the two things [TSON-JSON] adds to them: which JSON value
- * kinds each class admits (§4.2), and where that mapping <b>leaks</b> (§8.3).
+ * [TSON-SCHEMA] §5.4's discrimination classes, and what [TSON-JSON] adds to them: which JSON value kind each class
+ * admits (§4.2).
  *
  * <p>The classes exist so that every encoding can state how much of a value's class its own forms recover.
  * JSON has six value kinds and the type system five classes; the null kind carries no class at all -- it is
- * the void sentinel (§7), spent before any class question arises -- and the remaining five nearly map
- * one-to-one.
+ * the void sentinel (§7), spent before any class question arises -- and the remaining five map one-to-one.
  *
  * <p><b>A type with no class needs no verdict.</b> {@code rational} and {@code complex} (both strings, but
  * §5.4 gives them no class), {@code value} and {@code void}, a nested choice and the {@code scoped} instances all
  * answer empty -- and a choice containing one is not disjoint ([TSON-SCHEMA] §5.4), so §8.2's untagged route never
- * consults them.
+ * consults them. So do §5.4's two straddling kinds: an approximate atom whose {@code allow_nan} or
+ * {@code allow_infinity} is true, whose special values are JSON strings (§5.4), and a map whose key type takes the
+ * pairs form (§6.4), a JSON array. Every classed type is therefore class-stable (§8.3): each of its values arrives
+ * as its own class's kind.
  *
  * <p><b>The derivation itself is the type system's and is shared with the TSON reader by duplication</b>, not
  * by a common class: {@code tson-compiler} keeps its own in an unexported package. The two must agree, and
@@ -40,17 +42,19 @@ enum DiscriminationClass {
 
     /** The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none. */
     static Optional<DiscriminationClass> of(TsonLinkedSchema linked, String name) {
-        return ReferenceChain.terminal(linked.schema(), name).flatMap(resolved -> classify(resolved.definition()));
+        return ReferenceChain.terminal(linked.schema(), name)
+                .flatMap(resolved -> classify(linked.schema(), resolved.definition()));
     }
 
-    private static Optional<DiscriminationClass> classify(Top definition) {
+    private static Optional<DiscriminationClass> classify(TsonSchema schema, Top definition) {
         return switch (definition) {
             case IntegerType ignored -> Optional.of(NUMBER);
             case DecimalType ignored -> Optional.of(NUMBER);
-            case FloatType ignored -> Optional.of(NUMBER);
+            case FloatType floats -> floats.allowNan() || floats.allowInfinity()
+                    ? Optional.empty() : Optional.of(NUMBER);
             case EnumBody members -> ofEnum(members);
             case RecordBody ignored -> Optional.of(BRACE);
-            case MapBody ignored -> Optional.of(BRACE);
+            case MapBody map -> MapPlan.isObjectForm(schema, map) ? Optional.of(BRACE) : Optional.empty();
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
             // Every remaining atom family is string-content (§5.6). `rational`, `complex`, `value`,
@@ -105,11 +109,8 @@ enum DiscriminationClass {
 
     /**
      * §4.2's table, read from the wire end: the class an arriving value's kind names, or empty for null,
-     * which carries no class -- it is the void sentinel and is spent before any class question arises.
-     *
-     * <p>The two leaks §8.3 names are <em>not</em> folded in here, and that is the point of keeping stability
-     * a separate question: a string may be an approximate atom's special value and an array may be a map in
-     * pairs form, but a class-stable variant set contains neither, so the untagged route reads the kind straight.
+     * which carries no class -- it is the void sentinel and is spent before any class question arises. Every
+     * classed type is class-stable (§8.3), so the untagged route reads the kind straight.
      */
     static Optional<DiscriminationClass> ofKind(JsonEvent event) {
         return switch (event) {
@@ -120,29 +121,5 @@ enum DiscriminationClass {
             case JsonEvent.ArrayStart ignored -> Optional.of(BRACKET);
             default -> Optional.empty();
         };
-    }
-
-    /**
-     * §8.3: whether every JSON encoding of every one of {@code name}'s values is of its own class's kind --
-     * whether §4.2's mapping does not leak for it. <b>The unstable set is closed</b>, so this is a two-member
-     * test and not a survey:
-     *
-     * <ol>
-     *   <li>an approximate atom with {@code allow_nan} or {@code allow_infinity} still true has values that
-     *       encode as JSON <em>strings</em> (§5.4) -- number-class values in string clothing. Narrowing both
-     *       to false restores stability, which is what gives an API author a checkable reason to narrow;</li>
-     *   <li>a map whose key type forces the pairs form (§6.4) encodes as a JSON <em>array</em> -- a
-     *       brace-class value in bracket clothing.</li>
-     * </ol>
-     *
-     * <p>Everything else is stable, a record included: whatever members it carries, it is an object. A type with
-     * no class is not unstable -- it is unreachable by the untagged route either way.
-     */
-    static boolean stable(TsonSchema schema, String name) {
-        return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition()) {
-            case FloatType floats -> !floats.allowNan() && !floats.allowInfinity();
-            case MapBody map -> MapPlan.isObjectForm(schema, map);
-            default -> true;
-        }).orElse(true);
     }
 }

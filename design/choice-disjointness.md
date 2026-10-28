@@ -8,6 +8,9 @@ and why the same table is what untagged reading dispatches on. Current form only
 - `disjoint` is total and two-valued: `true` exactly when every variant has a discrimination class and no class appears
   twice, `false` otherwise, never absent.
 - An `integer` and a `decimal` are one class (`number`); records and maps are one class (`brace`).
+- Two kinds straddle classes and have none ([TSON-SCHEMA] §5.4): an approximate atom whose `allow_nan` or
+  `allow_infinity` is true, and a map whose key type, at the end of its reference chain, is not an atom other than
+  `value` and `void` (enums included). A classed type's every value lands in its class in every encoding.
 - A variant classifies through its §8.3 reference chain; no class at all makes the choice `false`.
 - An enum's class is its members' shared class, read off each member's spelling; every enum is over an identifier
   family, so no fact beyond the body is needed. A closed set of text values is `text_type`'s `members` facet and is
@@ -46,8 +49,15 @@ discrimination the wire can't deliver) and `bracket` (arrays and tuples). A vari
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
 `rational`/`complex` (whose typed forms straddle classes), `value`, `void`, a mixed-class enum, a scoped instance (its
 membership is a namespace, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
-conservative side. A `void` variant
-never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`) —
+conservative side. §5.4 adds two kinds to that list by the same straddling, judged across encodings: an approximate
+atom whose `allow_nan` or `allow_infinity` is true (a NaN is a number token in TSON text and a string in JSON, so
+core's `float32`/`float64` as declared have no class, and narrowing both facets to false restores `number`), and a
+map whose key type is not "a type a single scalar token denotes by its content — an atom-family instance or an enum,
+`value` and `void` excepted" (a compound key has no single-token spelling, so JSON writes the map in pairs form, an
+array). This is what makes `disjoint` class-stable: every classed type's values land in its class in every encoding,
+so a choice's untagged values are one set whichever encoding reads it, and no encoding needs a second condition.
+
+A `void` variant never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`) —
 `(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`), per §5.4's "a
 variant MUST NOT resolve to `void`", judged after following the variant's reference chain (§8.3) as §5.4
 requires, so an alias of `void` is caught too.

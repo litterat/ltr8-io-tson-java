@@ -1,14 +1,18 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -126,5 +130,89 @@ class ChoiceReadTest {
                 () -> personReader("(text | text)"));
 
         assertTrue(e.getMessage().contains("§5.4"), e.getMessage());
+    }
+
+    // ---------------------------------------------------------------- §5.4's straddling float
+
+    /**
+     * {@code loose} lists core's {@code float64} as declared, which admits NaN and the infinities and so has no
+     * class ([TSON-SCHEMA] §5.4); {@code tight} lists a float narrowing both facets, which keeps {@code number}.
+     */
+    private static final String STRADDLING = """
+            !!id:"https://example.test/choice-straddling.tn"
+            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/38/m/core.tn"
+            {
+              loose => ( float64 | text )
+              strict => !float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
+              tight => ( strict | text )
+              holder => { loose: loose  tight: tight }
+            }""";
+
+    private static TsonValue readHolder(String loose, String tight) {
+        Tson tson = Tson.standard();
+        TsonTypeReader<?> reader = tson.treeRegistry().compile(tson.resolve(STRADDLING)).get("holder");
+        return (TsonValue) reader.read(TestDocuments.document("{ loose: " + loose + "  tight: " + tight + " }"));
+    }
+
+    private static boolean disjoint(TsonLinkedSchema linked, String name) {
+        return ((ChoiceBody) linked.schema().entries().get(name)).disjoint().orElseThrow();
+    }
+
+    @Test
+    void aChoiceListingAFloatAdmittingSpecialsIsNotDisjoint() {
+        TsonLinkedSchema linked = Tson.standard().resolve(STRADDLING);
+
+        assertFalse(disjoint(linked, "loose"));
+        assertTrue(disjoint(linked, "tight"));
+    }
+
+    @Test
+    void anUntaggedFiniteFloatAtANonDisjointChoiceNeedsItsTag() {
+        ReadException e = assertThrows(ReadException.class, () -> readHolder("1.5", "1.5"));
+
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, e.diagnostic().code());
+        assertTrue(e.getMessage().contains("requires an explicit type annotation"), e.getMessage());
+    }
+
+    @Test
+    void anUntaggedNanAtANonDisjointChoiceNeedsItsTag() {
+        ReadException e = assertThrows(ReadException.class, () -> readHolder(".nan", "1.5"));
+
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, e.diagnostic().code());
+        assertTrue(e.getMessage().contains("requires an explicit type annotation"), e.getMessage());
+    }
+
+    @Test
+    void aTaggedNanAtANonDisjointChoiceReads() {
+        TsonValue loose = readHolder("!float64 .nan", "1.5").get("loose");
+
+        assertEquals(Optional.of("float64"), loose.typeRef());
+        assertTrue(Double.isNaN(loose.asNumber().orElseThrow().doubleValue()), loose.toString());
+    }
+
+    @Test
+    void aNarrowedFloatKeepsItsClassSoItsChoiceReadsUntagged() {
+        TsonValue holder = readHolder("!float64 1.5", "1.5");
+
+        assertEquals(Optional.of("strict"), holder.get("tight").typeRef());
+        assertEquals(1.5, holder.get("tight").asDouble().orElseThrow());
+    }
+
+    @Test
+    void aQuotedNanAtTheDisjointChoiceIsText() {
+        TsonValue tight = readHolder("!float64 1.5", "\".nan\"").get("tight");
+
+        assertEquals(Optional.of("text"), tight.typeRef());
+        assertEquals(Optional.of(".nan"), tight.asString());
+    }
+
+    /** {@code .nan} is number-class, so it dispatches to {@code strict}, whose {@code allow_nan: false} refuses it. */
+    @Test
+    void anUntaggedNanAtTheDisjointChoiceIsRefusedByTheNarrowedFloat() {
+        ReadException e = assertThrows(ReadException.class, () -> readHolder("!float64 1.5", ".nan"));
+
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.diagnostic().code());
+        assertTrue(e.getMessage().contains("allow_nan: false"), e.getMessage());
     }
 }
