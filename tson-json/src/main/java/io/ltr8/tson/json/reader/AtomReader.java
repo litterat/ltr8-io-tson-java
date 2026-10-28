@@ -44,8 +44,8 @@ final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
      * §5.2's enums, with {@code boolean} taken off the general path so it reads a real {@code Boolean} rather
-     * than the text {@code "true"}. The general rule still decides the <em>form</em>; only the host value
-     * differs, exactly as it does on the TSON side.
+     * than the text {@code "true"}. The general rule still decides the <em>form</em> -- a JSON boolean or a JSON
+     * string, matched on content -- and only the host value differs, exactly as it does on the TSON side.
      */
     static final ValueReaderFactory ENUM = (name, definition, context) -> "boolean".equals(name)
             ? new AtomReader<>(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(

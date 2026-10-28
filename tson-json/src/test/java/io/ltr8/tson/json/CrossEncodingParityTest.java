@@ -337,6 +337,18 @@ class CrossEncodingParityTest {
                         {"p": {"pet_type": "dog", "name": "Rex", "breed": "corgi"}}""");
     }
 
+    /**
+     * [TSON-JSON] §5.2: an enum position matches on content, not on kind, and {@code boolean} is the general rule
+     * applied -- so the string spelling of a member reads in JSON exactly as the quoted token does in TSON text,
+     * where form is not meaning at a typed position ([TSON-DATA] §2.4).
+     */
+    @Test
+    void aBooleanReadsItsStringSpellingInBothEncodings() {
+        bothAccept("kennel", "{ p: { pet_type: cat  name: Tom  indoor: \"true\" } }",
+                """
+                        {"p": {"pet_type": "cat", "name": "Tom", "indoor": "true"}}""");
+    }
+
     /** And the selection is a selection: the other pin reaches the other member's fields. */
     @Test
     void theOtherPinSelectsTheOtherMemberInBoth() {
