@@ -58,27 +58,6 @@ drop annotations without configuration, stating so in its contract. (b) is the s
 schemaless reader already does with the carrier; (a) keeps one rule for both encoders. `BACKLOG.md` carries the
 code half under "JSON encoding".
 
-## 2. [TSON-JSON] §8.2, §8.3 — class stability carries revision history, and the linker disagrees with §5.4
-
-**Problem.** §8.2 says "since Revision 36 a class is given only to types whose every value lands in it", and §8.3
-opens "informative from Revision 36" and recounts "the draft against Revision 35". The document is a draft with no
-published revision, so the phrases date nothing a reader can consult and should go: §8.3 states the fact (every
-classed type is class-stable here, because [TSON-SCHEMA] §5.4 gives no class to the two straddling kinds) and
-nothing about when it became so.
-
-**What is running, and the disagreement.** [TSON-SCHEMA] §5.4 denies a class to an approximate atom whose
-`allow_nan` or `allow_infinity` is true and to a map whose key type forces the pairs form, so `disjoint` is false
-for a choice listing one. The linker's derivation does not do that: `DiscriminationClass.of` classes every
-`FloatType` `NUMBER` and every `MapBody` `BRACE`, so `( float64 | text )` links `disjoint: true` with core's
-`float64` as declared. The JSON reader compensates with its own `DiscriminationClass.stable` check, refusing the
-untagged route for exactly those two kinds, which is the second condition §8.3 says the text no longer needs. The
-observable difference is on the TSON text side: `( float64 | text )` dispatches untagged there, where §5.4 says it
-must carry a tag. That is a Part 2 implementation gap, carried in `BACKLOG.md` under "Resolution & linking
-generality"; once the linker follows §5.4, `stable` is redundant and goes, and §8.3 is right as written.
-
-**Resolution.** For Part 3, remove the revision phrasing from §8.2 and §8.3 and state §8.3's rule in the present
-tense; no rule changes. This entry closes with that edit and the linker fix.
-
 ## 3. [TSON-SCHEMA] §5.7, §8.2 — a closed refinement source: "mints nothing" against "IS-A the source"
 
 **Problem.** §8.2's trigger positions say an application at a composition target or a refinement source "is subsumed

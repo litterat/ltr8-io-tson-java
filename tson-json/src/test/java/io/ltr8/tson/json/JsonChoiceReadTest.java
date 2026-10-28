@@ -16,11 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-JSON] §8.2's discrimination predicate and §8.3's class stability.
+ * [TSON-JSON] §8.2's discrimination predicate, and §8.3's note on why it needs no class-stability condition.
  *
- * <p>One condition and no second (§8.4 says why a choice has no discriminator). Every case here is the untagged
- * route — {@code disjoint: true}, whose classed variants are class-stable by [TSON-SCHEMA] §5.4, dispatching on the
- * JSON value kind — or the tagged form, or the refusal that follows when neither recovers the variant.
+ * <p>One condition (§8.4 says why a choice has no discriminator). Every case here is the untagged route —
+ * {@code disjoint: true}, whose classed variants are class-stable by [TSON-SCHEMA] §5.4, dispatching on the JSON
+ * value kind — or the tagged form, or the refusal that follows when neither recovers the variant.
  */
 class JsonChoiceReadTest {
 
@@ -28,11 +28,12 @@ class JsonChoiceReadTest {
      * TSON defines no comment syntax ([TSON-DATA] §2.10 — metadata is annotations), so what each declaration
      * is for is said here instead.
      *
-     * <p>{@code scalar_or_list} is disjoint with class-stable variants: one per JSON kind, so the untagged route holds.
+     * <p>{@code scalar_or_list} is disjoint, one variant per JSON kind, so the untagged route holds.
      * {@code shape}'s two record variants share the brace class, so it is not disjoint and the tag is
-     * required. {@code unit_circle} is a subtype of a variant, reachable by tag alone. {@code loose} carries
-     * §8.3's first leak — a {@code float64} still admitting {@code .nan} and the infinities has string-class
-     * values — and {@code tight} is the same choice over a variant that narrowed both facets away.
+     * required. {@code unit_circle} is a subtype of a variant, reachable by tag alone. {@code loose} lists a
+     * {@code float64} still admitting {@code .nan} and the infinities, which [TSON-SCHEMA] §5.4 gives no class, so
+     * the choice is not disjoint at link time; {@code tight} is the same choice over a variant that narrowed both
+     * facets away, and is disjoint.
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/choice-1.tn"
@@ -226,29 +227,29 @@ class JsonChoiceReadTest {
                 .refusal().code());
     }
 
-    // ── §8.3 class stability ─────────────────────────────────────────────
+    // ── §8.3: the straddling float has no class ──────────────────────────
 
     /**
-     * §8.3's first leak: a `float64` admitting `.nan` and the infinities has values that encode as JSON
-     * strings, so it is not class-stable and the untagged route is unavailable however disjoint the choice looks.
+     * A {@code float64} admitting {@code .nan} and the infinities has values that encode as JSON strings, so
+     * [TSON-SCHEMA] §5.4 gives it no class: the choice links {@code disjoint: false} and the tag is required.
      */
     @Test
-    void anApproximateVariantAdmittingSpecialsIsNotClassStable() {
+    void anApproximateVariantAdmittingSpecialsMakesTheChoiceNotDisjoint() {
         Diagnostic refusal = read("loose", "1.5").refusal();
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertTrue(refusal.message().contains("$type"), "the untagged route must be unavailable: " + refusal.message());
     }
 
-    /** Narrowing both facets to false confines the family to JSON numbers and restores stability. */
+    /** Narrowing both facets to false confines the family to JSON numbers, restoring its class and the route. */
     @Test
-    void narrowingTheFacetsRestoresStabilityAndWithItRouteTwo() {
+    void narrowingTheFacetsRestoresTheUntaggedRoute() {
         assertEquals("1.5", read("tight", "1.5").accepted().toString());
         assertEquals("\"hi\"", read("tight", "\"hi\"").accepted().toString());
     }
 
-    /** A tag still reads at an unstable choice: stability gates the untagged route, never the tagged form. */
+    /** A tag still reads at the non-disjoint choice: {@code disjoint} gates the untagged route, never the tag. */
     @Test
-    void anUnstableChoiceStillTakesATaggedValue() {
+    void aNonDisjointChoiceStillTakesATaggedValue() {
         assertEquals("1.5", read("loose", """
                 {"$type": "float64", "$value": 1.5}""").accepted().toString());
     }

@@ -24,9 +24,9 @@ import java.util.Optional;
  * <p><b>A value may omit the tag if and only if one condition recovers the variant from the schema and the
  * JSON form alone</b>, and the predicate "MUST NOT be extended by implementation cleverness -- no
  * member-shape matching among record variants, no value-set separation, no trying variants in order". The
- * condition is that <em>the choice is {@code disjoint: true} and every variant is class-stable</em>, and
- * selection is then by the arriving value's kind, which names a discrimination class (§4.2) and so names the
- * one variant bearing it.
+ * condition is that <em>the choice is {@code disjoint: true}</em>, and selection is then by the arriving
+ * value's kind, which names a discrimination class (§4.2) and so names the one variant bearing it. Every
+ * classed type is class-stable (§8.3), so the kind never lands a value in another variant's class.
  *
  * <p>There is no member dispatch at a choice position (§8.4): a discriminator is a property of a record
  * family and lives with the records (§6.1.5), so where the condition does not hold the tag is REQUIRED -- a
@@ -52,7 +52,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
     private final String name;
     private final List<String> variants;
     private final JsonSchemaLocation schemaLocation;
-    /** §8.2's condition, decided once: {@code disjoint} and class-stable, so the kind alone selects. */
+    /** §8.2's condition, decided once: the choice is {@code disjoint}, so the kind alone selects. */
     private final Map<DiscriminationClass, String> byClass;
 
     /** {@link #byClass}'s variants, as their readers. */
@@ -103,11 +103,11 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * The class → variant table when §8.2's condition holds, and an empty table otherwise -- emptiness being exactly
      * "the tag is REQUIRED at this position".
      *
-     * <p>Both halves are required and neither implies the other. The <b>{@code disjoint} fact</b> guarantees
-     * at most one variant per class, and the resolver derives it ([TSON-SCHEMA] §5.4) -- a processor does not
-     * re-derive it and MUST NOT second-guess it. <b>Class stability</b> guarantees the arriving value's kind
-     * actually lands in its variant's class (§8.3); without it a `float64` variant admitting {@code .nan}
-     * would receive a JSON string and dispatch as though a string variant had been chosen.
+     * <p>The <b>{@code disjoint} fact</b> guarantees at most one variant per class, and the resolver derives it
+     * ([TSON-SCHEMA] §5.4) -- a processor does not re-derive it and MUST NOT second-guess it. It carries class
+     * stability too (§8.3): §5.4 gives no class to an approximate atom admitting {@code .nan} or an infinity, or
+     * to a map in pairs form, so a {@code float64} variant as core declares it makes its choice non-disjoint and
+     * never receives a JSON string through this table.
      *
      * <p>A variant with no class at all leaves the table empty rather than being skipped: §5.4 makes a choice
      * containing one non-disjoint, so this is unreachable in a linked schema -- and treating it as "the tag is
@@ -120,8 +120,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         Map<DiscriminationClass, String> table = new LinkedHashMap<>();
         for (TypeRef variant : body.variants()) {
             Optional<DiscriminationClass> variantClass = DiscriminationClass.of(linked, variant.name());
-            if (variantClass.isEmpty() || !DiscriminationClass.stable(linked.schema(), variant.name())
-                    || table.put(variantClass.get(), variant.name()) != null) {
+            if (variantClass.isEmpty() || table.put(variantClass.get(), variant.name()) != null) {
                 return Map.of();
             }
         }
@@ -192,8 +191,8 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * the TSON reader gives the same document, as §9.4's single vocabulary requires.
      *
      * <p>The message says <em>why</em> the tag is required, because the two reasons want different fixes: a
-     * choice that cannot be discriminated needs a tag on every value, where one that is disjoint and
-     * class-stable but received an unexpected kind has a document problem. A null gets its own answer -- §7
+     * choice that cannot be discriminated needs a tag on every value, where a disjoint one that received an
+     * unexpected kind has a document problem. A null gets its own answer -- §7
      * spends it as the void sentinel before any class question arises, so it is not an unrecognised kind but
      * a void value at a position admitting none.
      */

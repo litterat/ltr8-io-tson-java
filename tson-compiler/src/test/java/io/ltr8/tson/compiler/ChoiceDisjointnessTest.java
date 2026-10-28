@@ -16,6 +16,7 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.UuidType;
 import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
@@ -31,8 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@link ChoiceDisjointness#derive}: the §5.4 disjointness derivation over choice variants -- total and
- * two-valued. {@code true} exactly when every variant has a discrimination class (null / boolean / number /
- * string / brace / bracket) and no class appears twice; {@code false} otherwise, with no third state.
+ * two-valued. {@code true} exactly when every variant has a discrimination class (boolean / number / string /
+ * brace / bracket) and no class appears twice; {@code false} otherwise, with no third state.
  *
  * <p>Alongside the rules, this pins the deliberate losses: value-set facts the class model does not consult
  * (separated numeric bounds, disjoint I-Regexp patterns, disjoint enum member sets, records separated by a
@@ -55,6 +56,15 @@ class ChoiceDisjointnessTest {
 
     private boolean disjoint(TypeRef... variants) {
         return ChoiceDisjointness.derive(new ChoiceBody(List.of(variants)), namespace);
+    }
+
+    private static FloatType float64(boolean allowNan, boolean allowInfinity) {
+        return new FloatType(FloatType.Format.BINARY64, Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), allowNan, allowInfinity, true, true);
+    }
+
+    private TypeRef mapKeyedBy(String name, TypeRef key) {
+        return product(name, new MapBody(key, TypeRef.of("text"), false, false, Optional.empty(), Optional.empty()));
     }
 
     private static IntegerType boundedInteger(Long min, Long max) {
@@ -125,8 +135,7 @@ class ChoiceDisjointnessTest {
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
         TypeRef d = atom("decimal", new DecimalType(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-        TypeRef f = atom("float64", new FloatType(FloatType.Format.BINARY64, Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), true, true, true, true));
+        TypeRef f = atom("strict_float", float64(false, false));
         assertFalse(disjoint(i, d));
         assertFalse(disjoint(i, f));
         assertFalse(disjoint(d, f));
@@ -208,6 +217,40 @@ class ChoiceDisjointnessTest {
                 Optional.empty(), Optional.empty()));
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertFalse(disjoint(r, t));
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.4: an approximate atom admitting NaN or an infinity straddles classes -- a NaN is a number
+     * token in TSON text and a string in JSON -- so it has no class; narrowing both facets restores {@code number}.
+     */
+    @Test
+    void anApproximateAtomAdmittingSpecialsHasNoClass() {
+        TypeRef t = atom("text", TextType.UNCONSTRAINED);
+        assertFalse(disjoint(atom("float64", float64(true, true)), t));
+        assertTrue(disjoint(atom("strict", float64(false, false)), t));
+        assertFalse(disjoint(atom("nan_only", float64(true, false)), t));
+        assertFalse(disjoint(atom("inf_only", float64(false, true)), t));
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.4: a map has the brace class only when its key type is one a single scalar token denotes
+     * -- an atom or an enum, {@code value} and {@code void} excepted. A compound key has no single-token spelling.
+     */
+    @Test
+    void aMapKeyedByACompoundTypeHasNoClass() {
+        atom("text", TextType.UNCONSTRAINED);
+        TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
+        TypeRef point = product("point", RecordBody.of(RecordBody.fieldMap()));
+        TypeRef colour = atom("colour", new EnumBody(List.of("red", "green")));
+        TypeRef value = atom("value", new ValueType());
+        TypeRef nothing = atom("void", new VoidType());
+        namespace.put("text_alias", new io.ltr8.tson.schema.meta.Reference(TypeRef.of("text")));
+        assertFalse(disjoint(mapKeyedBy("by_point", point), i));
+        assertTrue(disjoint(mapKeyedBy("by_text", TypeRef.of("text")), i));
+        assertTrue(disjoint(mapKeyedBy("by_alias", TypeRef.of("text_alias")), i));
+        assertTrue(disjoint(mapKeyedBy("by_colour", colour), i));
+        assertFalse(disjoint(mapKeyedBy("by_value", value), i));
+        assertFalse(disjoint(mapKeyedBy("by_void", nothing), i));
     }
 
     @Test

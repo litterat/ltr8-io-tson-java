@@ -41,6 +41,8 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.VoidType;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -58,6 +60,14 @@ import java.util.function.Function;
  * <p><b>Records and maps share {@link #BRACE} deliberately</b> (and arrays and tuples {@link #BRACKET}):
  * both are {@code {...}} on the wire and the empty {@code {}} is ambiguous between them, so calling them
  * distinct would promise a discrimination the encoding cannot deliver on every value.
+ *
+ * <p><b>A class is given only to a type whose every value lands in it in every encoding</b> ([TSON-SCHEMA]
+ * §5.4), so a choice's untagged values are one set whichever encoding reads them. Two kinds straddle classes
+ * and get none: an approximate atom whose {@code allow_nan} or {@code allow_infinity} is true (a NaN is a
+ * number token in TSON text and a string in JSON; narrowing both to false restores {@link #NUMBER}), and a map
+ * whose key type, at the end of its reference chain, is not a type a single scalar token denotes -- an atom
+ * other than {@code value} and {@code void}, enums included -- since such a key has no single-token spelling
+ * and JSON writes the map in pairs form, as an array.
  */
 public enum DiscriminationClass {
 
@@ -71,23 +81,25 @@ public enum DiscriminationClass {
     /**
      * The class of the named type's untagged wire values, or empty when it has none: an atom whose untagged
      * form §4's single pass cannot recover ({@code rational}/{@code complex}, whose typed forms straddle
-     * classes; {@code value} and {@code void}; a mixed-class enum; an {@code unknown}), a nested choice or extern, or a name
-     * the namespace does not resolve. A reference chain is followed to its terminal entry first (§8.3 makes
-     * an alias and its target one type); a cycle, having no terminal, has no class. An empty result makes
+     * classes; {@code value} and {@code void}; a mixed-class enum; an {@code unknown}), one of [TSON-SCHEMA]
+     * §5.4's two straddling kinds (an approximate atom admitting NaN or an infinity, a map whose key type is not
+     * a single-token scalar), a nested choice or extern, or a name the namespace does not resolve. A reference
+     * chain is followed to its terminal entry first (§8.3 makes an alias and its target one type); a cycle,
+     * having no terminal, has no class. An empty result makes
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
      * stays required.
      */
     public static Optional<DiscriminationClass> of(String name, Function<String, ? extends Top> namespace) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
-        return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
+        return ReferenceChain.terminalDefinition(name, namespace).flatMap(def -> classify(def, namespace));
     }
 
-    private static Optional<DiscriminationClass> classify(Top def) {
+    private static Optional<DiscriminationClass> classify(Top def, Function<String, ? extends Top> namespace) {
         return switch (def) {
             case IntegerType ignored -> Optional.of(NUMBER);
             case DecimalType ignored -> Optional.of(NUMBER);
-            case FloatType ignored -> Optional.of(NUMBER);
+            case FloatType f -> f.allowNan() || f.allowInfinity() ? Optional.empty() : Optional.of(NUMBER);
             case TextType ignored -> Optional.of(STRING);
             case IdentifierType ignored -> Optional.of(STRING);
             case RefBody ignored -> Optional.of(STRING); // a qualified name, written as a token
@@ -113,7 +125,7 @@ public enum DiscriminationClass {
             case MacType ignored -> Optional.of(STRING);
             case EnumBody members -> ofEnum(members);
             case RecordBody ignored -> Optional.of(BRACE);
-            case MapBody ignored -> Optional.of(BRACE);
+            case MapBody m -> hasScalarKey(m, namespace) ? Optional.of(BRACE) : Optional.empty();
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
@@ -122,6 +134,17 @@ public enum DiscriminationClass {
             case TemplateBody ignored -> Optional.empty();
             case Namespace<?> ignored -> Optional.empty();
         };
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.4's key test: whether the map's key type, at the end of its reference chain, is a type a
+     * single scalar token denotes by its content -- an atom-family instance or an enum, {@code value} and
+     * {@code void} excepted.
+     */
+    private static boolean hasScalarKey(MapBody map, Function<String, ? extends Top> namespace) {
+        return ReferenceChain.terminalDefinition(map.keyType().name(), namespace)
+                .filter(key -> key instanceof Atom && !(key instanceof ValueType) && !(key instanceof VoidType))
+                .isPresent();
     }
 
     /**

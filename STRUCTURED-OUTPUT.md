@@ -188,7 +188,7 @@ start_add: "@$" }`) and `{"first name": 1}` is read under a name type admitting 
 **Untagged unions.** Native TSON data announces a union member with `!typeName value` — the type-ref *is* the
 discriminator — and bare JSON has no such mechanism. [TSON-JSON] §8.2 lets a tag be omitted by exactly two
 routes and forbids extending them ("no trying variants in order", which is how JSON Schema validates a `oneOf`):
-a declared discriminator, or a disjoint choice whose variants are class-stable. So:
+a declared discriminator, or a disjoint choice. So:
 
 - **A `oneOf` that carries a discriminator converts to a discriminated record family**, not a choice: a base
   whose selector fields (`=?`) each subtype pins (`= v`) to a distinct value, dispatched on the object's own
