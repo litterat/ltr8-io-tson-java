@@ -8,6 +8,7 @@ import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -85,7 +86,7 @@ class LimitsPolicyTest {
     /** Exactly at the bound reads; one past it does not. The document either side differs by one bracket. */
     @Test
     void theBoundIsTheDeepestDepthThatStillReads() {
-        TsonTreeReader reader = new TsonTreeReader().withLimits(new LimitsPolicy(8));
+        TsonTreeReader reader = new TsonTreeReader().withLimits(LimitsPolicy.defaults().withMaxDepth(8));
 
         assertNotNull(reader.read(nested(8)));
         assertEquals(List.of(Diagnostic.Code.LIMIT_EXCEEDED),
@@ -99,7 +100,7 @@ class LimitsPolicyTest {
      */
     @Test
     void aRefusalCarriesTheBoundAndWhereItWasCrossed() {
-        Diagnostic refusal = problems(new TsonTreeReader().withLimits(new LimitsPolicy(4)), nested(5))
+        Diagnostic refusal = problems(new TsonTreeReader().withLimits(LimitsPolicy.defaults().withMaxDepth(4)), nested(5))
                 .getFirst();
 
         assertEquals("at most 4 levels of nesting", refusal.expected());
@@ -132,7 +133,7 @@ class LimitsPolicyTest {
     @Test
     void withLimitsDerivesRatherThanMutating() {
         TsonTreeReader base = new TsonTreeReader();
-        TsonTreeReader deeper = base.withLimits(new LimitsPolicy(500));
+        TsonTreeReader deeper = base.withLimits(LimitsPolicy.defaults().withMaxDepth(500));
 
         assertEquals(LimitsPolicy.DEFAULT_MAX_DEPTH, base.limitsPolicy().maxDepth());
         assertEquals(500, deeper.limitsPolicy().maxDepth());
@@ -145,7 +146,31 @@ class LimitsPolicyTest {
      */
     @Test
     void aDepthBelowOneIsRefusedAtTheConfiguration() {
-        assertThrows(IllegalArgumentException.class, () -> new LimitsPolicy(0));
+        assertThrows(IllegalArgumentException.class, () -> LimitsPolicy.defaults().withMaxDepth(0));
+    }
+
+    /** Every other limit is refused below one on the same terms, though only depth is counted yet. */
+    @Test
+    void everyLimitBelowOneIsRefusedAtTheConfiguration() {
+        LimitsPolicy limits = LimitsPolicy.defaults();
+        List<Function<LimitsPolicy, LimitsPolicy>> zeroed = List.of(
+                l -> l.withMaxTokenLength(0), l -> l.withMaxTextLength(0), l -> l.withMaxNumericLiteralLength(0),
+                l -> l.withMaxBinarySize(0), l -> l.withMaxDocumentSize(0), l -> l.withMaxElements(0),
+                l -> l.withMaxEntries(0), l -> l.withMaxFields(0), l -> l.withMaxAnnotations(0),
+                l -> l.withMaxValues(0), l -> l.withMaxForeignSchemas(0), l -> l.withMaxImportClosure(0),
+                l -> l.withMaxSchemaEntries(0), l -> l.withMaxReferenceChain(0), l -> l.withMaxSupertypeChain(0),
+                l -> l.withMaxMaterialisationDepth(0));
+        for (var wither : zeroed) {
+            assertThrows(IllegalArgumentException.class, () -> wither.apply(limits));
+        }
+    }
+
+    /** The rendering leads with depth and names only the limits that differ from the spec's defaults. */
+    @Test
+    void toStringNamesDepthAndWhatDiffers() {
+        assertEquals("max depth 64", LimitsPolicy.defaults().toString());
+        assertEquals("max depth 8, max fields 100",
+                LimitsPolicy.defaults().withMaxDepth(8).withMaxFields(100).toString());
     }
 
     /** A document nowhere near the bound is unaffected, which is every real document. */

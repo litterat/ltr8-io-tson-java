@@ -303,7 +303,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
 
         /**
          * The document asked for more than this processor's {@code LimitsPolicy} will spend ([TSON-DATA]
-         * §9.1) -- nested deeper than {@code LimitsPolicy.maxDepth()}, so far.
+         * §9.1) -- nested deeper than {@code LimitsPolicy.maxDepth()}, the one of its limits that is counted.
          *
          * <p><b>Not a verdict, and the one code here where that is a property of the reader rather than of
          * the document.</b> The bytes may be well-formed, valid, and read in full by the next processor

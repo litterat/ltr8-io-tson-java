@@ -91,7 +91,7 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy
                 .withSkeletonDistinctness(!lookAlikes);
         return new PolicyOptions(perSegment ? identifiers.perSegment() : identifiers,
                 assemble("token", tokenLevel, DEFAULTS.tokenPolicy().level(), false, tokenScripts),
-                new LimitsPolicy(maxDepth));
+                LimitsPolicy.defaults().withMaxDepth(maxDepth));
     }
 
     /**

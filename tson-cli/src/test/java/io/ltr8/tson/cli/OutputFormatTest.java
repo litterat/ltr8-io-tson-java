@@ -36,7 +36,12 @@ class OutputFormatTest {
                     + "\"skeleton_distinctness\":true,\"permitting\":[]},"
                     + "\"token_policy\":{\"level\":\"UNRESTRICTED\",\"permitting\":[]},"
                     + "\"unicode_data_version\":\"" + ProcessorPolicy.dataVersion() + "\","
-                    + "\"limits\":{\"max_depth\":" + LimitsPolicy.DEFAULT_MAX_DEPTH + "}}";
+                    + "\"limits\":{\"max_depth\":64,\"max_token_length\":1048576,\"max_text_length\":1048576,"
+                    + "\"max_numeric_literal_length\":4096,\"max_binary_size\":16777216,"
+                    + "\"max_document_size\":16777216,\"max_elements\":1048576,\"max_entries\":1048576,"
+                    + "\"max_fields\":65536,\"max_annotations\":64,\"max_values\":16777216,"
+                    + "\"max_foreign_schemas\":16,\"max_import_closure\":64,\"max_schema_entries\":65536,"
+                    + "\"max_reference_chain\":64,\"max_supertype_chain\":64,\"max_materialisation_depth\":64}}";
 
     @Test
     void parseAcceptsTheThreeKnownFormatsCaseInsensitively() {
@@ -341,10 +346,27 @@ class OutputFormatTest {
         assertEquals(POLICY_JSON, OutputFormat.JSON.render(POLICY));
 
         String text = OutputFormat.TEXT.render(POLICY);
-        assertEquals("identifier policy: HIGHLY_RESTRICTIVE" + System.lineSeparator()
-                + "token policy:      UNRESTRICTED" + System.lineSeparator()
-                + "unicode data:      " + ProcessorPolicy.dataVersion() + System.lineSeparator()
-                + "max depth:         " + LimitsPolicy.DEFAULT_MAX_DEPTH, text);
+        assertEquals(String.join(System.lineSeparator(),
+                "identifier policy:          HIGHLY_RESTRICTIVE",
+                "token policy:               UNRESTRICTED",
+                "unicode data:               " + ProcessorPolicy.dataVersion(),
+                "max depth:                  64",
+                "max token length:           1048576",
+                "max text length:            1048576",
+                "max numeric literal length: 4096",
+                "max binary size:            16777216",
+                "max document size:          16777216",
+                "max elements:               1048576",
+                "max entries:                1048576",
+                "max fields:                 65536",
+                "max annotations:            64",
+                "max values:                 16777216",
+                "max foreign schemas:        16",
+                "max import closure:         64",
+                "max schema entries:         65536",
+                "max reference chain:        64",
+                "max supertype chain:        64",
+                "max materialisation depth:  64"), text);
 
         Object reread = DiagnosticsSchema.compiled().get("policy")
                 .read(TestDocuments.document(OutputFormat.TSON.render(POLICY)));

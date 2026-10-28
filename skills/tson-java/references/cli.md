@@ -80,10 +80,26 @@ with no document in hand:
 
 ```
 $ tson policy
-identifier policy: HIGHLY_RESTRICTIVE
-token policy:      UNRESTRICTED
-unicode data:      16.0
-max depth:         64
+identifier policy:          HIGHLY_RESTRICTIVE
+token policy:               UNRESTRICTED
+unicode data:               16.0
+max depth:                  64
+max token length:           1048576
+max text length:            1048576
+max numeric literal length: 4096
+max binary size:            16777216
+max document size:          16777216
+max elements:               1048576
+max entries:                1048576
+max fields:                 65536
+max annotations:            64
+max values:                 16777216
+max foreign schemas:        16
+max import closure:         64
+max schema entries:         65536
+max reference chain:        64
+max supertype chain:        64
+max materialisation depth:  64
 ```
 
 **Read it before you generate and the refusal never happens** — that is the useful direction, and the reason
@@ -143,7 +159,7 @@ way: `snake_case` keys, and a field with nothing to say left out rather than wri
  "policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
                                "skeleton_distinctness":true,"permitting":[]},
            "token_policy":{"level":"UNRESTRICTED","permitting":[]},
-           "unicode_data_version":"16.0","limits":{"max_depth":64}},
+           "unicode_data_version":"16.0","limits":{"max_depth":64,"max_token_length":1048576,…}},
  "files":[{"file":"person-data.tn","outcome":"REJECTED","errors":[
    {"path":"/age","schema_pointer":"/person/age","schema_id":"example.com/…/person.tn",
     "code":"ATOM_FORM_INVALID","message":"'int32': 'thirty' is not a valid integer …",

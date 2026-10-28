@@ -2127,7 +2127,7 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/38/m/meta.tn?sha256=62dde2f344853848cd0ce4f722a0305d979e5883c0dcd14308959ad6a01bff47 |
 | core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/38/m/core.tn?sha256=95f66505cf74dd2d64d0b6cffd07538fa45b8c7096c556c87423b56b03423497 |
 | net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/38/m/net.tn?sha256=06a939fac91c6f27d02f105ea248d33504b4d437484884a20acd3b6ddcb8c32a |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=fc9208c720cfc28bacb33b6824b955df0627b4aa217f41f40b582ecd857295f6 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/38/m/policy.tn?sha256=2346ad7dd5867ecbab830aedc1e8e0d594dcc31fff7defb39684b1d081783c84 |
 
 ### 13.3 Informative References
 

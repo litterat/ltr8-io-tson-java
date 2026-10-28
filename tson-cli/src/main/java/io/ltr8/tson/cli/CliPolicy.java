@@ -2,6 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.unicode.RestrictionLevel;
 import io.ltr8.tson.base.policy.ScriptPolicy;
@@ -63,19 +64,47 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
     static CliPolicy from(ProcessorPolicy policy) {
         return new CliPolicy(CliIdentifierPolicy.from(policy.identifierPolicy()),
                 CliScriptPolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
-                new CliLimits(policy.limits().maxDepth()));
+                CliLimits.from(policy.limits()));
     }
 
     /**
-     * This run's [TSON-DATA] §9.1 resource limits -- what it will spend reading one document, where the two
-     * {@code *_policy} fields say what it will admit as a name.
+     * This run's [TSON-DATA] §9.1 and [TSON-SCHEMA] §11.5 resource limits -- what it will spend reading one
+     * document and resolving one schema, where the two {@code *_policy} fields say what it will admit as a
+     * name. The whole of {@code policy.tn}'s {@code limits} record, field for field from {@link LimitsPolicy}:
+     * a limit the processor does not yet count is still its stated threshold, and a report that left it out
+     * would leave a sender guessing at it.
      *
      * <p>Inside {@code policy} rather than beside it in the envelope because the envelope's one question is
      * "what judged this run", and a limit refusal answers it as much as a name refusal does. It also gets
      * {@link CliPolicy#isDefault()} for free, so a run that raised the depth states it even when nothing was
      * refused -- the same rule §8.2 imposes on a relaxation, and true here for the same reason.
      */
-    public record CliLimits(@Field("max_depth") int maxDepth) {
+    public record CliLimits(@Field("max_depth") int maxDepth,
+                            @Field("max_token_length") long maxTokenLength,
+                            @Field("max_text_length") long maxTextLength,
+                            @Field("max_numeric_literal_length") int maxNumericLiteralLength,
+                            @Field("max_binary_size") long maxBinarySize,
+                            @Field("max_document_size") long maxDocumentSize,
+                            @Field("max_elements") int maxElements,
+                            @Field("max_entries") int maxEntries,
+                            @Field("max_fields") int maxFields,
+                            @Field("max_annotations") int maxAnnotations,
+                            @Field("max_values") int maxValues,
+                            @Field("max_foreign_schemas") int maxForeignSchemas,
+                            @Field("max_import_closure") int maxImportClosure,
+                            @Field("max_schema_entries") int maxSchemaEntries,
+                            @Field("max_reference_chain") int maxReferenceChain,
+                            @Field("max_supertype_chain") int maxSupertypeChain,
+                            @Field("max_materialisation_depth") int maxMaterialisationDepth) {
+
+        static CliLimits from(LimitsPolicy limits) {
+            return new CliLimits(limits.maxDepth(), limits.maxTokenLength(), limits.maxTextLength(),
+                    limits.maxNumericLiteralLength(), limits.maxBinarySize(), limits.maxDocumentSize(),
+                    limits.maxElements(), limits.maxEntries(), limits.maxFields(), limits.maxAnnotations(),
+                    limits.maxValues(), limits.maxForeignSchemas(), limits.maxImportClosure(),
+                    limits.maxSchemaEntries(), limits.maxReferenceChain(), limits.maxSupertypeChain(),
+                    limits.maxMaterialisationDepth());
+        }
     }
 
     /**
