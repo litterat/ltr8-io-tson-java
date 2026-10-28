@@ -24,7 +24,10 @@ import io.ltr8.tson.schema.meta.Top;
  */
 enum AtomForm {
 
-    /** §5.2's boolean half -- the kernel's {@code boolean}, read as the member text {@code true}/{@code false}. */
+    /**
+     * §5.2's boolean half -- the kernel's {@code boolean}, the general enum rule applied: a JSON boolean or a JSON
+     * string, matched on content against {@code true}/{@code false}, and read as a host {@code Boolean}.
+     */
     BOOLEAN,
 
     /** §5.3's exact tier: {@code integer} and its refinements, and {@code number}. The literal is the content. */
@@ -77,7 +80,8 @@ enum AtomForm {
         return switch (event) {
             case JsonEvent.BooleanValue bool when this == BOOLEAN || this == ENUM -> String.valueOf(bool.value());
             case JsonEvent.NumberValue number when this == NUMBER || this == NUMBER_OR_STRING -> number.literal();
-            case JsonEvent.StringValue string when this == STRING || this == NUMBER_OR_STRING || this == ENUM ->
+            case JsonEvent.StringValue string
+                    when this == STRING || this == NUMBER_OR_STRING || this == ENUM || this == BOOLEAN ->
                     string.value();
             default -> null;
         };
@@ -86,7 +90,7 @@ enum AtomForm {
     /** What this form admits, for a diagnostic's {@code expected}. */
     String describe() {
         return switch (this) {
-            case BOOLEAN -> "a JSON boolean";
+            case BOOLEAN -> "a JSON boolean, or a string spelling true or false";
             case NUMBER -> "a JSON number";
             case STRING -> "a JSON string";
             case NUMBER_OR_STRING -> "a JSON number, or a string for .inf/-.inf/.nan";

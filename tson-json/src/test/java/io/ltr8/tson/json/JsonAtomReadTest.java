@@ -247,9 +247,13 @@ class JsonAtomReadTest {
         assertEquals(Boolean.FALSE, read("flag", "false").accepted());
     }
 
+    /** §5.2: an enum position matches on content, not on kind, and {@code boolean} is no exception. */
     @Test
-    void booleanRefusesTheStringSpellingOfItsMembers() {
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("flag", "\"true\"").refusal().code());
+    void booleanReadsTheStringSpellingOfItsMembersToABoolean() {
+        assertEquals(Boolean.TRUE, read("flag", "\"true\"").accepted());
+        assertEquals(Boolean.FALSE, read("flag", "\"false\"").accepted());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, read("flag", "\"yes\"").refusal().code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("flag", "1").refusal().code());
     }
 
     // ── §5.7 void and value ──────────────────────────────────────────────
