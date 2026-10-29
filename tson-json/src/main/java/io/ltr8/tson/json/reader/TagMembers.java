@@ -26,8 +26,8 @@ import java.util.Set;
  * §4.3 declines one for v1 and makes encoding a value that carries them an encode error. A class named for §3.3
  * would be the one place the word meant something else, so it is named for the tag and cites §3.3 throughout.
  *
- * <p>What §3.3 defines is the JSON carrier for a type annotation and a schema scope -- what TSON text
- * attaches beside a value, and JSON has no beside for.
+ * <p>What §3.3 defines is the JSON carrier for a type annotation, and at the root for the document's schema
+ * binding -- what TSON text attaches beside a value or in its header, and JSON has no beside for.
  *
  * <p>Two forms. The <b>wrapper</b> is an object whose members are these three only, with {@code $value} present
  * -- {@code {"$type": "age", "$value": 42}} -- and carries an annotation for a value of any shape. The
@@ -57,27 +57,20 @@ final class TagMembers {
     /**
      * What an object's leading members say about it.
      *
-     * @param schema    whether {@code $schema} leads -- admitted only at a scoped position (§8.5)
-     * @param schemaRef that member's string content, or null where it is missing or not a string
+     * @param schema    whether {@code $schema} leads -- the root's binding (§3.4), refused at every value position
      * @param typed     whether a {@code $type} member leads, whatever its value
      * @param type      that member's string content, or null where it is missing or not a string
      * @param wrapper   whether {@code $value} follows the annotation members -- §3.3's wrapper form
      * @param selectors the scalar value of each requested member found leading after the annotation members, by
      *                  NFC name; a requested member not among them is missing here
      */
-    record Lead(boolean schema, String schemaRef, boolean typed, String type, boolean wrapper,
-                Map<String, JsonEvent> selectors) {
+    record Lead(boolean schema, boolean typed, String type, boolean wrapper, Map<String, JsonEvent> selectors) {
 
-        static final Lead NONE = new Lead(false, null, false, null, false, Map.of());
+        static final Lead NONE = new Lead(false, false, null, false, Map.of());
 
         /** Whether the object leads with a annotation member -- §3.3's recognition test, and §8.3.1's. */
         boolean present() {
             return schema || typed || wrapper;
-        }
-
-        /** These leading members with {@code $schema} gone -- what a scoped position hands on once the scope is open. */
-        Lead withoutSchema() {
-            return new Lead(false, null, typed, type, wrapper, selectors);
         }
     }
 
@@ -104,15 +97,13 @@ final class TagMembers {
             return Lead.NONE;
         }
         boolean schema = false;
-        String schemaRef = null;
         boolean typed = false;
         String type = null;
         JsonEvent event = ctx.next();
         if (named(event, SCHEMA)) {
             schema = true;
-            schemaRef = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
             if (!skipScalar(ctx)) {
-                return new Lead(true, null, false, null, false, Map.of());
+                return new Lead(true, false, null, false, Map.of());
             }
             event = ctx.next();
         }
@@ -120,12 +111,12 @@ final class TagMembers {
             typed = true;
             type = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
             if (!skipScalar(ctx)) {
-                return new Lead(schema, schemaRef, true, null, false, Map.of());
+                return new Lead(schema, true, null, false, Map.of());
             }
             event = ctx.next();
         }
         if (named(event, VALUE)) {
-            return new Lead(schema, schemaRef, typed, type, true, Map.of());
+            return new Lead(schema, typed, type, true, Map.of());
         }
         Map<String, JsonEvent> selectors = wanted.isEmpty() ? Map.of() : new LinkedHashMap<>();
         while (selectors.size() < wanted.size() && event instanceof JsonEvent.MemberName member) {
@@ -138,7 +129,7 @@ final class TagMembers {
             ctx.next();
             event = ctx.next();
         }
-        return new Lead(schema, schemaRef, typed, type, false, selectors);
+        return new Lead(schema, typed, type, false, selectors);
     }
 
     private static boolean named(JsonEvent event, String name) {

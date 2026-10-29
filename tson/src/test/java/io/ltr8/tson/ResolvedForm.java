@@ -74,8 +74,8 @@ final class ResolvedForm {
      *
      * <p><b>A set-typed field is compared as the ordered list it is written as</b>: [TSON-SCHEMA] §7.5 makes
      * source declaration order canonical in resolved output, for {@code enum.members},
-     * {@code integer_type.members}, {@code decimal_type.members}, {@code text_type.members} and
-     * {@code scoped.scope} alike, so two resolved documents are compared as §8 writes them.
+     * {@code integer_type.members}, {@code decimal_type.members} and {@code text_type.members} alike, so two
+     * resolved documents are compared as §8 writes them.
      */
     static Top canonical(Top value) {
         return value instanceof Type type
@@ -210,14 +210,14 @@ final class ResolvedForm {
         String head = null;
         List<String> arguments = new java.util.ArrayList<>();
         for (RecordValue.Field field : record.fields()) {
-            CoreValue held = field.value().value().coreValue();
+            CoreValue held = field.value().coreValue();
             if (field.name().equals("name")) {
                 head = writtenApplication(held);
             } else if (field.name().equals("arguments")) {
                 for (var element : ((ArrayValue) held).elements()) {
-                    RecordValue argument = (RecordValue) element.value().coreValue();
+                    RecordValue argument = (RecordValue) element.coreValue();
                     RecordValue.Field only = argument.fields().getFirst();
-                    arguments.add(writtenApplication(only.value().value().coreValue()));
+                    arguments.add(writtenApplication(only.value().coreValue()));
                 }
             }
         }
@@ -288,7 +288,7 @@ final class ResolvedForm {
         Map<String, List<String>> values = new TreeMap<>();
         for (MapValue.MapEntry entry : map.entries()) {
             String name = ((TokenValue) entry.key().coreValue()).text();
-            List<String> written = entry.value().value().annotations().stream()
+            List<String> written = entry.value().annotations().stream()
                     .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
                     .map(annotation -> "@" + annotation.name() + annotation.value()
                             .map(value -> ":" + ((TokenValue) value.coreValue()).text()).orElse(""))

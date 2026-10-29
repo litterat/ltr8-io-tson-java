@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/core.tn?sha256=58021a47465d9dd4c13e24eb44a11034a5b6b8b995411e00ccd47535b069ff31"
-!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=8467f255a229022b240b607186c7374433c163e384b4d6f5e54333bad497bc48"
+!!id:"https://tson.io/2026/39/m/core.tn?sha256=9adb1b91117146334e26d4b0f031bca5622e3680b3f4a7d1ebae5985f1bff645"
+!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=f271892f662de4ec256c596b58d675ed7a470afccf0f06c10d23200b8aea822f"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 39 draft).
@@ -269,48 +269,14 @@
   email => !email_type {}
 
   @doc:"""
-    A type this schema declares or imports, chosen by the value. The narrowest
-    of the three scoped instances: the value names its type (in TSON text, with
-    a !type-ref) and that name resolves in the governing namespace
-    ([TSON-SCHEMA] §2.2.3), exactly as it does anywhere else.
+    A type this schema declares or imports, chosen by the value: the value
+    names its type (in TSON text, with a !type-ref), that name resolves in the
+    governing namespace ([TSON-SCHEMA] §2.2.3) exactly as it does anywhere
+    else, and the value is validated in full against it. A value naming no
+    type is invalid here.
     """
   @ordering:NONE @bounded:false
-  declared => !scoped { scope: [LOCAL] }
-
-  @doc:"""
-    A type from a foreign schema, which the value names for itself: it carries
-    the schema's identity and a type name resolved in that schema (in TSON text,
-    a nested !!schema, [TSON-DATA] §2.3, and a !type-ref, read by §7.8's scope
-    push). Any foreign schema is admitted; `extern_of` and `extern_type` narrow
-    to one schema, or to one type in one schema, without declaring anything.
-    """
-  @ordering:NONE @bounded:false
-  extern => !scoped { scope: [EXTERN] }
-
-  @doc:"""
-    A type from either namespace — the widest scoped instance: the *data*
-    decides the type, from any namespace, and the value is validated in full
-    against the type it names. A value naming no type at all is a validation
-    error here as at every scoped position.
-    """
-  @ordering:NONE @bounded:false
-  dynamic => !scoped { scope: [LOCAL EXTERN] }
-
-  @doc:"""
-    A type from one named foreign schema. An application rather than a
-    declaration, so a field writes `attachment: extern_of<"https://…/claim.tn">`
-    and declares nothing. `S` stands in a key typed by meta's `schema_identity`,
-    an atom, so it is a value parameter and the argument is the scalar §5.10
-    admits — one schema per application.
-    """
-  extern_of => <S> !scoped { scope: [EXTERN]  schemas: { S => _ } }
-
-  @doc:"""
-    One named type in one named foreign schema. As `extern_of`, with `T`
-    standing inside [type_name] — also an atom, so also a value parameter, and
-    one type per application.
-    """
-  extern_type => <S, T> !scoped { scope: [EXTERN]  schemas: { S => [T] } }
+  declared => !declared_type {}
 
   @doc:"""
     The set spelling an author writes: `set<text>` where the bare construction

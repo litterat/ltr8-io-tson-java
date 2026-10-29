@@ -8,7 +8,6 @@ import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.VoidValue;
 
@@ -102,7 +101,7 @@ final class WaitGraph {
         }
         for (MapValue.MapEntry entry : map.entries()) {
             String name = text(entry.key().coreValue());
-            graph.declarations.put(name, entry.value().value());
+            graph.declarations.put(name, entry.value());
             graph.keyAnnotations.put(name, entry.key().annotations());
         }
         for (Map.Entry<String, DataValue> entry : graph.declarations.entrySet()) {
@@ -278,7 +277,7 @@ final class WaitGraph {
                         for (MapValue.MapEntry entry : map.entries()) {
                             String key = text(entry.key().coreValue());
                             keyType.ifPresent(t -> read(entry.key(), t, "key", path + "{" + key + "}"));
-                            valueType.ifPresent(t -> read(entry.value().value(), t, "value", path + "." + key));
+                            valueType.ifPresent(t -> read(entry.value(), t, "value", path + "." + key));
                         }
                     } else if (!(core instanceof EmptyBrace)) {
                         problems.add(entry + ": a " + kind(core) + " at namespace " + type + " (" + path + ")");
@@ -288,7 +287,7 @@ final class WaitGraph {
                     String element = token(field(shape.declaration(), "element_type"));
                     if (core instanceof ArrayValue array) {
                         for (int i = 0; i < array.elements().size(); i++) {
-                            read(array.elements().get(i).value(), element, "element", path + "[" + i + "]");
+                            read(array.elements().get(i), element, "element", path + "[" + i + "]");
                         }
                     } else if (!(core instanceof EmptyBrace)) {
                         problems.add(entry + ": a " + kind(core) + " at array " + type + " (" + path + ")");
@@ -301,7 +300,7 @@ final class WaitGraph {
                         for (MapValue.MapEntry entry : map.entries()) {
                             String key = text(entry.key().coreValue());
                             read(entry.key(), keyType, "key", path + "{" + key + "}");
-                            read(entry.value().value(), valueType, "value", path + "." + key);
+                            read(entry.value(), valueType, "value", path + "." + key);
                         }
                     } else if (!(core instanceof EmptyBrace)) {
                         problems.add(entry + ": a " + kind(core) + " at map " + type + " (" + path + ")");
@@ -312,7 +311,7 @@ final class WaitGraph {
                     if (core instanceof ArrayValue array && array.elements().size() <= elements.size()) {
                         for (int i = 0; i < array.elements().size(); i++) {
                             String element = token(field(elements.get(i), "element_type"));
-                            read(array.elements().get(i).value(), element, "element", path + "[" + i + "]");
+                            read(array.elements().get(i), element, "element", path + "[" + i + "]");
                         }
                     } else {
                         problems.add(entry + ": a " + kind(core) + " at tuple " + type + " (" + path + ")");
@@ -341,7 +340,7 @@ final class WaitGraph {
                                     + " (" + path + ")");
                             continue;
                         }
-                        read(field.value().value(), token(field(declared, "type")), "field",
+                        read(field.value(), token(field(declared, "type")), "field",
                                 path + "." + field.name());
                     }
                 }
@@ -484,7 +483,7 @@ final class WaitGraph {
         DataValue map = field(declaration, "fields");
         if (map != null && map.coreValue() instanceof MapValue entries) {
             for (MapValue.MapEntry entry : entries.entries()) {
-                fields.put(text(entry.key().coreValue()), entry.value().value());
+                fields.put(text(entry.key().coreValue()), entry.value());
             }
         }
         return fields;
@@ -504,7 +503,7 @@ final class WaitGraph {
         if (value != null && value.coreValue() instanceof RecordValue record) {
             for (RecordValue.Field field : record.fields()) {
                 if (field.name().equals(name)) {
-                    return field.value().value();
+                    return field.value();
                 }
             }
         }
@@ -513,7 +512,7 @@ final class WaitGraph {
 
     private static List<DataValue> elements(DataValue value) {
         if (value != null && value.coreValue() instanceof ArrayValue array) {
-            return array.elements().stream().map(ScopedValue::value).toList();
+            return array.elements().stream().map(d -> d).toList();
         }
         return List.of();
     }

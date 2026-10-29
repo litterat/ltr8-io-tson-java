@@ -14,8 +14,8 @@ import java.util.Optional;
  * record's own field name has no match in the compiled schema at all.
  *
  * <p>Structurally mirrors {@code TsonDataParser.EventReducer}'s own reduction shape exactly (the
- * same grammar), just discarding instead of building where {@link #dataValue}/{@link #coreValue}/
- * {@link #scopedValue} are used for that purpose.
+ * same grammar), just discarding instead of building where {@link #dataValue}/{@link #coreValue} are used for
+ * that purpose.
  */
 public final class EventSkip {
 
@@ -98,14 +98,6 @@ public final class EventSkip {
         coreValue(ctx);
     }
 
-    /** Discards {@code [ schema-directive ] data-value} -- record field values, map entry values, array elements. */
-    public static void scopedValue(TsonReadContext ctx) {
-        if (ctx.peek() instanceof SchemaRef) {
-            ctx.next();
-        }
-        dataValue(ctx);
-    }
-
     /**
      * Discards one core-value, whose own first event has *not* yet been consumed (only peeked) by
      * the caller -- the natural shape for a reader that peeked to decide "this isn't what I expected"
@@ -117,7 +109,7 @@ public final class EventSkip {
             case RecordStart ignored -> {
                 while (!(ctx.peek() instanceof RecordEnd)) {
                     ctx.next(); // FieldName
-                    scopedValue(ctx);
+                    dataValue(ctx);
                 }
                 ctx.next(); // RecordEnd
             }
@@ -125,13 +117,13 @@ public final class EventSkip {
                 while (!(ctx.peek() instanceof MapEnd)) {
                     dataValue(ctx); // key
                     ctx.next(); // MapArrow
-                    scopedValue(ctx);
+                    dataValue(ctx);
                 }
                 ctx.next(); // MapEnd
             }
             case ArrayStart ignored -> {
                 while (!(ctx.peek() instanceof ArrayEnd)) {
-                    scopedValue(ctx);
+                    dataValue(ctx);
                 }
                 ctx.next(); // ArrayEnd
             }

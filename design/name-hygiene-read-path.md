@@ -29,7 +29,7 @@ refusal interacts with the verdicts around it. Current form only; history lives 
   is read as nothing when refused, and the keys of a map keyed by one, and the elements of a set of one, are a
   look-alike scope checked as each arrives.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`. The schema-side walk is
 `design/name-hygiene-and-minted-names.md`.

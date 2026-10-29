@@ -24,7 +24,7 @@ counted. Current form only; history lives in git.
   `PolicySchemaTest` holds `restriction_level` to `RestrictionLevel` and `limits` to `LimitsPolicy`. No document
   selects the policy it is judged under ([TSON-DATA] §8.2), so nothing here reads a policy out of a document.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`,
 `design/diagnostic-rules-and-messages.md`, `design/schema-side-diagnostics.md`.
 
@@ -110,15 +110,15 @@ inside `ProcessorPolicy`, not inside either of them** — they answer different 
 that changed one has said nothing about the other. The three arguments above transfer whole: a bound is constant for a run, a
 sender needs it before it writes, and a number a caller can act on beats a refusal after the fact.
 
-**The whole table is stated; only nesting depth is counted.** §9.1 states its limits as one table with a default
-each — twelve on the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under the same policy and
-the same reporting surfaces. `LimitsPolicy` has a component per limit, in the table's order, each defaulting to the
-spec's value and refused below 1, and `policy.tn`'s `limits` and `CliPolicy.CliLimits` carry the same seventeen, so
-`tson policy` and every envelope state each threshold. Depth is the one counted, at §9.1's default of 64, the
-tightest in common use, so a document that fits travels. The other sixteen are configured and reported but not
-counted, so nothing past one of them is refused for it; `BACKLOG.md` carries where each is counted. One of the
-schema-side five `TemplateMaterialiser.MAX_CLOSING_DEPTH` enforces as a bare constant at the default, not yet reading
-`maxMaterialisationDepth`.
+**The whole table is stated; only nesting depth is counted.** §9.1 states its limits as one table with a default each —
+eleven on the document side, its foreign-schemas row withdrawn with the scope push (`SPEC-FEEDBACK.md` #6) — and
+[TSON-SCHEMA] §11.5 adds five on the schema side under the same policy and the same reporting surfaces. `LimitsPolicy`
+has a component per limit, in the table's order, each defaulting to the spec's value and refused below 1, and
+`policy.tn`'s `limits` and `CliPolicy.CliLimits` carry the same sixteen, so `tson policy` and every envelope state each
+threshold. Depth is the one counted, at §9.1's default of 64, the tightest in common use, so a document that fits
+travels. The other fifteen are configured and reported but not counted, so nothing past one of them is refused for it;
+`BACKLOG.md` carries where each is counted. One of the schema-side five `TemplateMaterialiser.MAX_CLOSING_DEPTH`
+enforces as a bare constant at the default, not yet reading `maxMaterialisationDepth`.
 
 **It is a component of `ProcessorPolicy`** — `Tson.limitsPolicy()` is `processorPolicy().limits()` in one call. A
 deployment states one policy, and the CLI envelope nests `limits` under `policy`. What the grouping keeps is the

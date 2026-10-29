@@ -223,7 +223,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             if (selector != null && ctx.peek() instanceof TokenEvent token) {
                 found.putIfAbsent(selector, token);
             }
-            EventSkip.scopedValue(ctx);
+            EventSkip.dataValue(ctx);
         }
         return found;
     }

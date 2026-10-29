@@ -423,11 +423,6 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 seen[schemaIndex] = true;
                 continue;
             }
-            SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
-            if (push != null) {
-                ScopePush.refuse(ctx.schemaField(fieldName.name(), declaredName, declared.position()),
-                        declared.type().name(), push);
-            }
             Object decoded;
             if (ctx.peek() instanceof VoidEvent) {
                 ctx.next();
@@ -626,16 +621,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * stack uses everywhere else applies here too: if decoding reported, the contradiction check is skipped.
      */
     private void verifyFixed(TsonReadContext ctx, int schemaIndex, FieldSink sink, String fieldName) {
-        SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
         FixedCheck check = fixedCheck[schemaIndex];
         RecordField schema = fields.get(schemaIndex).schema();
         String schemaName = fields.get(schemaIndex).name();
         TsonReadContext fieldCtx = ctx.schemaField(fieldName, schemaName, schema.position());
-        if (push != null) {
-            // A FIXED field's type is an atom or an enum (§5.2), so it is never scoped and the directive is
-            // always refused here -- but it is refused rather than ignored, which is the point.
-            ScopePush.refuse(fieldCtx, schema.type().name(), push);
-        }
         if (ctx.peek() instanceof VoidEvent) {
             // A pinned field is never voidable -- `_` is not the pin -- so absence here is always the refusal.
             ctx.next();

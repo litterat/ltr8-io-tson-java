@@ -122,15 +122,15 @@ encodings ([TSON-JSON] §6.1.1).
   `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. Decided: the reader admits the annotation
   members anywhere within the object's leading run of `$`-named members, a run bounded by the record's declared `$`
   fields so the lookahead stays fixed by the schema. Implement it in the JSON readers (`RecordPlan`,
-  `DispatchChoiceReader`, `DispatchScopedReader`) and edit §3.3 with it, as a Revision 39 proposal; Revision 38
+  `DispatchChoiceReader`, `DispatchDeclaredReader`) and edit §3.3 with it, as a Revision 39 proposal; Revision 38
   keeps the strict lead.
 
 - [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
   and it is the one the spec calls the expected production route. What is left is the in-band one: a root value
   that is or is wrapped by an annotation object carrying `$schema` and `$type`, both REQUIRED on that route. It
-  rides §3.3's annotation object and §8.5's scope push, both built for scoped positions (`DispatchScopedReader`),
-  so what is left is the root: reading the leading `$schema`/`$type` before any schema is in hand. Where both
+  rides §3.3's annotation object, built for typed positions, so what is left is the root: reading the leading
+  `$schema`/`$type` before any schema is in hand, where every value position refuses a `$schema` today (`Tags`). Where both
   routes supply a binding they MUST agree by canonical identity, and disagreement is a resolver error — never a
   precedence question.
   [TSON-JSON] §3.5's `TSON-Schema` field, a projection of the binding rather than an alternative to it, is the
@@ -147,16 +147,16 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **The choice and scoped families do not state their rules from `base.diagnostics`.** Records, arrays,
+- [ ] **The choice and declared families do not state their rules from `base.diagnostics`.** Records, arrays,
   sets, tuples and maps do. `tson-compiler` states its dispatch diagnostics in `NamedDispatchReader`,
-  parameterised over a "candidate noun" so one class serves both a choice and a scoped position; `tson-json`
-  words each in its own dispatcher (`DispatchChoiceReader`, `DispatchScopedReader`), and `CrossEncodingParityTest`
+  parameterised over a "candidate noun" so one class serves both a choice and a declared position; `tson-json`
+  words each in its own dispatcher (`DispatchChoiceReader`, `DispatchDeclaredReader`), and `CrossEncodingParityTest`
   compares only their codes and pointers. The rule classes want the same parameterisation, so one sentence
   serves both positions in both encodings and the parity cases can move to `sameRule`.
 
 - [ ] **A pinned schema reference is not verified in the JSON stack.** `JsonCompiledSchemaRegistry.get`
   canonicalises before it asks its `TsonSchemaLoader`, and the loader takes a canonical identity and nothing
-  else, so the `?sha256=` of a pushed `$schema` ([TSON-JSON] §8.5) or an out-of-band `withSchema(uri)` is
+  else, so the `?sha256=` of an out-of-band `withSchema(uri)` is
   dropped unchecked -- where [TSON-SCHEMA] §10.2 makes verification a MUST and a mismatch a resolver error. The
   TSON registry verifies against the bytes it fetched; the JSON side holds only linked schemas, so what it
   needs is either the digest beside each linked schema or a loader that takes the reference as written.
@@ -242,7 +242,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   - **The same-named pairs** — `ValueIdentity`, `ReferenceChain`, `DeferredTypeReader`, `ErrorReader`,
     `CompiledReaders`, and the compile loop itself (resolve, cycle, gap reader, the bind-exception order), which is
     one algorithm over two reader types.
-  What stays per encoding is the event loop — TSON's positional records, `_`, annotations and scope pushes have no
+  What stays per encoding is the event loop — TSON's positional records, `_` and annotations have no
   JSON counterpart — the tree builders, and the tag carriers.
 
 - [ ] **The TSON encoding moves out of `tson-compiler` into `tson`, and `tson-compiler` imports it.** `tson-json`
@@ -393,17 +393,15 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   [TSON-DATA] §8.1 gives to the layer that detects them -- the resolver, following the reference.
 
 - [ ] **Counting the rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** The whole table is
-  stated: `spec/m/policy.tn`'s `limits` declares all seventeen, optional with the spec's defaults, and
-  `LimitsPolicy` and `CliPolicy.CliLimits` carry each one, so every limit is configured and reported. Only nesting
-  depth is counted. What is left, per limit, is the counter, a `LIMIT_EXCEEDED` refusal naming the limit and the
-  configured threshold, and a `--max-…` flag beside `--max-depth` in `PolicyOptions`. Document side: **token
-  length**, **decoded text length** after escape processing, **numeric literal length** (annotated tokens
-  included), **decoded binary size** per `!bytes` value, **document size**, **elements** per array or set,
-  **entries** per map, **fields** per record, **annotations** on one value, **total values**, and **foreign
-  schemas** one document's scope pushes may load. Schema side: **import closure**, **entries** in one schema map,
-  **reference chain**, **supertype chain**, and **materialisation depth** — which `TemplateMaterialiser`
-  enforces as the bare constant `MAX_CLOSING_DEPTH` at the default, and which moves to reading
-  `maxMaterialisationDepth`. What still needs deciding per limit is *where it is counted*: the ones that bound
-  shape are per-container state the stream does not keep, where depth was a counter it already had, and the two
-  aggregates (total values, foreign schemas) need their own counter since §9.1 is explicit that the total is not
-  bounded by the parts.
+  stated: `spec/m/policy.tn`'s `limits` declares all sixteen, optional with the spec's defaults, and `LimitsPolicy`
+  and `CliPolicy.CliLimits` carry each one, so every limit is configured and reported. Only nesting depth is counted.
+  What is left, per limit, is the counter, a `LIMIT_EXCEEDED` refusal naming the limit and the configured threshold,
+  and a `--max-…` flag beside `--max-depth` in `PolicyOptions`. Document side: **token length**, **decoded text
+  length** after escape processing, **numeric literal length** (annotated tokens included), **decoded binary size**
+  per `!bytes` value, **document size**, **elements** per array or set, **entries** per map, **fields** per record,
+  **annotations** on one value, and **total values**. Schema side: **import closure**, **entries** in one schema map,
+  **reference chain**, **supertype chain**, and **materialisation depth** — which `TemplateMaterialiser` enforces as
+  the bare constant `MAX_CLOSING_DEPTH` at the default, and which moves to reading `maxMaterialisationDepth`. What
+  still needs deciding per limit is *where it is counted*: the ones that bound shape are per-container state the
+  stream does not keep, where depth was a counter it already had, and the aggregate (total values) needs its own
+  counter since §9.1 is explicit that the total is not bounded by the parts.

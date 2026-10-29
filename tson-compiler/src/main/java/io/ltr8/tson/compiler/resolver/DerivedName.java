@@ -62,7 +62,7 @@ final class DerivedName {
         // outside ASCII, and a name that mixes it with the ASCII parts below is refused by §8.2's own walk.
         StringBuilder readable = new StringBuilder(InternalName.part(head));
         for (RecordValue.Field field : fields) {
-            appendReadable(readable, field.value().value().coreValue());
+            appendReadable(readable, field.value().coreValue());
         }
         return readable.append('_')
                 .append(String.format("%08x", canonicalBinding(head, fields).hashCode())).toString();
@@ -75,12 +75,12 @@ final class DerivedName {
                     .append(InternalName.part(
                             NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
             case RecordValue record -> record.fields()
-                    .forEach(field -> appendReadable(out, field.value().value().coreValue()));
+                    .forEach(field -> appendReadable(out, field.value().coreValue()));
             case ArrayValue array -> array.elements()
-                    .forEach(element -> appendReadable(out, element.value().coreValue()));
+                    .forEach(element -> appendReadable(out, element.coreValue()));
             case MapValue map -> map.entries().forEach(entry -> {
                 appendReadable(out, entry.key().coreValue());
-                appendReadable(out, entry.value().value().coreValue());
+                appendReadable(out, entry.value().coreValue());
             });
             default -> out.append("_v");
         }
@@ -98,7 +98,7 @@ final class DerivedName {
         out.append('(');
         for (RecordValue.Field field : fields) {
             appendText(out.append('f'), field.name());
-            appendValue(out, field.value().value().coreValue());
+            appendValue(out, field.value().coreValue());
         }
         out.append(')');
     }
@@ -114,17 +114,17 @@ final class DerivedName {
             case RecordValue record -> appendFields(out.append('r'), record.fields());
             case ArrayValue array -> {
                 out.append("a(");
-                array.elements().forEach(element -> appendValue(out, element.value().coreValue()));
+                array.elements().forEach(element -> appendValue(out, element.coreValue()));
                 out.append(')');
             }
-            // Both halves of every entry, in written order. Without this a map slot rendered as the
-            // unknown-value mark and every binding differing only inside one was the same name --
-            // `extern_of<"a.tn">` and `extern_of<"b.tn">` are two types and were one entry.
+            // Both halves of every entry, in written order. Without this a map slot renders as the
+            // unknown-value mark and every binding differing only inside one is the same name, two types
+            // sharing one entry.
             case MapValue map -> {
                 out.append("m(");
                 map.entries().forEach(entry -> {
                     appendValue(out.append('k'), entry.key().coreValue());
-                    appendValue(out.append('v'), entry.value().value().coreValue());
+                    appendValue(out.append('v'), entry.value().coreValue());
                 });
                 out.append(')');
             }

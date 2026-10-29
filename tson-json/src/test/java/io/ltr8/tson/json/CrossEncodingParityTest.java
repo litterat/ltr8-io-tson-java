@@ -114,7 +114,6 @@ class CrossEncodingParityTest {
               text_box   => box<text>
               crate      => { b: box }
               local_box  => { v: declared }
-              extern_box => { v: extern }
               fragment   => { ( include: text | name?: text  type?: text ) }
               endpoint   => { ( host: text  port: int32 | socket: text )? }
               contact    => { ( email: text | phone: text )+ }
@@ -520,17 +519,17 @@ class CrossEncodingParityTest {
                 {"b": {"$type": "box", "v": 1}}""");
     }
 
-    // ── §8.5 scoped positions: the value names its own type ──────────────────
+    // ── §8.5 declared positions: the value names its own type ────────────────
 
     @Test
-    void aScopedValueNamingAGoverningTypeIsAcceptedByBoth() {
+    void aDeclaredValueNamingAGoverningTypeIsAcceptedByBoth() {
         bothAccept("local_box", "{ v: !robot { serial: R2 } }", """
                 {"v": {"$type": "robot", "serial": "R2"}}""");
     }
 
     /** A value naming no type has nothing to be read as, in either encoding. */
     @Test
-    void anUntypedValueAtAScopedPositionIsRefusedInBoth() {
+    void anUntypedValueAtADeclaredPositionIsRefusedInBoth() {
         sameVerdict("local_box", "{ v: { serial: R2 } }", """
                 {"v": {"serial": "R2"}}""");
     }
@@ -539,15 +538,6 @@ class CrossEncodingParityTest {
     void aNameTheGoverningSchemaDoesNotHoldIsRefusedInBoth() {
         sameVerdict("local_box", "{ v: !nowhere { serial: R2 } }", """
                 {"v": {"$type": "nowhere", "serial": "R2"}}""");
-    }
-
-    /** A cell the instance does not hold: a scope push at `declared`, and a bare type at `extern`. */
-    @Test
-    void aCellTheInstanceDoesNotHoldIsRefusedInBoth() {
-        sameVerdict("local_box", "{ v: !!schema:\"https://example.test/other.tn\" !robot { serial: R2 } }", """
-                {"v": {"$schema": "https://example.test/other.tn", "$type": "robot", "serial": "R2"}}""");
-        sameVerdict("extern_box", "{ v: !robot { serial: R2 } }", """
-                {"v": {"$type": "robot", "serial": "R2"}}""");
     }
 
     // ── Kind positions ([TSON-SCHEMA] §4.2): an atom whose values are member names ───────────────────

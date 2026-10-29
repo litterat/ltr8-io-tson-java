@@ -18,7 +18,6 @@ form only; history lives in git.
 - On a race, what is duplicated is work, never state; explicit `register` on an identity already present is still an
   error.
 - A cache hit takes no lock; a read canonicalizes its schema URI once.
-- A compile with no registry behind it passes `ForeignSchemas.none()`, whose every lookup is `SCHEMA_NOT_PERMITTED`.
 
 Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/meta-layer-namespaces.md`,
 `design/cli-config-hashing.md`, `design/facades-and-tree.md`.
@@ -44,16 +43,6 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   you hold**, not a compile parameter. `get(uri)` resolves through the core (`resolveLinked`) and compiles
   the linked form standalone in its own mode, cached by identity; `compile(linked)` is the uncached
   primitive.
-  - **It also hands its own `get` to every compile it performs** (`ForeignSchemas`, threaded through
-    `TsonSchemaCompiler` into `ValueReaderContext`). [TSON-SCHEMA] §7.8's scope push resolves a schema the
-    *document* names, not one the schema being compiled does, so `ScopedReader` cannot be wired to an answer
-    the way every other reader's children are — it is wired to where to go and ask. Passing `this::get`
-    mid-construction is safe because nothing calls it until a read, long after every compile it could
-    re-enter has finished, and it is what makes a pushed schema share this cache, this loader and this read
-    mode with the schema that admitted it. A compile with no registry behind it — the bootstrap, a
-    standalone compile in a test — passes `ForeignSchemas.none()`, whose every lookup is
-    `SCHEMA_NOT_PERMITTED`: nothing was configured to supply a foreign schema, which is a fact about the
-    deployment and not a verdict on the document.
 - **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A
   schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue`
   can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile

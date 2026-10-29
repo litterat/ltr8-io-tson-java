@@ -17,7 +17,7 @@ before editing — each opens with its invariants.
 | `TypeInhabitance`, `RecordExtension` | `inhabitance-and-record-extension.md` |
 | `EnumLabels`, `FieldNames`, `resolver/KindMembers`, `resolver/NameType` | `kinds-and-name-types.md` |
 | `TsonSchemaCompiler`, the registries | `class2-compilation.md`, `compiled-registries.md` |
-| `reader/` | `readers-and-diagnostics.md`, then `record-dispatch.md`, `scope-push.md`, `reader-naming-and-schema-location.md`, `name-hygiene-read-path.md` as the class requires |
+| `reader/` | `readers-and-diagnostics.md`, then `record-dispatch.md`, `declared-positions.md`, `reader-naming-and-schema-location.md`, `name-hygiene-read-path.md` as the class requires |
 | A diagnostic's code, message or location | `diagnostic-model.md`, `diagnostic-rules-and-messages.md`, `schema-side-diagnostics.md` |
 | `TsonTreeReader`, `TsonObjectReader` | `facades-and-tree.md` |
 | `writer/`, `TsonTreeWriter`, `TsonObjectWriter`, `TsonDocumentPeek` | `writers-and-document-header.md` |

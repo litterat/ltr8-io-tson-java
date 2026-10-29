@@ -9,7 +9,6 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
@@ -555,7 +554,7 @@ class SchemaDesugarerTest {
         RecordValue payload = assertInstanceOf(RecordValue.class, template.value().coreValue());
         assertEquals(List.of("element_type"), payload.fields().stream().map(RecordValue.Field::name).toList());
         assertEquals(new TokenValue("p0", TokenForm.UNQUOTED),
-                payload.fields().getFirst().value().value().coreValue());
+                payload.fields().getFirst().value().coreValue());
 
         // `box` itself is `!record { ... }` by the time it leaves this phase (§5.2), so the field applying
         // the lifted form is a `type_ref` record inside the held binding record rather than a `GenericRef`
@@ -701,13 +700,13 @@ class SchemaDesugarerTest {
      */
     private static String tupleElements(Instance instance) {
         var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
-        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().value().coreValue();
+        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().coreValue();
         StringBuilder out = new StringBuilder("[");
         for (var element : elements.elements()) {
-            var members = (io.ltr8.tson.compiler.ast.RecordValue) element.value().coreValue();
+            var members = (io.ltr8.tson.compiler.ast.RecordValue) element.coreValue();
             StringBuilder rendered = new StringBuilder("{");
             for (var member : members.fields()) {
-                var token = (io.ltr8.tson.compiler.ast.TokenValue) member.value().value().coreValue();
+                var token = (io.ltr8.tson.compiler.ast.TokenValue) member.value().coreValue();
                 rendered.append(' ').append(member.name()).append(": ").append(token.text()).append(' ');
             }
             out.append(' ').append(rendered.append('}').toString().replace("  }", " }"));
@@ -718,9 +717,9 @@ class SchemaDesugarerTest {
     /** Renders {@code !choice { variants: [...] }} as {@code { variants: [a b] }}. */
     private static String variantsOf(Instance instance) {
         var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
-        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().value().coreValue();
+        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().coreValue();
         return "{ variants: [" + elements.elements().stream()
-                .map(e -> ((io.ltr8.tson.compiler.ast.TokenValue) e.value().coreValue()).text())
+                .map(e -> ((io.ltr8.tson.compiler.ast.TokenValue) e.coreValue()).text())
                 .reduce((a, b) -> a + " " + b).orElse("") + "] }";
     }
 
@@ -728,7 +727,7 @@ class SchemaDesugarerTest {
     private static MapValue heldFields(Instance template) {
         RecordValue binding = (RecordValue) template.value().coreValue();
         return (MapValue) binding.fields().stream().filter(f -> f.name().equals("fields"))
-                .findFirst().orElseThrow().value().value().coreValue();
+                .findFirst().orElseThrow().value().coreValue();
     }
 
     /** The key -- the field's name -- of the {@code n}th entry in a held {@code !record}'s {@code fields}. */
@@ -738,23 +737,23 @@ class SchemaDesugarerTest {
 
     /** One member of the {@code n}th {@code record_field} in a held {@code !record} binding record. */
     private static CoreValue fieldSlot(Instance template, int n, String member) {
-        RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().value().coreValue();
+        RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().coreValue();
         return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()
-                .value().value().coreValue();
+                .value().coreValue();
     }
 
     /** {@code type_ref}'s record form, {@code { name: head  arguments: [ { name: arg } ] }}. */
     private static CoreValue applicationValue(String head, String argument) {
         CoreValue argumentRecord = new RecordValue(List.of(new RecordValue.Field("name",
-                scoped(new TokenValue(argument, TokenForm.UNQUOTED)))));
-        CoreValue arguments = new ArrayValue(List.of(scoped(argumentRecord)));
+                plain(new TokenValue(argument, TokenForm.UNQUOTED)))));
+        CoreValue arguments = new ArrayValue(List.of(plain(argumentRecord)));
         return new RecordValue(List.of(
-                new RecordValue.Field("name", scoped(new TokenValue(head, TokenForm.UNQUOTED))),
-                new RecordValue.Field("arguments", scoped(arguments))));
+                new RecordValue.Field("name", plain(new TokenValue(head, TokenForm.UNQUOTED))),
+                new RecordValue.Field("arguments", plain(arguments))));
     }
 
-    private static ScopedValue scoped(CoreValue value) {
-        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
+    private static DataValue plain(CoreValue value) {
+        return new DataValue(List.of(), Optional.empty(), value);
     }
 
     /** Renders an {@code Instance}'s binding record as {@code { field: value  ... }} for readable assertions. */
@@ -762,7 +761,7 @@ class SchemaDesugarerTest {
         var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
         StringBuilder out = new StringBuilder("{");
         for (var field : record.fields()) {
-            var token = (io.ltr8.tson.compiler.ast.TokenValue) field.value().value().coreValue();
+            var token = (io.ltr8.tson.compiler.ast.TokenValue) field.value().coreValue();
             out.append(' ').append(field.name()).append(": ").append(token.text()).append(' ');
         }
         return out.append('}').toString().replace("  }", " }");

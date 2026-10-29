@@ -2440,7 +2440,7 @@ final class DefinitionResolver {
     /**
      * A field/group-member's type-ref, as one of the two shapes that reach resolution: a bare
      * {@link SimpleRef}, or a {@link GenericRef} -- a §5.10 application, or a constructor's own generic
-     * vocabulary such as meta's {@code scoped.scope: set<scope_kind>}.
+     * vocabulary such as a field typed {@code set<T>}.
      *
      * <p><b>A container sugar form is the third case and a broken invariant</b>, because by this phase every one
      * of them is an entry: {@link SchemaDesugarer} lifts each to a declaration and leaves a bare reference behind

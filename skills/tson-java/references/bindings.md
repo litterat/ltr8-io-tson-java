@@ -92,10 +92,9 @@ with no schema reads as `iri_reference`, the widest of the four.
 another type, declared as its own instance — `hexdigest => !bytes_type { encoding: HEX }`, with `BASE64`,
 `BASE64URL`, `BASE32` and `HEX` to choose from — and every one binds to `byte[]`.
 
-**The scoped types choose their type from the data** (§7.8): `declared` (a type this schema declares or
-imports), `extern` (a type in a foreign schema the value names), `dynamic` (either), and the applications
-`extern_of<S>` / `extern_type<S, T>` that narrow to one schema or one type. A tree read wraps a foreign value
-in `TsonScopedValue(schema, root)`; a bind hands back the bound object itself.
+**`declared` chooses its type from the data** (§7.8): the value names, by its `!type` (`$type` in JSON), a
+type this schema declares or imports, and is read in full as that type; an untagged value there is refused. A
+tree read hands back the value as that type reads it, and a bind the bound object of that type's class.
 
 **The host types are registered on the context, and that is the step nothing reminds you of.**
 `AtomContext.hostTypes()` (`io.ltr8.tson.base.bind`) is the list, `AtomContext.defaultContext()` a context

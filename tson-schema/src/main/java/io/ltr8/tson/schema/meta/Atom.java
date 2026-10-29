@@ -8,8 +8,8 @@ import java.util.List;
  * two atoms with no constraint vocabulary; {@link EnumBody} backs {@code boolean} and the kernel's other
  * internal enumerations, a listed set of names; {@link KindBody} backs {@code kind_type}, a computed one -- the
  * names of the types built with one constructor; the remaining variants are the atom constraint-vocabulary
- * families, one per {@code *_type} constructor. {@link Scoped} is the sibling SUM-kind case -- see {@link Sum}, not
- * here.
+ * families, one per {@code *_type} constructor. {@link DeclaredType} is the sibling SUM-kind case -- see {@link
+ * Sum}, not here.
  */
 public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody, KindBody, RefBody, IntegerType, TextType,
         IdentifierType,

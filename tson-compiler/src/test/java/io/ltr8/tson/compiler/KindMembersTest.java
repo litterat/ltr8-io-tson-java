@@ -267,6 +267,7 @@ class KindMembersTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 {
                   api        => namespace & { key_type: = identifier  value_type: = text }
+                  labels     => !map { key_type: identifier  value_type: text }
                   types      => !kind_type { of: type }
                   namespaces => !kind_type { of: namespace }
                   records    => !kind_type { of: record }

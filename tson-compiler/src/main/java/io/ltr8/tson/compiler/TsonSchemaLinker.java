@@ -35,6 +35,7 @@ import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.ComplexType;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
+import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.PeriodType;
@@ -73,7 +74,6 @@ import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
@@ -1551,7 +1551,7 @@ public final class TsonSchemaLinker {
             }
             case ComplexType ignored -> {
             }
-            case Scoped ignored -> {
+            case DeclaredType ignored -> {
             }
             // A reference names values of one type: `of` resolves in the writer's own namespace, and names a type
             // or a namespace type, never a constructor of types -- the names of the types built with a
@@ -1734,7 +1734,7 @@ public final class TsonSchemaLinker {
             case Reference reference -> collectNames(reference.target(), into);
             case TemplateBody ignored -> { } // open, answered above
             case Atom ignored -> { } // an atom body names no type
-            case Scoped ignored -> { } // a scope names namespaces, not types
+            case DeclaredType ignored -> { } // its variants are the closure's, named by no field
             case Namespace<?> ignored -> { } // a value names no type of its own
         }
     }
@@ -1927,7 +1927,8 @@ public final class TsonSchemaLinker {
             case RecordBody ignored -> "a record";
             case ChoiceBody ignored -> "a choice";
             case VoidType ignored -> "the void type";
-            case Scoped ignored -> "a scoped type, whose values name their own type rather than being a token shape";
+            case DeclaredType ignored ->
+                    "a declared type, whose values name their own type rather than being a token shape";
             default -> "not a scalar type";
         };
     }

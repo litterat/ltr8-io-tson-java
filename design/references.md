@@ -104,7 +104,7 @@ A name stands in a schema in one of five forms. Two are not references.
 **Stores**, all positional: the writer's type-name namespace (every type a declaration names; the first segment of a
 qualified name); the structure namespace (`!C` heads, `!I ^` heads, `kind_type.of`, a tag in a schema map); the
 enclosing collection (`discriminators` and group members in `fields`, a parameter in held text, the later segments of
-a qualified name); a foreign schema map named by identity (`scoped.schemas` values, an EXTERN value's `!type`).
+a qualified name).
 
 **Judgement.** One predicate covers every reference row: *the referent's value is a value of `T`*. For a constructor
 `T` that is `kind<T>`, the referent being a type built with `T`, less the constructors whose instances are types
@@ -154,7 +154,6 @@ constructor, its keys the key rows above under `api`'s family, its values judged
 qualified name's further segment enters (`myapi.get_orders` at a `ref<method>` slot). In Java it is a `Namespace`,
 the constructor's name beside the map, and its kind is `NAMESPACE`.
 
-`scoped.schemas` keys are cross-document addresses (canonical identity); its values are references by key into the
-named foreign schema. An annotation use `@name: v` is a reference by key into the annotation namespace (§3.3.3). In a
-data document a tag resolves in the governing type-name namespace (or the family's `subtypes` index, or the scope a
-`scoped` position admits), and a qualified name at a vocabulary-typed slot is a path of keys (§5.12).
+An annotation use `@name: v` is a reference by key into the annotation namespace (§3.3.3). In a data document a tag
+resolves in the governing type-name namespace (or the family's `subtypes` index, or the closure a `declared` position
+admits), and a qualified name at a vocabulary-typed slot is a path of keys (§5.12).

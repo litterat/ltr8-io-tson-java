@@ -8,7 +8,6 @@ import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.Instance;
@@ -245,7 +244,7 @@ public final class MetaKernelBootstrapResolver {
     }
 
     private static String bindingText(String name, RecordValue.Field binding) {
-        if (!(binding.value().value().coreValue() instanceof TokenValue token)) {
+        if (!(binding.value().coreValue() instanceof TokenValue token)) {
             throw new UnsupportedOperationException("'" + name + "': '" + binding.name()
                     + "' takes a token in meta-kernel's own bootstrap");
         }
@@ -335,7 +334,7 @@ public final class MetaKernelBootstrapResolver {
     private static void requireIdentifierProfile(Instance instance) {
         if (!(instance.value().coreValue() instanceof RecordValue record) || record.fields().size() != 1
                 || !record.fields().getFirst().name().equals("continue_add")
-                || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
+                || !(record.fields().getFirst().value().coreValue() instanceof TokenValue token)
                 || !token.text().equals("-")) {
             throw new IllegalStateException("expected { continue_add: \"-\" } for !identifier_type, found "
                     + instance.value().coreValue());
@@ -353,7 +352,7 @@ public final class MetaKernelBootstrapResolver {
         Map<String, String> stated = new HashMap<>();
         if (instance.value().coreValue() instanceof RecordValue record) {
             for (RecordValue.Field field : record.fields()) {
-                if (field.value().value().coreValue() instanceof TokenValue token) {
+                if (field.value().coreValue() instanceof TokenValue token) {
                     stated.put(field.name(), token.text());
                 }
             }
@@ -368,7 +367,7 @@ public final class MetaKernelBootstrapResolver {
     private static void requireSchemeRequired(Instance instance) {
         if (!(instance.value().coreValue() instanceof RecordValue record) || record.fields().size() != 1
                 || !record.fields().getFirst().name().equals("allow_relative")
-                || !(record.fields().getFirst().value().value().coreValue() instanceof TokenValue token)
+                || !(record.fields().getFirst().value().coreValue() instanceof TokenValue token)
                 || !token.text().equals("false")) {
             throw new IllegalStateException("expected { allow_relative: false } for !iri_type, found "
                     + instance.value().coreValue());
@@ -393,7 +392,7 @@ public final class MetaKernelBootstrapResolver {
             throw new IllegalStateException("expected a binding record, found " + value.coreValue());
         }
         for (RecordValue.Field field : record.fields()) {
-            if (field.name().equals(name) && field.value().value().coreValue() instanceof TokenValue token) {
+            if (field.name().equals(name) && field.value().coreValue() instanceof TokenValue token) {
                 return token.text();
             }
         }
@@ -409,9 +408,9 @@ public final class MetaKernelBootstrapResolver {
             throw new IllegalStateException("expected an array for !enum, found " + value.coreValue());
         }
         List<String> members = new ArrayList<>();
-        for (ScopedValue element : array.elements()) {
-            if (!(element.value().coreValue() instanceof TokenValue token)) {
-                throw new IllegalStateException("expected a token enum member, found " + element.value().coreValue());
+        for (DataValue element : array.elements()) {
+            if (!(element.coreValue() instanceof TokenValue token)) {
+                throw new IllegalStateException("expected a token enum member, found " + element.coreValue());
             }
             members.add(token.text());
         }

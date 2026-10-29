@@ -19,7 +19,7 @@ history lives in git.
 - A base-syntax exception keeps its position out of `getMessage()`, and a base-syntax failure goes to the receiver —
   a collecting read never throws for a bad document.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/processor-policy.md`,
 `design/schema-side-diagnostics.md`.
 
@@ -55,8 +55,8 @@ document stated something and is not missing it, and the message reports the rul
 broke. Sharing the prose is what keeps the two readers from choosing different rules for one document.
 
 **Five families state their rules here**: records, arrays and sets (one class, a set being an array that
-refuses a repeat), tuples, and maps. Choices and scoped positions do not: `tson-compiler` states its dispatch
-diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a scoped position, while
+refuses a repeat), tuples, and maps. Choices and declared positions do not: `tson-compiler` states its dispatch
+diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a declared position, while
 `tson-json` words each in its own dispatcher (`BACKLOG.md`).
 
 **Two boundary calls are finer than "the schema's nouns":**

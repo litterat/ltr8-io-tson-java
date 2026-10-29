@@ -13,7 +13,7 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `TYPE_MISMATCH`             | the value's shape does not match the type in scope                                           |
 | `WRONG_ARITY`               | a tuple or template application has the wrong element/argument count                         |
 | `UNKNOWN_TYPE_REF`          | a `!type` annotation names a type the schema in scope does not declare                       |
-| `SCOPE_NOT_ADMITTED`        | a `!!schema` (`$schema`) at a position whose type is not `scoped` (§7.8, a resolver error)   |
+| `SCOPE_NOT_ADMITTED`        | a `$schema` in JSON anywhere but the root annotation object (a resolver error)              |
 | `ATOM_FORM_INVALID`         | the token is not the atom's grammar — `'thirty'` where an integer goes                      |
 | `ATOM_CONSTRAINT_VIOLATION` | the token parsed, then broke a declared constraint — `150` under `max: 100`                  |
 | `UNRECOGNIZED_FIELD`        | the data carried a field the type does not declare (§7.2 — records are closed, always)       |
@@ -34,8 +34,8 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `SCHEMA_TIMEOUT`            | the location did not answer in time                                                          |
 | `SCHEMA_TOO_LARGE`          | the location answered with more bytes than a schema document may be                          |
 
-A push at a `scoped` position whose `scope` does not hold `EXTERN` is not `SCOPE_NOT_ADMITTED` but the cell rule's
-refusal, `VALIDATION_ERROR`: that position reads scopes, and this one is not admitted there.
+In TSON text a `!!schema` anywhere but the header is a parse error, reported as `VALIDATION_ERROR` like any
+document that will not parse.
 
 ### The eleven that are not verdicts on the document
 

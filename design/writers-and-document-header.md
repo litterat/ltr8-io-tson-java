@@ -67,13 +67,13 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
   deliberately *not* `WriteException`, which means "this value cannot be written in this encoding". That
   distinction needs `DataClassObjectWriter`'s two `catch (Throwable)` handlers to let it past, or an IO
   fault surfaces blaming the object. A document never has to exist as a `String`.
-- **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` has `documentId`/
-  `schemaRef` (the two of §3.3's four directive names that belong to a *data* document; `meta`/`import` are a
-  schema document's and this emitter does not write one), and both writers have a `describing(...)` derivation
-  over a shared `TsonDocumentHeader` carrier that knows §2.2's order — `!!id` first when both are present.
-  **A bare value is the default**, because that is what a writer is usually asked for — not to protect
-  output already in the world, of which there is none. A caller who wants a self-describing document says so
-  (`describing(schemaUri[, rootType])`/`identifiedBy`).
+- **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` has `documentId`/`schemaRef`
+  (the two of §3.3's four directive names that belong to a *data* document, both header-only; `meta`/`import` are a
+  schema document's and this emitter does not write one), and both writers have a `describing(...)` derivation over a
+  shared `TsonDocumentHeader` carrier that knows §2.2's order — `!!id` first when both are present. **A bare value is
+  the default**, because that is what a writer is usually asked for — not to protect output already in the world, of
+  which there is none. A caller who wants a self-describing document says so (`describing(schemaUri[,
+  rootType])`/`identifiedBy`).
   - **The object writer takes the schema *and* the root type; the tree writer takes only the schema.** A
     bound object carries neither fact — the schemaless writer emits a type-ref only where a value would not
     read back without one — so `!!schema` alone yields a document whose own reader says "declares a

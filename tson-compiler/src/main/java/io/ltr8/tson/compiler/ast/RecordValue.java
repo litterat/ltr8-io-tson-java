@@ -16,7 +16,7 @@ public record RecordValue(List<Field> fields) implements CoreValue {
         fields = List.copyOf(fields);
     }
 
-    /** {@code field = field-name ws ":" ws scoped-value}. {@code name} is the field-name token's decoded text. */
-    public record Field(String name, ScopedValue value) {
+    /** {@code field = field-name ws ":" ws data-value}. {@code name} is the field-name token's decoded text. */
+    public record Field(String name, DataValue value) {
     }
 }

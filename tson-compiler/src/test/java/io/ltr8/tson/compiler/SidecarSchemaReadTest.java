@@ -184,9 +184,9 @@ class SidecarSchemaReadTest {
                         type-ref: _
                         core: { record: { fields: [
                           { name: "a"
-                            value: { schema-ref: _  value: {
+                            value: {
                               annotations: []  type-ref: _
-                              core: { token: { form: unquoted  text: "1" } } } } }
+                              core: { token: { form: unquoted  text: "1" } } } }
                         ] } }
                       }
                     }

@@ -28,19 +28,11 @@
     max_length => !record_field { type: non_negative_integer  optional: true }
   } }
 
-  scope_kind => !enum { members: [LOCAL EXTERN] }
-
-  scope_set => !set_type { element_type: scope_kind  min_items: 1 }
-
   set => !template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }
 
-  scoped => !record { chain: { supertypes: [sum top type] }  fields: {
-    chain   => !record_field { type: type_chain  optional: true }
-    scope   => !record_field { type: scope_set }
-    schemas => !record_field { type: map_schema_identity_array_type_name_1_ef020ac1_true_1_xxhash  optional: true }
+  declared_type => !record { chain: { supertypes: [sum top type] }  fields: {
+    chain => !record_field { type: type_chain  optional: true }
   } }
-
-  schema_identity => !iri_type { allow_fragment: false }
 
   ieee_format => !enum { members: [BINARY16 BINARY32 BINARY64 BINARY128 BINARY256 DECIMAL32 DECIMAL64 DECIMAL128] }
 
@@ -282,8 +274,4 @@
   @synthetic array_value_xxhash => !array { element_type: value }
 
   @synthetic array_text_xxhash => !array { element_type: text }
-
-  @synthetic array_type_name_1_xxhash => !array { element_type: type_name  min_items: 1 }
-
-  @synthetic map_schema_identity_array_type_name_1_ef020ac1_true_1_xxhash => !map { key_type: schema_identity  value_type: array_type_name_1_xxhash  voidable: true  min_items: 1 }
 }

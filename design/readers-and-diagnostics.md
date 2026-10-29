@@ -21,7 +21,7 @@ applies, the continuation policy, and what a read leaves behind.
   entry loop.
 - Records are closed under their type and a repeated field or map key is an error, on the schemaless path too.
 
-Related: `design/reader-naming-and-schema-location.md`, `design/scope-push.md`, `design/record-dispatch.md`,
+Related: `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`, `design/record-dispatch.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`, `design/facades-and-tree.md`.
 

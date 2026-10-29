@@ -257,3 +257,45 @@ parse error in the data grammar. §1's list of lexer changes under principle 6 g
 (`pos_int32 => int32 <- positive`, `smallint => integer <- maxint<10>`). Each adds a capability with rules of its own
 (which constructors state a tightening rule; whether the right operand adds IS-A), and neither is needed to retire the
 `!` head.
+
+## 6. [TSON-DATA] §2.3, §3.3, §7.4, §9.1; [TSON-SCHEMA] §7.1, §7.8 — the scope push names a foreign type in data
+
+**Problem.** §7.8's EXTERN cell lets a data value name a schema its governing schema never imported, by a
+`!!schema` directive on the value. The foreign schema is then found mid-document: a schema the processor will not
+supply surfaces as a refusal halfway through a read, the pushed closure's pins need not agree with the governing one's,
+and [TSON-DATA] §9.1 has to count the schemas a document can make a processor load. It is also a second directive
+position, and the only one inside a value, for what is a fact about the schema: which foreign types a position admits.
+The LOCAL cell needs none of this — a value naming, by its tag, a type of the governing closure.
+
+**What is running.** The push is gone and `declared` is its own constructor:
+
+- meta.tn declares `declared_type => sum & {}`, and core.tn `declared => !declared_type {}`. A `declared` position
+  reads exactly as `!scoped { scope: [LOCAL] }` did: the value names its type by its tag, the name resolves in the
+  governing schema's closure (§2.2.3), and the value is checked in full against it; an untagged value is a validation
+  error in every mode, and a tag naming no type of the closure a resolver error. `declared` is SUM-kinded and has no
+  discrimination class (§5.4), as the `scoped` instances were.
+- `scoped`, `scope_kind`, `scope_set` and `schema_identity` are gone from meta.tn, and `extern`, `dynamic`,
+  `extern_of` and `extern_type` from core.tn.
+- [TSON-DATA]'s `scoped-value` production is gone: a record field value, a map entry value and an array element are
+  each a `data-value`, so a `!!schema` there is a directive outside its placement and a **parse error** (§3.3's closed
+  positional set). `!!schema` stands in the header alone.
+- [TSON-DATA] §9.1's foreign-schemas row is gone, from the limits policy and from `policy.tn`.
+- [TSON-JSON] (edited in place) admits `$schema` on the root's annotation object alone; anywhere else it is a resolver
+  error, and §8.5 is "Declared Positions".
+
+**Resolution, a proposal.** Sections amended:
+
+- [TSON-SCHEMA] §7.8 reduces to `declared`: the `scoped` constructor, its table, the two templates, the cell rule, the
+  scope push, the typed-position restriction and the schemaless-document paragraph go, and what stays is the LOCAL
+  rule above, stated of `declared_type`. §7.1 loses its scoped-value paragraphs (the binding of one value, the
+  typed-position sentence) and keeps the header binding. §4.1's sum bullet names `choice` and `declared_type`;
+  §5.10's `scoped.schemas` example, §7.5's `scoped.scope`, §8.1's table rows naming `scoped`, `extern_of` and
+  `dynamic`, and §9's meta and core rows follow.
+- [TSON-DATA] §2.3 has one value rule, `data-value`; §2.5, §2.6 and §2.7 lose their directive sentences, §2.1's example
+  its field-level `!!schema`, §3's augmentation intro and §3.3 place directives in the header alone, §7.4's grammar
+  drops `scoped-value`, and §1.5's Class 1 obligation to preserve `schema` directives concerns the header's.
+- [TSON-DATA] §9.1 drops the foreign-schemas row.
+
+A foreign type returns as a constructor meta.tn declares, `extern => atom & { schema: schema_identity  type:
+type_name }`, applied in the schema that admits it and read in the foreign schema's own closure, loaded with the
+declaring schema rather than by the document. That is a later step and is not running.

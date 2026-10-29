@@ -17,8 +17,8 @@ import java.util.function.UnaryOperator;
  * leaves it bare for a record to bind to a component.
  *
  * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), a
- * family-base template's, the choice's ({@link DispatchChoiceReader}) and a scoped position's ({@link
- * DispatchScopedReader}) select a reader and build nothing,
+ * family-base template's, the choice's ({@link DispatchChoiceReader}) and a declared position's ({@link
+ * DispatchDeclaredReader}) select a reader and build nothing,
  * so every mode registers the same ones. So does a concrete record's loop ({@link RecordReader}); what is the
  * mode's own is the factory that builds it and the {@link RecordBuilder} it hands its slots to.
  *
@@ -79,7 +79,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("tuple", TreeTupleBuilder.FACTORY);
         factories.put("map", TreeMapBuilder.FACTORY);
         factories.put("choice", DispatchChoiceReader.FACTORY);
-        factories.put("scoped", DispatchScopedReader.FACTORY);
+        factories.put("declared_type", DispatchDeclaredReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
@@ -102,7 +102,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("tuple", BindTupleBuilder.FACTORY);
         factories.put("map", BindMapBuilder.FACTORY);
         factories.put("choice", DispatchChoiceReader.FACTORY);
-        factories.put("scoped", DispatchScopedReader.FACTORY);
+        factories.put("declared_type", DispatchDeclaredReader.FACTORY);
         factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }

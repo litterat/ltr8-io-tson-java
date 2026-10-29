@@ -397,7 +397,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     /** {@link TsonReadContext#skipUnjudged}'s implementation, which carries the contract. */
     static void skipUnjudged(TsonReadContext ctx) {
-        unjudged(ctx, io.ltr8.tson.compiler.stream.EventSkip::scopedValue);
+        unjudged(ctx, io.ltr8.tson.compiler.stream.EventSkip::dataValue);
     }
 
     private static void unjudged(TsonReadContext ctx, java.util.function.Consumer<TsonReadContext> skip) {

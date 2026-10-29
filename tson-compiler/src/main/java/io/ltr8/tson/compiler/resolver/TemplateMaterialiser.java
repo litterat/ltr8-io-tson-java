@@ -843,8 +843,8 @@ final class TemplateMaterialiser {
         }
         return new RecordValue(record.fields().stream()
                 .map(field -> WireForm.CHAIN.equals(field.name()) ? field
-                        : new RecordValue.Field(field.name(), WireForm.rescope(field.value(),
-                                closeApplications(field.value().value().coreValue()))))
+                        : new RecordValue.Field(field.name(), WireForm.rewritten(field.value(),
+                                closeApplications(field.value().coreValue()))))
                 .toList());
     }
 
@@ -918,17 +918,17 @@ final class TemplateMaterialiser {
                     new TokenValue(close(WireForm.typeRefOf(record)).name(), TokenForm.UNQUOTED);
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> new RecordValue.Field(field.name(),
-                            WireForm.rescope(field.value(), closeApplications(field.value().value().coreValue()))))
+                            WireForm.rewritten(field.value(), closeApplications(field.value().coreValue()))))
                     .toList());
             case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> WireForm.rescope(element, closeApplications(element.value().coreValue()))).toList());
+                    .map(element -> WireForm.rewritten(element, closeApplications(element.coreValue()))).toList());
             // A map slot holds applications like any other: `{ S => [box<text>] }` writes one in the array
             // its value names, and a key type could take one too. Both halves descend, as they do in
             // WireForm.substitute, which walks the same shape one step earlier.
             case MapValue map -> new MapValue(map.entries().stream()
                     .map(entry -> new MapValue.MapEntry(
                             WireForm.retyped(entry.key(), closeApplications(entry.key().coreValue())),
-                            WireForm.rescope(entry.value(), closeApplications(entry.value().value().coreValue()))))
+                            WireForm.rewritten(entry.value(), closeApplications(entry.value().coreValue()))))
                     .toList());
             default -> value;
         };

@@ -371,7 +371,7 @@ public interface TsonReadContext {
     }
 
     /**
-     * Skips the scoped value at {@code ctx}'s cursor -- a record field's, any {@code !!schema} directive included --
+     * Skips the data value at {@code ctx}'s cursor -- a record field's --
      * holding no name in it to a name rule: the value of a field its record does not declare, which is reported
      * once, at the field, and read no further. No type governs it, so judging its names by the schemaless rule
      * would hand down verdicts its producer's schema might not share, beside the one problem that is real; the

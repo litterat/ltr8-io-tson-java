@@ -4,7 +4,6 @@ import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -70,9 +69,9 @@ class HeldBodyTest {
     @Test
     void aHeldBodyIsTheApplicationItHolds() {
         TemplateBody held = HeldBody.held(List.of("T"), new DataValue(List.of(), Optional.of("choice"),
-                new RecordValue(List.of(new RecordValue.Field("variants", scoped(new ArrayValue(List.of(
-                        scoped(new TokenValue("T", TokenForm.UNQUOTED)),
-                        scoped(new TokenValue("error", TokenForm.UNQUOTED))))))))));
+                new RecordValue(List.of(new RecordValue.Field("variants", plain(new ArrayValue(List.of(
+                        plain(new TokenValue("T", TokenForm.UNQUOTED)),
+                        plain(new TokenValue("error", TokenForm.UNQUOTED))))))))));
 
         assertEquals("!choice { variants: [ T error ] }", held.template());
     }
@@ -87,15 +86,15 @@ class HeldBodyTest {
     void whatAHeldBodyWritesParsesAgain() {
         DataValue application = new DataValue(List.of(), Optional.of("array"),
                 new RecordValue(List.of(new RecordValue.Field("element_type",
-                        scoped(new TokenValue("T", TokenForm.UNQUOTED))))));
+                        plain(new TokenValue("T", TokenForm.UNQUOTED))))));
 
         TemplateBody held = HeldBody.held(List.of("T"), application);
 
         assertEquals(application, HeldBody.of(held).application());
     }
 
-    private static ScopedValue scoped(CoreValue value) {
-        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
+    private static DataValue plain(CoreValue value) {
+        return new DataValue(List.of(), Optional.empty(), value);
     }
 
     /** A record template is a record with parameters, never held text (§5.10): the door refuses one. */

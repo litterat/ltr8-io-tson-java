@@ -19,8 +19,8 @@ public record DeferredTypeReader<T>(String typeName, Map<String, TsonTypeReader<
 
     /**
      * The entry this stands in for, once the compilation that created it has finished it -- {@code null}
-     * while it is still building. What {@link ScopePush} asks when a scope push arrives at a recursive
-     * position, since the real reader is the one that decides whether the push is admitted.
+     * while it is still building. What {@link RecordAbstractReader#unwrapped} looks through, since the real
+     * reader is the one whose shape a question about the position is asking.
      */
     TsonTypeReader<?> resolved() {
         return registry.get(typeName);

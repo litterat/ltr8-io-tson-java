@@ -15,7 +15,7 @@ public record MapValue(List<MapEntry> entries) implements CoreValue {
         entries = List.copyOf(entries);
     }
 
-    /** {@code map-entry = data-value ws "=>" ws scoped-value}. The key is a full data-value, not just a token (§2.6). */
-    public record MapEntry(DataValue key, ScopedValue value) {
+    /** {@code map-entry = data-value ws "=>" ws data-value}. The key is a full data-value, not just a token (§2.6). */
+    public record MapEntry(DataValue key, DataValue value) {
     }
 }

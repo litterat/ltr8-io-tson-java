@@ -178,7 +178,7 @@ class JsonTaggedValueReadTest {
                 {"$value": {"name": "Ada"}}""").refusal().code());
     }
 
-    /** §8.5 admits `$schema` only at a scoped position; §3.3 makes it a resolver error anywhere else. */
+    /** §3.3 makes `$schema` a resolver error at every value position. */
     @Test
     void aSchemaMemberIsRefusedAtARecordPosition() {
         Diagnostic refusal = read("person", """

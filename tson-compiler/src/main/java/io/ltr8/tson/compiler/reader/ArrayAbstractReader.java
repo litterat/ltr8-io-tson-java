@@ -141,10 +141,6 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
                 ? new ConfusableNames.Scope() : null;
         int index = 0;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            SchemaRef push = ScopePush.notAdmitted(ctx, elementParser);
-            if (push != null) {
-                ScopePush.refuse(ctx.index(index), body.elementType().name(), push);
-            }
             Object decoded = ctx.peek() instanceof VoidEvent ? defaultOrRequire(index, ctx)
                     : elementParser.read(ctx.index(index));
             if (seen != null && decoded != null) {

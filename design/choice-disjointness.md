@@ -47,8 +47,8 @@ takes its members' shared token class instead, so `[true false]` is boolean-clas
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
-`rational`/`complex` (whose typed forms straddle classes), `value`, `void`, a mixed-class enum, a scoped instance (its
-membership is a namespace, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
+`rational`/`complex` (whose typed forms straddle classes), `value`, `void`, a mixed-class enum, a declared instance (its
+membership is a closure, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
 conservative side. §5.4 adds two kinds to that list by the same straddling, judged across encodings: an approximate
 atom whose `allow_nan` or `allow_infinity` is true (a NaN is a number token in TSON text and a string in JSON, so
 core's `float32`/`float64` as declared have no class, and narrowing both facets to false restores `number`), and a

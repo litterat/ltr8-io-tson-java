@@ -6,7 +6,7 @@ import java.util.Optional;
 /**
  * {@code data-value = *annotation [type-ref] core-value} (§2.3, §7.4) — zero or more
  * annotations, an optional type reference, and a core value. Occurs everywhere a value does:
- * as the document root, as a map key, and as the payload of a {@link ScopedValue}.
+ * as the document root, a record field value, a map key or entry value, and an array element.
  *
  * <p>{@code typeRef} is preserved verbatim, uninterpreted: resolving it against the built-in
  * type vocabulary (§5) or a declared schema ([TSON-SCHEMA]) is a later layer's job. A Class 1

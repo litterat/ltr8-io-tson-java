@@ -35,7 +35,7 @@ import java.util.Set;
  * reference flattening of both") reaches the same reader.
  *
  * <p><b>It decides from the leading members and reads no further</b> ({@link TagMembers#lead}): §3.3
- * puts {@code $type} first, after a {@code $schema} where one is present, so the selector is known before any
+ * puts {@code $type} first, so the selector is known before any
  * of the object's own members, and the reader it selects reads the object once, from the start.
  */
 final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {

@@ -1,7 +1,7 @@
 # The JSON encoding: schema-directed reading
 
 Design notes for `tson-json`'s schema-directed reader stack — how a JSON document is bound to a schema, the annotation
-object, how the unexported `reader` package is named, and the record, container, choice and scoped readers. The CLI's
+object, how the unexported `reader` package is named, and the record, container, choice and declared readers. The CLI's
 JSON inputs are in `design/cli-config-hashing.md`.
 
 **Invariants**
@@ -13,9 +13,7 @@ JSON inputs are in `design/cli-config-hashing.md`.
 - Selectors lead their object ([TSON-JSON] §3.3, §6.1.5, §6.1.6): every decision is a peek at the leading members
   (`TagMembers.lead`), bounded by the schema, and no reader scans an object.
 - The concrete record reader looks ahead at nothing: its member loop judges every annotation member as it arrives, and
-  `$schema` is refused everywhere except a scoped position.
-- A scoped position opens the scope by consuming `$schema` (`JsonReadContext.consumeLeadingMember`), so no reader
-  below it has a second rule for the member; a foreign schema is looked up as the value arrives (`ForeignSchemas`).
+  `$schema` is refused at every value position (`Tags`, `SCOPE_NOT_ADMITTED`).
 - `CompiledReaders` is rebound exactly once, from the in-progress compilation to the finished schema.
 - The map form is chosen by the factory from `K` and the record reader from `record.extension`, once at compile, never by
   inspecting a value.
@@ -32,7 +30,7 @@ JSON inputs are in `design/cli-config-hashing.md`.
 
 Related: `design/json-encoding.md` (why the stack is separate, the parity guard), `design/json-lexer-stream-tree.md`,
 `design/json-facades-binding-writing.md`, `design/json-unicode-policies.md`, `design/linking-and-compilation.md`,
-`design/scope-push.md`, `design/cli-config-hashing.md`. Section numbers below are [TSON-JSON]'s unless prefixed.
+`design/declared-positions.md`, `design/cli-config-hashing.md`. Section numbers below are [TSON-JSON]'s unless prefixed.
 
 ## What the stack compiles
 
@@ -45,13 +43,13 @@ record and container builders and in the atom factories' wrapping.
 Classes that differ by mode are named **mode, then family, then form** (`TreeRecordBuilder`, `BindRecordBuilder`,
 `TreeAtomKeyedReader`), so a listing sorts by the axis someone scans when adding a mode. A mode-free loop carries no
 mode (`RecordReader`, `ArrayReader`, `MapPairsReader`). A dispatcher has no mode, so it leads with what it is, then how
-it selects (`DispatchTagReader`, `DispatchMemberReader`, `DispatchChoiceReader`, `DispatchScopedReader`, and
+it selects (`DispatchTagReader`, `DispatchMemberReader`, `DispatchChoiceReader`, `DispatchDeclaredReader`, and
 `DispatchFactories` over the record ones). `tson-compiler`'s peers keep record-first names (`RecordTagDispatchReader`)
 until that stack adopts the same design (`BACKLOG.md`).
 
 **The `Json` prefix is dropped in `reader` and kept in the root** — `CLAUDE.md`'s rule applied, `reader` being
 unexported. So most of the package shares a bare name with its `tson-compiler` counterpart (`CompiledReaders`,
-`ErrorReader`, `ValueReaderContext`, `ReferenceChain`, `DiscriminationClass`, `BindTargets`, `ForeignSchemas`, …),
+`ErrorReader`, `ValueReaderContext`, `ReferenceChain`, `DiscriminationClass`, `BindTargets`, …),
 which shows at a glance which TSON class a JSON class answers to. `tson-json` does not depend on `tson-compiler`
 (`module-info`), so nothing can name both.
 
@@ -113,9 +111,9 @@ Members read before a refusal have already reported, so an invalid document's di
 accepted deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid
 ones. The allocation harness measures the absent lookahead (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
 
-**`$schema` is refused everywhere a scoped reader does not stand.** §8.5 admits it only where the effective type is
-a `scoped` instance holding EXTERN, and [TSON-SCHEMA] §7.8 makes it a resolver error elsewhere (`SCOPE_NOT_ADMITTED`,
-as TSON text's `!!schema` there). The scoped reader consumes it, so a record reader never meets one it should admit.
+**`$schema` is refused at every value position.** It stands on the root's annotation object alone (§3.3, §3.4), so
+a record, a choice and a declared position refuse a leading one alike, through `Tags`, as `SCOPE_NOT_ADMITTED` (a
+resolver error) at the member's own path. TSON text refuses its `!!schema` there a layer earlier, as a parse error.
 
 **`CompiledReaders` is how a factory reaches another entry's reader**, and it is **rebound exactly once**, from the
 in-progress compilation to the finished schema, because handing readers the compilation's resolve would leak its
@@ -263,34 +261,19 @@ establishes no type, where `UNKNOWN_TYPE_REF` would claim a name denoted nothing
 type-ref is also the variant tag (`!scalars "hi"` names the choice), while JSON binds out of band (§3.4). And a tag
 refusal lands at `/outline/$type` in JSON, where the tag is a member, against `/outline` in text.
 
-## A scoped position: the open sum, read off the leading members
+## A declared position: the open sum, read off the leading members
 
-`DispatchScopedReader` serves every `scoped` instance (§8.5), what separates them being two constraint values,
-`scope` and `schemas`, not a shape. It is `ScopedReader`'s peer; `design/scope-push.md` has the model, and what
-follows is what the JSON carrier changes.
+`DispatchDeclaredReader` serves core's `declared` (§8.5), the open sum over the governing closure. It is
+`DeclaredReader`'s peer; `design/declared-positions.md` has the model, and what follows is what the JSON carrier
+changes.
 
-**The leading members pick the cell** (`TagMembers.lead`, which keeps `$schema`'s string beside `$type`'s). `$schema`
-leading is EXTERN, `$type` alone is LOCAL, and anything else — a bare scalar, an array, an object leading with none of
-them, a wrapper with no `$type` — names no type: a validation error in every mode. A cell the instance's `scope` does
-not hold refuses the value, which is also how a `$schema` at a `declared` position is refused ([TSON-SCHEMA] §7.8's
-cell rule).
+**The leading `$type` names the type** (`TagMembers.lead`). Anything else — a bare scalar, an array, an object leading
+with no annotation member, a wrapper with no `$type` — names no type: a validation error in every mode. A leading
+`$schema` is refused first, as at every value position (`Tags`).
 
-**LOCAL is wired at compile.** Every name the governing namespace holds is resolved to a `Route` when the scoped entry
-compiles, so a LOCAL read is one lookup and a route, as at a tagged record position. A name the namespace does not
-hold is `UNKNOWN_TYPE`, after name hygiene.
-
-**EXTERN is looked up as the value arrives, and the scope opens by consuming `$schema`.** Which schema a value names
-is the document's choice, so the compile is handed `ForeignSchemas`: `JsonCompiledSchemaRegistry` passes its own
-`get`, so a pushed schema compiles once, in the registry's mode, into its cache; a standalone compile passes
-`ForeignSchemas.none()`, whose every lookup is `SCHEMA_NOT_PERMITTED`. A schema nothing supplies, or one that is
-wrong, is reported by `ForeignSchemas.get` and never a verdict on the document. With the foreign
-reader in hand, `JsonReadContext.consumeLeadingMember` drops `$schema` from the stream and leaves the object open: what
-is left is `{"$type": …}` in the foreign namespace, and the foreign type's route reads it as any tagged value. A
-`$schema` nested inside the pushed value is still refused where it stands. There is no scope stack: the foreign
-reader is wired to the foreign schema's entries, and the scope pops by returning.
-
-**Every mode hands back what the selected reader built**: a JSON tree keeps no tag of any kind, so it drops the scope
-too, where TSON text's tree keeps the push (`TsonScopedValue`).
+**The closure is wired at compile.** Every name the governing closure holds is resolved to a `Route` when the entry
+compiles, so a read is one lookup and a route, as at a tagged record position. A name the closure does not hold is
+`UNKNOWN_TYPE`, after name hygiene. Every mode hands back what the selected reader built.
 
 ## An unknown root type names the author's declarations first
 

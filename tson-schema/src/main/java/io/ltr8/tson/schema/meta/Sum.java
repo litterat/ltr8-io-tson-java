@@ -5,11 +5,11 @@ import java.util.List;
 /**
  * The meta-kernel's {@code sum => type & {}} base kind (Part 2 §4.1) -- every SUM-kind {@link Top} variant
  * IS-A this. Two of them: {@link ChoiceBody} ({@code choice => ~sum & { variants: [type_ref] }}, §5.4), the
- * closed sum that enumerates its variants, and {@link Scoped} ({@code scoped => ~sum & { scope: ...
- * schemas: ...? }}), the open one that names the namespaces its variants are drawn from. {@code disjoint} is
- * derived on the first and absent on the second (§8.1), which is the same distinction from the other side.
+ * closed sum that enumerates its variants, and {@link DeclaredType} ({@code declared_type => sum & {}}), the open
+ * one whose variants are the types of the governing closure. {@code disjoint} is derived on the first and absent
+ * on the second (§8.1), which is the same distinction from the other side.
  */
-public sealed interface Sum extends Type permits ChoiceBody, Scoped {
+public sealed interface Sum extends Type permits ChoiceBody, DeclaredType {
 
     /**
      * Reports how this body's own facets contradict <em>each other</em> -- an empty list means it is

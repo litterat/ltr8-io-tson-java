@@ -75,7 +75,7 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(44, core.entries().size(), "expected every core.tn declaration to resolve");
+        assertEquals(40, core.entries().size(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements
         // (int32/positive_integer) and constructor applications (hex, float32, email, complex, unknown) --
@@ -93,10 +93,6 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("email"));
         assertTrue(core.entries().containsKey("complex"));
         assertTrue(core.entries().containsKey("declared"));
-        assertTrue(core.entries().containsKey("extern"));
-        assertTrue(core.entries().containsKey("dynamic"));
-        assertTrue(core.entries().containsKey("extern_of"));
-        assertTrue(core.entries().containsKey("extern_type"));
     }
 
     /** The network families are net.tn's, beside its host name, and core claims none of their names. */
@@ -113,7 +109,7 @@ class CoreSchemaImportTest {
 
     /**
      * {@link TsonCompiledMetaRegistry#register} (reached via {@code loader.load}, inside {@link
-     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own 44 entries as a side
+     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own entries as a side
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone
@@ -121,9 +117,7 @@ class CoreSchemaImportTest {
      * the whole standard library, so "every one of these reads" is the strongest single statement about the
      * compiled reader stack this repo can make, and a regression here is silent everywhere else.
      *
-     * <p>It was not always empty. {@code declared}, {@code extern} and {@code dynamic} sat here for as long
-     * as {@code scoped} had no reader, which is why this is written as a set rather than a boolean -- a new
-     * gap names itself.
+     * <p>Written as a set rather than a boolean so a new gap names itself.
      */
     @Test
     void noCoreEntryCompilesToAnErrorReader() {

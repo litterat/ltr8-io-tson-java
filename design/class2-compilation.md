@@ -144,7 +144,7 @@ non-empty `subtypes()`. An atom, array, map, tuple, or record whose type has no 
 consume the type-ref and discard it, so a document could claim any type at those positions. The guard is the
 same `VariantSchemaReader` a record with subtypes dispatches through, wired wherever the rule
 applies. Three things it has to get right: it **follows the body, not
-`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and scoped instances have their
+`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and declared instances have their
 own membership relations §7.2 excludes); it accepts an entry's **aliases as the entry itself**, since §7.2
 compares "after following both reference chains to their terminal entries" and resolving an alias would
 arrive back at the same reader and recurse; and it is **transparent to `UseSite` renaming and to bind-mode

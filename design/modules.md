@@ -40,7 +40,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   selection out of the schema layer. **A cyclic type graph resolves** — a record reaching itself, directly or
   through others: `getDescriptor` hands a re-entrant call a deferred supplier and each holder keeps it in a
   final `Memoized`, so laziness is confined to the cyclic edge and every other component still resolves
-  eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` → `ScopedValue` →
+  eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` →
   `DataValue`), which is what lets a held template body be written at all. **A generic record is described at its
   arguments**: a component's declared type has the class's type parameters replaced by the arguments it is
   described at (`TypeArguments`, `DefaultRecordBinder.resolveRecord(context, class, parameterizedType)`), so

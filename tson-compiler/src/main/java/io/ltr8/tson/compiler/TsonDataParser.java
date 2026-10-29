@@ -4,7 +4,6 @@ import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.compiler.stream.*;
@@ -279,7 +278,7 @@ public class TsonDataParser {
             List<RecordValue.Field> fields = new ArrayList<>();
             while (!(events.get(pos) instanceof RecordEnd)) {
                 FieldName name = (FieldName) events.get(pos++);
-                fields.add(new RecordValue.Field(name.name(), scopedValue()));
+                fields.add(new RecordValue.Field(name.name(), dataValue()));
             }
             pos++; // RecordEnd
             return new RecordValue(fields);
@@ -290,28 +289,19 @@ public class TsonDataParser {
             while (!(events.get(pos) instanceof MapEnd)) {
                 DataValue key = dataValue();
                 pos++; // MapArrow
-                entries.add(new MapValue.MapEntry(key, scopedValue()));
+                entries.add(new MapValue.MapEntry(key, dataValue()));
             }
             pos++; // MapEnd
             return new MapValue(entries);
         }
 
         private ArrayValue array() {
-            List<ScopedValue> elements = new ArrayList<>();
+            List<DataValue> elements = new ArrayList<>();
             while (!(events.get(pos) instanceof ArrayEnd)) {
-                elements.add(scopedValue());
+                elements.add(dataValue());
             }
             pos++; // ArrayEnd
             return new ArrayValue(elements);
-        }
-
-        private ScopedValue scopedValue() {
-            Optional<String> schemaRef = Optional.empty();
-            if (events.get(pos) instanceof SchemaRef sr) {
-                schemaRef = Optional.of(sr.uri());
-                pos++;
-            }
-            return new ScopedValue(schemaRef, dataValue());
         }
     }
 }

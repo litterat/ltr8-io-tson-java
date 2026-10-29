@@ -32,7 +32,6 @@ import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -339,17 +338,18 @@ public final class TsonDataStream implements TsonEventSource {
     /**
      * Nothing here can start a value.
      *
-     * <p><b>A directive is named rather than described</b>, because at a value position it is almost always
-     * a header directive in the wrong place -- §2.2 admits {@code !!id} and one governing directive and
-     * nothing else, and {@code !!import} is a schema document's. "found '!!'" is true and useless; naming
-     * the directive says which rule was broken. The rule is the <em>position's</em>, not the document
-     * kind's, so this holds whoever is reading -- which is why it can live here while the header's own
-     * verdicts have moved up to the parsers.
+     * <p><b>A directive is named rather than described</b>, because at a value position it is always a
+     * header directive in the wrong place -- a directive stands only in the header (§2.2, §3.3), which admits
+     * {@code !!id} and one governing directive and nothing else, so a {@code !!schema} prefixing a field
+     * value, a map entry value or an array element is refused here like any other. "found '!!'" is true and
+     * useless; naming the directive says which rule was broken. The rule is the <em>position's</em>, not the
+     * document kind's, so this holds whoever is reading -- which is why it can live here while the header's
+     * own verdicts have moved up to the parsers.
      */
     private ParseException notAValue(Token t) {
         if (t.type() == TokenType.DIRECTIVE) {
-            return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here "
-                    + "(expected '!!schema', '!!meta' or the start of the document's value)");
+            return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here: a directive "
+                    + "stands only in the document header (§2.2, §3.3)");
         }
         return parseError("expected a value (record, map, array, empty braces, "
                 + "the void sentinel '_', or a token), found " + describe(t));
@@ -894,7 +894,7 @@ public final class TsonDataStream implements TsonEventSource {
                     ready.add(new RecordStart(lbrace.start()));
                     ready.add(new FieldName(Nfc.of(t1.text()), t1.start()));
                     pushFrame(new RecordFrame());
-                    pushFrame(new ScopedValueFrame());
+                    pushFrame(new DataValueFrame());
                     return;
                 }
                 if (t2.type() == TokenType.MAP_ARROW) {
@@ -904,7 +904,7 @@ public final class TsonDataStream implements TsonEventSource {
                     ready.add(new TokenEvent(t1.text(), formOf(t1.type()), t1.start()));
                     ready.add(new MapArrow(t2.start()));
                     pushFrame(new MapFrame(MapFrame.Mode.AFTER_ENTRY));
-                    pushFrame(new ScopedValueFrame());
+                    pushFrame(new DataValueFrame());
                     return;
                 }
                 throw parseError("a value inside curly braces must be followed by ':' (record) or "
@@ -923,23 +923,6 @@ public final class TsonDataStream implements TsonEventSource {
         }
     }
 
-    /** {@code [ schema-directive ws ] data-value} (§2.3): record field values, map entry values, array elements. */
-    private final class ScopedValueFrame extends Frame {
-        @Override
-        void step() {
-            if (check(TokenType.DIRECTIVE)) {
-                String name = peekDirectiveName();
-                if (!"schema".equals(name)) {
-                    throw parseError("directive '!!" + name + "' is not permitted here (only '!!schema' is)");
-                }
-                Position pos = peekToken().start();
-                String uri = parseNamedDirective("schema");
-                ready.add(new SchemaRef(uri, pos));
-            }
-            pushFrame(new DataValueFrame());
-        }
-    }
-
     /** Repeatable step for every record field after the first (whose name/colon brace-disambiguation already consumed). */
     private final class RecordFrame extends Frame {
         @Override
@@ -955,7 +938,7 @@ public final class TsonDataStream implements TsonEventSource {
             expect(TokenType.COLON, "a record field's ':'");
             ready.add(new FieldName(Nfc.of(name.text()), name.start()));
             pushFrame(new RecordFrame());
-            pushFrame(new ScopedValueFrame());
+            pushFrame(new DataValueFrame());
         }
     }
 
@@ -985,7 +968,7 @@ public final class TsonDataStream implements TsonEventSource {
                     Token arrow = expect(TokenType.MAP_ARROW, "a map entry's '=>'");
                     ready.add(new MapArrow(arrow.start()));
                     pushFrame(new MapFrame(Mode.AFTER_ENTRY));
-                    pushFrame(new ScopedValueFrame());
+                    pushFrame(new DataValueFrame());
                 }
             }
         }
@@ -1010,7 +993,7 @@ public final class TsonDataStream implements TsonEventSource {
                 return;
             }
             pushFrame(new ArrayFrame(false));
-            pushFrame(new ScopedValueFrame());
+            pushFrame(new DataValueFrame());
         }
     }
 }
