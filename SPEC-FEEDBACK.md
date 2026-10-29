@@ -126,3 +126,70 @@ choice an emitter writes each untagged value in the form of its variant's class 
 resolve to another class is quoted, and a value of a boolean or number variant is written bare; a tag is never
 wrong.* And one clause in [TSON-DATA] §2.4 after "consulted exactly once": at a disjoint choice that consultation
 selects the variant, so the form an emitter chooses there is its tag. No reader rule changes.
+
+## 4. [TSON-SCHEMA] §3.4, §3.4.1, §5.10.1, §11.5 — resolution order within a schema is unstated
+
+**Problem.** §3.4.1 orders resolution *between* documents (the closure, dependencies first) but not within one:
+Pass 2 "resolves each entry's body against the populated namespace", forward references are permitted, and §5.10.1
+says the resolver "MUST detect and handle cycles" without saying which dependencies form one. The kernel's own order
+is left to pre-loading (§3.4). Under the ladder every constructor an ordinary schema applies is in another, already
+resolved document, so the gap shows only in the kernel and in composition chains; once a constructor and its instances
+share a document, an order has to be computed and its cycles defined.
+
+**What is running.** None of the rule below as a rule. Pass 2 resolves on demand and refuses "a circular
+composition/refinement chain" (rule 1's operand edge); the kernel bootstrap orders its entries by three hand-written
+passes (ordinary declarations, instances, atom refinements); defaults and pins are `value`-typed and judged at link
+(rule 3). The Revision 39 proposal replaces the bootstrap passes with this rule and checks that
+`meta-kernel-resolved.tn` comes out of it as a fixed point.
+
+**Resolution, a proposal.** Terms:
+
+- **Form.** A structure serialized data takes, read by an algorithm the processor owns: an atom (one token), a record
+  or tuple (fixed length, named or positional), an array or map (variable length, positional or keyed), a choice. Sets,
+  enums and namespaces are refinements of these.
+- **Constructor.** An entry that links a name to the data a form needs to be read: `array`'s `element_type` and
+  `min_items`, `integer_type`'s facets.
+- **Declaration.** An entry's value, the data its constructor describes. An entry is **ready** when its declaration
+  has been read; a type's reader is its form over its declaration, so a type can be read against exactly when it is
+  ready.
+
+The rule is 1; the rest are its consequences.
+
+1. **The rule.** Reading a value against a type `T` waits on `T` being ready, and on each type a part of the value is
+   read against as it is reached: a field's type, an element's, a nested `!` tag's, an annotation's. An entry's
+   declaration is read against its head (`C` in `!C { … }`, the source's constructor in `!I ^ { … }`) and waits as
+   well on each refinement source and `&` operand, since it starts from their declarations. An alias is ready when its
+   target is; a closed application when its materialised body is.
+2. **A reference orders nothing.** A name at a slot typed `type_kind`, `kind<C>`, `ref<T>` or `type_ref` is read by
+   its atom's grammar alone; what it names is resolved and judged once every entry is ready (§4.2, §8.3). So
+   `tree => { t: tree }`, mutual recursion, and a constructor whose facet is typed by its own instance
+   (`decimal_type => atom & { min?: number }` beside `number => !decimal_type {}`) are sound.
+3. **A held value orders nothing.** A `value`-typed slot (a field's default or pin, a type argument's value) and a
+   template's body hold what a schemaless read gives ([TSON-DATA] §4), judged against its type once every entry is
+   ready. One exception: reading against a base with a family selector (§5.2) waits on each subtype and on its pin,
+   read against the selector's type, which §5.2 confines to an atom or an enum.
+4. **A cycle is refused.** Entries waiting on each other through rule 1 are a resolver error naming the entries on the
+   cycle. A loop of references is not a cycle under this rule; §8.3 refuses a reference chain with no terminal. The
+   pre-loaded entries (§3.4) are ready before any declaration is read, and are exactly those on the one cycle the
+   kernel must close: `record`, whose declaration is a `!record`, and what reading a `!record` waits on. Every other
+   kernel entry is read by these rules, and the kernel's resolved form must come out of them unchanged.
+5. **Order independence.** Every order consistent with rule 1 gives one verdict and one resolved output, and the order
+   entries are written in is not consulted. This replaces §3.4.1's forward-reference sentence.
+6. **Limits.** §11.5 gains a row, *wait depth*: the longest chain of rule 1 waits in one closure, default 64. Template
+   expansion needs no new bound; §5.10.1's regular recursion and §11.5's materialisation depth bound it.
+
+With `nni => !integer ^ { min: 0 }`:
+
+| declaration | waits | verdict |
+|---|---|---|
+| `tree => { t: tree }` | `record`; `t`'s type is a reference | sound |
+| `uint8 => !integer ^ { min: 0  max: 255 }` | `integer` (source); `min` and `max` on `integer` | sound |
+| `point => { x: int32  next?: point ~ { x: 1 } }` | the default is held | sound |
+| `integer_type.multiple_of?: nni` | a `multiple_of` value on `nni`, on `integer` | sound: the kernel |
+| `integer_type.min?: nni` | `nni`'s `min: 0` on `nni` | cycle: refused |
+| `a => b & {}`, `b => a & {}` | `a` on `b` on `a` | cycle: refused |
+| `c1 => !c2 {}`, `c2 => !c1 {}` | `c1` on `c2` on `c1` | cycle: refused |
+| `a => b`, `b => a` | none | no cycle; refused by §8.3 |
+
+Sections amended: §3.4 (the pre-loaded set is rule 4's), §3.4.1 (Pass 2 runs in rule 1's order; rule 5), §5.10.1
+(its cycle sentence cites rule 4), §11.5 (rule 6's row).
