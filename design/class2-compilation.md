@@ -10,6 +10,8 @@ choices. Current form only; history lives in git.
 - Compilation is eager: every entry is walked, and a `RuntimeException` building one becomes an `ErrorReader`.
 - `CompiledReaders` is rebound exactly once, from the in-progress `Compilation` to the finished `TsonCompiledSchema`;
   never hand readers `Compilation::resolve`.
+- Building a reader resolves its parts' readers and reads through none of them. Work that reads through one (a
+  record's defaults and pins) goes to `CompiledReaders.afterEveryReader` and runs in `settle`, once, after the walk.
 - `ErrorReader` reports `NOT_IMPLEMENTED` and skips the value. Two causes are deliberately not reported that way: a
   `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile.
 - A `TEMPLATE`-kinded entry never reaches a factory: a family base (its held body carries `extension`) compiles to an
@@ -49,6 +51,15 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   `compileWith` binds the handle to the compiled schema as its last step, **replacing** the compile-time
   delegate rather than falling back to it, which is what actually makes that invariant true.
   `CompiledReadersTest` pins the handover; a second `bind` is rejected.
+- **`CompiledReaders` also says when every reader exists** ([TSON-SCHEMA] §5.2; a held value orders nothing). During
+  the walk a field's reader may be a `DeferredTypeReader` for an entry still being built, which cannot be read through
+  until the walk ends. So a reader never reads a held value while it is built: it queues the decode with
+  `afterEveryReader`, and `compileWith` calls `settle` between the walk and constructing the `TsonCompiledSchema`.
+  `bind` settles first if nothing has, so no reader reaches a finished schema with a value undecoded, and after
+  `settle` queued work runs at once. A failure in `settle` fails the compile rather than becoming an `ErrorReader`:
+  the value was judged at link, so a refusal is either an invariant break or a bind disagreement
+  (`readers-and-diagnostics.md`), and neither is one entry's gap to defer to a read. `HeldFieldValueTest` pins it with
+  a record whose default is typed by an entry still on the build stack.
 - **`ErrorReader` makes eager building survive coverage gaps.** A `RuntimeException` while building one
   entry is caught and substituted with an `ErrorReader` wrapping it — the schema still compiles, only
   *reading* that entry fails, with the original message preserved. Real causes: a constructor with no

@@ -34,6 +34,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
         // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
         super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation, fieldNames);
         this.annotationTypes = annotationTypes;
+        CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }
 
     /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */

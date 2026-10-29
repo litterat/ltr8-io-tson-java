@@ -64,6 +64,11 @@ import java.util.function.Function;
  * both: {@link Reference} (a bare {@code name => other_name} entry, §8.3) delegates straight to the
  * target's own reader, resolved recursively rather than built fresh.
  *
+ * <p><b>A held value is decoded after the walk, not during it.</b> A record field's default or pin is held as
+ * written while the readers are built and decoded through the field's reader once every entry has one ({@link
+ * CompiledReaders#settle}), so building a reader never reads through another -- a pin typed by an entry still
+ * on the build stack holds nothing back -- and the compiled schema is handed out with every value decoded.
+ *
  * <p>The per-compilation mutable state (cycle-detection bookkeeping) lives in a private nested
  * {@link Compilation} helper, one instance per {@link #compile} call, discarded once it returns --
  * {@link TsonCompiledSchema} itself holds nothing but the finished, immutable result.
@@ -149,6 +154,9 @@ public final class TsonSchemaCompiler {
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
+        // Every reader exists now, so the values readers hold as written -- a field's default or pin -- are
+        // decoded through their types here, still before the schema is handed out (see CompiledReaders).
+        compilation.readers.settle();
         TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished));
         // Hand every reader that resolves at *read* time over to the finished schema, releasing this
         // compilation -- see CompiledReaders, and the "never escape" invariant below that this preserves.

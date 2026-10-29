@@ -11,6 +11,8 @@ applies, the continuation policy, and what a read leaves behind.
   it, is the point.
 - A stated FIXED value is checked, not obeyed, with the **pre-rebind** parser (`FixedCheck`); what an omitted field
   yields is `RecordField.omitted`, derived once per field and shared by both encodings' readers.
+- A record reader's constructor reads through no field's reader: defaults and pins are decoded by
+  `settleHeldValues`, which runs once every reader of the compilation exists (`CompiledReaders.settle`), at load.
 - Collecting mode always keeps reading, so every problem surfaces; the value is all-or-nothing in both modes
   (`ConstructionGuard` per value, `CountingReceiver` at each facade) — a read that reported anything returns `null`.
 - Reporting instead of throwing obliges a reader to skip (`EventSkip`), or the enclosing frame's next pull sees the
@@ -74,8 +76,19 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
 - **A FIXED field's value comes from the schema, and a document that states it is checked, not obeyed** (§5.2).
   `RecordAbstractReader.verifyFixed` decodes the written token and compares it to the schema's value: a contradiction
   is `FIELD_FIXED`, and the field still resolves to the *schema's* value, so a document cannot say one thing and decode
-  to another in silence. The comparison uses the **pre-rebind** parser (`FixedCheck`), because bind mode narrows
-  `precomputedValue` in place and comparing across that narrowing would flag every conforming document.
+  to another in silence. The comparison uses the **pre-rebind** parser (`FixedCheck`), because bind mode decodes
+  `precomputedValue` through the rebound one and comparing across that narrowing would flag every conforming document.
+- **A default or pin is held as written while the reader is built, and decoded once every reader exists** ([TSON-SCHEMA]
+  §5.2; a held value orders nothing). A field's type may be an entry still on the build stack, whose reader is a
+  `DeferredTypeReader` until the walk finishes, so decoding at construction would make the record wait on it — or fail
+  outright, as a `DeferredTypeReader` read mid-walk does. Each concrete record reader hands `settleHeldValues` to
+  `CompiledReaders.afterEveryReader` as its constructor's last step (after bind mode's rebinding), and
+  `TsonSchemaCompiler` runs the queue after the walk and before the compiled schema exists; outside a compile
+  (a reader built against a plain resolver) it runs at once. `settleHeldValues` fills `FixedCheck` through the parser
+  the field was built with and `precomputedValue` through the one it reads with. It judges nothing: the linker's
+  `checkFieldValue` is the one place a pin is judged, so a refusal through the built parser is an
+  `IllegalStateException` (linker and reader disagree) and one through a rebound parser a `BindMismatchException`
+  (the component cannot hold the schema's value), both failing the compile.
 - **A field is four facts, and each decision reads its own** (`RecordField`: `optional`, `voidable`, `role`, `value`).
   A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and `value`; a field never written
   reads `RecordField.omitted`, derived from `optional` and `value` — `MISSING` (`FIELD_REQUIRED`) where not optional,
@@ -206,7 +219,7 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   `IllegalStateException` then fires on ordinary caller input with the diagnostics lost inside it. Where the skip goes
   is the caller's question: `DataClassObjectReader.read` has taken nothing and skips a whole data value, while
   `bindUnion` has consumed the framing to find the member and skips the core-value alone.
-- **`ListEventSource`** replays a pre-built event list: a schema default (`readSchemaDefault` wraps the literal `Token`
+- **`ListEventSource`** replays a pre-built event list: a schema default (`settleHeldValues` wraps the literal `Token`
   as one synthetic event, under `IdentifierPolicy.none()` since the real stream already judged it), an annotation probe,
   and, via `DataValueEvents`, the resolver's replay of a resolved `DataValue` through a compiled reader.
 

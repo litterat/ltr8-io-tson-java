@@ -65,6 +65,7 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
                     : resolver.resolve(field.type().name());
         }, schemaLocation, fieldNames);
         this.members = members;
+        CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }
 
     @Override

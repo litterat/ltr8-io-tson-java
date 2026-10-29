@@ -1,7 +1,9 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.SchemaLocation;
@@ -30,18 +32,25 @@ import java.util.stream.Collectors;
 /**
  * Everything {@link RecordTreeReader} and {@link RecordBindReader} share verbatim: the compiled
  * per-field list, the name -> position lookup, confirming a record-shaped value's own event
- * sequence, precomputing every field's own literal schema value once at construction rather than per read,
+ * sequence, decoding every field's own literal schema value once at load rather than per read,
  * and what each field yields when the document never writes it. Each
  * subclass's own {@code read()} still differs in shape (a {@code Map} vs. a real bound object's own
  * constructor arguments) and stays there, along with anything specific to only one of them (object
  * mode's own target-type narrowing, for instance).
  *
- * <p>{@link #precomputedValue} is the natural host value {@code readSchemaDefault} produces here, before
- * any field knows its target. {@link RecordBindReader} decodes its own entries again, once, right after
- * calling this class's constructor, through each field's now-bound parser -- so a FIXED value arrives the
- * way a written one would; {@link RecordTreeReader} leaves them exactly as this class computed them. A
- * field's {@code FixedCheck} keeps the pre-rebind parser and value for exactly that reason: the written
- * token and the schema's own have to be decoded the same way, or comparing them would compare across that.
+ * <p><b>A default or pin is held as written while the reader is built</b> ([TSON-SCHEMA] §5.2; a held value
+ * orders nothing). The constructor reads through no field's reader: a field's type may be an entry still being
+ * built (a {@link DeferredTypeReader}), so decoding there would make this reader wait on that one. {@link
+ * #settleHeldValues} decodes them once every reader of the compilation exists ({@link
+ * CompiledReaders#afterEveryReader}), still at load, and each subclass hands it over as its constructor's last
+ * step. Whether the value is one of the field's type is judged when the schema links ({@code TsonSchemaLinker}),
+ * the one place a pin is judged; decoding it here is what the reader injects and compares.
+ *
+ * <p>{@link #precomputedValue} is the value through each field's reader as the subclass leaves it: the
+ * natural host value in {@link RecordTreeReader}, and through the field's bound parser in {@link
+ * RecordBindReader}, so a FIXED value arrives the way a written one would. A field's {@code FixedCheck} keeps
+ * the parser the field was built with and the value it decodes for exactly that reason: the written token and
+ * the schema's own have to be decoded the same way, or comparing them would compare across the rebinding.
  *
  * <p><b>Forward, single-pass, and a repeated field name is a validation error</b> ({@code
  * DUPLICATE_FIELD}): {@link #readFields} consumes {@code FieldName} events strictly in stream order,
@@ -74,7 +83,7 @@ import java.util.stream.Collectors;
  * members: [true false] } }. {@link #positionalFieldIndex} (that field's own schema position, or
  * {@code -1} if the record doesn't qualify) is computed once, in the constructor, by counting required
  * fields in the same pass that already visits every field for {@link
- * #precomputedValue} -- no separate pass, and nothing paid per read: {@link #expectRecordShape} only
+ * #omitted} -- no separate pass, and nothing paid per read: {@link #expectRecordShape} only
  * consults it on the one path that isn't already record-shaped, and {@link #readPositional} then
  * reads whatever's already sitting at the cursor directly as that single field's own value, with no
  * synthetic wrapping needed at all.
@@ -100,9 +109,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * What a written value at a FIXED field is checked against (§5.2: "A contradicting value is a validation
-     * error"). Holds the field's <em>schema-level</em> parser, captured before any subclass rebinds it, so
-     * the token in the document is decoded the same way {@link #precomputedValue} was and the two are
-     * comparable in either read mode. {@code value} is likewise the <em>raw</em> parsed value, not the
+     * error"). Holds the field's <em>schema-level</em> parser, the one this class was built with, so
+     * the token in the document is decoded the same way {@code value} was and the two are
+     * comparable in either read mode. {@code value} is the <em>raw</em> parsed value, not the
      * {@link #precomputedValue} entry that {@link RecordBindReader} narrows in place -- comparing a
      * raw-parsed token against a narrowed one would report a contradiction between two spellings of the same
      * number.
@@ -147,9 +156,19 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /** Each field group as field indexes, compiled once ({@link GroupPlan}). */
     private final GroupPlan[] groupPlans;
+    /** Each field's default or pin through its reader, filled by {@link #settleHeldValues}. */
     final Object[] precomputedValue;
     /** What each field yields when the document never writes it ({@link RecordField#omitted}). */
     private final RecordField.Omitted[] omitted;
+
+    /**
+     * The reader each field carrying a default or pin was built with, before a subclass rebinds it -- what
+     * {@link #settleHeldValues} decodes the value through for its {@code FixedCheck}; {@code null} at a field
+     * with no value.
+     */
+    private final TsonTypeReader<?>[] heldParser;
+
+    /** Each FIXED field's check, filled by {@link #settleHeldValues}. */
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
 
@@ -188,7 +207,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         this.fieldIndex = new HashMap<>();
         this.precomputedValue = new Object[fields.size()];
         this.omitted = new RecordField.Omitted[fields.size()];
-        FixedCheck[] fixedChecks = new FixedCheck[fields.size()];
+        this.heldParser = new TsonTypeReader<?>[fields.size()];
+        this.fixedCheck = new FixedCheck[fields.size()];
         int solePositionalField = -1;
         int requiredCount = 0;
         for (int i = 0; i < fields.size(); i++) {
@@ -196,18 +216,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             RecordField schema = field.schema();
             fieldIndex.put(field.name(), i);
             if (schema.value().isPresent()) {
-                precomputedValue[i] = readSchemaDefault(field);
+                heldParser[i] = field.parser();
             }
             omitted[i] = schema.omitted(groups.stream().anyMatch(group -> group.hasMember(field.name())));
-            if (schema.role() == FieldRole.FIXED) {
-                fixedChecks[i] = new FixedCheck(precomputedValue[i], field.parser());
-            }
             if (!schema.optional()) {
                 requiredCount++;
                 solePositionalField = i;
             }
         }
-        this.fixedCheck = fixedChecks;
         this.nameForm = fieldNames.form();
         if (nameForm == io.ltr8.unicode.Normalization.NFC) {
             this.matchIndex = fieldIndex;
@@ -666,20 +682,63 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * The schema's own value for a field, decoded by that field's parser. Package-private because
-     * {@link RecordBindReader} runs it again once it has bound each field's atom to its component's wire
-     * class: the value a bound class receives has to be decoded the way that class's own reads are, and this
-     * class computes it before any of that is known (tree mode, which shares it, binds nothing).
+     * Decodes every field's default or pin, once every reader of the compilation exists -- each subclass hands
+     * this to {@link CompiledReaders#afterEveryReader} as its constructor's last step, after any rebinding, so
+     * {@link #precomputedValue} is decoded through the reader the field reads with. A FIXED field's {@code
+     * FixedCheck} is decoded through the reader the field was built with, as a written token at it will be.
+     *
+     * <p>Neither decode is a verdict. Linking has already judged the value one of the field's type, so a
+     * refusal through the reader the field was built with is the linker and the reader disagreeing, an {@link
+     * IllegalStateException}; a refusal through a rebound reader is the bound component unable to hold a value
+     * the schema states, a {@link BindMismatchException}, which fails the compile as every other disagreement
+     * between a schema and a class does.
+     */
+    final void settleHeldValues() {
+        for (int i = 0; i < fields.size(); i++) {
+            TsonTypeReader<?> built = heldParser[i];
+            if (built == null) {
+                continue;
+            }
+            CompiledField field = fields.get(i);
+            RecordField schema = field.schema();
+            Object value;
+            try {
+                value = readSchemaDefault(field, built);
+            } catch (ReadException e) {
+                throw new IllegalStateException("'" + displayName + "': field '" + field.name() + "''s "
+                        + heldValueNoun(schema) + " was judged a value of '" + schema.type().name() + "' when the "
+                        + "schema linked, but its reader refuses it -- " + e.getMessage(), e);
+            }
+            if (schema.role() == FieldRole.FIXED) {
+                fixedCheck[i] = new FixedCheck(value, built);
+            }
+            if (field.parser() != built) {
+                try {
+                    value = readSchemaDefault(field, field.parser());
+                } catch (ReadException e) {
+                    throw new BindMismatchException("'" + displayName + "': field '" + field.name() + "''s "
+                            + heldValueNoun(schema) + " " + schema.value().orElseThrow().text() + " does not "
+                            + "decode to what the field binds -- " + e.getMessage(), e);
+                }
+            }
+            precomputedValue[i] = value;
+        }
+    }
+
+    private static String heldValueNoun(RecordField schema) {
+        return schema.role() == FieldRole.FIXED ? "fixed value" : "default";
+    }
+
+    /**
+     * The schema's own value for a field, decoded by {@code parser}.
      *
      * <p>Reads through a one-event {@link ListEventSource} wrapping the schema's own literal {@link Token}
      * and a fail-fast-only {@link TsonReadContext}: there is no real stream to pull a schema-composed
-     * default from (this runs once, at construction, before any document is read) and no real source
-     * position for it either (a {@link Position} placeholder stands in; a schema-authoring bug here always
-     * throws immediately regardless). Only a bare-token default resolves through this today, matching
-     * {@link #positionalFieldIndex}'s own scope note: no composite (record/array/map-shaped) schema default
-     * resolves anywhere in this codebase yet.
+     * default from (this runs once, at load, before any document is read) and no real source
+     * position for it either (a {@link Position} placeholder stands in). Only a bare token is a default or a pin
+     * ([TSON-SCHEMA] §12.1).
      */
-    Object readSchemaDefault(CompiledField field) {
+    private Object readSchemaDefault(CompiledField field, TsonTypeReader<?> parser) {
         RecordField schema = field.schema();
         String schemaName = field.name();
         Token token = schema.value().orElseThrow(() -> new IllegalStateException("'" + schemaName + "' on '"
@@ -690,7 +749,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         // judged once. Checking it again here would report one author token twice.
         TsonReadContext syntheticCtx = TsonReadContext.throwing(new ListEventSource(List.of(event)),
                 IdentifierPolicy.none());
-        return field.parser().read(syntheticCtx);
+        return parser.read(syntheticCtx);
     }
 
     /** What field {@code i} yields when a document never writes it ({@link RecordField#omitted}). */
