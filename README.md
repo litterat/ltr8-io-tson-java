@@ -57,9 +57,9 @@ including records, record groups, enums and some in-built types. The `2026/39` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=52f1696e9327ed672e3f6ab231d235fb8dde9b5c48fde5c591bf335705c0f035"
-!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=f271892f662de4ec256c596b58d675ed7a470afccf0f06c10d23200b8aea822f"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=9adb1b91117146334e26d4b0f031bca5622e3680b3f4a7d1ebae5985f1bff645"
+!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=ae88c4d935531cd50b9cbbf9a384f9b2b9a0576f7a6f0baf0dedc6a818bd2412"
+!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=ac38ef086a93dcea7c58a0e3bce4e74c5e1f2fbb40801c1194ed763f2d37d5cf"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -563,9 +563,10 @@ vocabulary — parse → resolve → link → register → compile → read:
 
 `Tson.standard()` wires all of this together for the standard library and hands you a `Tson`
 whose `resolve`/`compile` run the pipeline for you (as shown in the [reader table](#reading-and-writing-tson-choosing-an-entry-point)'s
-schema example) — so you rarely touch the individual stages directly. Under the hood, resolving and
-linking a schema both need its own *governing* schema already compiled, to resolve constructor names
-like `!enum`/`!integer_type` against — including meta-kernel itself, whose own `!!meta` names *itself*
+schema example) — so you rarely touch the individual stages directly. Under the hood, resolving a schema
+reads each constructor it applies (`!enum`, `!integer_type`) through the compiled form of the schema in its
+import closure that declares it — its `!!meta` target counting as an import — including meta-kernel itself,
+whose own `!!meta` names *itself*
 (§1.5's "one deliberate circularity in the series"), closed by pre-loading a hand-written bootstrap
 (`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way. See
 [design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,

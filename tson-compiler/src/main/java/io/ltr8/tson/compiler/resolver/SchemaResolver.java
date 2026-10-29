@@ -7,7 +7,6 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonDiagnostics;
-import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -47,10 +46,12 @@ import java.util.function.Function;
 
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
- * ({@code !!id}/{@code !!import}), deriving the structure namespace from this resolver's own {@link
- * TsonCompiledSchemaLoader}, merging {@code !!import} entries into the type-name namespace, and
+ * ({@code !!id}/{@code !!import}), merging the {@code !!meta} target's and every {@code !!import}'s entries into the
+ * schema's one namespace (SPEC-FEEDBACK.md #7) through this resolver's own {@link TsonCompiledSchemaLoader}, and
  * handing each local declaration off to a {@link DefinitionResolver} for the actual, per-declaration
- * resolution work (Part 2 §4, §8's <code>{type_name =&gt; top}</code> shape, an entry being its value).
+ * resolution work (Part 2 §4, §8's <code>{type_name =&gt; top}</code> shape, an entry being its value). A
+ * construction head and an annotation type are read through the compiled form of the schema that declared them
+ * ({@link Vocabulary}).
  *
  * <p>A {@link TsonCompiledSchemaLoader} is required: a document-level resolution that can't validate
  * its own {@code !!id} or reach its own {@code !!meta} isn't a degraded version of this job, it's a
@@ -58,10 +59,9 @@ import java.util.function.Function;
  * {@link DefinitionResolver} is for directly.
  *
  * <p>{@link #resolveSchema(SchemaDocument)} builds a fresh {@link DefinitionResolver} per call, not a
- * reused field, since a single instance of this class can resolve documents governed by *different*
- * meta-schemas across separate calls -- both the compiled reader and the structure namespace have to
- * be bound to that call's own {@code metaParser}. The type-name namespace ({@code namespace}, this
- * method's own local, {@code !!import}-seeded map) is built before the {@link DefinitionResolver} it
+ * reused field, since a single instance of this class resolves documents with different closures across
+ * separate calls, and the readers a call reads through are its closure's. The namespace ({@code namespace}, this
+ * method's own local, import-seeded map) is built before the {@link DefinitionResolver} it
  * feeds and reaches it through {@link OnDemand}, a memo over that same map rather than a copy -- so the
  * resolver sees each newly-added entry immediately, and asking for one not yet resolved resolves it.
  */
@@ -114,21 +114,15 @@ public final class SchemaResolver {
      * just surfaced here, before resolution work is spent on a document that could never actually be registered.
      * Both are the author's error, so both throw {@link SchemaValidationException} naming the actual problem,
      * which the collecting front door reports as a schema error against the document as a whole.
-     * {@code document.meta()} itself is then resolved
-     * via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped/compiled on
-     * demand if it wasn't already available, rather than requiring it to pre-exist) -- and its
-     * resolved entries become the structure namespace every declaration resolves against.
      *
-     * <p><b>{@code !!import} is merged into the type-name namespace the same way</b> -- each import's
-     * own URI is validated the same way {@code !!id} is, then resolved via the same {@link
-     * TsonCompiledSchemaLoader} and its entries merged in, *before* any local declaration is
-     * resolved. This is genuinely required, not cosmetic: unlike the structure namespace (consulted
-     * only for constructor-application targets), an import's own entries feed the *type-name*
-     * namespace -- the same {@code namespace} map (exposed to {@link DefinitionResolver} through {@link
-     * OnDemand}) its own composition/refinement/atom-refinement resolution looks a
-     * supertype/refinement-source straight up in, with no fallback of any kind. meta.tn's own {@code
-     * date_type => ~atom & atom_specification & {...}}, composing with two meta-kernel entries it
-     * only has via its own {@code !!import}, would fail to resolve at all without this. Collision
+     * <p><b>The {@code !!meta} target and every {@code !!import} are merged into the one namespace</b>
+     * ({@link TsonSchema#namespaceSources}) -- each import's own URI is validated the same way {@code !!id} is,
+     * then resolved via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped on demand) and
+     * its entries merged in, *before* any local declaration is resolved. That map ({@code namespace}, exposed to
+     * {@link DefinitionResolver} through {@link OnDemand}) is where every name resolves: a construction head, a
+     * composition supertype, a refinement source, an annotation type. meta.tn's own {@code date_type => atom &
+     * atom_specification & {...}}, composing with two meta-kernel entries it only has via its own imports, would
+     * fail to resolve at all without this. Collision
      * handling mirrors {@code TsonSchemaLinker.mergeImports}'s own rule exactly: a name declared by
      * more than one import, or by an import *and* a local declaration, is a {@link
      * SchemaValidationException} -- checked as each import is merged in, and again as each local
@@ -214,7 +208,6 @@ public final class SchemaResolver {
             CanonicalIdentity.canonicalize(importUri);
         }
 
-        TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());
         IdentifierPolicy names = loader.identifierPolicy();
         Map<String, Annotations> nameAnnotations = new LinkedHashMap<>();
         // Every entry's facts -- an import's as its schema recorded them, a local one's as resolution learns
@@ -228,24 +221,27 @@ public final class SchemaResolver {
         // one's as materialisation closes it. Keyed on the entry, whatever its kind; written on the local keys as
         // `@application` where the entry map is assembled.
         Map<String, io.ltr8.tson.schema.meta.TypeRef> applications = new LinkedHashMap<>();
-        Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames);
+        // Which schema declared each imported entry: the compiled reader a construction head or an annotation is read
+        // through is that schema's.
+        Map<String, String> origins = new LinkedHashMap<>();
+        Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames, origins);
         nameAnnotations.forEach((name, annotations) -> TsonSchema.applicationOf(annotations)
                 .ifPresent(application -> applications.put(name, application)));
         boolean isKernel = TsonBundledSchemas.isMetaKernel(id);
         Predicate<String> kernel = name -> isKernel || kernelNames.contains(name);
+        Vocabulary vocabulary = isKernel ? new Vocabulary(loader.loadMeta(id)) : new Vocabulary(namespace, origins);
         Function<String, Optional<String>> localConstructors = name -> {
             Optional<String> recorded = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).constructor();
             if (recorded.isPresent()) {
                 return recorded;
             }
             Top local = namespace.get(name);
-            return local != null ? Optional.of(TsonSchema.constructorOf(local)) : metaParser.schema().constructorOf(name);
+            return local != null ? Optional.of(TsonSchema.constructorOf(local)) : vocabulary.constructorOf(name);
         };
 
         // Expand the sugar forms before anything reads a declaration, so resolution below only ever sees a
         // bare reference or `!C value` (§5.3/§5.6 define these as desugarings; §3.3.1 names their targets).
-        // Sits after `metaParser` because the expansion needs the governing meta's own constructor
-        // vocabulary, and returns `document` itself when there is no sugar to expand.
+        // Returns `document` itself when there is no sugar to expand.
         //
         // Desugaring reports through the same receiver resolution does, rather than throwing at the first bad
         // sugar form. It needs no phase gate of its own: it runs inside this method, so whatever it reports is
@@ -290,22 +286,22 @@ public final class SchemaResolver {
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
         TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
-                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names),
-                        heldByName, isValueBody(metaParser, type)),
+                (type, value) -> (Top) read(vocabulary.constructor(type), value, vocabulary.payloadNames(type, names),
+                        heldByName, vocabulary.isValueBody(type)),
                 generated,
-                metaParser.schema().entries()::get, namespaceGetter::current, facts, applications,
-                localConstructors, metaParser.schema()::constructorOf, kernel);
+                vocabulary::definition, namespaceGetter::current, facts, applications,
+                localConstructors, vocabulary::constructorOf, kernel);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
         DefinitionResolver resolver = new DefinitionResolver(
-                (type, value) -> (Top) read(metaParser.reader(type), value, payloadNames(metaParser, type, names),
-                        heldByName, isValueBody(metaParser, type)),
+                (type, value) -> (Top) read(vocabulary.constructor(type), value, vocabulary.payloadNames(type, names),
+                        heldByName, vocabulary.isValueBody(type)),
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary. Its value is
                 // as opaque to the linker as a namespace value's, so it is read under the policy too.
-                (type, value) -> read(metaParser.get(type), value, names, heldByName, false),
-                metaParser.schema().entries()::get, namespaceGetter, new ApplicationCloser() {
+                (type, value) -> read(vocabulary.type(type), value, names, heldByName, false),
+                vocabulary::definition, namespaceGetter, new ApplicationCloser() {
 
                     @Override
                     public String closeApplication(io.ltr8.tson.schema.meta.TypeRef application) {
@@ -330,7 +326,7 @@ public final class SchemaResolver {
                             io.ltr8.tson.schema.meta.TypeRef application) {
                         return materialiser.closeApplicationInto(declaredName, application);
                     }
-                }, positions, facts, kernel, metaParser.compiledSchema()::isKernel);
+                }, positions, facts, kernel, kernel, name -> !isKernel && declarations.containsKey(name));
         namespaceGetter.resolveWith(resolver);
 
         for (String name : declarations.keySet()) {
@@ -371,7 +367,7 @@ public final class SchemaResolver {
         Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written =
                 writtenParameterTypes(declarations, resolver, problems);
         Map<String, Map<String, TemplateParam>> declaredParameters = ParameterTypes.inferAll(namespace,
-                declarations.keySet(), written, metaParser.schema().entries()::get,
+                declarations.keySet(), written, vocabulary::definition,
                 (name, error) -> {
                     if (!problems.collecting()) {
                         throw error;
@@ -438,7 +434,7 @@ public final class SchemaResolver {
         // the entry keeps what it had.
         Set<String> local = new LinkedHashSet<>(resolvedLocals.keySet());
         local.addAll(instantiations.keySet());
-        stampParameters(ParameterTypes.inferAll(namespace, local, written, metaParser.schema().entries()::get,
+        stampParameters(ParameterTypes.inferAll(namespace, local, written, vocabulary::definition,
                 (name, error) -> { }), List.of(resolvedLocals, instantiations, namespace));
 
         // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
@@ -806,7 +802,7 @@ public final class SchemaResolver {
     }
 
     /**
-     * The type-name namespace as the driving loop and every phase after it sees one: a memo over the entries,
+     * The namespace as the driving loop and every phase after it sees one: a memo over the entries,
      * resolving a local declaration the first time it is asked for and remembering the answer.
      *
      * <p><b>On demand rather than in source order</b>, so a declaration may reference one declared later
@@ -962,16 +958,6 @@ public final class SchemaResolver {
     }
 
     /**
-     * Whether {@code constructor}'s instances are value bodies: a namespace type, whose payload is a map of values
-     * the resolver reads into the consumer's host classes. Nothing in one is ever lifted or minted, so a kind-typed
-     * slot there holds a bare name and a braced application is refused rather than left for a closer that will not
-     * come.
-     */
-    private static boolean isValueBody(TsonCompiledMetaSchema metaParser, String constructor) {
-        return metaParser.kindOf(constructor) == EntryKind.NAMESPACE;
-    }
-
-    /**
      * One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names},
      * as a read of a schema document's value ({@link TsonReadContext#readsSchemaDocument()}): a bare name at a
      * record position is a value by name here and nowhere else. The references the read produced by name are put in
@@ -991,31 +977,108 @@ public final class SchemaResolver {
     }
 
     /**
-     * The identifier policy a constructor's payload is read under: the loader's for a namespace type, none for the
-     * rest.
+     * The compiled readers one schema's resolution reads through: for each imported entry, the compiled form of the
+     * schema that declared it ({@link TsonCompiledSchemaLoader#vocabularyOf}). One namespace per schema (§3.3.1,
+     * SPEC-FEEDBACK.md #7) puts every construction head and annotation type in the closure, and the closure is the
+     * union of the imported schemas' own: an entry's reader, compiled over its declaring schema's closure, reads
+     * everything its body can name, since every name in that closure is in this one too. So nothing is compiled per
+     * closure -- each declaring schema is compiled once and cached by identity, and a schema that applies only the
+     * kernel's and meta.tn's constructors reaches exactly those two.
      *
-     * <p><b>A namespace value is a payload the linker cannot see into</b> -- a map keyed by names whose values bind
-     * to the consumer's own classes, their fields' types left behind in the meta -- so its keys and its
-     * identifier-typed values, a key of an identifier-keyed map among them, are judged here, at the read, as the
-     * same values are in a data document. Every other constructor builds the schema layer's own vocabulary, whose
-     * names [TSON-SCHEMA] §11.4's scopes cover and {@code TsonSchemaLinker} judges: field names, enum members,
-     * parameters. Its identifier-typed values outside those scopes are references -- a choice's variants, a supertype
-     * -- whose verdict belongs to the declaration they name, which may be another schema's.
+     * <p>The meta-kernel's own resolution reads through its pre-loaded stand-in for every name, its one cycle being
+     * closed by pre-loading (§3.4). A name no import declares has no reader: a head or annotation is looked up here
+     * only once it resolved among the imports, so one declared by this document is a gap the resolver refuses before
+     * asking ({@code DefinitionResolver}'s same-document rule).
      */
-    private static IdentifierPolicy payloadNames(TsonCompiledMetaSchema meta, String constructor,
-                                                 IdentifierPolicy names) {
-        return meta.compiledSchema().kindOf(constructor) == EntryKind.NAMESPACE ? names : IdentifierPolicy.none();
+    private final class Vocabulary {
+
+        /** The kernel's pre-loaded stand-in, answering for every name; {@code null} for every other schema. */
+        private final TsonCompiledMetaSchema self;
+        private final Map<String, Top> imported;
+        private final Map<String, String> origins;
+
+        Vocabulary(TsonCompiledMetaSchema self) {
+            this.self = self;
+            this.imported = self.schema().entries().entries();
+            this.origins = Map.of();
+        }
+
+        /** Over the imported entries, which this resolution adds no local entry to. */
+        Vocabulary(Map<String, Top> namespace, Map<String, String> origins) {
+            this.self = null;
+            this.imported = Map.copyOf(namespace);
+            this.origins = Map.copyOf(origins);
+        }
+
+        /** The compiled schema that declared {@code name}. */
+        private TsonCompiledMetaSchema of(String name) {
+            if (self != null) {
+                return self;
+            }
+            String origin = origins.get(name);
+            if (origin == null) {
+                throw new IllegalStateException("'" + name + "' is read against, and no imported schema declares it "
+                        + "-- a head or annotation type reaches the vocabulary only once it resolved among the imports");
+            }
+            return loader.vocabularyOf(origin);
+        }
+
+        /** An imported entry, or {@code null}: where a construction head and an annotation type resolve. */
+        Top definition(String name) {
+            return imported.get(name);
+        }
+
+        /** The constructor an imported entry's value applies, as its declaring schema recorded it. */
+        Optional<String> constructorOf(String name) {
+            return self != null ? self.schema().constructorOf(name)
+                    : Optional.ofNullable(imported.get(name)).map(TsonSchema::constructorOf);
+        }
+
+        /** The reader for an instance of the constructor {@code name}: what {@code !name { ... }} reads through. */
+        TsonTypeReader<?> constructor(String name) {
+            return of(name).reader(name);
+        }
+
+        /** The reader for a value of the type {@code name}: what an annotation's value reads through. */
+        TsonTypeReader<?> type(String name) {
+            return of(name).get(name);
+        }
+
+        /**
+         * Whether {@code constructor}'s instances are value bodies: a namespace type, whose payload is a map of values
+         * the resolver reads into the consumer's host classes. Nothing in one is ever lifted or minted, so a
+         * kind-typed slot there holds a bare name and a braced application is refused rather than left for a closer
+         * that will not come.
+         */
+        boolean isValueBody(String constructor) {
+            return of(constructor).kindOf(constructor) == EntryKind.NAMESPACE;
+        }
+
+        /**
+         * The identifier policy a constructor's payload is read under: the loader's for a namespace type, none for
+         * the rest.
+         *
+         * <p><b>A namespace value is a payload the linker cannot see into</b> -- a map keyed by names whose values
+         * bind to the consumer's own classes, their fields' types left behind in the declaring schema -- so its keys
+         * and its identifier-typed values, a key of an identifier-keyed map among them, are judged here, at the read,
+         * as the same values are in a data document. Every other constructor builds the schema layer's own
+         * vocabulary, whose names [TSON-SCHEMA] §11.4's scopes cover and {@code TsonSchemaLinker} judges: field
+         * names, enum members, parameters. Its identifier-typed values outside those scopes are references -- a
+         * choice's variants, a supertype -- whose verdict belongs to the declaration they name, which may be another
+         * schema's.
+         */
+        IdentifierPolicy payloadNames(String constructor, IdentifierPolicy names) {
+            return isValueBody(constructor) ? names : IdentifierPolicy.none();
+        }
     }
 
     /**
-     * Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s whole namespace, in
-     * declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code
-     * TsonSchemaLinker.mergeImports} exactly, including its transitivity and its identity-based collision
-     * rule (§2.2.3), since this is the same concept applied one stage earlier: an
-     * import contributes everything its namespace holds, one schema reached by several routes unifies, and
-     * two different schemas declaring one name is the error. Each import edge is judged by {@link
-     * TsonSchemaLinker#checkImportLevel} before its entries are taken, in the linker's wording: an import stands
-     * at the importer's governing level (§2.2.3).
+     * Stage 1 of {@link #resolveSchema(SchemaDocument)} -- the whole namespace of the {@code !!meta} target and of
+     * every {@code !!import} ({@link TsonSchema#namespaceSources}), in header order, merged as-is (never re-resolved
+     * against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its transitivity and
+     * its identity-based collision rule (§2.2.3), since this is the same concept applied one stage earlier: an
+     * import, the {@code !!meta} target among them, contributes everything its namespace holds, one schema reached by
+     * several routes unifies, and two different schemas declaring one name is the error.
      *
      * <p>Unlike the linker's, this merge has no {@code subtypes} to reconcile when a route repeats --
      * {@code subtypes} is populated at link time, one phase later, so both copies are still as their
@@ -1024,17 +1087,14 @@ public final class SchemaResolver {
      */
     private Map<String, Top> mergeImports(SchemaDocument document,
             Map<String, Annotations> importedNameAnnotations, Map<String, TsonSchema.EntryFacts> facts,
-            Set<String> kernelNames) {
+            Set<String> kernelNames, Map<String, String> origins) {
         Map<String, Top> merged = new LinkedHashMap<>();
-        Map<String, String> origins = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
-        for (String importUri : document.imports()) {
+        for (String importUri : namespaceSources(document)) {
             if (!alreadyImported.add(CanonicalIdentity.canonicalize(importUri))) {
                 continue;
             }
             TsonLinkedSchema imported = loader.resolveLinked(importUri);
-            TsonSchemaLinker.checkImportLevel(document.id().orElseThrow(), document.meta(),
-                    imported.schema().id(), imported.schema().meta());
             for (Map.Entry<String, Top> entry : imported.schema().entries().entrySet()) {
                 String name = entry.getKey();
                 String origin = imported.originOf(name);
@@ -1062,5 +1122,11 @@ public final class SchemaResolver {
             }
         }
         return merged;
+    }
+
+    /** {@link TsonSchema#namespaceSources} for the document before it is resolved: the same list, from its header. */
+    private static List<String> namespaceSources(SchemaDocument document) {
+        return new TsonSchema(document.id().orElseThrow(), document.meta(), document.imports(), Map.of())
+                .namespaceSources();
     }
 }

@@ -407,19 +407,19 @@ class FieldNameTypeTest {
     }
 
     /**
-     * A name type a record states resolves in the author's own schema first, as an enum's does, so a schema's own
-     * {@code field_name} is the one a record naming it gets; a record stating none has the kernel's.
+     * A name type a record states is the one it gets, a schema's own family ({@code at_name}) as readily as the
+     * kernel's; a record stating none has the kernel's {@code field_name}.
      */
     @Test
-    void aStatedNameTypeResolvesInTheAuthorsSchemaFirst() {
+    void aStatedNameTypeIsTheOneTheRecordGets() {
         String local = schema("local-field-name", """
-              field_name => !identifier_type { start_add: "@" }
-              stated => !record { name_type: field_name  fields: { "@id" => { type: text } } }
+              at_name => !identifier_type { start_add: "@" }
+              stated => !record { name_type: at_name  fields: { "@id" => { type: text } } }
             """);
         assertEquals(List.of(), read(local, "local-field-name", "!stated { \"@id\": \"x\" }"));
         org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("absent", """
-                      field_name => !identifier_type { start_add: "@" }
+                      at_name => !identifier_type { start_add: "@" }
                       absent => !record { fields: { "@id" => { type: text } } }
                     """)));
     }

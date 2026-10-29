@@ -189,8 +189,8 @@ admit UTS #39's own `Toys-Я-Us`.
   permits one (root, record field value, array element, both sides of a map entry, and recursively an
   annotation's own value). `AnnotationCapture` (in `reader`) is the shared helper: an annotation's value
   events are buffered and replayed through a schemaless tree read via `ListEventSource`, so the recursion
-  needs no special case, and an annotation's value is *always* read schemalessly — its type resolves one hop
-  against the governing namespace (§3.3.3), not against the compiled readers in scope. `EventSkip.typeRef`
+  needs no special case, and an annotation's value is *always* read schemalessly — its type resolves in the
+  namespace of the document's schema (§3.3.3), not against the compiled readers in scope. `EventSkip.typeRef`
   is split out of `annotationsAndTypeRef` so capture and discard share the framing's second half.
 - **The schema-driven readers capture by hoisting, not by widening signatures.** A compiled tree reader
   shares its `*AbstractReader` base with the bind subclass, and the base consumes the framing where the node
@@ -216,8 +216,8 @@ admit UTS #39's own `Toys-Я-Us`.
       recovery reads the value's discrimination class off `EventSkip.aheadOfValue` for the same reason — the
       cursor sits at the framing, not at the core-value.
 - **A schema-driven read also type-checks annotations** (§6: an annotation *names a type*). `AnnotationTypes`
-  resolves the name against the governing schema (§3.3.3's one hop — for a data document that's the
-  `!!schema` target, i.e. the very schema the readers were compiled from) and the value is read by *that
+  resolves the name in the governing schema's namespace (§3.3.3 — for a data document that's the
+  `!!schema` target's, i.e. the very schema the readers were compiled from) and the value is read by *that
   type's* compiled reader, so a wrong-typed value fails for the ordinary reason any wrong-typed value fails.
   Read-time resolution is safe because `compile` is eager; the lookup is gated on `schema().entries()`
   because the resolver throws for an unknown name. An unresolvable name reports `UNKNOWN_TYPE_REF` and the

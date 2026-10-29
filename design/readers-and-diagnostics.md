@@ -114,9 +114,9 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   is `UNRECOGNIZED_FIELD`, reported and then skipped unjudged (`TsonReadContext.skipUnjudged`), so a collecting pass
   finds every stray name. The diagnostic carries the type's field names in schema order, message *and* `expected` — the
   information that turns a retry into a one-shot fix. **Not configurable under a schema**, §7.2 making closure a MUST.
-  The same line polices schema authoring: a constructor body is bound by replaying it through the governing meta's
-  compiled reader, so `!integer ^ { minimum: 1 }` (JSON Schema's spelling of `min`) is rejected instead of compiling
-  clean and constraining nothing (§7.2, "a constructor is a record-shaped type").
+  The same line polices schema authoring: a constructor body is bound by replaying it through the compiled reader
+  of the schema declaring the constructor, so `!integer ^ { minimum: 1 }` (JSON Schema's spelling of `min`) is rejected
+  instead of compiling clean and constraining nothing (§7.2, "a constructor is a record-shaped type").
 - **Records are closed on the schemaless bind path too**, where the target class is the schema: a field it does not
   declare is `UNRECOGNIZED_FIELD` rather than dropped, since a later version's extra field can change what the fields a
   class does read mean. `ignoringUnknownFields()` is the opt-out, on that path only, on both encodings' object readers.

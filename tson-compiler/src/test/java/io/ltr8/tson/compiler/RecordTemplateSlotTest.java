@@ -114,8 +114,8 @@ class RecordTemplateSlotTest {
         assertDoesNotThrow(() -> compile("""
                   pair => <V> !tuple { elements: [{ element_type: text  voidable: V } { element_type: int32 }] }
                   p => pair<true>
-                  bounded => <N> !array { element_type: text  min_items: N }
-                  b => bounded<2>
+                  capped => <N> !array { element_type: text  min_items: N }
+                  b => capped<2>
                 """));
     }
 

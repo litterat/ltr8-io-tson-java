@@ -35,8 +35,8 @@ import java.util.Set;
  *
  * <p><b>A failure building one entry becomes a {@link ErrorReader}</b> rather than failing the compile:
  * the schema compiles, and reading a value against that one type reports {@code NOT_IMPLEMENTED} and skips
- * it. That is what keeps a constructor this encoding cannot read -- one a meta-schema other than the bundled
- * ones declares ([TSON-SCHEMA] §2.2.2) -- from costing a document every other verdict it was owed.
+ * it. That is what keeps a constructor this encoding cannot read -- one a schema other than the bundled ones
+ * declares, as any schema may -- from costing a document every other verdict it was owed.
  */
 public final class JsonSchemaCompiler {
 

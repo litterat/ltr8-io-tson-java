@@ -54,8 +54,8 @@ class GovernedSchemaHygieneTest {
             !!meta:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             {
-              identifier  => !identifier_type { continue_add: "-" }
-              method_name => identifier
+              slug  => !identifier_type { continue_add: "-" }
+              method_name => slug
               iface       => { methods: {method_name => text} }
             }""";
 

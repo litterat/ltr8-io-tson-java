@@ -42,15 +42,14 @@ import java.util.function.Function;
  * constructors and never a kind's own members, and a value of a kind is a name, not a value read through the type
  * it names.
  *
- * <p><b>A constructor is read from the structure namespace first</b>, where §3.3.1 puts every constructor role, so a
- * schema's own entry under a constructor's name never captures a hop. A name the structure namespace does not hold
- * is read in the entry's own namespace -- which is where the meta-kernel's own constructors are while it links
- * itself, with no structure namespace loaded. A hop naming {@code of} itself reaches it whether or not a namespace
- * in reach declares it: the name is the constructor's.
+ * <p><b>A constructor is read from the {@code structure} lookup first, then the entry's own namespace.</b> The linker
+ * hands both the schema's one namespace (SPEC-FEEDBACK.md #7), where a constructor and a type share one store and a
+ * name denotes one entry; the second lookup serves a caller holding a narrower first one. A hop naming {@code of}
+ * itself reaches it whether or not a namespace in reach declares it: the name is the constructor's.
  *
- * <p><b>A kind is not a bound.</b> {@code of} names a constructor of the structure namespace and the walk is
- * construction; {@code template_param.bound} names a type of the type-name namespace and walks IS-A. {@link
- * #ofRefusal} is what keeps the first from reading as the second.
+ * <p><b>A kind is not a bound.</b> {@code of} names a constructor and the walk is construction; {@code
+ * template_param.bound} names a type and walks IS-A. {@link #ofRefusal} is what keeps the first from reading as the
+ * second.
  */
 public final class KindMembers {
 
@@ -66,7 +65,7 @@ public final class KindMembers {
      * KindBody#linked} sorts them.
      *
      * @param constructorOf the constructor an entry of {@code merged} applies, from its recorded facts
-     * @param structure the governing meta's namespace, where every constructor role resolves
+     * @param structure where a constructor is looked up first; the linker hands it the schema's one namespace
      */
     public static List<String> of(KindBody kind, Map<String, Top> merged,
                                   Function<String, Optional<String>> constructorOf, Function<String, Top> structure) {
@@ -140,19 +139,18 @@ public final class KindMembers {
     }
 
     /**
-     * Why {@code kind}'s {@code of} cannot be a kind's, or empty where it can: it names a constructor of the
-     * structure namespace, followed through its alias hops, that is {@code type} or IS-A it, or is the kernel's
-     * {@code namespace} or IS-A it. A name that namespace does not declare is refused, a type of the schema's own
-     * namespace among them; so is a constructor above {@code type} or beside it, {@code template}
-     * and {@code reference} included, which no value has a type built with.
+     * Why {@code kind}'s {@code of} cannot be a kind's, or empty where it can: it names a constructor in {@code
+     * structure}, followed through its alias hops, that is {@code type} or IS-A it, or is the kernel's {@code
+     * namespace} or IS-A it. A name {@code structure} does not declare is refused; so is a type that is no
+     * constructor, and a constructor above {@code type} or beside it, {@code template} and {@code reference}
+     * included, which no value has a type built with.
      */
     public static Optional<String> ofRefusal(KindBody kind, Function<String, Top> structure) {
         String of = kind.of();
         Optional<Found> constructor = reached(of, structure);
         if (constructor.isEmpty()) {
-            return Optional.of("its 'of' names '" + of + "', which the structure namespace does not declare -- a "
-                    + "kind names a constructor of the governing meta, as a constructor role does (§3.3.1), and "
-                    + "never a type of this schema's own namespace");
+            return Optional.of("its 'of' names '" + of + "', which this schema's namespace does not declare -- a "
+                    + "kind names a constructor");
         }
         List<String> supertypes = TypeChain.supertypesOf(constructor.get().definition());
         if (constructor.get().name().equals(TYPE) || supertypes.contains(TYPE)

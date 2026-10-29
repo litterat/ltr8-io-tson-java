@@ -115,7 +115,7 @@ import java.util.stream.Collectors;
  *
  * <p><b>No materialization.</b> An argument-bearing {@code type_ref} does not become a synthesized entry
  * here. {@code SchemaDesugarer} turns every sugar form into a real declaration plus a bare reference, where
- * the AST and the governing meta's own constructor vocabulary are both still in hand -- which is what lets it
+ * the AST and the closure's constructor vocabulary are both still in hand -- which is what lets it
  * bind the constructor generically and so cover every shape, rather than the per-shape assemblers a
  * linker-side materialization would need -- and the resolver's {@code TemplateMaterialiser} closes every
  * template application into an entry. What survives into an entry the linker sees is therefore a bare name in
@@ -128,19 +128,17 @@ import java.util.stream.Collectors;
  * open synthetics lifted from one -- whose held body references its own type parameter by bare name, not a real
  * other entry.
  *
- * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
- * against is built in two stages, in this order: (1) every {@code !!import}'s whole namespace, in
- * declaration order, looked up via {@code loader} by canonical identity -- <b>transitive, not shallow</b>:
- * {@code loader} hands back an already-registered, already-linked schema whose {@code entries()} hold its
- * own import closure merged in, and all of them are taken, so an import contributes its own imports'
- * entries too; (2) this schema's own entries, exactly as resolved. §2.2.3 requires exactly this: "an {@code
- * !!import} contributes the imported schema's entire namespace -- the entries it declares and the entries
- * it imported", matching the {@code !!meta} half §3.3.1 defines as "the target's local declarations
- * <i>plus its imports</i>". A flat namespace with no hiding is the rule the rest of the format is built on.
+ * <p><b>One namespace per schema (Part 2 §2.2.3, SPEC-FEEDBACK.md #7).</b> The namespace a schema is checked
+ * against is built in two stages, in this order: (1) the whole namespace of its {@code !!meta} target and of every
+ * {@code !!import} ({@link TsonSchema#namespaceSources}), in header order, looked up via {@code loader} by canonical
+ * identity -- <b>transitive, not shallow</b>: {@code loader} hands back an already-registered, already-linked schema
+ * whose {@code entries()} hold its own closure merged in, and all of them are taken; (2) this schema's own entries,
+ * exactly as resolved. A {@code !!meta} target contributes exactly as an {@code !!import} does. Every name a schema
+ * writes -- a construction head, a refinement source, a type-ref, a kind's or a reference's {@code of}, an
+ * annotation -- resolves in that one flat namespace, with no hiding and no second store.
  *
- * <p><b>An import stands at the importer's governing level</b> ({@link #checkImportLevel}): a schema the
- * meta-kernel governs imports only schemas it governs, and an ordinary schema only ordinary ones. A reference
- * ({@code ref_type}) is declared only in a schema the meta-kernel governs, the one level where an entry holds a value.
+ * <p><b>Anyone may declare a constructor</b> (an entry IS-A {@code top}, §4.1) or a reference, and import any
+ * schema: no rule ties either to the document's {@code !!meta}.
  *
  * <p><b>Collisions are decided by entry identity.</b> One schema reached by several routes unifies; two
  * *different* schemas declaring one name is the error, as is a local declaration shadowing any name the
@@ -173,11 +171,10 @@ public final class TsonSchemaLinker {
      * <p>Takes no {@link TsonSchemaLoader} -- unlike {@link #link}, which always needs one for
      * {@code !!import}/{@code !!meta} lookups -- because meta-kernel's own document, the only real
      * caller of this method, never has any {@code !!import}s: it's the base of the whole governing
-     * chain, nothing above it to import from. {@link #link}'s own {@code loader == null} handling
-     * (an empty structure namespace) already covers the one lookup {@link #link} might otherwise
-     * attempt, and {@link #mergeImports} is only ever reached for a non-empty {@code imports()}
-     * list, which meta-kernel's own document never has -- so passing {@code null} through is safe
-     * for this specific, guaranteed-narrow case, not a general shortcut.
+     * chain, nothing above it to import from, and its self-naming {@code !!meta} contributes nothing
+     * ({@link TsonSchema#namespaceSources}) -- so {@link #mergeImports} never reaches the loader, and
+     * passing {@code null} through is safe for this specific, guaranteed-narrow case, not a general
+     * shortcut.
      *
      * <p>Does <b>not</b> store the result under a persistent identity anywhere, and {@code
      * TsonSchemaRegistry#register} refuses it outright regardless (see that class's own Javadoc).
@@ -669,26 +666,10 @@ public final class TsonSchemaLinker {
         schema.entries().keySet().forEach(name -> schema.applicationOf(name)
                 .ifPresent(application -> applications.put(name, application)));
 
-        // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
-        // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
-        // "this schema's own vocabulary/constructors come from that other schema"; it never merges anything
-        // in, and (§3.3.2) it's never consulted for an ordinary type-ref -- only at the constructor roles
-        // §3.3.1 lists. Used as a lookup fallback in one spot, in `validateEntry`: the derived `supertypes`
-        // chain, which is the residue of a constructor role. Every author-written reference (field/key/value/
-        // element types, subtypes, choice variants) stays type-name-namespace-only, per §3.3.2's explicit
-        // "NOT extended by the structure namespace". Empty
-        // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
-        Optional<TsonLinkedSchema> governingMeta =
-                loader == null ? Optional.empty() : loader.load(CanonicalIdentity.canonicalize(schema.meta()));
-        checkMayGovern(schema, governingMeta);
-        Map<String, Top> structureNamespace = governingMeta
-                .<Map<String, Top>>map(linked -> linked.schema().entries().entries()).orElse(Map.of());
-
         Set<String> localNames = new LinkedHashSet<>();
         // A constructor is judged by where `top` is defined, never by its spelling (§4.1).
         Predicate<String> kernel = name -> TsonBundledSchemas.isMetaKernel(origins.get(name));
 
-        Boolean constructorsAllowed = null;
         for (Map.Entry<String, Top> entry : schema.entries().entrySet()) {
             if (merged.containsKey(entry.getKey())) {
                 // Two entries of one name that are the same entry unify rather than collide. §8.2 names a
@@ -710,30 +691,6 @@ public final class TsonSchemaLinker {
                 }
             }
             Top def = entry.getValue();
-            // §2.2.2's meta-programming case, asked of the type system rather than of a marker: a constructor
-            // is an entry that IS-A `top` (§4.1), which is to say one composing, transitively, with a base
-            // kind. Only a schema chaining directly to the meta-kernel may declare one.
-            if (EntryKind.isConstructor(entry.getKey(), def, kernel)) {
-                if (constructorsAllowed == null) {
-                    constructorsAllowed = isMetaKernelGoverned(schema);
-                }
-                if (!constructorsAllowed) {
-                    // Reported, but the entry is still merged: its own shape is fine, it is only not permitted
-                    // here, so keeping it lets every reference to it check normally instead of turning one
-                    // eligibility error into an unresolved reference at every use site.
-                    String what = MapBody.isNamespace(def, kernel)
-                            ? "a namespace type -- it composes with the kernel's 'namespace', a constructor, so it "
-                                    + "IS-A 'top' (§4.1), and a namespace type is declared in a schema the "
-                                    + "meta-kernel governs (§2.2.2)"
-                            : "a type constructor -- it composes with a base kind, so it IS-A 'top' (§4.1)";
-                    report(receiver, schema, entry.getKey(), schema.positionOf(entry.getKey()), "'" + entry.getKey()
-                            + "' declares " + what + " -- but '" + schema.id() + "' is not governed directly by the "
-                            + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- only a schema chaining "
-                            + "to meta-kernel.tn directly may declare new constructors (§2.2.2's "
-                            + "meta-programming case); an ordinary type library or application schema may only "
-                            + "apply or refine constructors it doesn't declare itself");
-                }
-            }
             merged.put(entry.getKey(), def);
             facts.put(entry.getKey(), schema.factsOf(entry.getKey()));
             origins.put(entry.getKey(), localIdentity(schema));
@@ -741,52 +698,43 @@ public final class TsonSchemaLinker {
         }
 
         merged = computeSubtypes(merged, localNames);
-        // Only here can an enum's name type be followed into the governing meta, where a constructor's pinned one
-        // was written.
+        // Only here, with the closure whole, can an enum's name type be followed to the entry its constructor pinned.
         for (String name : localNames) {
             Top def = merged.get(name);
             Normalization form = EnumLabels.labelForm(def, constructorOf(name, def, facts), merged,
-                    structureNamespace::get);
+                    merged::get);
             if (form != Normalization.NONE) {
                 enumForms.put(name, form);
             }
         }
-        merged = computeKinds(merged, facts, structureNamespace::get);
+        merged = computeKinds(merged, facts, merged::get);
         merged = computeDisjointness(merged);
         // Before the name checks: a member that is not a value of its enum's name type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
-        Set<String> refusedEnums = checkEnumTypes(schema, merged, facts, localNames, structureNamespace::get,
+        Set<String> refusedEnums = checkEnumTypes(schema, merged, facts, localNames, merged::get,
                 receiver);
-        Set<String> refusedRecords = checkFieldNameTypes(schema, merged, facts, localNames, structureNamespace::get,
+        Set<String> refusedRecords = checkFieldNameTypes(schema, merged, facts, localNames, merged::get,
                 receiver);
         refusedEnums.addAll(refusedRecords);
         for (String name : localNames) {
             if (!refusedRecords.contains(name)) {
-                FieldNames.readBy(merged.get(name), merged, structureNamespace::get)
+                FieldNames.readBy(merged.get(name), merged, merged::get)
                         .ifPresent(type -> nameTypes.put(name, type));
             }
         }
-        checkNames(receiver, schema, merged, facts, structureNamespace::get, refusedEnums, identifiers);
-        readAsMaps(receiver, schema, merged, localNames, kernel, governingMeta, namespaces);
+        checkNames(receiver, schema, merged, facts, merged::get, refusedEnums, identifiers);
+        readAsMaps(receiver, schema, merged, localNames, kernel, namespaces);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         Map<String, Top> namespace = merged;
         Function<String, Optional<String>> constructors = name -> constructorOf(name, namespace.get(name), facts);
-        boolean kernelGoverned = isMetaKernelGoverned(schema);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
-            if (!kernelGoverned && entry.getValue() instanceof RefBody && localNames.contains(entry.getKey())) {
-                reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged, facts), facts,
-                        referenceOutsideTheKernelLevel(displayName(entry.getKey(), merged, facts, applications),
-                                schema), null);
-                continue;
-            }
             try {
                 // Named by what the author wrote, not by the content-derived name a derived entry carries:
                 // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
                 // a name §8.2 makes non-normative and nobody ever typed.
                 validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
-                        merged, structureNamespace,
-                        constructors);
+                        merged, constructors);
             } catch (UnresolvedReference e) {
                 if (pending.contains(e.name())) {
                     continue; // a bootstrap's kernel entry not yet read: judged when the whole kernel links
@@ -810,7 +758,7 @@ public final class TsonSchemaLinker {
             }
         }
 
-        checkValuesByName(schema, merged, facts, origins, localNames, governingMeta, loader, values, receiver);
+        checkValuesByName(schema, merged, facts, origins, localNames, namespaces, values, receiver);
         checkEveryEntryIsInhabited(schema, merged, facts, applications, localNames, receiver);
         checkRecordExtension(schema, merged, facts, applications, localNames, origins, enumForms, receiver);
 
@@ -824,10 +772,10 @@ public final class TsonSchemaLinker {
 
     /**
      * Each local namespace type, with the map a value of it is read as ({@link MapBody#ofNamespace}), into {@code
-     * namespaces}. The kernel's {@code namespace} is a composition operand, which resolves in this schema's
-     * namespace where it holds the name and in the governing meta's otherwise (§3.3.1), and is judged the kernel's
-     * by where it is defined there. A namespace type that is not abstract and leaves {@code key_type} or {@code
-     * value_type} unstated is refused: a value of it is a map, and an open facet describes none.
+     * namespaces}. The kernel's {@code namespace} is a composition operand, which resolves in this schema's one
+     * namespace (§3.3.1), and is judged the kernel's by where it is defined there. A namespace type that is not
+     * abstract and leaves {@code key_type} or {@code value_type} unstated is refused: a value of it is a map, and an
+     * open facet describes none.
      *
      * <p>A namespace type declaring a field beside its facets ({@link MapBody#NAMESPACE_FACETS}) is refused, abstract
      * or not: a value of it is the map alone, so the field has nowhere to be written, and an abstract one passes it
@@ -837,9 +785,8 @@ public final class TsonSchemaLinker {
      */
     private static void readAsMaps(DiagnosticsReceiver receiver, TsonSchema schema, Map<String, Top> merged,
                                    Set<String> localNames, Predicate<String> kernel,
-                                   Optional<TsonLinkedSchema> governingMeta, Map<String, MapBody.Namespace> namespaces) {
-        Predicate<String> kernelInReach = name -> merged.containsKey(name) ? kernel.test(name)
-                : governingMeta.map(meta -> meta.isKernel(name)).orElse(false);
+                                   Map<String, MapBody.Namespace> namespaces) {
+        Predicate<String> kernelInReach = kernel;
         for (String name : localNames) {
             Top def = merged.get(name);
             if (OpenEntry.isOpen(def) || !MapBody.isNamespace(def, kernelInReach)) {
@@ -902,13 +849,9 @@ public final class TsonSchemaLinker {
     private static void checkValuesByName(TsonSchema schema, Map<String, Top> merged,
                                           Map<String, TsonSchema.EntryFacts> facts,
                                           Map<String, String> origins, Set<String> localNames,
-                                          Optional<TsonLinkedSchema> governingMeta, TsonSchemaLoader loader,
-                                          DataBindContext values, DiagnosticsReceiver receiver) {
-        if (governingMeta.isEmpty()) {
-            return; // only meta-kernel links without a registered meta, and it declares no value entry
-        }
-        ValuesByName judged = new ValuesByName(schema, merged, facts, origins, governingMeta.get(), loader,
-                values);
+                                          Map<String, MapBody.Namespace> namespaces, DataBindContext values,
+                                          DiagnosticsReceiver receiver) {
+        ValuesByName judged = new ValuesByName(schema, merged, facts, origins, namespaces, values);
         for (String name : localNames) {
             Top definition = merged.get(name);
             List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
@@ -1105,117 +1048,6 @@ public final class TsonSchemaLinker {
         return result;
     }
 
-    /**
-     * The other half of the constructor-eligibility rule: {@link #isMetaKernelGoverned} restricts which schema
-     * may <em>declare</em> a constructor, and this restricts which may be <em>named as a {@code !!meta}
-     * target</em>. Both are the same §2.2.2 question asked from the two ends, and a schema that fails this one
-     * could not supply a structure namespace anyway -- having declared no constructors, it has none to supply.
-     *
-     * <p>The failure this prevents is an ordinary type library or application schema governing another by
-     * accident. Naming one as {@code !!meta} is almost always a confusion with {@code !!import}: an import
-     * merges another schema's entries into this schema's type-name namespace, which is what a caller wanting
-     * core.tn's {@code uuid} means, while {@code !!meta} names the contract the declarations themselves are
-     * validated against and is consulted only at §3.3.1's constructor roles. Uncaught, it surfaces much later
-     * as every construction in the governed schema falling out of scope.
-     *
-     * <p>In the wiring this library ships, a schema resolved through {@code TsonCompiledMetaRegistry} reaches
-     * that registry's own {@code loadMeta} first, which asks the same question a phase earlier (it must
-     * <em>compile</em> the meta to resolve against it) and raises {@link #notAMetaSchema} itself. This is
-     * still the linker's to check: a caller driving link with their own loader gets the same verdict, and the
-     * rule belongs with the declaration-side half it mirrors rather than only in a registry.
-     *
-     * <p>Only checked when the target actually loaded. An unresolvable {@code !!meta} is left to the caller
-     * that owns fetching (and meta-kernel's self-naming {@code !!meta}, mid-registration, is exactly that
-     * case) -- absence of evidence here is not evidence of ineligibility.
-     */
-    private static void checkMayGovern(TsonSchema schema, Optional<TsonLinkedSchema> governingMeta) {
-        if (governingMeta.isEmpty() || isMetaKernelGoverned(governingMeta.get().schema())) {
-            return;
-        }
-        throw notAMetaSchema(schema.meta(), governingMeta.get().schema().meta(), schema.id());
-    }
-
-    /**
-     * The one wording for "that schema cannot govern this one", shared with {@code
-     * TsonCompiledMetaRegistry.loadMeta}, which reaches the same conclusion one layer up and knows only the
-     * target (hence the nullable {@code governedId}). Public because that caller is in another module.
-     *
-     * <p>It is a {@link SchemaValidationException} rather than an {@code IllegalStateException} because
-     * it is an <b>authoring</b> error in a schema document, not a library fault: a caller wrapping {@code
-     * resolve} in the obvious {@code catch} sees it, and a CLI telling apart "your schema is wrong" from "this
-     * tool is broken" gets the right answer.
-     *
-     * @param governedId the schema naming {@code target} as its {@code !!meta}, or {@code null} where the
-     *     caller has only the target in hand
-     */
-    public static SchemaValidationException notAMetaSchema(String target, String targetsOwnMeta,
-            String governedId) {
-        return new SchemaValidationException("'" + target + "' is named as the !!meta"
-                + (governedId == null ? " of another schema" : " of '" + governedId + "'")
-                + " but is not a meta-schema -- its own !!meta is '" + targetsOwnMeta + "', not meta-kernel.tn, "
-                + "so it declares no type constructors and supplies no structure namespace (§2.2.2, §3.3.1). "
-                + "To use another schema's types, import it (!!import merges its entries into this schema's "
-                + "type-name namespace); !!meta names only the meta-schema the declarations are validated "
-                + "against");
-    }
-
-    /**
-     * [TSON-SCHEMA] §2.2.3's level rule for one {@code !!import} edge: the imported schema stands at the
-     * importer's governing level, both naming the meta-kernel as their {@code !!meta} or neither. A
-     * kernel-governed schema (the meta-kernel, meta.tn, a meta layer) is meta vocabulary; any other schema is
-     * governed by a meta-schema and describes data or, under a meta layer, applies its constructors. So meta.tn
-     * imports the meta-kernel, a meta layer imports meta.tn, and a schema a meta layer governs imports core.tn
-     * -- both ordinary, which is why the rule is the level and not one {@code !!meta}: an API description
-     * imports the records it describes. An ordinary schema importing a meta layer, or a meta layer importing an
-     * ordinary library, is refused: a field typed by a kernel entry ({@code type_ref}, {@code record_field},
-     * {@code value}) or by a meta layer's namespace type stands only in a kernel-governed document, and a meta
-     * layer declares the vocabulary its constructors use.
-     *
-     * <p>Judged once per edge, against the imported schema's own {@code !!meta}, and before its entries are
-     * merged. Public because {@code SchemaResolver} merges imports a phase earlier and asks the same question
-     * there, in this wording; a {@link SchemaValidationException}, as every import refusal is, because the
-     * importing document is wrong and the namespace it would build is not one to continue checking.
-     */
-    public static void checkImportLevel(String importerId, String importerMeta, String importedId,
-                                        String importedMeta) {
-        boolean importerIsKernelGoverned = isMetaKernelGoverned(importerMeta);
-        if (importerIsKernelGoverned == isMetaKernelGoverned(importedMeta)) {
-            return;
-        }
-        throw new SchemaValidationException("'" + importerId + "' (its !!meta '"
-                + CanonicalIdentity.canonicalize(importerMeta) + "') imports '" + importedId + "' (its !!meta '"
-                + CanonicalIdentity.canonicalize(importedMeta) + "'), but an !!import stands at the importer's "
-                + "governing level, both schemas naming meta-kernel.tn as their !!meta or neither (§2.2.3, §3.1) -- "
-                + (importerIsKernelGoverned
-                        ? "a meta layer declares the vocabulary its constructors use itself"
-                        : "an ordinary schema reaches a meta-schema's constructors only through its !!meta"));
-    }
-
-    /**
-     * Whether {@code schema} is entitled to declare its own constructors, entries IS-A {@code top} -- true
-     * only if its own {@code !!meta} target is exactly {@link TsonBundledSchemas#META_KERNEL_ID}, the *specific*
-     * meta-kernel this library's own compiled-reader machinery is built against, not merely "some
-     * self-referencing schema." This is stricter than structural self-reference alone: every
-     * resolved entry's value and every {@code !instance} construction (`!enum`,
-     * `!integer_type`, ...) is only interpretable because a matching type constructor is declared in
-     * *this* meta-kernel specifically -- {@code TsonParserFactoryRegistry}/{@code AtomTypeParser}/
-     * {@code RecordParser} (in {@code tson-compiler}) are Java code hard-wired to this one meta-kernel's
-     * own fixed vocabulary, not to "whatever schema happens to be self-referencing." A library
-     * supports one meta-kernel version at a time (a new revision would mean rebuilding that
-     * machinery, not just accepting a differently-identified but structurally-similar substitute), so
-     * this checks the schema's own {@code !!meta} string directly, no lookup needed -- correct for
-     * meta-kernel itself (whose own {@code !!meta} literally is {@link TsonBundledSchemas#META_KERNEL_ID}) and for
-     * meta.tn (governed one hop below it) alike.
-     */
-    private static boolean isMetaKernelGoverned(TsonSchema schema) {
-        return isMetaKernelGoverned(schema.meta());
-    }
-
-    /** Whether a schema whose {@code !!meta} is {@code meta} is governed by the meta-kernel itself. */
-    private static boolean isMetaKernelGoverned(String meta) {
-        return CanonicalIdentity.sameIdentity(meta, TsonBundledSchemas.META_KERNEL_ID);
-    }
-
     // ── Subtypes (reverse index) ─────────────────────────────────────────
 
     /**
@@ -1307,7 +1139,7 @@ public final class TsonSchemaLinker {
      * no member depends on: the walk reads each entry's constructor and the constructors' {@code supertypes}, both
      * already resolved. A kind with no members admits no value, and the inhabitance check reports it.
      *
-     * @param structure the governing meta's namespace, where a constructor role resolves (§3.3.1)
+     * @param structure where a constructor is looked up first: the schema's one namespace, as {@code merged} is
      */
     private static Map<String, Top> computeKinds(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
                                                  Function<String, Top> structure) {
@@ -1326,14 +1158,12 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Stage 1: every {@code !!import}'s whole namespace, in declaration order, brought in as-is (§2.2.3's
-     * "merged entries keep their home namespace" -- no re-resolution here).
+     * Stage 1: the whole namespace of the {@code !!meta} target and of every {@code !!import}, in header order,
+     * brought in as-is (§2.2.3's "merged entries keep their home namespace" -- no re-resolution here).
      *
-     * <p><b>The namespace is flat and the merge is transitive</b> (§2.2.3): an import
-     * contributes everything its own namespace holds, its own imports' entries included, exactly as {@code
-     * !!meta} contributes its target's locals *plus its imports* (§3.3.1's "Import what you expose"). So a
-     * schema reached by two routes arrives once, and the importer sees one flat name-to-type map with no
-     * hidden layers.
+     * <p><b>The namespace is flat and the merge is transitive</b> (§2.2.3): an import, the {@code !!meta} target
+     * among them, contributes everything its own namespace holds, its own closure included. So a schema reached by
+     * two routes arrives once, and the importer sees one flat name-to-type map with no hidden layers.
      *
      * <p><b>A collision is decided by entry identity, not by name occurrence.</b> The same schema reached
      * through several routes -- the diamond every practical schema forms by importing core.tn -- is one set
@@ -1345,9 +1175,6 @@ public final class TsonSchemaLinker {
      *
      * <p>Identity is the canonical one ([TSON-DATA] §2.2.1), so a pinned and an unpinned reference to one
      * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
-     *
-     * <p>Each import edge is judged by {@link #checkImportLevel} before its entries are taken, so an import at
-     * the wrong level is reported as that, not as the collision its closure would bring.
      */
     private static Map<String, Top> mergeImports(TsonSchema importer, TsonSchemaLoader loader,
                                                  Map<String, String> origins,
@@ -1358,16 +1185,24 @@ public final class TsonSchemaLinker {
                                                  Map<String, TypeRef> applications) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
-        for (String importUri : importer.imports()) {
+        Set<String> imports = new LinkedHashSet<>();
+        importer.imports().forEach(uri -> imports.add(CanonicalIdentity.canonicalize(uri)));
+        for (String importUri : importer.namespaceSources()) {
             String importIdentity = CanonicalIdentity.canonicalize(importUri);
             // Listing one schema twice (or under two spellings of one identity) is redundant, not an error:
             // the second mention asks for a namespace already present and contributes nothing new.
             if (!alreadyImported.add(importIdentity)) {
                 continue;
             }
-            TsonLinkedSchema imported = loader.load(importIdentity).orElseThrow(() -> new SchemaValidationException(
+            Optional<TsonLinkedSchema> found = loader == null ? Optional.empty() : loader.load(importIdentity);
+            if (found.isEmpty() && !imports.contains(importIdentity)) {
+                // A !!meta target this link cannot load is the fetching caller's to refuse: resolution already
+                // loaded it, so a schema reaching here from a registry always has it, and a schema linked
+                // standalone -- a hand-built one, or the kernel's bootstrap -- links its own entries.
+                continue;
+            }
+            TsonLinkedSchema imported = found.orElseThrow(() -> new SchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
-            checkImportLevel(importer.id(), importer.meta(), imported.schema().id(), imported.schema().meta());
             for (Map.Entry<String, Top> entry : imported.schema().entries().entrySet()) {
                 String name = entry.getKey();
                 // The import's own answer, not importIdentity: an entry it reached through an import of its
@@ -1418,17 +1253,13 @@ public final class TsonSchemaLinker {
     // ── Validation ───────────────────────────────────────────────────────
 
     private static void validateEntry(String name, Top def, Map<String, Top> namespace,
-                                       Map<String, Top> structureNamespace,
                                        Function<String, Optional<String>> constructors) {
         checkOpenEntryUsesEveryParameter(name, def);
-        // A chain is not an author-written reference but the residue of one, so it gets the structure-namespace
-        // fallback §3.3.2 withholds only from author-written type-refs; §2.2.3 puts a merged entry's own derived
-        // references in its defining schema's namespace, not the importer's. A chain reaches a constructor
-        // whenever a refinement derives from one -- meta-kernel's own `set_type => array ^ {...}` resolves with
-        // [array, product, top, type]. The fallback is defensive rather than load-bearing: a refinement source
-        // resolves through the type-name namespace alone, so a schema deriving from `array` already names it.
+        // A chain reaches a constructor whenever a refinement derives from one -- meta-kernel's own `set_type =>
+        // array ^ {...}` resolves with [array, product, top, type] -- and every name on it is in the one namespace,
+        // the defining schema's closure being inside the importer's (§2.2.3).
         for (String supertype : TypeChain.supertypesOf(def)) {
-            if (!namespace.containsKey(supertype) && !structureNamespace.containsKey(supertype)) {
+            if (!namespace.containsKey(supertype)) {
                 throw new SchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
             }
         }
@@ -1437,11 +1268,10 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def, namespace, structureNamespace, OpenEntry.parameterNames(def), constructors);
+        validateBody(name, def, namespace, OpenEntry.parameterNames(def), constructors);
     }
 
-    private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
-                                      Map<String, Top> structureNamespace, List<String> ownParameters,
+    private static void validateBody(String entryName, Top body, Map<String, Top> namespace, List<String> ownParameters,
                                       Function<String, Optional<String>> constructors) {
         if (OpenEntry.isOpen(body)) {
             // A held body is opaque to everything that needs to know what a reference *resolves to*: that
@@ -1461,9 +1291,9 @@ public final class TsonSchemaLinker {
             case RecordBody r -> {
                 // The chain is checked by validateEntry, its every member a bare name in a closed body.
                 for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
-                    validateTypeRef(field.getValue().type(), namespace, structureNamespace, ownParameters,
+                    validateTypeRef(field.getValue().type(), namespace, ownParameters,
                             constructors, entryName, " field '" + field.getKey() + "'");
-                    checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, structureNamespace,
+                    checkFieldValue(entryName, field.getKey(), field.getValue(), namespace,
                             ownParameters, constructors);
                 }
                 for (FieldGroup group : r.groups()) {
@@ -1478,20 +1308,20 @@ public final class TsonSchemaLinker {
             // The target in full: an alias naming an application states its arguments there, and a closed one
             // names the entry materialisation minted for it.
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
-            case Reference ref -> validateTypeRef(ref.target(), namespace, structureNamespace, ownParameters, null,
+            case Reference ref -> validateTypeRef(ref.target(), namespace, ownParameters, null,
                     entryName, "");
             case MapBody m -> {
-                validateTypeRef(m.keyType(), namespace, structureNamespace, ownParameters, constructors, entryName,
+                validateTypeRef(m.keyType(), namespace, ownParameters, constructors, entryName,
                         " key_type");
-                validateTypeRef(m.valueType(), namespace, structureNamespace, ownParameters, constructors,
+                validateTypeRef(m.valueType(), namespace, ownParameters, constructors,
                         entryName, " value_type");
             }
-            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, structureNamespace, ownParameters,
+            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, ownParameters,
                     constructors, entryName, " element_type");
             case TupleBody t -> {
                 int index = 0;
                 for (TupleElement element : t.elements()) {
-                    validateTypeRef(element.elementType(), namespace, structureNamespace, ownParameters, constructors,
+                    validateTypeRef(element.elementType(), namespace, ownParameters, constructors,
                             entryName, " element[" + index + "]");
                     index++;
                 }
@@ -1499,23 +1329,20 @@ public final class TsonSchemaLinker {
             case ChoiceBody c -> {
                 int index = 0;
                 for (TypeRef variant : c.variants()) {
-                    validateTypeRef(variant, namespace, structureNamespace, ownParameters, constructors, entryName,
+                    validateTypeRef(variant, namespace, ownParameters, constructors, entryName,
                             " variant[" + index + "]");
                     index++;
                 }
                 checkVariantsAreDistinct(entryName, c, namespace);
                 checkVariantsAreNotVoid(entryName, c, namespace);
             }
-            // `of` is a constructor role, so it resolves in the structure namespace and nowhere else (§3.3.1),
-            // and must name `type` or a constructor below it ([TSON-SCHEMA] §4.2). The members are the linker's
-            // own computation, not references an author wrote, so there is nothing else here to validate. With
-            // no governing meta loaded there is nothing to resolve `of` against, and no verdict is given.
+            // `of` resolves in the schema's one namespace and must name `type` or a constructor below it
+            // ([TSON-SCHEMA] §4.2). The members are the linker's own computation, not references an author wrote, so
+            // there is nothing else here to validate.
             case KindBody kind -> {
-                if (!structureNamespace.isEmpty()) {
-                    KindMembers.ofRefusal(kind, structureNamespace::get).ifPresent(refusal -> {
-                        throw new SchemaValidationException("'" + entryName + "' is a kind, but " + refusal);
-                    });
-                }
+                KindMembers.ofRefusal(kind, namespace::get).ifPresent(refusal -> {
+                    throw new SchemaValidationException("'" + entryName + "' is a kind, but " + refusal);
+                });
             }
             case TemplateBody ignored -> { } // open, answered above
             case ValueType ignored -> {
@@ -1580,16 +1407,10 @@ public final class TsonSchemaLinker {
             }
             // A reference names values of one type: `of` resolves in the writer's own namespace, and names a type
             // or a namespace type, never a constructor of types -- the names of the types built with a
-            // constructor are a kind, and `kind<record>` is that spelling. An ordinary schema's namespace holds no
-            // constructor, so there a constructor is the name the structure namespace holds, and is refused as one.
+            // constructor are a kind, and `kind<record>` is that spelling.
             case RefBody ref -> {
                 Top of = namespace.get(ReferenceChain.terminal(ref.of(), namespace));
                 if (of == null) {
-                    Top constructor = structureNamespace.get(ref.of());
-                    if (constructor != null && (TypeChain.supertypesOf(constructor).contains(TYPE)
-                            || TYPE.equals(ref.of()))) {
-                        throw referenceToAConstructor(entryName, ref);
-                    }
                     throw new UnresolvedReference(entryName, " of", ref.of());
                 }
                 if (TypeChain.supertypesOf(of).contains(TYPE) || of == namespace.get(TYPE)) {
@@ -1607,21 +1428,6 @@ public final class TsonSchemaLinker {
             case Namespace<?> ignored -> {
             }
         }
-    }
-
-    /**
-     * A reference ({@code ref_type}) declared in a schema the meta-kernel does not govern. A reference names an entry
-     * whose value is a value of its {@code of}, and an entry holds a value only where a namespace type can be
-     * declared, in a kernel-governed schema; a schema governing data declares only types, so a reference there names
-     * nothing. {@code ref<T>} is out of such a schema's reach (core.tn declares no {@code ref}, and an ordinary
-     * schema imports no kernel-governed one), so this meets only the constructor applied directly, {@code
-     * !ref_type { of: T }}, which the structure namespace supplies.
-     */
-    private static String referenceOutsideTheKernelLevel(String entryName, TsonSchema schema) {
-        return "'" + entryName + "' is a reference (ref_type), but '" + schema.id() + "' is not governed by the "
-                + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- a reference names an entry holding a "
-                + "value, and only a schema chaining to meta-kernel.tn directly has one (§2.2.2, §4.1); a schema "
-                + "governing data declares only types, so a reference there names nothing";
     }
 
     /** {@code ref<C>} with {@code C} a constructor: the names of the types built with one are a kind. */
@@ -1834,8 +1640,7 @@ public final class TsonSchemaLinker {
      * already been substituted by materialisation, and is checked against the argument it was closed with.
      */
     private static void checkFieldValue(String entryName, String fieldName, RecordField field,
-                                        Map<String, Top> namespace,
-                                        Map<String, Top> structureNamespace, List<String> ownParameters,
+                                        Map<String, Top> namespace, List<String> ownParameters,
                                         Function<String, Optional<String>> constructors) {
         if (field.value().isEmpty() || ownParameters.contains(field.type().name())) {
             return;
@@ -1855,11 +1660,11 @@ public final class TsonSchemaLinker {
         }
         Token value = field.value().get();
         if (target instanceof KindBody kind) {
-            checkKindValue(entryName, fieldName, field, value, kind, namespace, structureNamespace, constructors);
+            checkKindValue(entryName, fieldName, field, value, kind, namespace, constructors);
             return;
         }
         Optional<AtomType<?>> parser = AtomParsers.forType(target,
-                EnumLabels.labelForm(target, constructors.apply(terminal), namespace, structureNamespace::get));
+                EnumLabels.labelForm(target, constructors.apply(terminal), namespace, namespace::get));
         if (parser.isEmpty()) {
             throw notAScalarType(entryName, fieldName, field, value, target);
         }
@@ -1887,29 +1692,22 @@ public final class TsonSchemaLinker {
     /**
      * A {@code ~}/{@code =} value at a kind-typed field: a type name, judged a member of the kind by the walk over
      * the entry it resolves to ([TSON-SCHEMA] §4.2) -- {@code enum => enum_type ^ { name_type?: = identifier }}
-     * pins a name, and the pin is judged here, after resolution. The name resolves where the constructor pinning it
-     * is declared: this schema's own namespace, then the structure namespace, so a meta layer pins a name type it
-     * declares itself and an ordinary schema one of its meta's. A name resolving to nothing, or to an entry not
+     * pins a name, and the pin is judged here, after resolution, in the schema's one namespace, which holds the
+     * constructor pinning it and everything that constructor's schema reaches. A name resolving to nothing, or to an
+     * entry not
      * built with the kind's constructor, is refused with the field's own two halves named, as any other value of
      * the wrong type is.
      */
     private static void checkKindValue(String entryName, String fieldName, RecordField field, Token value,
-                                       KindBody kind, Map<String, Top> namespace, Map<String, Top> structureNamespace,
+                                       KindBody kind, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors) {
-        Function<String, Top> lookup = name -> {
-            Top found = namespace.get(name);
-            return found != null ? found : structureNamespace.get(name);
-        };
-        // A name the structure namespace supplies has no facts here; its body's constructor stands in.
-        Function<String, Optional<String>> constructorOf =
-                name -> namespace.containsKey(name) ? constructors.apply(name) : Optional.empty();
-        if (KindMembers.isMember(value.text(), kind.of(), lookup, constructorOf, structureNamespace::get)) {
+        if (KindMembers.isMember(value.text(), kind.of(), namespace::get, constructors, namespace::get)) {
             return;
         }
         throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
                 + "declared '" + field.type().name() + "', but its "
                 + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " " + asWritten(value)
-                + " is not a value of that type -- " + (lookup.apply(value.text()) == null
+                + " is not a value of that type -- " + (namespace.get(value.text()) == null
                         ? "it names nothing in scope"
                         : "'" + value.text() + "' is not a member of the kind, the names of the types built "
                                 + "with '" + kind.of() + "'")
@@ -1974,7 +1772,7 @@ public final class TsonSchemaLinker {
      * refused, and a namespace entry with its own diagnostic. A {@code type_ref} slot passes {@code null} and is
      * judged by resolution alone.
      */
-    private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace, Map<String, Top> structureNamespace,
+    private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace,
                                          List<String> ownParameters, Function<String, Optional<String>> constructors,
                                          String subject, String trail) {
         String context = "'" + subject + "'" + trail;
@@ -1993,8 +1791,8 @@ public final class TsonSchemaLinker {
         // Membership walks construction to `type`, so it is judged only where `type` is in reach: a namespace built
         // without the kernel (a test's, a fragment's) gets resolution alone, as a kind with no meta gets no verdict.
         if (constructors != null && ref.arguments().isEmpty() && !ownParameters.contains(ref.name())
-                && (structureNamespace.containsKey(TYPE) || namespace.containsKey(TYPE))
-                && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, structureNamespace::get)) {
+                && (namespace.containsKey(TYPE) || namespace.containsKey(TYPE))
+                && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, namespace::get)) {
             Top found = namespace.get(ReferenceChain.terminal(ref.name(), namespace));
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is "
                     + (found != null && TypeChain.supertypesOf(found).contains("top")
@@ -2005,7 +1803,7 @@ public final class TsonSchemaLinker {
         }
         for (TypeArgument arg : ref.arguments()) {
             if (arg instanceof TypeArgument.Ref nested) {
-                validateTypeRef(nested.ref(), namespace, structureNamespace, ownParameters, constructors, subject,
+                validateTypeRef(nested.ref(), namespace, ownParameters, constructors, subject,
                         trail);
             }
             // TypeArgument.Value is a literal token, not a type reference -- nothing to validate.
@@ -2078,7 +1876,7 @@ public final class TsonSchemaLinker {
         }
         Top referenced = namespace.get(ref.name());
         if (referenced == null) {
-            return; // reached only through the structure-namespace fallback, which the caller already allowed
+            return; // a name no entry holds is resolution's to refuse, not arity's
         }
         List<String> parameters = OpenEntry.parameterNames(referenced);
         int declared = parameters.size();

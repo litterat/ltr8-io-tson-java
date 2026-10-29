@@ -30,9 +30,9 @@ import java.util.function.Function;
  *
  * <p><b>Why the linker and not the body.</b> {@link EnumBody} holds {@code name_type} as a name, and what the name
  * denotes -- which family, which parser, which equality -- lives in a namespace the body cannot see: the
- * schema's own, where an author-written {@code name_type} resolves, or the governing meta's, where a value the
- * constructor pinned ({@code enum}'s {@code name_type: identifier}) was written. The linked closure is the first
- * place both are present.
+ * schema's one namespace, where an author-written {@code name_type} resolves and where the schema declaring the
+ * constructor that pinned one ({@code enum}'s {@code name_type: identifier}) sits in the closure. The linked closure
+ * is the first place it is whole.
  *
  * <p><b>An identifier family is a type built with {@code identifier_type}</b>, which is what membership of the
  * kernel's {@code identifier_kind} walks: an instance, a refinement of one, an instantiation of a template over the
@@ -51,7 +51,7 @@ final class EnumLabels {
 
     /**
      * The form {@code enumeration} matches its members in: its name type's {@code normalization}
-     * ([TSON-SCHEMA] §5.5), followed into the governing meta where the enum's constructor pinned the type.
+     * ([TSON-SCHEMA] §5.5), followed to the closure entry the enum's constructor pinned.
      * {@code NONE} for a body that is not an enum, a type that resolves to nothing, or one that is not a text
      * family -- each refused or reported on its own.
      */

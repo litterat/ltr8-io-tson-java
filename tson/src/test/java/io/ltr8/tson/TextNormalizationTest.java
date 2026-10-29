@@ -41,11 +41,11 @@ class TextNormalizationTest {
               picked => { p: typed_by<safe_header, Content-Type> }
               web => !uri ^ { schemes: [HTTP https] }
               link => { to: web }
-              field_name => !identifier_type { start: NONE  continue: NONE
+              folded_name => !identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: ASCII_CASEFOLD }
               accent => !text_type { members: ["\u00e9"]  normalization: ASCII_CASEFOLD }
-              message => { fields?: {field_name => text}  accent?: accent }
+              message => { fields?: {folded_name => text}  accent?: accent }
             }
             """;
 

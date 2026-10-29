@@ -490,13 +490,11 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * The half of §2.2.2's constructor-eligibility rule that governs the target end: naming an ordinary type
-     * library as {@code !!meta} is the {@code !!import} confusion, and it fails here rather than as every
-     * construction in the governed schema later falling out of scope.
+     * A {@code !!meta} target contributes its namespace exactly as an {@code !!import} does (SPEC-FEEDBACK.md #7),
+     * whatever its own {@code !!meta}: a plain type library named as the target is one more import.
      */
     @Test
-    void rejectsAMetaTargetThatIsNotItselfGovernedByTheMetaKernel() {
-        // a plain type library: its own !!meta is an ordinary meta, so it declares no constructors
+    void aMetaTargetContributesItsNamespaceAsAnImportDoes() {
         TsonLinkedSchema library = new TsonLinkedSchema(new TsonSchema("https://example.test/lib.tn",
                 "https://example.test/meta.tn", List.of(), Map.of("uuid", valueEntry())));
         Map<String, TsonLinkedSchema> byIdentity =
@@ -506,32 +504,29 @@ class TsonSchemaLinkerTest {
         TsonSchema governed = new TsonSchema("https://example.test/app.tn",
                 "https://example.test/lib.tn", List.of(), Map.of("local", emptyRecord()));
 
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> TsonSchemaLinker.link(governed, loader));
-        // both ends named, and the fix pointed at -- this is an authoring error, not an internal one
-        assertTrue(thrown.getMessage().contains("https://example.test/lib.tn"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("https://example.test/app.tn"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("!!import"), thrown.getMessage());
+        assertEquals(Set.of("uuid", "local"), TsonSchemaLinker.link(governed, loader).schema().entries().keySet());
     }
 
+    /** And a local declaration of a name the target declares collides, as with any import (§2.2.3). */
     @Test
-    void acceptsAMetaTargetThatChainsToTheMetaKernel() {
-        // schemaOf's own !!meta is meta-kernel, which is exactly what makes a schema a meta-schema
+    void aLocalDeclarationCollidesWithTheMetaTargetsName() {
         TsonLinkedSchema meta = new TsonLinkedSchema(schemaOf(Map.of("record", emptyRecord())));
         Map<String, TsonLinkedSchema> byIdentity =
                 Map.of(CanonicalIdentity.canonicalize("https://example.test/meta.tn"), meta);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema governed = new TsonSchema("https://example.test/app.tn",
-                "https://example.test/meta.tn", List.of(), Map.of("local", emptyRecord()));
+                "https://example.test/meta.tn", List.of(), Map.of("record", valueEntry()));
 
-        assertEquals(Set.of("local"), TsonSchemaLinker.link(governed, loader).schema().entries().keySet());
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> TsonSchemaLinker.link(governed, loader));
+        assertTrue(thrown.getMessage().contains("'record' collides"), thrown.getMessage());
     }
 
     /**
-     * Eligibility is judged only on a target the loader actually produced. Absence of evidence isn't evidence
-     * of ineligibility -- meta-kernel's own self-naming {@code !!meta} is unresolvable mid-registration, and
-     * whether an unresolvable {@code !!meta} is an error at all belongs to whoever owns fetching.
+     * A {@code !!meta} target the loader cannot produce is left to whoever owns fetching: resolution loads it before
+     * linking, so a schema linked standalone -- a hand-built one, or meta-kernel's own self-naming {@code !!meta} --
+     * links its own entries.
      */
     @Test
     void anUnresolvableMetaTargetIsNotJudgedHere() {
@@ -674,35 +669,19 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * An import stands at the importer's governing level (§2.2.3): an ordinary schema imports only ordinary ones.
-     * A kernel-governed schema's entries are meta vocabulary, reached through {@code !!meta}.
+     * An import ties to no level (SPEC-FEEDBACK.md #7): whatever either schema's {@code !!meta}, the importer takes
+     * the imported namespace -- an ordinary schema importing a kernel-governed one, the reverse, and two schemas
+     * under different metas.
      */
     @Test
-    void anOrdinarySchemaMayNotImportAKernelGovernedOne() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> linkImporting(
-                "https://example.test/meta.tn", TsonBundledSchemas.META_KERNEL_ID));
+    void anImportLinksWhateverEitherSchemasMeta() {
+        for (List<String> metas : List.of(List.of("https://example.test/meta.tn", TsonBundledSchemas.META_KERNEL_ID),
+                List.of(TsonBundledSchemas.META_KERNEL_ID, "https://example.test/meta.tn"),
+                List.of("https://example.test/meta-api.tn", "https://example.test/meta.tn"))) {
+            TsonLinkedSchema linked = linkImporting(metas.get(0), metas.get(1));
 
-        assertLevelRefusal(thrown, "https://example.test/meta.tn", TsonBundledSchemas.META_KERNEL_ID);
-    }
-
-    /** And the other direction: a kernel-governed layer declares the vocabulary its constructors use itself. */
-    @Test
-    void aKernelGovernedSchemaMayNotImportAnOrdinaryOne() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> linkImporting(
-                TsonBundledSchemas.META_KERNEL_ID, "https://example.test/meta.tn"));
-
-        assertLevelRefusal(thrown, TsonBundledSchemas.META_KERNEL_ID, "https://example.test/meta.tn");
-    }
-
-    /**
-     * Two ordinary schemas under different {@code !!meta}s stand at one level: a schema a meta layer governs
-     * imports the library of records it describes.
-     */
-    @Test
-    void twoOrdinarySchemasUnderDifferentMetasLink() {
-        TsonLinkedSchema linked = linkImporting("https://example.test/meta-api.tn", "https://example.test/meta.tn");
-
-        assertEquals(Set.of("imported_a", "local_a"), linked.schema().entries().keySet());
+            assertEquals(Set.of("imported_a", "local_a"), linked.schema().entries().keySet(), metas::toString);
+        }
     }
 
     /** {@code importer.tn}, governed by {@code importerMeta}, importing {@code import.tn} under {@code importedMeta}. */
@@ -716,16 +695,5 @@ class TsonSchemaLinkerTest {
         TsonSchema importer = new TsonSchema("https://example.test/importer.tn", importerMeta,
                 List.of("https://example.test/import.tn"), Map.of("local_a", emptyRecord()));
         return TsonSchemaLinker.link(importer, loader);
-    }
-
-    /** Both documents and both {@code !!meta}s named, and the rule stated. */
-    private static void assertLevelRefusal(SchemaValidationException thrown, String importerMeta,
-                                           String importedMeta) {
-        String message = thrown.getMessage();
-        for (String named : List.of("https://example.test/importer.tn", "https://example.test/import.tn",
-                CanonicalIdentity.canonicalize(importerMeta), CanonicalIdentity.canonicalize(importedMeta),
-                "governing level", "§2.2.3")) {
-            assertTrue(message.contains(named), () -> named + " in: " + message);
-        }
     }
 }

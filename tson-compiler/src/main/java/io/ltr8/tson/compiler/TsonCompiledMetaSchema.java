@@ -4,6 +4,7 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.reader.ErrorReader;
 import io.ltr8.tson.compiler.reader.NamespaceInstanceReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
@@ -12,119 +13,80 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A compiled meta-schema -- a {@link TsonCompiledSchema} plus the scoped constructor vocabulary a
- * schema governed by it (its own {@code !!meta} target) is allowed to see. That vocabulary is the
- * whole point: the global {@link ValueReaderFactoryResolver} is every structure this library can
- * build, but a governing meta-schema declares only *some* of them, and a schema saying {@code
- * !!meta:X} may construct only with the constructors X declares -- not with anything the global
- * registry happens to support.
+ * A schema compiled in object-binding mode as <b>vocabulary</b>: what a schema importing it reads its construction
+ * heads and annotation values through. One namespace per schema ([TSON-SCHEMA] §3.3.1, SPEC-FEEDBACK.md #7) puts
+ * every constructor of the import closure in reach, and the resolver reads {@code !C value} through the compiled form
+ * of the schema that declared {@code C} ({@code SchemaResolver}'s vocabulary), which is one of these. Any schema
+ * compiles to one -- the kernel, meta.tn, a library declaring constructors of its own -- and {@link
+ * TsonCompiledMetaRegistry#loadMeta} caches each by identity.
  *
- * <p>Each declared constructor is held as a {@link ReaderResolver} pairing its two compiled facets:
- * the reader that reads an *instance* of the constructor ({@link #reader}, used while resolving a
- * governed schema's {@code !C value} declarations), and the factory that builds a reader for an
- * entry whose own body *is* such a construction ({@link #constructor}, consulted by {@link
- * TsonSchemaCompiler} when it compiles a governed schema). Combining them keeps both facets scoped
- * to the same declared set.
- *
- * <p>A constructor this meta-schema does not declare ({@link #constructor} returns {@code null}) is
- * out of a governed schema's scope: {@link TsonSchemaCompiler} admits it only if the schema being
- * compiled declares it itself (meta.tn compiling {@code float32 => !float_type {}}, where {@code
- * float_type} is meta.tn's own new constructor, absent from its governing meta, meta-kernel -- sourced
- * then from {@link #globalResolver}), and rejects it otherwise. This is where scoping is enforced.
+ * <p>Holds, beside the compiled entries, the reader for an <em>instance</em> of each constructor it declares or
+ * imports ({@link #reader}): every entry IS-A {@code top}, keyed by its own name. The factory that builds a reader for
+ * an entry whose body <em>is</em> such a construction is the library's global set, consulted by {@link #compile}.
  */
 public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
 
-    private final ValueReaderFactoryResolver resolver;
-    private final Map<String, ReaderResolver> constructors;
+    private final Map<String, TsonTypeReader<?>> constructors;
 
-    TsonCompiledMetaSchema(TsonCompiledSchema base, ValueReaderFactoryResolver resolver) {
+    private TsonCompiledMetaSchema(TsonCompiledSchema base) {
         super(base.linkedSchema(), base.entries());
-        this.resolver = resolver;
-        this.constructors = buildConstructors(this, resolver);
+        this.constructors = buildConstructors(this);
     }
 
     /**
-     * This meta-schema as a plain {@link TsonCompiledSchema} -- it *is* one (this class extends it),
-     * so this returns {@code this}. Retained so a caller reading an arbitrary entry ({@code
-     * compiledSchema().get(name)}) keeps a stable spelling; {@link #reader} is the scoped,
-     * constructor-only view.
+     * Compiles {@code linked} through {@code resolver}'s factories as vocabulary. Every body is dispatched to the
+     * factory for its constructor; a constructor this library has no factory for -- one a schema declared, composing
+     * {@code atom} or {@code top} -- stands in as an {@link ErrorReader} naming the gap ({@link #unbuildable}), so the
+     * schema compiles and only reading a value against that entry fails.
+     */
+    static TsonCompiledMetaSchema compile(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver) {
+        return new TsonCompiledMetaSchema(TsonSchemaCompiler.compile(linked, name -> {
+            try {
+                return resolver.resolve(name);
+            } catch (RuntimeException noFactory) {
+                return unbuildable(linked.originOf(name), name, noFactory);
+            }
+        }));
+    }
+
+    /**
+     * This schema as a plain {@link TsonCompiledSchema} -- it *is* one (this class extends it), so this returns
+     * {@code this}. Retained so a caller reading an arbitrary entry ({@code compiledSchema().get(name)}) keeps a
+     * stable spelling; {@link #reader} is the constructor-only view.
      */
     public TsonCompiledSchema compiledSchema() {
         return this;
     }
 
     /**
-     * Reads an instance of {@code name}, one of this meta-schema's own declared constructors --
-     * {@code name} is the declaration's own name (e.g. {@code "record"}), not necessarily its
-     * resolved body's own constructor name (though for every meta-kernel/meta.tn declaration the two
-     * are identical). An instance of a namespace type is the map it reads as, delivered as a {@link Namespace}.
+     * Reads an instance of {@code name}, a constructor in this schema's namespace -- {@code name} is the
+     * declaration's own name (e.g. {@code "record"}), not necessarily its resolved body's own constructor name
+     * (though for every meta-kernel/meta.tn declaration the two are identical). An instance of a namespace type is
+     * the map it reads as, delivered as a {@link Namespace}.
      */
     public TsonTypeReader<?> reader(String name) {
-        ReaderResolver constructor = constructors.get(name);
+        TsonTypeReader<?> constructor = constructors.get(name);
         if (constructor == null) {
             throw new IllegalArgumentException(
-                    "'" + name + "' is not a constructor '" + schema().id() + "' declares");
+                    "'" + name + "' is not a constructor in the namespace of '" + schema().id() + "'");
         }
-        return constructor.instanceReader();
+        return constructor;
     }
 
     /**
-     * The factory for constructor {@code name} if this meta-schema declares it, else {@code null} --
-     * scoped strictly to this meta-schema's own vocabulary, with no global fallback. An absent result
-     * tells {@link TsonSchemaCompiler} the constructor is out of this governing meta's scope, to be
-     * admitted only if the schema being compiled declares it itself (sourced then from {@link
-     * #globalResolver}) and rejected otherwise. Package-private: only {@link TsonSchemaCompiler} (same
-     * package) consults it.
+     * Every entry IS-A {@code top} ([TSON-SCHEMA] §4.1), with the reader for an instance of it -- the same predicate
+     * {@code DefinitionResolver}'s own gate asks, so a head that gate admits has a reader here, and one it refuses
+     * never reaches this table. Wider than {@code constructor}, by the base kinds and {@code reference}; narrower than
+     * the whole namespace, by every component record ({@code record_field}, {@code type_ref}, …), which is a part of
+     * a type and not one.
      */
-    ValueReaderFactory constructor(String name) {
-        ReaderResolver declared = constructors.get(name);
-        return declared == null ? null : declared.factory();
-    }
-
-    /**
-     * The library's full factory set -- {@link TsonSchemaCompiler}'s source for a constructor the
-     * *compiling* schema declares itself (e.g. meta.tn's own {@code float_type}), one this governing
-     * meta's scoped vocabulary does not include. Package-private: only {@link TsonSchemaCompiler}
-     * consults it, and only after finding the constructor absent from {@link #constructor}.
-     */
-    ValueReaderFactoryResolver globalResolver() {
-        return resolver;
-    }
-
-    /**
-     * This meta-schema's scoped constructor vocabulary: every {@code constructor: true} entry it
-     * declares, paired with its instance reader and its factory.
-     *
-     * <p><b>A constructor with no factory is kept, not dropped</b>, its factory standing in as an
-     * {@link ErrorReader} that carries the real cause. Dropping it would lose the constructor from the
-     * vocabulary without complaint: a governing meta would compile and register looking healthy while
-     * missing a constructor it declares, and the failure would surface against a <em>different</em>
-     * document -- the first governed schema to write {@code !C ...} being told "'C' is not a constructor
-     * 'this-meta' declares", which is both false and unactionable. Keeping it
-     * puts the verdict where the gap is -- the entry that could not be built -- and states what is
-     * missing.
-     *
-     * <p>The two facets fail independently and that is the point: the <em>instance</em> reader (reading
-     * {@code !C value} while resolving a governed schema) is compiled from {@code C}'s own record-shaped
-     * declaration and usually works, while the <em>factory</em> (building a reader for a governed entry
-     * whose body <em>is</em> such a construction) needs library support for {@code C}. A governed schema
-     * that merely declares such an entry still compiles; only reading a value against it fails -- the same
-     * treatment {@link TsonSchemaCompiler} gives any entry it cannot build a reader for.
-     */
-    private static Map<String, ReaderResolver> buildConstructors(
-            TsonCompiledSchema compiledSchema, ValueReaderFactoryResolver resolver) {
-        Map<String, ReaderResolver> constructors = new HashMap<>();
+    private static Map<String, TsonTypeReader<?>> buildConstructors(TsonCompiledSchema compiledSchema) {
+        Map<String, TsonTypeReader<?>> constructors = new HashMap<>();
         for (Map.Entry<String, Top> entry : compiledSchema.schema().entries().entrySet()) {
-            // Applicability is IS-A `top` ([TSON-SCHEMA] §4.1), the same predicate `DefinitionResolver`'s
-            // own gate asks -- so a head that gate admits has a reader here, and one it refuses never
-            // reaches this table. Wider than `constructor`, by the base kinds and `reference`; narrower
-            // than the whole namespace, by every component record (`record_field`, `type_ref`, …), which
-            // is a part of a type and not one.
             if (!compiledSchema.linkedSchema().isConstructor(entry.getKey(), entry.getValue())) {
                 continue;
             }
             String name = entry.getKey();
-            // Already extension-substituted where one was needed -- see withExtensionReaders.
             TsonTypeReader<?> instanceReader = compiledSchema.find(name).orElse(null);
             if (instanceReader == null) {
                 continue;
@@ -134,26 +96,21 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
                 // that map as a value of the constructor.
                 instanceReader = new NamespaceInstanceReader(name, instanceReader);
             }
-            ValueReaderFactory factory;
-            try {
-                factory = resolver.resolve(name);
-            } catch (RuntimeException noFactory) {
-                factory = unbuildable(compiledSchema.schema().id(), name, noFactory);
-            }
-            constructors.put(name, new ReaderResolver(instanceReader, factory));
+            constructors.put(name, instanceReader);
         }
         return Map.copyOf(constructors);
     }
 
     /**
-     * The stand-in factory for a constructor this library cannot build a reader for. It names the
-     * constructor, the meta-schema that declares it and the entry that tried to use it, so the message
-     * identifies the gap rather than the document that ran into it.
+     * The stand-in factory for a constructor this library cannot build a reader for. It names the constructor, the
+     * schema that declares it and the entry that tried to use it, so the message identifies the gap rather than the
+     * document that ran into it. Kept rather than dropped: an entry built with an unbacked constructor still
+     * compiles, and the verdict lands where the gap is, on reading a value against it.
      */
-    private static ValueReaderFactory unbuildable(String metaId, String constructorName, RuntimeException cause) {
+    private static ValueReaderFactory unbuildable(String declaredBy, String constructorName, RuntimeException cause) {
         return (entryName, definition, context) -> new ErrorReader(entryName,
                 new UnsupportedOperationException("'" + entryName + "' is built with '" + constructorName
-                        + "', a constructor declared by the meta-schema '" + metaId + "' that this library has "
+                        + "', a constructor declared by '" + declaredBy + "' that this library has "
                         + "no reader for: " + cause.getMessage(), cause));
     }
 
@@ -173,14 +130,5 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
                     + "Namespace carries one, naming the constructor it is the body of");
         }
         return typename.name();
-    }
-
-    /**
-     * A declared constructor's two compiled facets, held together only while this class builds its
-     * scoped vocabulary: the reader for an *instance* of it ({@link #reader}) and the factory that
-     * builds a reader for an entry that *is* a construction of it ({@link #constructor}). A private
-     * convenience -- neither the record nor its facet split leaks past this class.
-     */
-    private record ReaderResolver(TsonTypeReader<?> instanceReader, ValueReaderFactory factory) {
     }
 }

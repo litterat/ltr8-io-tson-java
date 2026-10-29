@@ -38,7 +38,7 @@ class JsonAtomReadTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             {
               count      => int32
-              exact      => number
+              exact_number      => number
               ratio      => float64
               label      => text
               key        => uuid
@@ -134,13 +134,13 @@ class JsonAtomReadTest {
     /** §5.3: a {@code number} keeps its digits and its scale -- {@code 199.90} is not {@code 199.9}. */
     @Test
     void anExactNumberKeepsItsDigitsAndScale() {
-        assertEquals(new BigDecimal("199.90"), read("exact", "199.90").accepted());
+        assertEquals(new BigDecimal("199.90"), read("exact_number", "199.90").accepted());
     }
 
     /** §3.1: precision is arbitrary and preserved, and an implementation that cannot hold the digits errors. */
     @Test
     void anExactNumberKeepsMoreDigitsThanABinary64Would() {
-        assertEquals(new BigDecimal("9007199254740993"), read("exact", "9007199254740993").accepted());
+        assertEquals(new BigDecimal("9007199254740993"), read("exact_number", "9007199254740993").accepted());
     }
 
     // ── §5.4 the approximate tier ────────────────────────────────────────

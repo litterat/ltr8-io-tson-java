@@ -1,5 +1,6 @@
-!!id:"https://tson.io/2026/39/m/core.tn?sha256=9adb1b91117146334e26d4b0f031bca5622e3680b3f4a7d1ebae5985f1bff645"
-!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=f271892f662de4ec256c596b58d675ed7a470afccf0f06c10d23200b8aea822f"
+!!id:"https://tson.io/2026/39/m/core.tn?sha256=ac38ef086a93dcea7c58a0e3bce4e74c5e1f2fbb40801c1194ed763f2d37d5cf"
+!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 39 draft).
@@ -7,9 +8,9 @@
   Every type in core comes from a constructor defined in meta-kernel or meta.
   Atoms are defined as empty instances:
 
-      integer => !integer_type {}
-      text    => !text_type {}
-      date    => !date_type {}
+      number => !decimal_type {}
+      date   => !date_type {}
+      uuid   => !uuid_type {}
       ...
 
   except where an instance states a constructor field: `float32` and `float64`
@@ -22,16 +23,14 @@
   Hash pins here are real digests over the bytes of this copy; see
   meta-kernel.tn's note.
 
-  Annotation types (`@ordering`, `@bounded`, `@exact`, `@numeric`, `@disjoint`,
-  `@deprecated`, `@title`, `@comment`, `@examples`, `@read_only`,
-  `@write_only`) live in meta.tn — annotations resolve one hop against the
-  governing target's namespace ([TSON-SCHEMA] §3.3.3, §6), so for this schema
-  they must be reachable through the `!!meta` chain; they appear here only by
-  use. Core's own `doc` declaration, and its same-named siblings
-  of kernel and meta entries (`void`, `boolean`, `integer`, `text`, `regex`,
-  `iri`, `set` and `kind`), face the other direction: they exist so
-  that *data documents* and user schemas governed by or importing core can
-  use them.
+  Core imports meta.tn, which imports the meta-kernel, so a schema importing
+  core has the whole vocabulary in one namespace, each type under one
+  identity: the kernel's `void`, `boolean`, `integer`, `text`, `regex`, `iri`,
+  `kind` and `doc`, meta.tn's `set` and its annotation types (`@ordering`,
+  `@bounded`, `@exact`, `@numeric`, `@disjoint`, `@deprecated`, `@title`,
+  `@comment`, `@examples`, `@read_only`, `@write_only`), and core's own atoms
+  below. Every one of those names is reserved in such a schema
+  ([TSON-SCHEMA] §2.2.3).
 
   References:
     ISO/IEC 11404:2007    General Purpose Datatypes
@@ -49,26 +48,6 @@
     RFC 5322              Email address format
   """
 {
-  @doc:"""
-    Void primitive. A fresh sibling of the meta-kernel's `void` under the same
-    name — the same `!void_type {}` construction, and so the same contract, a
-    distinct type entity — so that data documents governed by core-importing
-    schemas can target it. The atom whose parsing contract admits only the
-    void sentinel `_`. See [TSON-SCHEMA] §6 and §7.3.
-    """
-  void => !void_type {}
-
-  @doc:"Two-value boolean enumeration."
-  boolean => !enum [true false]
-
-  @doc:"""
-    Arbitrary-precision signed integer. The value is the integer; TSON text
-    admits decimal, hex, octal and binary spellings ([TSON-DATA] §7.6), all one
-    value.
-    """
-  @ordering:TOTAL @bounded:false @exact:true @numeric
-  integer => !integer_type {}
-
   @doc:"""
     Exact number of arbitrary magnitude and precision, finite, with no special
     values (SQL exact tier; ISO/IEC 11404 `scaled`, radix 10). The canonical
@@ -170,14 +149,6 @@
   @ordering:PARTIAL @bounded:false @exact:false @numeric
   float64 => !float_type { format: BINARY64 }
 
-  @doc:"Unicode code point sequence. The universal text type."
-  @ordering:NONE @bounded:false
-  text => !text_type {}
-
-  @doc:"Interoperable regular expression pattern per RFC 9485 (I-Regexp)."
-  @ordering:NONE @bounded:false
-  regex => !regex_type {}
-
   @doc:"A URI-reference (RFC 3986 §4.1): a URI or a relative reference."
   @ordering:NONE @bounded:false
   uri_reference => !uri_type {}
@@ -192,10 +163,6 @@
     """
   @ordering:NONE @bounded:false
   iri_reference => !iri_type {}
-
-  @doc:"An IRI (RFC 3987 §2.2): the scheme is required."
-  @ordering:NONE @bounded:false
-  iri => !iri_reference ^ { allow_relative: false }
 
   @doc:"""
     Octet sequence. The universal binary type, and the only one: a field is
@@ -279,28 +246,6 @@
   declared => !declared_type {}
 
   @doc:"""
-    The set spelling an author writes: `set<text>` where the bare construction
-    is `!set_type { element_type: text }`. A §5.10 template, not a constructor:
-    it composes with nothing and so is not IS-A `top`.
-
-    A sibling of meta's declaration under the same name: user schemas reach it
-    through their core import, so `tags: set<text>` resolves without touching
-    the governing namespace.
-    """
-  set => <T> !set_type { element_type: T }
-
-  @doc:"""
-    The spelling of a kind an author writes inline: `kind<uuid_type>` holds the
-    name of a type in the schema's closure built with `uuid_type`, as
-    `!kind_type { of: uuid_type }` does. `T` names a constructor of the
-    structure namespace, not a type of this one.
-
-    A sibling of the meta-kernel's declaration under the same name: user
-    schemas reach it through their core import.
-    """
-  kind => <T> !kind_type { of: T }
-
-  @doc:"""
     A tuple of exactly one element: `tuple1<text>` admits `[a]` and
     refuses `[]`, `[a b]` and `[_]`. `[T]` is an array, and the tuple sugar
     takes two or more positions.
@@ -312,14 +257,5 @@
     be void, so `voidable_tuple1<text>` admits `[a]` and `[_]`.
     """
   voidable_tuple1 => <T> !tuple { elements: [{ element_type: T  voidable: true }] }
-
-  @doc:"""
-    Documentation for a declaration, a field or a document. The text is
-    CommonMark 0.31.2 (https://spec.commonmark.org/0.31.2/) with no extensions.
-    Every string is valid CommonMark, so this refuses nothing and says only how
-    the text is displayed. Raw HTML in it is never executed, and a renderer need
-    not render it.
-    """
-  doc => @annotation text
 
 }

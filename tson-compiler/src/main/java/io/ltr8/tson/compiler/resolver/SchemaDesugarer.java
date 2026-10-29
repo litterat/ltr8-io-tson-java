@@ -83,8 +83,8 @@ import java.util.function.UnaryOperator;
  * The enclosing container then routes a plain name like any other, at any depth. See {@link #elementRef}.
  *
  * <p><b>An application is a user template, and it passes through.</b> {@code name&lt;args&gt;} resolves its
- * head through the type-name namespace only (§3.3.1) -- parameters, then locals, then imports -- so it can
- * only ever be a §5.10 template application, and {@code TemplateMaterialiser} closes it over the
+ * head in the schema's namespace -- parameters, then locals, then imports -- so it can only ever be a §5.10
+ * template application, and {@code TemplateMaterialiser} closes it over the
  * <em>resolved</em> form one phase later. What is checked here is the one thing an AST alone decides: a head
  * this document declares with no parameters takes no arguments at all. See {@link #checkTemplateApplication}.
  *

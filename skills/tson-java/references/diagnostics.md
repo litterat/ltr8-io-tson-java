@@ -48,8 +48,9 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
   not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in one
   document both get reported. No construct the bundled schemas declare reaches one; what still can is a
-  document read against an entry built with a meta layer's own namespace type (§2.2.2's extension point), which
-  is a value and has no reader.
+  document read against an entry built with a schema's own namespace type, which is a value and has no reader;
+  a value at a `ref<T>`-typed position of a data document; and, in a schema, applying a constructor or
+  reading an annotation value against a type declared in the same document (SPEC-FEEDBACK.md #7).
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
   document than a gap is. It normally fails the bind-mode compile as an exception instead; it reaches a
   read as a diagnostic for a schema compiled on demand, and where the bound class refuses a value the schema

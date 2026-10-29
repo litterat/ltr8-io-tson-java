@@ -9,6 +9,8 @@ import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,11 +35,15 @@ class SchemaNameAnnotationTest {
     }
 
     private static TsonSchema linked(String id) {
+        return linkedSchema(id).schema();
+    }
+
+    private static io.ltr8.tson.schema.TsonLinkedSchema linkedSchema(String id) {
         TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
                 SchemaMetaNameBinder.defaultContext(), uri -> {
                     throw new IllegalStateException("unexpected fetch: " + uri);
                 });
-        return core.resolveLinked(id).schema();
+        return core.resolveLinked(id);
     }
 
     /** Bound through the type §6 says the name refers to -- {@code doc => documentation => text}, so a String. */
@@ -45,8 +51,8 @@ class SchemaNameAnnotationTest {
     void aDeclarationsDocArrivesAsAString() {
         Namespace<Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
 
-        assertEquals("Two-value boolean enumeration.",
-                core.getAnnotations("boolean").value("doc", String.class).orElseThrow());
+        assertEquals("128-bit identifier per RFC 9562.",
+                core.getAnnotations("uuid").value("doc", String.class).orElseThrow());
     }
 
     /** The plain-key interface is untouched, which is the whole point of the facade. */
@@ -66,10 +72,13 @@ class SchemaNameAnnotationTest {
      */
     @Test
     void everyCoreDeclarationKeepsItsDocumentationThroughLinking() {
-        Namespace<Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
+        io.ltr8.tson.schema.TsonLinkedSchema linked = linkedSchema(TsonBundledSchemas.CORE_ID);
+        Namespace<Top> core = linked.schema().entries();
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.CORE_ID);
 
-        long documented = core.keySet().stream().filter(k -> core.getAnnotations(k).has("doc")).count();
-        assertEquals(core.size(), documented, "core.tn documents every declaration it makes");
+        List<String> declared = core.keySet().stream().filter(k -> linked.originOf(k).equals(own)).toList();
+        long documented = declared.stream().filter(k -> core.getAnnotations(k).has("doc")).count();
+        assertEquals(declared.size(), documented, "core.tn documents every declaration it makes");
     }
 
     /** An imported name keeps the documentation its own schema resolved, not the importer's. */

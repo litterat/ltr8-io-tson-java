@@ -80,9 +80,8 @@ import java.util.function.Function;
  *
  * <p><b>A written type narrows what the positions give</b> ({@code <T: text, N: int8>}), read by the kind they
  * give: on a value parameter it replaces {@code type} and must IS-A the derived one; on a type parameter it is the
- * bound and must IS-A any bound the uses carry. Two same-named entries with identical bodies -- a core type and
- * the kernel original it copies -- count as one type here, so {@code <S: text>} over a slot typed by the
- * kernel's {@code text} is the narrowing it reads as.
+ * bound and must IS-A any bound the uses carry. One name denotes one entry in the schema's namespace, so {@code
+ * <S: text>} over a slot typed by the kernel's {@code text} is the narrowing it reads as.
  *
  * <p><b>An imported template is taken as recorded</b>, not walked again: its schema resolved it, and its recorded
  * parameters carry what its author wrote, which its held body does not.
@@ -122,18 +121,21 @@ final class ParameterTypes {
         }
     }
 
+    /** [TSON-SCHEMA] §4.1's root: an entry IS-A it is a constructor. */
+    private static final String TOP = "top";
+
     private ParameterTypes() {
     }
 
     /**
-     * Whether {@code template}'s value parameters are the governing meta's types, read and checked in the structure
-     * namespace (§5.10): a template whose body applies a meta constructor other than {@code record} --
-     * {@code vec => <N> !array { element_type: text  min_items: N }} -- binds its values into the meta's own
-     * structure, so {@code N} is the meta's {@code non_negative_integer} whatever the schema declares under that
-     * name, and a written narrowing names a type there too. A record template's fields are typed by the schema, so
-     * its parameters read in the schema's namespace. A template whose body applies another template takes that
-     * template's form. A type parameter's bound is the schema's either way: its argument names a schema type, the
-     * way {@code set<T>} captures a local name into the meta's {@code element_type}.
+     * Whether {@code template}'s value parameters are typed by the applied constructor's slots, read and checked among
+     * the schema's imports (§5.10): a template whose body applies a constructor other than {@code record} -- {@code vec
+     * => <N> !array { element_type: text  min_items: N }} -- binds its values into the constructor's own structure, so
+     * {@code N} is the kernel's {@code non_negative_integer}, and a written narrowing names an imported type too, the
+     * constructor's reader being the one that reads the argument. A record template's fields are typed by the schema,
+     * so its parameters read in the schema's namespace. A template whose body applies another template takes that
+     * template's form. A type parameter's bound is the schema's either way: its argument names a schema type, the way
+     * {@code set<T>} captures a local name into the meta's {@code element_type}.
      */
     static boolean readsInStructure(Top template, Function<String, Top> entries) {
         Top current = template;
@@ -413,10 +415,9 @@ final class ParameterTypes {
             if (declared.isPresent()) {
                 if (structural && meta.apply(declared.get().name()) == null) {
                     throw new SchemaValidationException("parameter '" + parameter + "' is declared '" + parameter
-                            + ": " + spell(declared.get()) + "', and this template applies a constructor of the "
-                            + "governing meta, so its value parameters are the meta's types and a written type "
-                            + "names one there -- '" + declared.get().name() + "' is not in the structure namespace "
-                            + "(§5.10)");
+                            + ": " + spell(declared.get()) + "', and this template applies a constructor, whose "
+                            + "reader reads its value parameters, so a written type names a type this schema "
+                            + "imports -- '" + declared.get().name() + "' is not one (§5.10)");
                 }
                 Use mine = new Use(declared.get(), !structural);
                 if (!isA(mine, derived, local, meta)) {
@@ -432,22 +433,22 @@ final class ParameterTypes {
 
         /**
          * A written bound names a type, so its name -- an application's head, where it is one -- resolves in the
-         * type-name namespace and nowhere else. The governing meta's constructors are structure vocabulary
-         * (§3.3.1): a bound naming one would admit no argument, since a type argument names a type, and the
-         * lookup that falls back to the meta for a slot's declared type must not reach it here.
+         * schema's namespace and names no constructor: a type argument names a type, which IS-A no constructor
+         * (§4.1), so a bound naming one would admit no argument.
          */
         private static void requireType(TypeRef bound, Function<String, Top> local,
                                         Function<String, Top> meta) {
             String name = bound.name();
-            if (local.apply(name) != null) {
-                return;
+            Top named = local.apply(name);
+            if (named == null) {
+                throw new SchemaValidationException("the bound '" + spell(bound) + "': '" + name + "' names no "
+                        + "type in this schema or its imports (§5.10)");
             }
-            throw new SchemaValidationException(meta.apply(name) != null
-                    ? "the bound '" + spell(bound) + "' names '" + name + "', and '" + name + "' is a constructor "
-                            + "of the governing meta -- structure vocabulary, not a type (§3.3.1); a bound names a "
-                            + "type, which every argument must IS-A (§5.10)"
-                    : "the bound '" + spell(bound) + "': '" + name + "' names no type in this schema or its "
-                            + "imports (§5.10)");
+            if (TOP.equals(name) || TypeChain.supertypesOf(named).contains(TOP)) {
+                throw new SchemaValidationException("the bound '" + spell(bound) + "' names '" + name + "', and '"
+                        + name + "' is a constructor, not a type (§4.1); a bound names a type, which every argument "
+                        + "must IS-A (§5.10)");
+            }
         }
 
         /** The use every other use is a supertype of, or a resolver error where no such use exists. */
@@ -467,8 +468,7 @@ final class ParameterTypes {
         }
 
         /**
-         * Whether {@code a}'s type IS-A {@code b}'s: equal, {@code b} among the supertypes {@code a} records, or
-         * the same name for two entries with the same body -- a core type and the kernel original it copies.
+         * Whether {@code a}'s type IS-A {@code b}'s: equal, or {@code b} among the supertypes {@code a} records.
          */
         static boolean isA(Use a, Use b, Function<String, Top> local, Function<String, Top> meta) {
             if (a.type().equals(b.type())) {
@@ -481,12 +481,7 @@ final class ParameterTypes {
             if (definition == null) {
                 return false;
             }
-            if (TypeChain.supertypesOf(definition).contains(b.type().name())) {
-                return true;
-            }
-            Top other = lookup(b, local, meta);
-            return other != null && a.type().name().equals(b.type().name())
-                    && TypeChain.withoutChain(definition).equals(TypeChain.withoutChain(other));
+            return TypeChain.supertypesOf(definition).contains(b.type().name());
         }
 
         private static Top lookup(Use use, Function<String, Top> local,
@@ -682,7 +677,7 @@ final class ParameterTypes {
         /**
          * A name's resolved body, reference chains followed -- the slot type a written value faces. A namespace type
          * faces it as the map its value is ({@link MapBody#ofNamespace}): {@code record}'s {@code fields} is written
-         * as a map. The walk is over the governing meta's vocabulary, where {@code namespace} is the kernel's.
+         * as a map. The walk is over the imported vocabulary, where {@code namespace} is the kernel's.
          */
         private Top resolve(String name) {
             Top definition = meta.apply(name);

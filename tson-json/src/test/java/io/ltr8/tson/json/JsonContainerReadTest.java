@@ -45,7 +45,7 @@ class JsonContainerReadTest {
                 version:   text = "2.0"
               }
 
-              bounded => {
+              capped => {
                 value: int32
                 ( min: int32 | max: int32 )
               }
@@ -286,11 +286,11 @@ class JsonContainerReadTest {
 
     @Test
     void aRequiredGroupTakesExactlyOneMember() {
-        read("bounded", """
+        read("capped", """
                 {"value": 1, "min": 0}""").accepted();
-        assertEquals(Diagnostic.Code.FIELD_GROUP, read("bounded", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("capped", """
                 {"value": 1}""").refusal().code());
-        assertEquals(Diagnostic.Code.FIELD_GROUP, read("bounded", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("capped", """
                 {"value": 1, "min": 0, "max": 9}""").refusal().code());
     }
 

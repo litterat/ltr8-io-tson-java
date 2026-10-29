@@ -9,32 +9,21 @@
   vocabulary (`schema`, `record`, `enum`, ...) reaches it
   through meta's kernel import. As a data document, this header
   cannot carry `!!import`: the namespace in which this map's
-  type-name tokens resolve (core.tn's locals; core imports nothing)
-  is declared by the source schema's header and supplied at ingest
-  ([TSON-SCHEMA] Section 8.1), never by this document. The
-  annotation types used here
-  (`doc` from the kernel via that import; `ordering`, `bounded`,
-  `exact`, `numeric` from meta itself) resolve one hop against meta's
-  namespace. Constructor names at entries' tags
+  type-name tokens resolve (core.tn's locals and the closure of
+  meta.tn, which core imports) is declared by the source schema's
+  header and supplied at ingest ([TSON-SCHEMA] Section 8.1), never
+  by this document. The annotation types used here (`ordering`,
+  `bounded`, `exact`, `numeric`) are meta's. Constructor names at entries' tags
   (`integer_type`, `decimal_type`, `float_type`, `complex_type`, ...)
   likewise name meta- and kernel-level entries.
 
-  The open entries (`set`, `kind`, `tuple1`, `voidable_tuple1`) hold
+  The open entries (`tuple1`, `voidable_tuple1`) hold
   their bodies — the application as written, unread until
   materialisation substitutes the parameters away — so a token in one is a parameter reference rather than a value of the
   slot's declared type (Part 2 Section 5.10's shadowing rule). A
   processor comparing these compares wire form, not bound values.
   """
 !schema {
-  void => !void_type {}
-
-  boolean => !enum { members: [true false] }
-
-  @ordering:TOTAL @bounded:false @exact:true @numeric
-  integer => !integer_type {
-    chain: { subtypes: [int128 int16 int256 int32 int64 int8 uint128 uint16 uint256 uint32 uint64 uint8] }
-  }
-
   @ordering:TOTAL @bounded:false @exact:true @numeric
   number => !decimal_type {}
 
@@ -87,22 +76,13 @@
   float64 => !float_type { format: BINARY64 }
 
   @ordering:NONE @bounded:false
-  text => !text_type {}
-
-  @ordering:NONE @bounded:false
-  regex => !regex_type {}
-
-  @ordering:NONE @bounded:false
   uri_reference => !uri_type { chain: { subtypes: [uri] } }
 
   @ordering:NONE @bounded:false
   uri => !uri_type { chain: { supertypes: [uri_reference] }  allow_relative: false }
 
   @ordering:NONE @bounded:false
-  iri_reference => !iri_type { chain: { subtypes: [iri] } }
-
-  @ordering:NONE @bounded:false
-  iri => !iri_type { chain: { supertypes: [iri_reference] }  allow_relative: false }
+  iri_reference => !iri_type {}
 
   @ordering:NONE @bounded:false
   bytes => !bytes_type {}
@@ -131,16 +111,10 @@
   @ordering:NONE @bounded:false
   declared => !declared_type {}
 
-  set => !template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }
-
-  kind => !template { parameters: [{ name: T  type: type_name }]  template: "!kind_type { of: T }" }
-
   tuple1 => !template { parameters: [{ name: T  type: type_kind }]  template: "!tuple { elements: [{ element_type: T }] }" }
 
   voidable_tuple1 => !template {
     parameters: [{ name: T  type: type_kind }]
     template: "!tuple { elements: [{ element_type: T  voidable: true }] }"
   }
-
-  doc => @annotation !reference { target: text }
 }

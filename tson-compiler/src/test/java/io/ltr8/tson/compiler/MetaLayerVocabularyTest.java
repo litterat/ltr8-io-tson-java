@@ -364,47 +364,41 @@ class MetaLayerVocabularyTest {
         assertEquals(Optional.of("hello"), value.get("q").asString());
     }
 
-    // ── A meta layer's own vocabulary is not in the governed schema's namespace ──────────────────
+    // ── A meta layer's own vocabulary is in the governed schema's namespace ──────────────────────
 
     /**
-     * <b>Every reference form gives the same verdict, applied or not.</b> {@code !!meta} says where this
-     * schema's constructors come from; it merges nothing into the type-name namespace (§3.3.2), so a name the
-     * meta layer declares -- atom, record, or template -- is simply unresolved in a schema it governs.
-     *
-     * <p>The applied row is the one a second lookup path would get wrong: an application this schema cannot close
-     * is unresolved like any other reference, never found in the governing meta's structure namespace and
-     * faulted for arguments the author had in fact written.
+     * <b>Every reference form resolves, applied or not.</b> One namespace per schema (SPEC-FEEDBACK.md #7): the
+     * {@code !!meta} target contributes its namespace as an {@code !!import} does, so a name the meta layer declares
+     * -- atom, record, or template -- is a type of the schema it governs, and an application of a template there is
+     * judged by its arity as any other.
      */
     @Test
-    void aMetaLayerNameIsUnresolvedInAGovernedSchemaWhetherOrNotItIsApplied() {
-        record Reference(String label, String declaration, String unresolved) {
+    void aMetaLayerNameResolvesInAGovernedSchemaWhetherOrNotItIsApplied() {
+        record Reference(String label, String declaration) {
         }
         List<Reference> references = List.of(
-                new Reference("atom", "x => { s: status_code }", "status_code"),
-                new Reference("record", "x => { s: plain }", "plain"),
-                new Reference("valueRecord", "x => { s: operation }", "operation"),
-                new Reference("template", "x => { s: envelope }", "envelope"),
-                new Reference("appliedInField", "x => { s: envelope<text> }", "envelope"),
-                new Reference("applied", "x => envelope<text>", "envelope"),
-                new Reference("appliedWithWrongArity", "x => pair<text>", "pair"));
+                new Reference("atom", "x => { s: status_code }"),
+                new Reference("record", "x => { s: plain }"),
+                new Reference("valueRecord", "x => { s: operation }"),
+                new Reference("appliedInField", "x => { s: envelope<text> }"),
+                new Reference("applied", "x => envelope<text>"));
 
         for (Reference reference : references) {
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> linked("scope" + reference.label(), SEARCH + "\n  " + reference.declaration()),
-                    () -> "expected " + reference.label() + " to be refused");
-
-            assertTrue(thrown.getMessage().contains("unresolved reference '" + reference.unresolved() + "'"),
-                    reference.label() + ": " + thrown.getMessage());
+            TsonLinkedSchema schema = linked("scope" + reference.label(), SEARCH + "\n  " + reference.declaration());
+            assertTrue(schema.schema().entries().containsKey("x"), reference.label());
         }
+        SchemaValidationException arity = assertThrows(SchemaValidationException.class,
+                () -> linked("scopearity", SEARCH + "\n  x => pair<text>"));
+        assertTrue(arity.getMessage().contains("pair"), arity.getMessage());
     }
 
-    /** The control: the same template declared locally applies exactly as it always has. */
+    /** And a governed schema declaring a name its meta layer declares collides with it (§2.2.3). */
     @Test
-    void theSameTemplateDeclaredLocallyStillApplies() {
-        TsonLinkedSchema schema = linked("localtemplate",
-                SEARCH + "\n  envelope => <T> { body: T }\n  x => envelope<text>");
+    void aLocalDeclarationOfAMetaLayerNameCollides() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> linked("localtemplate", SEARCH + "\n  envelope => <T> { body: T }\n  x => envelope<text>"));
 
-        assertTrue(schema.schema().entries().containsKey("x"));
+        assertTrue(thrown.getMessage().contains("'envelope' collides"), thrown.getMessage());
     }
 
     /** §8.1's resolved output writes the entry as written: the constructor's tag, then the map of operations. */

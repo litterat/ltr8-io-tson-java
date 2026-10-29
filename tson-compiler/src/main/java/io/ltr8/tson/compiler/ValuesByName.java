@@ -10,9 +10,9 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.TsonSchemaLoader;
+import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * The names a value entry holds -- a {@link Namespace}, a value of a namespace type -- resolved and judged by their slots
@@ -44,22 +45,21 @@ import java.util.function.Consumer;
  * {@code orders.1x}, {@code .orders} and {@code orders.} are refused as no qualified name before anything is looked
  * up. A reference carrying arguments is no value by name.
  *
- * <p><b>Two layers meet here.</b> The slot's type is the meta-schema's to declare, and arrives with the name: the
- * reader that read the name was built from the slot's declared type and recorded it beside the name ({@link
- * TsonSchema.SlotType}), a kind's {@code of} or a reference's {@code T} in the governing meta's namespace, whatever the
- * host class holds there. The name is the governed schema's to resolve: its first segment through this schema's own
- * entries and imports, alias hops followed ([TSON-SCHEMA] §8.3), never through the meta's namespace (§3.3.2); each
- * further segment selects in the value reached -- a key of a namespace value, a field of a record, never a position in
- * a list -- and a type entry admits none. An open entry is no referent at all: a template denotes no value until it is
- * applied. The referent's declared type is then judged against the slot's by §7.2's IS-A, comparing canonical
- * identities: an entry's declared type is the constructor that built its body, a field's is its type, and a map value's
- * is the map's value type. Found first, judged after, never a choice among candidates.
+ * <p><b>One namespace holds both sides.</b> The slot's type arrives with the name: the reader that read the name was
+ * built from the slot's declared type and recorded it beside the name ({@link TsonSchema.SlotType}), a kind's {@code
+ * of} or a reference's {@code T}, whatever the host class holds there. Both it and the name resolve in this schema's
+ * one namespace, its own entries and its import closure: the first segment, alias hops followed ([TSON-SCHEMA] §8.3),
+ * and each further segment selects in the value reached -- a key of a namespace value, a field of a record, never a
+ * position in a list -- and a type entry admits none. An open entry is no referent at all: a template denotes no value
+ * until it is applied. The referent's declared type is then judged against the slot's by §7.2's IS-A, comparing
+ * canonical identities: an entry's declared type is the constructor that built its body, a field's is its type, and a
+ * map value's is the map's value type. Found first, judged after, never a choice among candidates.
  *
- * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor of the
- * declaring schema's meta layer, and otherwise the kernel constructor its body mirrors ({@code @Typename}): a record
- * declaration or a composition is built by {@code record}, and {@code uuid => !uuid_type {}} by {@code uuid_type}.
- * Each type is looked up in the namespace of the meta layer that governs the schema declaring it, so an imported
- * referent is judged by its own meta's vocabulary and still compared by identity.
+ * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor, and
+ * otherwise the kernel constructor its body mirrors ({@code @Typename}): a record declaration or a composition is
+ * built by {@code record}, and {@code uuid => !uuid_type {}} by {@code uuid_type}. An imported referent's constructor
+ * is in the closure that declared it, which this schema's closure contains, so every type is looked up in the one
+ * namespace and compared by identity, declaring schema and name.
  *
  * <p><b>The value is walked beside its type.</b> A namespace entry holds the map its constructor describes, so a
  * segment selects a key of it and the value reached is of the constructor's {@code value_type}; a value of a namespace
@@ -77,41 +77,42 @@ final class ValuesByName {
 
     private final Map<String, Top> merged;
     private final Map<String, TsonSchema.EntryFacts> facts;
-    private final Map<String, String> origins;
-    private final String ownIdentity;
-    private final TsonLinkedSchema governingMeta;
-    private final TsonSchemaLoader loader;
+    private final Space space;
     private final DataBindContext values;
 
     /**
+     * @param namespaces the map a value of each namespace type in the closure is read as
      * @param values the bind context the schema's namespace values were bound under, which a field step reads a
      *               record value through; {@code null} where the link was given none
      */
     ValuesByName(TsonSchema schema, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                 Map<String, String> origins, TsonLinkedSchema governingMeta, TsonSchemaLoader loader,
-                 DataBindContext values) {
+                 Map<String, String> origins, Map<String, MapBody.Namespace> namespaces, DataBindContext values) {
         this.merged = merged;
         this.facts = facts;
-        this.origins = origins;
-        this.ownIdentity = CanonicalIdentity.canonicalize(schema.id());
-        this.governingMeta = governingMeta;
-        this.loader = loader;
+        String ownIdentity = CanonicalIdentity.canonicalize(schema.id());
+        this.space = new Space(merged, name -> origins.getOrDefault(name, ownIdentity), namespaces);
         this.values = values;
     }
 
-    /** A type named in one meta layer's namespace: where its name is looked up, and the name. */
-    private record Typed(TsonLinkedSchema space, String name) {
+    /** The schema's one namespace: its entries, where each was declared, and the map each namespace type reads as. */
+    private record Space(Map<String, Top> entries, Function<String, String> originOf,
+                         Map<String, MapBody.Namespace> namespaces) {
 
-        private Namespace<Top> entries() {
-            return space.schema().entries();
+        /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link EntryKind#isConstructor}). */
+        boolean isConstructor(String name, Top value) {
+            return EntryKind.isConstructor(name, value, entry -> TsonBundledSchemas.isMetaKernel(originOf.apply(entry)));
         }
+    }
+
+    /** A type named in the schema's namespace. */
+    private record Typed(Space space, String name) {
 
         String terminal() {
-            return ReferenceChain.terminal(name, entries()::get);
+            return ReferenceChain.terminal(name, space.entries()::get);
         }
 
         Top definition() {
-            return entries().get(terminal());
+            return space.entries().get(terminal());
         }
 
         Typed of(String typeName) {
@@ -124,15 +125,16 @@ final class ValuesByName {
          */
         String identity() {
             String terminal = terminal();
-            return space.originOf(terminal) + "#" + terminal;
+            return space.originOf().apply(terminal) + "#" + terminal;
         }
 
         /**
          * What a value of this type is read as: the map a namespace type's value is ({@link
-         * TsonLinkedSchema#namespace}), and the definition otherwise.
+         * MapBody#ofNamespace}), and the definition otherwise.
          */
         Top body() {
-            return space.namespace(terminal()).<Top>map(MapBody.Namespace::map).orElseGet(this::definition);
+            return Optional.ofNullable(space.namespaces().get(terminal())).<Top>map(MapBody.Namespace::map)
+                    .orElseGet(this::definition);
         }
 
         /**
@@ -141,7 +143,7 @@ final class ValuesByName {
          * {@code {K => V}} sugar map is built with {@code map} and is not.
          */
         boolean isNamespace() {
-            return space.namespace(terminal()).isPresent();
+            return space.namespaces().containsKey(terminal());
         }
 
         /** §7.2: this type is {@code wanted}, or lists it among its supertypes. */
@@ -226,10 +228,9 @@ final class ValuesByName {
             judgeMember(where, name, segments, slot, referent, entry);
             return;
         }
-        Typed wanted = new Typed(governingMeta, slot.of());
-        TsonLinkedSchema declarersMeta = metaOf(terminal);
+        Typed wanted = new Typed(space, slot.of());
         Typed at = constructorOf(TsonSchemaLinker.constructorOf(terminal, referent, facts).orElseThrow(), referent,
-                declarersMeta);
+                space);
         if (segments.size() == 1) {
             if (!at.isA(wanted)) {
                 throw new SchemaValidationException(where + " wants " + a(wanted.name()) + ", and " + entry
@@ -325,7 +326,7 @@ final class ValuesByName {
         }
         if (KindMembers.isMember(name, slot.of(), merged::get,
                 named -> TsonSchemaLinker.constructorOf(named, merged.get(named), facts),
-                governingMeta.schema().entries()::get)) {
+                merged::get)) {
             return;
         }
         if (referent instanceof Namespace<?> namespace) {
@@ -372,28 +373,17 @@ final class ValuesByName {
                 + "nothing can be typed by it";
     }
 
-    /** The meta layer governing the schema that declared {@code entry}: this schema's, or an import's own. */
-    private TsonLinkedSchema metaOf(String entry) {
-        String origin = origins.getOrDefault(entry, ownIdentity);
-        if (origin.equals(ownIdentity) || loader == null) {
-            return governingMeta;
-        }
-        return loader.load(origin)
-                .flatMap(declarer -> loader.load(CanonicalIdentity.canonicalize(declarer.schema().meta())))
-                .orElse(governingMeta);
-    }
-
     /**
-     * The constructor that built {@code definition}'s body: its tag where that names a constructor in {@code meta}'s
-     * namespace, and otherwise the kernel constructor the body's class mirrors.
+     * The constructor that built {@code definition}'s body: its tag where that names a constructor, and otherwise
+     * the kernel constructor the body's class mirrors.
      */
-    private static Typed constructorOf(String tag, Top definition, TsonLinkedSchema meta) {
-        Typed source = new Typed(meta, tag);
+    private static Typed constructorOf(String tag, Top definition, Space space) {
+        Typed source = new Typed(space, tag);
         Top constructor = source.definition();
-        if (constructor != null && meta.isConstructor(tag, constructor)) {
+        if (constructor != null && space.isConstructor(tag, constructor)) {
             return source;
         }
-        return new Typed(meta, TsonCompiledMetaSchema.typenameOf(definition));
+        return new Typed(space, TsonCompiledMetaSchema.typenameOf(definition));
     }
 
     /**

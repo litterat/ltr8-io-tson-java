@@ -20,8 +20,8 @@ import java.util.Optional;
  * already re-exports, which is why the schema-directed stack here costs no dependency on {@code
  * tson-compiler}.
  *
- * <p>Deliberately not {@code sealed} the way {@code TsonCompiledSchema} is: a governing meta-schema compiles
- * only for its own resolution, which is the TSON side's business, and [TSON-JSON] §3.4 gives this encoding no
+ * <p>Deliberately not {@code sealed} the way {@code TsonCompiledSchema} is: a schema compiles as vocabulary only
+ * for another schema's resolution, which is the TSON side's business, and [TSON-JSON] §3.4 gives this encoding no
  * schema documents of its own to govern.
  */
 public final class JsonCompiledSchema {

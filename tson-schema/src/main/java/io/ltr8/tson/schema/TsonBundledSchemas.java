@@ -20,7 +20,7 @@ import java.util.Optional;
  * <p>Both the identities and their source text live here, in {@code tson-schema}: "what these documents
  * are" (identity) and "where their content lives" (fetch) sit in the one module every consumer of them
  * already depends on -- {@code tson-compiler}'s {@code TsonCompiledMetaRegistry},
- * {@code MetaKernelBootstrapResolver} and {@code TsonSchemaLinker}'s meta-kernel-governed check among them,
+ * {@code MetaKernelBootstrapResolver} and {@code TsonSchema.namespaceSources} among them,
  * {@code tson-compiler} depending on this module and never the reverse.
  *
  * <p>{@link #fetch} is a static method on a class of constants, so there is no instance to implement
@@ -56,25 +56,25 @@ public final class TsonBundledSchemas {
      * library holds it so a hash-pinned reference to a pre-loaded schema can be verified, and so the
      * shipped resource can be checked against its own published digest ({@link #declaredSha256}).
      */
-    public static final String META_KERNEL_SHA256 = "373302d4cb3437e360d0fc39a50bb971d79eb7c09731589d38bb7f299259f4b5";
+    public static final String META_KERNEL_SHA256 = "cf460fa93a54cb544b0a69fa32c0f6e8e7fe923fb82725c1b0b11121c956ee04";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "f271892f662de4ec256c596b58d675ed7a470afccf0f06c10d23200b8aea822f";
+    public static final String META_SHA256 = "0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "9adb1b91117146334e26d4b0f031bca5622e3680b3f4a7d1ebae5985f1bff645";
+    public static final String CORE_SHA256 = "ac38ef086a93dcea7c58a0e3bce4e74c5e1f2fbb40801c1194ed763f2d37d5cf";
 
     /**
      * net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String NET_SHA256 = "2c7f0eb3003d660be6d66965e4d850297a8999608daf185e5facb9c6f0b3c145";
+    public static final String NET_SHA256 = "d6bd4c485c76517ac7b490a0b2d0bb8cdccb6b2bdc7cae42d42e12aab5b6b006";
 
     /**
      * policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s {@code
      * !!id}. See {@link #META_KERNEL_SHA256}.
      */
-    public static final String POLICY_SHA256 = "6b7c5101e3230e36f78c350074ede34e0a048ab51c407b5a716f1902c809446c";
+    public static final String POLICY_SHA256 = "e26341c05d8e5a29980b15a52c6b450221bcae35834a30acfe9f7f918101f303";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",

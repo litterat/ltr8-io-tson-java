@@ -178,7 +178,7 @@ pointer into the data and nothing else.
 
 **At the schema and link layers the category is the phase's, not the diagnostic code's.** §8.1 says every
 error that makes a schema fail to load or ingest is a resolver error "however value-like the violated rule",
-so a schema-authoring mistake this library catches through the meta's own compiled reader arrives carrying a
+so a schema-authoring mistake this library catches through a constructor's compiled reader arrives carrying a
 record-shaped code and is still a resolver error. What is checked per diagnostic instead is that each one is
 a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch codes say the vector could not be judged, and
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.

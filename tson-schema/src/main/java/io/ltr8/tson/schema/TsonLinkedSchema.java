@@ -48,7 +48,7 @@ import java.util.Optional;
  * ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's {@code identifier} is
  * NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed matches its members as
  * written. No reader can derive it: a {@code name_type} the enum's constructor pinned names an entry of the
- * governing meta-schema, which is not in {@link TsonSchema#entries()} and which linking is the last phase to see.
+ * closure, which the resolved {@link TsonSchema#entries()} do not hold and which linking is the last phase to see.
  * Like {@code entryOrigins} it is carried through {@code !!import}, each enum judged in the schema that declared it.
  *
  * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record whose {@code

@@ -13,11 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code identifier_type} end to end: a UAX #31 profile whose text facets apply inside it, so a naming convention
- * is a {@code pattern} and a closed vocabulary of names is {@code members} -- each refused as a facet, where a
- * name outside the profile is refused as the profile. Reached both by refining an {@code identifier} the schema
- * declares -- core declares none, so a schema importing it is free to -- and by constructing the family directly,
- * with the kernel's profile or another. A refinement narrows the text facets and restates the profile, never
+ * {@code identifier_type} end to end: a UAX #31 profile whose text facets apply inside it, so a naming convention is a
+ * {@code pattern} and a closed vocabulary of names is {@code members} -- each refused as a facet, where a name outside
+ * the profile is refused as the profile. Reached both by refining a family the schema declares ({@code slug}, under a
+ * name of its own: the kernel's {@code identifier} is in every closure reaching core) and by constructing the family
+ * directly, with the kernel's profile or another. A refinement narrows the text facets and restates the profile, never
  * moves it.
  */
 class IdentifierFamilyTest {
@@ -28,11 +28,11 @@ class IdentifierFamilyTest {
             !!meta:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             {
-              identifier => !identifier_type { continue_add: "-" }
-              snake_name => !identifier ^ { pattern: "[a-z][a-z0-9_]*" }
+              slug => !identifier_type { continue_add: "-" }
+              snake_name => !slug ^ { pattern: "[a-z][a-z0-9_]*" }
               direction => !identifier_type { members: [north south] }
               route => { name: snake_name  heading: direction }
-              handlers => { identifier => text }
+              handlers => { slug => text }
               kebab_name => !identifier_type { medial: "-" }
               js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
               short_kebab => !kebab_name ^ { max_length: 12  medial: "-" }
@@ -104,9 +104,9 @@ class IdentifierFamilyTest {
     /** The profile facets are fixed where the profile is constructed: a refinement restates them or leaves them. */
     @Test
     void aRefinementThatMovesTheProfileIsRefused() {
-        for (String refinement : List.of("!identifier ^ { start_add: \"_\" }", "!identifier ^ { exclude: \"_\" }",
-                "!identifier ^ { start: ID }", "!identifier ^ { normalization: NONE }",
-                "!identifier ^ { continue_add: \"-_\" }")) {
+        for (String refinement : List.of("!slug ^ { start_add: \"_\" }", "!slug ^ { exclude: \"_\" }",
+                "!slug ^ { start: ID }", "!slug ^ { normalization: NONE }",
+                "!slug ^ { continue_add: \"-_\" }")) {
             List<Diagnostic> refused = tson().validateSchema(schemaWith("moved => " + refinement));
             assertEquals(1, refused.size(), refinement + ": " + refused);
             assertTrue(refused.getFirst().message().contains("a refinement only restates it"),
@@ -129,7 +129,7 @@ class IdentifierFamilyTest {
                 !!meta:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 {
-                  identifier => !identifier_type { continue_add: "-" }
+                  slug => !identifier_type { continue_add: "-" }
                   %s
                 }
                 """.formatted(declaration);

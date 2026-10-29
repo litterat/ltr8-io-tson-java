@@ -80,9 +80,9 @@ class NamespaceTypeTest {
         assertEquals(List.of(), read("{ key_type => \"x\" }"));
     }
 
-    /** A schema importing the layer to type a field by its namespace type is refused at the import (§2.2.3). */
+    /** A schema importing the layer types a field by its namespace type, as by any imported type. */
     @Test
-    void anOrdinarySchemaMayNotImportTheLayerToTypeAFieldByIt() {
+    void aSchemaImportingTheLayerTypesAFieldByIt() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/request.tn"
                 !!meta:"https://tson.io/2026/39/m/meta.tn"
@@ -92,8 +92,7 @@ class NamespaceTypeTest {
                 }
                 """);
 
-        assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("governing level"), problems::toString);
+        assertEquals(List.of(), problems);
     }
 
     @Test
@@ -132,11 +131,11 @@ class NamespaceTypeTest {
     }
 
     /**
-     * A namespace type IS-A {@code top}, so only a schema the meta-kernel governs declares one: an ordinary schema
-     * reaches the kernel's {@code namespace} only by importing a kernel-governed schema, which is refused (§2.2.3).
+     * A namespace type IS-A {@code top}, and any schema declares one: the kernel's {@code namespace} is in the
+     * closure of every schema reaching meta.tn (SPEC-FEEDBACK.md #7).
      */
     @Test
-    void aNamespaceTypeIsDeclaredUnderTheMetaKernel() {
+    void anySchemaDeclaresANamespaceType() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/governed.tn"
                 !!meta:"https://tson.io/2026/39/m/meta.tn"
@@ -146,8 +145,7 @@ class NamespaceTypeTest {
                 }
                 """);
 
-        assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("governing level"), problems::toString);
+        assertEquals(List.of(), problems);
     }
 
     /** A namespace type leaving a facet open describes no map, unless it is abstract. */

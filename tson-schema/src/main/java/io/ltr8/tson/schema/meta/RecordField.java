@@ -42,8 +42,8 @@ import java.util.Optional;
  * it a mismatch. It is this implementation's own, kept for diagnostics -- a read reporting against a field
  * locates the pointer at the field ({@code /person/age}) and, without this, could pair it only with the
  * enclosing declaration's line, so six broken fields of one record all pointed at the record. It is
- * deliberately <em>not</em> carried in the annotation channel: that channel is schema data, resolves one
- * hop against the governing meta (§6) and round-trips into resolver output, none of which is true of a
+ * deliberately <em>not</em> carried in the annotation channel: that channel is schema data, resolves in the
+ * schema's namespace (§6) and round-trips into resolver output, none of which is true of a
  * source position.
  *
  * <p>Excluded from {@link #equals}/{@link #hashCode} on the same footing as {@code annotations}, and for

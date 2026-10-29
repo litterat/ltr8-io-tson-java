@@ -207,10 +207,10 @@ public final class MetaKernelBootstrapResolver {
                     preLoaded.add(declaration.name());
                 }
             }
-            // The kernel governs itself: the structure namespace a construction's head resolves in is the one being
-            // built, and every name it holds is the kernel's own.
+            // The kernel is read over itself: the entries a construction's head resolves in are the ones being built,
+            // every name it holds is the kernel's own, and a head declared beside its instance is read in wait order.
             this.resolver = new DefinitionResolver(this::read, null, this, this, null, positions, facts,
-                    name -> true, name -> true);
+                    name -> true, name -> true, name -> false);
         }
 
         /** Every entry, ready, in the order the kernel declares them. */

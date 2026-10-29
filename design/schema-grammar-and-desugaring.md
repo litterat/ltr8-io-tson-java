@@ -10,7 +10,7 @@ The schema grammar itself is in `design/schema-grammar.md`.
   declaration that is rebuilt has its position re-registered against the node replacing it (`SchemaDesugarerTest`).
 - `TypeRef.arguments` non-empty means an open form, a template application; everything closed is an entry referenced by
   a bare name, so `DefinitionResolver` only ever sees a bare reference or `!C value`.
-- The phase is purely syntactic and consults no governing meta: the sugar table is fixed, so meta-kernel's bootstrap
+- The phase is purely syntactic and consults no other schema: the sugar table is fixed, so meta-kernel's bootstrap
   needs no special case.
 - An injected name derives from the resolved binding record, never the spelling and never the AST's own `toString` or
   `hashCode`; `SchemaDesugarerTest` pins two derived names to exact strings.
@@ -69,7 +69,7 @@ deduplication would not disappear, only relocate: `[text]` in five records must 
 compile five readers, so the compiler would need a memo keyed on ref structure, which is the naming below
 rebuilt and called a cache.
 
-- **Purely syntactic, and per declaration — no governing meta.** The sugar set is closed and
+- **Purely syntactic, and per declaration — no other schema consulted.** The sugar set is closed and
   grammar-supplied, so the head each form desugars to and the vocabulary field each argument fills are a
   fixed table:
 
@@ -85,13 +85,14 @@ rebuilt and called a cache.
   | `{K => V; N..M}` | the same, plus `min_items`/`max_items` |
 
   The constructors being parameterless (§4.2), the table above is the whole rule: `SchemaResolver` threads no
-  governing-meta entries into the phase, and **meta-kernel's bootstrap needs no special case** — routing read
-  off the governing meta would, for the three constructors meta-kernel applies to itself, have to come from
+  imported entries into the phase, and **meta-kernel's bootstrap needs no special case** — routing read
+  off the imported vocabulary would, for the three constructors meta-kernel applies to itself, have to come from
   the very entries it is in the middle of producing.
 - **A generic application is a user template, and this phase mostly leaves it alone.** `name<args>` resolves
-  its head through the type-name namespace only (§3.3.1) — parameters, then locals, then imports — so
-  `map<text, text>` finds nothing and is an ordinary unresolved reference for the linker to report, and
-  anything that *does* resolve is a §5.10 template. Substitution happens over the **resolved** form
+  its head in the schema's one namespace (§3.3.1) — parameters, then locals, then the closure — so
+  `map<text, text>` finds the kernel's `map`, a parameterless constructor, and is refused as declaring no type
+  parameters (`ContainerSugarEndToEndTest`); `{text => text}` is the spelling. A head that resolves to a
+  template is a §5.10 one. Substitution happens over the **resolved** form
   (`TemplateMaterialiser`, `design/template-materialisation.md`), not over the AST, so an application passes through
   here with its head and arguments intact. `checkTemplateApplication` refuses exactly one thing: a local
   head declaring *no* parameters, the author's error — nothing there takes type arguments. A head this
@@ -114,9 +115,9 @@ rebuilt and called a cache.
   tuple position needs a record built for it. `voidable` is written only for a marked position — the member
   is defaulted (`voidable?: boolean ~ false`), so an unmarked one is spelled by omitting it,
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the
-  governing meta's compiled reader, where an undeclared member is `UNRECOGNIZED_FIELD` under §7.2's closure.
-  §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question about
-  what names *resolve to*, at the end of each variant's reference chain, which has no answer until the whole
+  compiled reader of the schema declaring the constructor, where an undeclared member is `UNRECOGNIZED_FIELD` under
+  §7.2's closure. §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question
+  about what names *resolve to*, at the end of each variant's reference chain, which has no answer until the whole
   namespace exists, imports merged. `TsonSchemaLinker.checkVariantsAreDistinct` asks it
   (`design/choice-disjointness.md`).
 - **Both declaration-level tiers desugar in place.** At declaration position the form *is* the construction
@@ -177,5 +178,5 @@ rebuilt and called a cache.
   rather than a field on the pass, because `hoist` deliberately does *not* inject a form an `!!import`
   already declares: that entry is the same form resolved by the schema that owns it, and marking it here
   would put this document's derived marker on someone else's key.
-- **The meta-kernel runs this phase too, with no accommodation at all** — its governing meta is itself, and
+- **The meta-kernel runs this phase too, with no accommodation at all** — it reads through itself, and
   with the table fixed there is nothing to look up.

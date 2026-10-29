@@ -72,13 +72,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      * <p><b>Meta-kernel itself is registered via ordinary {@code SchemaResolver.resolveSchema}, not
      * the raw bootstrap output</b> ({@code TsonSchemaRegistry#register} refuses <i>any</i>
      * self-referential schema with {@code bootstrap() == true}, materialized or not). The loader's own
-     * bootstrap branch supplies the structure namespace while resolving (so even {@code boolean =>
+     * bootstrap branch supplies the compiled readers while resolving (so even {@code boolean =>
      * !enum [...]} resolves correctly despite the forward reference); that result carries no {@code
-     * bootstrap} flag, so {@link TsonSchemaRegistry#register} accepts it. {@code registry.register}'s
-     * own {@code governingMeta} argument is meta-kernel's own freshly re-bootstrapped {@link
-     * TsonCompiledMetaSchema} (never cached for that identity -- see {@link
-     * TsonCompiledMetaRegistry}'s own Javadoc), since meta-kernel governs itself. Mirrors
-     * {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern.
+     * bootstrap} flag, so {@link TsonSchemaRegistry#register} accepts it, and {@code registry.register}
+     * compiles it as the kernel's vocabulary. Mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own
+     * pattern.
      */
     private static TsonCompiledSchemaLoader loadMetaKernelAndMeta() {
         return loadMetaKernelAndMeta(TsonBundledSchemas::fetch);
@@ -94,7 +92,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(metaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(metaKernel);
 
         loader.loadMeta(TsonBundledSchemas.META_ID);
 
@@ -189,7 +187,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     void aLoaderThatNeverGotMetaTn1RegisteredThrowsClearly() {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
         // meta-kernel only -- no meta.tn -- governed by its own freshly bootstrapped compiled form (loadMeta).
-        registry.register(resolveMetaKernelOrdinarily(), registry.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(resolveMetaKernelOrdinarily());
         TsonCompiledSchemaLoader loader = registry;
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
@@ -208,21 +206,21 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!id:"https://example.test/mini.tn"
             !!meta:"https://tson.io/2026/39/m/meta.tn"
             {
-              void => !void_type {}
+              nothing => !void_type {}
             }
             """;
 
     @Test
-    void resolveSchemaDerivesStructureNamespaceFromTheLoaderAutomatically() {
+    void resolveSchemaTakesTheMetaTargetsNamespaceFromTheLoader() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        // "void_type" is neither local to mini.tn nor imported by it -- only reachable if resolveSchema
-        // itself derived the structure namespace from the loader's own meta.tn entry (which in
-        // turn carries meta-kernel's own entries, merged in via meta.tn's real !!import).
+        // "void_type" is not local to mini.tn, which imports nothing -- only reachable because its !!meta target,
+        // meta.tn, contributes its namespace as an import does (meta-kernel's entries among it, through meta.tn's
+        // own !!import).
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
-        Top voidDef = resolved.entries().get("void");
+        Top voidDef = resolved.entries().get("nothing");
         assertEquals(new VoidType(), voidDef);
     }
 
@@ -269,7 +267,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolver.resolveSchema(document));
-        assertTrue(thrown.getMessage().contains("does not name a type in the governing meta-schema"),
+        assertTrue(thrown.getMessage().contains("does not name a type in this schema's namespace"),
                 thrown.getMessage());
     }
 
@@ -294,7 +292,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     private static final String MINI_DOCUMENT_NO_ID = """
             !!meta:"https://tson.io/2026/39/m/meta.tn"
             {
-              void => !void_type {}
+              nothing => !void_type {}
             }
             """;
 
@@ -315,7 +313,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!id:"mini.tn"
             !!meta:"https://tson.io/2026/39/m/meta.tn"
             {
-              void => !void_type {}
+              nothing => !void_type {}
             }
             """;
 
@@ -334,7 +332,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!meta:"https://tson.io/2026/39/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
-              void => !void_type {}
+              nothing => !void_type {}
             }
             """;
 
@@ -363,8 +361,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // exists anywhere, so that alone wouldn't prove anything -- composition is the real test:
         // resolveComposition does exactly one resolved.get(supertypeName), no fallback, so "atom"
         // (meta-kernel's own, zero fields) is only findable here if !!import's own entries were
-        // genuinely merged into the type-name namespace, not just validated as well-formed URIs. The
-        // document is kernel-governed, the level an import of meta-kernel stands at (§2.2.3).
+        // genuinely merged into the namespace, not just validated as well-formed URIs.
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_MERGED).parseSchemaDocument();
 
@@ -428,12 +425,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     /**
-     * An import stands at the importer's governing level (§2.2.3), and the resolver, which merges imports a
-     * phase before the linker, refuses the edge in the linker's wording: an ordinary schema importing a
-     * kernel-governed one, and a kernel-governed one importing an ordinary library.
+     * An import ties to no governing level (SPEC-FEEDBACK.md #7): a schema under meta.tn imports the kernel, and a
+     * kernel-governed one imports core.tn, each resolving in one namespace.
      */
     @Test
-    void resolveSchemaRefusesAnImportAtAnotherGoverningLevel() {
+    void resolveSchemaAdmitsAnImportWhateverEitherSchemasMeta() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         String ordinaryImportingTheKernel = """
                 !!id:"https://example.test/mini.tn"
@@ -450,17 +446,13 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         for (String source : List.of(ordinaryImportingTheKernel, kernelGovernedImportingCore)) {
             SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
 
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> resolver.resolveSchema(document));
-            assertTrue(thrown.getMessage().contains("https://example.test/mini.tn")
-                    && thrown.getMessage().contains("governing level"), thrown::getMessage);
+            assertTrue(resolver.resolveSchema(document).entries().containsKey("my_type"));
         }
     }
 
     /**
-     * The level rule admits every edge the bundled chain and a meta layer use: meta.tn importing the meta-kernel,
-     * policy.tn importing core.tn, a meta layer importing meta.tn, and a schema that layer governs importing
-     * core.tn -- both ordinary under different {@code !!meta}s, which is why the rule is the level, not one meta.
+     * Every edge the bundled chain and a meta layer use links: meta.tn importing the meta-kernel, policy.tn importing
+     * core.tn, a meta layer importing meta.tn, and a schema that layer governs importing core.tn.
      */
     @Test
     void theBundledChainAndALayersGovernedSchemaStillLink() {
@@ -560,7 +552,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(metaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(metaKernel);
 
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_ID);
 

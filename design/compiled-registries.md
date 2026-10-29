@@ -6,8 +6,8 @@ form only; history lives in git.
 
 **Invariants**
 
-- The core compiles and caches only meta-layer schemas; core.tn is resolve-only there and compiled inline in a read
-  registry.
+- The core compiles a schema as vocabulary only when a resolution reads through it, lazily and once per identity;
+  data reads compile per mode in a read registry.
 - The read mode is which registry you hold, not a compile parameter; resolution is always bind-anchored and delegated to
   the core.
 - An import cycle is caught by a per-thread in-flight set, not a cache lookup and not a registry-wide set; it throws even
@@ -29,15 +29,17 @@ Two registries over one shared resolution core, the compiled-side counterparts t
 
 - **`TsonCompiledMetaRegistry`** is the shared **meta/resolution core**, and *is* the on-demand
   `TsonCompiledSchemaLoader`. It owns the paired `TsonSchemaRegistry`, a bind-mode resolver, a
-  `SchemaSource`, content-hash verification, and the meta-kernel bootstrap. It compiles and caches
-  **only meta-layer schemas** (meta-kernel, meta.tn — the name is literally accurate). Its loader
-  interface is two honest methods: `loadMeta(uri) → TsonCompiledMetaSchema` (a governing meta, which must
-  be compiled — its `!enum`/`!integer` instances are read into `schema.meta` objects during a governed
-  schema's resolution) and `resolveLinked(uri) → TsonLinkedSchema` (an `!!import` target or a user schema
-  — fetched/resolved/linked/registered but **never compiled** here). `withStandardLibrary(context,
-  source)` builds a core with the five bundled schemas loaded (meta-kernel, meta, core, net, policy); **core.tn
-  is not a meta** (its `!!meta` is meta.tn) so it is resolve-only here, as net.tn and policy.tn are — its readers are
-  compiled per mode in a read registry when a user schema importing it is read, never standalone in the core.
+  `SchemaSource`, content-hash verification, and the meta-kernel bootstrap. Its loader interface:
+  `resolveLinked(uri) → TsonLinkedSchema` (a `!!meta` or `!!import` target, or a user schema —
+  fetched/resolved/linked/registered), and `loadMeta(uri)` / `vocabularyOf(identity) → TsonCompiledMetaSchema`,
+  a schema's **compiled vocabulary**: the readers a schema importing it reads a `!C { … }` body or an annotation
+  value through, where it declared `C` or the annotation's type (`design/resolver-vocabulary-and-bootstrap.md`).
+  Any schema compiles to one (`TsonCompiledMetaSchema.compile`), **on first use and cached per identity**, never
+  per closure: a schema applying only the kernel's and meta.tn's constructors reaches exactly those two compiled
+  schemas, and core.tn, net.tn and policy.tn are compiled here only if something applies a constructor or an
+  annotation type they declare. `withStandardLibrary(context, source)` builds a core with the five bundled schemas
+  resolved and registered (meta-kernel, meta, core, net, policy). The meta-kernel is always read from
+  `TsonBundledSchemas`, whatever the `SchemaSource`: it is the revision the library was built for.
 - **`TsonCompiledSchemaRegistry`** is a **per-mode registry of compiled user schemas** over a core, built
   via `TsonCompiledSchemaRegistry.tree(core)` / `bind(core, context)`. **The read mode is which registry
   you hold**, not a compile parameter. `get(uri)` resolves through the core (`resolveLinked`) and compiles
@@ -46,11 +48,11 @@ Two registries over one shared resolution core, the compiled-side counterparts t
 - **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A
   schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue`
   can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile
-  runs in the registry's mode (standalone: the schema's constructor usage was already validated at link
-  time). The bind read registry takes the *caller's own* `DataBindContext` (their user-class name binder),
-  deliberately distinct from the core's internal `SchemaMetaNameBinder`-based resolution context. A user
-  schema importing core.tn gets core.tn's entries merged into its own linked form (by `link`) and
-  compiled inline, which is why the core never needs core.tn compiled.
+  runs in the registry's mode (one factory set, no scoping: linking already established that every head the
+  schema applies is in its namespace). The bind read registry takes the *caller's own* `DataBindContext` (their
+  user-class name binder), deliberately distinct from the core's internal `SchemaMetaNameBinder`-based resolution
+  context, which every vocabulary compile in the core uses. A user schema importing core.tn gets core.tn's entries
+  merged into its own linked form (by `link`) and compiled inline in the read registry's mode.
 - **An import cycle is caught by what is *in flight*, not by a cache lookup** (§2.2.3). A schema is
   registered only once it has linked, so while `a.tn` is resolving it is in no registry at all and `b.tn`
   importing it back re-enters `resolveLinked` for the same identity and fetches it again — unguarded, that
@@ -63,11 +65,10 @@ Two registries over one shared resolution core, the compiled-side counterparts t
       two threads is safe here by design (below), and a registry-wide set would make the second thread's
       ordinary in-flight entry look like a cycle to the first. Recursion through `!!import`/`!!meta` is
       strictly within one thread, which is exactly the scope of the question.
-    - It **throws even with a receiver in play**, on the same footing as an unloadable `!!import` or an
-      ineligible `!!meta`: what fails is the namespace itself, so carrying on would report every reference
-      into the unresolvable half as a second problem. What is *not* here is the ordering half — collecting a
-      schema's transitive closure and resolving it dependencies-first, so callers stop hand-sequencing
-      registration (`BACKLOG.md`).
+    - It **throws even with a receiver in play**, on the same footing as an unloadable `!!import`: what fails is the
+      namespace itself, so carrying on would report every reference into the unresolvable half as a second problem. What
+      is *not* here is the ordering half — collecting a schema's transitive closure and resolving it dependencies-first,
+      so callers stop hand-sequencing registration (`BACKLOG.md`).
 - **Content-hash verification is per identity** (§10.2): the core records an identity's content hash on
   first resolution and checks every reference's `?sha256=` pin against it, on both fetch and cache-hit
   paths, so a conflicting pin errors rather than silently resolving to the cached instance. Verify-before-
@@ -92,7 +93,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   `resolveLinked` recurse into themselves and hold no lock across a fetch, so two threads reaching the same
   cold identity both do the work; the caches settle it, keeping the first entry and handing it to both
   (`TsonSchemaRegistry.registerIfAbsent`, `compileAndCache`). **What is duplicated on a race is work, never
-  state** — one linked form and one compiled meta per identity, always. The stake is real rather than
+  state** — one linked form and one compiled vocabulary per identity, always. The stake is real rather than
   hypothetical: a check-then-`register` shape fails the *loser*, and on a read that surfaces
   not as a crash but as a `SCHEMA_ERROR` against a document with nothing wrong with it, on the first
   concurrent requests a process ever serves (`ReadPathConcurrencyTest` pins both halves). Explicit

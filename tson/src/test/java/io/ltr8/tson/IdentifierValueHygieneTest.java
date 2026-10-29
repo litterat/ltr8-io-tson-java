@@ -45,16 +45,16 @@ class IdentifierValueHygieneTest {
             !!meta:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             {
-              identifier => !identifier_type { continue_add: "-" }
+              slug => !identifier_type { continue_add: "-" }
               js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
-              handlers => { identifier => text }
+              handlers => { slug => text }
               bindings => { js_name => text }
               labels => { text => text }
-              route => { name: identifier }
-              registry => { handlers: { identifier => text } }
-              team => { roles: set<identifier> }
-              ranked => !array { element_type: identifier  unique_items: true }
-              lists => { path: [identifier]  tags: set<text>  counts: set<int32> }
+              route => { name: slug }
+              registry => { handlers: { slug => text } }
+              team => { roles: set<slug> }
+              ranked => !array { element_type: slug  unique_items: true }
+              lists => { path: [slug]  tags: set<text>  counts: set<int32> }
             }
             """;
 
@@ -172,13 +172,13 @@ class IdentifierValueHygieneTest {
     @Test
     void aSchemasOwnIdentifierTypedValueIsAName() {
         List<Diagnostic> refused = tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
-                "account => { role?: identifier ~ " + MIXED + " }"));
+                "account => { role?: slug ~ " + MIXED + " }"));
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(refused).code());
         assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, only(tson(IdentifierPolicy.defaults())
-                .validateSchema(schemaWith("account => { kind: identifier = a\u0132b }"))).code());
+                .validateSchema(schemaWith("account => { kind: slug = a\u0132b }"))).code());
 
         assertEquals(List.of(), tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
-                "account => { role?: identifier ~ admin  bind?: js_name ~ \"$scope\"  tag?: text ~ " + MIXED + " }")));
+                "account => { role?: slug ~ admin  bind?: js_name ~ \"$scope\"  tag?: text ~ " + MIXED + " }")));
     }
 
     private static String schemaWith(String declaration) {
@@ -187,7 +187,7 @@ class IdentifierValueHygieneTest {
                 !!meta:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 {
-                  identifier => !identifier_type { continue_add: "-" }
+                  slug => !identifier_type { continue_add: "-" }
                   js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
                   %s
                 }

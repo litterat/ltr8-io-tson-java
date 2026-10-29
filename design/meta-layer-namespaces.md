@@ -1,13 +1,13 @@
 # A meta layer's vocabulary: records under a namespace constructor
 
-Design notes for the meta layer's extension point: how a meta-schema puts vocabulary of its own into the schemas it
-governs, how a consumer binds it, how the names it holds are judged, and what a meta layer is not. Current form only;
-history lives in git.
+Design notes for the meta layer's extension point: how a schema declares vocabulary of its own that the schemas
+importing it apply, how a consumer binds it, how the names it holds are judged, and what a meta layer is not. A meta
+layer is any schema declaring constructors; nothing else sets it apart (SPEC-FEEDBACK.md #7).
 
 **Invariants**
 
 - A meta layer's own vocabulary is a record plus a namespace constructor of it: the layer declares `method => { … }`
-  and `api => namespace & { key_type: = identifier  value_type: = method }`, and a schema it governs holds an
+  and `api => namespace & { key_type: = identifier  value_type: = method }`, and a schema importing it holds an
   instance, `myapi => !api { … }`. That entry is a `Namespace`, a value and never a type (`EntryKind.NAMESPACE`).
 - `Top` is sealed all the way down (`permits Type, Reference, TemplateBody, Namespace`). A switch that dispatches on a
   body's kind is exhaustive with an explicit `Namespace` arm and no `default`: `TypeInhabitance`, `DiscriminationClass`,
@@ -25,8 +25,8 @@ history lives in git.
   reference-typed slot is recorded and judged whatever the host component is; the hosts that receive the name as one
   are `TypeRef` and, at a reference-typed slot, `Ref<T>` (the name, and the value delivered at link), and any other
   (a `String`) receives what the slot's atom reads.
-- A value by name is entered through namespace keys only. Its first segment resolves in the governed schema's own
-  entries and imports, never the meta's; a further segment selects a key of a namespace value or a field of a record
+- A value by name is entered through namespace keys only. Its first segment resolves in the schema's one namespace,
+  its own entries and its import closure; a further segment selects a key of a namespace value or a field of a record
   value; a map that is no namespace, `{text => method}`, is not entered whatever its key type.
 - A segment selecting a field of a record value reads that field of the host object the read bound, through the
   descriptor of the bind context it was bound under, by wire name, never by reflection over the class; the registry
@@ -39,12 +39,13 @@ history lives in git.
   (`TsonSchema.entries`, typed `schema`) and a record's fields (`RecordBody.fields`, typed `field_map`). `Namespace`
   has its map's read API and is no `Map`, and its equality is `type`, the entries as a map and each key's
   annotations, never order.
-- A meta-schema keeps a constructor this library cannot build a reader for, as an `ErrorReader`; it is never dropped.
-- `!!meta` is not a vocabulary channel: it merges nothing into the type-name namespace, and shared vocabulary goes in a
-  third ordinary schema.
-- A namespace type IS-A `top`, so only a schema governed by the meta-kernel declares one (§2.2.2), and only a
-  kernel-governed document types a field by one: an import stands at the importer's governing level (§2.2.3), so no
-  ordinary schema imports the layer declaring it. The schemas the layer governs hold values of it as entries.
+- An entry built by a constructor this library has no factory for compiles to an `ErrorReader`; it is never dropped.
+- A `!!meta` target contributes its namespace exactly as an `!!import` does, so a layer's shared types sit beside its
+  constructors and every schema reaching the layer names them; one name declared twice in a closure is §2.2.3's
+  collision, by identity.
+- A namespace type IS-A `top`, and any schema declares one, types a field by one, or holds a value of one as an
+  entry. The entry applying it sits in a schema importing the one declaring it: a constructor applied in its own
+  document is a gap, refused as `NOT_IMPLEMENTED` (`design/constructor-application.md`).
 - A namespace type declares nothing but its facets, `key_type`, `value_type` and `ordered` (`MapBody.NAMESPACE_FACETS`):
   a value of it is the map alone, so the linker refuses a field beside them (`readAsMaps`), abstract or not, blaming
   the namespace type that declares it. A construct with fields is a record holding them, under a namespace type's key.
@@ -52,18 +53,18 @@ history lives in git.
 Related: `design/linking-and-compilation.md` (the namespace map and values by name), `design/references.md`,
 `design/class2-compilation.md`, `design/compiled-registries.md`, `design/schema-resolution.md`.
 
-## The extension point (§2.2.2, §4.1)
+## The extension point (§4.1)
 
-§2.2.2 calls the meta layer the format's sanctioned extension point, and a meta-schema may declare constructors of its
-own. The question that needs an answer is where a meta layer's own vocabulary lands when what it describes is not a
+The meta layer is the format's sanctioned extension point, and any schema may declare constructors of its own. The
+question that needs an answer is where a meta layer's own vocabulary lands when what it describes is not a
 data type. The motivating case is an HTTP interface: a set of methods, each naming its request and response types,
 which must sit at the schema layer because that is the only layer able to name a type *by name* — a data document can
 only instantiate one.
 
 `top` has two families of constructors, `type`'s, whose instances are types, and `namespace`'s, whose instances are
 maps; `reference` and `template` compose `top` directly beside them. The meta layer uses the second: it declares a
-record for one item of its vocabulary and a namespace type holding it, and a governed schema's entry is an instance of
-that namespace. The corpus fixture `meta-service.tn` is the worked case:
+record for one item of its vocabulary and a namespace type holding it, and an importing schema's entry is an instance
+of that namespace. The corpus fixture `meta-service.tn` is the worked case:
 
 ```
 method    => { request?: kind<record>  response?: type_kind  errors?: [kind<record>] }
@@ -72,7 +73,7 @@ binding   => { method: ref<method>  verb: http_verb  route: text }
 bindings  => namespace & { key_type: = identifier  value_type: = binding }
 ```
 
-and a schema it governs writes `orders => !interface { place_order => { request: place_order_request  response: order
+and a schema importing it writes `orders => !interface { place_order => { request: place_order_request  response: order
 } }` and `routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }`.
 
 **Why a namespace and not a marker kind.** The entry is a map the schema describes: its keys are judged by `key_type`,
@@ -96,9 +97,9 @@ interface  => { extends?: [type_name]  methods: method_map }
 interfaces => namespace & { key_type: = identifier  value_type: = interface }
 ```
 
-**A kind is judged by origin.** A schema's own record named `namespace` composed into `payload => namespace & { … }`
-leaves `payload` a PRODUCT: kind derivation counts `namespace` only as the meta-kernel's own entry
-(`validate-own-namespace.tn` in the corpus).
+**A kind is judged by origin.** Kind derivation counts `namespace` only as the meta-kernel's own entry. Every
+closure reaching the kernel holds that entry, so a schema declaring a `namespace` of its own meets §2.2.3's collision
+first.
 
 ## Binding: a plain class and a name binder
 
@@ -122,7 +123,7 @@ A slot naming a type is typed by a kind, `request: kind<record>`, and a slot nam
 `method: ref<method>`; a slot typed by a record holds the record's value inline. The read records every name it
 produces at a kind- or reference-typed slot with the path it descended (`["post_orders", "method"]`) and the slot's
 declared type (`TsonSchema.SlotType`: the role, kind, reference or `type_ref` application, and the kind's `of` or the
-reference's `T`, in the governing meta's namespace). `SchemaResolver` keeps them per entry in
+reference's `T`, in the schema's one namespace). `SchemaResolver` keeps them per entry in
 `TsonSchema.valuesByName`, and the linker judges each by that type: a member of the kind (`ValuesByName.judgeMember`),
 or a value IS-A the reference's `T` (`ValuesByName.judge`). The type comes from the reader that read the name, which
 was built from the slot's declaration, so it is right however the value was reached -- under a key, behind a record
@@ -132,9 +133,8 @@ about which components are references, so nothing asks it.
 **One host shape for every reference.** A `type_ref` slot binds a `TypeRef`, a kind-typed slot a `TypeRef`, and a
 reference-typed slot a `Ref<T>` or a `TypeRef`; `BindTargets` sets a `KindSlotReader` or `ReferenceNameReader` in
 place of the slot's atom reader for them, and a `Ref` receives the value the name reaches when the schema links
-(`Ref.deliver`), so a host reads `binding.method().get()` after the link and the name before it. A reference is
-declared only in a kernel-governed schema, a meta layer among them, since only there does an entry hold a value; a
-schema governing data has no reference to read (`design/references.md`).
+(`Ref.deliver`), so a host reads `binding.method().get()` after the link and the name before it. Any schema declares
+a reference (`ReferenceDeclarationTest`, `design/references.md`).
 
 **The slot judges the name, never the host.** A host may hold a kind- or reference-typed slot as a `String`: the slot's
 atom reader binds it as any atom, and `BindTargets` wraps it in a `RecordedNameReader`, which records the name it read
@@ -218,17 +218,17 @@ constructor, so the map is written untagged (`fields: { name => … }`). A value
 the name written, as a reference chain is (§8.3). It reads back through `top`'s tag dispatcher, which delivers a
 `Namespace` where the tag selects a namespace type (`design/record-dispatch.md`).
 
-## A constructor with no reader
+## A constructor with no factory
 
-**A meta-schema keeps a constructor this library cannot build a reader for**, its factory standing in as an
-`ErrorReader` carrying the real cause (`TsonCompiledMetaSchema`'s `unbuildable`). Dropping it would lose the
-constructor from the scoped vocabulary silently, so a governing meta would compile and register looking healthy and
-the complaint would land against a *different* document: the first governed schema to apply it is told the
-meta-schema does not declare it, which is both false and unactionable. Every constructor the kernel and meta.tn declare
-builds a real reader, and `CoreSchemaImportTest` asserts that no entry of core.tn compiles to an `ErrorReader`. A
-governed schema's namespace entry compiles to an unbuildable `ErrorReader` in both stacks: `typenameOf` and
-`JsonSchemaCompiler.constructorOf` read its `type`, a meta layer's constructor with no factory there, and nothing is
-typed by such an entry.
+**An entry built by a constructor this library has no factory for compiles to an `ErrorReader`** carrying the real
+cause (`TsonCompiledMetaSchema.compile`'s `unbuildable`, naming the constructor and the schema that declared it). It is
+kept, not dropped: the schema compiles, and only reading a value against that entry fails, with a message naming the
+gap rather than the document that ran into it. Every constructor the kernel and meta.tn declare builds a real reader,
+and `CoreSchemaImportTest` asserts that no entry of core.tn or net.tn compiles to an `ErrorReader`. A namespace entry
+(`myapi => !api { … }`) compiles to an unbuildable `ErrorReader` in both stacks: `typenameOf` and
+`JsonSchemaCompiler.constructorOf` read its `type`, a constructor with no factory, and nothing is typed by such an
+entry. The reader `!api { … }` itself is read through is another thing: the instance reader compiled from `api`'s own
+declaration, a map, which needs no factory (`design/compiled-registries.md`).
 
 ## What a meta layer is not
 
@@ -242,20 +242,12 @@ was the interim that did the same with a `.methods` hop and a third family of co
 one reading rule, a value of a type IS-A `namespace` is written and read as a map from `key_type` to `value_type`,
 and makes the kernel's namespaces and a meta layer's one type.
 
-**A meta layer is not a vocabulary channel, and this is the first thing an author tries.** The instinct on declaring
-`method` in a meta layer is to put the shared types beside it — a `status_code` atom, an envelope template — and let
-the governed schemas name them. They cannot: `!!meta` says where this schema's *constructors* come from and merges
-nothing into the type-name namespace (§3.3.2), so every such name is an unresolved reference in a schema the layer
-governs, whether it is written bare, in a field, or applied with its arguments. **Shared vocabulary goes in a third
-ordinary schema**, `!!import`ed by the governed schemas that need it. Nor is `!!import`ing the meta layer a way round
-it: an import stands at the importer's governing level, both schemas naming the meta-kernel as their `!!meta` or
-neither (§2.2.3), so an ordinary schema importing a kernel-governed layer is refused, in one
-diagnostic naming both documents and both `!!meta`s. The rule runs the other way too: a meta layer cannot import the
-third schema, nor core.tn or net.tn, and declares the vocabulary its constructors use itself. A namespace type meets
-both walls at once: it IS-A `top`, so it cannot go in the third schema, and no ordinary schema can import the layer
-that declares it, so a field typed by it exists only in a kernel-governed document (§2.2.2), and so does
-a field typed `ref<T>`, which names an entry holding a value: core.tn declares no `ref`, so a governed schema writing
-one meets an unresolved name. A data document holds a value of one only where its own schema is kernel-governed, as
-resolved output read through meta.tn is. The constraint is real and worth stating; what is not acceptable is
-discovering it through a message about the wrong thing, which is why an application's head resolves in the type-name
-namespace only (§3.3.1) and an unresolvable one is reported as written (`design/template-materialisation.md`).
+**One namespace, so shared vocabulary sits beside the constructors.** The instinct on declaring `method` in a meta
+layer is to put the shared types beside it -- a `status_code` atom, an envelope template -- and let the schemas
+importing the layer name them, and they can: a `!!meta` target contributes its whole namespace as an `!!import` does
+(SPEC-FEEDBACK.md #7), whether a name is written bare, in a field, or applied with its arguments. The cost is
+reservation: every name in the closure is taken, so a schema importing core.tn cannot declare `identifier`, `record`,
+`namespace` or `title` of its own (`MetaLayerVocabularyTest`). The one thing a layer's own document cannot do is
+apply its constructors to itself: `!api { … }` beside `api => namespace & { … }` waits on `api` being resolved
+first, and outside the kernel's bootstrap that is a gap, refused as `NOT_IMPLEMENTED`; the instance goes in a schema
+importing the layer.

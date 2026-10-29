@@ -1,8 +1,9 @@
 # Resolver vocabulary, reference hops, `@synthetic`, and the meta-kernel bootstrap
 
 The facts the resolver phases share rather than own: the three leaf classes (`WireForm`, `MetaRefs`, `DerivedName`),
-how a reference chain is kept in resolved output and walked, the one derived marker, and the special-cased bootstrap
-that resolves meta-kernel itself. Current form only; history lives in git.
+how a reference chain is kept in resolved output and walked, the one derived marker, the compiled vocabulary a
+resolution reads `!C` bodies and annotation values through, and the special-cased bootstrap that resolves meta-kernel
+itself. Current form only; history lives in git.
 
 **Invariants**
 
@@ -25,6 +26,9 @@ that resolves meta-kernel itself. Current form only; history lives in git.
   path, on demand, against readers compiled from the entries ready so far. The order is the waits', never source
   order. `MetaKernelBootstrapResolverTest` holds the set to the measured cycle and the output to the kernel's ordinary
   resolution; it attaches no `@synthetic`.
+- A `!C { … }` body or an annotation value is read through the compiled form of the schema that declared `C` or the
+  annotation's type (`SchemaResolver.Vocabulary`, by the origin the import merge recorded), never through one compiled
+  per closure. A name no import declares has no reader; the kernel alone reads through itself.
 - Only the bootstrap links with references pending or compiles with entries pending
   (`TsonSchemaLinker.linkBootstrap(TsonSchema, Set)`, `TsonSchemaCompiler.compileBootstrap`); both refuse a schema
   that is not the bootstrap's, and an ordinary link refuses an undeclared name as it always has.
@@ -153,8 +157,8 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
 §8.2 puts a bare **`@synthetic` on the key of every entry the resolver materialised from a sugar form**, and
 on no other. It is *derived* — attached by the resolver rather than written by an author, and discarded and
 recomputed on ingest (§8.1), so it carries no decode force and cannot be forged into a resolved document to
-change how it reads. It is built by name rather than resolved through the governing
-meta the way an author-written annotation is: there is no author to resolve against, and the value is fixed.
+change how it reads. It is built by name rather than resolved in the schema's namespace the way an author-written
+annotation is: there is no author to resolve against, and the value is fixed.
 
 - **Why a marker at all, when the names are distinctive.** A synthetic is named by derivation from its own
   content, but §8.2 makes that spelling non-normative — an implementation picks its own — so pattern-matching
@@ -195,13 +199,34 @@ meta the way an author-written annotation is: there is no author to resolve agai
 - **The bootstrap route attaches none, deliberately.** `MetaKernelBootstrapResolver` exists to be *just*
   enough to load the real meta-kernel from its own file, and nothing in the pipeline reads this marker — it is
   informational. meta-kernel's own eight synthetics are marked anyway, because the entries anything else sees come from
-  ordinary resolution: the bootstrap output stands in only as the transient governing meta for its own
-  resolution.
+  ordinary resolution: the bootstrap output stands in only as the transient vocabulary the kernel's own ordinary
+  resolution reads through.
 - Cross-checked against the spec's own output by
   `ResolvedFixtureTest.theSameEntriesAreMarkedSyntheticOnBothSides` — eight keys in meta-kernel, five in
   meta.tn, none in core.tn, which writes no inline form. It reads the fixtures' marked keys from their
   *text*, because a key-position annotation is still dropped when a resolved-form document is read back
   (`BACKLOG.md`), and a bound comparison would have both sides render nothing and agree for the wrong reason.
+
+## The compiled vocabulary (`SchemaResolver.Vocabulary`)
+
+One namespace per schema (SPEC-FEEDBACK.md #7) puts every construction head and annotation type in the closure, and
+a head's instance is read by a compiled reader. `SchemaResolver` records, for each imported entry, the canonical
+identity of the schema that declared it, and its private `Vocabulary` reads `!C { … }` through
+`TsonCompiledSchemaLoader.vocabularyOf(origin of C).reader(C)` and an annotation value through that schema's entry
+reader. **Why the declaring schema's compile suffices**: an entry's reader was compiled over its declaring schema's
+closure, which is inside the importer's, so it reads everything its body can name. Nothing is compiled per closure;
+each declaring schema is compiled once and cached by identity (`design/compiled-registries.md`), and a schema applying
+only the kernel's and meta.tn's constructors reaches exactly those two.
+
+- **Heads and annotations resolve among the imported entries** (`DefinitionResolver`'s `metaDefinitions`), since
+  only those have compiled readers; type uses resolve in the whole namespace (`namespaceDefinitions`). A head or an
+  annotation type declared in the document itself is in the namespace and has no reader yet, and is refused as a gap
+  before the vocabulary is asked (`DefinitionResolver.notYetReadable`, `design/schema-resolution.md`).
+- **Whether a payload is a value body** (`isValueBody`, `payloadNames`) is asked of the declaring schema's compiled
+  form: a namespace type's instance is read under the loader's identifier policy and lifts nothing
+  (`design/meta-layer-namespaces.md`).
+- **The kernel reads through itself.** Its resolution is handed the pre-loaded stand-in, which answers for every
+  name, the one cycle being closed by pre-loading (§3.4).
 
 ## Meta-kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 
@@ -248,14 +273,16 @@ constructor, positions included (the bootstrap resolves with the parser's positi
 - **The partial link and the bootstrap compile are contained.** Both refuse a schema whose `bootstrap()` is false.
   The partial link passes over a reference to a pending name and nothing else; an entry's walk stops at its first
   pending reference, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed
-  by (`TsonCompiledMetaRegistry.loadMeta` links and compiles the output). An ordinary link or compile has no pending
-  set, and refuses an undeclared name as before.
+  by (`TsonCompiledMetaRegistry.loadMeta` links and compiles the output into the stand-in). An ordinary link or compile
+  has no pending set, and refuses an undeclared name as before.
 - **Every name the kernel holds is the kernel's own**, so `DefinitionResolver` judges kinds and constructors with a
-  predicate that admits every name (`name -> true`), and the structure namespace a head resolves in is the one being
-  built; ordinary resolution judges by the origin of each name in the merged namespace instead.
+  predicate that admits every name (`name -> true`), and the entries a head resolves in are the ones being built, a
+  head declared beside its instance read in wait order; ordinary resolution judges by the origin of each name in the
+  merged namespace instead, and refuses a head declared in the same document as a gap.
 - **Desugaring needs no equivalent trick.** The container constructors are parameterless (§4.2), so the desugar table
-  is fixed by the sugar forms and nothing is looked up in the governing meta. Meta-kernel's eight sugar forms are
+  is fixed by the sugar forms and nothing is looked up in another schema. Meta-kernel's eight sugar forms are
   ordinary declarations by the time the linker sees them.
-- **Cost.** The two partial links and compiles make a warm bootstrap about 11 ms. Loading the standard library runs
-  it twice (`registerBundled` resolving the kernel, then registering it against `loadMeta`, which does not cache the
-  kernel's identity), so a warm `Tson.standard()` is about 58 ms.
+- **Cost.** The two partial links and compiles make a warm bootstrap about 11 ms, and it runs once per registry:
+  `loadMeta` builds the stand-in on the first lookup of the kernel's identity and reuses it until the ordinarily
+  resolved kernel is registered (`registerBundled`), after which the kernel's vocabulary is that registered schema's
+  compile.

@@ -445,9 +445,10 @@ at compile time; an entry that cannot be built becomes an `ErrorReader` reportin
 read, with two exceptions: a `BindMismatchException` fails the compile, and a
 `MissingBindingException` is thrown unwrapped from its reader.
 
-`TsonCompiledMetaRegistry` is the shared meta/resolution core: it compiles and caches **only**
-meta-layer schemas, resolves/links/registers everything else without compiling it, and owns content-hash
-verification, the bootstrap and §2.2.3's import-cycle guard.
+`TsonCompiledMetaRegistry` is the shared resolution core: it resolves/links/registers every schema, compiles
+(in object-binding mode, cached per identity) only a schema whose constructors or annotation types another
+schema's resolution reads through, and owns content-hash verification, the bootstrap and §2.2.3's
+import-cycle guard.
 
 ### Pipeline stages, if you need one directly
 

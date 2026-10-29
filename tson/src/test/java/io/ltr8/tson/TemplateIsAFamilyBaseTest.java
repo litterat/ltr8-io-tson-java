@@ -210,8 +210,8 @@ class TemplateIsAFamilyBaseTest {
     @Test
     void aSelectorTypedByAnApplicationIsTheEntryEveryMemberNames() {
         String declarations = """
-                  bounded => <M> !integer_type { max: M }
-                  pet     => <N> { kind: bounded<9> = N  name: text }
+                  capped => <M> !integer_type { max: M }
+                  pet     => <N> { kind: capped<9> = N  name: text }
                   cat     => pet<3>
                   dog     => pet<4>
                   holder  => { p: pet }

@@ -23,8 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * own read mode.</b> Resolving a schema's own {@code !enum}/{@code !integer} instances binds them to
  * {@code schema.meta} objects (a DOM reader's {@code Map} output can't stand in), so every mode shares the
  * one bind-mode core for resolution; only the final compile of the already-resolved, already-linked schema
- * runs in this registry's mode. That compile is <b>standalone</b> (no governing-meta scoping): the
- * schema's constructor usage was already validated when it was linked.
+ * runs in this registry's mode, through the mode's factory set alone: the schema's constructor usage was already
+ * validated when it was linked.
  */
 public final class TsonCompiledSchemaRegistry {
 
@@ -124,7 +124,7 @@ public final class TsonCompiledSchemaRegistry {
         return cached != null ? cached : compiled.computeIfAbsent(identity, id -> compile(linked));
     }
 
-    /** Compiles an already-resolved, already-linked schema in this registry's mode -- standalone, uncached. */
+    /** Compiles an already-resolved, already-linked schema in this registry's mode, uncached. */
     public TsonCompiledSchema compile(TsonLinkedSchema linked) {
         return TsonSchemaCompiler.compile(linked, factories);
     }

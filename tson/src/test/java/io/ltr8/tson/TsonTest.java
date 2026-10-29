@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import java.math.BigInteger;
@@ -37,25 +36,19 @@ class TsonTest {
             """;
 
     /**
-     * The `!!import`-vs-`!!meta` confusion, end to end: core.tn is a type library, not a meta-schema, so it
-     * can govern nothing. This is an authoring error in the schema, which is why it arrives as a {@link
-     * SchemaValidationException} a caller can catch around {@code resolve} rather than as an unchecked
-     * library-fault type — and why {@code tson validate} can tell it apart from a bug in this tool.
+     * A type library named as {@code !!meta} contributes its namespace as an {@code !!import} does
+     * (SPEC-FEEDBACK.md #7): core.tn's {@code uuid} resolves.
      */
     @Test
-    void rejectsASchemaThatNamesATypeLibraryAsItsMeta() {
-        Tson tson = Tson.standard();
-
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> tson.resolve("""
-                        !!id:"https://example.test/oops.tn"
-                        !!meta:"https://tson.io/2026/39/m/core.tn"
-                        {
-                          my_thing => uuid
-                        }
-                        """));
-        assertTrue(thrown.getMessage().contains("core.tn"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("!!import"), thrown.getMessage());
+    void aTypeLibraryNamedAsTheMetaIsImported() {
+        TsonLinkedSchema linked = Tson.standard().resolve("""
+                !!id:"https://example.test/oops.tn"
+                !!meta:"https://tson.io/2026/39/m/core.tn"
+                {
+                  my_thing => uuid
+                }
+                """);
+        assertTrue(linked.schema().entries().containsKey("uuid"));
     }
 
     @Test
@@ -63,10 +56,13 @@ class TsonTest {
         Tson tson = Tson.standard();
 
         TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
-        // Merged view: the two local declarations, plus core.tn's own 40 imported entries --
-        // TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved TsonSchema
-        // resolve()'s own resolution step produces internally, which stays local-only.
-        assertEquals(42, linked.schema().entries().size());
+        // Merged view: the two local declarations, plus core.tn's whole closure, meta.tn's and the kernel's
+        // entries among it -- TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved
+        // TsonSchema resolve()'s own resolution step produces internally, which stays local-only.
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(linked.schema().id());
+        assertEquals(2, linked.schema().entries().keySet().stream().filter(n -> linked.originOf(n).equals(own))
+                .count());
+        assertTrue(linked.schema().entries().containsKey("record_field"));
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 

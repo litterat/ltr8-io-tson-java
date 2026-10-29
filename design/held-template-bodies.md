@@ -162,8 +162,8 @@ positions it stands in; the kind follows from it. §12.1 decides an argument's c
 non-numeric argument arrives as a reference — wrong for `e => <M> !enum { members: [a b M] }` applied as `e<c>`, where
 `c` is a member. What settles it is the declared type of the slot the parameter stands in, read from the constructor's
 own vocabulary: `array.element_type` is `type_kind`, `enum.members` is `enum_set` (of `text`), `record_field.value` is
-`value`. §4.2 types every slot that names a type `type_kind` and every application position `type_ref`, so an
-extension meta-schema's constructors classify by the same walk. The class Javadoc lists the four sources of a use type.
+`value`. §4.2 types every slot that names a type `type_kind` and every application position `type_ref`, so a
+schema's own constructors classify by the same walk. The class Javadoc lists the four sources of a use type.
 Beyond those:
 
 - **Stamped twice.** A held body is built before anything can be typed. `SchemaResolver` runs
@@ -177,26 +177,26 @@ Beyond those:
   parameter (`type_kind`), as §5.10 states, so `loop => <T> loop<T>` is judged on what is wrong with it — it applies
   itself forever. An imported template is taken as recorded, since its held body does not carry what its author wrote.
 - **Several uses must agree**: the type is the use type that IS-A every other, uses unordered by IS-A are refused at
-  the declaration, and a parameter standing in both kinds of position keeps its own message. A core copy and its
-  kernel original (same name, same body) count as one type. A parameter standing for a whole collection or record
-  (`<T> !enum { members: T }`) is refused as neither a kind of type nor a scalar.
+  the declaration, and a parameter standing in both kinds of position keeps its own message. A parameter standing for a
+  whole collection or record (`<T> !enum { members: T }`) is refused as neither a kind of type nor a scalar.
 - **A routed default or fixed value** (a parameter at `record_field.value`) is read as the field's declared type, from
   the sibling `type` slot: `w?: T ~ N` gives `N` the type `T`, an earlier parameter. A payload in §5.6's positional form
   (`!enum [a b M]`) is walked as the one unmarked field it binds.
 - **The template's form decides where value types are read** (`ParameterTypes.readsInStructure`, §5.10). A template
-  whose held head is a meta constructor other than `record` reads its value parameters' types, written ones included,
-  in the structure namespace: a schema's own `non_negative_integer` never stands in for the meta's at `min_items: N`,
-  and `kind<T>`'s `T` is the kernel's `type_name`. A record template reads in the schema's namespace. A template whose
-  head is another open template takes that template's form; a deferred use takes its callee's. An alias's head is
-  `reference`, a meta constructor, so a written value type on an alias is checked in the structure namespace
-  (`rb => <N: int8> box<N>` is refused, `int8` not being a meta type). A type parameter's bound is the schema's in
-  every form.
+  whose held head is a constructor other than `record` reads its value parameters' types, written ones included,
+  among the schema's imported entries: the constructor's compiled reader reads the argument, and its slot types are
+  in the closure that declared it, so `min_items: N` makes `N` the kernel's `non_negative_integer` and `kind<T>`'s
+  `T` the kernel's `type_name`. A record template reads in the schema's whole namespace. A template whose head is
+  another open template takes that template's form; a deferred use takes its callee's. An alias's head is
+  `reference`, a constructor, so a written value type on an alias must name an imported type too. A written type
+  must also IS-A the derived one: `<N: int8> !array { … max_items: N }` is refused, core's `int8` not being a
+  `non_negative_integer` (`TemplateParamTypeTest`). A type parameter's bound is the schema's in every form.
 - **A written type narrows, read by the derived kind** (`<T: text, N: int8>`, from
   `SchemaMap.Declaration.parameterTypes`): on a value parameter it replaces `type` and must IS-A the derived one; on a
   type parameter it is `template_param.bound` and must IS-A every bound the uses inherit (`rebox => <T> boxed<T>`
-  inherits `boxed`'s). A written bound must resolve in the type-name namespace (`requireType`): the governing-meta
-  fallback a slot's declared type needs would otherwise let `<T: text_type>` bind to a constructor, which no type
-  argument can IS-A.
+  inherits `boxed`'s). A written bound must resolve in the schema's namespace and name a type (`requireType`):
+  `<T: text_type>` names a constructor (IS-A `top`), which no type argument can IS-A, and is refused as "a
+  constructor, not a type".
 - **The call-site check** (`TemplateMaterialiser.checkArguments`, through `byParameterKind`): a type argument must IS-A
   the bound, following reference chains; a value argument must parse as the parameter's type, or as the type an
   earlier parameter's argument names. An application as an argument, or an unresolved name, falls to the substituted
