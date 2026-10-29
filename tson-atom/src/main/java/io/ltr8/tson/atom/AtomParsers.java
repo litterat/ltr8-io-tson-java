@@ -132,9 +132,11 @@ public final class AtomParsers {
      * judges membership ([TSON-SCHEMA] §4.2, §8.1). Every other body is read as {@link #forType(Top, Normalization)}
      * reads it.
      *
-     * <p>A reference ({@code ref_type}) is read only here, with {@code governsSchemas} true: a reference names an
-     * entry holding a value, which only a kernel-governed schema has, so the linker refuses one declared anywhere
-     * else and a reference body reaching here under any other schema is a broken invariant.
+     * <p>A reference ({@code ref_type}) is read only here, with {@code governsSchemas} true: what its name reaches
+     * is judged when the schema holding it links, and a document such a schema governs is one that links. Any
+     * schema may declare a reference (SPEC-FEEDBACK.md #7), and under any other schema a reference-typed position
+     * is this library's gap, an {@link UnsupportedOperationException}: a data document is never linked, and
+     * nothing yet judges the name it writes there.
      */
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm, boolean governsSchemas) {
         if (governsSchemas && body instanceof KindBody kind) {
@@ -142,9 +144,9 @@ public final class AtomParsers {
         }
         if (body instanceof RefBody reference) {
             if (!governsSchemas) {
-                throw new IllegalStateException("a reference ('ref<" + reference.of() + ">') reached a schema the "
-                        + "meta-kernel does not govern: the linker refuses a reference declared outside a "
-                        + "kernel-governed schema");
+                throw new UnsupportedOperationException("a value at a reference-typed position ('ref<"
+                        + reference.of() + ">') in a data document is not yet read: what its name reaches is judged "
+                        + "when a schema links, and a data document is not linked");
             }
             return Optional.of(new RefParser(reference));
         }

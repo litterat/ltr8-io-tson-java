@@ -61,8 +61,7 @@ class SchemaResolverDiagnosticsTest {
 
         SchemaDocument metaKernel = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        registry.register(new SchemaResolver(loader).resolveSchema(metaKernel),
-                loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(new SchemaResolver(loader).resolveSchema(metaKernel));
         loader.loadMeta(TsonBundledSchemas.META_ID);
         loader.resolveLinked(TsonBundledSchemas.CORE_ID);
         return loader;

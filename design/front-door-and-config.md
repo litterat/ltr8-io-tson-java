@@ -222,7 +222,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   parameter names it would need are not retained for a secondary constructor. Reconsider only if something
   needs to re-derive the binding without the application in between.
 - **Two binding seams, never merged.** `ProcessorConfig.withDataBindContext` binds the *data* a schema
-  describes (`order` → `Order`); `ProcessorConfig.withMetaNameBinder` binds a governing meta's own *vocabulary*
+  describes (`order` → `Order`); `ProcessorConfig.withMetaNameBinder` binds a meta layer's own *vocabulary*
   (`method` → `Method`, a record a namespace constructor holds — `design/meta-layer-namespaces.md`). One
   namespace holding both would collide the first time a schema type and a meta-layer constructor shared a
   name. The meta binder is composed over `SchemaMetaNameBinder.INSTANCE` rather than replacing it, so what a

@@ -40,7 +40,6 @@ class RootAnnotationTest {
               api => { name: text }
               since => text
               owner => { team: text  contact: text }
-              deprecated => void
             }
             """;
 

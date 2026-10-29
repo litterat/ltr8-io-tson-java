@@ -25,8 +25,8 @@ import java.util.function.UnaryOperator;
  * <p><b>An unregistered constructor is a gap, not a fault.</b> {@link #resolve} raises, {@code
  * JsonSchemaCompiler} catches, and the entry becomes a {@link ErrorReader} -- so a schema whose types this
  * encoding cannot read still compiles, and each unreadable value costs a verdict on itself alone. Every
- * constructor the bundled meta-schemas declare is registered, so what reaches this is [TSON-SCHEMA] §2.2.2's
- * extension point: a constructor another meta-schema declares.
+ * constructor the bundled schemas declare is registered, so what reaches this is a constructor another schema
+ * declares.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
@@ -124,7 +124,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         ValueReaderFactory factory = factories.get(name);
         if (factory == null) {
             throw new IllegalStateException("no JSON reader is registered for constructor '" + name
-                    + "', which no bundled meta-schema declares ([TSON-SCHEMA] §2.2.2)");
+                    + "', which no bundled schema declares");
         }
         return factory;
     }

@@ -128,29 +128,32 @@ class TemplateParamTypeTest {
     }
 
     /**
-     * {@code N} stands in {@code array.min_items}, so its type is the meta's {@code non_negative_integer}, judged in
-     * the structure namespace (§5.10): a schema's own entry under that name is another type and never stands in for
-     * it, so {@code vec<0>} is a valid application however narrowly the schema defines its own.
+     * {@code N} stands in {@code array.min_items}, so its type is the kernel's {@code non_negative_integer}, the slot's
+     * own (§5.10): {@code vec<0>} is a valid application, and a text argument is refused. A schema declaring its own
+     * entry under that name collides with the kernel's, which every closure reaching core holds (§2.2.3).
      */
     @Test
-    void aConstructorTemplatesValueIsJudgedInTheStructureNamespace() {
+    void aConstructorTemplatesValueIsTheSlotsType() {
         assertEquals(List.of(), load("""
-                  non_negative_integer => !integer ^ { min: 1 }
                   vec => <N> !array { element_type: text  min_items: N }
                   v0  => vec<0>
                 """));
         List<Diagnostic> wide = load("""
-                  non_negative_integer => !text ^ {}
                   vec    => <N> !array { element_type: text  min_items: N }
                   holder => { a: vec<"abc"> }
                 """);
         assertEquals(1, wide.size(), wide::toString);
         assertTrue(wide.getFirst().message().contains("binds 'N' to 'abc'"), wide::toString);
+        List<Diagnostic> collides = load("""
+                  non_negative_integer => !integer ^ { min: 1 }
+                """);
+        assertEquals(1, collides.size(), collides::toString);
+        assertTrue(collides.getFirst().message().contains("collides"), collides::toString);
     }
 
-    /** A written type on such a template narrows within the meta's vocabulary, and a schema type is not there. */
+    /** A written type on such a template narrows the slot's type, and a type that is no narrowing of it is refused. */
     @Test
-    void aConstructorTemplatesWrittenTypeNamesTheMetasVocabulary() {
+    void aConstructorTemplatesWrittenTypeNarrowsTheSlotsType() {
         assertEquals(List.of(), load("""
                   vec => <N: non_negative_integer> !array { element_type: text  max_items: N }
                   v3  => vec<3>
@@ -159,7 +162,7 @@ class TemplateParamTypeTest {
                   vec => <N: int8> !array { element_type: text  max_items: N }
                 """);
         assertEquals(1, core.size(), core::toString);
-        assertTrue(core.getFirst().message().contains("not in the structure namespace"), core::toString);
+        assertTrue(core.getFirst().message().contains("does not IS-A"), core::toString);
     }
 
     /** A record template's fields are the schema's, and so is a written type on its parameters. */

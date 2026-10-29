@@ -81,11 +81,16 @@ class ApplicationInContainerPositionTest {
                 ? compiled.schema().entries().get(reference.target().name()) : entry;
     }
 
-    /** The entries this schema derived rather than the author declaring them -- synthetics and instantiations. */
+    /**
+     * The entries this schema derived rather than the author declaring them -- synthetics and instantiations, its
+     * closure's own left out.
+     */
     private static List<String> derived(TsonCompiledSchema compiled) {
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(compiled.schema().id());
         return compiled.schema().entries().entrySet().stream()
-                .filter(e -> compiled.schema().positionOf(e.getKey()).isEmpty()).map(java.util.Map.Entry::getKey)
-                .sorted().toList();
+                .filter(e -> compiled.schema().positionOf(e.getKey()).isEmpty())
+                .filter(e -> compiled.linkedSchema().originOf(e.getKey()).equals(own))
+                .map(java.util.Map.Entry::getKey).sorted().toList();
     }
 
     /** Derived entries still carrying parameters -- the open half of §8's counts. */
@@ -361,13 +366,13 @@ class ApplicationInContainerPositionTest {
     void theSmallestFormNeedingAnyOfThisIsOneArrayOverOneParameter() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { a: [T] }
-                  use => { u: box<text> }""");
+                  use => { u: box<uuid> }""");
 
         assertEquals(1, openSynthetics(compiled), () -> derived(compiled).toString());
         assertEquals(2, closedDerived(compiled), () -> derived(compiled).toString());
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
-        assertEquals(TypeRef.of("text"), array.elementType());
+        assertEquals(TypeRef.of("uuid"), array.elementType());
     }
 
     // ── The nested form in miniature, and the closed case that stays out ──
@@ -494,8 +499,8 @@ class ApplicationInContainerPositionTest {
     void aConcreteApplicationInABindingClosesAtTheDeclaration() {
         TsonCompiledSchema compiled = compile("""
                   box     => <T> { v: T }
-                  bounded => <N> [box<text>; N..]
-                  use     => { u: bounded<2> }""");
+                  capped => <N> [box<text>; N..]
+                  use     => { u: capped<2> }""");
 
         ArrayBody closed = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "u"));
 

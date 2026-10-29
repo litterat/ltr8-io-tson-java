@@ -92,7 +92,8 @@ import java.util.function.Predicate;
  *   arguments -- a reference or a value each, nested applications included -- and a closed one closes
  *   <em>into</em> the declared name.</li>
  *   <li><b>Constructor application</b> ({@code !C value}, §5.5/§5.6, {@link #resolveInstance}) -- bound
- *   through the governing meta's compiled reader ({@link #bindAtomInstance}), with no name-to-class table --
+ *   through the compiled reader of the schema declaring {@code C} ({@link #bindAtomInstance}), with no
+ *   name-to-class table --
  *   and <b>atom refinement</b> ({@code !I ^ { ... }}, §5.5, {@link #resolveAtomRefinement}), which merges
  *   its bindings with its source on the wire and is checked to narrow ({@link #checkNarrows}).</li>
  * </ul>
@@ -111,11 +112,11 @@ import java.util.function.Predicate;
  * pipeline builds. The test for which is which: <b>a schema error's verdict does not change
  * when this library improves; a gap's does.</b> Misfiling an author error as a gap tells the author their
  * correct understanding of the spec is this library's fault. Schema errors include: an atom refinement that
- * loosens its source ({@link #checkNarrows}); a name in a {@code !} position that resolves in neither
+ * loosens its source ({@link #checkNarrows}); a name in a {@code !} position that resolves nowhere in the
  * namespace ({@link #resolveConstructorTarget}, {@link #resolveAtomRefinement}); a {@code !} form used
  * against the wrong kind of target -- refining a constructor, applying a non-constructor, refining a
  * non-atom -- each answered with the form the author probably meant; a supertype chain reaching two base
- * kinds ({@link #determineKind}); and a body or annotation value the governing meta's compiled reader
+ * kinds ({@link #determineKind}); and a body or annotation value the declaring schema's compiled reader
  * rejects, which arrives as a {@link ReadException} and is restated as a schema error
  * ({@link #bodyIsNotValidData}).
  *
@@ -138,21 +139,25 @@ import java.util.function.Predicate;
  * declaration's name in front. What §5.7 leaves unchecked is not reported at all: a restated FIXED field
  * MUST NOT change its pinned value, and {@link #resolveTighteningField} does not compare the two.
  *
- * <p>Declarations are resolved against two separate namespaces (§3.3.1), each a required constructor
- * parameter since both are fixed for as long as this resolver is used:
+ * <p>Declarations resolve in one namespace per schema (§3.3.1, SPEC-FEEDBACK.md #7): the schema's own entries and its
+ * import closure, the {@code !!meta} target among the imports. It reaches this class as two getters over that one
+ * namespace, required constructor parameters fixed for as long as this resolver is used:
  * <ul>
- *   <li>{@code namespaceDefinitions} -- the type-name namespace, consulted by composition's supertype lookup
+ *   <li>{@code namespaceDefinitions} -- the whole namespace, consulted by composition's supertype lookup
  *   (§5.8), refinement's source lookup (§5.7), and atom refinement's source lookup (§5.5). Never populated
  *   by this class: the caller supplies a {@link DefinitionGetter} over a map it owns. A supertype or source
  *   must be answerable when asked for, so a caller wanting forward references resolves on demand, as
  *   {@link SchemaResolver} does.</li>
- *   <li>{@code metaDefinitions} -- the structure namespace: the governing meta-schema's entries, one hop via
- *   {@code !!meta}, consulted for a constructor-application target ({@link #resolveConstructorTarget}) and
- *   for an annotation's name. Atom refinement never consults it.</li>
+ *   <li>{@code metaDefinitions} -- the part of it this schema imports, already resolved and compiled, consulted for
+ *   a constructor-application target ({@link #resolveConstructorTarget}) and for an annotation's name: both are
+ *   read through a compiled reader, which exists only for an imported entry.</li>
  * </ul>
- * Either getter can be an always-{@code null} lookup for a resolver that never needs it. For {@link
- * MetaKernelBootstrapResolver} the two are one: the kernel governs itself, so the structure namespace is the one being
- * built.
+ * A name {@code sameDocument} holds is in the namespace but not yet readable: applying a constructor declared in the
+ * same document, or annotating with a type declared there, waits on that declaration being ready, which needs the
+ * wait-order resolution of SPEC-FEEDBACK.md #4, and is refused as {@code NOT_IMPLEMENTED} ({@link
+ * #notYetReadable}). Either getter can be an always-{@code null} lookup for a resolver that never needs it. For {@link
+ * MetaKernelBootstrapResolver} the two are one: the kernel is read in wait order over itself, so the entries a head
+ * resolves in are the ones being built.
  *
  * <p><b>Kind determination</b> (§4.1, {@link #determineKind}) checks the transitive supertype chain for the
  * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum}/{@code namespace} -- not a general
@@ -184,7 +189,7 @@ import java.util.function.Predicate;
  *
  * <p>Package-private, no {@code Tson} prefix -- internal machinery a consumer of this library never names.
  * {@link SchemaResolver} is the document-level counterpart: it validates a document's header directives,
- * merges {@code !!import} entries, derives the structure namespace, and holds one instance of this class to
+ * merges the {@code !!meta} target's and every {@code !!import}'s entries, and holds one instance of this class to
  * do the per-declaration work. This class takes a bare declaration and never sees a {@code SchemaDocument}.
  *
  * <p>Has no dependency on {@code reader} -- binding goes through {@link DefinitionMetaReader} (a required
@@ -227,12 +232,15 @@ final class DefinitionResolver {
      */
     private final Predicate<String> kernel;
 
-    /** {@link #kernel} for the structure namespace, where every construction head resolves (§3.3.1). */
+    /** {@link #kernel} for {@code metaDefinitions}, where every construction head resolves (§3.3.1). */
     private final Predicate<String> metaKernel;
+
+    /** Whether a name is declared by the document being resolved -- see {@link #notYetReadable}. */
+    private final Predicate<String> sameDocument;
 
     /**
      * Whether this resolver can bind annotation values at all -- false only for a caller with no compiled
-     * governing meta to read one through (the meta-kernel bootstrap, which is producing the very entries such
+     * reader to read one through (the meta-kernel bootstrap, which is producing the very entries such
      * a reader would need). It is what separates "this annotation's type is out of reach here" from "this
      * annotation's type does not resolve", the second of which is the author's error; see
      * {@link #bindAnnotationValue}.
@@ -269,21 +277,22 @@ final class DefinitionResolver {
 
     /**
      * No annotation reader: an annotation's name is kept, its value is out of reach, and no name is checked
-     * against the structure namespace. See {@link AnnotationValueReader}.
+     * against the imported entries. See {@link AnnotationValueReader}.
      */
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
                         DefinitionGetter namespaceDefinitions) {
         this(definitionMetaReader, null, metaDefinitions, namespaceDefinitions, null,
-                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true);
+                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true, name -> false);
     }
 
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
                         DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
                         ApplicationCloser applicationCloser, SchemaPositions positions,
                         Map<String, TsonSchema.EntryFacts> facts, Predicate<String> kernel,
-                        Predicate<String> metaKernel) {
+                        Predicate<String> metaKernel, Predicate<String> sameDocument) {
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.metaKernel = Objects.requireNonNull(metaKernel, "metaKernel");
+        this.sameDocument = Objects.requireNonNull(sameDocument, "sameDocument");
         this.positions = Objects.requireNonNull(positions, "positions");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
@@ -295,7 +304,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * Resolves a single declaration against this instance's own type-name/structure namespaces --
+     * Resolves a single declaration against this instance's namespace --
      * the sole entry point; every other {@code resolve*} method is a private dispatch target reached
      * from here. Delegates to {@link #resolve(SchemaMap.Declaration, Optional)} with no position,
      * for a caller with no {@code TsonSchemaParser}-produced position table to hand back -- every
@@ -412,17 +421,15 @@ final class DefinitionResolver {
      * to value", so {@link SchemaResolver} binds them through this same method and places them on the output
      * schema-map <em>key</em> (§8.1), beside the derived {@code @synthetic} marker.
      *
-     * <p>A value is bound through the governing meta the same way §6 describes reading one: the annotation's
-     * name resolves one hop against the structure namespace, and its value is read by that type's own
-     * compiled reader -- so {@code @doc:"..."} arrives as a {@code String}. <b>A name that does not resolve
-     * there is the author's error</b> ({@link #unresolvedAnnotation}), not a silently valueless annotation:
-     * §3.3.3's one hop is the whole annotation namespace of a schema document, and an annotation whose type
-     * is unreachable has no contract to validate its value against. The case worth its own wording is the
-     * one an author actually hits -- a type this schema declares itself, or brings in through {@code
-     * !!import}, which §3.3.3 admits for the schema's <em>data documents</em> and excludes here.
+     * <p>A value is bound the same way §6 describes reading one: the annotation's name resolves in the schema's one
+     * namespace (§3.3.3, SPEC-FEEDBACK.md #7), and its value is read by that type's own compiled reader -- so {@code
+     * @doc:"..."} arrives as a {@code String}. <b>A name that does not resolve there is the author's error</b>
+     * ({@link #unresolvedAnnotation}), not a silently valueless annotation: an annotation whose type is unreachable
+     * has no contract to validate its value against. A type this document declares itself is in the namespace but
+     * has no compiled reader yet, and is refused as not yet supported ({@link #notYetReadable}).
      *
      * <p>The check is skipped entirely by a resolver constructed with no {@link AnnotationValueReader}: there
-     * is no compiled governing meta to resolve against, so every name would fail it. That is the meta-kernel
+     * is no compiled reader to resolve against, so every name would fail it. That is the meta-kernel
      * bootstrap, which is producing the very entries such a reader would read through; there the annotation's
      * name is kept and its value dropped, {@code schema.meta} being a pure value model with no unbound form
      * to hold one in, and dropping the name too would lose more ([TSON-DATA] §1.5).
@@ -441,7 +448,9 @@ final class DefinitionResolver {
             // marker whose type nothing can reach is as unresolved as a valued one, and a bare mark whose type
             // is not void is refused as `_` would be.
             if (annotationsResolve && metaDefinitions.definition(annotation.name()) == null) {
-                throw unresolvedAnnotation(name, annotation.name());
+                throw sameDocument.test(annotation.name())
+                        ? notYetReadable(name, "'@" + annotation.name() + "' is annotated with a type")
+                        : unresolvedAnnotation(name, annotation.name());
             }
             refuseWrittenApplication(name, annotation.name());
             if (annotation.value().isEmpty()) {
@@ -454,19 +463,27 @@ final class DefinitionResolver {
     }
 
     /**
-     * §3.3.3's one hop missed: {@code annotationName} is not an entry of the governing meta-schema's own
-     * namespace. Worded from the two ways an author gets here -- a name they declared in this very schema (or
-     * imported into it), which is the near miss the rule actually catches, and a name that is simply nowhere.
+     * §3.3.3 missed: {@code annotationName} is no entry of this schema's namespace, its own entries and its imports.
      */
-    private SchemaValidationException unresolvedAnnotation(String declaration, String annotationName) {
-        boolean local = namespaceDefinitions.definition(annotationName) != null;
+    private static SchemaValidationException unresolvedAnnotation(String declaration, String annotationName) {
         return new SchemaValidationException("'" + declaration + "': '@" + annotationName + "' does not name "
-                + "a type in the governing meta-schema's namespace, which is the whole annotation namespace of a "
-                + "schema document (one hop through !!meta, §3.3.3)"
-                + (local ? " -- the name is declared by this schema or brought in by !!import, which makes it "
-                        + "usable by this schema's data documents but not within the schema document itself; "
-                        + "declare the annotation type in a meta-schema and point !!meta at that"
-                        : ""));
+                + "a type in this schema's namespace -- its own entries and every entry its !!meta target and its "
+                + "!!imports bring in (§3.3.3)");
+    }
+
+    /**
+     * A read against an entry this same document declares: applying its constructor ({@code !C { ... }}), or reading
+     * an annotation's value against its type. The entry is in the namespace, and the read waits on it being ready --
+     * the wait-order resolution of SPEC-FEEDBACK.md #4, which this resolver does not yet run outside the kernel, so
+     * the declaration is refused as a gap ({@code NOT_IMPLEMENTED}), not as the author's error. A type used by name
+     * (a field, a supertype, a refinement source whose constructor is imported) orders nothing, and resolves.
+     *
+     * @param what the read, as a message opens: {@code "'!C' applies a constructor"}
+     */
+    private static UnsupportedOperationException notYetReadable(String declaration, String what) {
+        return new UnsupportedOperationException("'" + declaration + "': " + what + " declared in this same "
+                + "schema, which is not yet supported -- reading against a declaration of the same document waits "
+                + "on that declaration being resolved first; declare it in a schema this one imports");
     }
 
     /** An annotation's value through the type its name refers to, or {@code null} when that type is out of reach. */
@@ -575,7 +592,7 @@ final class DefinitionResolver {
     /**
      * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A the kernel's {@code top}</b>
      * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain ({@link EntryKind#isConstructor}, judged in the
-     * structure namespace every head resolves in, where {@code top} must be the kernel's own).
+     * imported entries every head resolves in, where {@code top} must be the kernel's own).
      *
      * <p><b>A wider and more exact question than whether {@code C} is marked a constructor.</b> §4.1 makes
      * every base kind IS-A {@code top} and every constructor transitively so, while IS-A stops at
@@ -614,8 +631,8 @@ final class DefinitionResolver {
     /**
      * Refuses a construction whose head is abstract -- {@code top}, {@code type}, a base kind ([TSON-SCHEMA] §4.1),
      * or a meta layer's own abstract record: it has no direct instances (§5.2), so {@code !C { ... }} builds
-     * nothing. One sentence, naming what would satisfy it: the instantiable entries IS-A the head in the structure
-     * namespace, every abstract one among them left out, since naming one would refuse in turn, and {@code
+     * nothing. One sentence, naming what would satisfy it: the instantiable entries IS-A the head among the imported
+     * entries, every abstract one among them left out, since naming one would refuse in turn, and {@code
      * template}, which no declaration constructs ({@link #requireAuthorable}).
      */
     private void refuseAbstractHead(String name, String target, Top head) {
@@ -662,11 +679,10 @@ final class DefinitionResolver {
      * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
      * with {@code value}.
      *
-     * <p>{@code C} resolves against the structure namespace only (see {@link #resolveConstructorTarget}),
-     * and faces two questions. It MUST be <b>applicable</b> -- IS-A {@code top} (§4.1), see {@link
-     * #requireApplicable} -- and it MUST be <b>closed</b>: a template ({@code C} declaring type parameters)
-     * closes by application, {@code C<...>}, never by construction, so naming one here is a resolver error
-     * whether or not it also carries {@code ~}.
+     * <p>{@code C} resolves in the schema's one namespace, an imported entry (see {@link #resolveConstructorTarget}),
+     * and faces two questions. It MUST be <b>applicable</b> -- IS-A {@code top} (§4.1), see {@link #requireApplicable}
+     * -- and it MUST be <b>closed</b>: a template ({@code C} declaring type parameters) closes by application, {@code
+     * C<...>}, never by construction, so naming one here is a resolver error whether or not it also carries {@code ~}.
      *
      * <p>{@code value} is bound via {@link #bindAtomInstance} directly -- {@code instance.value().typeRef()}
      * already names {@code C} (per {@code Instance}'s own reshape, matching §12.1's {@code instance = "!"
@@ -787,9 +803,8 @@ final class DefinitionResolver {
     /**
      * Whether two records' name types are one type: the same entry at the end of each one's reference chain, not
      * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code field_name} is
-     * {@code identifier}. Each resolves where {@link NameType} resolves it -- one the record states in the schema's
-     * own namespace first, the absent default in the structure -- and two that resolve to nothing are compared as
-     * written, the linker refusing each on its own.
+     * {@code identifier}. Both resolve in the schema's one namespace, the absent default being the kernel's {@code
+     * field_name}, and two that resolve to nothing are compared as written, the linker refusing each on its own.
      */
     private boolean sameNameType(Optional<String> a, Optional<String> b) {
         String ka = nameTypeIdentity(a);
@@ -797,22 +812,12 @@ final class DefinitionResolver {
         return ka != null && kb != null ? ka.equals(kb) : a.equals(b);
     }
 
-    /** {@code nameType}'s terminal entry, qualified by the namespace it is in, or {@code null} where it is in none. */
+    /** {@code nameType}'s terminal entry, or {@code null} where the namespace holds no such name. */
     private String nameTypeIdentity(Optional<String> nameType) {
         String written = nameType.orElse(RecordBody.FIELD_NAME);
-        if (nameType.isPresent() && namespaceDefinitions.definition(written) != null) {
-            String terminal = ReferenceChain.terminal(written, namespaceDefinitions::definition);
-            if (namespaceDefinitions.definition(terminal) != null) {
-                return "schema:" + terminal;
-            }
-            written = terminal;   // an alias of a structure entry, which the walk below continues
-        }
-        if (metaDefinitions.definition(written) == null) {
-            return null;
-        }
-        return "structure:" + ReferenceChain.terminal(written, metaDefinitions::definition);
+        DefinitionGetter in = metaDefinitions.definition(written) != null ? metaDefinitions : namespaceDefinitions;
+        return in.definition(written) == null ? null : ReferenceChain.terminal(written, in::definition);
     }
-
 
     /**
      * {@code <T, N> !array { element_type: T  min_items: N }} -- the open counterpart of {@link
@@ -940,13 +945,10 @@ final class DefinitionResolver {
 
     /**
      * {@code !I ^ { values }} -- refines an atom-family instance by tightening its constructor's
-     * constraint fields. Per §3.3.1, {@code I} resolves against the type-name namespace *only*
-     * (never the structure namespace -- unlike {@link #resolveInstance}'s {@code C}) and MUST be a
-     * non-constructor instance of an atom family (kind {@code ATOM}, {@code constructor: false}).
-     * The constructor {@code I} was built from is reached through {@code I}'s own facts -- the tag its
-     * value carries -- never a further name lookup, so refinement works even where the constructor itself
-     * isn't name-visible (e.g. a governed schema that can't name {@code integer_type} directly, only
-     * {@code integer}).
+     * constraint fields. {@code I} resolves in the schema's one namespace, this document's own entries
+     * included (§3.3.1), and MUST be a non-constructor instance of an atom family (kind {@code ATOM},
+     * {@code constructor: false}). The constructor {@code I} was built from is reached through {@code I}'s
+     * own facts -- the tag its value carries -- never a further name lookup.
      *
      * <p>Unlike {@link #resolveInstance}, {@code refinement.bindings()}'s own {@code typeRef} is not
      * pre-set by the grammar -- §12.1's {@code atom-refinement} takes a bare {@code record-def}, naming no
@@ -975,7 +977,7 @@ final class DefinitionResolver {
         Top source = namespaceDefinitions.definition(sourceName);
         if (source == null) {
             throw new SchemaValidationException("'" + name + "': '!" + sourceName
-                    + "' does not resolve against the type-name namespace (§3.3.1)");
+                    + "' names no entry of this schema's namespace (§3.3.1)");
         }
         // §5.5's question, asked of the body: is this an atom *instance*? An instance's body IS an atom
         // (`integer` carries an `!integer_type {}`), where its constructor's body is the vocabulary record
@@ -1111,16 +1113,20 @@ final class DefinitionResolver {
      */
     private ConstructorHead resolveConstructorTarget(String name, String target) {
         if (metaDefinitions.definition(target) == null) {
-            throw new SchemaValidationException("'" + name + "': '!" + target
-                    + "' does not resolve against the structure namespace (§3.3.1)");
+            if (sameDocument.test(target)) {
+                throw notYetReadable(name, "'!" + target + "' applies a constructor");
+            }
+            throw new SchemaValidationException("'" + name + "': '!" + target + "' names no entry of this "
+                    + "schema's namespace -- its own entries and every entry its !!meta target and its !!imports "
+                    + "bring in (§3.3.1)");
         }
         String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
         Top atEnd = metaDefinitions.definition(terminal);
         if (atEnd == null) {
-            // The walk stopped at a name the structure namespace does not declare -- a broken hop, which is
-            // the alias's own problem and not this declaration's, but this is where it becomes visible.
+            // The walk stopped at a name no import declares -- a broken hop, which is the alias's own problem and
+            // not this declaration's, but this is where it becomes visible.
             throw new SchemaValidationException("'" + name + "': '!" + target + "' is an alias whose chain "
-                    + "ends at '" + terminal + "', which the structure namespace does not declare (§8.3)");
+                    + "ends at '" + terminal + "', which this schema's namespace does not declare (§8.3)");
         }
         return new ConstructorHead(terminal, atEnd);
     }

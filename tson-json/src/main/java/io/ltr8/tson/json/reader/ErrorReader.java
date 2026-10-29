@@ -14,9 +14,8 @@ import io.ltr8.tson.json.JsonTypeReader;
  * <em>code</em> rather than the channel is what keeps a gap apart from an author error -- {@code
  * Code.verdict()} is false for this one, so nothing downstream can mistake it for a verdict on the document.
  *
- * <p>This is where a constructor this encoding has no reader for lands, and where [TSON-SCHEMA] §2.2.2's
- * extension point lands for good: a meta-layer constructor this library has never seen has no factory to
- * dispatch to.
+ * <p>This is where a constructor this encoding has no reader for lands: one a schema declared that this library
+ * has never seen has no factory to dispatch to.
  */
 public final class ErrorReader implements JsonTypeReader<Object> {
 

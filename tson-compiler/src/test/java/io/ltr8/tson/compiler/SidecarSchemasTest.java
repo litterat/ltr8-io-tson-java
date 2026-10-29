@@ -75,7 +75,7 @@ class SidecarSchemasTest {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        compiledRegistry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        compiledRegistry.register(resolvedMetaKernel);
 
         TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.entries().isEmpty(), fileName + " resolved with no entries");

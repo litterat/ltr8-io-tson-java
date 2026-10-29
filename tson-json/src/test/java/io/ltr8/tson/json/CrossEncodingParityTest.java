@@ -62,7 +62,7 @@ class CrossEncodingParityTest {
               unique => set<text>
               stamps => set<datetime>
               pair   => [text, int32]
-              bounded => {
+              capped => {
                 value: int32
                 ( min: int32 | max: int32 )
               }
@@ -121,10 +121,10 @@ class CrossEncodingParityTest {
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: NFKC_CASEFOLD }
               headers     => { header_name => text }
-              field_name  => !identifier_type { start: NONE  continue: NONE
+              folded_name  => !identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: ASCII_CASEFOLD }
-              fields      => { field_name => text }
+              fields      => { folded_name => text }
               pinned      => { h: header_name = Idempotency-Key }
               charset     => !text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
               encoded     => { c: charset }
@@ -684,7 +684,7 @@ class CrossEncodingParityTest {
 
     @Test
     void aRequiredGroupWithNoMemberPresent() {
-        sameRule("bounded", """
+        sameRule("capped", """
                 { value: 1 }""", """
                 {"value": 1}""");
     }
@@ -889,7 +889,7 @@ class CrossEncodingParityTest {
 
     @Test
     void aRequiredGroupWithTwoMembersPresent() {
-        sameRule("bounded", """
+        sameRule("capped", """
                 { value: 1  min: 0  max: 9 }""", """
                 {"value": 1, "min": 0, "max": 9}""");
     }

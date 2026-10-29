@@ -132,8 +132,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         // stated once, there. What the key set carries is the other fact -- *which constructors are atoms*
         // -- which nothing else states: BuiltinTypeVocabulary is keyed by type name (`int32`) rather than
         // constructor name (`integer_type`), and AtomParsers switches on the body's own class. Listing them
-        // is also what makes a constructor this library has never seen reach NOT_IMPLEMENTED (§2.2.2's
-        // extension point) instead of being guessed at from whatever body it happened to resolve to.
+        // is also what makes a constructor this library has never seen, which any schema may declare, reach
+        // NOT_IMPLEMENTED instead of being guessed at from whatever body it happened to resolve to.
         for (String atomConstructor : ATOM_CONSTRUCTORS) {
             factories.put(atomConstructor, leaf.apply(AtomTypeReader.ATOM));
         }

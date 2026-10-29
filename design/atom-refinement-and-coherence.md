@@ -128,7 +128,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     admit a value, and for a network family the prefix bounds participate.
   - **A non-numeric bound binds, so the temporal and duration families' rules are live at the resolver.**
     `date_type.min`/`max` and their siblings are declared `value` in meta.tn (§7.4 — meta cannot write
-    `min: date`, `date` living a layer up in core.tn), so a bound is decoded by [TSON-DATA] §4 and arrives as a
+    `min: date`, `date` being core.tn's, and core imports meta), so a bound is decoded by [TSON-DATA] §4 and arrives as a
     `String`. `ValueParser.at` closes the distance: where the natural resolution cannot be what the bound
     component holds, the token is re-read under the built-in atom that produces that host type (`HostAtoms`), so
     `!date ^ { min: 2020-01-01 }` binds a `LocalDate` and `!duration ^ { min: PT30M }` a `Duration`. A bound the

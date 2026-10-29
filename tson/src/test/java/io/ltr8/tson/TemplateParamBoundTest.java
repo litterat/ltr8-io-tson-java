@@ -31,7 +31,6 @@ class TemplateParamBoundTest {
     private static final String SCHEMA = HEADER + """
             {
               non_empty_text       => !text ^ { min_length: 1 }
-              non_negative_integer => !integer ^ { min: 0 }
               boxed      => <T: text> { a: T }
               vec        => <T: text, N> !array { element_type: T  min_items: N }
               rebox      => <T> boxed<T>
@@ -88,7 +87,7 @@ class TemplateParamBoundTest {
         assertEquals(List.of(bounded("T", "non_empty_text")), parameters().get("narrower"));
     }
 
-    /** Core's non_negative_integer copies the kernel's, which the slot is typed by: the same type, so it narrows. */
+    /** The kernel's non_negative_integer, which the slot is typed by: the same type, so it narrows. */
     @Test
     void aValueParametersWrittenTypeNarrowsItsType() {
         assertEquals(List.of(new TemplateParam("N", TypeRef.of("non_negative_integer"))), parameters().get("counted"));
@@ -115,12 +114,12 @@ class TemplateParamBoundTest {
     }
 
     /**
-     * A bound names a type, in the type-name namespace. A name found only among the governing meta's constructors
-     * is structure vocabulary (§3.3.1), which no argument could satisfy -- a type argument names a type.
+     * A bound names a type in the schema's namespace. A constructor is no type (§4.1), so a bound naming one is
+     * refused: no argument could satisfy it -- a type argument names a type.
      */
     @Test
-    void aWrittenBoundNamesATypeInTheTypeNamespace() {
-        assertRefused("  boxed => <T: text_type> { a: T }", "'text_type' is a constructor of the governing meta");
+    void aWrittenBoundNamesAType() {
+        assertRefused("  boxed => <T: text_type> { a: T }", "'text_type' is a constructor, not a type");
         assertRefused("  boxed => <T: no_such_type> { a: T }", "'no_such_type' names no type");
         assertRefused("  boxed => <T: no_such<text>> { a: T }", "'no_such' names no type");
     }

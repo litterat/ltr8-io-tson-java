@@ -67,7 +67,12 @@ spec-required case:
   component, so the host holds no value for it and `ValuesByName.fieldOf` finds no component to read. The value is the
   schema's own, the field's pinned value in the record type, so the walk should take it from the declared
   `RecordField` and continue; no test covers the case yet.
-- [ ] **A value a schema writes at a reference-typed field is not judged** ([TSON-SCHEMA] §4.2, §5.12). In a kernel-governed
+- [ ] **A data document's value at a reference-typed position is not read** ([TSON-SCHEMA] §4.2, §5.12). Any schema
+  may declare `ref<T>` (SPEC-FEEDBACK.md #7), and a data document it governs reaches `AtomParsers.forType` with
+  `governsSchemas` false, which reports `NOT_IMPLEMENTED`: a reference is judged by what its name reaches when a
+  schema links, and a data document is never linked. The name is to resolve in the governing schema's namespace and
+  be judged as a value body's names are (`ValuesByName`), against the schema's value entries.
+- [ ] **A value a schema writes at a reference-typed field is not judged** ([TSON-SCHEMA] §4.2, §5.12). In any
   schema, `rpick => { m: ref<order> = os.o1 }` (or `~`) reaches `AtomParsers.forType`'s token-level reading from the
   linker's field-value check, which a reference has none of, and the `UnsupportedOperationException` escapes
   `validateSchema` rather than arriving as a `NOT_IMPLEMENTED` diagnostic. The name is to be recorded with the field's
@@ -311,7 +316,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 ## Miscellaneous
 
 - [ ] **No test pins [TSON-SCHEMA] §5.9 rule 8.** A subtracted construction whose head is a constructor
-  (`my_record => record - { groups }` in a meta layer) resolves with an empty chain and `!my_record { … }` is refused
+  (`my_record => record - { groups }`) resolves with an empty chain and `!my_record { … }` is refused
   as not IS-A `top`, which is the rule; nothing in the suite or the corpus exercises it, and the refusal's hint
   ("Did you mean atom refinement") misleads there. Add a vector and drop the hint for a subtracted head.
 - [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
@@ -319,11 +324,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an
   author can write (`InternalName`), so `KindMembers` should pass over `@synthetic` entries, in the message's list
   and in `expected` alike, or the walk should exclude an application's minted entry from every kind.
-- [ ] **A linker refusal of an atom application names its minted entry.** `pick => { m: ref<record> }`, in a
-  kernel-governed schema, reads "'ref_type_record_3034e1a1' is a reference whose 'of' names 'record', a constructor
-  …", and an unresolved `ref<nope>` or `kind<nope>` the same way: an application nothing declares is its expansion,
-  which `EntryDisplayName` gives no authored name, so `TsonSchemaLinker.validateEntry`'s subject falls back to the
-  key. Name it by the application the key's facts carry (`ref<record>`), or state the refusal without a subject, since
+- [ ] **A linker refusal of an atom application names its minted entry.** `pick => { m: ref<record> }` reads
+  "'ref_type_record_3034e1a1' is a reference whose 'of' names 'record', a constructor …", and an unresolved
+  `ref<nope>` or `kind<nope>` the same way: an application nothing declares is its expansion, which
+  `EntryDisplayName` gives no authored name, so `TsonSchemaLinker.validateEntry`'s subject falls back to the key.
+  Name it by the application the key's facts carry (`ref<record>`), or state the refusal without a subject, since
   the diagnostic is already located at the declaration that wrote it.
 - [ ] **The §7.2 refusal names a synthetic by its key.** `VariantSchemaReader` builds its `SubsumptionDiagnostics`
   from the entry name and keeps it through `renamed`, so beside `text_list => [text]` and `r => { t: [text] }`,

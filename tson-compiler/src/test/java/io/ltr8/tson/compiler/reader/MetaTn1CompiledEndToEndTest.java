@@ -44,10 +44,8 @@ class MetaTn1CompiledEndToEndTest {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
-        // meta-kernel governs itself -- loader.load(META_KERNEL_ID) re-bootstraps a fresh
-        // TsonCompiledMetaSchema (never cached for that identity, see TsonCompiledMetaRegistry's
-        // own Javadoc), which is exactly what register's own governingMeta argument needs here.
-        compiledRegistry.register(metaKernelMaterialized.schema(), loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        // Registered with the compiled registry too, which compiles it as the kernel's vocabulary.
+        compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();

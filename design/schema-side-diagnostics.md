@@ -148,8 +148,7 @@ how a *data* read reports on the schema its `!!schema` names — so `tson valida
 account of the same broken schema. It registers only a clean schema and otherwise returns `null`.
 
 **What still throws even with a receiver** makes the namespace itself unusable rather than one entry wrong: an
-`!!import` that will not load or stands at another governing level (`TsonSchemaLinker.checkImportLevel`), a `!!meta`
-that may not govern, a local declaration colliding with an imported name, a reference whose target owns a different
+`!!import` that will not load, a local declaration colliding with an imported name, a reference whose target owns a different
 `!!id` than it was fetched under (§2.2.1's cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Continuing would
 report a page of unresolved references that are all consequences of the one problem. `Tson.validateSchema` catches
 these and reports them against RFC 6901's root pointer (`""`), since they concern the document rather than a

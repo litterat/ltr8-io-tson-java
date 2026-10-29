@@ -123,7 +123,7 @@ an identity check of the token's text against the members, and the host value is
 governs what may be *declared* — each member a value of it, none two of one value — so it is a schema-load question the
 linker asks (`EnumLabels`). The one fact a reader needs from it is the name type's `normalization`: the token and each
 member are compared in that form, so under a case-folding name type `Content-Type` is the member written
-`content-type`. The type may be an entry of the governing meta, which only linking sees, so the linker records each
+`content-type`. The type may be an imported entry, which only linking resolves, so the linker records each
 enum's form (`EnumLabels.labelForm`, `TsonLinkedSchema.enumForms`) and every site that builds an enum parser passes it
 to `AtomParsers.forType(body, form)` — both encodings' atom readers, map keys, pins and selectors, and the linker's own
 default and pin checks. `text_type.members` is an ordinary facet on the shared parser, which `TextParser` checks last,
@@ -171,7 +171,7 @@ does narrow, such as a media type that must parse, is a type of its own.
   alone), and `identifier_type` by `IdentifierParser` — the text put into its `normalization` form, matched against
   the type's own `IdentifierProfile` (a profile failure is a parse failure), then `text_type`'s facets through
   `TextParser`. So a naming convention is a `pattern`, a closed vocabulary of names is `members`, and an identifier is
-  string-class (§5.4). Core's `void` is `!void_type {}` too, so the linker's refusal of a `void` variant and the
+  string-class (§5.4). The kernel's `void` is `!void_type {}`, so the linker's refusal of a `void` variant and the
   inhabitance check ask the body (`ReferenceChain.resolvesToVoid`), not the name.
 - **`identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `ASCII`, `NONE`), `start_add`,
   `continue_add`, `medial` and `exclude` code-point sets, with `text_type`'s `normalization` defaulting to `NFC`.
@@ -179,8 +179,9 @@ does narrow, such as a media type that must parse, is a type of its own.
   built, so a read builds nothing. The kernel declares two instances, told apart by entry name:
   `identifier => !identifier_type { continue_add: "-" }` (`IdentifierType.IDENTIFIER`) and `scheme_name`
   (`IdentifierType.SCHEME_NAME`). `MetaKernelBootstrapResolver` refuses either stating any other body, so the
-  constants and the declarations cannot drift. Core declares no `identifier`; a schema wanting one writes the kernel's
-  line. How the profile facets behave under refinement and what `coherenceCheck` holds them to is
+  constants and the declarations cannot drift. Every schema importing core reaches the kernel's `identifier`, and
+  so cannot declare one of its own; a differently named identifier family is an `identifier_type` instance. How the
+  profile facets behave under refinement and what `coherenceCheck` holds them to is
   `design/atom-refinement-and-coherence.md`'s.
 - **`IdentifierGrammar` is the series' name grammar, beside the atom it is the profile of.** `PROFILE` is built from
   `IdentifierType.IDENTIFIER` and held statically by both encodings' readers, the schema parser, the resolver and the

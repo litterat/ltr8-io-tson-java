@@ -39,12 +39,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code core.tn} -- driven through the real bundled chain. The end-to-end peer of {@code
  * SchemaDesugarerTest}, which pins the same rewrite on the AST alone.
  *
- * <p>Sugar and the {@code !} form are the <b>only</b> two ways to reach a container constructor. Bare names
- * and generic-application heads resolve in the type-name namespace only ([TSON-SCHEMA] §3.3.1), where
- * {@code array}/{@code set}/{@code map} are not reachable however the schema's {@code !!meta} chain is
- * arranged -- so {@code map<text, text>} is an unresolved reference and <code>{text =&gt; text}</code> is
- * the spelling. What makes every form work uniformly is that {@code SchemaDesugarer} rewrites each into a
- * real {@code !C value} declaration before resolution, off one fixed table.
+ * <p>Sugar and the {@code !} form are the <b>only</b> two ways to build a container. A generic-application head
+ * resolves in the schema's one namespace, where the kernel's {@code map} is a closed constructor taking no type
+ * arguments -- so {@code map<text, text>} is refused and <code>{text =&gt; text}</code> is the spelling. What makes
+ * every form work uniformly is that {@code SchemaDesugarer} rewrites each into a real {@code !C value} declaration
+ * before resolution, off one fixed table.
  */
 class ContainerSugarEndToEndTest {
 
@@ -438,8 +437,8 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * §8.2's one-entry-per-form rule, across the two channels that produce one. {@code [text]} written
-     * directly lifts at desugar; {@code [T]} closed with {@code T := text} arrives from materialisation --
+     * §8.2's one-entry-per-form rule, across the two channels that produce one. {@code [uuid]} written
+     * directly lifts at desugar; {@code [T]} closed with {@code T := uuid} arrives from materialisation --
      * and they are the same type, so they must be the same entry. Both are named by one function of one
      * binding record, which is what makes it so.
      */
@@ -447,7 +446,7 @@ class ContainerSugarEndToEndTest {
     void aFormClosedFromATemplateIsTheSameEntryADirectOneProduces() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: [T] }
-                  holder => { b: box<text>  direct: [text] }""");
+                  holder => { b: box<uuid>  direct: [uuid] }""");
 
         RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b"));
         RecordBody holder = (RecordBody) compiled.schema().entries().get("holder");
@@ -455,8 +454,8 @@ class ContainerSugarEndToEndTest {
         assertEquals(holder.fields().values().stream().toList().get(1).type().name(),
                 box.fields().values().stream().toList().get(0).type().name());
         assertEquals(1, compiled.schema().entries().keySet().stream()
-                .filter(n -> n.startsWith("array_text_")).count(),
-                () -> "one array_text entry, shared: " + compiled.schema().entries().keySet());
+                .filter(n -> n.startsWith("array_uuid_")).count(),
+                () -> "one array_uuid entry, shared: " + compiled.schema().entries().keySet());
     }
 
     /**
@@ -535,16 +534,16 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * And a container constructor's own name is no longer reachable at a head, however the {@code !!meta}
-     * chain is arranged: {@code map} resolves in the type-name namespace, finds nothing, and is an ordinary
-     * unresolved reference. This is the migration the change to type-name-only head resolution forces, and the
-     * error an author writing {@code map<text, text>} out of habit will see.
+     * A container constructor's own name at an application head resolves -- the kernel's {@code map} is in every
+     * closure reaching core -- and is refused as what it is: a constructor, closed, taking no type arguments. An
+     * author writing {@code map<text, text>} out of habit is told to drop the arguments, and the sugar
+     * {@code {text => text}} is the spelling.
      */
     @Test
-    void aContainerConstructorsNameAtAHeadIsAnUnresolvedReference() {
+    void aContainerConstructorsNameAtAHeadTakesNoArguments() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("  holder => { entries: map<text, text> }"));
 
-        assertTrue(thrown.getMessage().contains("unresolved reference 'map'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'map' declares no type parameters"), thrown.getMessage());
     }
 }

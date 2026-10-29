@@ -1,18 +1,15 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=f271892f662de4ec256c596b58d675ed7a470afccf0f06c10d23200b8aea822f"
-!!meta:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=373302d4cb3437e360d0fc39a50bb971d79eb7c09731589d38bb7f299259f4b5"
-!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=373302d4cb3437e360d0fc39a50bb971d79eb7c09731589d38bb7f299259f4b5"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
+!!meta:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=cf460fa93a54cb544b0a69fa32c0f6e8e7fe923fb82725c1b0b11121c956ee04"
+!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=cf460fa93a54cb544b0a69fa32c0f6e8e7fe923fb82725c1b0b11121c956ee04"
 @doc:"""
   TSON meta-schema (2026 Revision 39 draft).
 
-  The canonical meta-schema for user schemas: a schema governed by the
-  meta-kernel that adds the type constructors the core type library (core.tn)
-  instantiates. Type constructors are a meta-schema concern: user schemas use
-  them and by convention define none, a convention the grammar does not enforce.
-
-  User schemas normally chain to this file via `!!meta`. The meta-kernel is
-  reachable but not typically referenced directly — schemas that chain to
-  meta-kernel are either alternative type libraries replacing meta, or
-  extensions of the meta layer itself.
+  The canonical meta-schema for user schemas: it imports the meta-kernel and
+  adds the type constructors the core type library (core.tn) instantiates. A
+  schema's namespace is its own entries and its whole import closure, a `!!meta`
+  target contributing as an `!!import` does ([TSON-SCHEMA] §2.2.3), so a schema
+  reaching this file has every name it and the kernel declare, and reserves
+  each. User schemas normally reach it through core.tn, which imports it.
 
   Hash pins here are real digests over the bytes of this copy; see
   meta-kernel.tn's note.
@@ -25,8 +22,7 @@
      have no constructor of their own: `[T; N]` is the spelling.
 
   2. The `set` template — the `set<T>` spelling of the kernel's `set_type`
-     constructor, declared here for meta-layer extensions; core declares a
-     sibling for user schemas.
+     constructor.
 
   3. Constraint vocabulary constructors for atom families that the kernel itself
      doesn't need: numeric (`float_type` for the approximate tier, with the
@@ -39,10 +35,9 @@
 
   Plus annotation types — the classifying markers `ordering`, `bounded`, `exact`,
   `numeric`; the checked assertion `disjoint`; and the documentary `deprecated`,
-  `title`, `comment`, `examples`, `read_only`, `write_only`. Annotation types
-  must reside in the governing target's namespace ([TSON-SCHEMA] §6); placing
-  them in meta makes them reachable from core and from every schema that meta
-  governs.
+  `title`, `comment`, `examples`, `read_only`, `write_only`. An annotation
+  resolves in the annotating schema's namespace ([TSON-SCHEMA] §3.3.3, §6), so
+  these reach core and every schema whose closure includes meta.
 
   An annotation never changes a value, its type, or whether it is valid:
   validation is over values, and a schema with every annotation erased admits
@@ -86,10 +81,6 @@
     The set spelling an author writes: `set<text>` where the bare construction
     is `!set_type { element_type: text }`. A §5.10 template, not a constructor:
     it composes with nothing and so is not IS-A `top`.
-
-    This copy serves meta-layer extensions. Core declares a sibling under the
-    same name, so that user schemas reach it through their core import rather
-    than through the governing namespace.
     """
   set => <T> !set_type { element_type: T }
 

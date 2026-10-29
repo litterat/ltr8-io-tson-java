@@ -85,8 +85,8 @@ public enum EntryKind {
 
     /**
      * Whether {@code value} IS-A the meta-kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind, a
-     * namespace type, {@code reference} or {@code template} -- what a construction may apply, what only a
-     * meta-kernel-governed schema may declare, and what a meta layer builds a reader for. Read off the chain, so a
+     * namespace type, {@code reference} or {@code template} -- what a construction may apply, and what a compiled
+     * schema builds an instance reader for. Read off the chain, so a
      * template composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would; and
      * judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:
      * it is what every other answer IS-A, and as abstract as the base kinds beneath it, so its own reader is what

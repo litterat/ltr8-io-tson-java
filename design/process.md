@@ -68,9 +68,9 @@ the schemas ship in the library and are read as the normative vocabulary, so an 
 - **Stays:** what the entry is, and for a type its value space — which values, how equality and ordering work; what
   each field or facet means, with its unit; coherence rules and schema-load/resolver errors; refinement rules (what a
   refinement may set, tighten, never change); defaults and what omission yields; cross-layer name-resolution facts
-  (core declaring a sibling of a kernel type under the same name); how TSON text spells a value, said by name;
-  mappings a converter needs (JSON Schema `number`, a host language's closed-set construct); one short example where
-  the spelling is not obvious; the spec citations attached to sentences that stay.
+  (a kernel or meta.tn name every schema importing core reaches, and so cannot redeclare); how TSON text spells a value,
+  said by name; mappings a converter needs (JSON Schema `number`, a host language's closed-set construct); one short
+  example where the spelling is not obvious; the spec citations attached to sentences that stay.
 - **Goes:** history ("earlier revisions called", "was removed", "unchanged", "now", "remains"); rationale ("because",
   "which is why", "considered and rejected"); comparisons made to persuade (Java's `BigDecimal.equals`, "as
   `java.time.Duration` writes it"); restatements — a rule a file header states for several entries (meta's bounds,

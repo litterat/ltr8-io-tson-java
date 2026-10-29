@@ -13,21 +13,18 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §3.3.3's one hop, on the schema side: a schema document's annotations resolve against its
- * {@code !!meta} target's namespace and nothing else -- "neither the local declarations of the document being
- * authored nor any further rung of the ladder participates". An annotation type a schema declares itself, or
- * brings in through {@code !!import}, is therefore usable by that schema's <em>data documents</em> (which is
- * what {@code SchemaDrivenTreeAnnotationTest} pins one layer down) and not within the schema document itself.
+ * [TSON-SCHEMA] §3.3.3 on the schema side, under one namespace per schema (SPEC-FEEDBACK.md #7): a schema document's
+ * annotations resolve in its own namespace, its entries and its whole import closure, the {@code !!meta} target
+ * among them. An annotation type an import declares binds its value through that schema's compiled reader; one this
+ * document declares itself is in the namespace, but reading a value against it waits on wait-order resolution, a
+ * gap reported as {@code NOT_IMPLEMENTED}; a name nowhere in the closure is the author's error.
  *
- * <p><b>The rule only helps if breaking it is loud.</b> An unreachable annotation type has no contract to
- * validate its value against, so the value cannot be bound -- and an annotation kept by name with its value
- * quietly discarded is the worst of the three outcomes: the schema loads clean and the metadata is not there.
- * Every case here asserts a diagnostic naming the declaration, and the meta-layer case asserts the value the
- * author actually gets once the type is where §3.3.3 wants it.
+ * <p><b>Every case is loud.</b> An annotation kept by name with its value quietly discarded is the worst outcome:
+ * the schema loads clean and the metadata is not there. Every case asserts a value bound or a diagnostic naming the
+ * declaration.
  */
 class SchemaAnnotationScopeTest {
 
@@ -73,12 +70,12 @@ class SchemaAnnotationScopeTest {
     }
 
     /**
-     * {@code method} is this schema's own declaration, so {@code @method:"POST"} names nothing the annotation
-     * namespace can reach -- on the name side of {@code =>} and on the definition side alike, the two §6 keeps
-     * separate. Each is reported against the declaration that wrote it, and the message names the remedy.
+     * {@code method} is this schema's own declaration, so reading {@code @method:"POST"} waits on it -- on the name
+     * side of {@code =>} and on the definition side alike, the two §6 keeps separate. Each is reported against the
+     * declaration that wrote it, as a gap and never a verdict.
      */
     @Test
-    void aLocallyDeclaredAnnotationTypeIsReportedAtEveryUseSite() {
+    void aLocallyDeclaredAnnotationTypeIsNotYetImplementedAtEveryUseSite() {
         List<Diagnostic> problems = validate("""
                 !!id:"https://example.test/local-annotations.tn"
                 !!meta:"https://tson.io/2026/39/m/meta.tn"
@@ -92,15 +89,17 @@ class SchemaAnnotationScopeTest {
 
         assertEquals(List.of("/item", "/order"),
                 problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
-        assertTrue(problems.stream().allMatch(d -> d.message().contains("'@method'")), problems.toString());
-        assertTrue(problems.getFirst().message().contains("declare the annotation type in a meta-schema"),
+        assertTrue(problems.stream().allMatch(d -> d.message().contains("'@method'")
+                && d.code() == Diagnostic.Code.NOT_IMPLEMENTED), problems.toString());
+        assertTrue(problems.getFirst().message().contains("declared in this same schema, which is not yet supported"),
                 problems.getFirst().message());
     }
 
-    /** An {@code !!import} is no closer than a local declaration: §3.3.3's hop is through {@code !!meta} only. */
+    /** An annotation type an {@code !!import} declares is in the namespace, and its value binds. */
     @Test
-    void anImportedAnnotationTypeIsReportedTheSameWay() {
-        List<Diagnostic> problems = validate("""
+    void anImportedAnnotationTypeBindsItsValue() {
+        Tson tson = tson();
+        assertEquals(List.of(), tson.validateSchema("""
                 !!id:"https://example.test/imported-annotations.tn"
                 !!meta:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
@@ -108,16 +107,13 @@ class SchemaAnnotationScopeTest {
                 {
                   order => @status:201 { id: int32 }
                 }
-                """);
+                """));
 
-        assertEquals(1, problems.size(), problems.toString());
-        assertEquals(Optional.of("/order"), problems.getFirst().schemaPointer());
-        assertTrue(problems.getFirst().message().contains("'@status'"), problems.getFirst().message());
-        assertTrue(problems.getFirst().message().contains("brought in by !!import"),
-                problems.getFirst().message());
+        var schema = tson.schemaRegistry().get("https://example.test/imported-annotations.tn").orElseThrow().schema();
+        assertEquals(Optional.of(201), schema.factsOf("order").annotations().value("status", Integer.class));
     }
 
-    /** A name nowhere in reach at all -- same verdict, without the "you declared it yourself" half. */
+    /** A name nowhere in the closure is the author's error. */
     @Test
     void anAnnotationTypeThatExistsNowhereIsReportedToo() {
         List<Diagnostic> problems = validate("""
@@ -132,13 +128,10 @@ class SchemaAnnotationScopeTest {
         assertEquals(1, problems.size(), problems.toString());
         assertTrue(problems.getFirst().message().contains("'@no_such_annotation'"),
                 problems.getFirst().message());
-        // No remedy clause: there is no declaration of this name anywhere to move, so the only thing to say
-        // is that the name does not resolve.
-        assertFalse(problems.getFirst().message().contains("brought in by !!import"),
-                problems.getFirst().message());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
     }
 
-    /** A bare marker names a type too ({@code @T} is {@code @T:_}, §6), so it is checked like a valued one. */
+    /** A bare marker names a type too ({@code @T} is {@code @T:_}, §6), so it waits like a valued one. */
     @Test
     void aValuelessMarkerIsCheckedAsWell() {
         List<Diagnostic> problems = validate("""
@@ -153,11 +146,12 @@ class SchemaAnnotationScopeTest {
 
         assertEquals(1, problems.size(), problems.toString());
         assertTrue(problems.getFirst().message().contains("'@reviewed'"), problems.getFirst().message());
+        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code());
     }
 
     /**
-     * The remedy, end to end: {@code method} moved into a meta-layer schema and reached through {@code
-     * !!meta} binds its value, on both sides of {@code =>}.
+     * {@code method} declared in a meta-layer schema and reached through {@code !!meta} binds its value, on both
+     * sides of {@code =>}, as through any import.
      */
     @Test
     void anAnnotationTypeInTheGoverningMetaBindsItsValue() {

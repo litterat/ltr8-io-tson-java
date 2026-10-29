@@ -11,12 +11,12 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
  * caller needs of the target:
  *
  * <ul>
- *   <li>{@link #resolveLinked} -- an {@code !!import} target (or a user schema being read): its
- *       <i>resolved</i> form is all that's needed (merged into the importer's type-name namespace, or
- *       compiled per-mode by a {@code TsonCompiledSchemaRegistry}). Never compiled by the loader itself.
- *   <li>{@link #loadMeta} -- a {@code !!meta} target: a governing meta-schema, which must be
- *       <i>compiled</i> (its {@code !enum}/{@code !integer} instances are read into {@code schema.meta}
- *       objects during the governed schema's own resolution).
+ *   <li>{@link #resolveLinked} -- an {@code !!import} or {@code !!meta} target (or a user schema being read): its
+ *       <i>resolved</i> form, merged into the importer's namespace, or compiled per-mode by a {@code
+ *       TsonCompiledSchemaRegistry}.
+ *   <li>{@link #loadMeta} -- the <i>compiled</i> vocabulary of the schema that declared a constructor or an
+ *       annotation type the importer applies: its {@code !enum}/{@code !integer} instances are read into {@code
+ *       schema.meta} objects during the importer's own resolution.
  * </ul>
  *
  * <p>Not a plain registry lookup, because meta-kernel's own document names <i>itself</i> as its {@code
@@ -44,15 +44,23 @@ public interface TsonCompiledSchemaLoader {
     TsonLinkedSchema resolveLinked(String uri);
 
     /**
-     * Resolves {@code uri} to its compiled governing meta-schema -- for a document's own {@code !!meta}
-     * target, which must be a meta-layer schema (its own {@code !!meta} is meta-kernel).
+     * Resolves {@code uri} to its compiled vocabulary -- the readers a schema importing it reads a construction
+     * head or an annotation value through, where {@code uri} declared the constructor or the annotation type. Any
+     * schema: one namespace per schema ([TSON-SCHEMA] §3.3.1) puts every schema's constructors in reach of the
+     * schemas importing it, and a {@code !!meta} target is one of those imports.
      *
-     * @throws io.ltr8.tson.base.SchemaValidationException if {@code uri} resolves but isn't a
-     *                               meta-layer schema, so cannot govern another -- an authoring error, like
-     *                               every other verdict on a schema's own soundness (in addition to whatever
-     *                               {@link #resolveLinked} may throw)
+     * @throws RuntimeException whatever {@link #resolveLinked} may throw
      */
     TsonCompiledMetaSchema loadMeta(String uri);
+
+    /**
+     * {@link #loadMeta} for a schema already registered, named by its canonical identity ({@code
+     * CanonicalIdentity.canonicalize}) -- the origin an imported entry records, which is the schema whose compiled
+     * readers read an instance of it.
+     *
+     * @throws IllegalStateException if no schema is registered under {@code identity}
+     */
+    TsonCompiledMetaSchema vocabularyOf(String identity);
 
     /**
      * [TSON-DATA] §8.2's identifier policy the schemas this loader resolves are judged under. The resolver reads

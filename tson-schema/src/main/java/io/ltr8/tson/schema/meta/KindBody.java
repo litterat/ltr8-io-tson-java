@@ -14,8 +14,8 @@ import java.util.Optional;
  * resolves to one of its {@link #members} -- the name, never a value of the type it names.
  *
  * <p>An enum is an atom whose value set is a listed set of names; a kind is an atom whose value set is a computed
- * one. {@link #of} names a constructor of the writer's structure namespace, never a type of its type-name
- * namespace, and is held as the name it was written. Which entries are members is a question about the governing
+ * one. {@link #of} names a constructor in the writer's namespace, never a type that is no constructor, and is held
+ * as the name it was written. Which entries are members is a question about the governing
  * schema's closure, which this body cannot see, so the linker answers it and writes the answer here.
  *
  * <p><b>{@link #members} is a derived index</b>, as {@link TypeChain#subtypes} is: absent on a declaration,

@@ -7,8 +7,12 @@ What `!C { … }` may apply, how its head resolves, and why a template is never 
 
 - A template closes by application (`C<...>`), never by construction (`!C { ... }`); naming one at a construction site
   is an author error (`SchemaValidationException`), never an `IllegalStateException`.
-- A construction head resolves through its reference chain first (`resolveConstructorTarget`): every question is asked
-  of the entry at the end, while the entry's facts record the name the author wrote as its constructor.
+- A construction head resolves in the schema's one namespace, among the entries its closure imports
+  (SPEC-FEEDBACK.md #7), through its reference chain first (`resolveConstructorTarget`): every question is asked of
+  the entry at the end, while the entry's facts record the name the author wrote as its constructor.
+- A head declared in the same document is a gap, refused as `NOT_IMPLEMENTED` (`DefinitionResolver.notYetReadable`):
+  its instance waits on it being ready, which only the kernel's bootstrap orders. The body is read through the
+  compiled form of the schema that declared the head (`design/resolver-vocabulary-and-bootstrap.md`).
 - What `!C { … }` may apply is IS-A `top` (§4.1) — there is no constructor marker — and
   `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so a head the gate admits has a reader.
 - `template` is resolver vocabulary (§8.1): IS-A `top`, yet a source declaration applying it, closed or open, is an
@@ -18,13 +22,13 @@ What `!C { … }` may apply, how its head resolves, and why a template is never 
 - `!reference { target: X }` resolves to the alias's own entry — `kind: REFERENCE`, `X` as source and body — the same
   entry `name => X` denotes.
 - Construction transfers kind and no supertypes (§5.5), so an instance carries an empty chain and is not itself a
-  constructor; §2.2.2 eligibility is the linker's, asked as IS-A `top`.
+  constructor. Any schema may declare a constructor; nothing ties it to the document's `!!meta`.
 - A constructor's parameters are confined to no channel: nothing is checked at the declaration, and each channel is
   decided where the argument lands.
 
 Related: `design/schema-resolution.md` (the resolution phase around this), `design/atom-refinement-and-coherence.md`
 (`!I ^ { ... }`), `design/template-materialisation.md` and `design/held-template-bodies.md` (how `C<...>` closes),
-`design/resolver-vocabulary-and-bootstrap.md` (reference hops), `design/linking-and-compilation.md` (eligibility).
+`design/resolver-vocabulary-and-bootstrap.md` (reference hops, the vocabulary), `design/linking-and-compilation.md`.
 
 ## Constructor application (`tson-compiler/.../resolver/DefinitionResolver.java`)
 
@@ -51,8 +55,8 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   exactly the entries describing *a type* rather than a part of one. Over the bundled schemas that is every
   vocabulary constructor plus `top`, `type`, the three base kinds, `namespace` (and the namespace types, `schema`
   and `field_map` among them), `reference` and `template` — judged by where `top` is defined
-  (`EntryKind.isConstructor`, one predicate the resolver's gate, the linker's §2.2.2 eligibility, the meta's reader
-  table and the governed compile all ask), and over a template's chain as over a closed one's. **A per-entry
+  (`EntryKind.isConstructor`, one predicate the resolver's gate, the compiled vocabulary's reader table and the
+  linker all ask), and over a template's chain as over a closed one's. **A per-entry
   constructor marker would be both too narrow and inconsistent.** `reference` describes no value, so it would go
   unmarked, and the language needs it applicable — which takes a by-name exception that the open and closed paths
   must then both remember, or `<T> !reference { target: T }` resolves while `!reference { target: int32 }` does
@@ -83,20 +87,13 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   entries, selecting precisely the wrong side — while kind alone cannot separate them either, an atom constructor
   being ATOM-kinded exactly like its instances. Together they agree on all 211. The construction hint in the
   refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather than advice that
-  would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a construction that resolved
-  reaches a factory rather than failing "out of scope" on a narrower test. **There is no marker.** §12.1's grammar
+  would fail in turn. **There is no marker.** §12.1's grammar
   has no constructor sigil and §8.1's `type` no `constructor` field: what makes an entry a constructor is that it
-  IS-A `top`, which its supertype chain records. **§2.2.2 eligibility** — who may declare one — asks the linker
-  whether the entry IS-A `top`, so an ordinary type library cannot reach constructor level, by composing its way
-  there or otherwise. **There is no separate level discipline**: composition propagates the chain, so an entry
-  deriving from a constructor *is* one, and there is nothing to refuse beyond eligibility — which refuses the
-  declaration outright in an ordinary schema, and in a meta-schema, where extending a vocabulary is the point,
-  simply allows it. `ApplicabilityIsIsATopTest` and `ConstructorLevelDisciplineTest` pin both halves; §3.3.1 and
-  §4.2 are the spec side.
-- **§4.2's remaining declaration-time rule is placement** — a constructor declared only in a schema whose own
-  `!!meta` names the meta-kernel — which is the eligibility rule above, checked in the linker.
-  **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an
-  entry with an empty chain, which is why an instance is not itself a constructor.
+  IS-A `top`, which its supertype chain records. **There is no level discipline**: composition propagates the
+  chain, so an entry deriving from a constructor *is* one, and any schema may declare one (SPEC-FEEDBACK.md #7).
+  **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an entry with an empty
+  chain, which is why an instance is not itself a constructor. `ApplicabilityIsIsATopTest` and
+  `ConstructorLevelDisciplineTest` pin both halves; §3.3.1 and §4.2 are the spec side.
 - **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
   substituted as a token and read by the position it lands in, so a slot typed `type_kind` takes a type where
   an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where

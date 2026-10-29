@@ -50,9 +50,14 @@ class NumericArgumentIdentityTest {
                 .withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source)).get(ID);
     }
 
-    /** Every derived entry, which is where two spellings of one number would show up as two. */
+    /**
+     * Every derived entry this schema declared, which is where two spellings of one number would show up as two --
+     * its closure's own derived entries, the kernel's and meta.tn's among them, left out.
+     */
     private static List<String> derivedEntries(TsonCompiledSchema compiled) {
-        return compiled.schema().entries().keySet().stream().filter(n -> n.matches(".*_[0-9a-f]{8}")).toList();
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(compiled.schema().id());
+        return compiled.schema().entries().keySet().stream().filter(n -> n.matches(".*_[0-9a-f]{8}"))
+                .filter(n -> compiled.linkedSchema().originOf(n).equals(own)).toList();
     }
 
     /**

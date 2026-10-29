@@ -6,9 +6,13 @@ facts and refinement, groups, subtraction, and the exception boundary.
 
 **Invariants**
 
-- An annotation on a declaration resolves one hop against the governing meta and nowhere else (§3.3.3); a name that
-  misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its type. Only
-  the meta-kernel bootstrap, resolving `meta-kernel.tn` itself, skips the check.
+- Every name a declaration writes resolves in the schema's one namespace, its own entries and the closure of its
+  `!!meta` target and its `!!import`s (SPEC-FEEDBACK.md #7). An annotation on a declaration resolves there (§3.3.3); a
+  name that misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its
+  type. Only the meta-kernel bootstrap, resolving `meta-kernel.tn` itself, skips the check.
+- A read against a declaration of the same document — `!C { … }` with `C` local, or an annotation whose type is
+  local — is a gap, refused as `NOT_IMPLEMENTED` (`DefinitionResolver.notYetReadable`); the kernel's bootstrap,
+  which reads in wait order, is the exception.
 - `abstract`/`final` are grammar, not annotations; `=?` is field syntax; and the definition mark is applied once, in
   `DefinitionResolver.resolve` (`withExtension`), never inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
@@ -49,16 +53,19 @@ meta-kernel bootstrap), `design/meta-layer-namespaces.md` (namespace-type payloa
 ## The two resolvers
 
 `SchemaResolver` resolves a whole `SchemaDocument` (`TsonSchemaResolver` is its public wrapper): header directives,
-the structure namespace from the governing `!!meta`, and the `!!import` merge into the type-name namespace *before*
-any local declaration resolves. That merge mirrors `TsonSchemaLinker.mergeImports` — transitive, collisions decided
-by entry identity, each import edge judged by `TsonSchemaLinker.checkImportLevel` (§2.2.3) — because it is the same
-concept met one phase earlier, and the two are kept in step deliberately. Local declarations resolve on demand
+and the merge of the `!!meta` target's and every `!!import`'s namespace (`TsonSchema.namespaceSources`) *before* any
+local declaration resolves, recording each imported entry's origin. That merge mirrors `TsonSchemaLinker.mergeImports`
+— transitive, collisions decided by entry identity (§2.2.3) — because it is the same concept met one phase earlier,
+and the two are kept in step deliberately. The origins key its vocabulary: each `!C` body and annotation value is
+read through the compiled form of the schema that declared `C` or the type
+(`design/resolver-vocabulary-and-bootstrap.md`). Local declarations resolve on demand
 (`OnDemand`), so a supertype or source may be declared later; a cycle through those edges is the author's error.
 
 `DefinitionResolver` (package-private) resolves one `SchemaMap.Declaration` and never sees a document. Everything it
-consults is fixed at construction: the type-name namespace and the structure namespace (`DefinitionGetter`s — the
-second consulted only for a construction head and an annotation name, §3.3.1), the meta's compiled reader
-(`DefinitionMetaReader`) and annotation reader (`AnnotationValueReader`), the `ApplicationCloser` onto the
+consults is fixed at construction: two `DefinitionGetter`s over the one namespace, `namespaceDefinitions` the whole
+of it and `metaDefinitions` its imported part (where a construction head and an annotation name resolve, since only
+an imported entry has a compiled reader), a `sameDocument` predicate naming the local entries, the vocabulary's
+compiled reader (`DefinitionMetaReader`) and annotation reader (`AnnotationValueReader`), the `ApplicationCloser` onto the
 schema's one `TemplateMaterialiser`, and the `EntryFacts` map it shares with `SchemaResolver` and the materialiser,
 so an atom refinement finds the constructor of a source another schema declared. Its class Javadoc lists the
 shapes it dispatches and the exact exception boundary.
@@ -71,9 +78,9 @@ key set's failures itself, since that loop runs outside the memoized getter that
 
 The name is checked whether or not a value was written — §6 makes `@T` shorthand for `@T:_` — so silence is never
 the outcome: an annotation keeping its name and losing its value would let the schema load clean with the
-metadata gone (`SchemaAnnotationScopeTest`). The near miss gets its own wording: a type the schema itself declares
-or imports is usable by its *data documents*, not inside the schema document, so the message names the remedy
-(move it into a meta-schema). A resolved value is read by that type's own compiled reader, a bare mark as a
+metadata gone (`SchemaAnnotationScopeTest`). A type the schema itself declares is in the namespace but has no
+compiled reader yet, and is refused as a gap naming the remedy (declare it in a schema this one imports). A resolved
+value is read by that type's own compiled reader, a bare mark as a
 synthetic `_` (`BareAnnotationTest`). The bootstrap passes no `AnnotationValueReader`, because it is producing the
 entries such a reader would read through; there the name is kept and the value dropped.
 
@@ -222,10 +229,14 @@ library improves; a gap's does.* Misfiling an author error as `NOT_IMPLEMENTED` 
 fix and lifts the CLI to exit 70. All three kinds are collected per declaration, each leaving a placeholder
 (`SchemaResolver.unresolved`) that keeps the failed declaration's type parameters.
 
-- **No schema construct reaches `NOT_IMPLEMENTED`.** The `UnsupportedOperationException` sites left are the
-  catch-alls around the compiled meta reader (an exception none of the classified ones), a failed re-serialisation
-  of an atom refinement's source, a closed application with no `ApplicationCloser` (a resolver built standalone),
-  and the bootstrap's closed switch over `meta-kernel.tn`'s own declarations.
+- **One schema construct reaches `NOT_IMPLEMENTED`: a read against the same document** (`notYetReadable`).
+  Applying a constructor declared beside its instance, or annotating with a local type, waits on that declaration
+  being ready, which needs the wait order of SPEC-FEEDBACK.md #4; a type used by name, and an atom refinement whose
+  source is local but whose constructor is imported, order nothing and resolve. The other
+  `UnsupportedOperationException` sites are the catch-alls around the compiled reader (an exception none of the
+  classified ones), a failed re-serialisation of an atom refinement's source, a closed application with no
+  `ApplicationCloser` (a resolver built standalone), and the bootstrap's closed switch over `meta-kernel.tn`'s own
+  declarations.
 - **A body the constructor's vocabulary rejects** arrives as a `ReadException` and is restated as a schema error
   (`bodyIsNotValidData`, `payloadFailure`). The read `Diagnostic` is dropped: it was produced against a
   `DataValueEvents` replay whose positions are placeholders and whose path points into a synthetic body. The real
@@ -244,8 +255,8 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
   offers, so a conforming processor may load the same document cleanly and no vector states the refusal.
 
 **No gap reaches a read either:** every constructor `meta-kernel.tn` and `meta.tn` declare builds a real reader, and
-`CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReader`. The machinery stays because §2.2.2's
-extension point can still reach it — a meta-layer constructor this library has no factory for — and it rides in
+`CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReader`. The machinery stays because the
+extension point can still reach it — a schema's own constructor this library has no factory for — and it rides in
 the report, located at the value it could not read (`TsonCli.exitCodeFor` lifts the run to 70).
 
 ## The `schema.meta` value model

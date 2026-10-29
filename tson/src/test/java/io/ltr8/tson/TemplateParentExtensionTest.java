@@ -122,8 +122,8 @@ class TemplateParentExtensionTest {
     @Test
     void aDiscriminatorTypedByAnApplicationOfAParameterIsRefused() {
         String refusal = refusal("p8", """
-                  bounded => <M> !integer_type { max: M }
-                  pet     => <M, N> { kind: bounded<M> = N  name: text }
+                  capped => <M> !integer_type { max: M }
+                  pet     => <M, N> { kind: capped<M> = N  name: text }
                   cat     => pet<9, 3>
                 """);
 

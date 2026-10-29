@@ -116,7 +116,7 @@ final class TemplateMaterialiser {
     /** The constructor an entry's value applies, through the schema's facts and then its own class. */
     private final Function<String, Optional<String>> localConstructors;
 
-    /** The same, of an entry of the governing meta. */
+    /** The same, of an imported entry. */
     private final Function<String, Optional<String>> metaConstructors;
 
     /** §8.2's freshness MUST over the names this class mints -- see {@link MintedNames}. */
@@ -254,7 +254,7 @@ final class TemplateMaterialiser {
     /** Whether a name is the meta-kernel's own, for telling a constructor from a family member. */
     private final Predicate<String> kernel;
 
-    /** The governing meta's entries, which is where a slot's declared type is read from. */
+    /** The imported entries, where a constructor and the type its slot declares are read from. */
     private final Function<String, Top> metaTypes;
 
     /** The local declaration resolution is inside, or {@code null} -- who an early check answers to. */
@@ -437,7 +437,7 @@ final class TemplateMaterialiser {
      * bare head. The list is the evidence the author supplied arguments, and the linker reports on what it is
      * handed: a head stripped of its arguments is found as a bare name and then faulted for supplying no
      * arguments, which is the opposite of what the author wrote. Keeping them lets the honest verdict through:
-     * a name the type-name namespace does not hold is an unresolved reference, applied or not.
+     * a name the schema's namespace does not hold is an unresolved reference, applied or not.
      */
     private TypeRef close(TypeRef ref) {
         if (ref.arguments().isEmpty()) {
@@ -1047,9 +1047,9 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * {@code argument} as a value of {@code type}, read in the structure namespace where the template applies a meta
-     * constructor ({@link ParameterTypes#readsInStructure}) -- so a schema's own entry under a meta type's name never
-     * stands in for the type the constructor's slot declares -- and in the schema's namespace otherwise.
+     * {@code argument} as a value of {@code type}, read among the imported entries where the template applies a
+     * constructor ({@link ParameterTypes#readsInStructure}) -- the constructor's reader reads the argument, and its
+     * slot's type is in its declaring schema's closure -- and in the schema's namespace otherwise.
      */
     private void checkValue(String head, TemplateParam parameter, String argument, String type, boolean structural) {
         if (type == null) {
@@ -1058,7 +1058,7 @@ final class TemplateMaterialiser {
         Function<String, Top> resolve = structural ? metaTypes : this::lookup;
         String terminal = ReferenceChain.terminal(type, resolve::apply);
         Top definition = resolve.apply(terminal);
-        // An enum's argument is matched in its name type's form, which the governing meta may hold.
+        // An enum's argument is matched in its name type's form, which an import may hold.
         Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition,
                 NameType.form(definition, (structural ? metaConstructors : localConstructors).apply(terminal),
                         namespace::definition, metaTypes));
@@ -1073,7 +1073,7 @@ final class TemplateMaterialiser {
         }
     }
 
-    /** A name in the schema's own namespace first, then in the governing meta's -- a slot type is the meta's. */
+    /** A name in the schema's own namespace first, then among its imported entries. */
     private Top lookup(String name) {
         Top local = namespace.definition(name);
         return local != null ? local : metaTypes.apply(name);

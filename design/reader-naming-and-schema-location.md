@@ -169,7 +169,7 @@ the offending token.
 - **`RecordField.position` is `@Unbound`** — §8.1's `record_field`
   declares no such field, so nothing fills it and strict binding would call it a mismatch. Deliberately not
   carried in the annotation channel, which is the opposite kind of thing: annotations are schema data, they
-  resolve one hop against the governing meta (§6, and an unresolvable name is the author's error), and they
+  resolve in the schema's namespace (§3.3.3, and an unresolvable name is the author's error), and they
   round-trip into resolver output checked against the `*-resolved.tn` fixtures.
 - **The reader takes it at the one descent that knows the field** — `ctx.schemaField(name, position)`, whose
   absent case leaves the enclosing record's position in place, which is the honest answer for a document

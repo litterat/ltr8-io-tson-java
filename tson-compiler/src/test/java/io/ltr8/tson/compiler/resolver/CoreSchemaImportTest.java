@@ -58,7 +58,7 @@ class CoreSchemaImportTest {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(resolvedMetaKernel);
 
         loader.loadMeta(TsonBundledSchemas.META_ID);
         loader.resolveLinked(TsonBundledSchemas.CORE_ID); // core.tn is a non-meta import: resolved, not compiled here
@@ -75,16 +75,14 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(40, core.entries().size(), "expected every core.tn declaration to resolve");
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.CORE_ID);
+        assertEquals(31, core.entries().keySet().stream().filter(name -> registered.get().originOf(name).equals(own))
+                .count(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements
         // (int32/positive_integer) and constructor applications (hex, float32, email, complex, unknown) --
-        // all genuinely present in the validated, registered namespace. core.tn declares
-        // no !!import of its own (only !!meta:"...meta.tn"), so unlike MetaSchemaImportTest's own
-        // assertions, meta.tn's/meta-kernel's own vocabulary (e.g. "atom", "binary") is never merged
-        // into this schema's own entries() -- it's only reachable one hop via !!meta, and only for a
-        // "source" reference (§3.3.1's structure-namespace rule), which is exactly what lets int32's
-        // own `source: integer_type` validate despite integer_type living in meta-kernel, two hops up.
+        // all genuinely present in the validated, registered namespace, which also holds meta.tn's and the
+        // kernel's entries: core.tn imports meta.tn, which imports the kernel (§2.2.3).
         assertTrue(core.entries().containsKey("int32"));
         assertTrue(core.entries().containsKey("uint8"));
         assertTrue(core.entries().containsKey("bytes"));
@@ -93,6 +91,7 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("email"));
         assertTrue(core.entries().containsKey("complex"));
         assertTrue(core.entries().containsKey("declared"));
+        assertTrue(core.entries().containsKey("record_field"));
     }
 
     /** The network families are net.tn's, beside its host name, and core claims none of their names. */
@@ -103,7 +102,10 @@ class CoreSchemaImportTest {
         TsonSchema core = schemaRegistry.get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
         Set<String> network = Set.of("ipv4", "ipv6", "cidr4", "cidr6", "mac", "hostname", "host", "media_type");
-        assertEquals(network, net.entries().keySet());
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.NET_ID);
+        TsonLinkedSchema linkedNet = schemaRegistry.get(TsonBundledSchemas.NET_ID).orElseThrow();
+        assertEquals(network, net.entries().keySet().stream().filter(name -> linkedNet.originOf(name).equals(own))
+                .collect(java.util.stream.Collectors.toSet()));
         assertTrue(network.stream().noneMatch(core.entries()::containsKey), "core declares a network name");
     }
 
@@ -124,9 +126,8 @@ class CoreSchemaImportTest {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
-        // core.tn is not a meta-layer schema (its !!meta is meta.tn, not meta-kernel), so it's resolved
-        // but never compiled in the core -- its readers are compiled per mode in a read registry, exactly
-        // as they are when a user schema imports it. DOM mode is enough to check which entries error.
+        // core.tn's readers are compiled per mode in a read registry, exactly as they are when a user schema
+        // imports it. DOM mode is enough to check which entries error.
         TsonCompiledSchema compiledCore =
                 TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
 

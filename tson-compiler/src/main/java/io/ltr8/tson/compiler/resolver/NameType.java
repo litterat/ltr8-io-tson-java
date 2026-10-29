@@ -23,12 +23,12 @@ import java.util.stream.Stream;
 
 /**
  * Where an entry's {@code name_type} resolves, and whether what it resolves to may stand there: an enum's, which its
- * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of
- * ([TSON-SCHEMA] §5.2). A value the entry's constructor wrote resolves where that constructor is declared, the
- * governing meta's namespace -- so {@code !enum [A B]} names the kernel's {@code identifier}, and a record that says
- * nothing the kernel's {@code field_name}, whatever the schema declares or imports; one an author wrote resolves in
- * the schema's own namespace first. Shared by the linker's enum and field name checks and by materialisation, which
- * checks a template's value argument of an enum type before linking has run.
+ * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of ([TSON-SCHEMA] §5.2).
+ * A value the entry's constructor wrote resolves where that constructor is declared, whose closure is in the schema's
+ * -- so {@code !enum [A B]} names the kernel's {@code identifier}, and a record that says nothing the kernel's {@code
+ * field_name}, names no schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own
+ * namespace first. Shared by the linker's enum and field name checks and by materialisation, which checks a template's
+ * value argument of an enum type before linking has run.
  *
  * <p><b>What may stand there is the slot's kind's to say</b> ([TSON-SCHEMA] §4.2). The kernel types both slots
  * {@code identifier_kind}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
@@ -55,7 +55,8 @@ public final class NameType {
 
     /**
      * {@code entry}'s name type, given the constructor its value applies (an enum's decides whether its {@code
-     * name_type} is the constructor's pin), the schema's own namespace and the governing meta's. Empty for a body
+     * name_type} is the constructor's pin), and two lookups, the schema's own namespace and the one holding the
+     * constructor -- the same namespace, from the linker. Empty for a body
      * that is neither an enum nor a record, and for a {@code name_type} that resolves in neither namespace.
      */
     public static Optional<Resolved> of(Top entry, Optional<String> constructor, Function<String, Top> local,
@@ -99,8 +100,8 @@ public final class NameType {
     /**
      * The kind {@code entry}'s {@code name_type} slot is typed by: the {@code name_type} field of the constructor
      * {@code entry}'s value applies -- through a constructor template's held body to the constructor it applies
-     * -- read in the structure namespace first, where every constructor role resolves (§3.3.1). Empty where no such
-     * constructor or kind is in reach.
+     * -- read in {@code structure} first, then {@code local}; the linker hands both the schema's one namespace.
+     * Empty where no such constructor or kind is in reach.
      */
     private static Optional<KindBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
                                                Function<String, Top> structure) {

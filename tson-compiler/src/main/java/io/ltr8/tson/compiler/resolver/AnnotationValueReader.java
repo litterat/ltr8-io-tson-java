@@ -5,8 +5,8 @@ import io.ltr8.tson.compiler.ast.DataValue;
 /**
  * Reads an annotation's value through the type its name refers to (Part 2 §6: "an annotation {@code @T} (or
  * {@code @T:value}) names a type {@code T}", with the value "validated against {@code T}'s contract").
- * {@code type} is the annotation's own name, resolved one hop against the governing target's namespace by
- * the caller; {@code value} is the authored data value.
+ * {@code type} is the annotation's own name, resolved in the schema's namespace (§3.3.3) by the caller, which
+ * reads it through the compiled form of the schema that declared it; {@code value} is the authored data value.
  *
  * <p>Separate from {@link DefinitionMetaReader} despite the identical parameters, because the two read
  * genuinely different things and only one of them has a bounded return. A constructor body always binds to a

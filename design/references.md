@@ -54,12 +54,11 @@ account, qualified type names and one reference atom over `kind_type`, `ref_type
 - A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
   Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
   refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.
-- A reference is kernel vocabulary, declared only in a kernel-governed schema: it names an entry holding a value, and
-  only a schema that can declare a namespace type has one; a schema governing data declares only types. core.tn
-  declares no `ref`, and the type-name namespace is not inherited through `!!meta`, so `ref<order>` in an ordinary
-  schema is an unresolved name. The constructor applied directly, `!ref_type { of: order }`, which the structure
-  namespace supplies, is refused by the linker for the schema's level. So a compiled reader meets a `ref_type` body
-  only under a kernel-governed schema, and `AtomParsers` treats any other as a broken invariant.
+- Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `ref` is in every closure reaching meta.tn or
+  core.tn, and `!ref_type { of: order }` applied directly is no different (`ReferenceDeclarationTest`). A reference's
+  value is judged by what its name reaches, which only a link can judge: `AtomParsers` reads a `ref_type` position
+  only in a document whose schema `governsSchemas` (a schema, which links), and refuses one in a data document as a
+  gap (`UnsupportedOperationException`).
 - A recorded name at a kind-typed slot of a value body is judged a member by `ValuesByName.judgeMember`; a qualified
   name there is refused where it reaches a value, and is a gap where it would reach a type through a namespace of
   types. A recorded name at a reference-typed slot resolves its first segment in the schema map and each further
@@ -101,10 +100,10 @@ A name stands in a schema in one of five forms. Two are not references.
 | **Tag** | names the type of the value it is written on, `!T v` | store and judgement, as a reference, and the payload is read under the referent |
 | **Index** | computed at link and written out: `supertypes`, `subtypes`, `members`, the `application` annotation | none; never read as a reference on ingest |
 
-**Stores**, all positional: the writer's type-name namespace (every type a declaration names; the first segment of a
-qualified name); the structure namespace (`!C` heads, `!I ^` heads, `kind_type.of`, a tag in a schema map); the
-enclosing collection (`discriminators` and group members in `fields`, a parameter in held text, the later segments of
-a qualified name).
+**Stores**, positional: the writer's namespace, its own entries and its import closure (every type a declaration
+names, every `!C` and `!I ^` head, `kind_type.of`, a tag in a schema map, an annotation, the first segment of a
+qualified name; SPEC-FEEDBACK.md #7); and the enclosing collection (`discriminators` and group members in `fields`, a
+parameter in held text, the later segments of a qualified name).
 
 **Judgement.** One predicate covers every reference row: *the referent's value is a value of `T`*. For a constructor
 `T` that is `kind<T>`, the referent being a type built with `T`, less the constructors whose instances are types
@@ -122,22 +121,22 @@ map.
 |---|---|---|---|---|
 | schema-map key, `field_map` key, `template_param.name` | key | — | spelling under the key type; `fields` by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
 | `enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
-| `type_chain.parents`, `type_argument.name`, `application` | application | type-name namespace | a constructor or a record type for an operand; an open entry or a parameter for a head | resolver, `checkArity` |
+| `type_chain.parents`, `type_argument.name`, `application` | application | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head | resolver, `checkArity` |
 | `type_chain.supertypes`, `subtypes`, `kind_type.members` | index | — | — | link |
-| `reference.target` | reference | type-name namespace | any entry, type or constructor; `type_ref`, by resolution | `validateTypeRef` |
-| `template_param.type`, `bound` | reference | type-name namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
-| `template.template` | parameters and applications as parsed | `parameters`, then type-name namespace | §5.10's shadowing rule | `HeldBody` |
-| `record_field.type`, `tuple_element.element_type`, `array.element_type`, `map.key_type`, `map.value_type`, `namespace.value_type`, `choice.variants` | reference | type-name namespace | `type_kind`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
-| `record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference | type-name, then structure namespace | member of the slot's kind | `checkKindValue` |
+| `reference.target` | reference | namespace | any entry, type or constructor; `type_ref`, by resolution | `validateTypeRef` |
+| `template_param.type`, `bound` | reference | namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
+| `template.template` | parameters and applications as parsed | `parameters`, then namespace | §5.10's shadowing rule | `HeldBody` |
+| `record_field.type`, `tuple_element.element_type`, `array.element_type`, `map.key_type`, `map.value_type`, `namespace.value_type`, `choice.variants` | reference | namespace | `type_kind`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
+| `record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference | namespace | member of the slot's kind | `checkKindValue` |
 | `record.discriminators`, `field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
-| `record.name_type`, `enum_type.name_type` | reference | structure namespace for a constructor-pinned value, else type-name | `identifier_kind` | `NameType.admits` |
-| `kind_type.of` | reference | structure namespace | a constructor, `type` or `namespace`, or IS-A either | `KindMembers.ofRefusal` |
-| `ref_type.of` | reference | type-name namespace | a type or a namespace type, never a constructor of types | `validateBody` |
+| `record.name_type`, `enum_type.name_type` | reference | namespace | `identifier_kind` | `NameType.admits` |
+| `kind_type.of` | reference | namespace | a constructor, `type` or `namespace`, or IS-A either | `KindMembers.ofRefusal` |
+| `ref_type.of` | reference | namespace | a type or a namespace type, never a constructor of types | `validateBody` |
 | a slot typed `ref<T>` | reference by key, a path | schema map, then namespace values and record fields | `ref<T>`: the referent IS-A `T` | `ValuesByName.judge` |
-| `schema.value_type: = top` | tag | structure namespace | IS-A `top` | `DefinitionResolver` |
-| `myapi => !api { … }` | tag | structure namespace | an instance of a namespace constructor, IS-A `top`; the payload a map of `api`'s keys and values | `DefinitionResolver` |
-| `!I ^ { … }` head | reference | type-name namespace | an atom instance, never the family's constructor | resolver |
-| `A & B` operand, `A - { … }` source | reference | type-name namespace | a constructor or a record type | resolver |
+| `schema.value_type: = top` | tag | namespace | IS-A `top` | `DefinitionResolver` |
+| `myapi => !api { … }` | tag | namespace | an instance of a namespace constructor, IS-A `top`; the payload a map of `api`'s keys and values | `DefinitionResolver` |
+| `!I ^ { … }` head | reference | namespace | an atom instance, never the family's constructor | resolver |
+| `A & B` operand, `A - { … }` source | reference | namespace | a constructor or a record type | resolver |
 
 The schema map and a record's `fields` are values of the kernel's two namespace types, `schema` and `field_map`,
 and in Java each is a `Namespace` (`TsonSchema.entries`, `RecordBody.fields`). A
@@ -149,11 +148,11 @@ read by spelling and judged once the host resolves (a record's field names by it
 by `value_type`.
 
 An entry may itself be a value of a namespace type: `myapi => !api { get_orders => { response: order_list } }`,
-under a meta layer declaring `api => namespace & { key_type: = identifier  value_type: = method }`. Its tag is the
+in a schema importing one declaring `api => namespace & { key_type: = identifier  value_type: = method }`. Its tag is the
 constructor, its keys the key rows above under `api`'s family, its values judged by `method`, and it is what a
 qualified name's further segment enters (`myapi.get_orders` at a `ref<method>` slot). In Java it is a `Namespace`,
 the constructor's name beside the map, and its kind is `NAMESPACE`.
 
-An annotation use `@name: v` is a reference by key into the annotation namespace (§3.3.3). In a data document a tag
-resolves in the governing type-name namespace (or the family's `subtypes` index, or the closure a `declared` position
+An annotation use `@name: v` is a reference by key into the annotating schema's namespace (§3.3.3). In a data
+document a tag resolves in its schema's namespace (or the family's `subtypes` index, or the closure a `declared` position
 admits), and a qualified name at a vocabulary-typed slot is a path of keys (§5.12).

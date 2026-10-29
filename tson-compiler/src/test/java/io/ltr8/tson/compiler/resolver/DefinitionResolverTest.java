@@ -148,7 +148,7 @@ class DefinitionResolverTest {
                         .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
                                 IdentifierPolicy.none())), null,
                 metaParser.schema().entries()::get, definitionGetter, null, SchemaPositions.none(), facts,
-                n -> true, metaParser.compiledSchema()::isKernel);
+                n -> true, metaParser.compiledSchema()::isKernel, n -> false);
     }
 
     /** The facts {@link #resolveSnippet} and {@link #resolveSnippetsAgainstMetaKernel} recorded. */
@@ -1520,14 +1520,11 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void atomRefinementNeverConsultsTheStructureNamespace() {
-        // integer_type is real and present in `metaKernelEntries` -- an Instance target would find
-        // it there via the structure-namespace fallback (§3.3.1, proven by
-        // instanceResolvesViaTheStructureNamespaceWhenNotLocallyAvailable above). An atom
-        // refinement's source MUST NOT get that same fallback: with `resolved` empty and
-        // `integer_type` supplied only as structureNamespace (never consulted for `^`), "!integer_type
-        // ^ {...}" still fails to resolve `I` at all -- a different failure from "resolves but isn't
-        // an instance" (the constructor-rejection test above), which requires `I` to resolve first.
+    void atomRefinementResolvesItsSourceInTheWholeNamespace() {
+        // An atom refinement's source resolves through the getter over the whole namespace, the schema's own entries
+        // and its imports, never the one over the imported entries alone that a construction head reads: with the
+        // whole namespace empty, "!integer_type ^ {...}" fails to resolve `I` at all -- a different failure from
+        // "resolves but isn't an instance" (the constructor-rejection test above), which requires `I` to resolve.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
@@ -1536,7 +1533,7 @@ class DefinitionResolverTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
                         schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("does not resolve against the type-name namespace"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("names no entry of this schema's namespace"), thrown.getMessage());
     }
 
     private SchemaMap schemaMapFromCoreFixture() throws IOException {

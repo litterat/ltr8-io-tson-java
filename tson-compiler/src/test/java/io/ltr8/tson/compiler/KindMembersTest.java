@@ -28,10 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Each walk case the kernel's {@code kind_type} doc names is pinned on its own: a construction is a member, a
  * refinement of a member is one, the constructor itself is not, a type built with another constructor is not, an
- * ABSTRACT record base is a member of {@code kind<record>} with no values of its own, and an instantiation is a
- * member of its constructor's kind where the template it closes is not. Then {@code of}: resolved in the structure
- * namespace, so a name only the schema's own namespace holds is refused, and refused unless it is {@code type} or
- * below it. Last, the kernel's {@code name_type} slots, typed {@code identifier_kind}, judged by membership.
+ * ABSTRACT record base is a member of {@code kind<record>} with no values of its own, and an instantiation is a member
+ * of its constructor's kind where the template it closes is not. A kind's members are computed over the whole closure,
+ * so the kernel's and meta.tn's own types join them wherever the schema reaches core. Then {@code of}: resolved in the
+ * schema's one namespace, and refused unless it is {@code type} or a constructor below it. Last, the kernel's {@code
+ * name_type} slots, typed {@code identifier_kind}, judged by membership.
  */
 class KindMembersTest {
 
@@ -110,7 +111,8 @@ class KindMembersTest {
                 }
                 """), "records");
 
-        assertEquals(Optional.of(List.of("dog", "pet")), records.members());
+        assertTrue(records.memberNames().containsAll(List.of("dog", "pet", "record_field")),
+                records.memberNames().toString());
     }
 
     /**
@@ -129,9 +131,11 @@ class KindMembersTest {
                 }
                 """);
 
-        // `set` is core's template, a `template` body: no type, so no member.
-        assertEquals(Optional.of(List.of("tags")), kind(linked, "sets").members());
-        assertEquals(Optional.of(List.of("box_t", "boxed")), kind(linked, "recs").members());
+        // `set` is meta's template, a `template` body: no type, so no member. The kernel's own sets are members.
+        List<String> sets = kind(linked, "sets").memberNames();
+        assertTrue(sets.containsAll(List.of("tags", "enum_set")) && !sets.contains("set"), sets.toString());
+        List<String> recs = kind(linked, "recs").memberNames();
+        assertTrue(recs.containsAll(List.of("box_t", "boxed")), recs.toString());
     }
 
     @Test
@@ -180,7 +184,8 @@ class KindMembersTest {
         KindBody atoms = kind(linked, "atoms");
         assertTrue(atoms.memberNames().containsAll(List.of("atoms", "kinds", "ids")), atoms.memberNames().toString());
         assertTrue(!atoms.memberNames().contains("shape"), atoms.memberNames().toString());
-        assertEquals(Optional.of(List.of("atoms", "ids", "kinds")), kind(linked, "kinds").members());
+        assertTrue(kind(linked, "kinds").memberNames().containsAll(List.of("atoms", "ids", "kinds", "type_kind")),
+                kind(linked, "kinds").memberNames().toString());
     }
 
     @Test
@@ -306,8 +311,8 @@ class KindMembersTest {
     }
 
     @Test
-    void ofResolvesInTheStructureNamespaceAndNeverTheSchemasOwn() {
-        // `stock_id` is this schema's type, and a kind is not a bound: it names a constructor of the governing meta.
+    void ofNamingATypeThatIsNoConstructorIsRefused() {
+        // `stock_id` is this schema's type, and a kind is not a bound: its `of` names a constructor.
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
                   stock_id => !uuid_type {}
@@ -315,24 +320,22 @@ class KindMembersTest {
                 }
                 """));
 
-        assertTrue(e.getMessage().contains("structure namespace does not declare"), e.getMessage());
+        assertTrue(e.getMessage().contains("not 'type', 'namespace' or a constructor"), e.getMessage());
     }
 
     @Test
-    void aSchemaEntryUnderAConstructorsNameDoesNotCaptureOf() {
-        // `uuid_type` here is this schema's own text alias; `of` still names meta's constructor.
-        KindBody ids = kind(link("""
+    void aSchemaEntryUnderAConstructorsNameCollidesWithIt() {
+        // One namespace per schema: meta.tn's `uuid_type` is in the closure, so the schema cannot declare its own.
+        SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 !!id:"https://example.test/kinds.tn"
                 !!meta:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   uuid_type => text
-                  stock_id  => !uuid_type {}
-                  ids       => !kind_type { of: uuid_type }
                 }
-                """, ""), "ids");
+                """, ""));
 
-        assertEquals(Optional.of(List.of("stock_id", "uuid")), ids.members());
+        assertTrue(e.getMessage().contains("'uuid_type' collides"), e.getMessage());
     }
 
     @Test

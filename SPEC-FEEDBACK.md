@@ -154,6 +154,10 @@ it is built and decodes them through their types once every reader of the schema
 out, so building `iri_type`'s reader reads nothing through `iri`'s (the `spec` pin). Link remains the one place a pin
 is judged, and a bad pin or default still fails the load (rule 6).
 
+Outside the kernel the wait order is not yet run: one namespace per schema (#7) lets a constructor and its instance
+share a document, and this library refuses applying a constructor, or reading an annotation value against a type,
+declared in the same document as `NOT_IMPLEMENTED`, a gap and not a verdict, until rules 1 to 6 run in every schema.
+
 **Resolution, a proposal.** Terms:
 
 - **Form.** A structure serialized data takes, read by an algorithm the processor owns: an atom (one token), a record
@@ -305,3 +309,57 @@ The LOCAL cell needs none of this — a value naming, by its tag, a type of the 
 A foreign type returns as a constructor meta.tn declares, `extern => atom & { schema: schema_identity  type:
 type_name }`, applied in the schema that admits it and read in the foreign schema's own closure, loaded with the
 declaring schema rather than by the document. That is a later step and is not running.
+
+## 7. [TSON-SCHEMA] §2.2.2, §2.2.3, §3.1, §3.3, §3.4, §6, §9 — one namespace per schema: the ladder's rules go
+
+**Problem.** A schema document resolves in two stores: `!` targets, `kind`/`ref` `of` and annotations in the
+structure namespace of its `!!meta` target (§3.3.1, §3.3.3), every other name in its type-name namespace (§3.3.2).
+Four rules hold the two apart and keep each document on one rung: placement (§2.2.2, only a kernel-governed
+document declares a constructor, a namespace type or a reference), direction of service (§3.3.1, a schema's `!`
+targets come from its meta, never its own entries), the level of an import (§2.2.3) and a `!!meta` target's
+eligibility (only a kernel-governed schema governs). They cost core.tn nine sibling declarations of the kernel's and
+meta.tn's entries (§3.3.5), and make a constructor declared beside its instance, or in an ordinary library its
+importer applies, unexpressible. Each is a rule about levels, which the dependency model of #4 replaces.
+
+**What is running.** One namespace per schema:
+
+- **`!!meta` contributes as `!!import` does.** A schema's namespace is its own entries and every entry of its
+  import closure, transitively, the `!!meta` target's included. The `!!meta` directive still classifies the
+  document as a schema, and the meta-kernel's self-naming `!!meta` contributes nothing, its cycle closed by
+  pre-loading (§3.4); nothing else distinguishes a `!!meta` target from an import, and any schema may be one.
+- **Every name resolves there:** a `!` head, an atom refinement's source, a type-ref, a kind's or a reference's
+  `of`, a template bound, and an annotation (§3.3.3: in the annotating schema's namespace, for a schema document as
+  for a data document).
+- **Deleted:** placement (§2.2.2) — any schema declares a constructor, a namespace type or a reference, with no
+  extension guard; direction of service (§3.3.1); the import-level rule (§2.2.3); the governing-target eligibility
+  check; the structure/type-name split (§3.3.1, §3.3.2, §3.3.4's invisibility of structural vocabulary); and §3.3.5's
+  sibling allowance. Two same-named entries in one closure are §2.2.3's collision, decided by identity.
+- **core.tn imports meta.tn** and no longer declares `void`, `boolean`, `integer`, `text`, `regex`, `iri`, `kind` or
+  `doc` (the kernel's) or `set` (meta.tn's). Core's `iri` was IS-A its `iri_reference`; the kernel's is not, and core
+  keeps `iri_reference`. The descriptive annotations core put on its copies (`@ordering`, `@bounded`, …) go with them.
+- **A same-document read is a gap, refused as `NOT_IMPLEMENTED`:** applying a constructor declared in the same
+  document (`!C { … }` with `C` local), and reading an annotation value against a type declared there. Both wait on
+  that declaration being ready, which #4's wait order provides and which runs only in the kernel's bootstrap so far.
+  A type used by name, and an atom refinement whose source is local but whose constructor is imported, are
+  unaffected.
+- **The cost:** every name in the closure is reserved. A schema importing core reserves every name of meta.tn and
+  the kernel — `identifier`, `field_name`, `record`, `map`, `namespace`, `bounded`, `exact`, `title`, `comment`,
+  `examples` among them — until the kernel moves under one name of its own.
+
+**Resolution, a proposal.** Sections amended:
+
+- §2.2.2: `!!meta` names a schema the document imports, and marks the document a schema; its two bullets, the ladder
+  paragraph, "Constructor declarations are a meta-schema privilege" and the namespace-type paragraph's level
+  sentences go.
+- §2.2.3: "An import stands at the importer's governing level" goes; "exactly as `!!meta` contributes" becomes "the
+  `!!meta` target's included"; the sentence placing imports in the type-name namespace only goes.
+- §3 intro, §3.1, §3.3, §3.3.1, §3.3.2, §3.3.4 restate one namespace: §3.3.1 keeps the constructor-role
+  applicability rule (IS-A `top`) and the desugar targets, now resolved in that namespace, and its
+  direction-of-service, one-hop and "import what you expose" paragraphs go; §3.3.2's lookup order gains the
+  `!!meta` target as an import; §3.3.5 goes.
+- §3.3.3: an annotation resolves in the annotating document's namespace; core declares no `doc` of its own.
+- §3.4: the kernel's entries reach a schema through its import closure; "NOT automatically available as type-refs"
+  goes.
+- §4.2 (core's `kind`, `void` and `set` siblings), §4.x's "Core declares no sibling of `identifier`", §1's worked
+  example ("reached through the structure namespace"), §6, §9 and §13.2: core imports meta.tn; core's sibling rows
+  go.

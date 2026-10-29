@@ -107,7 +107,7 @@ order — the selector may arrive after the fields it selects.
 
 **In a schema document, §5.6's positional form keeps a bare token only where it would fill an atom-typed field**
 (§5.6). The rule belongs to the read, not to the readers: a value inside a schema document — a
-constructor's binding record, a namespace entry's values — reaches the governing meta's compiled readers as a replay from
+constructor's binding record, a namespace entry's values — reaches its declaring schema's compiled readers as a replay from
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
 bare value as that field — `type_ref`'s `name` is a `type_name`, which is how `request: search_request` at a

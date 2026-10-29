@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=373302d4cb3437e360d0fc39a50bb971d79eb7c09731589d38bb7f299259f4b5"
+!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=cf460fa93a54cb544b0a69fa32c0f6e8e7fe923fb82725c1b0b11121c956ee04"
 !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 39 draft).
@@ -55,8 +55,8 @@
     too, and is a type of another kind: a value of it is a map, so `namespace`
     and the namespace types composing it (`schema`, `field_map`) are the
     constructors `type_kind` holds. An entry whose value is an instance of a
-    namespace type is a value, never a type: it is how a meta layer puts its
-    own vocabulary in a schema map.
+    namespace type is a value, never a type: it is how a schema puts
+    vocabulary of its own in a schema map.
 
     A type carries its IS-A chain. A declaration never writes `chain`, and a
     constructor never declares a field of that name: the resolver computes the
@@ -207,10 +207,6 @@
     `_`. It binds no host value. void is the target type for bare annotations
     (`@T` with no value); the resolver fills the implicit `_` and validates
     against this contract. See [TSON-SCHEMA] §6.
-
-    Core declares its own sibling under the same name — the same !void_type
-    construction, and so the same contract, a distinct type entity — so that
-    data documents governed by core-importing schemas can target it.
     """
   void_type => atom & {}
 
@@ -238,10 +234,8 @@
     Integer constraint vocabulary. Atom constructor whose instance, `integer`,
     is the kernel's arbitrary-precision integer. Field types reference `integer`
     directly; the mutual reference closes via the kernel's standard local-name
-    lookup. The constructor reaches meta directly (the kernel is meta's
-    governing namespace) and reaches meta-governed schemas through meta's kernel
-    import — one hop in each case. The `integer` instance reaches meta via that
-    same import; core defines its own.
+    lookup. Both reach every schema whose import closure includes the kernel,
+    meta.tn and core.tn importing it.
 
     Bounds: each side is a field group ([TSON-SCHEMA] §5.11) — the inclusive
     `min` or the exclusive `exclusive_min`; likewise `max` or `exclusive_max` —
@@ -401,9 +395,9 @@
     quoting. Another profile carries no such guarantee, and a value under it may
     need quoting.
 
-    Core declares no sibling: a schema that types a value or a map key as a
-    name declares its own identifier_type instance, such as
-    `identifier => !identifier_type { continue_add: "-" }`.
+    A schema that types a value or a map key as a name of another family
+    declares its own identifier_type instance under a name of its own, such as
+    `slug => !identifier_type { continue_add: "-" }`.
     """
   identifier_type => text_type & atom_specification & {
     spec?:          = "https://www.unicode.org/reports/tr31/"
@@ -900,15 +894,14 @@
     construction, so a kind holds an abstract type: `kind<record>` holds
     `pet => abstract { ... }`, and `kind<namespace>` holds `namespace` itself.
 
-    `of` names a constructor of the writer's structure namespace
-    ([TSON-SCHEMA] §3.3.1), as a constructor role does, and never a type of its
-    type-name namespace. It is `type` or `namespace`, or a constructor at or
-    below either; any other `of` (`kind<reference>`) is a resolver error at the
-    declaration.
+    `of` names a constructor of the writer's namespace ([TSON-SCHEMA] §3.3.1),
+    never a type that is no constructor. It is `type` or `namespace`, or a
+    constructor at or below either; any other `of` (`kind<reference>`) is a
+    resolver error at the declaration.
 
     A value is a type name ([TSON-DATA] §7.7), and conforms when it resolves to
-    a member. In a data document it resolves in the type-name namespace of the
-    governing schema. In a schema document it resolves where the slot holding
+    a member. In a data document it resolves in the namespace of the governing
+    schema. In a schema document it resolves where the slot holding
     it says, `name_type`'s by [TSON-SCHEMA] §7.4, and is judged a member when
     that schema links. The value is the name, never a value of the type it
     names.
@@ -941,21 +934,17 @@
   @doc:"""
     A reference to a value: an atom whose values are qualified names, each
     segment a [TSON-DATA] §7.7 identifier, naming a value whose type is `of`
-    or IS-A it. The first segment resolves in the writer's type-name namespace
-    and names an entry; each further segment selects a key in a namespace
-    value or a field in a record value, and a map that is no namespace is not
-    entered. The referent is judged when the schema links, and delivered to a
-    host with the name as written. A slot typed by a reference holds the name
-    and nothing else; a slot typed by the value's type holds the value inline
-    and nothing else.
+    or IS-A it. The first segment resolves in the writer's namespace and names
+    an entry; each further segment selects a key in a namespace value or a
+    field in a record value, and a map that is no namespace is not entered. The
+    referent is judged when the schema links, and delivered to a host with the
+    name as written. A slot typed by a reference holds the name and nothing
+    else; a slot typed by the value's type holds the value inline and nothing
+    else.
 
     `of` names a type of the writer's own namespace, never a constructor: a
     reference to a type is a kind (`kind<record>`), and `ref<record>` is a
     resolver error at the declaration.
-
-    A reference is declared only in a schema whose `!!meta` is this
-    meta-kernel, since only there does an entry hold a value. A schema that
-    governs data declares only types, so it has nothing a reference could name.
     """
   ref_type => atom & {
     of: type_name

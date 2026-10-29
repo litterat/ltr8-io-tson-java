@@ -94,8 +94,8 @@ final class MetaRefs {
             // A held body maps nothing: its references are tokens that have not been resolved against
             // anything yet, and rewriting one would be rewriting a name whose meaning is not settled until
             // substitution supplies the arguments.
-            // A kind holds none either: `of` names a constructor of the structure namespace, which no rewrite
-            // of this schema's entries touches, and its members are derived at link, after every rewrite.
+            // A kind holds none either: `of` names a constructor, which no rewrite of this schema's entries
+            // touches, and its members are derived at link, after every rewrite.
             default -> body; // an atom body holds no type references
         };
         return mapChain && mapped instanceof Type type

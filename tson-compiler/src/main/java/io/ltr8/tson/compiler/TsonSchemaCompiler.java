@@ -43,9 +43,7 @@ import java.util.function.Function;
  * still compiles; only actually reading a value against that one entry fails, at that point. This
  * covers both a constructor with no {@link ValueReaderFactory} to dispatch to, and a factory that exists
  * but rejects this particular entry. Every constructor meta-kernel.tn and meta.tn declare has a factory,
- * so the first case is a constructor declared by a meta-layer schema this library has never seen
- * ([TSON-SCHEMA] §2.2.2's extension point), or one out of the governing meta's scope ({@link
- * #governedFactory}).
+ * so the first case is a constructor a schema declared itself that this library has never seen.
  *
  * <p><b>An entry declaring type parameters never reaches a factory at all</b>, and compiles to one of two
  * readers. A template whose held body carries {@code extension} is a <em>family base</em> and compiles to
@@ -55,17 +53,12 @@ import java.util.function.Function;
  * value: only a <em>data</em> type-ref can reach one -- a schema naming a template without applying it is
  * refused when it links -- and that is the author's error, not a gap.
  *
- * <p>Two compile modes share this eager walk, differing only in how a body's constructor name maps to
- * a factory. A <b>governed</b> compile ({@link #compile(TsonLinkedSchema, TsonCompiledMetaSchema)})
- * dispatches, scoped, through the governing meta-schema ({@link #governedFactory}): its own declared
- * vocabulary, then the global set only for a constructor the compiling schema declares itself,
- * otherwise rejected as out of scope. A <b>standalone</b> compile ({@link #compile(TsonLinkedSchema,
- * ValueReaderFactoryResolver)}) dispatches through a factory set directly, with no scoping -- for
- * reading an already-validated schema in a chosen mode. One non-factory case is checked first in
- * both: {@link Reference} (a bare {@code name => other_name} entry, §8.3) delegates straight to the
- * target's own reader, resolved recursively rather than built fresh. A <b>bootstrap</b> compile ({@link
- * #compileBootstrap}) is a standalone compile of the meta-kernel entries ready so far, in which a kernel entry not
- * yet read is a {@link PendingTypeReader} rather than a missing name.
+ * <p>A compile dispatches each body's constructor name to a factory through one factory set ({@link
+ * #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}), with no scoping: linking already established that every
+ * head a schema applies is in its namespace. One non-factory case is checked first: {@link Reference} (a bare {@code
+ * name => other_name} entry, §8.3) delegates straight to the target's own reader, resolved recursively rather than
+ * built fresh. A <b>bootstrap</b> compile ({@link #compileBootstrap}) is a compile of the meta-kernel
+ * entries ready so far, in which a kernel entry not yet read is a {@link PendingTypeReader} rather than a missing name.
  *
  * <p><b>A held value is decoded after the walk, not during it.</b> A record field's default or pin is held as
  * written while the readers are built and decoded through the field's reader once every entry has one ({@link
@@ -82,52 +75,10 @@ public final class TsonSchemaCompiler {
     }
 
     /**
-     * <b>Governed compile</b>: compiles {@code linkedSchema} against {@code governingMeta}, so each
-     * body's constructor is dispatched, scoped, through that meta-schema (see {@link #governedFactory}).
-     * This is what {@code TsonCompiledMetaRegistry} uses to compile a schema in the context of the meta that
-     * governs it. {@code governingMeta} is always an already-compiled result from a previous compile --
-     * meta-kernel's own case aside (see {@link TsonSchema#bootstrap()}).
-     */
-    public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
-        TsonSchema schema = linkedSchema.schema();
-        return compileWith(linkedSchema, name -> governedFactory(name, linkedSchema, governingMeta), Set.of());
-    }
-
-    /**
-     * Scoped factory dispatch for a governed compile: the governing meta-schema's own vocabulary first
-     * ({@link TsonCompiledMetaSchema#constructor}); then, only if the schema being compiled declares the
-     * constructor itself (a meta-schema introducing its own new constructor, e.g. meta.tn's {@code
-     * float_type}), the global factory set; otherwise the constructor is out of scope. The resulting
-     * {@link IllegalStateException} is caught per entry by {@link Compilation#resolve} and deferred into
-     * an {@link ErrorReader}, same as any other unbuildable entry -- the schema still compiles, only
-     * reading a value against that one entry fails.
-     */
-    private static ValueReaderFactory governedFactory(String constructorName, TsonLinkedSchema schema,
-                                                      TsonCompiledMetaSchema governingMeta) {
-        ValueReaderFactory inherited = governingMeta.constructor(constructorName);
-        if (inherited != null) {
-            return inherited;
-        }
-        // Applicable is IS-A `top` (§4.1) -- the same predicate the resolver's own gate and the meta-schema's
-        // head table ask, so a construction that resolved reaches a factory lookup here rather than falling
-        // through to "out of scope" on a narrower question.
-        Top own = schema.schema().entries().get(constructorName);
-        if (own != null && schema.isConstructor(constructorName, own)) {
-            return governingMeta.globalResolver().resolve(constructorName);
-        }
-        throw new IllegalStateException("constructor '" + constructorName + "' is out of scope: not in the "
-                + "vocabulary of governing meta-schema '" + governingMeta.schema().id() + "', and not declared "
-                + "by the schema being compiled");
-    }
-
-    /**
-     * <b>Standalone compile</b>: compiles {@code linkedSchema} directly against a factory set, with no
-     * governing meta-schema -- every body's constructor is dispatched through {@code factories} alone.
-     * This is for reading data against an already-resolved, already-linked (hence already-validated)
-     * schema in a chosen mode: the schema's own constructor usage was checked when it was registered,
-     * so no governing-meta scoping is applied or needed here, and any of the mode's factories may be
-     * used. It is also how meta-kernel itself is first compiled ({@link TsonSchema#bootstrap()}),
-     * since meta-kernel declares its whole vocabulary itself and has no earlier meta to be governed by.
+     * Compiles {@code linkedSchema} against a factory set -- every body's constructor is dispatched through
+     * {@code factories} alone. A read registry compiles a schema in its mode this way, and {@link
+     * TsonCompiledMetaSchema#compile} compiles vocabulary in object-binding mode, meta-kernel's pre-loaded
+     * stand-in ({@link TsonSchema#bootstrap()}) among it.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
         return compileWith(linkedSchema, factories::resolve, Set.of());
@@ -154,7 +105,7 @@ public final class TsonSchemaCompiler {
 
     /**
      * The shared eager walk (see the "Eager, not lazy" note) -- {@code factoryFor} is the only thing that
-     * differs between a governed and a standalone compile.
+     * differs between a compile and a bootstrap compile's.
      */
     private static TsonCompiledSchema compileWith(
             TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {

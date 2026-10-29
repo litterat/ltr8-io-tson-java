@@ -65,8 +65,8 @@ class AllocationHarnessTest {
             {
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
               line => { sku: text  quantity: int32  price: float64 }
-              identifier => !identifier_type { continue_add: "-" }
-              named => { names: { identifier => text } }
+              slug => !identifier_type { continue_add: "-" }
+              named => { names: { slug => text } }
               labelled => { names: { text => text } }
             }
             """;

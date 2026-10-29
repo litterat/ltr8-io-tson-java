@@ -69,9 +69,8 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
 - **`ErrorReader` makes eager building survive coverage gaps.** A `RuntimeException` while building one
   entry is caught and substituted with an `ErrorReader` wrapping it — the schema still compiles, only
   *reading* that entry fails, with the original message preserved. Real causes: a constructor with no
-  registered factory or out of the governing meta's scope — which only a meta-layer constructor this library
-  has never seen can be (§2.2.2's extension point), every constructor meta-kernel.tn and meta.tn declare
-  having a factory — or a factory that rejects one entry.
+  registered factory — which only a schema's own constructor this library has never seen can be, every
+  constructor meta-kernel.tn and meta.tn declare having a factory — or a factory that rejects one entry.
     - **It reports `NOT_IMPLEMENTED` and skips the value**, the same report-then-skip shape `OpenTemplateReader` uses
       (with `TYPE_MISMATCH`) for the entry it refuses — report before consuming so the position names the value, then
       `EventSkip.dataValue` so the stream stays in step. The code, not the channel, is what says this is a gap rather
@@ -108,16 +107,15 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   synthetic (no factory for an open body), both a library-gap report for a plainly invalid document. The message
   mirrors the linker's schema-side sentence for the same mistake and adds the route — name the application
   in the schema, write that name in the data.
-- **`TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema`.** A meta-layer schema (its `!!meta` is
-  meta-kernel) compiles to the `TsonCompiledMetaSchema` subtype — a compiled schema plus its governing
-  constructor vocabulary — so it can go on to govern others; every other schema is a bare
+- **`TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema`.** A schema compiled as vocabulary, in the
+  resolution core's bind mode, is the `TsonCompiledMetaSchema` subtype — a compiled schema plus the instance reader
+  of each constructor in its namespace (`reader(name)`), what a schema importing it reads a `!C { … }` body through.
+  Any schema may be compiled so (`design/compiled-registries.md`); a schema compiled for reading data is a bare
   `TsonCompiledSchema`.
-- **Two compile modes, both sharing one eager walk:** a **governed** compile (`compile(linked,
-  TsonCompiledMetaSchema)`) dispatches each body's constructor scoped through the governing meta
-  (`governedFactory`: the meta's declared vocabulary → the constructor the schema declares itself → else
-  out of scope, an `IllegalStateException` deferred into an `ErrorReader`); a **standalone** compile
-  (`compile(linked, ValueReaderFactoryResolver)`) dispatches through a factory set directly, no scoping —
-  for reading an already-validated schema in a chosen mode.
+- **One compile, one factory set:** `compile(linked, ValueReaderFactoryResolver)` dispatches each body's constructor
+  through the mode's factories, with no scoping, since linking already established that every head a schema applies
+  is in its namespace. `TsonCompiledMetaSchema.compile` wraps the same walk, mapping a constructor with no factory
+  to an `ErrorReader` naming the schema that declared it (`unbuildable`).
 - **Two output modes share each reader family** via a `*AbstractReader` base plus `*TreeReader`/`*BindReader`
   subclasses (`Record`/`Array`/`Map`/`Tuple`). Tree mode produces an immutable `tson-tree` `TsonValue`
   (structure-preserving, typed leaves); object-binding mode produces real bound Java objects via a

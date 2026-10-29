@@ -55,14 +55,15 @@ class EnumTypeTest {
     }
 
     /**
-     * The {@code identifier} {@code enum} pins was written in the governing meta, and names the kernel's there -- a
-     * schema's own {@code identifier}, however narrow, is a different type and does not take its place.
+     * The {@code identifier} {@code enum} pins is the kernel's: a schema declaring its own entry under that name
+     * collides with it (§2.2.3), so an {@code enum}'s labels are never retyped by one.
      */
     @Test
-    void aSchemasOwnIdentifierDoesNotRetypeAnEnum() {
-        assertEquals(List.of(), Tson.standard().validateSchema(schema("own-identifier", """
+    void aSchemasOwnIdentifierCollidesWithTheOneAnEnumPins() {
+        List<Diagnostic> refused = Tson.standard().validateSchema(schema("own-identifier", """
                 { identifier => !identifier_type { pattern: "[a-z]+" }
-                  shout      => !enum [LOUD QUIET] }""")));
+                  shout      => !enum [LOUD QUIET] }"""));
+        assertTrue(messages(refused).contains("'identifier' collides"), messages(refused));
     }
 
     /** An {@code enum} applied in a template's held body is typed as one applied directly. */

@@ -198,8 +198,7 @@ resolves, before the batch pass runs. They are handled differently.
   closure is a reference. It is not a base kind (§4.1). A record template is a type, the family base, and takes a
   record's kind: PRODUCT, or the base kind its chain reaches.
   - **A closed entry's kind is its substituted value's**, §4.1's "construction transfers kind" asked of the
-    construction — not the constructor's *name*, which is structure-namespace vocabulary this pass does not hold
-    (§3.3.1).
+    construction — not the constructor's *name*.
   - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }` makes
     `listed<text>` a constructor whose `!record` body describes its instances, so its kind is the base kind its chain
     reaches (ATOM), as for a declared entry (`EntryKind.ofChain`, which `DefinitionResolver.determineKind` guards);

@@ -197,7 +197,7 @@ class SyntheticEntryMarkerTest {
         Namespace<Top> importing = entriesOf(IMPORTER_ID);
 
         Set<String> synthetics = new TreeSet<>();
-        declaring.keySet().forEach(name -> {
+        localEntries().keySet().forEach(name -> {
             if (marked(declaring, name)) {
                 synthetics.add(name);
             }

@@ -3,6 +3,7 @@ package io.ltr8.tson.schema;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
@@ -167,11 +168,11 @@ public record TsonSchema(String id, String meta, List<String> imports, Namespace
     }
 
     /**
-     * The declared type of a slot holding a reference by name, in the governing meta's namespace: what the reader
-     * of that slot was built from, so the linker judges the name without walking the path back through the meta's
-     * declarations. {@code of} is a kind's {@code of} (a constructor), a reference's {@code T} (a type), and {@code
-     * type_ref} itself for the application form; {@code name} is the declared type as a message names it, {@code
-     * kind<record>} or {@code type_kind}.
+     * The declared type of a slot holding a reference by name, in the namespace of the schema declaring the slot's
+     * record, which the reading schema's closure contains: what the reader of that slot was built from, so the linker
+     * judges the name without walking the path back through the declarations. {@code of} is a kind's {@code of} (a
+     * constructor), a reference's {@code T} (a type), and {@code type_ref} itself for the application form; {@code
+     * name} is the declared type as a message names it, {@code kind<record>} or {@code type_kind}.
      */
     public record SlotType(Role role, String of, String name) {
 
@@ -262,6 +263,24 @@ public record TsonSchema(String id, String meta, List<String> imports, Namespace
     public TsonSchema withNameAnnotations(String name, Annotations annotations) {
         return new TsonSchema(id, meta, imports, entries.withAnnotations(name, annotations), bootstrap, valuesByName,
                 facts);
+    }
+
+    /**
+     * The schemas whose namespaces this schema's own namespace takes in, in header order: the {@code !!meta} target
+     * first, which contributes exactly as an {@code !!import} does, then each {@code !!import}. One namespace per
+     * schema is its own entries and every entry of these, transitively. The meta-kernel's {@code !!meta}, naming
+     * itself, contributes nothing: its one cycle is closed by pre-loading ([TSON-SCHEMA] §3.4). Any other schema
+     * naming itself is listed, and refused as the import cycle it is. A target named twice is listed once.
+     */
+    public List<String> namespaceSources() {
+        Map<String, String> sources = new LinkedHashMap<>();
+        if (!TsonBundledSchemas.isMetaKernel(id)) {
+            sources.put(CanonicalIdentity.canonicalize(meta), meta);
+        }
+        for (String imported : imports) {
+            sources.putIfAbsent(CanonicalIdentity.canonicalize(imported), imported);
+        }
+        return List.copyOf(sources.values());
     }
 
     /** {@code name}'s facts, {@link EntryFacts#NONE} for an entry with none or a name this schema lacks. */

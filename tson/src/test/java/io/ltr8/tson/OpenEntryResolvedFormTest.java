@@ -1,9 +1,11 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -268,7 +270,15 @@ class OpenEntryResolvedFormTest {
         Map<String, Top> universe = new LinkedHashMap<>();
         Map<String, Map<String, Top>> perSchema = new LinkedHashMap<>();
         for (String id : ids) {
-            Map<String, Top> entries = tson.bindRegistry().core().resolveLinked(id).schema().entries().entries();
+            TsonLinkedSchema linked = tson.bindRegistry().core().resolveLinked(id);
+            String own = CanonicalIdentity.canonicalize(id);
+            // The entries the schema declares itself: its linked namespace holds its whole closure too.
+            Map<String, Top> entries = new LinkedHashMap<>();
+            linked.schema().entries().entries().forEach((name, definition) -> {
+                if (linked.originOf(name).equals(own)) {
+                    entries.put(name, definition);
+                }
+            });
             perSchema.put(id, entries);
             entries.forEach(universe::putIfAbsent);
         }
@@ -301,9 +311,9 @@ class OpenEntryResolvedFormTest {
         int openEntries = open;
         int outsideOwnSchema = neededTheGoverningMeta;
         assertEquals(List.of(), mismatches, "kind restates what supertypes and body already determine");
-        assertTrue(closedEntries > 200, () -> "not enough entries for this to mean anything: " + closedEntries);
+        assertTrue(closedEntries > 150, () -> "not enough entries for this to mean anything: " + closedEntries);
         assertTrue(openEntries > 0, () -> "no open entry exercised the TEMPLATE branch: " + openEntries);
-        assertTrue(outsideOwnSchema > 50, () -> "the lookup should reach outside the entry's own schema for "
+        assertTrue(outsideOwnSchema > 40, () -> "the lookup should reach outside the entry's own schema for "
                 + "most of core.tn -- that is why the field stays: " + outsideOwnSchema + " of " + closedEntries);
     }
 

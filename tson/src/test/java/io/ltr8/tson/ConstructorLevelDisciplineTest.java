@@ -19,9 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ([TSON-SCHEMA] §4.1), and composition propagates the supertype chain, so an entry composing with a constructor is
  * one too, by construction: nothing can derive from a constructor and fail to be one.
  *
- * <p>Where a constructor may be declared is §2.2.2's: only in a schema the meta-kernel governs. An ordinary schema
- * meets §2.2.3 first, since a base kind is the meta-kernel's and an ordinary schema may not import a kernel-governed
- * one, so it has no base kind to compose with.
+ * <p>Any schema may declare one (SPEC-FEEDBACK.md #7): the base kinds are the meta-kernel's, and every closure
+ * reaching meta.tn holds them. A schema importing the one that declares a constructor applies it; applying one
+ * declared in the same document waits on wait-order resolution and is refused as not yet implemented.
  */
 class ConstructorLevelDisciplineTest {
 
@@ -76,19 +76,54 @@ class ConstructorLevelDisciplineTest {
         assertTrue(TypeChain.supertypesOf(entries.get("composed")).contains("top"), "and everything deriving from it");
     }
 
+    /** An ordinary schema composes a base kind: the kernel's {@code product} is in its namespace. */
+    @Test
+    void anOrdinarySchemaDeclaresAConstructor() {
+        assertEquals(List.of(), problems(META, CORE, "  mine => product & { id: identifier }"));
+    }
+
+    /** A constructor an ordinary library declares is applied by a schema importing it. */
+    @Test
+    void anImporterAppliesALibrarysConstructor() {
+        String libraryId = "https://example.test/lib.tn";
+        String library = """
+                !!id:"https://example.test/lib.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                {
+                  steps => namespace & { key_type: = identifier  value_type: = text }
+                }
+                """;
+        String importer = """
+                !!id:"https://example.test/app.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://example.test/lib.tn"
+                {
+                  plan => !steps { first => "a"  second => "b" }
+                }
+                """;
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(libraryId, library)))));
+
+        assertEquals(List.of(), tson.validateSchema(library));
+        assertEquals(List.of(), tson.validateSchema(importer));
+    }
+
     /**
-     * An ordinary schema cannot reach constructor level by composing its way there: a base kind is the
-     * meta-kernel's, and importing a kernel-governed schema into an ordinary one is refused (§2.2.3), in one
-     * diagnostic naming the import rather than every declaration that would have used it.
+     * Applying a constructor declared in the same document reads the instance against a declaration not yet ready,
+     * which needs wait-order resolution: a gap this library reports as {@code NOT_IMPLEMENTED}, never a verdict.
      */
     @Test
-    void anOrdinarySchemaHasNoBaseKindToComposeWith() {
-        List<Diagnostic> problems = problems(META, KERNEL, "  mine => product & { id: identifier }");
+    void applyingASameDocumentConstructorIsNotYetImplemented() {
+        List<Diagnostic> problems = problems(META, CORE, """
+                  steps => namespace & { key_type: = identifier  value_type: = text }
+                  plan  => !steps { first => "a" }
+                """);
 
         assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
-        assertTrue(problems.getFirst().message().contains("governing level"), problems::toString);
-        assertTrue(problems.getFirst().message().contains("§2.2.3"), problems::toString);
+        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("'!steps' applies a constructor declared in this same "
+                + "schema, which is not yet supported"), problems::toString);
     }
 
     /** An ordinary type over an ordinary type is untouched — the overwhelmingly common case. */

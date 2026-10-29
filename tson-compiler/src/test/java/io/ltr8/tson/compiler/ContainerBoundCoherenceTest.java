@@ -151,7 +151,7 @@ class ContainerBoundCoherenceTest {
     void equalBoundsPinALengthAndAreCoherent() {
         assertNotNull(compile("""
                   triple => [text; 3]
-                  exact  => !map { key_type: text  value_type: integer  min_items: 2  max_items: 2 }"""));
+                  pinned_pair  => !map { key_type: text  value_type: integer  min_items: 2  max_items: 2 }"""));
     }
 
     /** One bound alone is unbounded on the other side and contradicts nothing. */
