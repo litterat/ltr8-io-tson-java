@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.reader.*;
@@ -62,7 +63,9 @@ import java.util.function.Function;
  * ValueReaderFactoryResolver)}) dispatches through a factory set directly, with no scoping -- for
  * reading an already-validated schema in a chosen mode. One non-factory case is checked first in
  * both: {@link Reference} (a bare {@code name => other_name} entry, §8.3) delegates straight to the
- * target's own reader, resolved recursively rather than built fresh.
+ * target's own reader, resolved recursively rather than built fresh. A <b>bootstrap</b> compile ({@link
+ * #compileBootstrap}) is a standalone compile of the meta-kernel entries ready so far, in which a kernel entry not
+ * yet read is a {@link PendingTypeReader} rather than a missing name.
  *
  * <p><b>A held value is decoded after the walk, not during it.</b> A record field's default or pin is held as
  * written while the readers are built and decoded through the field's reader once every entry has one ({@link
@@ -87,7 +90,7 @@ public final class TsonSchemaCompiler {
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
         TsonSchema schema = linkedSchema.schema();
-        return compileWith(linkedSchema, name -> governedFactory(name, linkedSchema, governingMeta));
+        return compileWith(linkedSchema, name -> governedFactory(name, linkedSchema, governingMeta), Set.of());
     }
 
     /**
@@ -127,7 +130,26 @@ public final class TsonSchemaCompiler {
      * since meta-kernel declares its whole vocabulary itself and has no earlier meta to be governed by.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
-        return compileWith(linkedSchema, factories::resolve);
+        return compileWith(linkedSchema, factories::resolve, Set.of());
+    }
+
+    /**
+     * <b>Bootstrap compile</b>: compiles the part of meta-kernel's bootstrap that is ready, in object-binding mode
+     * over {@code context}, with {@code pending} naming the kernel's declarations not yet read. A pending name
+     * compiles to a {@link PendingTypeReader}, which stops a read that reaches it so the bootstrap can make that entry
+     * ready first, and binds a held value typed by it as written. {@code linkedSchema} comes from {@code
+     * TsonSchemaLinker.linkBootstrap(TsonSchema, Set)}; nothing but {@code MetaKernelBootstrapResolver} compiles a
+     * schema with names left pending.
+     *
+     * @throws IllegalArgumentException if {@code linkedSchema} is not the bootstrap's
+     */
+    public static TsonCompiledSchema compileBootstrap(TsonLinkedSchema linkedSchema, DataBindContext context,
+                                                      Set<String> pending) {
+        if (!linkedSchema.schema().bootstrap()) {
+            throw new IllegalArgumentException("'" + linkedSchema.schema().id() + "' was not produced by the "
+                    + "meta-kernel bootstrap -- only its partial kernel compiles with entries pending");
+        }
+        return compileWith(linkedSchema, ValueReaderFactoryRegistry.bind(context)::resolve, Set.copyOf(pending));
     }
 
     /**
@@ -135,8 +157,8 @@ public final class TsonSchemaCompiler {
      * differs between a governed and a standalone compile.
      */
     private static TsonCompiledSchema compileWith(
-            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor) {
-        Compilation compilation = new Compilation(linkedSchema, factoryFor);
+            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {
+        Compilation compilation = new Compilation(linkedSchema, factoryFor, pending);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -192,7 +214,11 @@ public final class TsonSchemaCompiler {
          */
         private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
-        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor) {
+        /** The entries a bootstrap compile reads as {@link PendingTypeReader}s; empty for every other compile. */
+        private final Set<String> pending;
+
+        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {
+            this.pending = pending;
             this.linked = linked;
             this.schema = linked.schema();
             this.factoryFor = factoryFor;
@@ -204,6 +230,9 @@ public final class TsonSchemaCompiler {
             TsonTypeReader<?> done = finished.get(name);
             if (done != null) {
                 return done;
+            }
+            if (pending.contains(name)) {
+                return new PendingTypeReader(name); // a bootstrap's kernel entry not yet read
             }
             if (!building.add(name)) {
                 return new DeferredTypeReader<>(name, finished);

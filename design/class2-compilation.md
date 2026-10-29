@@ -51,6 +51,12 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   `compileWith` binds the handle to the compiled schema as its last step, **replacing** the compile-time
   delegate rather than falling back to it, which is what actually makes that invariant true.
   `CompiledReadersTest` pins the handover; a second `bind` is rejected.
+- **The bootstrap compile is the one in which a name may have no entry** (`compileBootstrap`). The meta-kernel
+  bootstrap compiles the kernel entries ready so far to read the next instance, and a kernel declaration not yet read
+  compiles to a `PendingTypeReader`: a schema-document read that reaches one throws `NotReady` for the bootstrap to make
+  the entry ready and read again, and a held value decoded through one at `settle` binds as written. Every other
+  compile has no pending set, and an absent name stays the linker's missed refusal (`IllegalStateException`). It
+  refuses a schema whose `bootstrap()` is false; `design/resolver-vocabulary-and-bootstrap.md` has why.
 - **`CompiledReaders` also says when every reader exists** ([TSON-SCHEMA] §5.2; a held value orders nothing). During
   the walk a field's reader may be a `DeferredTypeReader` for an entry still being built, which cannot be read through
   until the walk ends. So a reader never reads a held value while it is built: it queues the decode with

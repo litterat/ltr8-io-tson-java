@@ -938,10 +938,9 @@ class DefinitionResolverTest {
      * enum member text. {@code bindAtomInstance}'s own compiled-reader dispatch is schema-driven
      * (looked up by the constructor's own name, {@code enum}, fixed at compile time) rather than
      * token-identification-driven, so {@code "true"}/{@code "false"} are read correctly as the
-     * enum's own raw member text, the same as every other real enum instance. This is a separate
-     * path from {@link MetaKernelBootstrapResolver}'s own hand-picked {@code boolean}/{@code
-     * toEnumBody} handling for meta-kernel's own bootstrap, which never calls {@code resolveInstance}
-     * at all.
+     * enum's own raw member text, the same as every other real enum instance. {@link
+     * MetaKernelBootstrapResolver} builds the kernel's {@code boolean} by hand, it being on the kernel's
+     * wait cycle, and reads its other enums through this path.
      */
     @Test
     void booleanInstanceResolvesCorrectlyViaTheCompiledReader() throws IOException {

@@ -20,8 +20,14 @@ that resolves meta-kernel itself. Current form only; history lives in git.
   or an entry's value, and the linker re-attaches it (`withNameAnnotations`), imports included.
 - `@application` goes on the **key** of exactly the entries that close an application, whatever their kind, by the
   same path; `@synthetic` is recomputed on ingest, `@application` read as stated, and an author writing it is refused.
-- The bootstrap is three passes — ordinary declarations, instances, atom refinements — over a closed `instanceBody`
-  switch and a hand-written `refinedBody` merge, with no compiled reader, and attaches no `@synthetic`.
+- The bootstrap hand-builds exactly the pre-loaded set — the instances and the one refinement on the kernel's one
+  wait cycle (`SPEC-FEEDBACK.md #4`, rule 4) — and reads every other instance through `DefinitionResolver`'s ordinary
+  path, on demand, against readers compiled from the entries ready so far. The order is the waits', never source
+  order. `MetaKernelBootstrapResolverTest` holds the set to the measured cycle and the output to the kernel's ordinary
+  resolution; it attaches no `@synthetic`.
+- Only the bootstrap links with references pending or compiles with entries pending
+  (`TsonSchemaLinker.linkBootstrap(TsonSchema, Set)`, `TsonSchemaCompiler.compileBootstrap`); both refuse a schema
+  that is not the bootstrap's, and an ordinary link refuses an undeclared name as it always has.
 
 Related: `design/schema-resolution.md` (definition resolution), `design/template-materialisation.md` and
 `design/held-template-bodies.md` (the callers of `WireForm` and `DerivedName`), `design/constructor-application.md`,
@@ -200,45 +206,56 @@ meta the way an author-written annotation is: there is no author to resolve agai
 ## Meta-kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 
 Meta-kernel is special: its own `!!meta` names *itself* (§1.5's one deliberate circularity, closed by
-pre-loading, not resolution). Ordinary resolution can't bootstrap it — resolving a constructor application
-needs that constructor's vocabulary already known, and every constructor meta-kernel uses is defined
-within meta-kernel.
+pre-loading, not resolution). Ordinary resolution can't bootstrap it — reading a constructor application needs that
+constructor's compiled reader, and every constructor meta-kernel applies is declared within meta-kernel.
 
-`MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved
-meta-kernel `TsonSchema` in **three passes** over its declarations: ordinary declarations first
-(`DefinitionResolver`), then the deferred `Instance` declarations (`value => !value_type {}`, `boolean
-=> !enum [true false]`, …) once every constructor they reference — including ones declared later in the
-file — has an entry to transfer a kind from, then the deferred atom refinements, whose source is an instance
-and so exists only after the second pass. `TsonSchemaResolver` alone is single-pass, strict source order, so
-it can't handle `boolean` preceding `enum`; this ordering lives here.
+`MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved kernel under
+`SPEC-FEEDBACK.md #4`'s order: reading a value against a type waits on the type being ready, and on each type a part
+of the value is read against as the read reaches it; a reference and a held value (a default or pin) order nothing.
+Its output is what ordinary resolution of the kernel against it produces, entry for entry and constructor for
+constructor, positions included (the bootstrap resolves with the parser's positions).
 
-- **An open instance is held, not constructed.** An `Instance` with type parameters is a §5.10 template, so
-  the second pass stores it as a `TEMPLATE` entry whose body is `HeldBody.held(…)` — the application as
-  written, applied later by materialisation. Constructing it would resolve `element_type: T` into a reference
-  to a type called `T`. Held bodies are the one thing the bootstrap shares with ordinary resolution.
-- **An atom refinement merges through `refinedBody`**, `instanceBody`'s twin and bounded the same way:
-  meta-kernel refines exactly one family, so the merge handles that one and refuses any other by name.
-- **Every name the kernel holds is the kernel's own**, so the first pass's `DefinitionResolver` judges kinds and
-  constructors with a predicate that admits every name (`name -> true`); ordinary resolution judges by the origin
-  of each name in the merged namespace instead, and a name's origin is meta-kernel exactly when it is one of these.
-
-- **Constructor-application binding goes through a closed `instanceBody` switch, not the generic path.**
-  Meta-kernel instantiates constructors in exactly four shapes — a bare `{}` (each target's `UNCONSTRAINED`
-  constant), a bare token array (`enum`, via `toEnumBody` reading `TokenValue.text()` directly), a record of tokens
-  (`identifier_type`, `iri_type`, and the three `kind_type` instances, whose one field is `of`), and the binding
-  record `SchemaDesugarer` emits for an `array`/`set`/`map` application. `schema` and `field_map` are none of them:
-  each is a composition over `namespace` pinning its facets, an ordinary first-pass declaration, so no instance
-  shape reads a namespace. No compiled reader is involved. `enum_type.name_type` is typed by `identifier_kind`, an
-  instance the second pass builds, and nothing in the first pass reads a field's type, so the self-hosted slot
-  needs no ordering.
-- **Why even a compiled-reader bootstrap can't read meta-kernel from its own in-progress state:**
-  `integer_size => { bits: ... signed: boolean }` is a first-pass entry whose `signed` field already
-  references `boolean`, which the *second* pass resolves — so there is no moment at which a reader could be
-  compiled against a complete schema. Given how narrow and fixed meta-kernel's instance shapes are,
-  hand-picking them is simplest — "the bootstrap can do whatever tricks it needs, including not compiling,
-  just calling `new Xxx(...)`."
-- **Desugaring needs no equivalent trick.** The container constructors are parameterless (§4.2), so the
-  desugar table is fixed by the sugar forms and nothing is looked up in the governing meta — which for
-  meta-kernel would be the entries this class is in the middle of producing. The bootstrap and the general
-  case are one mechanism, and meta-kernel's linked form needs no materialization either: its eight sugar
-  forms are ordinary declarations by the time the linker sees them.
+- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the
+  kernel's one wait cycle, the one holding `record`: `value`, `boolean`, `field_role`, `enum_set`, `integer`,
+  `non_negative_integer`, `text`, `identifier`, `type_kind` (`PRE_LOADED`), and the arrays lifted over `type_name`,
+  `field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted array is named by its content, so it is
+  designated by what it holds). `instanceBody` covers the four shapes those apply — a bare `{}` (each target's
+  unconstrained constant), `identifier`'s profile (checked against the constant the lexer already holds), a bare token
+  array (`enum`), and a record of tokens (`kind_type`, the `array`/`set_type` binding records the desugar phase lifts,
+  with their `min_items`/`max_items`) — and refuses any other target; `refinedBody` merges the integer family's `min`
+  and `max`. `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from `meta-kernel-resolved.tn` and
+  asserts the hand-built names equal it, so a kernel edit that moves the cycle fails there.
+- **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
+  a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
+  the pre-loaded set first, so the first compile holds every head a read applies.
+- **Every other instance is read through the ordinary path.** `DefinitionResolver.resolveInstance` binds through a
+  `DefinitionMetaReader` that reads against readers compiled from the entries ready now:
+  `TsonSchemaLinker.linkBootstrap(ready, pending)` then `TsonSchemaCompiler.compileBootstrap(linked, context,
+  pending)`, `pending` naming the kernel's declarations not yet ready. A pending name compiles to a
+  `PendingTypeReader`. A read that reaches one throws `PendingTypeReader.NotReady`; the bootstrap makes that entry
+  ready (on demand, through the same getter), drops the compile, and reads again. A held value reached through one
+  binds as written — what base type resolution gives the token, carried to its component by the field's bridge — and
+  is judged when the whole kernel links. That is how `iri` is read against `iri_type`, whose `spec` pin is typed by
+  `iri` itself: rule 3 says the pin orders nothing, and binding it as written is what makes that true here.
+- **The order is computed.** The bootstrap is the `DefinitionGetter` every lookup goes through, making an entry ready
+  the first time anything asks for it, as `SchemaResolver`'s getter does; its `resolving` stack refuses an entry that
+  waits on itself, naming the chain (an `IllegalStateException`: only a kernel edit can put a cycle outside the
+  pre-loaded set). The driving loop's order changes how many compiles run, never the output. Against the current kernel
+  the nineteen instances outside the cycle read in two compiles: the first holds every resolved declaration and the
+  pre-loaded set; `scheme_name` reaching `identifier_base` and `normalization` forces the second.
+- **Parameter types are derived after every entry is ready**, through `ParameterTypes.inferAll` as `SchemaResolver`
+  derives a schema's, so `kind` and `ref` carry `T: type_name` as their ordinary resolution does.
+- **The partial link and the bootstrap compile are contained.** Both refuse a schema whose `bootstrap()` is false.
+  The partial link passes over a reference to a pending name and nothing else; an entry's walk stops at its first
+  pending reference, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed
+  by (`TsonCompiledMetaRegistry.loadMeta` links and compiles the output). An ordinary link or compile has no pending
+  set, and refuses an undeclared name as before.
+- **Every name the kernel holds is the kernel's own**, so `DefinitionResolver` judges kinds and constructors with a
+  predicate that admits every name (`name -> true`), and the structure namespace a head resolves in is the one being
+  built; ordinary resolution judges by the origin of each name in the merged namespace instead.
+- **Desugaring needs no equivalent trick.** The container constructors are parameterless (§4.2), so the desugar table
+  is fixed by the sugar forms and nothing is looked up in the governing meta. Meta-kernel's eight sugar forms are
+  ordinary declarations by the time the linker sees them.
+- **Cost.** The two partial links and compiles make a warm bootstrap about 11 ms. Loading the standard library runs
+  it twice (`registerBundled` resolving the kernel, then registering it against `loadMeta`, which does not cache the
+  kernel's identity), so a warm `Tson.standard()` is about 58 ms.
