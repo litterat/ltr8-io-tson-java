@@ -37,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p><b>As a loader</b> it resolves a schema on demand from its URI, so a resolver reaching a {@code
  * !!meta}/{@code !!import} target needn't have it pre-registered -- {@link #loadMeta} for a governing meta
  * (compiled), {@link #resolveLinked} for an import or user schema (resolved only). Both, in order: a cache
- * hit; meta-kernel's own well-known identity, answered by its hand-written bootstrap and never cached (its
+ * hit; meta-kernel's own well-known identity, answered by its bootstrap, built once and never registered (its
  * self-naming {@code !!meta} would recurse forever through the generic path, §1.5); otherwise fetch via the
  * configured {@link SchemaSource}, parse, resolve via a fresh {@code SchemaResolver} bound to this same
  * loader (so the document's own {@code !!meta}/{@code !!import} resolve recursively, all the way down).
@@ -80,6 +80,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private final DataBindContext context;
     private final SchemaSource source;
     private final Map<String, TsonCompiledMetaSchema> compiled = new LinkedHashMap<>();
+    /**
+     * Meta-kernel's bootstrap stand-in, compiled on the first lookup of its identity and reused until the
+     * ordinarily resolved kernel is registered. The bootstrap is a function of the bundled bytes and this
+     * registry's resolver alone, so two threads racing here build equal values and either may win.
+     */
+    private volatile TsonCompiledMetaSchema bootstrapped;
     // Content hash per canonical identity, recorded when an identity is first resolved. Every
     // hash-pinned reference to an identity is verified against it -- so conflicting pins for one
     // identity error (at most one can match the content) and a plain reference resolves to the
@@ -223,7 +229,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * TsonBundledSchemas} (never the configured {@code source}) and registered; its own {@code
      * !!meta}/{@code !!import} targets are cache hits by the time they're needed (meta-kernel's own is
      * its self-referential bootstrap case, resolved ordinarily and registered explicitly since {@link
-     * #loadMeta} never caches that identity -- see that method).
+     * #loadMeta} never registers that identity -- see that method).
      */
     private void loadStandardLibrary() {
         registerBundled(TsonBundledSchemas.META_KERNEL_ID);
@@ -257,9 +263,10 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /**
      * Resolves {@code uri} to its compiled governing meta-schema, fetching/resolving/compiling on demand --
-     * a cache hit ({@link #get}), meta-kernel's own hand-written bootstrap (never cached, since its {@code
-     * !!meta} names itself, §1.5), or the generic path ({@link #resolveLinked} then compile+cache). A
-     * target that resolves but isn't a meta-layer schema is rejected -- only such a schema may govern.
+     * a cache hit ({@link #get}), meta-kernel's own bootstrap (built once per registry and never registered,
+     * since its {@code !!meta} names itself, §1.5), or the generic path ({@link #resolveLinked} then
+     * compile+cache). A target that resolves but isn't a meta-layer schema is rejected -- only such a schema
+     * may govern.
      * Deliberately not {@code synchronized}: it recurses into itself (via {@link #resolveLinked}), and
      * holding a lock across a whole fetch would serialize unrelated loads for no real benefit.
      */
@@ -275,14 +282,18 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             return cached.get();
         }
         if (META_KERNEL_IDENTITY.equals(identity)) {
-            TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
             // The bootstrap's own output, linked and compiled but never registered -- TsonSchemaRegistry
-            // refuses a bootstrap schema outright -- so every call re-bootstraps from scratch. The
-            // permanent, shared registry entry for meta-kernel comes from an explicit "load it and
-            // register it" step done once elsewhere, resolving the kernel ordinarily against this one;
-            // until then this one-off bootstrap stands in so nothing is ever left unable to resolve.
+            // refuses a bootstrap schema outright. The permanent, shared registry entry for meta-kernel comes
+            // from an explicit "load it and register it" step done once elsewhere, resolving the kernel
+            // ordinarily against this one; until then this stand-in, built once per registry, answers every
+            // lookup, so nothing is ever left unable to resolve.
             recordAndVerify(TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID), uri, identity);
-            return bootstrap(TsonSchemaLinker.linkBootstrap(metaKernel));
+            TsonCompiledMetaSchema standIn = bootstrapped;
+            if (standIn == null) {
+                standIn = bootstrap(TsonSchemaLinker.linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema()));
+                bootstrapped = standIn;
+            }
+            return standIn;
         }
         TsonLinkedSchema linked = resolveLinked(uri);
         if (!isMetaLayer(linked.schema())) {
