@@ -144,7 +144,9 @@ compiled reader consulted: one cycle, holding `record` and 29 more of the 77 ent
 `identifier`, `non_negative_integer`, the enum and set machinery, `field_group`, and the synthetics they name), every
 other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with
 `@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap's passes are not yet
-replaced by this order.
+replaced by this order, and this implementation departs from rule 3: a reader decodes its pins and defaults
+through their types when it is built, so `iri_type`'s reader needs `iri` (the `spec` pin) and `iri` is read through
+`iri_type`, a cycle the rule does not have.
 
 **Resolution, a proposal.** Terms:
 
@@ -169,10 +171,12 @@ The rule is 1; the rest are its consequences.
    `tree => { t: tree }`, mutual recursion, and a constructor whose facet is typed by its own instance
    (`decimal_type => atom & { min?: number }` beside `number => !decimal_type {}`) are sound.
 3. **A held value orders nothing.** A `value`-typed slot (a field's default or pin, a type argument's value) and a
-   template's body hold what a schemaless read gives ([TSON-DATA] §4), judged against its type once every entry is
-   ready. Where a declaration names the type a form reads against, a read reaches that type by rule 1, the name itself
-   ordering nothing: a value of `field_map` reaches `record_field`, which `field_map` pins as its `value_type`, and a
-   value of a family base (§5.2) reaches each subtype, whose selector pins §5.2 confines to an atom or an enum.
+   template's body hold what a schemaless read gives ([TSON-DATA] §4), and bind as written: a pin or default is not
+   decoded through its type when the reader carrying it is built, but judged against its type once every entry is
+   ready, still at load (rule 6). Where a declaration names the type a form reads against, a read reaches that type
+   by rule 1, the name itself ordering nothing: a value of `field_map` reaches `record_field`, which `field_map` pins
+   as its `value_type`, and a value of a family base (§5.2) reaches each subtype, whose selector pins §5.2 confines to
+   an atom or an enum.
 4. **A cycle is refused.** Entries waiting on each other through rule 1 are a resolver error naming the entries on the
    cycle. A loop of references is not a cycle under this rule; §8.3 refuses a reference chain with no terminal. The
    pre-loaded entries (§3.4) are ready before any declaration is read, and are exactly the kernel's one cycle, the one
