@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=82c280810e8e0079a200af146a5ee686819c282ae28f9a1120cfb128a536769d"
+!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=373302d4cb3437e360d0fc39a50bb971d79eb7c09731589d38bb7f299259f4b5"
 !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 39 draft).
@@ -588,7 +588,7 @@
     The annotation type marker: a type carrying it is meant as annotation
     metadata ([TSON-SCHEMA] §6).
     """
-  annotation => @annotation void
+  annotation => void
 
   @doc:"""
     Documentation for a declaration, a field or a document. The text is

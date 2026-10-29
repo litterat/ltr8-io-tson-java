@@ -302,7 +302,7 @@
 
   record_extension_type => !enum { members: [ABSTRACT FINAL OPEN] }
 
-  annotation => @annotation !reference { target: void }
+  annotation => !reference { target: void }
 
   doc => @annotation !reference { target: text }
 

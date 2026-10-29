@@ -85,7 +85,7 @@ class SchemaNameAnnotationTest {
     }
 
     /**
-     * §6's split, held: {@code annotation => @annotation void} writes its marker after {@code =>}, so it is
+     * §6's split, held: {@code synthetic => @annotation void} writes its marker after {@code =>}, so it is
      * the definition's, while the {@code @doc} above the name is the name's. Neither is hoisted onto the
      * other.
      */
@@ -93,9 +93,9 @@ class SchemaNameAnnotationTest {
     void nameAndDefinitionAnnotationsStaySeparate() {
         Namespace<Top> kernel = entriesOf(TsonBundledSchemas.META_KERNEL_ID);
 
-        Annotations onValue = factsOf(TsonBundledSchemas.META_KERNEL_ID, "annotation").annotations();
+        Annotations onValue = factsOf(TsonBundledSchemas.META_KERNEL_ID, "synthetic").annotations();
         assertTrue(onValue.has("annotation"), "the definition's own marker");
-        assertTrue(kernel.getAnnotations("annotation").has("doc"), "the name's own documentation");
+        assertTrue(kernel.getAnnotations("synthetic").has("doc"), "the name's own documentation");
         assertTrue(onValue.value("doc", String.class).isEmpty(), "not hoisted onto the definition");
     }
 }

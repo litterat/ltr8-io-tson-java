@@ -139,8 +139,12 @@ share a document, an order has to be computed and its cycles defined.
 **What is running.** None of the rule below as a rule. Pass 2 resolves on demand and refuses "a circular
 composition/refinement chain" (rule 1's operand edge); the kernel bootstrap orders its entries by three hand-written
 passes (ordinary declarations, instances, atom refinements); defaults and pins are `value`-typed and judged at link
-(rule 3). The Revision 39 proposal replaces the bootstrap passes with this rule and checks that
-`meta-kernel-resolved.tn` comes out of it as a fixed point.
+(rule 3). A test harness measures the kernel's wait graph from `meta-kernel-resolved.tn`'s own declarations, no
+compiled reader consulted: one cycle, holding `record` and 29 more of the 77 entries (`boolean`, `integer`, `text`,
+`identifier`, `non_negative_integer`, the enum and set machinery, `field_group`, and the synthetics they name), every
+other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with
+`@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap's passes are not yet
+replaced by this order.
 
 **Resolution, a proposal.** Terms:
 
@@ -166,16 +170,20 @@ The rule is 1; the rest are its consequences.
    (`decimal_type => atom & { min?: number }` beside `number => !decimal_type {}`) are sound.
 3. **A held value orders nothing.** A `value`-typed slot (a field's default or pin, a type argument's value) and a
    template's body hold what a schemaless read gives ([TSON-DATA] §4), judged against its type once every entry is
-   ready. One exception: reading against a base with a family selector (§5.2) waits on each subtype and on its pin,
-   read against the selector's type, which §5.2 confines to an atom or an enum.
+   ready. Where a declaration names the type a form reads against, a read reaches that type by rule 1, the name itself
+   ordering nothing: a value of `field_map` reaches `record_field`, which `field_map` pins as its `value_type`, and a
+   value of a family base (§5.2) reaches each subtype, whose selector pins §5.2 confines to an atom or an enum.
 4. **A cycle is refused.** Entries waiting on each other through rule 1 are a resolver error naming the entries on the
    cycle. A loop of references is not a cycle under this rule; §8.3 refuses a reference chain with no terminal. The
-   pre-loaded entries (§3.4) are ready before any declaration is read, and are exactly those on the one cycle the
-   kernel must close: `record`, whose declaration is a `!record`, and what reading a `!record` waits on. Every other
-   kernel entry is read by these rules, and the kernel's resolved form must come out of them unchanged.
+   pre-loaded entries (§3.4) are ready before any declaration is read, and are exactly the kernel's one cycle, the one
+   holding `record`, whose declaration is a `!record`. Every other kernel entry is read by these rules, and the
+   kernel's resolved form must come out of them unchanged.
 5. **Order independence.** Every order consistent with rule 1 gives one verdict and one resolved output, and the order
    entries are written in is not consulted. This replaces §3.4.1's forward-reference sentence.
-6. **Limits.** §11.5 gains a row, *wait depth*: the longest chain of rule 1 waits in one closure, default 64. Template
+6. **Everything closes at load.** Every entry is ready, every reference and held value judged and every reader built
+   before the schema is used. No wait is left for a data read to discharge, and every type is known open or closed
+   and usable in data once the schema has loaded.
+7. **Limits.** §11.5 gains a row, *wait depth*: the longest chain of rule 1 waits in one closure, default 64. Template
    expansion needs no new bound; §5.10.1's regular recursion and §11.5's materialisation depth bound it.
 
 With `nni => !integer ^ { min: 0 }`:
@@ -191,5 +199,6 @@ With `nni => !integer ^ { min: 0 }`:
 | `c1 => !c2 {}`, `c2 => !c1 {}` | `c1` on `c2` on `c1` | cycle: refused |
 | `a => b`, `b => a` | none | no cycle; refused by §8.3 |
 
-Sections amended: §3.4 (the pre-loaded set is rule 4's), §3.4.1 (Pass 2 runs in rule 1's order; rule 5), §5.10.1
-(its cycle sentence cites rule 4), §11.5 (rule 6's row).
+Sections amended: §3.4 (the pre-loaded set is rule 4's), §6 (its "one exception is structural" sentence goes, the
+kernel's `annotation` no longer annotating itself), §3.4.1 (Pass 2 runs in rule 1's order; rule 5), §5.10.1
+(its cycle sentence cites rule 4), §11.5 (rule 7's row).
