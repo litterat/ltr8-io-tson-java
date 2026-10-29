@@ -36,9 +36,9 @@ class NestedBindTargetTest {
     private static final String ID = "https://example.test/nested-bind-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/nested-bind-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               counts   => { values: [int32] }
               tally    => { values: {text => int32} }
               keyed    => { values: {int32 => text} }

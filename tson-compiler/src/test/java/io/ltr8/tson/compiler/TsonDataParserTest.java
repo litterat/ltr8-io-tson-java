@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.VoidValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import java.util.List;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -74,45 +75,50 @@ class TsonDataParserTest {
     void idDirectiveOnly() {
         Document doc = parse("!!id:\"https://example.com/x.tn\"\n_");
         assertEquals("https://example.com/x.tn", doc.id().orElseThrow());
-        assertTrue(doc.schema().isEmpty());
+        assertTrue(doc.imports().isEmpty());
         assertInstanceOf(VoidValue.class, doc.root().coreValue());
     }
 
     @Test
-    void idAndSchemaDirectives() {
+    void idAndImportDirectives() {
         Document doc = parse("""
                 !!id:"https://example.com/orders/1042.tn"
-                !!schema:"https://example.com/order.tn"
+                !!import:"https://example.com/order.tn"
                 Alice
                 """);
         assertEquals("https://example.com/orders/1042.tn", doc.id().orElseThrow());
-        assertEquals("https://example.com/order.tn", doc.schema().orElseThrow());
+        assertEquals(List.of("https://example.com/order.tn"), doc.imports());
         assertEquals("Alice", token(doc.root()).text());
     }
 
     @Test
-    void schemaDirectiveWithoutId() {
-        Document doc = parse("!!schema:\"https://example.com/order.tn\" Alice");
+    void importDirectiveWithoutId() {
+        Document doc = parse("!!import:\"https://example.com/order.tn\" Alice");
         assertTrue(doc.id().isEmpty());
-        assertEquals("https://example.com/order.tn", doc.schema().orElseThrow());
+        assertEquals(List.of("https://example.com/order.tn"), doc.imports());
     }
 
     @Test
     void noHeaderJustAValue() {
         Document doc = parse("Alice");
         assertTrue(doc.id().isEmpty());
-        assertTrue(doc.schema().isEmpty());
+        assertTrue(doc.imports().isEmpty());
     }
 
     @Test
-    void metaDirectiveIsRejectedAsSchemaDocument() {
-        assertThrows(TsonUnsupportedDocumentException.class, () -> parse("!!meta:\"https://example.com/m.tn\" { }"));
+    void aRootTaggedSchemaIsRejectedAsSchemaDocument() {
+        assertThrows(TsonUnsupportedDocumentException.class, () -> parse("!!import:\"https://example.com/m.tn\" !schema { }"));
     }
 
     @Test
-    void idThenMetaIsRejectedAsSchemaDocument() {
+    void anImportFreeSchemaIsRejectedAsSchemaDocument() {
+        assertThrows(TsonUnsupportedDocumentException.class, () -> parse("@doc:\"s\" !schema { a => [text] }"));
+    }
+
+    @Test
+    void idThenImportThenSchemaRootIsRejectedAsSchemaDocument() {
         assertThrows(TsonUnsupportedDocumentException.class,
-                () -> parse("!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }"));
+                () -> parse("!!id:\"https://example.com/x.tn\"\n!!import:\"https://example.com/m.tn\" !schema { }"));
     }
 
     /**
@@ -166,11 +172,11 @@ class TsonDataParserTest {
     void directiveArgumentsMayCarryCharactersBeyondUsAscii() {
         Document doc = parse("""
                 !!id:"https://example.com/donn\u00E9es/1042.tn"
-                !!schema:"https://example.com/sch\u00E9mas/order.tn"
+                !!import:"https://example.com/sch\u00E9mas/order.tn"
                 Alice
                 """);
         assertEquals("https://example.com/donn\u00E9es/1042.tn", doc.id().orElseThrow());
-        assertEquals("https://example.com/sch\u00E9mas/order.tn", doc.schema().orElseThrow());
+        assertEquals(List.of("https://example.com/sch\u00E9mas/order.tn"), doc.imports());
     }
 
     @Test
@@ -180,16 +186,16 @@ class TsonDataParserTest {
     }
 
     @Test
-    void schemaDirectiveArgumentInHeaderMustBeAValidUri() {
-        assertThrows(ParseException.class, () -> parse("!!schema:\"not a uri\" Alice"));
+    void importDirectiveArgumentInHeaderMustBeAValidUri() {
+        assertThrows(ParseException.class, () -> parse("!!import:\"not a uri\" Alice"));
     }
 
     @Test
-    void metaDirectiveArgumentMustBeAValidUriEvenThoughTheDocumentIsRejectedEitherWay() {
-        // A malformed !!meta argument is a genuine ParseException, not merely "a well-formed
+    void aSchemaDocumentsHeaderMustBeWellFormedEvenThoughTheDocumentIsRejectedEitherWay() {
+        // A malformed !!import argument is a genuine ParseException, not merely "a well-formed
         // schema document this processor doesn't support" -- TsonUnsupportedDocumentException requires the
-        // directive itself to actually be well-formed first.
-        assertThrows(ParseException.class, () -> parse("!!meta:\"not a uri\" { }"));
+        // header itself to actually be well-formed first.
+        assertThrows(ParseException.class, () -> parse("!!import:\"not a uri\" !schema { }"));
     }
 
     // ── Records ──────────────────────────────────────────────────────────
@@ -419,7 +425,7 @@ class TsonDataParserTest {
     @Test
     void schemaDirectiveOnArrayElementIsParseError() {
         ParseException e = assertThrows(ParseException.class,
-                () -> parse("[ !!schema:\"https://example.com/s.tn\" 1 2 ]"));
+                () -> parse("[ !!import:\"https://example.com/s.tn\" 1 2 ]"));
         assertTrue(e.getMessage().contains("stands only in the document header"), e::getMessage);
     }
 
@@ -593,13 +599,13 @@ class TsonDataParserTest {
     @Test
     void schemaDirectiveOnFieldValueIsParseError() {
         assertThrows(ParseException.class, () -> parse("""
-                { database: !!schema:"https://example.com/db-config.tn" !db_config { host: db1 } }
+                { database: !!import:"https://example.com/db-config.tn" !db_config { host: db1 } }
                 """));
     }
 
     @Test
     void schemaDirectiveOnMapEntryValueIsParseError() {
-        assertThrows(ParseException.class, () -> parse("{ k => !!schema:\"https://example.com/s.tn\" 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ k => !!import:\"https://example.com/s.tn\" 1 }"));
     }
 
     @Test
@@ -609,12 +615,12 @@ class TsonDataParserTest {
 
     @Test
     void directivesNotPermittedBeforeMapKey() {
-        assertThrows(ParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn\" k => 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ !!import:\"https://example.com/s.tn\" k => 1 }"));
     }
 
     @Test
     void directivesNotPermittedBeforeFieldName() {
-        assertThrows(ParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn\" x: 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ !!import:\"https://example.com/s.tn\" x: 1 }"));
     }
 
     // ── Full example document (adapted from spec §2.1) ──────────────────
@@ -623,7 +629,7 @@ class TsonDataParserTest {
     void fullOrderDocumentFromSpec() {
         String doc = """
                 !!id:"https://example.com/orders/1042.tn"
-                !!schema:"https://example.com/order.tn"
+                !!import:"https://example.com/order.tn"
                 @doc:"Order record exported 2026-07-03"
                 !order {
                   order_id:  1042
@@ -654,7 +660,7 @@ class TsonDataParserTest {
         Document parsed = parse(doc);
 
         assertEquals("https://example.com/orders/1042.tn", parsed.id().orElseThrow());
-        assertEquals("https://example.com/order.tn", parsed.schema().orElseThrow());
+        assertEquals(List.of("https://example.com/order.tn"), parsed.imports());
 
         DataValue root = parsed.root();
         assertEquals(1, root.annotations().size());

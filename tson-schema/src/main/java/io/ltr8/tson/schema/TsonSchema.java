@@ -19,7 +19,7 @@ import java.util.Optional;
 /**
  * A resolved schema (Part 2 §8): a value of the kernel's {@code schema}, the namespace type
  * <code>{type_name =&gt; top}</code> ({@link #entries}, a {@link Namespace} typed {@value #SCHEMA}), plus the
- * governing-chain directives its own document header carried ({@code !!id}/{@code !!meta}/{@code !!import}*, §2.2)
+ * directives its own document header carried ({@code !!id}, {@code !!import}*, §2.2)
  * -- the "produced schema" this module exists for, as opposed to {@code tson-compiler}'s grammar-only {@code
  * SchemaDocument}/{@code SchemaMap}. {@code entries}' insertion order is preserved, matching {@code
  * SchemaMap.declarations}' own ordering guarantee.
@@ -61,11 +61,10 @@ import java.util.Optional;
  * mattering once a schema is safely registered).
  *
  * <p><b>{@link #bootstrap()}</b> -- {@code true} <i>only</i> for a schema {@code MetaKernelBootstrapResolver}
- * itself produced (Part 2 §1.5's "one deliberate circularity in the series": meta-kernel's own
- * {@code !!meta} names its own {@code !!id}, and nothing else is allowed to). A real, stored flag,
- * not derived from {@code id().equals(meta())} -- a *derived* check can't tell "this schema really
- * was produced by reading meta-kernel.tn through the real two-pass bootstrap reader" apart from
- * "this schema merely happens to have matching {@code id}/{@code meta} fields," and the whole point
+ * itself produced (the kernel, pre-loaded by special resolution, [TSON-SCHEMA] §3.4). A real, stored flag,
+ * not derived from the identity -- a *derived* check can't tell "this schema really
+ * was produced by reading meta-kernel.tn through the real bootstrap reader" apart from
+ * "this schema merely happens to carry the kernel's {@code !!id}," and the whole point
  * of gating {@link TsonSchemaRegistry#register}/{@code TsonSchemaLinker.linkBootstrap} on it is to keep
  * proving, continuously, that the real reader is what produces whatever ever gets registered under
  * meta-kernel's own identity -- not just that something of the right shape did. This one stays a flag
@@ -81,7 +80,7 @@ import java.util.Optional;
  * nothing the host declares. The linker resolves each and judges it against the slot's declared type. A fact the
  * resolver hands the linker, never part of §8's output: no resolved document writes it.
  */
-public record TsonSchema(String id, String meta, List<String> imports, Namespace<Top> entries,
+public record TsonSchema(String id, List<String> imports, Namespace<Top> entries,
                           boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
                           Map<String, EntryFacts> facts) {
 
@@ -208,7 +207,6 @@ public record TsonSchema(String id, String meta, List<String> imports, Namespace
 
     public TsonSchema {
         Objects.requireNonNull(id, "!!id is required");
-        Objects.requireNonNull(meta, "!!meta is required");
         imports = List.copyOf(imports);
         // A Namespace's map is an immutable copy, which is part of a registered schema being locked.
         if (!SCHEMA.equals(entries.type())) {
@@ -231,16 +229,16 @@ public record TsonSchema(String id, String meta, List<String> imports, Namespace
      * No value held by name and no facts -- a schema assembled by hand, whose entries were declared nowhere a
      * position could name.
      */
-    public TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, Top> entries,
+    public TsonSchema(String id, List<String> imports, AnnotatedMap<String, Top> entries,
                        boolean bootstrap) {
-        this(id, meta, imports, entries, bootstrap, Map.of(), Map.of());
+        this(id, imports, entries, bootstrap, Map.of(), Map.of());
     }
 
     /** {@code entries}, a map with each key's annotations, as the schema map: a value of {@value #SCHEMA}. */
-    public TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, Top> entries,
+    public TsonSchema(String id, List<String> imports, AnnotatedMap<String, Top> entries,
                        boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
                        Map<String, EntryFacts> facts) {
-        this(id, meta, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, facts);
+        this(id, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, facts);
     }
 
     /**
@@ -249,34 +247,30 @@ public record TsonSchema(String id, String meta, List<String> imports, Namespace
      * the schema map's key, so the {@link Namespace}'s {@link AnnotatedMap} is what holds them; a caller with none
      * to carry need not know.
      */
-    public TsonSchema(String id, String meta, List<String> imports, Map<String, Top> entries,
+    public TsonSchema(String id, List<String> imports, Map<String, Top> entries,
                        boolean bootstrap) {
-        this(id, meta, imports, AnnotatedMap.of(entries), bootstrap);
+        this(id, imports, AnnotatedMap.of(entries), bootstrap);
     }
 
     /** {@code bootstrap} defaults to {@code false} -- the common case: an ordinary, non-bootstrap schema. */
-    public TsonSchema(String id, String meta, List<String> imports, Map<String, Top> entries) {
-        this(id, meta, imports, entries, false);
+    public TsonSchema(String id, List<String> imports, Map<String, Top> entries) {
+        this(id, imports, entries, false);
     }
 
     /** This schema with {@code name}'s own annotations recorded -- everything else unchanged. */
     public TsonSchema withNameAnnotations(String name, Annotations annotations) {
-        return new TsonSchema(id, meta, imports, entries.withAnnotations(name, annotations), bootstrap, valuesByName,
+        return new TsonSchema(id, imports, entries.withAnnotations(name, annotations), bootstrap, valuesByName,
                 facts);
     }
 
     /**
-     * The schemas whose namespaces this schema's own namespace takes in, in header order: the {@code !!meta} target
-     * first, which contributes exactly as an {@code !!import} does, then each {@code !!import}. One namespace per
-     * schema is its own entries and every entry of these, transitively. The meta-kernel's {@code !!meta}, naming
-     * itself, contributes nothing: its one cycle is closed by pre-loading ([TSON-SCHEMA] §3.4). Any other schema
-     * naming itself is listed, and refused as the import cycle it is. A target named twice is listed once.
+     * The schemas whose namespaces this schema's own namespace takes in: its {@code !!import}s in header order, a
+     * target named twice (in two spellings of one identity) listed once. One namespace per schema is its own entries
+     * and every entry of these, transitively ([TSON-SCHEMA] §2.2.3). A schema naming itself is listed, and refused as
+     * the import cycle it is.
      */
     public List<String> namespaceSources() {
         Map<String, String> sources = new LinkedHashMap<>();
-        if (!TsonBundledSchemas.isMetaKernel(id)) {
-            sources.put(CanonicalIdentity.canonicalize(meta), meta);
-        }
         for (String imported : imports) {
             sources.putIfAbsent(CanonicalIdentity.canonicalize(imported), imported);
         }

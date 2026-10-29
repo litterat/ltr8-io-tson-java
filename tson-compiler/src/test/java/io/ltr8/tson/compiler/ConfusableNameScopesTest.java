@@ -58,9 +58,9 @@ class ConfusableNameScopesTest {
     private static TsonCompiledSchema compileWith(IdentifierPolicy identifiers, String declarations) {
         String schema = """
                 !!id:"https://example.test/confusable.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                 %s
                 }
                 """.formatted(declarations);

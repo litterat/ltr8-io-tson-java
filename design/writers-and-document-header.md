@@ -67,17 +67,16 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
   deliberately *not* `WriteException`, which means "this value cannot be written in this encoding". That
   distinction needs `DataClassObjectWriter`'s two `catch (Throwable)` handlers to let it past, or an IO
   fault surfaces blaming the object. A document never has to exist as a `String`.
-- **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` has `documentId`/`schemaRef`
-  (the two of §3.3's four directive names that belong to a *data* document, both header-only; `meta`/`import` are a
-  schema document's and this emitter does not write one), and both writers have a `describing(...)` derivation over a
-  shared `TsonDocumentHeader` carrier that knows §2.2's order — `!!id` first when both are present. **A bare value is
+- **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` has `documentId`/`importRef`
+  (§2.2's two directives, both header-only), and both writers have a `describing(...)` derivation, emitting
+  `!!import`, over a shared `TsonDocumentHeader` carrier that knows §2.2's order — `!!id` first. **A bare value is
   the default**, because that is what a writer is usually asked for — not to protect output already in the world, of
   which there is none. A caller who wants a self-describing document says so (`describing(schemaUri[,
   rootType])`/`identifiedBy`).
   - **The object writer takes the schema *and* the root type; the tree writer takes only the schema.** A
     bound object carries neither fact — the schemaless writer emits a type-ref only where a value would not
-    read back without one — so `!!schema` alone yields a document whose own reader says "declares a
-    !!schema but has no root type-ref to select a type". Half self-describing is not self-describing, so
+    read back without one — so `!!import` alone yields a document whose own reader says "data imports a
+    schema but has no root type-ref … to select a type". Half self-describing is not self-describing, so
     there is no one-argument form on `TsonObjectWriter` to get it half right. A tree records each node's
     type on a schema-driven read, so the root's own `!typeName` is written back with it; a root that has
     none is refused rather than half-written.
@@ -122,13 +121,14 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
 
 ## Reading a header: `TsonDocumentPeek`
 
-- **`TsonDocumentPeek` reads a header and stops, and keeps the rest of the document** — [TSON-DATA] §7.1's
-  "at most two directives of lookahead and no value parsing, so streams, previews, and content sniffers can
-  classify a document from its opening bytes". A caller routing to the right schema version has to know what
-  a document names *before* choosing how to read it, and every other public entry point reads the whole
-  document to answer that. It runs the same `Lexer`/`TsonDataStream` cursor the real read runs — pulling the
-  stream's first event, `DocumentStart`, which carries all three of §2.2's directives — and never touches the
-  value: the stream fills only until it has an event, and the header alone produces one. **There is no second
+- **`TsonDocumentPeek` reads a header and the root's tag, and keeps the rest of the document** — [TSON-DATA]
+  §7.1's classification of a document from its opening bytes, for streams, previews and content sniffers. A caller
+  routing to the right schema version has to know what a document names *before* choosing how to read it, and every
+  other public entry point reads the whole document to answer that. It runs the same `Lexer`/`TsonDataStream` cursor
+  the real read runs — pulling the stream's first event, `DocumentStart`, which carries the `!!id` and the
+  `!!import`s, then `TsonDataStream.rootTag()`, which looks past the root's leading annotations to its tag — and
+  never parses the root's value: annotations stand before the tag, so a root's `@doc` is the one value it reads
+  (not quite §7.1's "no value parsing"; SPEC-FEEDBACK.md #8). **There is no second
   header scan**; the header is a projection of the one the stream performs for every reader. It is reached
   through `Tson.begin(…)`, or `TsonDocumentPeek.of(…)` standalone. `TsonDocumentHeader` itself is a pure value
   with no way to obtain one — reading a header means running the lexer, which is the stream's job.
@@ -136,7 +136,7 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
     the header, and a reader continues on it: `objectReader().read(peek, Invoice.class)`, `treeReader()
     .read(peek)`, and `readAs(peek, type)` on both facades (`objectReader().withSchema(uri).readAs(peek, type,
     Invoice.class)` in bind mode) — the last being the shape a schema stated outside the body takes, a
-    `TSON-Schema` header, with any `!!schema` the body declares overridden and agreement the caller's to check
+    `TSON-Schema` header, with any `!!import` the body declares overridden and agreement the caller's to check
     first. That is what makes it work on a source that cannot be read twice —
     an HTTP request body, a socket, a pipe — which is the case the whole surface exists for. There is no
     resumable/non-resumable pair, because every peek continues; a caller who only wants to classify takes
@@ -148,16 +148,16 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
     the tokens the header is made of — so a reader that disagrees is **refused**, not quietly obeyed. The
     receiver *does* move: the peek reads the header with a throwing receiver of its own and the continuing
     read re-points the token surface at its own, or a collecting read would throw at the first problem.
-  - **`!!meta` classifies rather than fails**, at every layer. The stream reports the directive, and the
-    Class 1 verdict is taken by whoever asked for a data read — `TsonDataParser.parseDocument` and both
-    facades' `requireDataDocument`. A peek exists precisely to say "schema document" and answers with
-    `meta()` present (§12.1 requires exactly one, so `isSchemaDocument()` is that question). `tson
-    validate`'s file classification is this call.
+  - **A `!schema` root classifies rather than fails**, at every layer. The stream reports the tag, and the
+    Class 1 verdict (`TsonUnsupportedDocumentException`) is taken by whoever asked for a data read —
+    `TsonDataParser.parseDocument` and both facades' `requireDataDocument`; `readAs` asks for none. A peek exists
+    precisely to say "schema document", and `isSchemaDocument()` is that question. `tson validate`'s file
+    classification is this call.
   - **What it will not do is guess — and that makes it total.** A malformed *value* is not its business and
     still yields a header; a malformed *header* yields **nothing at all** rather than throwing — the header is
     built once, when the whole of it has been read, so a break part-way leaves no partial answer to hand back
     — and a directive §2.2 does not admit there stops the scan. The one answer it must never give is a schema
-    the document does not name, so a `!!schema` written inside the value or after it is that value's text and
+    the document does not name, so an `!!import` written inside the value or after it is that value's text and
     nothing more — `TsonDocumentPeekTest` is adversarial about it. **The failure is kept, not discarded**: the
     read that continues reports it through that reader's own receiver, so a caller who peeks and then reads
     gets exactly the diagnostic a caller who only read would have, and `begin` is safe to call on arbitrary

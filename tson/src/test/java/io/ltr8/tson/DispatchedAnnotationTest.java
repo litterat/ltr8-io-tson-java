@@ -39,9 +39,9 @@ class DispatchedAnnotationTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/dispatch-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               note => text
               shape => {}
               circle => shape & { radius: text }
@@ -70,7 +70,7 @@ class DispatchedAnnotationTest {
     }
 
     private static final String DISPATCHED = """
-            !!schema:"https://example.test/dispatch-1.tn"
+            !!import:"https://example.test/dispatch-1.tn"
             !holder { thing: @note:"why this one" !circle { radius: "3" } }""";
 
     /** The defect itself: a bound variant with a carrier, dispatched to, keeping what the document wrote. */
@@ -90,7 +90,7 @@ class DispatchedAnnotationTest {
     @Test
     void theSameClassKeepsThemWhereNothingDispatched() {
         Circle circle = tson().objectReader().read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 @note:"why this one"
                 !circle { radius: "3" }""", Circle.class);
 
@@ -110,7 +110,7 @@ class DispatchedAnnotationTest {
     @Test
     void aTaggedChoiceVariantKeepsItsAnnotations() {
         TsonValue pick = tson().treeReader().read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 !chooser { pick: @note:"chosen" !integer 42 }""").get("pick");
 
         assertEquals(Optional.of("integer"), pick.typeRef());
@@ -126,7 +126,7 @@ class DispatchedAnnotationTest {
     @Test
     void anUntaggedChoiceVariantIsStillRecoveredThroughItsAnnotations() {
         TsonValue pick = tson().treeReader().read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 !chooser { pick: @note:"chosen" 42 }""").get("pick");
 
         assertEquals(Optional.of("integer"), pick.typeRef());
@@ -143,7 +143,7 @@ class DispatchedAnnotationTest {
     void anUnknownDispatchTargetDiscardsTheWholeValueFramingIncluded() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonValue root = tson().treeReader().withDiagnostics(problems).read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 !holder { thing: @note:"why" !square { side: "3" } }""");
 
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
@@ -158,7 +158,7 @@ class DispatchedAnnotationTest {
     void anUnknownUnionMemberDiscardsTheWholeValueToo() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         tson().objectReader().withDiagnostics(problems).read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 !holder { thing: @note:"why" !square { side: "3" } }""", Holder.class);
 
         assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH),

@@ -36,9 +36,9 @@ class AliasedInstantiationBindingTest {
     /** A discriminated family whose members are minted by a subtype-template factory (§5.10, #10). */
     private static final String ENVELOPE = """
             !!id:"https://example.test/envelope.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               msg    => abstract { kind: text =? }
               msg_of => <T, V> msg & { kind?: = T  body: V }
 
@@ -93,7 +93,7 @@ class AliasedInstantiationBindingTest {
     @Test
     void anAliasedInstantiationBindsUnderTheNameTheAuthorWrote() {
         Channel read = envelope().objectReader().read("""
-                !!schema:"%s"
+                !!import:"%s"
                 !channel { m: { kind: ping  body: { seq: 1 } } }""".formatted(ENVELOPE_ID), Channel.class);
 
         assertEquals(new Ping(new PingBody(1)), read.m());
@@ -103,7 +103,7 @@ class AliasedInstantiationBindingTest {
     @Test
     void anAliasedInstantiationOverAContainerPayloadBindsTheSameWay() {
         Channel read = envelope().objectReader().read("""
-                !!schema:"%s"
+                !!import:"%s"
                 !channel { m: { kind: pong  body: [ { seq: 1  latency: 7 } ] } }""".formatted(ENVELOPE_ID),
                 Channel.class);
 
@@ -116,9 +116,9 @@ class AliasedInstantiationBindingTest {
 
     private static final String BOXES = """
             !!id:"https://example.test/boxes.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               box     => <V> { item: V }
               int_box => box<int32>
               boxes   => { a: int_box }
@@ -143,7 +143,7 @@ class AliasedInstantiationBindingTest {
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
-                        !!schema:"%s"
+                        !!import:"%s"
                         !boxes { a: { item: 1 } }""".formatted(BOXES_ID), Boxes.class));
 
         assertNotNull(thrown.getCause(), "the cause is what says which component could not be bound");

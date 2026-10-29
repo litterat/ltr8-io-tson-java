@@ -6,6 +6,8 @@ history lives in git.
 **Invariants**
 
 - `TsonSchemaParser` is grammar-only: no namespace resolution, no materialization, no validation.
+- A schema document is `[!!id] *!!import *annotation !schema schema-map`; the `!schema` tag is matched as a
+  spelling, and an untagged root is a syntax error.
 - It `extends TsonDataParser` in the same package and calls its package-private methods rather than re-implementing
   Part 1's grammar.
 - `type-name = identifier`: every declared name, type parameter, referenced name and `!` head is matched against
@@ -32,6 +34,11 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`extends TsonDataParser`, same package** — §12.1 imports Part 1's `annotation`/`data-value`/directive
   grammar directly, so `TsonSchemaParser` calls straight into package-private methods rather than
   re-implementing them, adding only the schema-only tokens (`~ ^ & | ( ) < > ? ; -`).
+- **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
+  takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
+  the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's `schema`
+  whatever the document imports, so it is matched as a spelling, never looked up; an untagged root is a syntax
+  error saying the document is data.
 - **`type-name = identifier`, and that one rule replaces §12.1's number rule rather than joining it.**
   `expectTypeName` matches every declared name, type parameter and referenced name against
   `IdentifierProfile`, and `parseAtomRefinementOrInstance` matches the `!` head. §12.1 states separately that

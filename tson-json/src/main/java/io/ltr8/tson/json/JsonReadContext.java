@@ -198,7 +198,7 @@ public final class JsonReadContext {
      *
      * <p><b>Why one event of peek is not enough.</b> {@link #peek()} answers "what is here". Recognising an
      * annotation object ([TSON-JSON] §3.3) asks something else: which members lead the object -- {@code
-     * $schema}, {@code $type}, a sealed position's discriminators -- and the reader that ends up building the
+     * $import}, {@code $type}, a sealed position's discriminators -- and the reader that ends up building the
      * value must still see them all, so reading them to find out is not a substitute.
      *
      * <p>Consumed events are replayed from a buffer rather than re-lexed, so a lookahead costs what it

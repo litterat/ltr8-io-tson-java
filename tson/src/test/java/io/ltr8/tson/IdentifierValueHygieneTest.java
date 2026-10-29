@@ -42,9 +42,9 @@ class IdentifierValueHygieneTest {
     private static final String ID = "https://example.test/names-2.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/names-2.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               slug => !identifier_type { continue_add: "-" }
               js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
               handlers => { slug => text }
@@ -87,7 +87,7 @@ class IdentifierValueHygieneTest {
     }
 
     private static List<Diagnostic> validate(IdentifierPolicy identifiers, String body) {
-        return tson(identifiers).validate("!!schema:\"" + ID + "\"\n" + body);
+        return tson(identifiers).validate("!!import:\"" + ID + "\"\n" + body);
     }
 
     /** The one diagnostic {@code body} draws, asserting it is the only one. */
@@ -184,9 +184,9 @@ class IdentifierValueHygieneTest {
     private static String schemaWith(String declaration) {
         return """
                 !!id:"https://example.test/names-3.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   slug => !identifier_type { continue_add: "-" }
                   js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
                   %s
@@ -199,7 +199,7 @@ class IdentifierValueHygieneTest {
     void bindingRefusesTheSameKeys() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
         Tson tson = tson(IdentifierPolicy.defaults());
-        tson.objectReader().withDiagnostics(problems).read("!!schema:\"" + ID + "\"\n!registry { handlers: { pass => a  "
+        tson.objectReader().withDiagnostics(problems).read("!!import:\"" + ID + "\"\n!registry { handlers: { pass => a  "
                 + CYRILLIC_PASS + " => b } }", Registry.class);
         assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, only(problems.diagnostics()).code());
     }
@@ -235,7 +235,7 @@ class IdentifierValueHygieneTest {
     void bindingRefusesTheSameElements() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
         tson(IdentifierPolicy.defaults()).objectReader().withDiagnostics(problems)
-                .read("!!schema:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }", Team.class);
+                .read("!!import:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }", Team.class);
         assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, only(problems.diagnostics()).code());
     }
 
@@ -251,7 +251,7 @@ class IdentifierValueHygieneTest {
 
         DiagnosticsCollector problems = new DiagnosticsCollector();
         tson(IdentifierPolicy.defaults()).objectReader().withDiagnostics(problems)
-                .read("!!schema:\"" + ID + "\"\n!team { roles: [admin " + MIXED + "] }", Team.class);
+                .read("!!import:\"" + ID + "\"\n!team { roles: [admin " + MIXED + "] }", Team.class);
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(problems.diagnostics()).code());
     }
 }

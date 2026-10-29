@@ -23,9 +23,9 @@ class PositionalNameTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/positional-name.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               named  => { v: text }
               slot   => { type: kind<record> }
               holder => { c?: named  p?: slot  q?: kind<record> }
@@ -76,9 +76,9 @@ class PositionalNameTest {
         for (String fields : List.of("{ p => text }", "{ p => { type: text } }")) {
             assertEquals(List.of(), Tson.standard().validateSchema("""
                     !!id:"https://example.test/positional-name-schema.tn"
-                    !!meta:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
                     !!import:"https://tson.io/2026/39/m/core.tn"
-                    {
+                    !schema {
                       r => !record { fields: %s }
                     }""".formatted(fields)), fields);
         }

@@ -31,9 +31,9 @@ class RefusedNameDrawsNoVerdictTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/accounts.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               account => { password: text }
             }
             """;
@@ -42,7 +42,7 @@ class RefusedNameDrawsNoVerdictTest {
         Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
         return tson.validate("""
-                !!schema:"https://example.test/accounts.tn"
+                !!import:"https://example.test/accounts.tn"
                 !account { %s: "x" }
                 """.formatted(fieldName)).stream().map(Diagnostic::code).toList();
     }

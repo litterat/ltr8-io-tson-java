@@ -46,9 +46,9 @@ class MetaLayerConstructorThroughTsonTest {
     /** The meta-layer schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !schema {
               operation => {
                 path:     text
                 method:   text
@@ -66,9 +66,9 @@ class MetaLayerConstructorThroughTsonTest {
     /** An ordinary API schema governed by it -- two real types, and one entry that is a value, not a type. */
     private static final String API_SCHEMA = """
             !!id:"https://example.test/api.tn"
-            !!meta:"https://example.test/meta-http.tn"
+            !!import:"https://example.test/meta-http.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               search_request  => { q: text }
               search_response => { hits: [text] }
               api => !operations {
@@ -143,7 +143,7 @@ class MetaLayerConstructorThroughTsonTest {
 
         assertEquals("tson", value.get("q").asString().orElseThrow());
         assertEquals(List.of(), tson.validate("""
-                !!schema:"https://example.test/api.tn"
+                !!import:"https://example.test/api.tn"
                 !search_response { hits: ["a" "b"] }
                 """));
     }

@@ -64,7 +64,7 @@ class RecordClosureTest {
                 Map.entry("name", RecordField.required(TypeRef.of("text"))),
                 Map.entry("address", RecordField.required(TypeRef.of("addr"))))));
         TsonSchema schema = new TsonSchema("https://example.test/closure.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         return TsonSchemaCompiler.compile(new TsonLinkedSchema(schema), ValueReaderFactoryRegistry.tree());
     }
 
@@ -157,7 +157,7 @@ class RecordClosureTest {
                 Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
                         new Token("NONE", Token.Form.UNQUOTED))))));
         TsonSchema schema = new TsonSchema("https://example.test/bind-closure.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(new TsonLinkedSchema(schema),
                 ValueReaderFactoryRegistry.bind(context));

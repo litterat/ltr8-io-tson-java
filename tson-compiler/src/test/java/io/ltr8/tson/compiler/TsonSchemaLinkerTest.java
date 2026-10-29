@@ -74,14 +74,12 @@ class TsonSchemaLinkerTest {
      * compares against that exact identity, not merely "is this schema self-referencing."
      */
     private static TsonSchema schemaOf(Map<String, Top> entries) {
-        return new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
-                List.of(), entries);
+        return new TsonSchema("https://example.test/s.tn", List.of(), entries);
     }
 
     /** The same, each entry's facts -- its position, its value's annotations -- given. */
     private static TsonSchema schemaOf(Map<String, Top> entries, Map<String, TsonSchema.EntryFacts> facts) {
-        return new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
-                List.of(), AnnotatedMap.of(entries), false, Map.of(), facts);
+        return new TsonSchema("https://example.test/s.tn", List.of(), AnnotatedMap.of(entries), false, Map.of(), facts);
     }
 
     /** {@code @disjoint} written after {@code =>}, on {@code name}'s value -- the entry's facts. */
@@ -91,7 +89,7 @@ class TsonSchemaLinkerTest {
 
     /** A schema with its own identity and imports, for the origin-tracking chain below. */
     private static TsonSchema schemaOf(String id, List<String> imports, Map<String, Top> entries) {
-        return new TsonSchema(id, TsonBundledSchemas.META_KERNEL_ID, imports, entries);
+        return new TsonSchema(id, imports, entries);
     }
 
     /**
@@ -180,7 +178,7 @@ class TsonSchemaLinkerTest {
                 .withAnnotations("generic", TsonSchema.withApplication(io.ltr8.annotation.Annotations.empty(),
                         otherOfToken));
         TsonLinkedSchema result = TsonSchemaLinker.link(new TsonSchema("https://example.test/s.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of(), annotated, false, Map.of(), Map.of()), null);
+                List.of(), annotated, false, Map.of(), Map.of()), null);
 
         assertEquals(otherOfToken, result.schema().applicationOf("generic").orElseThrow());
         assertEquals(3, result.schema().entries().size(),
@@ -294,8 +292,7 @@ class TsonSchemaLinkerTest {
         AnnotatedMap<String, Top> entries = AnnotatedMap.of(nonDisjointChoice());
         entries = entries.withAnnotations("contact", disjointMarker());
 
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
-                List.of(), entries, false);
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn", List.of(), entries, false);
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(schema, null));
     }
 
@@ -442,7 +439,7 @@ class TsonSchemaLinkerTest {
         localEntries.put("local_a", RecordBody.of(RecordBody.fieldMap(Map.entry("field",
                 RecordField.required(TypeRef.of("imported_a"))))));
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of("https://example.test/import.tn"), localEntries);
+                List.of("https://example.test/import.tn"), localEntries);
 
         TsonLinkedSchema result = TsonSchemaLinker.link(local, loader);
 
@@ -453,7 +450,7 @@ class TsonSchemaLinkerTest {
     void rejectsAnImportThatIsNotRegistered() {
         TsonSchemaLoader loader = id -> Optional.empty();
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of("https://example.test/missing.tn"), Map.of());
+                List.of("https://example.test/missing.tn"), Map.of());
 
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
     }
@@ -484,57 +481,26 @@ class TsonSchemaLinkerTest {
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of("https://example.test/import.tn"),
+                List.of("https://example.test/import.tn"),
                 Map.of(name, localEntry));
         return TsonSchemaLinker.link(local, loader);
     }
 
-    /**
-     * A {@code !!meta} target contributes its namespace exactly as an {@code !!import} does (SPEC-FEEDBACK.md #7),
-     * whatever its own {@code !!meta}: a plain type library named as the target is one more import.
-     */
+    /** A local declaration of a name an import declares collides (§2.2.3): no hiding and no redefinition. */
     @Test
-    void aMetaTargetContributesItsNamespaceAsAnImportDoes() {
+    void aLocalDeclarationCollidesWithAnImportedName() {
         TsonLinkedSchema library = new TsonLinkedSchema(new TsonSchema("https://example.test/lib.tn",
-                "https://example.test/meta.tn", List.of(), Map.of("uuid", valueEntry())));
+                List.of(), Map.of("record", emptyRecord())));
         Map<String, TsonLinkedSchema> byIdentity =
                 Map.of(CanonicalIdentity.canonicalize("https://example.test/lib.tn"), library);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        TsonSchema governed = new TsonSchema("https://example.test/app.tn",
-                "https://example.test/lib.tn", List.of(), Map.of("local", emptyRecord()));
-
-        assertEquals(Set.of("uuid", "local"), TsonSchemaLinker.link(governed, loader).schema().entries().keySet());
-    }
-
-    /** And a local declaration of a name the target declares collides, as with any import (§2.2.3). */
-    @Test
-    void aLocalDeclarationCollidesWithTheMetaTargetsName() {
-        TsonLinkedSchema meta = new TsonLinkedSchema(schemaOf(Map.of("record", emptyRecord())));
-        Map<String, TsonLinkedSchema> byIdentity =
-                Map.of(CanonicalIdentity.canonicalize("https://example.test/meta.tn"), meta);
-        TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
-
-        TsonSchema governed = new TsonSchema("https://example.test/app.tn",
-                "https://example.test/meta.tn", List.of(), Map.of("record", valueEntry()));
+        TsonSchema importer = new TsonSchema("https://example.test/app.tn",
+                List.of("https://example.test/lib.tn"), Map.of("record", valueEntry()));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> TsonSchemaLinker.link(governed, loader));
+                () -> TsonSchemaLinker.link(importer, loader));
         assertTrue(thrown.getMessage().contains("'record' collides"), thrown.getMessage());
-    }
-
-    /**
-     * A {@code !!meta} target the loader cannot produce is left to whoever owns fetching: resolution loads it before
-     * linking, so a schema linked standalone -- a hand-built one, or meta-kernel's own self-naming {@code !!meta} --
-     * links its own entries.
-     */
-    @Test
-    void anUnresolvableMetaTargetIsNotJudgedHere() {
-        TsonSchemaLoader loader = id -> Optional.empty();
-        TsonSchema governed = new TsonSchema("https://example.test/app.tn",
-                "https://example.test/nowhere.tn", List.of(), Map.of("local", emptyRecord()));
-
-        assertEquals(Set.of("local"), TsonSchemaLinker.link(governed, loader).schema().entries().keySet());
     }
 
     @Test
@@ -591,7 +557,7 @@ class TsonSchemaLinkerTest {
         localEntries.put("local_child",
                 ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("imported_base")));
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of("https://example.test/import.tn"), localEntries);
+                List.of("https://example.test/import.tn"), localEntries);
 
         TsonLinkedSchema result = TsonSchemaLinker.link(local, loader);
 
@@ -621,7 +587,6 @@ class TsonSchemaLinkerTest {
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                TsonBundledSchemas.META_KERNEL_ID,
                 List.of("https://example.test/import-one.tn", "https://example.test/import-two.tn"), Map.of());
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -656,7 +621,6 @@ class TsonSchemaLinkerTest {
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
-                TsonBundledSchemas.META_KERNEL_ID,
                 List.of("https://example.test/shared.tn", "https://example.test/b.tn"), Map.of());
 
         TsonLinkedSchema linked = TsonSchemaLinker.link(local, loader);
@@ -687,13 +651,12 @@ class TsonSchemaLinkerTest {
     /** {@code importer.tn}, governed by {@code importerMeta}, importing {@code import.tn} under {@code importedMeta}. */
     private static TsonLinkedSchema linkImporting(String importerMeta, String importedMeta) {
         TsonLinkedSchema imported = new TsonLinkedSchema(new TsonSchema("https://example.test/import.tn",
-                importedMeta, List.of(), Map.of("imported_a", emptyRecord())));
+                List.of(), Map.of("imported_a", emptyRecord())));
         Map<String, TsonLinkedSchema> byIdentity =
                 Map.of(CanonicalIdentity.canonicalize("https://example.test/import.tn"), imported);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        TsonSchema importer = new TsonSchema("https://example.test/importer.tn", importerMeta,
-                List.of("https://example.test/import.tn"), Map.of("local_a", emptyRecord()));
+        TsonSchema importer = new TsonSchema("https://example.test/importer.tn", List.of("https://example.test/import.tn"), Map.of("local_a", emptyRecord()));
         return TsonSchemaLinker.link(importer, loader);
     }
 }

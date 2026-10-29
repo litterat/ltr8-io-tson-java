@@ -33,9 +33,9 @@ class TsonSealedFamilyBindTest {
     /** The flat layout: the selector sits beside each member's own fields, with no payload wrapper. */
     private static final String SCHEMA = """
             !!id:"https://example.test/inline-envelope.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               msg  => abstract { kind: text =?  id: int32 }
               ping => msg & { kind?: = "ping"  seq: int32 }
               pong => msg & { kind?: = "pong"  latency: int32 }
@@ -74,7 +74,7 @@ class TsonSealedFamilyBindTest {
     @Test
     void anInlineDiscriminatorDispatchesAndBindsTheSelectedMember() {
         Channel read = bound().objectReader().read("""
-                !!schema:"%s"
+                !!import:"%s"
                 !channel { m: { kind: ping  id: 1  seq: 2 } }""".formatted(ID), Channel.class);
 
         assertEquals(new Ping(1, 2), read.m());
@@ -84,7 +84,7 @@ class TsonSealedFamilyBindTest {
     @Test
     void theOtherPinBindsTheOtherMember() {
         Channel read = bound().objectReader().read("""
-                !!schema:"%s"
+                !!import:"%s"
                 !channel { m: { kind: pong  id: 3  latency: 7 } }""".formatted(ID), Channel.class);
 
         assertEquals(new Pong(3, 7), read.m());
@@ -98,7 +98,7 @@ class TsonSealedFamilyBindTest {
     @Test
     void theSelectorMayArriveLastInBindMode() {
         Channel read = bound().objectReader().read("""
-                !!schema:"%s"
+                !!import:"%s"
                 !channel { m: { seq: 2  id: 1  kind: ping } }""".formatted(ID), Channel.class);
 
         assertEquals(new Ping(1, 2), read.m());

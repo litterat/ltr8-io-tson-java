@@ -27,9 +27,9 @@ class FixedToVoidBindTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/retired.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               person => { name: text  retired?: void? }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
@@ -50,7 +50,7 @@ class FixedToVoidBindTest {
     }
 
     private static Person read(String body) {
-        return bound().objectReader().read("!!schema:\"" + ID + "\"\n!person " + body, Person.class);
+        return bound().objectReader().read("!!import:\"" + ID + "\"\n!person " + body, Person.class);
     }
 
     @Test

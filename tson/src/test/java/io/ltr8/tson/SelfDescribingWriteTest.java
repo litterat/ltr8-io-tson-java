@@ -39,9 +39,9 @@ class SelfDescribingWriteTest {
     private static final String ID = "https://example.test/point-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/point-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { point => { x: int32  y: int32 } }
+            !schema { point => { x: int32  y: int32 } }
             """;
 
     public record Point(long x, long y) {
@@ -65,7 +65,7 @@ class SelfDescribingWriteTest {
 
     @Test
     void aDescribingObjectWriterEmitsTheSchemaAndTheRootType() {
-        assertEquals("!!schema:\"" + ID + "\"\n!point { x: 3 y: 4 }",
+        assertEquals("!!import:\"" + ID + "\"\n!point { x: 3 y: 4 }",
                 tson().objectWriter().describing(ID, "point").toTson(new Point(3, 4)));
     }
 
@@ -87,13 +87,13 @@ class SelfDescribingWriteTest {
     void aTreeReadFromASelfDescribingDocumentWritesBackAsOne() {
         Tson tson = tson();
         String original = """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""";
 
         TsonValue tree = tson.treeReader().read(original);
         String written = tson.treeWriter().describing(ID).toTson(tree);
 
-        assertTrue(written.startsWith("!!schema:\"" + ID + "\"\n!point "), written);
+        assertTrue(written.startsWith("!!import:\"" + ID + "\"\n!point "), written);
         assertEquals(List.of(), tson.validate(written), written);
     }
 
@@ -105,7 +105,7 @@ class SelfDescribingWriteTest {
                 .describing(ID, "point")
                 .toTson(new Point(3, 4));
 
-        assertEquals(List.of("!!id:\"https://example.test/doc-1.tn\"", "!!schema:\"" + ID + "\""),
+        assertEquals(List.of("!!id:\"https://example.test/doc-1.tn\"", "!!import:\"" + ID + "\""),
                 List.of(document.split("\n")[0], document.split("\n")[1]));
     }
 

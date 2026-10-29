@@ -38,8 +38,9 @@ class FieldNameTypeTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema
             """;
 
     private static String schema(String id, String body) {
@@ -68,7 +69,7 @@ class FieldNameTypeTest {
     private static List<Diagnostic> read(String schemaText, String id, String body) {
         Tson tson = Tson.standard();
         tson.resolve(schemaText);
-        return tson.validate("!!schema:\"https://example.test/" + id + ".tn\"\n" + body);
+        return tson.validate("!!import:\"https://example.test/" + id + ".tn\"\n" + body);
     }
 
     /** A document's field names are judged by the record that reads them, not by the identifier default. */
@@ -154,11 +155,11 @@ class FieldNameTypeTest {
     void aRelaxedNameBindsThroughTheComponentThatStatesIt() {
         Tson tson = boundJsonLd();
         Node read = tson.objectReader().read("""
-                !!schema:"https://example.test/json-ld.tn"
+                !!import:"https://example.test/json-ld.tn"
                 !node { "@id": "urn:x"  "$ref": "#/a"  label: "x" }""", Node.class);
         assertEquals(new Node("urn:x", "#/a", "x"), read);
         assertEquals(new Node("urn:x", null, "x"), tson.objectReader().read("""
-                !!schema:"https://example.test/json-ld.tn"
+                !!import:"https://example.test/json-ld.tn"
                 !node { "@id": "urn:x"  label: "x" }""", Node.class));
     }
 

@@ -27,10 +27,10 @@ import java.util.function.BiConsumer;
  * like {@code {}} record/map disambiguation; everything here is reduction (event sequence -&gt;
  * tree), the streaming counterpart of a DOM builder sitting on top of a SAX/StAX reader.
  *
- * <p>Rejects schema documents (header containing {@code !!meta}) with {@link
- * TsonUnsupportedDocumentException} rather than attempting to parse them -- this is a Class 1
- * (data-format-only) processor (§1.5). The check is {@link #parseDocument()}'s own, on the {@link
- * DocumentStart} the stream hands it: the stream reads §2.2's header for everyone and judges nobody.
+ * <p>Rejects schema documents (a root tagged {@code !schema}) with {@link TsonUnsupportedDocumentException}
+ * rather than attempting to parse them -- this is a Class 1 (data-format-only) processor (§1.5). The check is
+ * {@link #parseDocument()}'s own, on the root's tag the stream finds past the header: the stream reads §2.2's header
+ * for everyone and judges nobody.
  *
  * <p><b>The sources it accepts acquire nothing</b> -- a {@code String} or an {@code InputStream}, whose
  * {@code ByteSource.close()} is a no-op -- so a parser holding its stream for its own lifetime releases
@@ -39,7 +39,7 @@ import java.util.function.BiConsumer;
  * <p><b>Not {@code final}, deliberately.</b> {@link TsonSchemaParser} (Part 2's schema-document
  * compiler, same package) extends this class to reuse the machinery [TSON-SCHEMA] itself says it
  * imports from [TSON-DATA] §7.4 -- {@code annotation}, {@code data-value}, directive parsing
- * (identical shape for {@code !!id}/{@code !!meta}/{@code !!import}), and the separator/adjacency
+ * (identical shape for {@code !!id}/{@code !!import}), and the separator/adjacency
  * primitives -- rather than re-implementing identical grammar a second time. Since the schema
  * grammar has its own token types this class's event stream never models (structural operators
  * like {@code ~ ^ & | ( ) < > ? ; -}), {@link TsonSchemaParser} cannot itself be event-driven for
@@ -99,7 +99,7 @@ public class TsonDataParser {
 
     /**
      * §2.2's header, as the stream's first event -- <b>the one place either parser reads it</b>.
-     * {@link TsonSchemaParser} takes its {@code !!id}/{@code !!meta} from here too, which is what leaves
+     * {@link TsonSchemaParser} takes its {@code !!id}/{@code !!import}s from here too, which is what leaves
      * one implementation of the header grammar rather than one per conformance class.
      *
      * <p>Reading it frames nothing: the stream pushes the root value's frames on the first demand for an
@@ -111,18 +111,32 @@ public class TsonDataParser {
     }
 
     /**
-     * <b>The refusal is here, not in the stream.</b> {@link TsonDataStream} opens a {@code !!meta} document
-     * like any other -- classifying one is §7.1's point, and {@link TsonSchemaParser} sits on that same
-     * stream and requires the directive this class refuses. So the header is read once, by the stream, and
-     * each parser applies its own conformance class to the result.
+     * <b>The refusal is here, not in the stream.</b> {@link TsonDataStream} opens a schema document like any
+     * other -- classifying one is §7.1's point, and {@link TsonSchemaParser} sits on that same stream and requires
+     * the root tag this class refuses. So the header is read once, by the stream, and each parser applies its own
+     * conformance class to the result.
      *
-     * <p>Refused on the first event, before the document's value is reduced: a schema document is not this
-     * parser's to parse, so parsing it and then complaining would be work done to reach a verdict already
-     * available.
+     * <p>Refused at the root's tag, before the root's value is reduced: a schema document is not this parser's to
+     * parse -- its sugar is no data grammar -- so parsing it and then complaining would be work done to reach a
+     * verdict already available.
      */
     public Document parseDocument() {
+        return parse(false);
+    }
+
+    /**
+     * Parses a <em>resolved form</em> ([TSON-SCHEMA] §8.1): a document whose root is tagged {@code !schema} and whose
+     * entries are written as values, so it reads as data. Nothing in such a document marks it resolved -- its header
+     * is its source's -- so it is the caller who says which it is, as §10.1's ingest does. Any other document parses
+     * exactly as {@link #parseDocument()} parses it.
+     */
+    public Document parseResolvedForm() {
+        return parse(true);
+    }
+
+    private Document parse(boolean resolvedForm) {
         DocumentStart start = documentStart();
-        if (start.isSchemaDocument()) {
+        if (!resolvedForm && DocumentStart.isSchemaTag(stream.rootTag())) {
             throw new TsonUnsupportedDocumentException(start.position());
         }
         List<TsonEvent> rest = new ArrayList<>();
@@ -131,7 +145,7 @@ public class TsonDataParser {
         }
         List<TsonEvent> rootEvents = rest.subList(0, rest.size() - 1); // trims the trailing DocumentEnd
         DataValue root = new EventReducer(rootEvents, positions::put).dataValue();
-        return new Document(start.id(), start.schema(), root);
+        return new Document(start.id(), start.imports(), root);
     }
 
     // ── Shared data-grammar entry points, reused by TsonSchemaParser ────────────────────

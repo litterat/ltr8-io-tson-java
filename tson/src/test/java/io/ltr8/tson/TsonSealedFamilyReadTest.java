@@ -24,9 +24,9 @@ class TsonSealedFamilyReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/pets.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               pet => abstract { pet_type: text =?  name: text }
               dog => pet & { pet_type?: = "dog"  breed: text }
               cat => pet & { pet_type?: = "cat"  indoor: boolean }
@@ -50,7 +50,7 @@ class TsonSealedFamilyReadTest {
     }
 
     private static List<Diagnostic> problems(String body) {
-        return tson().validate("!!schema:\"%s\"\n%s".formatted(ID, body));
+        return tson().validate("!!import:\"%s\"\n%s".formatted(ID, body));
     }
 
     private static String message(String body) {
@@ -123,7 +123,7 @@ class TsonSealedFamilyReadTest {
     @Test
     void aPinMatchesByValueWhenTheMemberIsDispatched() {
         assertEquals(List.of(), tson().validate(
-                "!!schema:\"%s\"\n!frame_holder { f: { opcode: 255  payload: hi  seq: 1 } }".formatted(ID)));
+                "!!import:\"%s\"\n!frame_holder { f: { opcode: 255  payload: hi  seq: 1 } }".formatted(ID)));
     }
 
     // ── SEALED: the tag can only assert ──────────────────────────────────

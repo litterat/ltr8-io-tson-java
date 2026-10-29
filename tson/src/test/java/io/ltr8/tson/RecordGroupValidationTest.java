@@ -20,9 +20,9 @@ class RecordGroupValidationTest {
     private static TsonTypeReader<?> contactReader() {
         String schema = """
                 !!id:"https://example.test/group-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   contact => {
                     name: text
                     ( email: text | phone: text )

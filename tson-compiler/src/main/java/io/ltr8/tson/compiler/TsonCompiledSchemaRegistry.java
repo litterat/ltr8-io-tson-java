@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.CountingReceiver;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
@@ -8,6 +9,13 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.tree.TsonValue;
 
+import io.ltr8.tson.schema.TsonSchema;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -109,6 +117,51 @@ public final class TsonCompiledSchemaRegistry {
             return null;
         }
         return compiledFor(identity, linked);
+    }
+
+    /**
+     * {@link #get(String, DiagnosticsReceiver)} for a read under several schemas, as a data document importing all of
+     * them is read ([TSON-DATA] §2.2): one namespace over their closures, with the collision rule a schema's imports
+     * are judged by ([TSON-SCHEMA] §2.2.3) -- a name two of them declare differently refuses the whole namespace.
+     * One import (in any number of spellings) is that schema's own compilation.
+     *
+     * <p>Several are linked as a schema of no entries of its own importing each of them, under an identity derived
+     * from theirs ({@link #closureIdentity}) that is never registered, and compiled once per set.
+     */
+    public TsonCompiledSchema get(List<String> imports, DiagnosticsReceiver receiver) {
+        List<String> identities = imports.stream().map(CanonicalIdentity::canonicalize).distinct().toList();
+        if (identities.size() == 1) {
+            return get(imports.getFirst(), receiver);
+        }
+        for (String uri : imports) {
+            // Each resolved on its own first: its pin verified, and every problem in it reported as for one import.
+            if (core.resolveLinked(uri, CanonicalIdentity.canonicalize(uri), receiver) == null) {
+                return null;
+            }
+        }
+        String identity = closureIdentity(identities);
+        TsonCompiledSchema cached = compiled.get(identity);
+        if (cached != null) {
+            return cached;
+        }
+        CountingReceiver counting = new CountingReceiver(receiver);
+        TsonLinkedSchema linked = TsonSchemaLinker.link(new TsonSchema(identity, imports, Map.of()),
+                core.schemaRegistry(), counting, core.identifierPolicy());
+        return counting.reported() ? null : compiledFor(identity, linked);
+    }
+
+    /**
+     * The identity a set of imports is linked under: a path-only identity ([TSON-DATA] §2.2.1) named by a digest of
+     * the canonical identities in header order, so one set always names one compilation.
+     */
+    private static String closureIdentity(List<String> identities) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(String.join("\n", identities).getBytes(StandardCharsets.UTF_8));
+            return "/imports/" + HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is required of every Java platform", e);
+        }
     }
 
     /**

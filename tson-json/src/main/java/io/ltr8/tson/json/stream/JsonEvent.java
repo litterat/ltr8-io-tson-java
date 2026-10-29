@@ -16,7 +16,7 @@ import io.ltr8.tson.json.JsonPosition;
  *
  * <p><b>There is no document-start event.</b> RFC 8259's {@code JSON-text} is one value and carries no
  * header, so there is nothing for one to hold -- the TSON counterpart exists only because a TSON
- * document opens with its {@code !!id}/{@code !!schema} directives. {@link EndOfDocument} does exist,
+ * document opens with its {@code !!id}/{@code !!import} directives. {@link EndOfDocument} does exist,
  * and is not merely {@code hasNext() == false}: producing it is what pulls past the root value and so
  * what rejects trailing content.
  *

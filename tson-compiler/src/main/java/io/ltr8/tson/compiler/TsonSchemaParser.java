@@ -139,12 +139,12 @@ public final class TsonSchemaParser extends TsonDataParser {
      * syntax error that is the real problem, and §8.1's error categories are per layer precisely so a layer's
      * verdict is not second-guessed by the next one. The surviving nodes exist only to keep parsing.
      *
-     * <p><b>Two failures are not recoverable and still throw.</b> A malformed <em>header</em> (a missing or
-     * ill-placed {@code !!meta}, a directive argument that isn't a URI) has no following construct to
-     * resynchronise on -- the schema map has not started. And a token that will not <em>lex</em> raises
-     * {@link io.ltr8.tson.compiler.lexer.LexException} from underneath this recovery, since resynchronising
-     * means reading the very tokens that don't exist; the lexer being fail-fast is the floor on how much of a
-     * broken document this can report ({@code STRUCTURED-OUTPUT.md} tracks it).
+     * <p><b>Two failures are not recoverable and still throw.</b> A malformed <em>header</em> (a retired or ill-placed
+     * directive, a directive argument that isn't a URI, a root not tagged {@code !schema}) has no following construct
+     * to resynchronise on -- the schema map has not started. And a token that will not <em>lex</em> raises {@link
+     * io.ltr8.tson.compiler.lexer.LexException} from underneath this recovery, since resynchronising means reading the
+     * very tokens that don't exist; the lexer being fail-fast is the floor on how much of a broken document this can
+     * report ({@code STRUCTURED-OUTPUT.md} tracks it).
      */
     public Optional<SchemaDocument> parseSchemaDocument(DiagnosticsReceiver receiver) {
         this.receiver = receiver;
@@ -174,35 +174,17 @@ public final class TsonSchemaParser extends TsonDataParser {
     private Optional<SchemaDocument> parseDocumentBody() {
         // §2.2's header comes off the stream's first event, exactly as a data document's does -- one
         // implementation of that grammar, not one per conformance class. What differs is the verdict, which
-        // is this parser's: [TSON-SCHEMA] §12.1 requires exactly one `!!meta` where §2.2 merely permits it.
+        // is this parser's: a schema document's root is tagged `!schema`, where a data document's need not be.
         DocumentStart start = documentStart();
         final Optional<String> id = start.id();
         id.ifPresent(value -> schemaId = canonicalIdOrAsWritten(value));
-
-        if (start.meta().isEmpty()) {
-            throw start.schema().isPresent()
-                    ? parseError("a schema document is governed by '!!meta', not '!!schema' (§12.1 requires "
-                            + "exactly one '!!meta', immediately after '!!id' if present)")
-                    : parseError("expected '!!meta' (a schema document requires exactly one, "
-                            + "immediately after '!!id' if present)");
-        }
-        String meta = start.meta().get();
-
-        List<String> imports = new ArrayList<>();
-        while (check(TokenType.DIRECTIVE) && "import".equals(peekDirectiveName())) {
-            imports.add(parseNamedDirective("import"));
-        }
-        if (check(TokenType.DIRECTIVE)) {
-            throw parseError("directive '!!" + peekDirectiveName() + "' is not permitted here "
-                    + "(expected '!!import' or the schema map's opening '{')");
-        }
 
         Optional<SchemaMap> body = parseSchemaMap();
 
         if (!check(TokenType.EOF)) {
             throw parseError("unexpected content after the schema map: " + describe(peek()));
         }
-        return body.map(map -> new SchemaDocument(id, meta, imports, map));
+        return body.map(map -> new SchemaDocument(id, start.imports(), map));
     }
 
     // ── Schema Map (§2.1, §12.1) ─────────────────────────────────────────
@@ -214,6 +196,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      */
     private Optional<SchemaMap> parseSchemaMap() {
         List<Annotation> annotations = parseAnnotationList();
+        expectSchemaTag();
         expect(TokenType.LBRACE, "a schema map's opening '{'");
         if (check(TokenType.RBRACE)) {
             throw parseError("a schema map requires at least one declaration; '{}' is not permitted here (§2.1)");
@@ -235,6 +218,26 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
         expect(TokenType.RBRACE, "a schema map's closing '}'");
         return declarations.isEmpty() ? Optional.empty() : Optional.of(new SchemaMap(annotations, declarations));
+    }
+
+    /**
+     * The root's {@code !schema} tag ([TSON-DATA] §2.2): what makes the document a schema. It names the pre-loaded
+     * kernel's {@code schema} whatever the document imports, so it is read here as a spelling, never looked up.
+     * A document without it is data, and handing one to a schema parser is a syntax error naming the rule.
+     */
+    private void expectSchemaTag() {
+        if (!check(TokenType.BANG)) {
+            throw parseError("a schema document's root is tagged '!" + DocumentStart.SCHEMA_TAG + "' "
+                    + "([TSON-DATA] §2.2); this document's root is not, which makes it a data document");
+        }
+        Token bang = advance();
+        Token name = peek();
+        if (name.type() != TokenType.UNQUOTED || !bang.end().equals(name.start())
+                || !DocumentStart.SCHEMA_TAG.equals(name.text())) {
+            throw parseError("a schema document's root is tagged '!" + DocumentStart.SCHEMA_TAG + "' "
+                    + "([TSON-DATA] §2.2), found '!' followed by " + describe(name));
+        }
+        advance();
     }
 
     /** Hands one recovered declaration's syntax error to {@link #receiver}, pointed at the declaration it was found in. */

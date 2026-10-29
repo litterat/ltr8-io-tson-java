@@ -56,9 +56,9 @@ class MetaLayerVocabularyTest {
     /** (1) The meta-layer schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !schema {
               operation => {
                 path:     text
                 method:   text
@@ -121,9 +121,9 @@ class MetaLayerVocabularyTest {
         String id = "https://example.test/api-" + label + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://example.test/meta-http.tn"
+                !!import:"https://example.test/meta-http.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   search_request  => { q: text }
                   search_response => { hits: [text] }
                   %s

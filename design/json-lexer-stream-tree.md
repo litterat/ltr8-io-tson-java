@@ -131,7 +131,7 @@ after `{` the next token is either `}` or a member name and consuming it decides
 because it does not draw the distinction. `peek()` holds back a produced event, not a token.
 
 **There is no document-start event.** `JSON-text` is one value and carries no header, so there is nothing for
-one to hold; the TSON counterpart exists only for `!!id`/`!!schema`. `EndOfDocument` does exist and is not
+one to hold; the TSON counterpart exists only for `!!id`/`!!import`. `EndOfDocument` does exist and is not
 merely `hasNext() == false` — **producing it is what pulls past the root value, and so what rejects trailing
 content**. `[1] 2` is refused there and nowhere else, the same trap the TSON facades keep under
 `requireDocumentEnd`.

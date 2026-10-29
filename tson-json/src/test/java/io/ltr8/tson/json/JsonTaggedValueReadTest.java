@@ -23,9 +23,9 @@ class JsonTaggedValueReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/tagged-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               person   => { name: text }
               employee => person & { department: text }
               robot    => { serial: text }
@@ -178,13 +178,33 @@ class JsonTaggedValueReadTest {
                 {"$value": {"name": "Ada"}}""").refusal().code());
     }
 
-    /** §3.3 makes `$schema` a resolver error at every value position. */
+    /** §3.3: `$import` stands at the top of the document alone, a resolver error at every value position. */
     @Test
-    void aSchemaMemberIsRefusedAtARecordPosition() {
-        Diagnostic refusal = read("person", """
-                {"$schema": "https://example.test/other.tn", "$type": "person", "name": "Ada"}""").refusal();
+    void anImportMemberIsRefusedAtARecordPosition() {
+        Diagnostic refusal = read("holder", """
+                {"who": {"$import": ["https://example.test/other.tn"], "$type": "person", "name": "Ada"}}""")
+                .refusal();
         assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, refusal.code());
-        assertEquals("/$schema", refusal.path().orElseThrow());
+        assertEquals("/who/$import", refusal.path().orElseThrow());
+        assertTrue(refusal.message().contains("'$import'"), refusal.message());
+    }
+
+    /** The refusal is the position's, whatever the member holds: no value position admits a binding at all. */
+    @Test
+    void anImportMemberIsRefusedWhateverItsValue() {
+        Diagnostic refusal = read("holder", """
+                {"who": {"$import": "https://example.test/other.tn", "name": "Ada"}}""").refusal();
+        assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, refusal.code());
+        assertEquals("/who/$import", refusal.path().orElseThrow());
+    }
+
+    /** §3.3: `$import` leads where it stands at all, so one after `$type` is refused as out of place too. */
+    @Test
+    void anImportMemberAfterTheTypeIsRefused() {
+        Diagnostic refusal = read("person", """
+                {"$type": "person", "$import": ["https://example.test/other.tn"], "name": "Ada"}""").refusal();
+        assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, refusal.code());
+        assertEquals("/$import", refusal.path().orElseThrow());
     }
 
     /** §3.2: at a map position every member name is an ordinary key, the three included. */

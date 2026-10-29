@@ -54,7 +54,7 @@ class MultiErrorCollectionTest {
                 Map.entry("tag", RecordField.required(TypeRef.of("integer"))),
                 Map.entry("items", RecordField.required(TypeRef.of("numbers"))))));
         TsonSchema schema = new TsonSchema("https://example.test/multi-error.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         String dataSource = """

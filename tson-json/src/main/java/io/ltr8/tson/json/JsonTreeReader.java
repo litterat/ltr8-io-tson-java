@@ -88,8 +88,10 @@ public final class JsonTreeReader {
      *
      * <p>[TSON-JSON] §3.4's <b>out-of-band route</b>, which the spec calls "the expected production route":
      * the application supplies the schema and the root type, and the document is then a bare value read
-     * directly at that type. A JSON document has no in-band channel for either -- {@code !!schema} is TSON
-     * text syntax -- so this is where the binding a TSON document carries in its own header comes from.
+     * directly at that type. §3.4's in-band route -- a root annotation object led by {@code $import} and
+     * {@code $type}, the JSON spelling of a TSON document's {@code !!import}s and root annotation -- is not read
+     * yet: a root led by {@code $import} is declined as {@code NOT_IMPLEMENTED} ({@code InBandBinding}), so this is
+     * where the binding comes from.
      *
      * <p>The schema is not resolved here: {@link #readAs} reaches for it, so a schema nothing would supply
      * is a diagnostic on the read that needed it rather than an exception from the derivation that named it.
@@ -226,6 +228,9 @@ public final class JsonTreeReader {
             // holds the position, so it knows which member names are field names ([TSON-JSON] §9.4).
             JsonReadContext ctx = JsonReadContext.of(events, receiver, policy.identifierPolicy());
             ctx = schema.rootDeclaration(rootType).map(ctx::underDeclaration).orElse(ctx);
+            if (InBandBinding.declines(ctx)) {
+                return null;
+            }
             JsonValue root = (JsonValue) reader.read(ctx);
             if (!(events.next() instanceof JsonEvent.EndOfDocument)) {
                 throw new IllegalStateException("the stream produced events after the document's root value");

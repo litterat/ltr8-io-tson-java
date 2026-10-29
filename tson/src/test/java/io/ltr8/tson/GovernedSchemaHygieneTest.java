@@ -39,9 +39,9 @@ class GovernedSchemaHygieneTest {
     private static final String META_ID = "https://example.test/2026/39/iface-meta-1.tn";
     private static final String META = """
             !!id:"https://example.test/2026/39/iface-meta-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !schema {
               method_name => identifier
               iface       => { methods: {method_name => text} }
               ifaces      => namespace & { key_type: = identifier  value_type: = iface }
@@ -51,9 +51,9 @@ class GovernedSchemaHygieneTest {
     private static final String DATA_ID = "https://example.test/2026/39/iface-data-1.tn";
     private static final String DATA_SCHEMA = """
             !!id:"https://example.test/2026/39/iface-data-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               slug  => !identifier_type { continue_add: "-" }
               method_name => slug
               iface       => { methods: {method_name => text} }
@@ -87,8 +87,8 @@ class GovernedSchemaHygieneTest {
     private static String governed(String annotation, String methods) {
         return """
                 !!id:"https://example.test/2026/39/orders-1.tn"
-                !!meta:"%s"
-                {
+                !!import:"%s"
+                !schema {
                   apis => %s!ifaces { orders => { methods: { %s } } }
                 }""".formatted(META_ID, annotation, methods);
     }
@@ -97,7 +97,7 @@ class GovernedSchemaHygieneTest {
     @Test
     void inADataDocumentTheKeysAreNames() {
         Tson tson = tson();
-        String head = "!!schema:\"" + DATA_ID + "\"\n";
+        String head = "!!import:\"" + DATA_ID + "\"\n";
 
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES),
                 codes(tson.validate(head + "!iface { methods: { pass => a  " + CYRILLIC_PASS + " => b } }")));

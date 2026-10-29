@@ -1,18 +1,16 @@
 !!id:"https://tson.io/2026/39/m/core-resolved.tn"
-!!schema:"https://tson.io/2026/39/m/meta.tn"
+!!import:"https://tson.io/2026/39/m/meta.tn"
 @doc:"""
   Resolver-output fixture for core.tn (2026 Revision 39 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-kernel-resolved.tn.
 
-  This document is governed by the meta-schema: the structural
-  vocabulary (`schema`, `record`, `enum`, ...) reaches it
-  through meta's kernel import. As a data document, this header
-  cannot carry `!!import`: the namespace in which this map's
-  type-name tokens resolve (core.tn's locals and the closure of
-  meta.tn, which core imports) is declared by the source schema's
-  header and supplied at ingest ([TSON-SCHEMA] Section 8.1), never
-  by this document. The annotation types used here (`ordering`,
+  Its header is its source's: it imports meta.tn, through which the
+  structural vocabulary (`record`, `enum`, ...) and the kernel reach
+  it. Nothing in the document marks it resolved; a processor reads
+  it as a resolved form because its caller says so ([TSON-SCHEMA]
+  Section 8.1). Its type-name tokens resolve in core.tn's locals and
+  the closure of meta.tn. The annotation types used here (`ordering`,
   `bounded`, `exact`, `numeric`) are meta's. Constructor names at entries' tags
   (`integer_type`, `decimal_type`, `float_type`, `complex_type`, ...)
   likewise name meta- and kernel-level entries.

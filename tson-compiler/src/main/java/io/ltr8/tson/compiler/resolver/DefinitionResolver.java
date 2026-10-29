@@ -140,7 +140,7 @@ import java.util.function.Predicate;
  * MUST NOT change its pinned value, and {@link #resolveTighteningField} does not compare the two.
  *
  * <p>Declarations resolve in one namespace per schema (§3.3.1, SPEC-FEEDBACK.md #7): the schema's own entries and its
- * import closure, the {@code !!meta} target among the imports. It reaches this class as two getters over that one
+ * import closure. It reaches this class as two getters over that one
  * namespace, required constructor parameters fixed for as long as this resolver is used:
  * <ul>
  *   <li>{@code namespaceDefinitions} -- the whole namespace, consulted by composition's supertype lookup
@@ -189,7 +189,7 @@ import java.util.function.Predicate;
  *
  * <p>Package-private, no {@code Tson} prefix -- internal machinery a consumer of this library never names.
  * {@link SchemaResolver} is the document-level counterpart: it validates a document's header directives,
- * merges the {@code !!meta} target's and every {@code !!import}'s entries, and holds one instance of this class to
+ * merges every {@code !!import}'s entries, and holds one instance of this class to
  * do the per-declaration work. This class takes a bare declaration and never sees a {@code SchemaDocument}.
  *
  * <p>Has no dependency on {@code reader} -- binding goes through {@link DefinitionMetaReader} (a required
@@ -467,8 +467,8 @@ final class DefinitionResolver {
      */
     private static SchemaValidationException unresolvedAnnotation(String declaration, String annotationName) {
         return new SchemaValidationException("'" + declaration + "': '@" + annotationName + "' does not name "
-                + "a type in this schema's namespace -- its own entries and every entry its !!meta target and its "
-                + "!!imports bring in (§3.3.3)");
+                + "a type in this schema's namespace -- its own entries and every entry its !!imports bring in "
+                + "(§3.3.3)");
     }
 
     /**
@@ -1117,8 +1117,7 @@ final class DefinitionResolver {
                 throw notYetReadable(name, "'!" + target + "' applies a constructor");
             }
             throw new SchemaValidationException("'" + name + "': '!" + target + "' names no entry of this "
-                    + "schema's namespace -- its own entries and every entry its !!meta target and its !!imports "
-                    + "bring in (§3.3.1)");
+                    + "schema's namespace -- its own entries and every entry its !!imports bring in (§3.3.1)");
         }
         String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
         Top atEnd = metaDefinitions.definition(terminal);

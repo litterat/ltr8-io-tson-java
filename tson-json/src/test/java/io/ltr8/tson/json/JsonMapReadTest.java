@@ -23,9 +23,9 @@ class JsonMapReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/maps-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               counts    => { text => int32 }
               by_date   => { date => number }
               by_number => { number => text }
@@ -88,8 +88,8 @@ class JsonMapReadTest {
     @Test
     void aDollarInitialMemberIsAnOrdinaryKey() {
         assertEquals("""
-                {"$schema":1}""", read("counts", """
-                {"$schema": 1}""").accepted().toString());
+                {"$import":1}""", read("counts", """
+                {"$import": 1}""").accepted().toString());
     }
 
     /**

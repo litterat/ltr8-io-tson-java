@@ -42,7 +42,7 @@ class RecordTreeReaderTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry);
         entries.put("point", RecordBody.of(RecordBody.fieldMap(valueField)));
-        return new TsonLinkedSchema(new TsonSchema("test-schema", "test-meta", List.of(), entries));
+        return new TsonLinkedSchema(new TsonSchema("test-schema", List.of(), entries));
     }
 
     private static Top atomEntry(IntegerType body) {

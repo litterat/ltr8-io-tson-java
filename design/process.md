@@ -43,8 +43,8 @@ from them — an entry's kind through `EntryKind.of`, a choice's disjointness, a
 **Changing a bundled schema means re-stamping every digest downstream of it, bottom-up**, moving the matching
 `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the
 published values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in
-dependency order, plus the getting-started example, which pins meta and core and so has a digest of its own
-that moves with them; `--check` reports staleness and writes nothing. **The digests are not a test-only
+dependency order, plus the getting-started example, which pins core and so has a digest of its own
+that moves with it; `--check` reports staleness and writes nothing. **The digests are not a test-only
 concern**: the library verifies the packaged bytes against `TsonBundledSchemas`' held digest on every load, so
 one stale constant fails `Tson.standard()` and with it most of the suite. Restamping after each edit is what
 lets a schema change land across several commits with the integrity checks left on.
@@ -57,7 +57,9 @@ and every schema-map key must carry the same annotations (`@ordering`, `@bounded
 docs out, since it exists to be compared and a summary of a source doc only drifts from it. **Key annotations
 are compared from the parsed text**, never through the bound document, which drops them, so both sides would
 carry none and agree for the wrong reason. They are the only external statement of what a conforming resolver
-produces. Keep them in step with the `.tn` beside them.
+produces. Keep them in step with the `.tn` beside them. A fixture's header is its source's and its root is
+`!schema`; nothing marks it resolved, so `ResolvedFixtureTest` reads it as one (`parseResolvedForm()`, or
+`withImports(imports).readAs(text, "schema")`), the kernel's form, which imports nothing, under the pre-loaded kernel.
 
 ### Writing the bundled schemas' docs
 
@@ -81,7 +83,7 @@ the schemas ship in the library and are read as the normative vocabulary, so an 
   `"""` block indented as the file does. Doc text is filled to **80 columns, indentation included**; a backtick code
   span is never split across lines, and preformatted text (a grammar, the References table, indented examples)
   keeps its own layout. A member-set entry says whose members it holds ("The members of an integer_type.").
-- **File headers** keep what the file is, how it is reached through `!!meta` and `!!import`, what it contains, rules
+- **File headers** keep what the file is, how it is reached through `!!import`, what it contains, rules
   shared by several entries, and the hash-pin note.
 - **Shortening a rule never changes it.** Where tighter wording could strengthen or weaken it, the sentence stays
   verbatim. A doc that contradicts its declaration or another doc is reported, never silently reconciled.

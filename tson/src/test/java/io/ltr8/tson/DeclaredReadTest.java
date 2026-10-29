@@ -30,9 +30,9 @@ class DeclaredReadTest {
     private static final Map<String, String> SCHEMAS = Map.of(
             HOST, """
                     !!id:"https://example.test/declared-host.tn"
-                    !!meta:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
                     !!import:"https://tson.io/2026/39/m/core.tn"
-                    {
+                    !schema {
                       note     => { body: text }
                       memo     => { body: text  urgent: boolean }
                       envelope => { local: declared }
@@ -42,9 +42,9 @@ class DeclaredReadTest {
                     """,
             OTHER, """
                     !!id:"https://example.test/declared-other.tn"
-                    !!meta:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
                     !!import:"https://tson.io/2026/39/m/core.tn"
-                    {
+                    !schema {
                       claim => { id: text  amount: int32 }
                     }
                     """);
@@ -63,11 +63,11 @@ class DeclaredReadTest {
     }
 
     private static TsonValue read(String data) {
-        return tson().treeReader().withSchema(HOST).read("!!schema:\"" + HOST + "\"\n" + data);
+        return tson().treeReader().withSchema(HOST).read("!!import:\"" + HOST + "\"\n" + data);
     }
 
     private static List<Diagnostic> problems(String data) {
-        return tson().validate("!!schema:\"" + HOST + "\"\n" + data);
+        return tson().validate("!!import:\"" + HOST + "\"\n" + data);
     }
 
     /**
@@ -132,8 +132,8 @@ class DeclaredReadTest {
     @Test
     void aSchemaDirectiveAtAValuePositionIsAParseError() {
         for (String data : List.of(
-                "!envelope { local: !!schema:\"" + OTHER + "\" !claim { id: a  amount: 1 } }",
-                "!closed { n: !!schema:\"" + OTHER + "\" 1 }")) {
+                "!envelope { local: !!import:\"" + OTHER + "\" !claim { id: a  amount: 1 } }",
+                "!closed { n: !!import:\"" + OTHER + "\" 1 }")) {
             List<Diagnostic> problems = problems(data);
 
             assertEquals(1, problems.size(), problems::toString);
@@ -150,6 +150,6 @@ class DeclaredReadTest {
         String written = new TsonTreeWriter().toTson(read("!envelope { local: !memo { body: b  urgent: true } }"));
 
         assertTrue(written.contains("!memo"), written);
-        assertEquals(List.of(), tson().validate("!!schema:\"" + HOST + "\"\n" + written), written);
+        assertEquals(List.of(), tson().validate("!!import:\"" + HOST + "\"\n" + written), written);
     }
 }

@@ -57,11 +57,10 @@ including records, record groups, enums and some in-built types. The `2026/39` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=ae88c4d935531cd50b9cbbf9a384f9b2b9a0576f7a6f0baf0dedc6a818bd2412"
-!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=ac38ef086a93dcea7c58a0e3bce4e74c5e1f2fbb40801c1194ed763f2d37d5cf"
+!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=7a2686013936632f53fa876184988a9f7edd1a8d6da4860f8001aae4d26b00e6"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=7893c2f71d61a7c0933b38f9bf8c1176c3ae7ae5c6ac3a43bdeb02eeb7a1a6e4"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
-{
+!schema {
   role => !enum [admin member guest]
 
   address => {
@@ -84,19 +83,22 @@ URIs is the draft year/revision marker from the spec's release scheme.
 }
 ```
 
+The root's `!schema` tag is what makes this a schema document; `!!import` brings in the standard library,
+`core.tn`, and with it everything `core.tn` imports.
+
 Every reference is *hash-pinned*. The `?sha256=…` on `!!id` is the schema's own content digest — its
-identity is the URL, but its integrity is the hash, so this file *is* content-addressed. The digests
-on `!!meta` and `!!import` pin the exact standard-library versions this schema was written against;
-if a fetched `meta.tn`/`core.tn` doesn't hash to those, `validate`/`compile` refuse it rather than
+identity is the URL, but its integrity is the hash, so this file *is* content-addressed. The digest
+on `!!import` pins the exact standard-library version this schema was written against;
+if a fetched `core.tn` doesn't hash to it, `validate`/`compile` refuse it rather than
 resolve against something subtly different. Run `tson hash person.tn` any time to (re)compute the
 content digest and stamp it onto `!!id` — the id line itself is excluded from the hash, so re-stamping
 is stable. (Pinning is optional: drop the `?sha256=…` and a reference resolves by identity alone.)
 
 And here's a corresponding `person-data.tn` *data* document. It's *self-describing*: the
-`!!schema` header names the schema it conforms to, and the leading `!person` says which type:
+`!!import` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!schema:"https://example.com/2026/39/getting-started/person.tn"
+!!import:"https://example.com/2026/39/getting-started/person.tn"
 !person {
   id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
   name: "Ada Lovelace"
@@ -113,7 +115,7 @@ And here's a corresponding `person-data.tn` *data* document. It's *self-describi
 }
 ```
 
-**`tson validate`** takes the files and validates the data. You pass both files; the data's `!!schema`
+**`tson validate`** takes the files and validates the data. You pass both files; the data's `!!import`
 selects `person.tn` (by its `!!id`) and its root `!person` selects the type.
 
 ```
@@ -164,10 +166,10 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 |---|---|---|---|
 | a data document + your Java class | it bound (validated if it self-describes) | **`tson.objectReader()`** | your object |
 | a data document | a queryable tree (validated if it self-describes) | **`tson.treeReader()`** | a `TsonValue` tree |
-| a data document + a schema you hold | it validated as a named type | **`.withSchema(uri).readAs(…)`** on either reader | a tree / your object |
+| a data document + a schema you hold | it validated as a named type | **`.withSchema(uri).readAs(…)`** (or `.withImports(uris)`) on either reader | a tree / your object |
 | a Java object | it as TSON text | **`tson.objectWriter()`** | a `String`, or written to a sink |
 | a `TsonValue` tree | it as TSON text | **`tson.treeWriter()`** | a `String`, or written to a sink |
-| either of those | it self-describing (`!!schema` + root type) | **`.describing(…)`** on either writer | a document that reads back on its own |
+| either of those | it self-describing (`!!import` + root type) | **`.describing(…)`** on either writer | a document that reads back on its own |
 | a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
 | a *schema* document | every problem with the schema itself | **`tson.validateSchema()`** | a `List<Diagnostic>` |
 | a data document | the value **and** every problem | **`.withDiagnostics(…)`** on either facade reader | the value + a `List<Diagnostic>` |
@@ -178,13 +180,15 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 
 `tson.treeReader()` / `tson.objectReader()` and their writer peers `tson.objectWriter()` /
 `tson.treeWriter()` are the facade doors on a built `Tson`: the readers take a *self-describing* document
-and validate it against its own `!!schema` as they read, falling back to a schemaless read when it
-declares none — the object form also checking your target class against the schema's root type up front.
-`readWithoutSchema(…)` opts a reader back out to a pure schemaless read. When your *data* isn't
-self-describing but you hold the schema out of band, `withSchema(uri).readAs(source, type)` supplies what
-the document didn't say. All of these stream their input — a large document is never fully buffered before
-reading begins — and take a `String`, an `InputStream` or any `ByteSource` (a `byte[]`, a `ByteBuffer`, a
-`Path`, a mapped file), where bytes already in memory are read without a copy. The writers mirror that:
+and validate it against the schemas its `!!import`s name as they read (several read as one namespace),
+falling back to a schemaless read when it imports none — the object form also checking your target class
+against the schema's root type up front. `readWithoutSchema(…)` opts a reader back out to a pure schemaless
+read. When your *data* isn't self-describing but you hold the schema out of band,
+`withSchema(uri).readAs(source, type)` (or `withImports(uris)` for several) supplies what the document didn't
+say. A *schema* document — one whose root is tagged `!schema` — is reported as unsupported by every read but
+`readAs`; `tson.validateSchema()` is its door. All of these stream their input — a large document is never
+fully buffered before reading begins — and take a `String`, an `InputStream` or any `ByteSource` (a `byte[]`,
+a `ByteBuffer`, a `Path`, a mapped file), where bytes already in memory are read without a copy. The writers mirror that:
 `write(value, out)` takes an `OutputStream`, any `ByteSink` (a `ByteBuffer`, a channel, a file) or any
 `Appendable`, and emits as it goes, with `toTson(…)` the same call over a buffer. The byte targets encode
 UTF-8 here rather than through an `OutputStreamWriter`, so an unpaired surrogate is refused rather than
@@ -199,7 +203,7 @@ schemaless bind into a sealed hierarchy needs. Add `preservingUnknownTypeRefs()`
 through uninterpreted: reading the raw wire of a document whose schema you're deliberately ignoring, or
 round-tripping a tree back out through `tson.treeWriter()`.
 
-**These two readers are the whole document-reading surface.** They own the `!!schema` decision, the
+**These two readers are the whole document-reading surface.** They own the `!!import` decision, the
 target-class check, and the framing that rejects trailing content. `tson.treeRegistry()`/`bindRegistry()`
 and the `TsonTypeReader` they hand back for a named type are the layer underneath — useful for compiling a
 schema once and inspecting it, but `TsonTypeReader` is a strict single-method interface (`T
@@ -207,7 +211,7 @@ read(TsonReadContext ctx)`) that reads *one value at a cursor* and polices nothi
 
 **No `Tson`?** The reader and writer classes construct directly for lightweight, schemaless (Class 1) use
 with no standard-library bootstrap — `new TsonTreeReader()`, `new TsonObjectReader()`, `new
-TsonObjectWriter()`, `new TsonTreeWriter()` — where a directly-built reader ignores any `!!schema` and
+TsonObjectWriter()`, `new TsonTreeWriter()` — where a directly-built reader ignores any `!!import` and
 binds to the wire, or your Java class, alone (Jackson-style). That's what the examples below do.
 `TsonDataParser` and `TsonDataStream` are always standalone and schemaless.
 
@@ -270,7 +274,7 @@ for (Diagnostic d : problems.diagnostics()) {
 ```
 
 A receiver sees **every** problem with the document — a value the schema rejects, an unresolvable
-`!!schema`, and a document that will not lex or parse — so a collecting read never throws for a bad
+`!!import`, and a document that will not lex or parse — so a collecting read never throws for a bad
 document. Only a fault in the library throws past it. (Fail-fast reads still throw at the first problem;
 for a base-syntax failure that is a `ReadException` carrying the diagnostic, position included.)
 
@@ -358,9 +362,8 @@ Tson tson = Tson.standard();
 
 String schema = """
         !!id:"https://example.com/2026/39/app/server-1.tn"
-        !!meta:"https://tson.io/2026/39/m/meta.tn"
         !!import:"https://tson.io/2026/39/m/core.tn"
-        {
+        !schema {
             server => { hostname: text  port: int32 }
         }""";
 
@@ -374,8 +377,9 @@ value.get("hostname").asString();          // Optional[web-01] — validated aga
 value.get("port").asInt();                 // OptionalInt[8080] — a bad port would surface as a diagnostic
 ```
 
-You supply exactly what a `!!schema` directive and a root type-ref would have said, and the validation is
-identical either way. `tson.objectReader().withSchema(…).readAs(source, "server", Server.class)` is the
+You supply exactly what an `!!import` directive and a root type-ref would have said, and the validation is
+identical either way; `withImports(List.of(…))` reads under several schemas at once, as a document importing
+each would be read. `tson.objectReader().withSchema(…).readAs(source, "server", Server.class)` is the
 object-binding twin, and both compose with `withDiagnostics(…)` to collect instead of throwing.
 
 ▶ Runnable: [`examples/SchemaValidation.java`](examples/SchemaValidation.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java` (also shows collecting a diagnostic)
@@ -383,16 +387,17 @@ object-binding twin, and both compose with `withDiagnostics(…)` to collect ins
 **Bind mode** (`TsonSchemaCompiler.bind(dataBindContext)`) produces bound Java objects the same way
 `TsonObjectReader` does, but with the TSON schema — not your Java class — as the source of truth. The
 full multi-stage pipeline behind this (parse → resolve → link → register → compile → read), and how a
-schema governed by meta.tn/core.tn is assembled, is described under [Schema pipeline](#schema-pipeline)
+schema importing core.tn is assembled, is described under [Schema pipeline](#schema-pipeline)
 below.
 
 ### 5. Read a self-describing document — `tson.treeReader()`
 
 Sections 1–4 make *you* choose the reader; this one lets the **document** choose. A schema-aware
 `TsonTreeReader` (or `TsonObjectReader`), obtained from a configured `Tson` facade rather than
-constructed directly, reads a document that declares its own `!!schema`, resolves that schema through
+constructed directly, reads a document that names its schema with `!!import`, resolves that schema through
 your `SchemaAccess`, and validates against it — falling back to a schemaless read when the document
-declares none. It's the value-returning peer of `tson.validate`:
+imports none. Several `!!import`s are read as one namespace over their closures, so the root's type may
+come from any of them. It's the value-returning peer of `tson.validate`:
 
 ```java
 Tson tson = Tson.of(ProcessorConfig.defaults()
@@ -403,10 +408,10 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
-        !!schema:"https://example.com/2026/39/app/server-1.tn"
+        !!import:"https://example.com/2026/39/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
-// No !!schema? The same reader reads schemalessly, straight off the wire.
+// No !!import? The same reader reads schemalessly, straight off the wire.
 TsonValue raw = tson.treeReader().read("{ hostname: \"db-01\"  port: 5432 }");
 ```
 
@@ -419,20 +424,22 @@ one back out to a pure schemaless read.
 ### 6. Read the header first, then the body — `tson.begin`
 
 Sometimes the routing decision comes *before* the read: which schema version governs this body, is this
-upload a schema document or a data one, which handler gets it. [TSON-DATA] §7.1 is explicit that
-classification "requires at most two directives of lookahead and no value parsing, so streams, previews,
-and content sniffers can classify a document from its opening bytes" — `begin` is that door. It reads
-`!!id` and `!!schema` (or `!!meta`, which means the document is a *schema* document) and stops before the
-value:
+upload a schema document or a data one, which handler gets it. [TSON-DATA] §7.1 lets streams, previews
+and content sniffers classify a document from its opening bytes — `begin` is that door. It reads the
+header (`!!id`, then any `!!import`s) and the root's tag — a root tagged `!schema` is a *schema* document —
+and stops before the root's value:
 
 ```java
 TsonDocumentPeek peek = tson.begin(text);                     // or an InputStream
-if (peek.isSchemaDocument()) { … }                            // it carries !!meta
-String schemaUri = peek.header().schema().orElse(DEFAULT);    // route on what it names
+if (peek.isSchemaDocument()) { … }                            // its root is tagged !schema
+List<String> imports = peek.header().imports();               // route on what it names
 ```
 
+To reach the tag it reads past the root's leading annotations, so a schema's document-level `@doc` is the
+one value a classification parses; the root's value itself never is.
+
 It is **total**: a header it cannot read yields nothing rather than throwing, and what it never does is
-answer with a schema the document does not name — a `!!schema` anywhere but the header is a parse error,
+answer with a schema the document does not name — an `!!import` anywhere but the header is a parse error,
 which the read that follows reports along with whatever else is wrong with the document.
 
 **The peek keeps the rest of the document**, so nothing is rewound and nothing is re-read — which is what
@@ -492,14 +499,14 @@ which is what makes a TSON response body self-describing in both directions:
 
 ```java
 String body = tson.objectWriter().describing(schemaUri, "person").toTson(person);
-// !!schema:"https://example.com/person.tn"
+// !!import:"https://example.com/person.tn"
 // !person { name: "Ada" age: 36 }
 
 tson.validate(body);            // [] — resolves the schema and the type from the bytes alone
 ```
 
-A bound object carries neither fact, so the object writer takes both: `!!schema` alone would produce a
-document whose reader answers *"declares a !!schema but has no root type-ref to select a type"*. A
+A bound object carries neither fact, so the object writer takes both: `!!import` alone would produce a
+document whose reader answers *"data imports a schema but has no root type-ref … to select a type"*. A
 `TsonValue` already knows its own type, so `treeWriter().describing(schemaUri)` takes just the URI.
 `identifiedBy(documentId)` adds `!!id`. All three are derivations — the writer you called them on is
 unchanged, and a writer that was not asked for a header still writes a bare value.
@@ -529,8 +536,8 @@ dedicated docs rather than crowding this page:
 
 The [reader table](#reading-and-writing-tson-choosing-an-entry-point) above binds data against a plain Java class
 with no schema involved — that's Class 1 (§1.5), TSON's schemaless mode. Part 2 layers a schema
-*system* on top: a governing document that declares types, which a data document can then be validated
-against. Turning schema source text into something a data reader can actually use goes through a
+*system* on top: a schema document — root tagged `!schema` — declares types, which a data document importing it
+can then be validated against. Turning schema source text into something a data reader can actually use goes through a
 handful of well-defined stages, each with its own class, deliberately named after standard compiler
 vocabulary — parse → resolve → link → register → compile → read:
 
@@ -552,7 +559,7 @@ vocabulary — parse → resolve → link → register → compile → read:
    remember to check.
 5. **Register** (`TsonSchemaRegistry`) — stores a linked schema under its own canonical `!!id` (only
    ever accepts a `TsonLinkedSchema` — there's no way to register something that skipped linking), so a
-   later schema can find it via its own `!!import`/`!!meta`. Once registered, a schema is locked: never
+   later schema can find it via its own `!!import`. Once registered, a schema is locked: never
    mutated or removed.
 6. **Compile** (`TsonSchemaCompiler`) — turns a registered schema's `Map<String, Top>` into
    a `TsonCompiledSchema`: real Java object references between per-type parsers rather than further
@@ -565,22 +572,23 @@ vocabulary — parse → resolve → link → register → compile → read:
 whose `resolve`/`compile` run the pipeline for you (as shown in the [reader table](#reading-and-writing-tson-choosing-an-entry-point)'s
 schema example) — so you rarely touch the individual stages directly. Under the hood, resolving a schema
 reads each constructor it applies (`!enum`, `!integer_type`) through the compiled form of the schema in its
-import closure that declares it — its `!!meta` target counting as an import — including meta-kernel itself,
-whose own `!!meta` names *itself*
-(§1.5's "one deliberate circularity in the series"), closed by pre-loading a hand-written bootstrap
-(`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way. See
+import closure that declares it. Every name a schema writes resolves in that one namespace — its own entries
+and its imports, transitively — and every name of the kernel reaches it only by import (core.tn imports
+meta.tn, which imports meta-kernel). The kernel itself imports nothing and applies only its own
+constructors, a cycle closed by pre-loading a hand-written bootstrap (`MetaKernelBootstrapResolver`) rather
+than resolving it from a document. See
 [design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
 including how meta-kernel/meta.tn/core.tn are loaded and registered together.
 
-There's no polished, single-call "load a *custom* governing chain" entry point yet (see
-[BACKLOG.md](BACKLOG.md)) — `Tson` today assumes a schema governed by the standard
-meta-kernel/meta.tn/core.tn library.
+A layer of your own — a schema declaring constructors or namespace types for others to apply — is a schema like
+any other, reached by `!!import` through the configured `SchemaAccess`; the records its namespace types hold bind
+through `ProcessorConfig.withMetaNameBinder`.
 
 ## Command-line interface
 
 The `tson-cli` module is a small, zero-dependency CLI (ajv-cli-style) for checking TSON from the shell —
 no Java to write. Four commands: **`init-example`** scaffolds an example schema + data file to start
-from, **`validate`** checks data files (each against the schema its own `!!schema` names, or
+from, **`validate`** checks data files (each against the schemas its own `!!import`s name, or
 schemalessly), **`compile`** checks that a
 schema document itself resolves and compiles cleanly, and **`policy`** prints what this build would judge a
 document by — the Unicode name/value policy and the resource limits, the two things that can make the same
@@ -673,7 +681,7 @@ are ordinary characters in a value, so a token policy has no unit at all. The fl
 **`tson hash`** computes a document's content hash ([TSON-DATA] §2.2.1 — SHA-256 of every byte after
 the `!!id` line) and stamps it onto the `!!id` as `?sha256=<hex>`, in place. Requires an `!!id`; the id
 line is excluded from the hash, so a document can carry its own. A pinned reference is then verified on
-use: if a data file's `!!schema` (or a schema's `!!import`/`!!meta`) carries `?sha256=…`, `validate`
+use: if an `!!import` (a data file's or a schema's) carries `?sha256=…`, `validate`
 hashes the referenced content and errors on a mismatch (the pin is matched by canonical identity, so a
 pinned reference and a plain one still resolve to the same schema).
 
@@ -685,10 +693,10 @@ whitespace collapsed; other annotations and other references stay. `--keep-docs`
 `@examples`, for a model that should read the documentation too; `@comment`, a note for maintainers, still goes.
 The output is valid syntax but not loadable, so the file is never rewritten.
 
-**`validate` takes a flat list of files** and auto-classifies each as a schema (its header carries
-`!!meta`) or a data document. A data file's own `!!schema` directive selects which schema it's
+**`validate` takes a flat list of files** and auto-classifies each as a schema (its root is tagged
+`!schema`) or a data document. A data file's own `!!import` directives select which schemas it's
 validated against and its root type-ref (`!person`) selects the type — the schema files are just made
-available, so order doesn't matter and you can pass several of each. A data file with **no `!!schema`**
+available, so order doesn't matter and you can pass several of each. A data file with **no `!!import`**
 is checked *schemalessly*: base syntax plus any built-in type (`!uuid`/`!int32`/`!date`/…), with a
 non-built-in type-ref reported as unknown.
 
@@ -696,7 +704,7 @@ non-built-in type-ref reported as unknown.
 rather than writing a temp file per attempt:
 
 ```
-$ printf '!!schema:"…/person-1.tn"\n!person { name: "Ada" age: 30 }\n' | tson validate person.tn -
+$ printf '!!import:"…/person-1.tn"\n!person { name: "Ada" age: 30 }\n' | tson validate person.tn -
 OK
 ```
 
@@ -708,18 +716,17 @@ For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
 !!id:"https://example.com/2026/39/app/person-1.tn"
-!!meta:"https://tson.io/2026/39/m/meta.tn"
 !!import:"https://tson.io/2026/39/m/core.tn"
-{
+!schema {
     person => { name: text  age: int32 }
 }
 ```
 
 ```
-$ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !person { name: "Ada" age: 30 }
+$ tson validate person.tn ada.tn      # ada.tn = !!import:"…/person-1.tn" !person { name: "Ada" age: 30 }
 OK
 
-$ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
+$ tson validate --output json person.tn bad.tn   # bad.tn = !!import:"…/person-1.tn" !person { age: 30 }
 {"outcome":"REJECTED","policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
   "skeleton_distinctness":true,"permitting":[]},"token_policy":{"level":"UNRESTRICTED","permitting":[]},
   "unicode_data_version":"16.0"},
@@ -727,7 +734,7 @@ $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person
   "schema_pointer":"/person/name","schema_id":"example.com/2026/39/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(missing)","data_position":"2:9:63",
-  "schema_position":"5:5:145"}]}],"errors":[]}
+  "schema_position":"4:5:110"}]}],"errors":[]}
 
 $ tson compile person.tn
 OK
@@ -779,7 +786,7 @@ OK
 - **`expected` is the constraint that failed, not a type name** — `<= 100`, `one of (PENDING, SHIPPED,
   DELIVERED)`, `at most 10 characters`, `an RFC 3339 date-time` — so a consumer building its own message
   (an LLM repair loop, say) never has to parse `message` to recover a bound or a member list.
-- **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
+- **Schema selection** is entirely the data's own doing: its `!!import`s name the schemas and its root
   type-ref (`!person`) names the type. The CLI itself does no URL *fetching* — schemas come from the files
   you list, and one it can't match is `SCHEMA_NOT_PERMITTED` (exit 69): this run will not supply it, so the
   document is rejected here, though nothing says it is invalid. The

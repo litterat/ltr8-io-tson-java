@@ -77,8 +77,9 @@ in the merged map after `computeSubtypes` and before the name-type checks.
   the kernel's `enum => enum_type ^ { name_type?: = identifier }` is a member at the kernel's link, a meta layer's pin
   of its own `text_identifier` at that layer's, and a pin of a text family is refused where it is written.
 - **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers`' `KindParser`): a
-  type-name token, or a JSON string, naming a member of the linked index. Under a meta layer
-  (`TsonLinkedSchema.governsSchemas`) the document is a schema whose names resolve in itself, so the reader checks the
+  type-name token, or a JSON string, naming a member of the linked index. Under the kernel or a schema importing it
+  directly (`TsonLinkedSchema.governsSchemas`; core.tn, reaching it transitively, governs data) the document is a
+  schema or describes one, its names resolving in the described schema, so the reader checks the
   grammar alone (`KindParser.namesOnly`) and that schema's link judges membership, which is what lets a resolved form
   naming a user's own name type read back through meta.tn.
 

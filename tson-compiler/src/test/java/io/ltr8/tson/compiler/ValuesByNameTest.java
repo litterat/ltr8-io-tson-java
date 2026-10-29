@@ -44,9 +44,9 @@ class ValuesByNameTest {
     static {
         DOCUMENTS.put(META_SERVICE, """
                 !!id:"https://example.test/meta-service.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   method_name => identifier
                   status_name => identifier
                   method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
@@ -69,9 +69,9 @@ class ValuesByNameTest {
     private static String orders(String id, String more) {
         return """
                 !!id:"%s"
-                !!meta:"https://example.test/meta-service.tn"
+                !!import:"https://example.test/meta-service.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   order               => { sku: text  quantity: int32 }
                   place_order_request => { order: order }
                   orders => !interface {
@@ -104,10 +104,10 @@ class ValuesByNameTest {
         String id = "https://example.test/api-" + label + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://example.test/meta-service.tn"
+                !!import:"https://example.test/meta-service.tn"
                 !!import:"https://example.test/orders.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   %s
                 }
                 """.formatted(id, declarations));
@@ -336,9 +336,9 @@ class ValuesByNameTest {
         String id = "https://example.test/meta-" + constructor.replace('_', '-') + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   %s => { a: %s }
                 }
                 """.formatted(id, constructor, fieldType));

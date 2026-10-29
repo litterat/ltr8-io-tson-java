@@ -37,13 +37,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Proves the guarantee {@link SchemaResolver#resolveSchema(SchemaDocument)} relies on to derive
  * its own structure namespace -- a {@link TsonCompiledSchemaLoader} that already has meta-kernel and
- * meta.tn registered and compiled can, given a document's own real {@code !!meta} target (just
- * {@code document.meta()}, a URI), {@link TsonCompiledSchemaLoader#load} it and get back a
+ * meta.tn registered and compiled can, given a document's own real {@code !!import} target (just
+ * a URI of {@code document.imports()}), {@link TsonCompiledSchemaLoader#load} it and get back a
  * *compiled* meta-schema genuinely usable to read real data -- not merely present. Exercised
  * directly against the loader itself, not through the resolver, since that's exactly what {@code
  * resolveSchema} does internally with no further logic of its own. Proven in both directions of the
- * real governing chain: core.tn's own {@code !!meta} target (meta.tn) and meta.tn's own {@code
- * !!meta} target (meta-kernel itself). Also covers {@code resolveSchema} itself, separately, below.
+ * real import chain: core.tn's own {@code !!import} target (meta.tn) and meta.tn's own {@code
+ * !!import} target (meta-kernel itself). Also covers {@code resolveSchema} itself, separately, below.
  * Deliberately doesn't touch {@code bindAtomInstance} at all (see that
  * method's own Javadoc for why that's a separate, later step); this only proves the wiring to
  * *reach* a compiled governing schema works.
@@ -123,11 +123,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
-        // core's own !!meta now names meta.tn with a ?sha256= pin -- compare by identity.
+        // core's own !!import names meta.tn with a ?sha256= pin -- compare by identity.
         assertEquals(CanonicalIdentity.canonicalize(TsonBundledSchemas.META_ID),
-                CanonicalIdentity.canonicalize(coreDocument.meta()));
+                CanonicalIdentity.canonicalize(coreDocument.imports().getFirst()));
 
-        TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
+        TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.imports().getFirst());
 
         assertTrue(compiledMeta.schema().entries().containsKey("bytes_encoding"));
     }
@@ -137,7 +137,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
-        TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
+        TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.imports().getFirst());
         Object result = compiledMeta.compiledSchema().get("bytes_encoding")
                 .read(TestDocuments.document("BASE64"));
 
@@ -145,7 +145,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     /**
-     * The other direction of the same governing chain: meta.tn's own {@code !!meta} names
+     * The other direction of the same import chain: meta.tn's own {@code !!import} names
      * meta-kernel itself, not meta.tn's own compiled reader.
      */
     @Test
@@ -154,11 +154,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument metaDocument =
                 new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
 
-        // meta's own !!meta now names meta-kernel with a ?sha256= pin -- compare by identity.
+        // meta's own !!import names meta-kernel with a ?sha256= pin -- compare by identity.
         assertEquals(CanonicalIdentity.canonicalize(TsonBundledSchemas.META_KERNEL_ID),
-                CanonicalIdentity.canonicalize(metaDocument.meta()));
+                CanonicalIdentity.canonicalize(metaDocument.imports().getFirst()));
 
-        TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.meta());
+        TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.imports().getFirst());
 
         // "integer_type" is meta-kernel's own -- not one of meta.tn's own 31 declarations -- so its
         // presence confirms this genuinely reached meta-kernel's compiled reader, not meta.tn's own.
@@ -171,7 +171,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument metaDocument =
                 new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
 
-        TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.meta());
+        TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.imports().getFirst());
         Object result = compiledMetaKernel.compiledSchema().get("product_access_type")
                 .read(TestDocuments.document("INDEX"));
 
@@ -194,7 +194,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // meta.tn isn't meta-kernel's own well-known bootstrap case, and the default SchemaSource
         // fetches nothing -- so this is exactly SchemaSource.registeredOnly()'s own rejection.
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> loader.loadMeta(coreDocument.meta()));
+                () -> loader.loadMeta(coreDocument.imports().getFirst()));
         assertEquals(SchemaFetchException.Reason.NOT_PERMITTED, thrown.reason());
         assertTrue(thrown.getMessage().contains("meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
@@ -204,20 +204,19 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !schema {
               nothing => !void_type {}
             }
             """;
 
     @Test
-    void resolveSchemaTakesTheMetaTargetsNamespaceFromTheLoader() {
+    void resolveSchemaTakesAnImportsNamespaceFromTheLoader() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        // "void_type" is not local to mini.tn, which imports nothing -- only reachable because its !!meta target,
-        // meta.tn, contributes its namespace as an import does (meta-kernel's entries among it, through meta.tn's
-        // own !!import).
+        // "void_type" is not local to mini.tn -- reachable because its import, meta.tn, contributes its whole
+        // namespace (meta-kernel's entries among it, through meta.tn's own !!import).
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         Top voidDef = resolved.entries().get("nothing");
@@ -225,12 +224,12 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     @Test
-    void resolveSchemaThrowsClearlyWhenTheMetaTargetCantBeResolvedAtAll() {
+    void resolveSchemaThrowsClearlyWhenAnImportCantBeResolvedAtAll() {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
         SchemaResolver resolver = new SchemaResolver(registry);
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        // The default source fetches nothing, so what fails is obtaining !!meta, not resolving it -- and
+        // The default source fetches nothing, so what fails is obtaining the import, not resolving it -- and
         // SchemaSource.fetch names the type that says so.
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
                 () -> resolver.resolveSchema(miniDocument));
@@ -273,25 +272,25 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String KERNEL_GOVERNED_MARKS = """
             !!id:"https://example.test/marks.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !schema {
               pet => abstract { pet_type: identifier =?  nick: identifier }
             }
             """;
 
     private static final String KERNEL_GOVERNED_UNKNOWN_MARK = """
             !!id:"https://example.test/unknown-mark.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !schema {
               pet => @totally_unknown_xyz { nick: identifier }
             }
             """;
 
     private static final String MINI_DOCUMENT_NO_ID = """
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !schema {
               nothing => !void_type {}
             }
             """;
@@ -311,8 +310,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
             !!id:"mini.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !schema {
               nothing => !void_type {}
             }
             """;
@@ -329,9 +328,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"meta-kernel.tn"
-            {
+            !schema {
               nothing => !void_type {}
             }
             """;
@@ -341,16 +340,16 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument malformedImportDocument = new TsonSchemaParser(MINI_DOCUMENT_MALFORMED_IMPORT).parseSchemaDocument();
 
-        assertEquals(1, malformedImportDocument.imports().size());
+        assertEquals(2, malformedImportDocument.imports().size());
         // "meta-kernel.tn" alone is a syntactically valid relative-reference URI, but has no scheme.
         assertThrows(SchemaValidationException.class, () -> resolver.resolveSchema(malformedImportDocument));
     }
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !schema {
               my_type => atom & {}
             }
             """;
@@ -375,9 +374,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !schema {
               void => !void_type {}
             }
             """;
@@ -398,10 +397,10 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !schema {
               placeholder => unit
             }
             """;
@@ -433,15 +432,15 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         String ordinaryImportingTheKernel = """
                 !!id:"https://example.test/mini.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                { my_type => { v: identifier } }
+                !schema { my_type => { v: identifier } }
                 """;
         String kernelGovernedImportingCore = """
                 !!id:"https://example.test/mini.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { my_type => { v: text } }
+                !schema { my_type => { v: text } }
                 """;
         for (String source : List.of(ordinaryImportingTheKernel, kernelGovernedImportingCore)) {
             SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
@@ -459,15 +458,15 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         Map<String, String> sources = Map.of(
                 "https://example.test/meta-api.tn", """
                         !!id:"https://example.test/meta-api.tn"
-                        !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                        !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                         !!import:"https://tson.io/2026/39/m/meta.tn"
-                        { status_name => identifier }
+                        !schema { status_name => identifier }
                         """,
                 "https://example.test/orders.tn", """
                         !!id:"https://example.test/orders.tn"
-                        !!meta:"https://example.test/meta-api.tn"
+                        !!import:"https://example.test/meta-api.tn"
                         !!import:"https://tson.io/2026/39/m/core.tn"
-                        { order => { sku: text  quantity: int32 } }
+                        !schema { order => { sku: text  quantity: int32 } }
                         """);
         SchemaSource local = SchemaSource.ofMap(sources);
         TsonCompiledMetaRegistry registry = loadMetaKernelAndMeta(uri -> uri.contains("example.test")

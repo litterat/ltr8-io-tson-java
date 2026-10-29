@@ -1,8 +1,13 @@
 !!id:"https://tson.io/2026/39/m/meta-kernel-resolved.tn"
-!!schema:"https://tson.io/2026/39/m/meta-kernel.tn"
 @doc:"""
   Resolver-output fixture for meta-kernel.tn (2026 Revision 39 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
+
+  A resolved form's header is its source's, and the kernel imports nothing,
+  so this one carries its `!!id` alone and is read under the pre-loaded
+  kernel. Nothing in the document marks it resolved; a processor reads it
+  as a resolved form because its caller says so ([TSON-SCHEMA] Section
+  8.1).
 
   Conventions:
   - Every entry is its value: a name maps to the body it resolves

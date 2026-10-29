@@ -28,7 +28,7 @@ class TsonSchemaRegistryTest {
         entries.put("container", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("members", RecordField.required(TypeRef.of("set_token"))))));
         return new TsonSchema("https://example.test/registry-test.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
     }
 
     /**
@@ -100,7 +100,7 @@ class TsonSchemaRegistryTest {
     @Test
     void constructingASchemaWithNoIdIsRejected() {
         assertThrows(NullPointerException.class,
-                () -> new TsonSchema(null, "https://example.test/meta.tn", List.of(), Map.of()));
+                () -> new TsonSchema(null, List.of(), Map.of()));
     }
 
     @Test
@@ -118,8 +118,7 @@ class TsonSchemaRegistryTest {
         registry.register(linkedSchema());
 
         TsonSchema sameIdentityDifferentScheme = new TsonSchema(
-                "http://example.test/registry-test.tn", "https://example.test/meta.tn",
-                List.of(), Map.of());
+                "http://example.test/registry-test.tn", List.of(), Map.of());
         TsonLinkedSchema linked = new TsonLinkedSchema(sameIdentityDifferentScheme);
 
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));

@@ -54,8 +54,7 @@ class VariantTreeReaderTest {
                 RecordField.required(TypeRef.of("integer"))))));
         entries.put("triangle",
                 ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("shape")));
-        return new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn",
-                List.of(), entries);
+        return new TsonSchema("https://example.test/s.tn", List.of(), entries);
     }
 
     private static TsonCompiledSchema compiled() {

@@ -24,9 +24,9 @@ class TsonValidateTest {
     private static final String POINT_ID = "https://example.test/point-1.tn";
     private static final String POINT_SCHEMA = """
             !!id:"https://example.test/point-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { point => { x: int32  y: int32 } }
+            !schema { point => { x: int32  y: int32 } }
             """;
 
     private static Tson tsonWithPoint() {
@@ -44,7 +44,7 @@ class TsonValidateTest {
     @Test
     void selfDescribingDataResolvesItsSchemaAndValidates() {
         List<Diagnostic> problems = tsonWithPoint().validate("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""");
         assertEquals(List.of(), problems);
     }
@@ -52,7 +52,7 @@ class TsonValidateTest {
     @Test
     void aBadValueInSchemaDrivenDataIsReported() {
         List<Diagnostic> problems = tsonWithPoint().validate("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
@@ -66,7 +66,7 @@ class TsonValidateTest {
     @Test
     void aDocumentWithAValueProblemAndASyntaxProblemReportsBoth() {
         List<Diagnostic> problems = tsonWithPoint().validate("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 99999999999999  y: ,, }""");
 
         assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, Diagnostic.Code.VALIDATION_ERROR),
@@ -80,7 +80,7 @@ class TsonValidateTest {
     @Test
     void aSchemaTheSourceCannotProvideIsUnavailableRatherThanWrong() {
         List<Diagnostic> problems = tsonWithPoint().validate("""
-                !!schema:"https://example.test/not-there.tn"
+                !!import:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, problems.getFirst().code());
@@ -89,7 +89,7 @@ class TsonValidateTest {
     @Test
     void aSchemaDrivenDocumentWithNoRootTypeRefIsReported() {
         List<Diagnostic> problems = tsonWithPoint().validate("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 { x: 3  y: 4 }""");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code());
@@ -99,7 +99,7 @@ class TsonValidateTest {
     @Test
     void aRootTypeRefTheSchemaDoesNotDeclareIsAnUnknownType() {
         List<Diagnostic> problems = tsonWithPoint().validate("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !no_such_type { x: 3  y: 4 }""");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE, problems.getFirst().code());
@@ -111,7 +111,7 @@ class TsonValidateTest {
         // `expected` carries the whole closed set, including the core.tn entries the !!import flattens
         // in -- which is why the prose lists only a few of them rather than all.
         List<Diagnostic> problems = tsonWithPoint().validate("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !pont { x: 3  y: 4 }""");
         assertEquals(1, problems.size(), problems.toString());
         Diagnostic problem = problems.getFirst();
@@ -131,22 +131,22 @@ class TsonValidateTest {
         String hash = TsonContentHash.sha256(POINT_SCHEMA.getBytes(StandardCharsets.UTF_8));
         Tson tson = tsonWithPoint();
 
-        assertEquals(List.of(), tson.validate("!!schema:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }"));
+        assertEquals(List.of(), tson.validate("!!import:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }"));
         assertEquals(List.of(), tson.validate(
-                "!!schema:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 3  y: 4 }"));
+                "!!import:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 3  y: 4 }"));
     }
 
     @Test
     void aCorrectlyPinnedReferenceVerifies() {
         String hash = TsonContentHash.sha256(POINT_SCHEMA.getBytes(StandardCharsets.UTF_8));
         assertEquals(List.of(), tsonWithPoint().validate(
-                "!!schema:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 1  y: 2 }"));
+                "!!import:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 1  y: 2 }"));
     }
 
     @Test
     void aMisPinnedReferenceIsRejected() {
         List<Diagnostic> problems = tsonWithPoint().validate(
-                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
+                "!!import:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
@@ -158,10 +158,10 @@ class TsonValidateTest {
         // records its content hash; a later reference whose pin doesn't match that hash errors rather
         // than resolving to the already-registered instance -- even though the schema is cached.
         Tson tson = tsonWithPoint();
-        assertEquals(List.of(), tson.validate("!!schema:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }"));
+        assertEquals(List.of(), tson.validate("!!import:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }"));
 
         List<Diagnostic> problems = tson.validate(
-                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 3  y: 4 }");
+                "!!import:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 3  y: 4 }");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
@@ -177,7 +177,7 @@ class TsonValidateTest {
         tson.resolve(POINT_SCHEMA);
 
         List<Diagnostic> problems = tson.validate(
-                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
+                "!!import:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
@@ -190,7 +190,7 @@ class TsonValidateTest {
         assertEquals(List.of(), tson.validateSchema(POINT_SCHEMA));
 
         List<Diagnostic> problems = tson.validate(
-                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
+                "!!import:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
@@ -204,7 +204,7 @@ class TsonValidateTest {
         String hash = TsonContentHash.sha256(POINT_SCHEMA.getBytes(StandardCharsets.UTF_8));
 
         assertEquals(List.of(), tson.validate(
-                "!!schema:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 1  y: 2 }"));
+                "!!import:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 1  y: 2 }"));
     }
 
     @Test
@@ -225,15 +225,15 @@ class TsonValidateTest {
         // no reference may pin -- not one that fails to load. Hashing every schema on load must therefore
         // record the absence rather than refuse the document, and refuse the pin when one arrives.
         String oneLine = "!!id:\"https://example.test/one-1.tn\" "
-                + "!!meta:\"https://tson.io/2026/39/m/meta.tn\" "
-                + "!!import:\"https://tson.io/2026/39/m/core.tn\" { point => { x: int32 } }";
+                + "!!import:\"https://tson.io/2026/39/m/meta.tn\" "
+                + "!!import:\"https://tson.io/2026/39/m/core.tn\" !schema { point => { x: int32 } }";
         Tson tson = Tson.standard();
         tson.resolve(oneLine);
 
         assertEquals(List.of(), tson.validate(
-                "!!schema:\"https://example.test/one-1.tn\"\n!point { x: 1 }"));
+                "!!import:\"https://example.test/one-1.tn\"\n!point { x: 1 }"));
 
-        List<Diagnostic> problems = tson.validate("!!schema:\"https://example.test/one-1.tn?sha256="
+        List<Diagnostic> problems = tson.validate("!!import:\"https://example.test/one-1.tn?sha256="
                 + "a".repeat(64) + "\"\n!point { x: 1 }");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
@@ -249,7 +249,7 @@ class TsonValidateTest {
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(wrongIdSource)));
 
         List<Diagnostic> problems = tson.validate(
-                "!!schema:\"https://example.test/other-1.tn\"\n!point { x: 1  y: 2 }");
+                "!!import:\"https://example.test/other-1.tn\"\n!point { x: 1  y: 2 }");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("identity mismatch"), problems.toString());
@@ -266,7 +266,7 @@ class TsonValidateTest {
         SchemaSource flaky = uri -> calls.getAndIncrement() == 0 ? tampered : POINT_SCHEMA;
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(flaky)));
 
-        String pinnedData = "!!schema:\"" + POINT_ID + "?sha256=" + correctHash + "\"\n!point { x: 1  y: 2 }";
+        String pinnedData = "!!import:\"" + POINT_ID + "?sha256=" + correctHash + "\"\n!point { x: 1  y: 2 }";
 
         List<Diagnostic> rejected = tson.validate(pinnedData);   // tampered content -> pin mismatch
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, rejected.getFirst().code(), rejected.toString());
@@ -292,8 +292,8 @@ class TsonValidateTest {
     @Test
     void repeatedValidationsOnOneInstanceAreIndependentOfEachOther() {
         Tson tson = tsonWithPoint();
-        String valid = "!!schema:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }";
-        String invalid = "!!schema:\"" + POINT_ID + "\"\n!point { x: 1 }";
+        String valid = "!!import:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }";
+        String invalid = "!!import:\"" + POINT_ID + "\"\n!point { x: 1 }";
 
         assertEquals(List.of(), tson.validate(valid));
         assertEquals(Diagnostic.Code.FIELD_REQUIRED, only(tson, invalid).code());
@@ -317,7 +317,7 @@ class TsonValidateTest {
     @Test
     void aValueErrorLocatesTheAuthorsOwnFieldNotTheLeafTypeItResolvesTo() {
         Diagnostic problem = only(tsonWithPoint(), """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
 
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
@@ -340,9 +340,9 @@ class TsonValidateTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/nested-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   person => { home: address }
 
                   address => { city: text }
@@ -350,7 +350,7 @@ class TsonValidateTest {
                 """);
 
         Diagnostic problem = only(tson, """
-                !!schema:"https://example.test/nested-1.tn"
+                !!import:"https://example.test/nested-1.tn"
                 !person { home: { } }""");
 
         assertEquals(Optional.of("/person/home/city"), problem.schemaPointer());
@@ -367,7 +367,7 @@ class TsonValidateTest {
     @Test
     void aRootValueWithNoEnclosingRecordCarriesItsOwnDeclaringSchema() {
         Diagnostic problem = only(tsonWithPoint(), """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !int32 99999999999999""");
 
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
@@ -386,13 +386,13 @@ class TsonValidateTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/tags-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { tagged => { tags: [text] } }
+                !schema { tagged => { tags: [text] } }
                 """);
 
         Diagnostic problem = only(tson, """
-                !!schema:"https://example.test/tags-1.tn"
+                !!import:"https://example.test/tags-1.tn"
                 !tagged { tags: { a: 1 } }""");
 
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
@@ -410,7 +410,7 @@ class TsonValidateTest {
     @Test
     void anUnrecognizedFieldDoesNotExtendTheSchemaPointer() {
         Diagnostic problem = only(tsonWithPoint(), """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4  nope: 5 }""");
 
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, problem.code());
@@ -428,7 +428,7 @@ class TsonValidateTest {
     @Test
     void aConstraintViolationCarriesTheViolatedBoundNotTheTypeName() {
         Diagnostic problem = only(tsonWithPoint(), """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
 
         assertEquals(">= -2147483648 and <= 2147483647", problem.expected());
@@ -446,9 +446,9 @@ class TsonValidateTest {
         String schemaId = "https://example.test/pct-1.tn";
         String schema = """
                 !!id:"https://example.test/pct-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   my_percentage => !integer ^ { min: 1  max: 100 }
                   reading => { pct: my_percentage }
                 }
@@ -460,7 +460,7 @@ class TsonValidateTest {
             throw new IllegalStateException("no schema for " + uri);
         })));
 
-        Diagnostic problem = only(tson, "!!schema:\"" + schemaId + "\"\n!reading { pct: 500 }");
+        Diagnostic problem = only(tson, "!!import:\"" + schemaId + "\"\n!reading { pct: 500 }");
 
         assertEquals("<= 100", problem.expected());
         assertTrue(problem.message().startsWith("'my_percentage':"), problem.message());
@@ -475,7 +475,7 @@ class TsonValidateTest {
     @Test
     void aFacadeLevelFailureCarriesItsStructuredEndsToo() {
         Diagnostic unreachable = only(tsonWithPoint(), """
-                !!schema:"https://example.test/not-there.tn"
+                !!import:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""");
         // Not "a resolvable schema": nothing was resolved, because nothing was obtained. The two share a
         // code and are told apart here, which is the half of the distinction that costs no schema version.
@@ -483,7 +483,7 @@ class TsonValidateTest {
         assertEquals("https://example.test/not-there.tn", unreachable.actual(), "which schema could not be had");
 
         Diagnostic noRootRef = only(tsonWithPoint(), """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 { x: 3  y: 4 }""");
         assertEquals("a root type-ref", noRootRef.expected());
         assertEquals("(none)", noRootRef.actual());
@@ -501,9 +501,9 @@ class TsonValidateTest {
         String schemaId = "https://example.test/facets-1.tn";
         String schema = """
                 !!id:"https://example.test/facets-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   status => !enum [PENDING SHIPPED DELIVERED]
                   label  => !text ^ { max_length: 4 }
                   order  => { status: status  label: label  when: date }
@@ -516,7 +516,7 @@ class TsonValidateTest {
             throw new IllegalStateException("no schema for " + uri);
         })));
 
-        List<Diagnostic> problems = tson.validate("!!schema:\"" + schemaId + "\"\n"
+        List<Diagnostic> problems = tson.validate("!!import:\"" + schemaId + "\"\n"
                 + "!order { status: CANCELLED  label: toolong  when: nope }");
 
         assertEquals(3, problems.size(), problems.toString());
@@ -535,7 +535,7 @@ class TsonValidateTest {
     @Test
     void aShapeMismatchAtAnAtomNamesTheTypeAndTheShape() {
         Diagnostic problem = only(tsonWithPoint(), """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: { nested: 1 } }""");
 
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
@@ -552,7 +552,7 @@ class TsonValidateTest {
     @Test
     void aContainerShapeMismatchNamesTheShapeNotTheEvent() {
         Diagnostic problem = only(tsonWithPoint(), """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point [1 2]""");
 
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
@@ -611,7 +611,7 @@ class TsonValidateTest {
     void contentAfterTheDocumentsValueIsReported() {
         Tson tson = tsonWithPoint();
         String trailing = """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 1  y: 2 } junk""";
 
         List<Diagnostic> problems = tson.validate(trailing);
@@ -635,7 +635,7 @@ class TsonValidateTest {
         // A doubled comma: a trailing one is ordinary (§2.4 -- a comma may follow a value), where this one
         // follows a comma and so separates nothing.
         List<Diagnostic> syntax = tson.validate("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 1, , y: 2 }""");
         assertEquals(1, syntax.size(), syntax.toString());
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, syntax.getFirst().code());

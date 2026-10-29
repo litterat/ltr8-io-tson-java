@@ -36,7 +36,7 @@ import java.util.Optional;
  *       discrimination class ([TSON-SCHEMA] §5.4, §8.3).</li>
  * </ul>
  *
- * <p><b>The three mean nothing at a map position</b> (§3.2): keys are data, not names, so {@code "$schema"} under
+ * <p><b>The three mean nothing at a map position</b> (§3.2): keys are data, not names, so {@code "$import"} under
  * {@code {text => text}} is an ordinary key. §8.3.1's escape is for a map standing as a choice variant, and
  * belongs to the choice reader.
  */

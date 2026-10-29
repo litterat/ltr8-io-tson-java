@@ -32,9 +32,9 @@ class JsonKindReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/json-kinds.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               stock_id    => !uuid_type {}
               customer_id => !uuid_type {}
               sku         => text

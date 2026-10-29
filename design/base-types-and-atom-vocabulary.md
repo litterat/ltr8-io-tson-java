@@ -60,8 +60,8 @@ else: what a `value`-typed slot meant (below).
 tokens. `NumberGrammar.tryParse` (`atom.number`, exported because base type resolution stays with the text encoding
 and reads it) recognizes the `number` production (§7.6).
 
-**What counts as untyped is narrower than "no `!!schema`".** [TSON-DATA] §4.1 states its applicability over what
-types a position, and names a declared host type naming a §5 family among what does. So a document with no `!!schema`
+**What counts as untyped is narrower than "no `!!import`".** [TSON-DATA] §4.1 states its applicability over what
+types a position, and names a declared host type naming a §5 family among what does. So a document with no `!!import`
 read *into a Java class* is **typed**: `{ i: "12" }` reads as `12` at an `int`, exactly as at a schema's `int32`. §4 is
 reached only where nothing types the position: a **tree** read (`TsonValue`, and `JsonValue` beside it), and targets
 no built-in family names — `char`, an opaque `Object`, a host type outside §5's vocabulary. [TSON-JSON] §4.1 and §5.7

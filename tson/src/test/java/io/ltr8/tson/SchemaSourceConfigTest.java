@@ -33,15 +33,15 @@ class SchemaSourceConfigTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { sku: text  quantity: int32 }
             }
             """.formatted(SCHEMA_URI);
 
     private static final String DOCUMENT = """
-            !!schema:"%s"
+            !!import:"%s"
             !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI);
 
     /** The whole point of the short form: one call where the long form is a builder and a wiring step. */
@@ -69,7 +69,7 @@ class SchemaSourceConfigTest {
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
         assertEquals(2, tson.validate("""
-                !!schema:"%s"
+                !!import:"%s"
                 !order { }""".formatted(SCHEMA_URI)).size(), "both required fields are missing");
     }
 
@@ -147,7 +147,7 @@ class SchemaSourceConfigTest {
                 .withSchemaAccess(SchemaAccess.httpSchemas("allowed.example.test", "internal.corp.example")));
 
         String refusal = onlyMessage(tson.validate("""
-                !!schema:"https://denied.example.test/order-1.tn"
+                !!import:"https://denied.example.test/order-1.tn"
                 !order { }"""));
         assertFalse(refusal.contains("allowed.example.test"), refusal);
         assertFalse(refusal.contains("internal.corp.example"), refusal);
@@ -162,7 +162,7 @@ class SchemaSourceConfigTest {
     // --- schemas a caller already holds ---
 
     private static final String UNPUBLISHED = """
-            !!schema:"https://schemas.example.test/unpublished-1.tn"
+            !!import:"https://schemas.example.test/unpublished-1.tn"
             !order { sku: "ABC-1"  quantity: 3 }""";
 
     /** The short form for a caller who already has the text: no host, no directory, no fetching. */

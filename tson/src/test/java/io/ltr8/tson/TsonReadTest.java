@@ -32,9 +32,9 @@ class TsonReadTest {
     private static final String POINT_ID = "https://example.test/point-1.tn";
     private static final String POINT_SCHEMA = """
             !!id:"https://example.test/point-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { point => { x: int32  y: int32 } }
+            !schema { point => { x: int32  y: int32 } }
             """;
 
     private static Tson tsonWithPoint() {
@@ -56,7 +56,7 @@ class TsonReadTest {
     @Test
     void schemaDrivenReadReturnsTheValidatedTree() {
         TsonValue node = tsonWithPoint().treeReader().read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""");
 
         assertTrue(node.isRecord());
@@ -77,7 +77,7 @@ class TsonReadTest {
     @Test
     void aBadValueThrowsFailFast() {
         ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }"""));
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, thrown.diagnostic().code());
     }
@@ -85,7 +85,7 @@ class TsonReadTest {
     @Test
     void aSchemaDrivenDocumentWithNoRootTypeRefThrows() {
         ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, thrown.diagnostic().code());
         assertTrue(thrown.diagnostic().message().contains("root type-ref"), thrown::getMessage);
@@ -94,7 +94,7 @@ class TsonReadTest {
     @Test
     void aSchemaTheSourceCannotProvideThrows() {
         ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read("""
-                !!schema:"https://example.test/not-there.tn"
+                !!import:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, thrown.diagnostic().code());
     }
@@ -112,7 +112,7 @@ class TsonReadTest {
         for (SchemaFetchException.Reason reason : SchemaFetchException.Reason.values()) {
             DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
             failing(reason).treeReader().withDiagnostics(problems).read("""
-                    !!schema:"https://example.test/not-there.tn"
+                    !!import:"https://example.test/not-there.tn"
                     !point { x: 3  y: 4 }""");
 
             Diagnostic diagnostic = problems.diagnostics().getFirst();
@@ -130,7 +130,7 @@ class TsonReadTest {
     @Test
     void theThrownAndCollectedChannelsAgreeOnTheReason() {
         String document = """
-                !!schema:"https://example.test/not-there.tn"
+                !!import:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""";
         Tson tson = failing(SchemaFetchException.Reason.NOT_PERMITTED);
 
@@ -151,7 +151,7 @@ class TsonReadTest {
     void aProblemThatIsNotAFetchFailureCarriesNoReason() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         tsonWithPoint().treeReader().withDiagnostics(problems).read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
 
         assertTrue(problems.diagnostics().getFirst().code().verdict());
@@ -172,7 +172,7 @@ class TsonReadTest {
     @Test
     void aRootTypeRefTheSchemaDoesNotDeclareThrows() {
         ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !no_such_type { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE, thrown.diagnostic().code());
     }
@@ -199,7 +199,7 @@ class TsonReadTest {
     @Test
     void objectReaderReturnsTheSchemaBoundObject() {
         Point value = tsonWithPointBinding().objectReader().read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""", Point.class);
 
         assertEquals(new Point(3, 4), value);
@@ -218,7 +218,7 @@ class TsonReadTest {
         // The schema's root type `point` binds to Point, not String -- caught up front, before any value read.
         ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPointBinding().objectReader()
                 .read("""
-                        !!schema:"https://example.test/point-1.tn"
+                        !!import:"https://example.test/point-1.tn"
                         !point { x: 3  y: 4 }""", String.class));
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, thrown.diagnostic().code());
     }
@@ -228,7 +228,7 @@ class TsonReadTest {
         // y is out of int32 range -- fail-fast, same validation the tree read applies.
         ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPointBinding().objectReader()
                 .read("""
-                        !!schema:"https://example.test/point-1.tn"
+                        !!import:"https://example.test/point-1.tn"
                         !point { x: 3  y: 99999999999999 }""", Point.class));
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, thrown.diagnostic().code());
     }
@@ -237,7 +237,7 @@ class TsonReadTest {
     void readWithoutSchemaBindsEvenWhenTheSchemaIsUnavailable() {
         // read() would SCHEMA_ERROR (the source can't provide this URI); readWithoutSchema binds the class anyway.
         Point value = tsonWithPointBinding().objectReader().withHostTypes().readWithoutSchema("""
-                !!schema:"https://example.test/not-there.tn"
+                !!import:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""", Point.class);
 
         assertEquals(new Point(3, 4), value);
@@ -249,7 +249,7 @@ class TsonReadTest {
         // (the Jackson-style "target class is the contract" case), even a !!schema the reader couldn't resolve.
         // The class is the schema for the root's !point only because the reader is told so.
         Point value = new TsonObjectReader(tsonWithPointBinding().dataBindContext()).withHostTypes().read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""", Point.class);
 
         assertEquals(new Point(3, 4), value);
@@ -264,7 +264,7 @@ class TsonReadTest {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         TsonValue node = tsonWithPoint().treeReader().withDiagnostics(problems).read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 99999999999999  y: 88888888888888 }""");
 
         assertEquals(2, problems.diagnostics().size(), problems.diagnostics()::toString);
@@ -280,7 +280,7 @@ class TsonReadTest {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         tsonWithPointBinding().objectReader().withDiagnostics(problems).read("""
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 99999999999999  y: 88888888888888 }""", Point.class);
 
         assertEquals(2, problems.diagnostics().size(), problems.diagnostics()::toString);
@@ -296,13 +296,13 @@ class TsonReadTest {
         }
         List<Case> cases = List.of(
                 new Case("""
-                        !!schema:"https://example.test/not-there.tn"
+                        !!import:"https://example.test/not-there.tn"
                         !point { x: 3  y: 4 }""", Diagnostic.Code.SCHEMA_NOT_FOUND),
                 new Case("""
-                        !!schema:"https://example.test/point-1.tn"
+                        !!import:"https://example.test/point-1.tn"
                         { x: 3  y: 4 }""", Diagnostic.Code.VALIDATION_ERROR),
                 new Case("""
-                        !!schema:"https://example.test/point-1.tn"
+                        !!import:"https://example.test/point-1.tn"
                         !no_such_type { x: 3  y: 4 }""", Diagnostic.Code.UNKNOWN_TYPE));
 
         for (Case testCase : cases) {
@@ -388,7 +388,7 @@ class TsonReadTest {
     @Test
     void withDiagnosticsReturnsANewReaderAndLeavesTheOriginalFailFast() {
         String bad = """
-                !!schema:"https://example.test/point-1.tn"
+                !!import:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""";
         var reader = tsonWithPoint().treeReader();
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();

@@ -31,15 +31,15 @@ class BindingsConfigTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/orders.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { sku: text  quantity: int32  when: datetime }
             }
             """;
 
     private static final String DOC = """
-            !!schema:"https://example.test/orders.tn"
+            !!import:"https://example.test/orders.tn"
             !order { sku: "A"  quantity: 1  when: "2026-08-23T10:00:00Z" }""";
 
     /** A profiled shorter constructor, to show {@code profile} reaching the binder through the config. */
@@ -56,9 +56,9 @@ class BindingsConfigTest {
     /** The same schema without the field the profiled constructor omits. */
     private static final String SHORT_SCHEMA = """
             !!id:"https://example.test/orders.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { sku: text  quantity: int32 }
             }
             """;
@@ -95,7 +95,7 @@ class BindingsConfigTest {
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
-                        !!schema:"https://example.test/orders.tn"
+                        !!import:"https://example.test/orders.tn"
                         !invoice { sku: "A"  quantity: 1 }""", Order.class));
 
         // The map's own account leads and names what it does hold, so the reader sees the line missing
@@ -116,7 +116,7 @@ class BindingsConfigTest {
                 .withDataBindContext(binding(Map.of("order", Order.class), "orders-1")));
 
         Order order = tson.objectReader().read("""
-                !!schema:"https://example.test/orders.tn"
+                !!import:"https://example.test/orders.tn"
                 !order { sku: "A"  quantity: 1 }""", Order.class);
 
         assertEquals(java.time.OffsetDateTime.parse("2000-01-01T00:00:00Z"), order.when(),
@@ -139,7 +139,7 @@ class BindingsConfigTest {
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
-                        !!schema:"https://example.test/orders.tn"
+                        !!import:"https://example.test/orders.tn"
                         !order { sku: "A"  quantity: 1 }""", Order.class));
 
         assertTrue(thrown.getMessage().contains("no bound Java class for 'order'"), thrown.getMessage());

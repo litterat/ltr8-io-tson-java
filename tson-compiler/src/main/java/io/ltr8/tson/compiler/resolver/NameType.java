@@ -34,10 +34,9 @@ import java.util.stream.Stream;
  * {@code identifier_kind}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
  * kind off the constructor the entry is built with -- the {@code name_type} field's own type -- and asks {@link
  * KindMembers} whether the referent is a member. The resolution above is the store and the kind the judgment: the
- * referent is found first, and the kind refuses the one found. Where the slot's kind is out of reach -- no governing
- * meta loaded, or a meta layer that reaches the kernel's kinds through its own {@code !!meta} without importing them
- * -- the kernel's {@code identifier_kind} is what the slot is typed by in every meta this library loads, and its
- * {@code of} is used.
+ * referent is found first, and the kind refuses the one found. Where the slot's kind is out of reach -- a schema
+ * assembled by hand whose closure holds no kernel -- the kernel's {@code identifier_kind} is what the slot is typed
+ * by in every schema this library loads, and its {@code of} is used.
  */
 public final class NameType {
 

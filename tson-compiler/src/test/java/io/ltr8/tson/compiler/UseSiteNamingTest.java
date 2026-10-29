@@ -48,9 +48,9 @@ class UseSiteNamingTest {
     private static List<String> messages(String declarations, String data) {
         String schema = """
                 !!id:"https://example.test/naming.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                 %s%s
                 }
                 """.formatted(PRELUDE, declarations);

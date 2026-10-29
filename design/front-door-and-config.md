@@ -187,8 +187,8 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   picks a mode.
 - **`validate(String|InputStream)` *is* `treeReader()` with a collecting receiver**, both halves of it —
   one call with no `catch` around it, no second implementation. The reader already works out whether a schema
-  applies (a `!!schema` directive selects the schema through `ProcessorConfig.withSchemaAccess`, compiled once in
-  tree mode, and the root type-ref selects the type; with no `!!schema` it reads schemalessly, checking
+  applies (`!!import` directives select the schemas through `ProcessorConfig.withSchemaAccess`, compiled once per
+  set in tree mode, and the root type-ref selects the type; with no `!!import` it reads schemalessly, checking
   the wire's own type-refs), and reports every failure around all of that through the receiver. Validating
   is that read with the tree thrown away. Returns every problem as a `List<Diagnostic>` (empty means valid)
   and **never throws for a bad input document** — malformed syntax, a schema document handed in where data
@@ -205,7 +205,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
     propagates to `TsonCli`'s fault handler rather than becoming a per-file verdict.
 - `objectReader()`/`treeReader()` return **schema-aware** `TsonObjectReader`/`TsonTreeReader` over this
   instance — the value-returning read peers of `validate`: a self-describing document is validated against
-  its declared `!!schema` (schemaless when it declares none), the object form checking the target class up
+  its `!!import`s (schemaless when it declares none), the object form checking the target class up
   front. **Both are built over this instance's own `treeRegistry()`/`bindRegistry()`, so every reader shares
   one compiled-schema cache** — a schema compiles once per `Tson`, not once per reader. The readers take a
   `TsonCompiledSchemaRegistry` rather than a `TsonCompiledMetaRegistry` for exactly that reason; since the

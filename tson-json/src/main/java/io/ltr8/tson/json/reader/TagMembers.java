@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * [TSON-JSON] §3.2's three annotation members -- {@code $schema}, {@code $type}, {@code $value} -- and the peek that
+ * [TSON-JSON] §3.2's three annotation members -- {@code $import}, {@code $type}, {@code $value} -- and the peek that
  * asks which of them lead an object. They are the only member names the encoding gives a meaning: any other name,
  * {@code $}-initial or not, is a record's field name or a map's key, so a translated record's {@code $ref} is an
  * ordinary member.
@@ -26,30 +26,32 @@ import java.util.Set;
  * §4.3 declines one for v1 and makes encoding a value that carries them an encode error. A class named for §3.3
  * would be the one place the word meant something else, so it is named for the tag and cites §3.3 throughout.
  *
- * <p>What §3.3 defines is the JSON carrier for a type annotation, and at the root for the document's schema
- * binding -- what TSON text attaches beside a value or in its header, and JSON has no beside for.
+ * <p>What §3.3 defines is the JSON carrier for a type annotation, and at the top of the document for its binding,
+ * the list of schemas it imports -- what TSON text attaches beside a value or writes as {@code !!import}s in its
+ * header, and JSON has no beside or header for.
  *
  * <p>Two forms. The <b>wrapper</b> is an object whose members are these three only, with {@code $value} present
  * -- {@code {"$type": "age", "$value": 42}} -- and carries an annotation for a value of any shape. The
- * <b>inline</b> form lets {@code $schema} and {@code $type} stand beside a record's own when the selected type reads the
+ * <b>inline</b> form lets {@code $import} and {@code $type} stand beside a record's own when the selected type reads the
  * value as a record, and {@code $value} is missing: {@code {"$type": "employee", "name": "Ada"}}.
  *
  * <p><b>The selectors lead, so a peek at the opening members answers the question.</b> §3.3 puts {@code
- * $schema} first where present and {@code $type} after it, and §6.1.5 puts a sealed position's discriminators
+ * $import} first where present and {@code $type} after it, and §6.1.5 puts a sealed position's discriminators
  * next. {@link #lead} reads those members and no others, rewinding so the read that follows sees a stream
  * nothing has touched -- what it holds is bounded by the schema, never by the document (§10.1). A valid
  * wrapper's only members are the annotation members, so its {@code $value} directly follows them, and the peek
  * sees it there; a {@code $value} anywhere else is an extra member of an invalid object, which whoever reads
  * the object refuses. A selector's value is held only when it is a scalar: one that is not stops the peek,
- * so a sender cannot make it hold an arbitrary value.
+ * so a sender cannot make it hold an arbitrary value. A leading {@code $import} stops the peek too: it stands at the
+ * top of the document alone, so every value position that meets one refuses the object and needs nothing past it.
  */
 final class TagMembers {
 
     /** §3.2's closed set: the names this encoding gives a meaning, and there is no fourth. */
     static final String TYPE = "$type";
     static final String VALUE = "$value";
-    static final String SCHEMA = "$schema";
-    static final List<String> MEMBERS = List.of(SCHEMA, TYPE, VALUE);
+    static final String IMPORT = "$import";
+    static final List<String> MEMBERS = List.of(IMPORT, TYPE, VALUE);
 
     private TagMembers() {
     }
@@ -57,20 +59,20 @@ final class TagMembers {
     /**
      * What an object's leading members say about it.
      *
-     * @param schema    whether {@code $schema} leads -- the root's binding (§3.4), refused at every value position
+     * @param imports   whether {@code $import} leads -- the document's binding (§3.4), refused at every value position
      * @param typed     whether a {@code $type} member leads, whatever its value
      * @param type      that member's string content, or null where it is missing or not a string
      * @param wrapper   whether {@code $value} follows the annotation members -- §3.3's wrapper form
      * @param selectors the scalar value of each requested member found leading after the annotation members, by
      *                  NFC name; a requested member not among them is missing here
      */
-    record Lead(boolean schema, boolean typed, String type, boolean wrapper, Map<String, JsonEvent> selectors) {
+    record Lead(boolean imports, boolean typed, String type, boolean wrapper, Map<String, JsonEvent> selectors) {
 
         static final Lead NONE = new Lead(false, false, null, false, Map.of());
 
         /** Whether the object leads with a annotation member -- §3.3's recognition test, and §8.3.1's. */
         boolean present() {
-            return schema || typed || wrapper;
+            return imports || typed || wrapper;
         }
     }
 
@@ -96,27 +98,22 @@ final class TagMembers {
         if (!(ctx.next() instanceof JsonEvent.ObjectStart)) {
             return Lead.NONE;
         }
-        boolean schema = false;
+        JsonEvent event = ctx.next();
+        if (named(event, IMPORT)) {
+            return new Lead(true, false, null, false, Map.of());
+        }
         boolean typed = false;
         String type = null;
-        JsonEvent event = ctx.next();
-        if (named(event, SCHEMA)) {
-            schema = true;
-            if (!skipScalar(ctx)) {
-                return new Lead(true, false, null, false, Map.of());
-            }
-            event = ctx.next();
-        }
         if (named(event, TYPE)) {
             typed = true;
             type = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
             if (!skipScalar(ctx)) {
-                return new Lead(schema, true, null, false, Map.of());
+                return new Lead(false, true, null, false, Map.of());
             }
             event = ctx.next();
         }
         if (named(event, VALUE)) {
-            return new Lead(schema, typed, type, true, Map.of());
+            return new Lead(false, typed, type, true, Map.of());
         }
         Map<String, JsonEvent> selectors = wanted.isEmpty() ? Map.of() : new LinkedHashMap<>();
         while (selectors.size() < wanted.size() && event instanceof JsonEvent.MemberName member) {
@@ -129,7 +126,7 @@ final class TagMembers {
             ctx.next();
             event = ctx.next();
         }
-        return new Lead(schema, typed, type, false, selectors);
+        return new Lead(false, typed, type, false, selectors);
     }
 
     private static boolean named(JsonEvent event, String name) {
@@ -166,7 +163,7 @@ final class TagMembers {
      */
     static Object readWrapped(JsonReadContext ctx, JsonTypeReader<?> target) {
         ctx.next();   // ObjectStart
-        return walkWrapper(ctx, target, SCHEMA, false, null);
+        return walkWrapper(ctx, target, IMPORT, false, null);
     }
 
     /**
@@ -181,7 +178,7 @@ final class TagMembers {
     /**
      * The wrapper's member loop, from wherever the caller left it.
      *
-     * @param next  the leading member that may still come -- {@code $schema}, then {@code $type} (§3.3) --
+     * @param next  the leading member that may still come -- {@code $import}, then {@code $type} (§3.3) --
      *              or null once another member has come
      * @param found whether {@code $value} has already been read, {@code value} being what it read
      */
@@ -208,15 +205,15 @@ final class TagMembers {
             }
             // The leading members were judged before this was reached; one found here, after them, is out of place.
             boolean leading = !found && next != null && (name.equals(next) || TYPE.equals(name));
-            next = leading && SCHEMA.equals(name) ? TYPE : null;
-            if (SCHEMA.equals(name) || TYPE.equals(name)) {
+            next = leading && IMPORT.equals(name) ? TYPE : null;
+            if (IMPORT.equals(name) || TYPE.equals(name)) {
                 if (!leading) {
                     refuseMisplaced(ctx, name);
                 }
             } else {
                 ctx.field(member.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                         "'%s' stands beside '$value' in an annotation object, which is apparatus and not a record "
-                                .formatted(member.name()) + "-- it admits '$schema', '$type' and '$value' and nothing "
+                                .formatted(member.name()) + "-- it admits '$import', '$type' and '$value' and nothing "
                                 + "else (§3.3)", String.join(" | ", MEMBERS), member.name());
             }
             EventSkip.nextValue(ctx.field(member.name()));
@@ -232,12 +229,12 @@ final class TagMembers {
     }
 
     /**
-     * Reports a {@code $schema} or {@code $type} that does not lead its object (§3.3) -- a resolver error, the
+     * Reports an {@code $import} or {@code $type} that does not lead its object (§3.3) -- a resolver error, the
      * selectors having a fixed place so that no decoder holds more than the schema bounds before dispatch.
      */
     static void refuseMisplaced(JsonReadContext ctx, String name) {
         ctx.field(name).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
-                "'%s' must lead its object -- '$schema' first where present, then '$type' (§3.3) -- and here it "
+                "'%s' must lead its object -- '$import' first where present, then '$type' (§3.3) -- and here it "
                         .formatted(name) + "follows another member", "'" + name + "' as a leading member", name);
     }
 }

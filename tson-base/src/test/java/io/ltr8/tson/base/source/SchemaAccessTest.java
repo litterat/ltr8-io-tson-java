@@ -27,9 +27,9 @@ class SchemaAccessTest {
     private static String schema() {
         return """
                 !!id:"https://%s/order-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   order => { sku: text  quantity: int32 }
                 }
                 """.formatted(HOST);

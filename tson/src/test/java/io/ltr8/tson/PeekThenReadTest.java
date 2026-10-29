@@ -44,16 +44,16 @@ class PeekThenReadTest {
 
     private static final String V1_SCHEMA = """
             !!id:"https://example.test/order-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { order => { sku: text  quantity: int32  code: int32 } }
+            !schema { order => { sku: text  quantity: int32  code: int32 } }
             """;
 
     private static final String V2_SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { order => { sku: text  quantity: int32  currency: text } }
+            !schema { order => { sku: text  quantity: int32  currency: text } }
             """;
 
     public record Order(String sku, int quantity, int code, String currency) {
@@ -85,11 +85,11 @@ class PeekThenReadTest {
     }
 
     private static final String V1_DOC = """
-            !!schema:"https://example.test/order-1.tn"
+            !!import:"https://example.test/order-1.tn"
             !order { sku: "A"  quantity: 1  code: 7 }""";
 
     private static final String V2_DOC = """
-            !!schema:"https://example.test/order-2.tn"
+            !!import:"https://example.test/order-2.tn"
             !order { sku: "B"  quantity: 2  currency: "NZD" }""";
 
     /** A body that may be read once, forwards. Rewinding it is a test failure, not a slow path. */
@@ -123,7 +123,7 @@ class PeekThenReadTest {
     /** What a receiver actually writes: peek, choose, read -- the body streaming through once. */
     private static Order route(Tson v1, Tson v2, InputStream body) {
         TsonDocumentPeek peek = v1.begin(body);
-        Tson version = peek.header().schema().filter(V2::equals).isPresent() ? v2 : v1;
+        Tson version = peek.header().imports().contains(V2) ? v2 : v1;
         return version.objectReader().read(peek, Order.class);
     }
 
@@ -132,7 +132,7 @@ class PeekThenReadTest {
     void theHeaderIsAvailableBeforeTheBody() {
         TsonDocumentPeek peek = tson("api-1", V1_SCHEMA).begin(oneShot(V1_DOC));
 
-        assertEquals(V1, peek.header().schema().orElseThrow());
+        assertEquals(List.of(V1), peek.header().imports());
         assertFalse(peek.isSchemaDocument());
     }
 
@@ -157,7 +157,7 @@ class PeekThenReadTest {
         Tson tson = tson("api-1", V1_SCHEMA);
 
         TsonDocumentPeek peek = tson.begin(oneShot("""
-                !!schema:"https://example.test/order-1.tn"
+                !!import:"https://example.test/order-1.tn"
                 !order { sku: "A"  quantity: 1 }"""));
         Order order = tson.objectReader().withDiagnostics(problems).read(peek, Order.class);
 
@@ -192,7 +192,7 @@ class PeekThenReadTest {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         Tson tson = tson("api-1", V1_SCHEMA);
 
-        TsonDocumentPeek peek = tson.begin(oneShot("!!schema:\n{ sku: \"A\" }"));
+        TsonDocumentPeek peek = tson.begin(oneShot("!!import:\n{ sku: \"A\" }"));
         Order order = tson.objectReader().withDiagnostics(problems).read(peek, Order.class);
 
         assertEquals(null, order);
@@ -214,7 +214,7 @@ class PeekThenReadTest {
         Tson tson = tson("api-1", V1_SCHEMA);
         TsonDocumentPeek peek = tson.begin(oneShot(UNDECLARED_V1));
 
-        assertTrue(peek.header().schema().isEmpty());
+        assertTrue(peek.header().imports().isEmpty());
         assertEquals(new Order("A", 1, 7, "AUD"),
                 tson.objectReader().withSchema(V1).readAs(peek, "order", Order.class));
     }
@@ -239,7 +239,7 @@ class PeekThenReadTest {
         Tson tson = tson("api-1", V1_SCHEMA);
         TsonDocumentPeek peek = tson.begin(oneShot(V1_DOC));
 
-        assertEquals(V1, peek.header().schema().orElseThrow());
+        assertEquals(List.of(V1), peek.header().imports());
         assertEquals(new Order("A", 1, 7, "AUD"),
                 tson.objectReader().withSchema(V1).readAs(peek, "order", Order.class));
     }

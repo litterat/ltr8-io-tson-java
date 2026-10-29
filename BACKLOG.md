@@ -38,8 +38,17 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
+- [ ] **Which schemas describe schemas, once value entries are ordinary types** (step 5e, SPEC-FEEDBACK.md #8).
+  `TsonLinkedSchema.governsSchemas` reads a kind-typed position by its name's grammar alone under the kernel and a
+  schema importing it directly, and by membership under every other; the rule stands in for the `!!meta` that named
+  the kernel, and a read under several imports takes none of it from an import that has it. Decide it with the
+  binder split, and give the corpus a vector for each side.
+- [ ] **Rename the meta-layer vocabulary the header no longer has.** `TsonCompiledMetaRegistry`,
+  `TsonCompiledMetaSchema`, `TsonCompiledSchemaLoader.loadMeta`, `ProcessorConfig.metaNameBinder` and
+  `SchemaMetaNameBinder` name a "meta" no directive states: each is the compiled vocabulary of an imported schema, or
+  the bind context for `schema.meta`'s classes. A rename across some 130 files, done as one IDE refactor.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
-  collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
+  collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the five bundled
@@ -50,8 +59,10 @@ spec-required case:
   recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`
   must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
   family checks (no member minted at a use site) over the ingested map and its closure, the §5.11 group
-  declaration rules over every `field_group`, and every kind-typed slot's name against its kind, which the reader
-  of a meta-governed data document checks for grammar alone ([TSON-SCHEMA] §4.2, `KindParser.namesOnly`).
+  declaration rules over every `field_group`, and every kind-typed slot's name against its kind, which a reader under
+  a schema that describes schemas checks for grammar alone ([TSON-SCHEMA] §4.2, `KindParser.namesOnly`). A resolved
+  form is read today only where a caller says it is one (`TsonDataParser.parseResolvedForm`, a reader's
+  `readAs(text, "schema")`), with nothing verified.
   `ParameterTypes` already derives the type to check against.
 - [ ] **An application is not yet unified with an imported library's entry for it** ([TSON-SCHEMA] §8.1, §8.2). A
   library declaring `int_box => box<int32>` writes `@application:{ name: box  arguments: [{ name: int32 }] }` on that
@@ -114,7 +125,7 @@ it — and no schema declares one, so nothing in this stack reads a schema-side 
 written. A record is closed under its type and open-ended data is a declared map-typed field, identically in both
 encodings ([TSON-JSON] §6.1.1).
 
-- [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 39.** §3.3 requires `$type` (after any `$schema`)
+- [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 39.** §3.3 requires `$type` (after any `$import`)
   to lead its object and argues that code-point sorting preserves that; with `record.name_type` admitting `$ref`,
   `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged value —
   `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. Decided: the reader admits the annotation
@@ -123,16 +134,21 @@ encodings ([TSON-JSON] §6.1.1).
   `DispatchChoiceReader`, `DispatchDeclaredReader`) and edit §3.3 with it, as a Revision 39 proposal; Revision 38
   keeps the strict lead.
 
-- [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
+- [ ] **A JSON document has no in-band way to name its schemas — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
   and it is the one the spec calls the expected production route. What is left is the in-band one: a root value
-  that is or is wrapped by an annotation object carrying `$schema` and `$type`, both REQUIRED on that route. It
-  rides §3.3's annotation object, built for typed positions, so what is left is the root: reading the leading
-  `$schema`/`$type` before any schema is in hand, where every value position refuses a `$schema` today (`Tags`). Where both
-  routes supply a binding they MUST agree by canonical identity, and disagreement is a resolver error — never a
-  precedence question.
-  [TSON-JSON] §3.5's `TSON-Schema` field, a projection of the binding rather than an alternative to it, is the
-  channel a server uses and is where this answer has to stay consistent.
+  that is or is wrapped by an annotation object led by `$import` — a non-empty array of schema references — and
+  `$type`, both REQUIRED on that route. Today a root led by `$import` is declined as `NOT_IMPLEMENTED`
+  (`InBandBinding`). The work: read the leading `$import`/`$type` before any schema is in hand, refuse an `$import`
+  that is not a non-empty array of strings (a resolver error), read the root with the `$import` member consumed,
+  and check agreement with an out-of-band binding — the two as **sets** of canonical identities, and the type by
+  name (§3.4, §3.5); disagreement is a resolver error, never a precedence question.
+  **Several imports need a linking seam first.** A read under several schemas is one namespace over their closures
+  (§3.4), which takes the linker: `TsonCompiledSchemaRegistry.get(List, receiver)` links one on the TSON side, but
+  `tson-json` holds only a `TsonSchemaLoader` of already-linked schemas and cannot depend on `tson-compiler`. The
+  JSON registry needs a loader that also links an import set (say a `TsonSchemaLoader` method taking several
+  identities, implemented where `Tson` wires it), and the same seam gives the out-of-band route a `withImports`
+  beside `withSchema`. One import needs none of this.
 
 **`tson-json` is a stack of its own, not a second front end over `TsonEventSource`.** Reusing the TSON event
 contract would make one encoding's layering decide the other's at the two points where JSON and TSON genuinely
@@ -377,13 +393,12 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   beside it; what constrains it is that the JSON lexer has to state which kind it raised, and that
   `CrossEncodingParityTest` compares codes, so the two encodings must sort one malformed input the same way.
 
-- [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
-  in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a
-  reference whose pin does not match its target's bytes is refused, a query parameter that is not a
-  recognized hash algorithm is an error rather than silently retained, and a hashed reference whose target
-  carries no id line is refused (the hash input having no boundary). All three are expressible at the
-  `class2/validate` layer, where a subject's own `!!schema` names a corpus fixture the runner serves: a
-  wrong pin is portable without pinning any fixture's bytes, since no conforming processor may accept it.
+- [ ] **The shared corpus states little about [TSON-DATA] §2.2.1's content-hash pins.** One vector pins a fixture
+  wrongly (`class2/link/invalid/one-identity-imported-under-two-pins`); two MUSTs go unmeasured across
+  implementations: a query parameter that is not a recognized hash algorithm is an error rather than silently
+  retained, and a hashed reference whose target carries no id line is refused (the hash input having no boundary).
+  Both are expressible at the `class2/validate` layer, where a subject's own `!!import` names a corpus fixture the
+  runner serves.
   What is *not* expressible is which registration route recorded the hash — a corpus subject always reaches
   its schema through the runner's `SchemaSource`, where a host application registering a schema from text it
   holds is the case this repo covers in `TsonValidateTest`. The category is settled for all three: [TSON-SCHEMA]

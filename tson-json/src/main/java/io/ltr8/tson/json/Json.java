@@ -156,8 +156,9 @@ public final class Json {
      * <p>An empty list is a conforming document. Nothing is thrown for a document that does not conform, or
      * for one that will not even parse: a collecting read returns nothing and the diagnostics say why.
      *
-     * <p>The two arguments are the binding, and a JSON document cannot supply them itself (§3.4). Which is
-     * the whole difference from {@code Tson.validate}, whose documents name their own.
+     * <p>The two arguments are the binding, §3.4's out-of-band route. Which is the whole difference from {@code
+     * Tson.validate}, whose documents name their own: the in-band route, a root {@code $import} and {@code $type},
+     * is not read yet, and a document carrying one is declined at its {@code $import} as {@code NOT_IMPLEMENTED}.
      */
     public List<Diagnostic> validate(InputStream source, String schemaUri, String rootType) {
         List<Diagnostic> problems = new ArrayList<>();

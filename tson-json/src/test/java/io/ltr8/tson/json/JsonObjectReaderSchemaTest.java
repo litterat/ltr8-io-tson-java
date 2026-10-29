@@ -29,9 +29,9 @@ class JsonObjectReaderSchemaTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/object-reader-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               line    => { sku: text  quantity: int32  price: float64 }
               order   => { customer: text  lines: [line]  note?: text ~ "none" }
               orphan  => { value: text }

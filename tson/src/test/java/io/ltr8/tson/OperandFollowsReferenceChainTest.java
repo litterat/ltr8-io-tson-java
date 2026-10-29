@@ -36,9 +36,9 @@ class OperandFollowsReferenceChainTest {
     private static String schema(String id, String declarations) {
         return """
                 !!id:"https://example.test/%s.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                 %s}
                 """.formatted(id, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, declarations);
     }

@@ -33,9 +33,9 @@ class HttpSchemaSourceTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
                 order => { sku: text  quantity: int32 }
             }""";
 

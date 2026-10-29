@@ -25,9 +25,9 @@ class TemplateParamTypeTest {
     private static final String ID = "https://example.test/params-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/params-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               percent  => !integer ^ { min: 0  max: 100 }
               vector   => <T, N> !array { element_type: T  min_items: N  max_items: N }
               counted  => <C> { c?: percent ~ C }
@@ -88,8 +88,8 @@ class TemplateParamTypeTest {
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, SCHEMA)))));
         assertEquals(List.of(), tson.validateSchema(SCHEMA));
-        assertEquals(List.of(), tson.validate("!!schema:\"" + ID + "\"\n!holder { n: c }"));
-        List<Diagnostic> refused = tson.validate("!!schema:\"" + ID + "\"\n!holder { n: z }");
+        assertEquals(List.of(), tson.validate("!!import:\"" + ID + "\"\n!holder { n: c }"));
+        List<Diagnostic> refused = tson.validate("!!import:\"" + ID + "\"\n!holder { n: z }");
         assertEquals(1, refused.size(), refused.toString());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, refused.getFirst().code());
     }
@@ -99,9 +99,9 @@ class TemplateParamTypeTest {
     void usesThatDisagreeAreRefused() {
         List<Diagnostic> refused = Tson.standard().validateSchema("""
                 !!id:"https://example.test/clash-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   clash => <N> { a?: text ~ N  b?: int32 ~ N }
                 }
                 """);
@@ -121,9 +121,9 @@ class TemplateParamTypeTest {
     private static List<Diagnostic> load(String declarations) {
         return Tson.standard().validateSchema("""
                 !!id:"https://example.test/params-structure.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                 """ + declarations + "}");
     }
 

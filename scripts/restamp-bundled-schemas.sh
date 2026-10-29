@@ -2,7 +2,7 @@
 #
 # Re-stamp the five bundled schemas' content-hash pins, bottom-up, plus every copy of them this
 # repo carries. Run it after any edit to spec/m/{meta-kernel,meta,core,net,policy}.tn: a digest is over the
-# document's own bytes, so an edit to meta.tn invalidates meta.tn's own !!id pin, core.tn's !!meta
+# document's own bytes, so an edit to meta.tn invalidates meta.tn's own !!id pin, core.tn's !!import
 # pin, core.tn's own !!id pin (its bytes now differ), TsonBundledSchemas' held constants, and the
 # getting-started example's pins in README.md and InitCommand.java.
 #
@@ -133,7 +133,6 @@ restamp spec/m/net.tn "$META_ID" "$META"
 NET=$(digest spec/m/net.tn)
 restamp spec/m/net.tn "$NET_ID" "$NET"
 
-restamp spec/m/policy.tn "$META_ID" "$META"
 restamp spec/m/policy.tn "$CORE_ID" "$CORE"
 POLICY=$(digest spec/m/policy.tn)
 restamp spec/m/policy.tn "$POLICY_ID" "$POLICY"
@@ -145,10 +144,9 @@ restamp_constant "$BUNDLED" CORE_SHA256 "$CORE"
 restamp_constant "$BUNDLED" NET_SHA256 "$NET"
 restamp_constant "$BUNDLED" POLICY_SHA256 "$POLICY"
 
-# The example pins meta.tn and core.tn, so its own digest is over bytes this pass has just changed:
-# stamp those two first, then hash it, then stamp its own !!id.
+# The example pins core.tn, so its own digest is over bytes this pass has just changed: stamp that
+# first, then hash it, then stamp its own !!id.
 for carrier in "${CARRIERS[@]}"; do
-    restamp "$carrier" "$META_ID" "$META"
     restamp "$carrier" "$CORE_ID" "$CORE"
 done
 EXAMPLE_ID=$(awk '/^!!id:"https:\/\/[^"]*person\.tn/ { sub(/^!!id:"/, ""); sub(/[?"].*$/, ""); print; exit }' README.md)

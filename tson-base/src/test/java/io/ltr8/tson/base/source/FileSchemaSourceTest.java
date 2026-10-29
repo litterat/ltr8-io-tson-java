@@ -27,9 +27,9 @@ class FileSchemaSourceTest {
     private static String schemaAt(String path) {
         return """
                 !!id:"https://%s%s"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   order => { sku: text  quantity: int32 }
                 }
                 """.formatted(HOST, path);

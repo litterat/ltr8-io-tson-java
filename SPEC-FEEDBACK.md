@@ -287,11 +287,11 @@ The LOCAL cell needs none of this — a value naming, by its tag, a type of the 
 - `scoped`, `scope_kind`, `scope_set` and `schema_identity` are gone from meta.tn, and `extern`, `dynamic`,
   `extern_of` and `extern_type` from core.tn.
 - [TSON-DATA]'s `scoped-value` production is gone: a record field value, a map entry value and an array element are
-  each a `data-value`, so a `!!schema` there is a directive outside its placement and a **parse error** (§3.3's closed
-  positional set). `!!schema` stands in the header alone.
+  each a `data-value`, so a directive there is outside its placement and a **parse error** (§3.3's closed positional
+  set). Directives stand in the header alone, and the header's one binding directive is `!!import` (#8).
 - [TSON-DATA] §9.1's foreign-schemas row is gone, from the limits policy and from `policy.tn`.
-- [TSON-JSON] (edited in place) admits `$schema` on the root's annotation object alone; anywhere else it is a resolver
-  error, and §8.5 is "Declared Positions".
+- [TSON-JSON] (edited in place) admits its binding member, `$import` since #8, at the top of a document alone;
+  anywhere else it is a resolver error, and §8.5 is "Declared Positions".
 
 **Resolution, a proposal.** Sections amended:
 
@@ -323,10 +323,9 @@ importer applies, unexpressible. Each is a rule about levels, which the dependen
 
 **What is running.** One namespace per schema:
 
-- **`!!meta` contributes as `!!import` does.** A schema's namespace is its own entries and every entry of its
-  import closure, transitively, the `!!meta` target's included. The `!!meta` directive still classifies the
-  document as a schema, and the meta-kernel's self-naming `!!meta` contributes nothing, its cycle closed by
-  pre-loading (§3.4); nothing else distinguishes a `!!meta` target from an import, and any schema may be one.
+- **A schema's namespace is its own entries and every entry of its import closure**, transitively. `!!meta`
+  contributed exactly as `!!import` does, and is retired by #8: `!!import` is the one directive, and the root's
+  `!schema` tag classifies the document.
 - **Every name resolves there:** a `!` head, an atom refinement's source, a type-ref, a kind's or a reference's
   `of`, a template bound, and an annotation (§3.3.3: in the annotating schema's namespace, for a schema document as
   for a data document).
@@ -348,18 +347,71 @@ importer applies, unexpressible. Each is a rule about levels, which the dependen
 
 **Resolution, a proposal.** Sections amended:
 
-- §2.2.2: `!!meta` names a schema the document imports, and marks the document a schema; its two bullets, the ladder
-  paragraph, "Constructor declarations are a meta-schema privilege" and the namespace-type paragraph's level
-  sentences go.
-- §2.2.3: "An import stands at the importer's governing level" goes; "exactly as `!!meta` contributes" becomes "the
-  `!!meta` target's included"; the sentence placing imports in the type-name namespace only goes.
+- §2.2.2: goes with `!!meta` (#8); its two bullets, the ladder paragraph, "Constructor declarations are a
+  meta-schema privilege" and the namespace-type paragraph's level sentences go with it.
+- §2.2.3: "An import stands at the importer's governing level" and "exactly as `!!meta` contributes" go; the sentence
+  placing imports in the type-name namespace only goes.
 - §3 intro, §3.1, §3.3, §3.3.1, §3.3.2, §3.3.4 restate one namespace: §3.3.1 keeps the constructor-role
   applicability rule (IS-A `top`) and the desugar targets, now resolved in that namespace, and its
   direction-of-service, one-hop and "import what you expose" paragraphs go; §3.3.2's lookup order gains the
-  `!!meta` target as an import; §3.3.5 goes.
+  closure's imports alone; §3.3.5 goes.
 - §3.3.3: an annotation resolves in the annotating document's namespace; core declares no `doc` of its own.
 - §3.4: the kernel's entries reach a schema through its import closure; "NOT automatically available as type-refs"
   goes.
 - §4.2 (core's `kind`, `void` and `set` siblings), §4.x's "Core declares no sibling of `identifier`", §1's worked
   example ("reached through the structure namespace"), §6, §9 and §13.2: core imports meta.tn; core's sibling rows
   go.
+
+## 8. [TSON-DATA] §2.2, §7.1; [TSON-SCHEMA] §2.2.2, §2.2.3, §3.4, §7.1, §8.1 — one directive, the root says the kind
+
+**Problem.** Three directives state one relation. `!!import` brings a schema's namespace into a schema; since #7
+`!!meta` does the same and also classifies the document as a schema; and `!!schema` on a data document names "a
+namespace, not a root contract" (§7.1), which is what an import is, but admits one. The kernel names itself with
+`!!meta`, a cycle closed only by pre-loading, and a resolved form cannot carry its source's imports, so they are
+supplied at ingest (§8.1).
+
+**What is running.**
+
+- **The header is an optional `!!id`, then any number of `!!import`s**, for every document. `!!meta` and `!!schema` are
+  parse errors naming their replacement; an unknown directive, and an `!!id` after an `!!import`, are refused by the
+  same grammar. A directive past the header is the parse error #6 left.
+- **A document is a schema exactly when its root is tagged `!schema`.** The tag always names the pre-loaded kernel's
+  `schema`, whatever the document imports, and is read as a spelling; a schema parser refuses an untagged root.
+  Classification reads the header, the root's leading annotations and its tag, and never the root's value, so a schema
+  map's sugar is never parsed to classify it. That is not §7.1's "at most two directives of lookahead and no value
+  parsing": annotations stand before the tag (§7.4's `*annotation [type-ref] core-value`), so a schema carrying a
+  document-level `@doc` is classified past that annotation's value. This is the reading running; the alternative, a
+  schema's annotations after its tag, would make the root the one value whose annotations follow its type-ref.
+- **A Class 1 processor still refuses a schema document** with §1.5's categorized diagnostic, now at the root's tag.
+  Reading one as a map with a preserved tag would surface its sugar as a misleading parse error.
+- **Data documents import as schemas do.** Several imports are read under one namespace over their closures, a name two
+  of them declare differently being §2.2.3's collision; under imports the root names its type (§7.1). A read under
+  several imports is linked as a schema with no entries of its own importing each, and compiled once per set.
+- **Every import target is a schema document**: a target whose root is not tagged `!schema` fails to parse as one, and
+  the importer fails to load. Two pins of one identity in one closure are refused, since at most one matches the
+  content (§2.2.1). Two revisions of one base are refused where they declare a common name, as §2.2.3's collision;
+  nothing defines a revision for an arbitrary identity, so no rule refuses them otherwise.
+- **The kernel's header is its `!!id` alone**, its root `!schema`. It imports nothing, is pre-loaded (§3.4) and is never
+  resolved from a document, and a document claiming its identity is checked against the bytes the processor ships.
+  Its names reach a schema only by import: an import-free `!schema { a => { b: b }  b => {} }` is valid and sees its
+  own names. meta.tn imports the kernel, core.tn and net.tn import meta.tn, and policy.tn imports core.tn.
+- **A resolved form's header is its source's**, and its root `!schema`; nothing in it marks it resolved. Reading one is
+  the caller's choice, as §10.1's ingest is: the reader is told the root's type, and reads under the form's own
+  imports, the kernel's own form, which imports nothing, under the pre-loaded kernel. Nothing is supplied at ingest.
+- **What remains of the ladder is one reading rule.** A kind-typed position reads the name's grammar alone, leaving
+  membership to the described schema's link (§4.2, §8.1), when the schema read under is the kernel or imports it
+  directly, as meta.tn does; that was the schemas whose `!!meta` named the kernel. Whether a schema describes schemas
+  is open until value entries are ordinary types.
+- [TSON-JSON] (edited in place): the binding member is `$import`, a list of references, at the top of a document only.
+
+**Resolution, a proposal.** Sections amended:
+
+- [TSON-DATA] §2.2: a header is `[id-directive] *import-directive`; the directive table loses `meta` and `schema`; a
+  document is a schema when its root is tagged `!schema`. §3.3's positional set is `id` then `import`. §7.1's
+  classification reads the header, the root's annotations and its tag. §7.4: `document = [id-directive ws]
+  *(import-directive ws) data-value ws`. §1.5 and §8.1 identify a schema document by its root's tag.
+- [TSON-SCHEMA] §2.2.2 goes. §2.2.3 states imports for every document, every target a schema document, and the pin
+  rule above. §3.4: the kernel's header is `!!id` alone, and it is pre-loaded, never resolved. §7.1: a data document's
+  `!!import`s bind it, several in one namespace, and the root names its type. §8.1: a resolved form carries its
+  source's header, and nothing is supplied at ingest. §12.1: `schema-document = [id-directive ws] *(import-directive
+  ws) *(annotation ws) "!schema" ws schema-map`.

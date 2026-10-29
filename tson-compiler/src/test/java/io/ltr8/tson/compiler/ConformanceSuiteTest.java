@@ -60,6 +60,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import static io.ltr8.tson.suite.Sidecar.fieldCore;
 import static io.ltr8.tson.suite.Sidecar.fieldText;
+import static io.ltr8.tson.suite.Sidecar.fieldTextArray;
 import static io.ltr8.tson.suite.Sidecar.fieldTextOrAbsent;
 import static io.ltr8.tson.suite.Sidecar.fieldValue;
 import static io.ltr8.tson.suite.Sidecar.hasField;
@@ -138,15 +139,16 @@ class ConformanceSuiteTest {
 
     /**
      * [TSON-DATA] §2.2.1 over the subject's first directive: an {@code !!id} is a document's own name and must be
-     * written canonically ({@link CanonicalIdentity#validate}); a {@code !!schema} is a reference, read in any
+     * written canonically ({@link CanonicalIdentity#validate}); an {@code !!import} is a reference, read in any
      * spelling ({@link CanonicalIdentity#canonicalize}). Nothing is fetched or resolved.
      */
     private static void checkIdentityVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        TsonDocumentHeader header = TsonDocumentPeek.of(new ByteArrayInputStream(subjectBytes(subject, sidecar)))
+        TsonDocumentHeader header = TsonDocumentPeek.of(new ByteArrayInputStream(subjectBytes(subject)))
                 .header();
         boolean ownName = header.id().isPresent();
         String argument = ownName ? header.id().get()
-                : header.schema().orElseThrow(() -> new AssertionError("an identity subject carries !!id or !!schema"));
+                : header.imports().stream().findFirst()
+                        .orElseThrow(() -> new AssertionError("an identity subject carries !!id or !!import"));
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 if (ownName) {
@@ -176,7 +178,7 @@ class ConformanceSuiteTest {
             checkEncodingVector(subject, sidecar);
             return;
         }
-        byte[] raw = subjectBytes(subject, sidecar);
+        byte[] raw = subjectBytes(subject);
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 List<Token> actual = new Lexer(ByteSource.of(new ByteArrayInputStream(raw))).tokenize();
@@ -240,7 +242,7 @@ class ConformanceSuiteTest {
     // ── TsonDataParser-layer vectors ─────────────────────────────────────────────
 
     private static void checkParserVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        byte[] raw = subjectBytes(subject, sidecar);
+        byte[] raw = subjectBytes(subject);
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 Document actual = new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument();
@@ -257,7 +259,7 @@ class ConformanceSuiteTest {
 
     private static void assertDocumentMatches(RecordValue expected, Document actual) {
         assertEquals(fieldTextOrAbsent(expected, "id"), actual.id().orElse(null), "document.id");
-        assertEquals(fieldTextOrAbsent(expected, "schema"), actual.schema().orElse(null), "document.schema");
+        assertEquals(fieldTextArray(expected, "imports"), actual.imports(), "document.imports");
         RecordValue expectedRoot = (RecordValue) fieldValue(expected, "root").coreValue();
         assertDataValueMatches(expectedRoot, actual.root());
     }
@@ -359,7 +361,7 @@ class ConformanceSuiteTest {
      * here for the wrong reason.
      */
     private static void checkReaderVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        byte[] raw = subjectBytes(subject, sidecar);
+        byte[] raw = subjectBytes(subject);
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 TsonValue actual = new TsonTreeReader().read(new ByteArrayInputStream(raw));
@@ -518,7 +520,7 @@ class ConformanceSuiteTest {
     private static void checkResolverVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         // §4 never rejects a token, so this layer has one outcome and the sidecar carries `valid`
         // as a plain field -- a group of one is not a group (§5.11's two-member minimum).
-        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject, sidecar))).parseDocument();
+        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject))).parseDocument();
         TokenValue token = assertInstanceOf(TokenValue.class, doc.root().coreValue(),
                 "resolver vector .tn must be a single bare token");
         BaseValue actual = BaseTypeResolver.resolve(token);
@@ -632,7 +634,7 @@ class ConformanceSuiteTest {
      * validation error. The suite's README flags the first half as not yet settled by the spec.
      */
     private static void checkVocabularyVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject, sidecar))).parseDocument();
+        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject))).parseDocument();
         DataValue root = doc.root();
         String typeRef = root.typeRef().orElseThrow(
                 () -> new AssertionError("vocabulary vector .tn must carry a type-ref"));
@@ -759,50 +761,6 @@ class ConformanceSuiteTest {
     private static Rational parseRational(String text) {
         String[] parts = text.split("/", 2);
         return new Rational(new BigInteger(parts[0]), new BigInteger(parts[1]));
-    }
-
-    // ── Dynamic meta/import splicing (RUNNER.md's "Schema-governed vectors") ──
-
-    /**
-     * Proves {@link Sidecar#splicedSource} both splices the right text, in the right place, and produces a
-     * document that genuinely resolves against the real bundled meta.tn/core.tn chain -- not just
-     * something that looks plausible. Self-contained: doesn't depend on the sibling test-suite repo
-     * being checked out.
-     */
-    @Test
-    void theSpliceInsertsRealDirectivesThatActuallyResolve(@TempDir Path tempDir) throws IOException {
-        Path subject = tempDir.resolve("synthetic.tn");
-        Files.writeString(subject,
-                "!!id:\"https://tson.io/test-suite/schema/valid/synthetic.tn\"\n{ my_int => integer }");
-        RecordValue sidecar = (RecordValue) new TsonDataParser("{ meta: \"meta.tn\" import: [\"core.tn\"] }")
-                .parseDocument().root().coreValue();
-
-        String resolved = Sidecar.splicedSource(subject, sidecar);
-
-        assertEquals(
-                "!!id:\"https://tson.io/test-suite/schema/valid/synthetic.tn\"\n"
-                        + "!!meta:\"" + TsonBundledSchemas.META_ID + "\"\n"
-                        + "!!import:\"" + TsonBundledSchemas.CORE_ID + "\"\n"
-                        + "{ my_int => integer }",
-                resolved, "!!meta/!!import spliced right after !!id, in header order");
-
-        SchemaDocument schemaDocument = new TsonSchemaParser(resolved).parseSchemaDocument();
-        // Resolution (unlike compilation) always needs an object-binding-mode governing-meta reader,
-        // regardless of what mode the caller eventually wants -- see Tson's own class Javadoc.
-        // Same bootstrap sequence ProcessorConfig#build uses: meta-kernel has to be resolved and
-        // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
-        // register itself -- see TsonBundledSchemas's own class Javadoc for why.
-        TsonCompiledMetaRegistry compiledRegistry =
-                new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
-        TsonCompiledSchemaLoader loader = compiledRegistry;
-        SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        compiledRegistry.register(resolvedMetaKernel);
-
-        TsonSchema resolvedSchema = new TsonSchemaResolver(loader).resolveSchema(schemaDocument);
-        assertTrue(resolvedSchema.entries().containsKey("my_int"),
-                "my_int should resolve as a bare reference to core.tn's own integer, reachable via the real spliced !!import");
     }
 
     /**

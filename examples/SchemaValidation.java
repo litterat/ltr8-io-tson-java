@@ -18,9 +18,9 @@ void main() {
 
     String schema = """
             !!id:"https://example.com/2026/39/app/server-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
                 server => { hostname: text  port: int32 }
             }""";
 

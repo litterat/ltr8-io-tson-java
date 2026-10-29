@@ -127,7 +127,7 @@ source for it, or because reaching it would break documents already on the wire.
 - **Declared positions.** `declared` requires an annotation object naming the type (§5.7, §8.5), which
   existing JSON does not carry. `additionalProperties: true` converts to the recursive `json` choice of §5.7,
   which is tag-free, never to `declared`.
-- **In-band root binding.** Existing JSON has no `$schema`/`$type`, so the root binds by §3.4's out-of-band
+- **In-band root binding.** Existing JSON has no `$import`/`$type`, so the root binds by §3.4's out-of-band
   route — "the expected production route" in the spec's own words — through `Json.withSchemas` and
   `tson validate --schema --type`.
 

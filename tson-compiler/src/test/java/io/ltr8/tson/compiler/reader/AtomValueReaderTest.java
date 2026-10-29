@@ -51,7 +51,7 @@ class AtomValueReaderTest {
         entries.put("holder", RecordBody.of(RecordBody.fieldMap(Map.entry("value",
                 RecordField.required(TypeRef.of("field"))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
 
@@ -163,7 +163,7 @@ class AtomValueReaderTest {
         entries.put("holder", RecordBody.of(RecordBody.fieldMap(Map.entry("value",
                 RecordField.required(TypeRef.of(typeName))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
 

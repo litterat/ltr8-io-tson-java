@@ -27,8 +27,9 @@ class EnumTypeTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static String schema(String name, String body) {
@@ -137,7 +138,7 @@ class EnumTypeTest {
                   steps => !enum_type { name_type: kebab  members: [make-tea drink-tea] }
                   rec   => { s: steps } }""";
         tson.resolve(schema("steps", kebab));
-        String head = "!!schema:\"https://example.test/steps.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/steps.tn\"\n!rec ";
         assertEquals(List.of(), tson.validate(head + "{ s: make-tea }"));
 
         List<Diagnostic> refused = Tson.standard().validateSchema(schema("steps-bad", """
@@ -180,27 +181,27 @@ class EnumTypeTest {
         String userId = "https://example.test/kebab-user.tn";
         String meta = """
                 !!id:"%s"
-                !!meta:"%s"
                 !!import:"%s"
-                { kebab      => !identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
+                !!import:"%s"
+                !schema { kebab      => !identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
                   kebab_enum => enum_type ^ { name_type?: = kebab } }
                 """.formatted(metaId, TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID);
         String user = """
                 !!id:"%s"
-                !!meta:"%s"
-                { steps => !kebab_enum [make-tea drink-tea]
+                !!import:"%s"
+                !schema { steps => !kebab_enum [make-tea drink-tea]
                   rec   => { s: steps } }
                 """.formatted(userId, metaId);
         String bad = """
                 !!id:"https://example.test/kebab-bad.tn"
-                !!meta:"%s"
-                { steps => !kebab_enum [make-tea Drink] }
+                !!import:"%s"
+                !schema { steps => !kebab_enum [make-tea Drink] }
                 """.formatted(metaId);
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(
                 Map.of(metaId, meta, userId, user, "https://example.test/kebab-bad.tn", bad)))));
 
         assertEquals(List.of(), tson.validateSchema(user));
-        assertEquals(List.of(), tson.validate("!!schema:\"" + userId + "\"\n!rec { s: drink-tea }"));
+        assertEquals(List.of(), tson.validate("!!import:\"" + userId + "\"\n!rec { s: drink-tea }"));
         assertTrue(messages(tson.validateSchema(bad)).contains("member 'Drink' is not a value of its name_type 'kebab'"),
                 messages(tson.validateSchema(bad)));
     }
@@ -219,7 +220,7 @@ class EnumTypeTest {
                 { words    => !identifier_type { continue_add: "-"  medial: " " }
                   activity => !enum_type { name_type: words  members: [sedentary "lightly active"] }
                   rec => { a: activity } }"""));
-        String head = "!!schema:\"https://example.test/read.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/read.tn\"\n!rec ";
 
         assertEquals(List.of(), tson.validate(head + "{ a: \"lightly active\" }"));
 
@@ -240,12 +241,12 @@ class EnumTypeTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/answers.tn"
-                !!meta:"%s"
-                { reply  => !text_type { members: ["true" "false"] }
+                !!import:"%s"
+                !schema { reply  => !text_type { members: ["true" "false"] }
                   bit    => !enum [true false]
                   either => ( reply | bit )
                   rec    => { e: either } }""".formatted(TsonBundledSchemas.META_ID));
-        String head = "!!schema:\"https://example.test/answers.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/answers.tn\"\n!rec ";
 
         assertEquals(List.of(), tson.validate(head + "{ e: \"true\" }"));
         assertEquals(List.of(), tson.validate(head + "{ e: true }"));
@@ -256,7 +257,7 @@ class EnumTypeTest {
     void booleanIsStillAnOrdinaryEnum() {
         Tson tson = Tson.standard();
         tson.resolve(schema("bool", "{ rec => { b: boolean } }"));
-        String head = "!!schema:\"https://example.test/bool.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/bool.tn\"\n!rec ";
 
         assertEquals(List.of(), tson.validate(head + "{ b: true }"));
         assertEquals(List.of(), tson.validate(head + "{ b: \"true\" }"),

@@ -42,9 +42,9 @@ class BindStrictnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { sku: text  quantity: int32  currency: text }
             }
             """;
@@ -52,7 +52,7 @@ class BindStrictnessTest {
     private static final String OPTIONAL_SCHEMA = SCHEMA.replace("currency: text", "currency: text?");
 
     private static final String DOC = """
-            !!schema:"https://example.test/order-2.tn"
+            !!import:"https://example.test/order-2.tn"
             !order { sku: "A"  quantity: 1  currency: "AUD" }""";
 
     /** The v1 class: no component for the field v2 added. */
@@ -189,9 +189,9 @@ class BindStrictnessTest {
 
     private static final String MONEY_SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               money => text
               order => { sku: text  quantity: int32  currency: money }
             }
@@ -248,7 +248,7 @@ class BindStrictnessTest {
         Tson tson = moneyTson(true);
         assertNotNull(tson.bindRegistry().get(ID));
         OrderPriced order = tson.objectReader().read("""
-                !!schema:"https://example.test/order-2.tn"
+                !!import:"https://example.test/order-2.tn"
                 !order { sku: "A"  quantity: 1  currency: "12.34" }""", OrderPriced.class);
         assertEquals(new Money("12.34"), order.currency());
     }

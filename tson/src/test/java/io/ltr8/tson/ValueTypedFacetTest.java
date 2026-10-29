@@ -31,9 +31,9 @@ class ValueTypedFacetTest {
     private static String schemaDeclaring(String declarations) {
         return """
                 !!id:"https://example.test/facet-%d.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { %s }
+                !schema { %s }
                 """.formatted(NEXT.incrementAndGet(), declarations);
     }
 
@@ -69,13 +69,13 @@ class ValueTypedFacetTest {
         tson.resolve(schema);
         String id = schema.split("\"")[1];
 
-        assertEquals(List.of(), tson.validate("!!schema:\"" + id + "\"\n!box { d: PT45M }"));
+        assertEquals(List.of(), tson.validate("!!import:\"" + id + "\"\n!box { d: PT45M }"));
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                tson.validate("!!schema:\"" + id + "\"\n!box { d: PT10M }").getFirst().code());
+                tson.validate("!!import:\"" + id + "\"\n!box { d: PT10M }").getFirst().code());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                tson.validate("!!schema:\"" + id + "\"\n!box { d: PT3H }").getFirst().code());
+                tson.validate("!!import:\"" + id + "\"\n!box { d: PT3H }").getFirst().code());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                tson.validate("!!schema:\"" + id + "\"\n!box { d: PT40M }").getFirst().code());
+                tson.validate("!!import:\"" + id + "\"\n!box { d: PT40M }").getFirst().code());
     }
 
     @Test
@@ -89,10 +89,10 @@ class ValueTypedFacetTest {
         tson.resolve(schema);
         String id = schema.split("\"")[1];
 
-        assertEquals(List.of(), tson.validate("!!schema:\"" + id + "\"\n!box { d: PT90M }"));
-        assertEquals(List.of(), tson.validate("!!schema:\"" + id + "\"\n!box { d: P0DT5400S }"));
+        assertEquals(List.of(), tson.validate("!!import:\"" + id + "\"\n!box { d: PT90M }"));
+        assertEquals(List.of(), tson.validate("!!import:\"" + id + "\"\n!box { d: P0DT5400S }"));
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                tson.validate("!!schema:\"" + id + "\"\n!box { d: PT5401S }").getFirst().code());
+                tson.validate("!!import:\"" + id + "\"\n!box { d: PT5401S }").getFirst().code());
     }
 
     // ── the author's error is the author's ───────────────────────────────

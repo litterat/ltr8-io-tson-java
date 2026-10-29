@@ -32,9 +32,9 @@ class TransitiveImportTest {
     private static String leaf(String id, String typeName) {
         return """
                 !!id:"%s"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                   %s => { name: text }
                 }
                 """.formatted(id, META, CORE, typeName);
@@ -44,9 +44,9 @@ class TransitiveImportTest {
     private static String derived(String id, String importId, String typeName) {
         return """
                 !!id:"%s"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                   %s => { inner: widget }
                 }
                 """.formatted(id, META, importId, typeName);
@@ -64,10 +64,10 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/c-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/a-1.tn"
                 !!import:"https://example.test/b-1.tn"
-                {
+                !schema {
                   pair => { left: alpha  right: beta }
                 }
                 """);
@@ -85,11 +85,11 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/c-2.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !!import:"https://example.test/a-2.tn"
                 !!import:"https://example.test/b-2.tn"
-                {
+                !schema {
                   pair => { left: alpha  right: beta  label: text }
                 }
                 """);
@@ -109,9 +109,9 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/d-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/a-3.tn"
-                {
+                !schema {
                   tagged => alpha & { label: text }
                 }
                 """);
@@ -127,10 +127,10 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/dup-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   thing => { label: text }
                 }
                 """);
@@ -156,10 +156,10 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/r-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/p-1.tn"
                 !!import:"https://example.test/q-1.tn"
-                {
+                !schema {
                   both => { one: panel  two: quilt }
                 }
                 """);
@@ -185,9 +185,9 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/d-2.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/a-4.tn"
-                {
+                !schema {
                   uuid => { mine: text }
                 }
                 """);
@@ -205,9 +205,9 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/d-3.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/a-5.tn"
-                {
+                !schema {
                   wrapper => { inner: alpha }
                 }
                 """);
@@ -225,10 +225,10 @@ class TransitiveImportTest {
         try {
             tson.resolve("""
                     !!id:"https://example.test/c-6.tn"
-                    !!meta:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
                     !!import:"https://example.test/a-6.tn"
                     !!import:"https://example.test/b-6.tn"
-                    {
+                    !schema {
                       pair => { left: alpha  right: beta }
                     }
                     """);
@@ -243,9 +243,9 @@ class TransitiveImportTest {
     private static String leafPinningCore(String id, String typeName) {
         return """
                 !!id:"%s"
-                !!meta:"%s"
+                !!import:"%s"
                 !!import:"%s?sha256=%s"
-                {
+                !schema {
                   %s => { name: text }
                 }
                 """.formatted(id, META, CORE, CORE_SHA256, typeName);
@@ -265,10 +265,10 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/c-pin-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/a-pin.tn"
                 !!import:"https://example.test/b-nopin.tn"
-                {
+                !schema {
                   pair => { left: alpha  right: beta  label: text }
                 }
                 """);
@@ -285,10 +285,10 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/c-pin-2.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !!import:"https://example.test/a-pin-2.tn"
-                {
+                !schema {
                   thing => { left: alpha  label: text }
                 }
                 """);
@@ -304,10 +304,10 @@ class TransitiveImportTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://tson.io/2026/39/ltr8/example/c-pin-3.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn?sha256=%s"
                 !!import:"https://example.test/b-nopin-2.tn"
-                {
+                !schema {
                   thing => { right: beta  label: text }
                 }
                 """.formatted(CORE_SHA256));
@@ -327,10 +327,10 @@ class TransitiveImportTest {
         String wrongPin = "0".repeat(64);
         assertThrows(ContentHashMismatchException.class, () -> tson.resolve("""
                 !!id:"https://example.test/c-pin-4.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn?sha256=%s"
                 !!import:"https://example.test/b-nopin-3.tn"
-                {
+                !schema {
                   thing => { right: beta  label: text }
                 }
                 """.formatted(wrongPin)));

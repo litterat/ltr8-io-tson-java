@@ -42,7 +42,7 @@ import java.util.Set;
  * that token must satisfy the atom, and with no target class to name (rule 2 is object-binding only) any
  * other name links to nothing and is {@code UNKNOWN_TYPE_REF}. {@link #preserving()} opts out of that last
  * rule for a caller who wants the wire back as authored -- reading the structure of a document whose
- * {@code !!schema} is deliberately being ignored, or round-tripping through {@code TsonTreeWriter}.
+ * {@code !!import} is deliberately being ignored, or round-tripping through {@code TsonTreeWriter}.
  *
  * <p><b>Every problem goes through {@code ctx.report}</b>, so the read's own {@code DiagnosticsReceiver}
  * decides its fate exactly as it does for the schema-driven readers: fail-fast throws {@code
@@ -78,7 +78,7 @@ public final class SchemalessTreeReader {
 
     /**
      * A reader that keeps a type-ref naming no built-in type on the node without reporting it, carried all
-     * the way to the tree. For reading the wire form of a document whose own {@code !!schema} defines those
+     * the way to the tree. For reading the wire form of a document whose own {@code !!import} defines those
      * names but is deliberately not in scope -- a reading of its structure, not a verdict on it.
      */
     public static SchemalessTreeReader preserving() {

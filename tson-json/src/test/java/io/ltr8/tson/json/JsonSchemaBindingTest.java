@@ -27,9 +27,9 @@ class JsonSchemaBindingTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/binding-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               person => { name: text  tries?: int32 ~ 0 }
               alias  => person
             }
@@ -116,6 +116,41 @@ class JsonSchemaBindingTest {
     void aFailedBindingHandsBackNoTree() {
         assertNull(Json.standard().withSchemas(uri -> Optional.<TsonLinkedSchema>empty())
                 .treeReader().withDiagnostics(d -> { }).withSchema(ID).readAs("{}", "person"));
+    }
+
+    // ── §3.4's in-band route, which this processor does not read ────────
+
+    /**
+     * A root led by {@code $import} stands where §3.3 puts a document's binding, so it is no misplaced member: the
+     * route is one this processor does not read, which is {@code NOT_IMPLEMENTED} -- no verdict on the document.
+     */
+    @Test
+    void aRootImportIsDeclinedAsNotImplemented() {
+        List<Diagnostic> problems = json().validate("""
+                {"$import": ["https://example.test/binding-1.tn"], "$type": "person", "name": "Ada"}""",
+                ID, "person");
+        assertEquals(1, problems.size(), () -> String.valueOf(problems));
+        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code());
+        assertEquals("/$import", problems.getFirst().path().orElseThrow());
+        assertFalse(problems.getFirst().code().verdict());
+    }
+
+    /** The bind door declines it on the same terms. */
+    @Test
+    void aRootImportIsDeclinedByTheBindDoorToo() {
+        List<Diagnostic> problems = new java.util.ArrayList<>();
+        Object bound = json().objectReader().withDiagnostics(problems::add).withSchema(ID).readAs("""
+                {"$import": ["https://example.test/binding-1.tn"], "$type": "person", "name": "Ada"}""",
+                "person", Object.class);
+        assertNull(bound);
+        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code());
+    }
+
+    /** A root led by `$type` alone is the out-of-band route's voluntary restatement, and reads. */
+    @Test
+    void aRootLedByItsTypeAloneReads() {
+        assertEquals(List.of(), json().validate("""
+                {"$type": "person", "name": "Ada"}""", ID, "person"));
     }
 
     // ── The two doors are separate ──────────────────────────────────────

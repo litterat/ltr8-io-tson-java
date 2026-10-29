@@ -132,6 +132,7 @@ public final class TsonSchemaStripper {
         while (tokens.get(i).type() == TokenType.AT) {
             i += annotationLength(tokens, i);
         }
+        i += 2;   // the root's tag: ! schema
         int depth = 0;
         for (i++; depth > 0 || tokens.get(i).type() != TokenType.RBRACE; i++) {
             if (depth == 0) {

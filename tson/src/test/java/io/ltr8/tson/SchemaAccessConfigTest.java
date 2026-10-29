@@ -31,15 +31,15 @@ class SchemaAccessConfigTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { sku: text  quantity: int32 }
             }
             """.formatted(SCHEMA_URI);
 
     private static final String DOCUMENT = """
-            !!schema:"%s"
+            !!import:"%s"
             !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI);
 
     /** The one-call form reaches the loader, which is the baseline everything below varies from. */

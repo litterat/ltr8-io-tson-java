@@ -51,15 +51,15 @@ public final class TsonObjectWriter {
     }
 
     /**
-     * A writer whose documents are <b>self-describing</b>: {@code !!schema:"<schemaUri>"} in the header and
+     * A writer whose documents are <b>self-describing</b>: {@code !!import:"<schemaUri>"} in the header and
      * {@code !rootTypeName} on the root value, which together are everything a reader needs to resolve the
      * schema, pick the type and validate -- nothing out of band. The mirror of {@link
      * TsonObjectReader#withSchema}/{@code readAs}, which is what reads such a document back.
      *
      * <p><b>Both, not just the directive.</b> A bound object carries neither fact: the schemaless writer
      * emits a type-ref only where the value would not read back without one (see {@link #toTson}), so a
-     * record writes bare. A {@code !!schema} on its own therefore produces a document whose reader answers
-     * "data declares a !!schema but has no root type-ref to select a type" -- half self-describing is not
+     * record writes bare. An {@code !!import} on its own therefore produces a document whose reader answers
+     * that the data imports a schema and names no root type -- half self-describing is not
      * self-describing, so this method takes both and there is no one-argument form to get it half right.
      *
      * <p><b>Derivation, not a setter, and off by default.</b> Emitting a directive by default would change
@@ -70,7 +70,7 @@ public final class TsonObjectWriter {
      * already holds is the shape that would spare a caller naming what it already knows, and it needs the
      * schema-aware writer this library does not have yet ({@code BACKLOG.md}); nothing here forecloses it.
      *
-     * @param schemaUri    the governing schema's identity, written as the {@code !!schema} argument
+     * @param schemaUri    the governing schema's identity, written as the {@code !!import} argument
      * @param rootTypeName the schema's own name for the root value's type, written as its type-ref. A value
      *                     that writes a type-ref of its own -- a vocabulary host type, a union member -- is
      *                     refused rather than written twice; see {@link TsonDataEmitter#typeRef}
@@ -123,13 +123,13 @@ public final class TsonObjectWriter {
     /** This writer with {@code document}'s own directives and root type applied over its own. */
     private TsonObjectWriter forDocument(TsonObjectDocument<?> document) {
         TsonObjectWriter writer = this;
-        if (document.schema().isPresent()) {
+        if (!document.imports().isEmpty()) {
             String type = document.rootType().orElseThrow(() -> new WriteException(
-                    "this document names the schema \"" + document.schema().get() + "\" and no root type, so "
-                    + "there is nothing to write as the root's type-ref and a reader would have no way to pick "
-                    + "a type from that schema -- a document read against a schema carries both, so this one "
-                    + "was assembled by hand; supply the type, or drop the schema and write a bare value", null));
-            writer = writer.describing(document.schema().get(), type);
+                    "this document imports " + document.imports() + " and names no root type, so there is "
+                    + "nothing to write as the root's type-ref and a reader would have no way to pick a type from "
+                    + "those schemas -- a document read against a schema carries both, so this one was assembled "
+                    + "by hand; supply the type, or drop the imports and write a bare value", null));
+            writer = new TsonObjectWriter(context, writer.header.importing(document.imports()), Optional.of(type));
         }
         if (document.id().isPresent()) {
             writer = writer.identifiedBy(document.id().get());

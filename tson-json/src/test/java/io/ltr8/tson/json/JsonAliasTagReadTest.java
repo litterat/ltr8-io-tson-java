@@ -30,9 +30,9 @@ class JsonAliasTagReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/alias-tag.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               base   => { tag: text }
               sub    => base & { extra: text }
               s_of   => sub

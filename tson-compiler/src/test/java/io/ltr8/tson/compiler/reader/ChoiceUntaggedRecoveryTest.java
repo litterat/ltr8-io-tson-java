@@ -57,7 +57,7 @@ class ChoiceUntaggedRecoveryTest {
         Top choiceDef = new ChoiceBody(refs, disjoint);
         entries.put("contact", choiceDef);
         ValueReaderContext context = new ValueReaderContext(
-                new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), entries)), readers);
+                new TsonLinkedSchema(new TsonSchema("id", List.of(), entries)), readers);
         return ChoiceReader.FACTORY.create("contact", choiceDef, context);
     }
 

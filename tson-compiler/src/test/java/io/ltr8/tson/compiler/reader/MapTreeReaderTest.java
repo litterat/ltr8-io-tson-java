@@ -41,7 +41,7 @@ class MapTreeReaderTest {
         entries.put("integer", integerEntry());
         entries.put("scores", body);
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }

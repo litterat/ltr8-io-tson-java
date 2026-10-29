@@ -7,7 +7,7 @@ facts and refinement, groups, subtraction, and the exception boundary.
 **Invariants**
 
 - Every name a declaration writes resolves in the schema's one namespace, its own entries and the closure of its
-  `!!meta` target and its `!!import`s (SPEC-FEEDBACK.md #7). An annotation on a declaration resolves there (§3.3.3); a
+  `!!import`s (SPEC-FEEDBACK.md #7). An annotation on a declaration resolves there (§3.3.3); a
   name that misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its
   type. Only the meta-kernel bootstrap, resolving `meta-kernel.tn` itself, skips the check.
 - A read against a declaration of the same document — `!C { … }` with `C` local, or an annotation whose type is
@@ -53,7 +53,7 @@ meta-kernel bootstrap), `design/meta-layer-namespaces.md` (namespace-type payloa
 ## The two resolvers
 
 `SchemaResolver` resolves a whole `SchemaDocument` (`TsonSchemaResolver` is its public wrapper): header directives,
-and the merge of the `!!meta` target's and every `!!import`'s namespace (`TsonSchema.namespaceSources`) *before* any
+and the merge of every `!!import`'s namespace (`TsonSchema.namespaceSources`) *before* any
 local declaration resolves, recording each imported entry's origin. That merge mirrors `TsonSchemaLinker.mergeImports`
 — transitive, collisions decided by entry identity (§2.2.3) — because it is the same concept met one phase earlier,
 and the two are kept in step deliberately. The origins key its vocabulary: each `!C` body and annotation value is

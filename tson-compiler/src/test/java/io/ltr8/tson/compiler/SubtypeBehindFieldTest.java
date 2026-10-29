@@ -35,9 +35,9 @@ class SubtypeBehindFieldTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/sb-meta.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   sb_endpoint  => abstract {}
                   sb_op        => sb_endpoint & { request?: type_kind }
                   sb_ops       => namespace & { key_type: = identifier  value_type: = sb_endpoint }
@@ -67,9 +67,9 @@ class SubtypeBehindFieldTest {
         String id = "https://example.test/sb-" + label + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://example.test/sb-meta.tn"
+                !!import:"https://example.test/sb-meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   order => { sku: text }
                   %s
                 }

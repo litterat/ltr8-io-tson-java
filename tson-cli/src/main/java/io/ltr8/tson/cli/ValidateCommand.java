@@ -31,10 +31,10 @@ import java.util.Set;
 /**
  * {@code tson validate [--output text|json|tson] <file|->...} -- validates data documents.
  *
- * <p><b>A flat list of files, auto-classified.</b> Each file is a TSON schema document (its header
- * carries {@code !!meta}) or a data document. The schema files are made available through a {@link
+ * <p><b>A flat list of files, auto-classified.</b> Each file is a TSON schema document (its root is
+ * tagged {@code !schema}) or a data document. The schema files are made available through a {@link
  * SchemaSource}, and each data document is handed to {@link Tson#validate(InputStream)}, which
- * works out on its own whether the data's {@code !!schema} selects a schema or whether it's validated
+ * works out on its own whether the data's {@code !!import}s select a schema or whether it's validated
  * schemalessly (base syntax + built-in atoms). This command only turns the argument list into a
  * source + a list of data documents, then renders the diagnostics.
  *
@@ -68,13 +68,13 @@ final class ValidateCommand {
                    JsonBinding binding) {
         Map<String, String> schemas = new HashMap<>();
         // The !!id each schema file declares, verbatim and in argument order -- what an unmatched
-        // !!schema is reported against. Kept apart from the lookup map, whose keys are canonicalized
+        // !!import is reported against. Kept apart from the lookup map, whose keys are canonicalized
         // (scheme and ?sha256= stripped) and so would not be the string the author actually wrote.
         List<String> declaredIds = new ArrayList<>();
         List<ValidateInput> dataInputs = new ArrayList<>();
 
         // The provided schemas, made available by !!id; the bundled standard library is always served
-        // underneath. Tson.validate resolves a data file's !!schema through this. Built before the files are
+        // underneath. Tson.validate resolves a data file's !!imports through this. Built before the files are
         // classified because it reads `schemas` only when a document asks for one, and because the run's own
         // policy has to come from the instance that judges -- including on a run that fails classification
         // and judges nothing, whose report carries the same envelope as any other.
@@ -111,8 +111,8 @@ final class ValidateCommand {
             }
             if (!schema) {
                 System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_FOUND,
-                        "--schema \"" + schemaFile + "\" is a file but not a schema document -- its header "
-                                + "carries no !!meta, and schemas are TSON text whatever encoding their data is")));
+                        "--schema \"" + schemaFile + "\" is a file but not a schema document -- its root "
+                                + "is not tagged !schema, and schemas are TSON text whatever encoding their data is")));
                 return 2;
             }
             try {
@@ -231,7 +231,7 @@ final class ValidateCommand {
     }
 
     /**
-     * What the supplied schema files actually declare, appended to an unmatched {@code !!schema}.
+     * What the supplied schema files actually declare, appended to an unmatched {@code !!import}.
      *
      * <p>A schema file is matched by the {@code !!id} inside it, never by its filename ([TSON-DATA]
      * §2.2.1), so the mismatch an author hits most is passing the right file with the wrong identity in
@@ -352,7 +352,7 @@ final class ValidateCommand {
             System.err.println("note: " + file + " declares the built-in schema id \"" + id
                     + "\" -- overriding meta-kernel/meta/core is not supported; ignoring this file");
         } else {
-            // Key by canonical identity so a data file's plain !!schema resolves against a schema whose
+            // Key by canonical identity so a data file's plain !!import resolves against a schema whose
             // !!id carries a ?sha256= pin (the hash is not identity, §2.2.1).
             schemas.put(CanonicalIdentity.canonicalize(id), text);
             declaredIds.add(id);
@@ -369,7 +369,7 @@ final class ValidateCommand {
         }
     }
 
-    /** A file whose header carries {@code !!meta} is a schema document ([TSON-SCHEMA] §12.1 requires one). */
+    /** A file whose root is tagged {@code !schema} is a schema document ([TSON-DATA] §2.2). */
     private static boolean isSchemaDocument(Path file) throws IOException {
         try (InputStream in = Files.newInputStream(file)) {
             return TsonDocumentPeek.of(in).isSchemaDocument();

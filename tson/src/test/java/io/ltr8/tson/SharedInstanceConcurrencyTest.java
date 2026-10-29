@@ -41,13 +41,13 @@ class SharedInstanceConcurrencyTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/shared.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { person => { name: text  age: int32 } }
+            !schema { person => { name: text  age: int32 } }
             """;
 
     private static final String DOCUMENT = """
-            !!schema:"https://example.test/shared.tn"
+            !!import:"https://example.test/shared.tn"
             !person { name: "Ada" age: 36 }
             """;
 

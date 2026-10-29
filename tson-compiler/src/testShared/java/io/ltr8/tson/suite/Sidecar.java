@@ -8,7 +8,6 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.TsonBundledSchemas;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -27,28 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
  *
  * <p><b>Shared by the Class 1 and Class 2 runners</b>, which live in different modules. The sidecar
  * contract is one contract: the outcome group, the field accessors that know {@code _} from a missing
- * field, and the header splice that lets a vector name {@code core.tn} instead of a revision-stamped
- * identity. Two copies of it is how the first two runners came to disagree about what a subject even is,
- * which is the reason {@code RUNNER.md} was written.
+ * field, and how a subject is read. Two copies of it is how the first two runners came to disagree about what a
+ * subject even is, which is the reason {@code RUNNER.md} was written.
  *
  * <p>The sidecar is parsed with the real {@link TsonDataParser} -- rule 2, deliberate dogfooding: a broken
  * parser fails loudly rather than quietly agreeing with itself.
  */
 public final class Sidecar {
-
-    /**
-     * The spec's own four, whose real identities carry the revision -- resolved off {@link
-     * TsonBundledSchemas}'s constants, so a revision bump touches that one class rather than every vector
-     * that mentions core.tn.
-     */
-    private static final Map<String, String> BUNDLED_SHORT_NAMES = Map.of(
-            "meta-kernel.tn", TsonBundledSchemas.META_KERNEL_ID,
-            "meta.tn", TsonBundledSchemas.META_ID,
-            "core.tn", TsonBundledSchemas.CORE_ID,
-            "net.tn", TsonBundledSchemas.NET_ID);
-
-    /** Where the corpus publishes its own schemas -- the sidecar schemas, and the link layer's fixtures. */
-    private static final String SUITE_SCHEMAS = "https://tson.io/test-suite/schemas/";
 
     /** The outcome group's members, across every layer's sidecar schema. */
     private static final List<String> OUTCOMES = List.of("valid", "error", "schema-document", "refused");
@@ -90,66 +73,22 @@ public final class Sidecar {
         return (RecordValue) fieldCore(sidecar, outcomeOf(sidecar));
     }
 
-    // ── The subject, and the header splice ───────────────────────────────
+    // ── The subject ──────────────────────────────────────────────────────
 
     /**
-     * {@code subject}'s own bytes, with any {@code meta}/{@code import}/{@code schema} the sidecar names
-     * spliced into the document's header as real directives -- and untouched where it names none.
+     * {@code subject}'s own bytes, as they are on disk. Every subject is a complete document, its header
+     * importing what it needs, so nothing is spliced into it ({@code RUNNER.md}).
      *
      * <p><b>Bytes, never a decoded string</b> (rule 1): reading a subject into a {@code String} re-encodes
-     * it, which is harmless for text and destroys exactly the vectors that exist to be destroyed. The
-     * splice is the one case that must go through text, and only ever runs for a vector that asked for it.
-     *
-     * <p><b>Not a prepend</b>: the header grammar is a fixed sequence -- optional {@code !!id}, then
-     * {@code !!meta} immediately after it, then {@code !!import} -- so the block goes in right after the
-     * subject's own {@code !!id} line, or at the very start where it has none.
+     * it, which is harmless for text and destroys exactly the vectors that exist to be destroyed.
      */
-    public static byte[] subjectBytes(Path subject, RecordValue sidecar) throws IOException {
-        if (!hasField(sidecar, "meta") && !hasField(sidecar, "schema")) {
-            return Files.readAllBytes(subject);
-        }
-        return splicedSource(subject, sidecar).getBytes(StandardCharsets.UTF_8);
+    public static byte[] subjectBytes(Path subject) throws IOException {
+        return Files.readAllBytes(subject);
     }
 
-    /** {@link #subjectBytes} as text, for a caller that hands source to a parser rather than a stream. */
-    public static String splicedSource(Path subject, RecordValue sidecar) throws IOException {
-        String raw = readRaw(subject);
-        StringBuilder directives = new StringBuilder();
-        if (hasField(sidecar, "meta")) {
-            directives.append("!!meta:\"").append(resolveShortName(fieldText(sidecar, "meta"))).append("\"\n");
-        }
-        if (hasField(sidecar, "schema")) {
-            directives.append("!!schema:\"").append(resolveShortName(fieldText(sidecar, "schema"))).append("\"\n");
-        }
-        if (hasField(sidecar, "import")) {
-            for (String name : fieldTextArray(sidecar, "import")) {
-                directives.append("!!import:\"").append(resolveShortName(name)).append("\"\n");
-            }
-        }
-        int insertAt;
-        if (raw.startsWith("!!id:")) {
-            int newline = raw.indexOf('\n');
-            insertAt = (newline == -1) ? raw.length() : newline + 1;
-        } else {
-            insertAt = 0;
-        }
-        return raw.substring(0, insertAt) + directives + raw.substring(insertAt);
-    }
-
-    /**
-     * The real, current identity a sidecar's short name stands for: one of the spec's own four, or a
-     * schema the corpus publishes itself, named by its path under {@code schemas/}.
-     *
-     * <p><b>A rule, not a table.</b> The four bundled names have to be listed because their identities
-     * carry the spec revision and nothing in the name says so. Everything else is derived, which is what
-     * lets the corpus grow a fixture without every runner in every language editing a constant to keep up
-     * -- and a table that has to be edited per fixture is the same drift {@code RUNNER.md} exists to stop,
-     * once per fixture rather than once. So a link-layer vector that needs a chain, a diamond, or a wide
-     * fan-in adds files and names them; no runner changes.
-     */
-    public static String resolveShortName(String shortName) {
-        String bundled = BUNDLED_SHORT_NAMES.get(shortName);
-        return bundled != null ? bundled : SUITE_SCHEMAS + shortName;
+    /** {@code subject} as text, for a caller that hands source to a parser rather than a stream. */
+    public static String subjectSource(Path subject) throws IOException {
+        return readRaw(subject);
     }
 
     // ── Field accessors ──────────────────────────────────────────────────
@@ -185,14 +124,14 @@ public final class Sidecar {
 
     /**
      * Unlike {@link #fieldTextOrAbsent}, for a field that may be missing from the record entirely rather
-     * than present with the value {@code _} -- what an optional sidecar field like {@code meta} or {@code
+     * than present with the value {@code _} -- what an optional sidecar field like {@code
      * path} actually looks like when a vector does not use it.
      */
     public static boolean hasField(RecordValue record, String name) {
         return record.fields().stream().anyMatch(field -> field.name().equals(name));
     }
 
-    /** Each element of an array-of-tokens field (e.g. {@code import}), as plain text. */
+    /** Each element of an array-of-tokens field, as plain text. */
     public static List<String> fieldTextArray(RecordValue record, String name) {
         List<String> result = new ArrayList<>();
         for (DataValue element : ((ArrayValue) fieldCore(record, name)).elements()) {

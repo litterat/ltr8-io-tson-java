@@ -28,9 +28,9 @@ class JsonDeclaredReadTest {
 
     private static final String HOST_SCHEMA = """
             !!id:"https://example.test/json-declared-host.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               note     => { body: text }
               memo     => { body: text  urgent: boolean }
               count    => !integer ^ { min: 0  max: 9 }
@@ -130,15 +130,15 @@ class JsonDeclaredReadTest {
     }
 
     /**
-     * §3.3: {@code $schema} stands on the root's annotation object alone, so one at a declared position is a
-     * resolver error, as at every other value position.
+     * §3.3, §8.5: {@code $import} stands at the top of the document alone, so one at a declared position is a
+     * resolver error, as at every other value position -- a value cannot widen the namespace it is read in.
      */
     @Test
-    void aSchemaMemberAtADeclaredPositionIsRefused() {
+    void anImportMemberAtADeclaredPositionIsRefused() {
         Diagnostic refusal = refusal("envelope", envelope("""
-                {"$schema": "https://example.test/other.tn", "$type": "note", "body": "hi"}"""));
+                {"$import": ["https://example.test/other.tn"], "$type": "note", "body": "hi"}"""));
         assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, refusal.code());
-        assertEquals("/local/$schema", refusal.path().orElseThrow());
+        assertEquals("/local/$import", refusal.path().orElseThrow());
     }
 
     public record Note(String body) {

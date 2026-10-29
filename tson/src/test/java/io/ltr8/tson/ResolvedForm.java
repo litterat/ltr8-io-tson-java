@@ -175,7 +175,7 @@ final class ResolvedForm {
      * than among {@link #fixtureKeyAnnotations}' tokens.
      */
     static Map<String, String> markedApplications(String resolvedText) {
-        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseDocument().root().coreValue();
+        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseResolvedForm().root().coreValue();
         Map<String, String> marked = new TreeMap<>();
         for (MapValue.MapEntry entry : map.entries()) {
             String name = ((TokenValue) entry.key().coreValue()).text();
@@ -245,7 +245,7 @@ final class ResolvedForm {
      * tell one from the prose inside a {@code @doc}.
      */
     static Map<String, List<String>> fixtureKeyAnnotations(String resolvedText) {
-        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseDocument().root().coreValue();
+        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseResolvedForm().root().coreValue();
         Map<String, List<String>> keys = new TreeMap<>();
         for (MapValue.MapEntry entry : map.entries()) {
             String name = ((TokenValue) entry.key().coreValue()).text();
@@ -284,7 +284,7 @@ final class ResolvedForm {
      * facts.
      */
     static Map<String, List<String>> fixtureValueAnnotations(String resolvedText) {
-        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseDocument().root().coreValue();
+        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseResolvedForm().root().coreValue();
         Map<String, List<String>> values = new TreeMap<>();
         for (MapValue.MapEntry entry : map.entries()) {
             String name = ((TokenValue) entry.key().coreValue()).text();
@@ -322,23 +322,36 @@ final class ResolvedForm {
     }
 
     /**
-     * A §8 resolved-schema document, bound back into the value model. The text names no governing schema of
-     * its own -- meta.tn is what governs every one of these, and the reader says so.
+     * A §8 resolved-schema document, bound back into the value model, read under its own header's imports -- a
+     * resolved form's header is its source's ([TSON-SCHEMA] §8.1) -- and as a resolved form because this caller says
+     * so: its root, tagged {@code !schema}, is read as a value of {@code schema}.
      */
     static Map<String, Top> readResolved(Tson tson, String resolvedText) {
-        return readResolved(tson, resolvedText, TsonBundledSchemas.META_ID);
+        return readResolved(tson, resolvedText, io.ltr8.tson.compiler.TsonDocumentPeek.of(resolvedText).header().imports());
     }
 
     /**
-     * {@link #readResolved(Tson, String)} under the meta layer {@code governingMeta} instead of meta.tn: the schema
-     * the subject's own {@code !!meta} names, which imports meta.tn and adds the constructors only it declares. An
-     * instance of its namespace type is typed by that layer alone, so a resolved document holding one reads
-     * back only under it; for a subject governed by meta.tn the two are the same read.
+     * {@link #readResolved(Tson, String)} under {@code imports}, the source's own -- what a sidecar's resolved text,
+     * which carries no header of its own, is read under. A source importing nothing is the kernel's, whose resolved
+     * form is read under the pre-loaded kernel (§3.4).
      */
     @SuppressWarnings("unchecked")
-    static Map<String, Top> readResolved(Tson tson, String resolvedText, String governingMeta) {
+    static Map<String, Top> readResolved(Tson tson, String resolvedText, List<String> imports) {
+        List<String> under = imports.isEmpty() ? List.of(TsonBundledSchemas.META_KERNEL_ID) : imports;
         return (Map<String, Top>) tson.objectReader()
-                .withSchema(governingMeta)
+                .withImports(under)
                 .readAs(resolvedText, "schema", Object.class);
+    }
+
+    /**
+     * Every problem a resolved form's read reports -- {@link #readResolved(Tson, String)} as a validation, in tree
+     * mode: the form validated as the value of {@code schema} it is, under its own header's imports.
+     */
+    static List<io.ltr8.tson.base.Diagnostic> validateResolved(Tson tson, String resolvedText) {
+        List<String> imports = io.ltr8.tson.compiler.TsonDocumentPeek.of(resolvedText).header().imports();
+        List<io.ltr8.tson.base.Diagnostic> problems = new java.util.ArrayList<>();
+        tson.treeReader().withImports(imports.isEmpty() ? List.of(TsonBundledSchemas.META_KERNEL_ID) : imports)
+                .withDiagnostics(problems::add).readAs(resolvedText, "schema");
+        return problems;
     }
 }

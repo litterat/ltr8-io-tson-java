@@ -43,9 +43,9 @@ class NamespaceEntryTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/meta-api.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   status_name => identifier
                   method    => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
                                  replies?: {status_name => kind<record>} }
@@ -75,9 +75,9 @@ class NamespaceEntryTest {
         String id = "https://example.test/api-" + label + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://example.test/meta-api.tn"
+                !!import:"https://example.test/meta-api.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   order      => { sku: text }
                   order_list => [order]
                   myapi      => !api {

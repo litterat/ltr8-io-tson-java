@@ -10,8 +10,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 **Implemented:**
 
-- [x] Lexer and structural parser — records, maps, arrays, annotations, directives (`!!id`/
-      `!!schema`/`!!meta` arguments are validated as URIs, not just single-line tokens)
+- [x] Lexer and structural parser — records, maps, arrays, annotations, and the one header grammar for every
+      document, an optional `!!id` then any number of `!!import`s (arguments validated as URIs, not just
+      single-line tokens); a document is a schema exactly when its root is tagged `!schema`
 - [x] Base types — boolean, string, numbers (integer, float, hex-float, based-integer), and the absent
       sentinel `_`
 - [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, and `integer` with its bounds
@@ -43,12 +44,13 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Streaming writes to match — both writers take an `OutputStream`/`Appendable` and emit as they go,
       so a large or open-ended document is never built as a `String` first (`toTson` is that call over
       a buffer)
-- [x] Self-describing output — a writer can emit the `!!schema`/`!!id` header the readers already
+- [x] Self-describing output — a writer can emit the `!!id`/`!!import` header the readers already
       honour (`describing(…)`/`identifiedBy(…)`, off by default), so a document this library reads it
       can also reproduce, and a response body says what governs it without anything out of band
 - [x] Reading a self-describing document with nothing named up front — `tson.treeReader().read(text)`
-      resolves the document's own `!!schema`, picks the type from its root type-ref (`!person`) and
-      validates against it; `tson.validate(text)` is the same read returning only the problems
+      resolves the document's own `!!import`s (several read as one namespace), picks the type from its root
+      type-ref (`!person`) and validates against it; `tson.validate(text)` is the same read returning only the
+      problems
 - [x] Consumable as an ordinary dependency — `./gradlew publishToMavenLocal` installs every module as
       `io.ltr8:<module>`, with sources and javadoc, usable on the class path or the module path (see
       the README's [Use it from another project](README.md#use-it-from-another-project))
@@ -62,14 +64,14 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       the specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
       directives during resolution, flattens argument-bearing type references into real named
-      entries, merges the `!!meta` target's and every `!!import`'s namespace into one per schema
+      entries, merges every `!!import`'s namespace into one per schema
       ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #7), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see the README's [Schema pipeline](README.md#schema-pipeline))
 - [x] The full pipeline verified end-to-end, three schemas deep — an ordinary, user-defined schema
-      can `!!import` `core.tn` (itself governed by `meta.tn`, governed by `meta-kernel.tn`) and
+      can `!!import` `core.tn` (itself importing `meta.tn`, which imports `meta-kernel.tn`) and
       compile cleanly with real, manually-registered Java classes bound against records composed
       from its imported vocabulary, reading real TSON data through the whole chain
 - [x] Resource limits (§9.1) — nesting depth is bounded (64 by default, `ProcessorConfig.withLimits`,

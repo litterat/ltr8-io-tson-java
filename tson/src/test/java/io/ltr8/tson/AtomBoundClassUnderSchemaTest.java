@@ -46,16 +46,16 @@ class AtomBoundClassUnderSchemaTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/invoice-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               money => text
               invoice => { total: money }
             }
             """;
 
     private static final String DOC = """
-            !!schema:"https://example.test/invoice-1.tn"
+            !!import:"https://example.test/invoice-1.tn"
             !invoice { total: "12.34" }""";
 
     private static final String BARE = "{ total: \"12.34\" }";
@@ -188,15 +188,15 @@ class AtomBoundClassUnderSchemaTest {
      */
     private static final String VALUE_SCHEMA = """
             !!id:"https://example.test/holder-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !schema {
               holder => { slot: value }
             }
             """;
 
     private static final String VALUE_DOC = """
-            !!schema:"https://example.test/holder-1.tn"
+            !!import:"https://example.test/holder-1.tn"
             !holder { slot: "%s" }""";
 
     public record UuidHolder(UUID slot) {

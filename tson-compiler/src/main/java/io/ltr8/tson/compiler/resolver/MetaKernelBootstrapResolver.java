@@ -47,10 +47,10 @@ import java.util.SequencedSet;
 import java.util.Set;
 
 /**
- * Resolves meta-kernel's own source text into the {@link TsonSchema} that governs its ordinary resolution (Part 2
- * §1.5): the {@code !!meta} directive names the file itself, the one circularity in the series, closed by
- * pre-loading. Every constructor the kernel applies is declared in the kernel, so no compiled governing meta exists
- * to read its instances through until this class has produced one.
+ * Resolves meta-kernel's own source text into the {@link TsonSchema} that governs its ordinary resolution: the
+ * kernel is never resolved from a document but pre-loaded by special resolution ([TSON-SCHEMA] §3.4), its header an
+ * {@code !!id} alone. Every constructor the kernel applies is declared in the kernel, so no compiled vocabulary
+ * exists to read its instances through until this class has produced one.
  *
  * <p><b>The order is {@code SPEC-FEEDBACK.md #4}'s.</b> Reading a value against a type waits on that type being
  * ready, and on each type a part of the value is read against as the read reaches it; a reference and a held value
@@ -119,7 +119,7 @@ public final class MetaKernelBootstrapResolver {
         SchemaDocument document = SchemaDesugarer.desugar(parser.parseSchemaDocument(), Set.of());
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
         Map<String, Top> entries = new Bootstrap(document, parser.schemaPositions(), facts).resolve();
-        return new TsonSchema(id(document), document.meta(), document.imports(), AnnotatedMap.of(entries), true,
+        return new TsonSchema(id(document), document.imports(), AnnotatedMap.of(entries), true,
                 Map.of(), facts);
     }
 
@@ -301,7 +301,7 @@ public final class MetaKernelBootstrapResolver {
             if (compiled == null || !compiled.schema().entries().containsKey(type)) {
                 Set<String> pending = new LinkedHashSet<>(declarations.keySet());
                 pending.removeAll(entries.keySet());
-                TsonSchema ready = new TsonSchema(id, document.meta(), document.imports(),
+                TsonSchema ready = new TsonSchema(id, document.imports(),
                         AnnotatedMap.of(new LinkedHashMap<>(entries)), true, Map.of(), new LinkedHashMap<>(facts));
                 compiled = TsonSchemaCompiler.compileBootstrap(TsonSchemaLinker.linkBootstrap(ready, pending),
                         context, pending);

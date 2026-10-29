@@ -46,7 +46,7 @@ import java.util.function.Function;
 
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
- * ({@code !!id}/{@code !!import}), merging the {@code !!meta} target's and every {@code !!import}'s entries into the
+ * ({@code !!id}/{@code !!import}), merging every {@code !!import}'s entries into the
  * schema's one namespace (SPEC-FEEDBACK.md #7) through this resolver's own {@link TsonCompiledSchemaLoader}, and
  * handing each local declaration off to a {@link DefinitionResolver} for the actual, per-declaration
  * resolution work (Part 2 §4, §8's <code>{type_name =&gt; top}</code> shape, an entry being its value). A
@@ -54,7 +54,7 @@ import java.util.function.Function;
  * ({@link Vocabulary}).
  *
  * <p>A {@link TsonCompiledSchemaLoader} is required: a document-level resolution that can't validate
- * its own {@code !!id} or reach its own {@code !!meta} isn't a degraded version of this job, it's a
+ * its own {@code !!id} or reach its own imports isn't a degraded version of this job, it's a
  * different one -- per-declaration resolution against a hand-built namespace, which is exactly what
  * {@link DefinitionResolver} is for directly.
  *
@@ -70,7 +70,7 @@ public final class SchemaResolver {
     /**
      * [TSON-SCHEMA] §8.2's derived marker, attached below to the key of every entry this resolver
      * materialised from a sugar form. Valueless -- presence at the key is the whole of the information --
-     * and built by name rather than resolved through the governing meta the way an author-written annotation
+     * and built by name rather than resolved through the import closure the way an author-written annotation
      * is: there is no author to resolve against, and §8.1 makes it derived, discarded and recomputed on
      * ingest rather than read from a document.
      */
@@ -80,18 +80,15 @@ public final class SchemaResolver {
 
     /**
      * @param loader consulted by {@link #resolveSchema(SchemaDocument)} to resolve a document's own
-     *               {@code !!meta}/{@code !!import} targets -- fetching, resolving, registering, and
+     *               {@code !!import} targets -- fetching, resolving, registering, and
      *               compiling each as needed rather than requiring them to already exist somewhere.
      *               Required.
      *
      *               <p>Deliberately the {@link TsonCompiledSchemaLoader} interface, not the concrete
      *               registry that implements it -- and a loader rather than a plain "look it up, throw
-     *               if missing" lookup, because such a lookup has no way to bootstrap meta-kernel's own
-     *               document: resolving it means resolving *its own* {@code !!meta}, which names itself,
-     *               so a lookup-only resolver would need meta-kernel already registered before it could
-     *               ever register meta-kernel. The loader's implementation ({@code TsonCompiledMetaRegistry})
-     *               recognizes that one case and answers it directly (its own hand-written bootstrap)
-     *               instead of looping forever.
+     *               if missing" lookup, because the kernel is never resolved from a document: it is
+     *               pre-loaded ([TSON-SCHEMA] §3.4), and the loader's implementation ({@code
+     *               TsonCompiledMetaRegistry}) answers for it from its bootstrap.
      */
     public SchemaResolver(TsonCompiledSchemaLoader loader) {
         this.loader = Objects.requireNonNull(loader, "loader");
@@ -101,8 +98,8 @@ public final class SchemaResolver {
      * Resolves every declaration in {@code document}'s body, on demand and dependency-following rather than
      * strict source order (§3.4.1) -- so a declaration may compose or refine one declared later in the same
      * schema, with a circular composition/refinement chain rejected as unresolvable -- and carries {@code
-     * document}'s own header directives (§2.2: {@code !!id}?/{@code !!meta}/{@code !!import}*) straight into the
-     * result's {@link TsonSchema#id()}/{@link TsonSchema#meta()}/{@link TsonSchema#imports()}.
+     * document}'s own header directives (§2.2: {@code !!id}?/{@code !!import}*) straight into the
+     * result's {@link TsonSchema#id()}/{@link TsonSchema#imports()}.
      *
      * <p><b>Two things are validated up front, before any declaration is resolved</b>, rather than
      * silently proceeding (or failing confusingly deep inside some unrelated declaration): (1)
@@ -115,7 +112,7 @@ public final class SchemaResolver {
      * Both are the author's error, so both throw {@link SchemaValidationException} naming the actual problem,
      * which the collecting front door reports as a schema error against the document as a whole.
      *
-     * <p><b>The {@code !!meta} target and every {@code !!import} are merged into the one namespace</b>
+     * <p><b>Every {@code !!import} is merged into the one namespace</b>
      * ({@link TsonSchema#namespaceSources}) -- each import's own URI is validated the same way {@code !!id} is,
      * then resolved via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped on demand) and
      * its entries merged in, *before* any local declaration is resolved. That map ({@code namespace}, exposed to
@@ -201,8 +198,8 @@ public final class SchemaResolver {
                                DiagnosticsReceiver receiver) {
         String id = document.id().orElseThrow(() -> new SchemaValidationException(
                 "!!id is required to register this schema under its own name, but is absent -- an id-less schema "
-                        + "is a development artifact ([TSON-SCHEMA] §2.2.1, §10.1), and this schema, governed by '"
-                        + document.meta() + "', has no name to be registered under"));
+                        + "is a development artifact ([TSON-SCHEMA] §2.2.1, §10.1), and this schema has no name to "
+                        + "be registered under"));
         CanonicalIdentity.validate(id);
         for (String importUri : document.imports()) {
             CanonicalIdentity.canonicalize(importUri);
@@ -516,7 +513,7 @@ public final class SchemaResolver {
                 localFacts.put(name, known);
             }
         });
-        return new TsonSchema(id, document.meta(), document.imports(), localOnly, false, valuesByName, localFacts);
+        return new TsonSchema(id, document.imports(), localOnly, false, valuesByName, localFacts);
     }
 
     /**
@@ -1073,11 +1070,11 @@ public final class SchemaResolver {
     }
 
     /**
-     * Stage 1 of {@link #resolveSchema(SchemaDocument)} -- the whole namespace of the {@code !!meta} target and of
-     * every {@code !!import} ({@link TsonSchema#namespaceSources}), in header order, merged as-is (never re-resolved
+     * Stage 1 of {@link #resolveSchema(SchemaDocument)} -- the whole namespace of every {@code !!import} ({@link
+     * TsonSchema#namespaceSources}), in header order, merged as-is (never re-resolved
      * against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its transitivity and
      * its identity-based collision rule (§2.2.3), since this is the same concept applied one stage earlier: an
-     * import, the {@code !!meta} target among them, contributes everything its namespace holds, one schema reached by
+     * import contributes everything its namespace holds, one schema reached by
      * several routes unifies, and two different schemas declaring one name is the error.
      *
      * <p>Unlike the linker's, this merge has no {@code subtypes} to reconcile when a route repeats --
@@ -1126,7 +1123,7 @@ public final class SchemaResolver {
 
     /** {@link TsonSchema#namespaceSources} for the document before it is resolved: the same list, from its header. */
     private static List<String> namespaceSources(SchemaDocument document) {
-        return new TsonSchema(document.id().orElseThrow(), document.meta(), document.imports(), Map.of())
+        return new TsonSchema(document.id().orElseThrow(), document.imports(), Map.of())
                 .namespaceSources();
     }
 }

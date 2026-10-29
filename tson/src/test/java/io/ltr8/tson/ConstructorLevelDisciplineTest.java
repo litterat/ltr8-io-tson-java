@@ -30,9 +30,9 @@ class ConstructorLevelDisciplineTest {
     private static List<Diagnostic> problems(String meta, String imported, String declarations) {
         String source = """
                 !!id:"https://example.test/m.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                 %s }
                 """.formatted(meta, imported, declarations);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
@@ -63,9 +63,9 @@ class ConstructorLevelDisciplineTest {
     void theDerivedEntryIsItselfConstructorLevel() {
         String source = """
                 !!id:"https://example.test/m.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !schema {
                   c        => product & { id: identifier }
                   composed => c & { extra: identifier }
                 }
@@ -88,17 +88,17 @@ class ConstructorLevelDisciplineTest {
         String libraryId = "https://example.test/lib.tn";
         String library = """
                 !!id:"https://example.test/lib.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   steps => namespace & { key_type: = identifier  value_type: = text }
                 }
                 """;
         String importer = """
                 !!id:"https://example.test/app.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/lib.tn"
-                {
+                !schema {
                   plan => !steps { first => "a"  second => "b" }
                 }
                 """;

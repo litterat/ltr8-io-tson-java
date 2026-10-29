@@ -156,9 +156,9 @@ class KernelWaitGraphTest {
 
     // ── The fixture ──────────────────────────────────────────────────────
 
-    /** {@code meta-kernel-resolved.tn}, read schemalessly. */
+    /** {@code meta-kernel-resolved.tn}, read schemalessly as the resolved form it is. */
     static Document fixture() throws Exception {
-        return new TsonDataParser(Files.readString(specDirectory().resolve("meta-kernel-resolved.tn"))).parseDocument();
+        return new TsonDataParser(Files.readString(specDirectory().resolve("meta-kernel-resolved.tn"))).parseResolvedForm();
     }
 
     /** {@code spec/m}, found by walking up rather than assumed relative to a working directory. */

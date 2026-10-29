@@ -74,15 +74,15 @@ class ReferenceChainTest {
     private static List<Diagnostic> validate(String document) {
         Tson tson = Tson.standard();
         tson.resolve(schema(CHAIN));
-        return tson.validate("!!schema:\"https://example.test/chain.tn\"\n" + document);
+        return tson.validate("!!import:\"https://example.test/chain.tn\"\n" + document);
     }
 
     private static String schema(String body) {
         return """
                 !!id:"https://example.test/chain.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { %s }
+                !schema { %s }
                 """.formatted(body);
     }
 

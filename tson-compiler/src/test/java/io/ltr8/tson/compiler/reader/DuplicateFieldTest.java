@@ -48,7 +48,7 @@ class DuplicateFieldTest {
         entries.put("holder", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("value", RecordField.required(TypeRef.of("int8"))))));
         TsonSchema schema = new TsonSchema("https://example.test/dup-field.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         // "value" appears twice: first as 999 (out of int8's own -128..127 range), then as 42 (valid).
@@ -78,7 +78,7 @@ class DuplicateFieldTest {
         entries.put("holder", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("value", RecordField.required(TypeRef.of("int8"))))));
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(new TsonSchema(
-                "https://example.test/dup-field.tn", "https://example.test/meta.tn", List.of(), entries)));
+                "https://example.test/dup-field.tn", List.of(), entries)));
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
         compiled.get("holder").read(TestDocuments.document("{ value: 1  value: 2  value: 3 }", problems));

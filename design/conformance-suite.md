@@ -28,14 +28,15 @@ to catch drift against the spec.
 door, because a Class 2 vector is about a phase boundary — did this schema resolve, did it link, does this
 document validate against it — and those boundaries are `Tson.validateSchema`/`Tson.validate`'s to own,
 not a test's to reassemble. What the two share lives in `tson-compiler/src/testShared`, added to both test
-source sets: `SuiteCheckout` (finding the corpus), `Sidecar` (reading a sidecar and splicing a subject's
-header) and `Vectors` (walking the tree). One statement of the corpus's contract rather than two, which is
-what `RUNNER.md` exists to keep from drifting — the first two runners written against its prose had already
-disagreed about what a subject even is.
+source sets: `SuiteCheckout` (finding the corpus), `Sidecar` (reading a sidecar and its subject's bytes) and
+`Vectors` (walking the tree). A subject is a complete document, importing what it needs: the runner splices nothing
+into it (`Sidecar.subjectBytes`/`subjectSource`), and no sidecar carries a `meta`, `import` or `schema` field.
+One statement of the corpus's contract rather than two, which is what `RUNNER.md` exists to keep from drifting — the
+first two runners written against its prose had already disagreed about what a subject even is.
 
 **The corpus states its own contract, and this runner obeys it rather than inferring it.**
 `schemas/<layer>-sidecar.tn` gives each layer's sidecar shape and every sidecar names one with
-`!!schema`; `RUNNER.md` is normative for the runner. Three rules bind here: a subject reaches the lexer
+`!!import`; `RUNNER.md` is normative for the runner. Three rules bind here: a subject reaches the lexer
 as the **bytes on disk**, never a decoded and re-encoded string; an `error` vector's §8.1 **category is
 asserted at every layer**, not only the vocabulary one (the layers are pipeline stages and cross the
 categories — the vocabulary layer raises `resolver` and `validation` errors and never a "vocabulary"
@@ -135,10 +136,12 @@ where a registry is built directly). `SidecarSchemasTest` resolves the fixtures 
 applying a namespace type would otherwise fail there for want of a class rather than for anything about the fixture.
 A new fixture record is a new host record beside them; the fixture's `@doc` lists the records its namespace types hold,
 which is the corpus's half of the contract (`RUNNER.md`, "A meta layer's own records").
-**A `schema/` vector's expected side is read under the subject's own `meta`** (`ResolvedForm.readResolved` with the
-sidecar's `meta` resolved), and the object reader binds through `SuiteBindings` too: a fixture meta imports meta.tn
-and adds its constructors, and a namespace entry in resolved output is typed by that layer alone, so a vector
-showing a value by name written back as written reads only there. For a subject under meta.tn it is the same read.
+**A `schema/` vector's expected side is read under the subject's first `!!import`** (`ResolvedForm.readResolved`, a
+`withImports(…).readAs(text, "schema")` read; the pre-loaded kernel where the subject imports nothing), and the object
+reader binds through `SuiteBindings` too: a fixture meta imports meta.tn and adds its constructors, and a namespace
+entry in resolved output is typed by that layer alone, so a vector showing a value by name written back as written
+reads only there. Only the first: `SuiteBindings` binds by name across the corpus, and reading under every import
+would bind a second fixture's same-named record to the first's class.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist

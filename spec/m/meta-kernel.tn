@@ -1,19 +1,19 @@
-!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=cf460fa93a54cb544b0a69fa32c0f6e8e7fe923fb82725c1b0b11121c956ee04"
-!!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=f906da450f8e6f27c3e3e3195a97afbeb9c6c25b7092745cdd16aa05b0de2b07"
 @doc:"""
-  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 39 draft).
+  TSON meta-kernel — pre-loaded bootstrap layer (2026 Revision 39 draft).
 
-  The `!!meta` directive names this file itself. The circularity is closed by
-  pre-loading rather than by resolution: implementations ship the kernel's
-  resolved structure, and this document describes it.
+  The kernel imports nothing and is never resolved from a document: it is
+  pre-loaded by special resolution ([TSON-SCHEMA] §3.4), and must be the
+  revision the processor was built for. Its root tag, `!schema`, names its own
+  `schema`, as every schema document's root tag does. Implementations ship the
+  kernel's resolved structure, and this document describes it.
 
   Hash pins are real digests: sha256 over every byte of a document past its
   `!!id` line ([TSON-DATA] §2.2.1), which is what lets an `!!id` carry the
-  digest of the document it identifies. The `!!meta` above is unpinned, since a
-  pin there would be part of the bytes it digests. Meta pins this file and core
-  pins meta, so an edit here moves every pin above it.
+  digest of the document it identifies. Meta pins this file and core pins meta,
+  so an edit here moves every pin above it.
   """
-{
+!schema {
   @doc:"""
     The structural root, and what a schema map's entries are: `schema` maps a
     name to a `top`, an entry being its value. Every constructor transitively
@@ -189,8 +189,7 @@
     read by the type the position hands it to. A value-typed field is read by
     the declared type it stands for and never by base type resolution, which
     applies only in schemaless documents ([TSON-DATA] §4). value is not
-    narrowable, and a value position is not a scope: it admits no nested
-    !!schema.
+    narrowable, and a value position is not a scope: it admits no directive.
 
     Used for record_field.value (the type of fixed/default values, which must be
     the field's declared type) and for constraint vocabulary fields in meta

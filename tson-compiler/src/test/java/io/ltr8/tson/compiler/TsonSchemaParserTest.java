@@ -70,47 +70,63 @@ class TsonSchemaParserTest {
     // ── Header (§2.1, §2.2) ──────────────────────────────────────────────
 
     @Test
-    void parsesIdMetaAndImports() {
+    void parsesIdAndImports() {
         SchemaDocument doc = parse("""
                 !!id:"https://example.com/x.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { a => text }""");
+                !schema { a => text }""");
         assertEquals("https://example.com/x.tn", doc.id().orElseThrow());
-        assertEquals("https://tson.io/2026/39/m/meta.tn", doc.meta());
-        assertEquals(List.of("https://tson.io/2026/39/m/core.tn"), doc.imports());
+        assertEquals(List.of("https://tson.io/2026/39/m/meta.tn", "https://tson.io/2026/39/m/core.tn"), doc.imports());
     }
 
     @Test
     void idIsOptional() {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { a => text }""");
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { a => text }""");
         assertTrue(doc.id().isEmpty());
     }
 
     @Test
     void multipleImportsPreserveOrder() {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.com/one.tn"
                 !!import:"https://example.com/two.tn"
-                { a => text }""");
-        assertEquals(List.of("https://example.com/one.tn", "https://example.com/two.tn"), doc.imports());
+                !schema { a => text }""");
+        assertEquals(List.of("https://tson.io/2026/39/m/meta.tn", "https://example.com/one.tn",
+                "https://example.com/two.tn"), doc.imports());
+    }
+
+    /** A schema needs no import: the root's tag is what makes it one ([TSON-DATA] §2.2). */
+    @Test
+    void anImportFreeSchemaParses() {
+        SchemaDocument doc = parse("!schema { a => { b: b }  b => {} }");
+        assertEquals(List.of(), doc.imports());
+        assertEquals(List.of("a", "b"), List.copyOf(doc.body().declarations().keySet()));
+    }
+
+    /** A root not tagged {@code !schema} is data, and a schema parser says so rather than reading it. */
+    @Test
+    void anUntaggedRootIsAParseError() {
+        ParseException e = assertThrows(ParseException.class, () -> parse("{ a => text }"));
+        assertTrue(e.getMessage().contains("a schema document's root is tagged '!schema'"), e.getMessage());
     }
 
     @Test
-    void missingMetaIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("{ a => text }"));
+    void anotherRootTagIsAParseError() {
+        assertThrows(ParseException.class, () -> parse("!record { a => text }"));
     }
 
     @Test
-    void schemaDirectiveInHeaderIsAParseError() {
-        // !!schema belongs to data documents, not schema documents (§2.2).
-        assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                !!schema:"https://example.com/x.tn"
-                { a => text }"""));
+    void aRetiredDirectiveInTheHeaderIsAParseError() {
+        for (String retired : List.of("meta", "schema")) {
+            ParseException e = assertThrows(ParseException.class, () -> parse("""
+                    !!%s:"https://example.com/x.tn"
+                    !schema { a => text }""".formatted(retired)));
+            assertTrue(e.getMessage().contains("'!!" + retired + "' directive is retired"), e.getMessage());
+        }
     }
 
     // ── Schema map (§2.1) ─────────────────────────────────────────────────
@@ -118,16 +134,16 @@ class TsonSchemaParserTest {
     @Test
     void emptySchemaMapIsAParseError() {
         assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {}"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {}"""));
     }
 
     @Test
     void schemaLevelAnnotationBindsToTheMap() {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 @doc:"a schema"
-                { a => text }""");
+                !schema { a => text }""");
         assertEquals(1, doc.body().annotations().size());
         assertEquals("doc", doc.body().annotations().get(0).name());
     }
@@ -135,8 +151,8 @@ class TsonSchemaParserTest {
     @Test
     void declarationNameAndTypeDefAnnotationsBindSeparately() {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { @since:2025 a => @doc:"a field" text }""");
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { @since:2025 a => @doc:"a field" text }""");
         SchemaMap.Declaration decl = doc.body().declarations().get("a");
         assertEquals("since", decl.nameAnnotations().get(0).name());
         assertEquals("doc", decl.typeDefAnnotations().get(0).name());
@@ -147,8 +163,8 @@ class TsonSchemaParserTest {
         // Genuine duplicate-name detection is deferred to schema resolution's Pass 1 (§3.4.1),
         // the same "grammar layer doesn't dedupe" treatment as ordinary data maps/records.
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { a => text  b => integer  a => uuid }""");
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { a => text  b => integer  a => uuid }""");
         assertEquals(List.of("a", "b"), List.copyOf(doc.body().declarations().keySet()));
         assertEquals(new SimpleRef("uuid"),
                 ((ReferenceTypeDef) doc.body().declarations().get("a").typeDef()).ref());
@@ -336,8 +352,8 @@ class TsonSchemaParserTest {
     @Test
     void aMapArrowInARecordBodyNamesTheConstructRatherThanTheToken() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { config => base ^ {text => text} }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { config => base ^ {text => text} }"""));
         assertTrue(thrown.getMessage().contains("'=>' begins a map type only where a type is expected"),
                 thrown.getMessage());
     }
@@ -346,8 +362,8 @@ class TsonSchemaParserTest {
     @Test
     void aSecondMapEntryIsNamedAsTheSingleEntryRuleRatherThanAnUnexpectedToken() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { m => {text => integer  integer => text} }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { m => {text => integer  integer => text} }"""));
         assertTrue(thrown.getMessage().contains("a map type is a single 'key => value' entry"),
                 thrown.getMessage());
     }
@@ -356,8 +372,8 @@ class TsonSchemaParserTest {
     @Test
     void aBareRecordAtATypeRefPositionDistinguishesTheTwoBraceMeanings() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { holder => { inner: {name: text} } }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { holder => { inner: {name: text} } }"""));
         assertTrue(thrown.getMessage().contains("opens the map sugar"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("record body is not permitted"), thrown.getMessage());
     }
@@ -371,8 +387,8 @@ class TsonSchemaParserTest {
     @Test
     void aQuestionMarkOnAMapKeyIsAParseError() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { m => {pair<text>? => integer} }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { m => {pair<text>? => integer} }"""));
         assertTrue(thrown.getMessage().contains("not permitted on a map type's key"), thrown.getMessage());
     }
 
@@ -394,8 +410,8 @@ class TsonSchemaParserTest {
     @Test
     void aDetachedQuestionMarkOnAMapValueIsAParseError() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { m => {text => integer ?} }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { m => {text => integer ?} }"""));
         assertTrue(thrown.getMessage().contains("immediately adjacent"), thrown.getMessage());
     }
 
@@ -410,8 +426,8 @@ class TsonSchemaParserTest {
     @Test
     void aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { m => {text? => integer} }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { m => {text? => integer} }"""));
         assertTrue(thrown.getMessage().contains("'=>' begins a map type only where a type is expected"),
                 thrown.getMessage());
     }
@@ -581,12 +597,12 @@ class TsonSchemaParserTest {
     @Test
     void aTrailingCommaInATupleIsOrdinaryAndAStrayOneIsNot() {
         assertNotNull(parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { a => [text, integer,] }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { a => [text, integer,] }"""));
 
         assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { a => [text, , integer] }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { a => [text, , integer] }"""));
     }
 
     // ── Instance templates (§12.1) ────────────────────────────────────────
@@ -652,8 +668,8 @@ class TsonSchemaParserTest {
             "t => !integer ^ @doc:\"d\" { min: 1 }"})     // an annotation layer on the payload
     void anAtomRefinementBodyMustBeABracedRecord(String declaration) {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { %s }""".formatted(declaration)));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { %s }""".formatted(declaration)));
         assertTrue(thrown.getMessage().contains("'{'"), thrown.getMessage());
     }
 
@@ -672,8 +688,8 @@ class TsonSchemaParserTest {
     void aRefinementBodyErrorIsReportedPerDeclarationAndTheParseContinues() {
         List<Diagnostic> problems = new ArrayList<>();
         new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   bad  => !integer ^ 5
                   good => { n: int32 }
                 }""").parseSchemaDocument(problems::add);
@@ -687,8 +703,8 @@ class TsonSchemaParserTest {
     @Test
     void aParameterizedAtomRefinementIsAParseError() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { t => <N> !integer ^ { min: N } }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { t => <N> !integer ^ { min: N } }"""));
         assertTrue(thrown.getMessage().contains("'^' takes no type parameters"), thrown.getMessage());
     }
 
@@ -697,8 +713,8 @@ class TsonSchemaParserTest {
     @Test
     void numericDeclarationNameIsAParseError() {
         assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { 42 => text }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { 42 => text }"""));
     }
 
     /**
@@ -712,8 +728,8 @@ class TsonSchemaParserTest {
     @ParameterizedTest
     void aDeclarationNameOutsideTheIdentifierProfileIsAParseError(String name) {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { %s => text }""".formatted(name)));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { %s => text }""".formatted(name)));
         assertTrue(thrown.getMessage().contains("cannot start an identifier"), thrown.getMessage());
     }
 
@@ -725,8 +741,8 @@ class TsonSchemaParserTest {
     @Test
     void aDeclarationNameContainingADotIsAParseError() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { x.y => text }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { x.y => text }"""));
         assertTrue(thrown.getMessage().contains("cannot appear in an identifier"), thrown.getMessage());
     }
 
@@ -739,11 +755,11 @@ class TsonSchemaParserTest {
     @Test
     void aLeadingUnderscoreDeclarationNameIsAParseError() {
         assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { _id => text }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { _id => text }"""));
         ParseException field = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { r => { _id: text } }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { r => { _id: text } }"""));
         assertTrue(field.getMessage().contains("quote it, \"_id\""), field.getMessage());
     }
 
@@ -751,8 +767,8 @@ class TsonSchemaParserTest {
     @Test
     void aTypeParameterOutsideTheIdentifierProfileIsAParseError() {
         assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { box => <9t> { v: 9t } }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { box => <9t> { v: 9t } }"""));
     }
 
     /**
@@ -771,16 +787,16 @@ class TsonSchemaParserTest {
     @Test
     void aColonWithNoTypeAfterItIsAParseError() {
         assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { box => <T:> { v: T } }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { box => <T:> { v: T } }"""));
     }
 
     /** And so is the constructor head of an atom refinement or instance, which names a type. */
     @Test
     void aConstructorHeadOutsideTheIdentifierProfileIsAParseError() {
         assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { t => !9integer { min: 1 } }"""));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { t => !9integer { min: 1 } }"""));
     }
 
     /**
@@ -791,8 +807,8 @@ class TsonSchemaParserTest {
     @ParameterizedTest
     void anIdentifierDeclarationNameParses(String name) {
         assertTrue(parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { %s => text }""".formatted(name)).body().declarations().containsKey(name));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { %s => text }""".formatted(name)).body().declarations().containsKey(name));
     }
 
     // ── §1.6's full worked example ────────────────────────────────────────
@@ -801,10 +817,10 @@ class TsonSchemaParserTest {
     void section1Point6WorkedExample() {
         SchemaDocument doc = parse("""
                 !!id:"https://example.com/task.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 @doc:"Task-tracking example schema."
-                {
+                !schema {
                   priority => !integer ^ { min: 1  max: 5 }
                   status   => !enum [OPEN ACTIVE DONE]
                   flagged  => <T, N> { entry: T  priority?: priority ~ N }
@@ -864,8 +880,8 @@ class TsonSchemaParserTest {
 
     private static SchemaMap.Declaration declOf(String declaration) {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { %s }""".formatted(declaration));
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { %s }""".formatted(declaration));
         return doc.body().declarations().values().iterator().next();
     }
 
@@ -913,8 +929,8 @@ class TsonSchemaParserTest {
     void everyBrokenDeclarationIsReportedInOnePass() {
         List<Diagnostic> problems = parseCollecting("""
                 !!id:"https://example.com/x.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   first => { x: }
                   second => { y: text }
                   third => { z: !integer ^ { min: 1 } }
@@ -929,8 +945,8 @@ class TsonSchemaParserTest {
     void aParseThatReportedAnythingHandsBackNoDocumentEvenThoughSomeDeclarationsParsed() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   broken => { x: }
                   sound => { y: text }
                 }
@@ -943,8 +959,8 @@ class TsonSchemaParserTest {
     void aCleanParseThroughTheRecoveringEntryPointHandsBackTheDocument() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { sound => { y: text } }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { sound => { y: text } }
                 """);
         SchemaDocument doc = parser.parseSchemaDocument(problems).orElseThrow();
         assertEquals(0, parser.reported());
@@ -955,8 +971,8 @@ class TsonSchemaParserTest {
     void everyDeclarationFailingLeavesNoSchemaMapToBuildRatherThanAnEmptyOne() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   first => { x: }
                   second => { y: }
                 }
@@ -968,8 +984,8 @@ class TsonSchemaParserTest {
     @Test
     void recoveryResynchronisesPastNestedBracketsRatherThanStoppingAtTheirClosers() {
         List<Diagnostic> problems = parseCollecting("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   broken => { a: [ text, (b | c) ] x: }
                   next => { y: }
                 }
@@ -981,8 +997,8 @@ class TsonSchemaParserTest {
     @Test
     void aDeclarationFailingBeforeItsOwnNameIsPointedAtTheDocumentRoot() {
         List<Diagnostic> problems = parseCollecting("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   "quoted" => text
                   next => text
                 }
@@ -994,8 +1010,8 @@ class TsonSchemaParserTest {
     void aSchemaSyntaxDiagnosticLocatesItselfAtTheSchemaEndAndNotTheDataEnd() {
         Diagnostic d = parseCollecting("""
                 !!id:"https://example.com/x.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   broken => { x: }
                   next => text
                 }
@@ -1012,8 +1028,8 @@ class TsonSchemaParserTest {
     @Test
     void aMissingReceiverIsStillFailFast() {
         assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   broken => { x: }
                   next => text
                 }
@@ -1032,8 +1048,8 @@ class TsonSchemaParserTest {
     @Test
     void declarationPositionsRecordsEachDeclarationsOwnNameTokenPosition() {
         String source = """
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   first => {}
 
                   second => {}
@@ -1052,43 +1068,30 @@ class TsonSchemaParserTest {
     }
 
     /**
-     * <b>The header comes off {@code DocumentStart} now, and the verdict is still this parser's.</b>
-     * §2.2's grammar has one implementation -- the stream's -- where it had three; what stays here is
-     * [TSON-SCHEMA] §12.1's rule, that a schema document carries exactly one {@code !!meta} where §2.2
-     * merely permits it. These pin the messages, because the risk of reading the header off a shared event
-     * was always that a schema document would be told about a data document's rules.
+     * <b>The header comes off {@code DocumentStart}, and the verdict on the root is this parser's.</b> §2.2's
+     * grammar has one implementation -- the stream's; what stays here is that a schema document's root is tagged
+     * {@code !schema}. These pin the messages, because the risk of reading the header off a shared event was always
+     * that a schema document would be told about a data document's rules.
      */
     @Test
-    void aSchemaDocumentMissingItsMetaSaysSo() {
+    void aSchemaDocumentMissingItsRootTagSaysSo() {
         for (String source : new String[]{
-                "!!import:\"https://example.com/core.tn\"\n{ a => text }",   // a directive §2.2 does not admit
-                "{ a => text }"}) {                                          // no header at all
+                "!!import:\"https://example.com/core.tn\"\n{ a => text }",
+                "{ a => text }"}) {
             ParseException e = assertThrows(ParseException.class, () -> parse(source));
-            assertTrue(e.getMessage().startsWith("expected '!!meta'"), e.getMessage());
+            assertTrue(e.getMessage().startsWith("a schema document's root is tagged '!schema'"), e.getMessage());
         }
     }
 
-    /** And a document governed by the wrong directive is told which one it should carry. */
+    /** A directive the header grammar does not know is refused there, naming what a header holds. */
     @Test
-    void aSchemaDocumentGovernedBySchemaSaysWhichDirectiveItNeeds() {
-        for (String source : new String[]{
-                "!!schema:\"https://example.com/s.tn\"\n{ a => text }",
-                "!!id:\"https://example.com/x\"\n!!schema:\"https://example.com/s.tn\"\n{ a => text }"}) {
-            ParseException e = assertThrows(ParseException.class, () -> parse(source));
-            assertTrue(e.getMessage().contains("governed by '!!meta', not '!!schema'"), e.getMessage());
-        }
-    }
-
-    /** A directive after the header is still the schema map's business, and names its own alternatives. */
-    @Test
-    void aStrayDirectiveAfterTheMetaIsTheSchemaParsersToRefuse() {
+    void anUnknownDirectiveIsRefusedByTheHeader() {
         ParseException e = assertThrows(ParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!bogus:"https://example.com/x"
-                { a => text }"""));
+                !schema { a => text }"""));
 
-        assertTrue(e.getMessage().contains("'!!bogus' is not permitted here"), e.getMessage());
-        assertTrue(e.getMessage().contains("'!!import' or the schema map's opening"), e.getMessage());
+        assertTrue(e.getMessage().contains("unknown directive '!!bogus'"), e.getMessage());
     }
 
     /** The whole header, read through the shared event: id, meta and the imports that follow it. */
@@ -1096,12 +1099,11 @@ class TsonSchemaParserTest {
     void theWholeHeaderSurvivesTheSharedRead() {
         SchemaDocument doc = parse("""
                 !!id:"https://example.com/s.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { a => text }""");
+                !schema { a => text }""");
 
         assertEquals(Optional.of("https://example.com/s.tn"), doc.id());
-        assertEquals("https://tson.io/2026/39/m/meta.tn", doc.meta());
-        assertEquals(List.of("https://tson.io/2026/39/m/core.tn"), doc.imports());
+        assertEquals(List.of("https://tson.io/2026/39/m/meta.tn", "https://tson.io/2026/39/m/core.tn"), doc.imports());
     }
 }

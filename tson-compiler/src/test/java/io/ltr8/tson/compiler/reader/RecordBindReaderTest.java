@@ -115,7 +115,7 @@ class RecordBindReaderTest {
                 Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
                 Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
                         new Token("NONE", Token.Form.UNQUOTED))))));
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));
@@ -153,7 +153,7 @@ class RecordBindReaderTest {
                         new Token("NONE", Token.Form.UNQUOTED))))));
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 new TsonLinkedSchema(new TsonSchema("https://example.test/s.tn",
-                        "https://example.test/meta.tn", List.of(), entries)),
+                        List.of(), entries)),
                 ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()));
 
         // stating the fixed value is fine, and the bound field still gets the narrowed Integer
@@ -244,7 +244,7 @@ class RecordBindReaderTest {
                                 new Token("NONE", Token.Form.UNQUOTED))),
                         Map.entry("spec",
                                 RecordField.optionalVoidable(TypeRef.of("text"))))))).withSupertypes(List.of("text_type")));
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));

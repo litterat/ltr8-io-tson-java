@@ -173,7 +173,7 @@ public final class Tson {
 
     /**
      * A schema-aware {@link TsonObjectReader} over this instance -- reads TSON text into bound Java objects
-     * (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema},
+     * (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!import},
      * schemaless when it declares none. Built over {@link #bindRegistry()}, so every reader from this
      * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
      *
@@ -188,7 +188,7 @@ public final class Tson {
 
     /**
      * A schema-aware {@link TsonTreeReader} over this instance -- reads TSON text into an immutable,
-     * queryable {@code TsonValue} tree, validating against a self-describing document's {@code !!schema},
+     * queryable {@code TsonValue} tree, validating against a self-describing document's {@code !!import},
      * schemaless when it declares none. The tree-producing peer of {@link #objectReader()}, and built over
      * {@link #treeRegistry()} on the same shared-cache terms -- which is what keeps {@link #validate}, which
      * makes a reader per call, from recompiling the schema for every document it checks.
@@ -247,11 +247,10 @@ public final class Tson {
     }
 
     /**
-     * Resolves, links, and registers {@code schemaText} -- its own {@code !!meta} must already be
-     * registered here (meta-kernel, meta.tn, or core.tn), and any {@code !!import} it carries must
-     * resolve the same way. Deliberately stops short of compiling -- compiling in a chosen mode is a
-     * registry's job ({@link #treeRegistry()}/{@link #bindRegistry()}), independent of the object-binding
-     * mode this always used internally.
+     * Resolves, links, and registers {@code schemaText} -- every {@code !!import} it carries must already be registered
+     * here (the bundled schemas are) or be servable by the configured source. Deliberately stops short of compiling --
+     * compiling in a chosen mode is a registry's job ({@link #treeRegistry()}/{@link #bindRegistry()}), independent of
+     * the object-binding mode this always used internally.
      */
     public TsonLinkedSchema resolve(String schemaText) {
         TsonSchemaParser parser = new TsonSchemaParser(schemaText);
@@ -277,19 +276,19 @@ public final class Tson {
 
     /**
      * Validates a data document, working out on its own whether a schema applies. If the document
-     * declares a {@code !!schema}, that URI selects the schema (resolved through this instance's own
+     * declares an {@code !!import}, that URI selects the schema (resolved through this instance's own
      * {@link ProcessorConfig#schemaAccess} and compiled once, in tree mode) and the document's root type-ref
-     * (e.g. {@code !person}) selects the type; with no {@code !!schema} it's validated schemalessly
+     * (e.g. {@code !person}) selects the type; with no {@code !!import} it's validated schemalessly
      * (Class 1: base syntax, plus the built-in type vocabulary for whatever the wire tags).
      *
      * <p>Returns every problem found, an empty list meaning valid. A problem specific to this document
      * that isn't a value error -- malformed syntax, a schema document where data was expected, a {@code
-     * !!schema} the source can't provide, a root type the schema doesn't declare, a missing root type-ref
+     * !!import} the source can't provide, a root type the schema doesn't declare, a missing root type-ref
      * -- comes back as a {@link Diagnostic} in the list too, so a caller has one shape to render and never
      * has to catch an exception for a bad input document.
      *
      * <p><b>This <em>is</em> {@link #treeReader()} with a collecting receiver</b>, both halves of it. The
-     * reader already resolves a {@code !!schema}, selects the root type, checks a schemaless document's own
+     * reader already resolves an {@code !!import}, selects the root type, checks a schemaless document's own
      * type-refs, and reports every failure around all of that as a diagnostic; validating is that read with
      * its result thrown away. There is no second implementation to drift from this one.
      */
@@ -354,26 +353,26 @@ public final class Tson {
             }
             treeRegistry().compile(core.register(linked, schemaText));
         } catch (SchemaFetchException e) {
-            // An !!import or !!meta naming an identity no configured source will serve. The document fails
+            // An !!import naming an identity no configured source will serve. The document fails
             // either way, but it was never checked: nothing here saw the imported schema, so "this schema
             // is wrong" is a verdict this call has no grounds for. Same root pointer as the rest -- what
             // differs is the code and the exception's own Reason, which say respectively that no schema was
             // obtained and whose doing that was.
             problems.report(TsonDiagnostics.ofSchemaUnavailable("", "", e, Optional.empty()));
         } catch (BindMismatchException e) {
-            // A class bound to this schema's governing meta cannot work with it -- a record component
+            // A class bound to a constructor this schema imports cannot work with it -- a record component
             // the binder cannot analyse, say. The schema may be perfectly good and this call cannot say either way,
             // so it reports the wiring mistake rather than letting a bare runtime exception past a caller who
             // asked for a list of problems, which would read as a fault in this library.
             problems.report(TsonDiagnostics.ofSchemaBindMismatch("", "", e, Optional.empty()));
         } catch (ContentHashMismatchException e) {
-            // A ?sha256= pin -- this document's own !!id, or one on an !!import or !!meta -- against
+            // A ?sha256= pin -- this document's own !!id, or one on an !!import -- against
             // content that does not hash to it. §2.2.1's integrity failure is a verdict on the reference,
             // so it is reported like the rest rather than escaping a call that promised a list.
             problems.report(TsonDiagnostics.ofSchemaError("", "", e.getMessage(), Optional.empty()));
         } catch (SchemaValidationException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
-            // loaded and would not link, a !!meta that may not govern. Author errors about the document as
+            // loaded and would not link. Author errors about the document as
             // a whole, so they carry the root pointer rather than naming a declaration.
             problems.report(TsonDiagnostics.ofSchemaError("", "", e.getMessage(), Optional.empty()));
         } catch (RuntimeException e) {

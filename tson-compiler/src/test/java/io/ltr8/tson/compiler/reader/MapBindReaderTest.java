@@ -34,9 +34,9 @@ class MapBindReaderTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/catalogue.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               catalogue => { entries: {text => text?} }
               ranked    => !map { key_type: text  value_type: int32  ordered: true }
               league    => { table: ranked }

@@ -1,11 +1,11 @@
 !!id:"https://tson.io/2026/39/m/net-resolved.tn"
-!!schema:"https://tson.io/2026/39/m/meta.tn"
+!!import:"https://tson.io/2026/39/m/meta.tn"
 @doc:"""
   Resolver-output fixture for net.tn (2026 Revision 39 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-kernel-resolved.tn, and the header note in
-  core-resolved.tn applies here unchanged: net.tn imports nothing, and
-  every entry's tag names a meta- or kernel-level constructor.
+  core-resolved.tn applies here unchanged: net.tn imports meta.tn alone,
+  and every entry's tag names a meta- or kernel-level constructor.
   """
 !schema {
   @ordering:TOTAL @bounded:true

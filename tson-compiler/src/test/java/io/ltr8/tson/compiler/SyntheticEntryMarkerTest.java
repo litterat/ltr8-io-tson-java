@@ -47,9 +47,9 @@ class SyntheticEntryMarkerTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/marker.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               @doc:"An order." order => { id: text }
               paged => <T> { items: [T; 1..] }
               order_response => paged<order>
@@ -68,9 +68,9 @@ class SyntheticEntryMarkerTest {
 
     private static final String IMPORTER = """
             !!id:"https://example.test/importer.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://example.test/marker.tn"
-            {
+            !schema {
               shipment => { of: order }
             }
             """;

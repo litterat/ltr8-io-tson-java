@@ -278,10 +278,10 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         UNKNOWN_TYPE_REF,
 
         /**
-         * A value names a schema at a value position -- {@code $schema} in JSON anywhere but the root's annotation
-         * object ([TSON-JSON] §3.3, §3.4). §8.1's {@code resolver} category: the document's binding is written
-         * where no binding stands. TSON text has no counterpart here, a {@code !!schema} anywhere but the header
-         * being a parse error ([TSON-DATA] §3.3).
+         * A document's imports written at a value position -- {@code $import} in JSON anywhere but the leading
+         * member of the document's top object ([TSON-JSON] §3.4). §8.1's {@code resolver} category: the
+         * document's binding is written where no binding stands. TSON text has no counterpart here, an {@code
+         * !!import} anywhere but the header being a parse error ([TSON-DATA] §3.3).
          */
         SCOPE_NOT_ADMITTED,
         ATOM_FORM_INVALID,

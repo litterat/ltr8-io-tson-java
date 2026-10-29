@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -19,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonDocumentHeader#peek}: §7.1's classification from a document's opening bytes.
+ * {@link TsonDocumentPeek}: §7.1's classification from a document's opening bytes -- the header, then the root's
+ * tag ([TSON-DATA] §2.2).
  *
  * <p>The governing rule throughout is that a peek may answer "nothing here" but must never answer with a
  * schema the document does not name -- so the adversarial cases (a directive spelled inside the value, a
@@ -61,49 +63,75 @@ class TsonDocumentPeekTest {
     }
 
     @Test
-    void readsTheSchemaADataDocumentNames() {
-        TsonDocumentHeader header = peek("!!schema:\"https://example.com/order.tn\"\n{ id: 1 }");
+    void readsTheSchemaADataDocumentImports() {
+        TsonDocumentPeek peek = TsonDocumentPeek.of("!!import:\"https://example.com/order.tn\"\n!order { id: 1 }");
 
-        assertEquals(Optional.of("https://example.com/order.tn"), header.schema());
-        assertEquals(Optional.empty(), header.id());
-        assertFalse(header.isSchemaDocument());
+        assertEquals(List.of("https://example.com/order.tn"), peek.header().imports());
+        assertEquals(Optional.empty(), peek.header().id());
+        assertFalse(peek.isSchemaDocument());
     }
 
     @Test
-    void readsBothDirectivesInOrder() {
+    void readsEveryDirectiveInOrder() {
         TsonDocumentHeader header = peek("""
                 !!id:"https://example.com/orders/1"
-                !!schema:"https://example.com/order.tn"
-                { id: 1 }
+                !!import:"https://example.com/order.tn"
+                !!import:"https://example.com/money.tn"
+                !order { id: 1 }
                 """);
 
         assertEquals(Optional.of("https://example.com/orders/1"), header.id());
-        assertEquals(Optional.of("https://example.com/order.tn"), header.schema());
+        assertEquals(List.of("https://example.com/order.tn", "https://example.com/money.tn"), header.imports());
     }
 
     @Test
-    void classifiesASchemaDocumentByItsMeta() {
-        TsonDocumentHeader header = peek("""
+    void classifiesASchemaDocumentByItsRootTag() {
+        TsonDocumentPeek peek = TsonDocumentPeek.of("""
                 !!id:"https://example.com/order.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { order => { id: int32 } }
+                !schema { order => { id: int32 } }
                 """);
 
-        assertTrue(header.isSchemaDocument());
-        assertEquals(Optional.of("https://tson.io/2026/39/m/meta.tn"), header.meta());
-        assertEquals(Optional.of("https://example.com/order.tn"), header.id());
-        assertEquals(Optional.empty(), header.schema());
+        assertTrue(peek.isSchemaDocument());
+        assertEquals(List.of("https://tson.io/2026/39/m/core.tn"), peek.header().imports());
+        assertEquals(Optional.of("https://example.com/order.tn"), peek.header().id());
+    }
+
+    /** An import-free schema is one by its tag alone: the header carries nothing to classify it by. */
+    @Test
+    void classifiesAnImportFreeSchemaByItsRootTag() {
+        assertTrue(TsonDocumentPeek.of("!schema { a => { b: b }  b => {} }").isSchemaDocument());
+    }
+
+    /**
+     * The tag stands after the root's annotations, so classifying reads past them -- and only them: the schema map
+     * that follows, whose sugar no data frame reads, is never parsed.
+     */
+    @Test
+    void classifiesPastTheRootsAnnotationsWithoutReadingTheSchemaMap() {
+        TsonDocumentPeek peek = TsonDocumentPeek.of("""
+                @doc:"orders" @title:{ text: "Orders" }
+                !schema { order => { id: int32 | text  tags: [text; 1..] } }
+                """);
+
+        assertTrue(peek.isSchemaDocument());
+        assertEquals(null, peek.failure());
+    }
+
+    /** A root carrying another tag, or none, is data -- the document's imports say nothing either way. */
+    @Test
+    void anyOtherRootIsData() {
+        assertFalse(TsonDocumentPeek.of("!order { id: 1 }").isSchemaDocument());
+        assertFalse(TsonDocumentPeek.of("@doc:\"x\" { id: 1 }").isSchemaDocument());
+        assertFalse(TsonDocumentPeek.of("[ 1 2 ]").isSchemaDocument());
     }
 
     @Test
     void aDocumentWithNoDirectivesHasAnEmptyHeader() {
-        TsonDocumentHeader header = peek("{ id: 1 }");
+        TsonDocumentPeek peek = TsonDocumentPeek.of("{ id: 1 }");
 
-        assertEquals(Optional.empty(), header.id());
-        assertEquals(Optional.empty(), header.schema());
-        assertEquals(Optional.empty(), header.meta());
-        assertFalse(header.isSchemaDocument());
+        assertEquals(TsonDocumentHeader.NONE, peek.header());
+        assertFalse(peek.isSchemaDocument());
     }
 
     @Test
@@ -114,41 +142,45 @@ class TsonDocumentPeekTest {
     /** No value parsing (§7.1): the header is answerable whether or not what follows it is a document. */
     @Test
     void readsTheHeaderOfADocumentWhoseValueIsMalformed() {
-        TsonDocumentHeader header = peek("!!schema:\"https://example.com/order.tn\"\n{ id: ");
+        TsonDocumentHeader header = peek("!!import:\"https://example.com/order.tn\"\n!order { id: ");
 
-        assertEquals(Optional.of("https://example.com/order.tn"), header.schema());
+        assertEquals(List.of("https://example.com/order.tn"), header.imports());
     }
 
     @Test
     void readsTheHeaderOfADocumentWithNoValueAtAll() {
-        TsonDocumentHeader header = peek("!!schema:\"https://example.com/order.tn\"\n");
+        TsonDocumentHeader header = peek("!!import:\"https://example.com/order.tn\"\n");
 
-        assertEquals(Optional.of("https://example.com/order.tn"), header.schema());
+        assertEquals(List.of("https://example.com/order.tn"), header.imports());
     }
 
     /** A directive is a directive only in the header: one spelled inside the value is that value's text. */
     @Test
     void doesNotReportADirectiveWrittenInsideTheValue() {
         TsonDocumentHeader header =
-                peek("{ note: \"!!schema:\\\"https://attacker.example/evil.tn\\\"\" }");
+                peek("{ note: \"!!import:\\\"https://attacker.example/evil.tn\\\"\" }");
 
-        assertEquals(Optional.empty(), header.schema());
+        assertEquals(List.of(), header.imports());
     }
 
-    /** {@code !!schema} after the value has started is not a header directive and is not reported as one. */
+    /** {@code !!import} after the value has started is not a header directive and is not reported as one. */
     @Test
     void doesNotReportADirectiveAfterTheValue() {
-        TsonDocumentHeader header = peek("{ id: 1 }\n!!schema:\"https://attacker.example/evil.tn\"");
+        TsonDocumentHeader header = peek("{ id: 1 }\n!!import:\"https://attacker.example/evil.tn\"");
 
-        assertEquals(Optional.empty(), header.schema());
+        assertEquals(List.of(), header.imports());
     }
 
-    /** A directive §2.2 does not admit here stops the scan; whether the document parses is the parser's answer. */
+    /** A retired directive is refused by the header grammar, so a peek answers nothing and keeps why. */
     @Test
-    void stopsAtADirectiveThatIsNeitherSchemaNorMeta() {
-        TsonDocumentHeader header = peek("!!import:\"https://example.com/core.tn\"\n{ id: 1 }");
+    void aRetiredDirectiveYieldsNothing() {
+        TsonDocumentPeek schema = TsonDocumentPeek.of("!!sch" + "ema:\"https://example.com/order.tn\"\n{ id: 1 }");
+        TsonDocumentPeek meta = TsonDocumentPeek.of("!!me" + "ta:\"https://example.com/meta.tn\"\n{ a => {} }");
 
-        assertEquals(TsonDocumentHeader.NONE, header);
+        assertEquals(TsonDocumentHeader.NONE, schema.header());
+        assertTrue(schema.failure().getMessage().contains("'!!schema' directive is retired"), schema.failure()::getMessage);
+        assertEquals(TsonDocumentHeader.NONE, meta.header());
+        assertFalse(meta.isSchemaDocument());
     }
 
     /**
@@ -157,11 +189,9 @@ class TsonDocumentPeekTest {
      */
     @Test
     void aMalformedHeaderYieldsNothingRatherThanGuessing() {
-        assertEquals(Optional.empty(), peek("!!schema:\n{ id: 1 }").schema());
-        assertEquals(Optional.empty(),
-                peek("!!schema:\"not a uri at all\"\n{ id: 1 }").schema());
-        assertEquals(Optional.empty(),
-                peek("!!schema:\"https://example.com/order.tn\n{ id: 1 }").schema());
+        assertEquals(TsonDocumentHeader.NONE, peek("!!import:\n{ id: 1 }"));
+        assertEquals(TsonDocumentHeader.NONE, peek("!!import:\"not a uri at all\"\n{ id: 1 }"));
+        assertEquals(TsonDocumentHeader.NONE, peek("!!import:\"https://example.com/order.tn\n{ id: 1 }"));
     }
 
     /**
@@ -177,7 +207,7 @@ class TsonDocumentPeekTest {
     @Test
     void aMalformedDirectiveYieldsNothingEvenAfterAGoodOne() {
         TsonDocumentHeader header =
-                peek("!!id:\"https://example.com/orders/1\"\n!!schema:\n{ id: 1 }");
+                peek("!!id:\"https://example.com/orders/1\"\n!!import:\n{ id: 1 }");
 
         assertEquals(TsonDocumentHeader.NONE, header);
     }
@@ -203,11 +233,11 @@ class TsonDocumentPeekTest {
     @Test
     void continuesAOneShotStreamWithoutRewinding() throws Exception {
         String document = "!!id:\"https://example.com/orders/1\"\n"
-                + "!!schema:\"https://example.com/order.tn\"\n"
+                + "!!import:\"https://example.com/order.tn\"\n"
                 + "{ id: 1  note: \"hello\" }\n";
         TsonDocumentPeek peeked = TsonDocumentPeek.of(oneShot(document));
 
-        assertEquals(Optional.of("https://example.com/order.tn"), peeked.header().schema());
+        assertEquals(List.of("https://example.com/order.tn"), peeked.header().imports());
         assertEquals(Optional.of("https://example.com/orders/1"), peeked.header().id());
         TsonValue value = new TsonTreeReader().read(peeked);
         assertEquals(1, value.get("id").asInt().orElseThrow());
@@ -218,7 +248,7 @@ class TsonDocumentPeekTest {
     @Test
     void resumingDoesNotBufferTheDocument() throws Exception {
         String body = "x".repeat(500_000);
-        String document = "!!schema:\"https://example.com/order.tn\"\n{ note: \"" + body + "\" }";
+        String document = "!!import:\"https://example.com/order.tn\"\n{ note: \"" + body + "\" }";
         AtomicLong pulled = new AtomicLong();
         InputStream counting = new FilterInputStream(oneShot(document)) {
             @Override
@@ -242,7 +272,7 @@ class TsonDocumentPeekTest {
 
         TsonDocumentPeek peeked = TsonDocumentPeek.of(counting);
 
-        assertEquals(Optional.of("https://example.com/order.tn"), peeked.header().schema());
+        assertEquals(List.of("https://example.com/order.tn"), peeked.header().imports());
         assertTrue(pulled.get() < 64_000, "the peek pulled " + pulled.get() + " bytes for a header of 41");
 
         // And the 500 KB it did not pull is still there to be read, on the same stream.
@@ -255,7 +285,7 @@ class TsonDocumentPeekTest {
      */
     @Test
     void aPeekedDocumentReadsWholeThroughAnOrdinaryReader() throws Exception {
-        String document = "!!schema:\"https://example.com/order.tn\"\n{ id: 1 }";
+        String document = "!!import:\"https://example.com/order.tn\"\n{ id: 1 }";
         TsonDocumentPeek peeked = TsonDocumentPeek.of(oneShot(document));
 
         TsonValue value = new TsonTreeReader().read(peeked);
@@ -274,8 +304,8 @@ class TsonDocumentPeekTest {
 
     @Test
     void peeksAnInputStreamWithoutReadingTheDocument() {
-        try (InputStream in = stream("!!schema:\"https://example.com/order.tn\"\n{ id: 1 }")) {
-            assertEquals(Optional.of("https://example.com/order.tn"), peek(in).schema());
+        try (InputStream in = stream("!!import:\"https://example.com/order.tn\"\n{ id: 1 }")) {
+            assertEquals(List.of("https://example.com/order.tn"), peek(in).imports());
         } catch (Exception e) {
             throw new AssertionError(e);
         }
@@ -292,6 +322,6 @@ class TsonDocumentPeekTest {
         TsonDocumentHeader header = peek(document);
 
         assertEquals(Optional.of("https://example.com/orders/1"), header.id());
-        assertEquals(Optional.of("https://example.com/order.tn"), header.schema());
+        assertEquals(List.of("https://example.com/order.tn"), header.imports());
     }
 }

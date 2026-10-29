@@ -129,16 +129,16 @@ import java.util.stream.Collectors;
  * other entry.
  *
  * <p><b>One namespace per schema (Part 2 §2.2.3, SPEC-FEEDBACK.md #7).</b> The namespace a schema is checked
- * against is built in two stages, in this order: (1) the whole namespace of its {@code !!meta} target and of every
- * {@code !!import} ({@link TsonSchema#namespaceSources}), in header order, looked up via {@code loader} by canonical
+ * against is built in two stages, in this order: (1) the whole namespace of every {@code !!import} ({@link
+ * TsonSchema#namespaceSources}), in header order, looked up via {@code loader} by canonical
  * identity -- <b>transitive, not shallow</b>: {@code loader} hands back an already-registered, already-linked schema
  * whose {@code entries()} hold its own closure merged in, and all of them are taken; (2) this schema's own entries,
- * exactly as resolved. A {@code !!meta} target contributes exactly as an {@code !!import} does. Every name a schema
+ * exactly as resolved. Every name a schema
  * writes -- a construction head, a refinement source, a type-ref, a kind's or a reference's {@code of}, an
  * annotation -- resolves in that one flat namespace, with no hiding and no second store.
  *
  * <p><b>Anyone may declare a constructor</b> (an entry IS-A {@code top}, §4.1) or a reference, and import any
- * schema: no rule ties either to the document's {@code !!meta}.
+ * schema.
  *
  * <p><b>Collisions are decided by entry identity.</b> One schema reached by several routes unifies; two
  * *different* schemas declaring one name is the error, as is a local declaration shadowing any name the
@@ -169,10 +169,9 @@ public final class TsonSchemaLinker {
      * storage -- and this is a link whose result the registry deliberately never stores (see below).
      *
      * <p>Takes no {@link TsonSchemaLoader} -- unlike {@link #link}, which always needs one for
-     * {@code !!import}/{@code !!meta} lookups -- because meta-kernel's own document, the only real
-     * caller of this method, never has any {@code !!import}s: it's the base of the whole governing
-     * chain, nothing above it to import from, and its self-naming {@code !!meta} contributes nothing
-     * ({@link TsonSchema#namespaceSources}) -- so {@link #mergeImports} never reaches the loader, and
+     * {@code !!import} lookups -- because meta-kernel's own document, the only real caller of this method,
+     * never has any {@code !!import}s: its header is its {@code !!id} alone ([TSON-SCHEMA] §3.4) -- so {@link
+     * #mergeImports} never reaches the loader, and
      * passing {@code null} through is safe for this specific, guaranteed-narrow case, not a general
      * shortcut.
      *
@@ -184,7 +183,7 @@ public final class TsonSchemaLinker {
      * separately wiring a {@link TsonSchemaLoader} or a registry at all.
      *
      * @throws SchemaValidationException if {@code bootstrap.bootstrap()} is {@code false} -- this
-     *                                        method exists specifically for the one self-referential
+     *                                        method exists specifically for the one pre-loaded
      *                                        schema, not as a general "link without registering"
      *                                        escape hatch for ordinary schemas (call {@link #link}
      *                                        directly for that)
@@ -260,7 +259,7 @@ public final class TsonSchemaLinker {
      * registering or compiling it.
      *
      * <p><b>What still throws:</b> anything that makes the namespace itself unusable rather than making one
-     * entry wrong -- an {@code !!import} that will not load, or a {@code !!meta} that may not govern. Carrying
+     * entry wrong -- an {@code !!import} that will not load. Carrying
      * on past those would report a page of unresolved references that are all consequences of the one real
      * problem, which is the cascade this reporting is meant to avoid, not an example of it.
      *
@@ -765,7 +764,7 @@ public final class TsonSchemaLinker {
         AnnotatedMap<String, Top> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
 
-        return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
+        return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.imports(),
                 annotated, schema.bootstrap(), schema.valuesByName(), facts), origins, enumForms, nameTypes,
                 namespaces);
     }
@@ -1158,12 +1157,12 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Stage 1: the whole namespace of the {@code !!meta} target and of every {@code !!import}, in header order,
+     * Stage 1: the whole namespace of every {@code !!import}, in header order,
      * brought in as-is (§2.2.3's "merged entries keep their home namespace" -- no re-resolution here).
      *
-     * <p><b>The namespace is flat and the merge is transitive</b> (§2.2.3): an import, the {@code !!meta} target
-     * among them, contributes everything its own namespace holds, its own closure included. So a schema reached by
-     * two routes arrives once, and the importer sees one flat name-to-type map with no hidden layers.
+     * <p><b>The namespace is flat and the merge is transitive</b> (§2.2.3): an import contributes everything its own
+     * namespace holds, its own closure included. So a schema reached by two routes arrives once, and the importer sees
+     * one flat name-to-type map with no hidden layers.
      *
      * <p><b>A collision is decided by entry identity, not by name occurrence.</b> The same schema reached
      * through several routes -- the diamond every practical schema forms by importing core.tn -- is one set
@@ -1185,8 +1184,6 @@ public final class TsonSchemaLinker {
                                                  Map<String, TypeRef> applications) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
-        Set<String> imports = new LinkedHashSet<>();
-        importer.imports().forEach(uri -> imports.add(CanonicalIdentity.canonicalize(uri)));
         for (String importUri : importer.namespaceSources()) {
             String importIdentity = CanonicalIdentity.canonicalize(importUri);
             // Listing one schema twice (or under two spellings of one identity) is redundant, not an error:
@@ -1194,14 +1191,8 @@ public final class TsonSchemaLinker {
             if (!alreadyImported.add(importIdentity)) {
                 continue;
             }
-            Optional<TsonLinkedSchema> found = loader == null ? Optional.empty() : loader.load(importIdentity);
-            if (found.isEmpty() && !imports.contains(importIdentity)) {
-                // A !!meta target this link cannot load is the fetching caller's to refuse: resolution already
-                // loaded it, so a schema reaching here from a registry always has it, and a schema linked
-                // standalone -- a hand-built one, or the kernel's bootstrap -- links its own entries.
-                continue;
-            }
-            TsonLinkedSchema imported = found.orElseThrow(() -> new SchemaValidationException(
+            TsonLinkedSchema imported = (loader == null ? Optional.<TsonLinkedSchema>empty()
+                    : loader.load(importIdentity)).orElseThrow(() -> new SchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
             for (Map.Entry<String, Top> entry : imported.schema().entries().entrySet()) {
                 String name = entry.getKey();
