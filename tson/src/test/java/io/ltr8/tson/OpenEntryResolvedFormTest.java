@@ -78,7 +78,7 @@ class OpenEntryResolvedFormTest {
      * implementation's.
      *
      * <p>It passes because the only templates the bundled schemas declare put every parameter in a {@code
-     * type_ref} slot ({@code set<T>}, {@code extern_of<S>}, {@code extern_type<S, T>}), which is exactly the
+     * type_ref} slot ({@code set<T>}, {@code kind<T>}, {@code tuple1<T>}), which is exactly the
      * case §8.1's premise covers. It is a regression guard, not evidence that the premise is sound; the next
      * test is the counterexample.
      */
@@ -126,14 +126,10 @@ class OpenEntryResolvedFormTest {
     }
 
     /**
-     * <b>And a held body is read back as held, not as the constructor it names.</b> Read as the constructors
-     * they name, these two would validate clean and bind as something else -- {@code S} as a
-     * schema identity literally named {@code S}, {@code M} as a third enum member spelled {@code M} -- which
-     * is what §8.1 names as {@code extern_of} resolving to "a schema whose {@code S} was a relative URI" --
-     * accepted, and wrong, with no diagnostic anywhere.
-     *
-     * <p>{@code extern_of} is core.tn's own declaration. What comes back is the application as text,
-     * with nothing having tried to read it.
+     * <b>And a held body is read back as held, not as the constructor it names.</b> Read as the constructor
+     * it names, this would validate clean and bind as something else -- {@code M} as a third enum member
+     * spelled {@code M} -- accepted, and wrong, with no diagnostic anywhere. What comes back is the
+     * application as text, with nothing having tried to read it.
      */
     @Test
     void aHeldBodyReadsBackAsTheApplicationItHolds() {
@@ -141,28 +137,20 @@ class OpenEntryResolvedFormTest {
         String resolved = """
                 !!schema:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  extern_of => !template {
-                    parameters: [ { name: S  type: schema_identity } ]
-                    template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }"
-                  }
                   e => !template {
                     parameters: [ { name: M  type: text } ]
                     template: "!enum { members: [a b M] }"
                   }
                 }
                 """;
-        assertEquals(List.of(), tson.validate(resolved), "both open entries are valid data");
+        assertEquals(List.of(), tson.validate(resolved), "the open entry is valid data");
 
         Map<String, Top> read = ResolvedForm.readResolved(tson, resolved);
-
-        TemplateBody externOf = assertInstanceOf(TemplateBody.class, read.get("extern_of"));
-        assertEquals(List.of(new TemplateParam("S", TypeRef.of("schema_identity"))), externOf.parameters());
-        assertEquals("!scoped { scope: [EXTERN]  schemas: { S => _ } }", externOf.template(),
-                "the application as written -- no URI named 'S' anywhere");
 
         TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e"));
         assertEquals("!enum { members: [a b M] }", e.template(),
                 "the application as written -- no third enum member spelled 'M'");
+        assertEquals(List.of(new TemplateParam("M", TypeRef.of("text"))), e.parameters());
     }
 
     // ── The biconditional an entry's parameters rest on ─────────────────

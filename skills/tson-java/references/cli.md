@@ -94,7 +94,6 @@ max entries:                1048576
 max fields:                 65536
 max annotations:            64
 max values:                 16777216
-max foreign schemas:        16
 max import closure:         64
 max schema entries:         65536
 max reference chain:        64

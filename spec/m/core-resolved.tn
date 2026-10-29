@@ -19,10 +19,9 @@
   (`integer_type`, `decimal_type`, `float_type`, `complex_type`, ...)
   likewise name meta- and kernel-level entries.
 
-  The open entries (`extern_of`, `extern_type`, `set`, `kind`, `tuple1`,
-  `voidable_tuple1`) hold their bodies — the application as written,
-  unread until materialisation substitutes the parameters away — so a
-  token in one is a parameter reference rather than a value of the
+  The open entries (`set`, `kind`, `tuple1`, `voidable_tuple1`) hold
+  their bodies — the application as written, unread until
+  materialisation substitutes the parameters away — so a token in one is a parameter reference rather than a value of the
   slot's declared type (Part 2 Section 5.10's shadowing rule). A
   processor comparing these compares wire form, not bound values.
   """
@@ -130,17 +129,7 @@
   email => !email_type {}
 
   @ordering:NONE @bounded:false
-  declared => !scoped { scope: [LOCAL] }
-
-  @ordering:NONE @bounded:false
-  extern => !scoped { scope: [EXTERN] }
-
-  @ordering:NONE @bounded:false
-  dynamic => !scoped { scope: [LOCAL EXTERN] }
-
-  extern_of => !template { parameters: [{ name: S  type: schema_identity }]  template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }" }
-
-  extern_type => !template { parameters: [{ name: S  type: schema_identity } { name: T  type: type_name }]  template: "!scoped { scope: [EXTERN]  schemas: { S => [T] } }" }
+  declared => !declared_type {}
 
   set => !template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }
 

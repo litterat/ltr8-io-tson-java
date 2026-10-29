@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -9,8 +8,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.ScopeKind;
-import io.ltr8.tson.schema.meta.Scoped;
+import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -41,8 +39,7 @@ class ValueReaderFactoryRegistryTest {
     // These atom/enum factories consult only name/definition, never the enclosing schema, so an empty one suffices.
     private static final ValueReaderContext CONTEXT =
             new ValueReaderContext(
-                    new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), Map.of())), NEVER_CALLED,
-                    ForeignSchemas.none());
+                    new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), Map.of())), NEVER_CALLED);
 
     @Test
     void resolveThrowsForAnUnregisteredConstructor() {
@@ -60,9 +57,9 @@ class ValueReaderFactoryRegistryTest {
 
     /**
      * <b>Every {@code ~}-marked constructor in the table builds a real reader</b> -- there is no
-     * "registered to an {@code ErrorReader} so the schema still compiles" entry left, {@code scoped} having
-     * been the last of them. {@code CoreSchemaImportTest} pins the same fact over core.tn's own entries;
-     * this pins it at the table, where a new constructor would be added.
+     * "registered to an {@code ErrorReader} so the schema still compiles" entry left. {@code
+     * CoreSchemaImportTest} pins the same fact over core.tn's own entries; this pins it at the table, where a
+     * new constructor would be added.
      *
      * <p>An entry the compiler can build no reader for is still possible and still becomes an
      * {@code ErrorReader} -- but only through [TSON-SCHEMA] §2.2.2's extension point, a meta-layer
@@ -71,12 +68,12 @@ class ValueReaderFactoryRegistryTest {
      */
     @Test
     void everyRegisteredConstructorBuildsARealReader() {
-        Top declared = new Scoped(List.of(ScopeKind.LOCAL), Optional.empty());
+        Top declared = new DeclaredType();
 
         for (ValueReaderFactoryRegistry registry : List.of(ValueReaderFactoryRegistry.tree(),
                 ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()))) {
-            TsonTypeReader<?> reader = registry.resolve("scoped").create("declared", declared, CONTEXT);
-            assertFalse(reader instanceof ErrorReader, () -> "scoped still errors: " + reader);
+            TsonTypeReader<?> reader = registry.resolve("declared_type").create("declared", declared, CONTEXT);
+            assertFalse(reader instanceof ErrorReader, () -> "declared_type errors: " + reader);
         }
     }
 

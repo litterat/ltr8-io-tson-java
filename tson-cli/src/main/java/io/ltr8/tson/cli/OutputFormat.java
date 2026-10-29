@@ -244,7 +244,6 @@ enum OutputFormat {
                 Map.entry("max_fields", (long) limits.maxFields()),
                 Map.entry("max_annotations", (long) limits.maxAnnotations()),
                 Map.entry("max_values", (long) limits.maxValues()),
-                Map.entry("max_foreign_schemas", (long) limits.maxForeignSchemas()),
                 Map.entry("max_import_closure", (long) limits.maxImportClosure()),
                 Map.entry("max_schema_entries", (long) limits.maxSchemaEntries()),
                 Map.entry("max_reference_chain", (long) limits.maxReferenceChain()),

@@ -158,7 +158,6 @@ public final class SchemalessTreeReader {
         Map<String, TsonValue> fields = new LinkedHashMap<>();
         while (!(ctx.peek() instanceof RecordEnd)) {
             FieldName fieldName = (FieldName) ctx.next();
-            ScopePush.refuseSchemaless(ctx);
             if (fields.containsKey(fieldName.name())) {
                 ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
                         "duplicate field '" + fieldName.name() + "' -- a record states each field at most once "
@@ -176,7 +175,6 @@ public final class SchemalessTreeReader {
         ctx.next(); // ArrayStart
         List<TsonValue> elements = new ArrayList<>();
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            ScopePush.refuseSchemaless(ctx);
             elements.add(readNode(ctx.index(elements.size())));
         }
         ctx.next(); // ArrayEnd
@@ -212,7 +210,6 @@ public final class SchemalessTreeReader {
                         "each key stated once", "'" + keySegment(key) + "' stated again");
             }
             ctx.next(); // MapArrow
-            ScopePush.refuseSchemaless(ctx);
             entries.add(new TsonMap.Entry(key, readNode(ctx.field(keySegment(key)))));
         }
         ctx.next(); // MapEnd
@@ -308,9 +305,6 @@ public final class SchemalessTreeReader {
             // ever a compound key's own element.
             case TsonVoid ignored -> KeyKind.VOID;
             case TsonMissing ignored -> KeyKind.MISSING;
-            // A map key is a data-value, never a scoped-value (§2.3), so no key this reader builds is one.
-            // Identity is still the value's -- a scope says where a type name resolves, not what a key is.
-            case TsonScopedValue scoped -> keyIdentity(scoped.root());
         };
     }
 

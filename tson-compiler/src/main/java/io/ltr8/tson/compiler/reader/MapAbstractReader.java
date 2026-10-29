@@ -173,7 +173,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
                 ctx.next(); // the absent key itself
                 ctx.report(rules.voidKey(VOID));
                 ctx.next(); // MapArrow
-                EventSkip.scopedValue(ctx); // no meaningful key to associate the value with -- discard it
+                EventSkip.dataValue(ctx); // no meaningful key to associate the value with -- discard it
                 count++;
                 continue;
             }
@@ -195,10 +195,6 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
                 }
             }
             ctx.next(); // MapArrow
-            SchemaRef push = ScopePush.notAdmitted(ctx, valueParser);
-            if (push != null) {
-                ScopePush.refuse(ctx.field(keySegment), body.valueType().name(), push);
-            }
             sink.accept(key, decodedValue(keySegment, ctx));
             count++;
         }

@@ -171,11 +171,9 @@ Where schemas come from is one value, `SchemaAccess` — the source plus the `Fe
 
 ## Reading into a tree
 
-`TsonValue` is a sealed interface over eight pure immutable node types — `TsonRecord`, `TsonMap`,
-`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonVoid`, `TsonMissing`, `TsonScopedValue` (no `Node` suffix,
-deliberately). **Every accessor is total — nothing throws.** `TsonScopedValue(schema, root)` is a value
-read under a foreign schema at an `extern`/`dynamic` position (§7.8): it names that schema and is transparent
-to navigation, so `get`/`at` look straight through it.
+`TsonValue` is a sealed interface over seven pure immutable node types — `TsonRecord`, `TsonMap`,
+`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonVoid`, `TsonMissing` (no `Node` suffix, deliberately). **Every
+accessor is total — nothing throws.**
 
 | Call                                                     | Answers                                                         |
 | -------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -506,10 +504,10 @@ List<Diagnostic> problems = json.validate(body, uri, "order");
 arguments (`withSchema` + `readAs`, or `validate(source, uri, type)`). `JsonValue` is a sealed tree
 (`JsonObject`, `JsonArray`, `JsonString`, `JsonNumber`, `JsonBoolean`, `JsonNull`) whose model follows JEP
 540. A schema-directed tree read returns a `JsonValue`, never a `TsonValue`; a schema-directed object read
-validates in full and builds the classes the binding resolves, all-or-nothing like TSON's. A value at a scoped
-position (`declared`, `extern`, `dynamic`) names its own type in the object: `{"$type": "note", "body": "hi"}`, or
-led by `"$schema": "<uri>"` for a foreign schema's type, which the reader loads through the same `withSchemas`
-loader; a bare value there is refused, and the tree comes back without the tag. Built from the same
+validates in full and builds the classes the binding resolves, all-or-nothing like TSON's. A value at a
+`declared` position names its own type, one of the schema's or its imports', in the object: `{"$type": "note",
+"body": "hi"}`; a bare value there is refused, and the tree comes back without the tag. `$schema` binds the
+document on the root alone, and anywhere else is refused (`SCOPE_NOT_ADMITTED`). Built from the same
 `ProcessorConfig`, `Json.of(config)` and `Tson.of(config)` judge under the same policy and bind the same
 classes.
 

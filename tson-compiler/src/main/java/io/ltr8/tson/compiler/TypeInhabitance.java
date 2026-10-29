@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.Scoped;
+import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -119,7 +119,7 @@ final class TypeInhabitance {
             case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
             case TemplateBody ignored -> true; // open, answered above
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
-            case Scoped ignored -> true; // a scope's values name their own types
+            case DeclaredType ignored -> true; // its values name their own types
             case Namespace<?> ignored -> true; // a value, which nothing is typed by
         };
     }

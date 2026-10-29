@@ -39,7 +39,7 @@ import io.ltr8.bind.DataClassUnion;
  *
  * <p><b>A cyclic type graph does not mean an infinite value.</b> {@code Node -> Optional<Node>} describes a
  * list that ends wherever a value says it ends, and the AST this was found through -- {@code DataValue ->
- * CoreValue -> RecordValue -> ScopedValue -> DataValue} -- describes an ordinary finite document. Resolution
+ * CoreValue -> RecordValue -> DataValue} -- describes an ordinary finite document. Resolution
  * follows the types and so must be broken deliberately; reading and writing follow the values and terminate
  * on their own.
  *

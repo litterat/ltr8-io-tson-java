@@ -126,11 +126,7 @@ public final class TsonCompiledSchemaRegistry {
 
     /** Compiles an already-resolved, already-linked schema in this registry's mode -- standalone, uncached. */
     public TsonCompiledSchema compile(TsonLinkedSchema linked) {
-        // `this::get` is what makes [TSON-SCHEMA] §7.8's scope push work: a value naming its own !!schema
-        // resolves it through this registry, so it shares this cache, this loader and this read mode with
-        // the schema that admitted it. Safe to hand over mid-construction because nothing calls it until a
-        // read, long after every compile it could re-enter has finished.
-        return TsonSchemaCompiler.compile(linked, factories, this::get);
+        return TsonSchemaCompiler.compile(linked, factories);
     }
 
     /** The bind-mode resolution core this registry reads user schemas against. */

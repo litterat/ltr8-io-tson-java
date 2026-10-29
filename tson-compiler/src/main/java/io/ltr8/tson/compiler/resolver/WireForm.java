@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -118,22 +117,22 @@ final class WireForm {
      * A {@code field_group} as a held body writes it: {@code optional_members} only where it names a member, and
      * {@code optional} only where it is set.
      */
-    static ScopedValue group(FieldGroup group, List<Annotation> annotations) {
+    static DataValue group(FieldGroup group, List<Annotation> annotations) {
         List<RecordValue.Field> fields = new ArrayList<>();
-        fields.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
-                .map(option -> scoped(names(option))).toList()))));
+        fields.add(new RecordValue.Field(MEMBERS, plain(new ArrayValue(group.members().stream()
+                .map(option -> plain(names(option))).toList()))));
         if (!group.optionalMembers().isEmpty()) {
-            fields.add(new RecordValue.Field(OPTIONAL_MEMBERS, scoped(names(group.optionalMembers()))));
+            fields.add(new RecordValue.Field(OPTIONAL_MEMBERS, plain(names(group.optionalMembers()))));
         }
         if (group.optional()) {
             fields.add(nameField(OPTIONAL, "true"));
         }
-        return scoped(new RecordValue(fields), annotations);
+        return plain(new RecordValue(fields), annotations);
     }
 
     /** A list of field names as the array of bare names a resolved document writes. */
     private static ArrayValue names(List<String> names) {
-        return new ArrayValue(names.stream().map(name -> scoped(declaredName(name))).toList());
+        return new ArrayValue(names.stream().map(name -> plain(declaredName(name))).toList());
     }
 
     /**
@@ -146,13 +145,13 @@ final class WireForm {
     }
 
     /** One {@link #fieldMap} entry: the field's declared name as the key, its facts as the value. */
-    static MapValue.MapEntry fieldEntry(String name, ScopedValue field) {
+    static MapValue.MapEntry fieldEntry(String name, DataValue field) {
         return new MapValue.MapEntry(new DataValue(List.of(), Optional.empty(), declaredName(name)), field);
     }
 
-    /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
-    static ScopedValue scoped(CoreValue value) {
-        return scoped(value, List.of());
+    /** A bare value in a field or element position -- no annotations and no type-ref of its own. */
+    static DataValue plain(CoreValue value) {
+        return plain(value, List.of());
     }
 
     /**
@@ -160,8 +159,8 @@ final class WireForm {
      * annotations on the {@code record_field} in resolver output, and a held body reaches that through the
      * wire value, so they travel here rather than being re-attached after the fact.
      */
-    static ScopedValue scoped(CoreValue value, List<Annotation> annotations) {
-        return new ScopedValue(Optional.empty(), new DataValue(annotations, Optional.empty(), value));
+    static DataValue plain(CoreValue value, List<Annotation> annotations) {
+        return new DataValue(annotations, Optional.empty(), value);
     }
 
     /**
@@ -182,7 +181,7 @@ final class WireForm {
     }
 
     static RecordValue.Field nameField(String name, String text) {
-        return new RecordValue.Field(name, scoped(new TokenValue(text, TokenForm.UNQUOTED)));
+        return new RecordValue.Field(name, plain(new TokenValue(text, TokenForm.UNQUOTED)));
     }
 
     /**
@@ -218,7 +217,7 @@ final class WireForm {
      */
     static DataValue heldReference(TypeRef target) {
         return new DataValue(List.of(), Optional.of(REFERENCE), new RecordValue(List.of(
-                new RecordValue.Field(TARGET, scoped(refValue(target))))));
+                new RecordValue.Field(TARGET, plain(refValue(target))))));
     }
 
     /**
@@ -238,16 +237,16 @@ final class WireForm {
         for (Map.Entry<String, RecordField> declared : body.fields().entrySet()) {
             RecordField field = declared.getValue();
             List<RecordValue.Field> members = new ArrayList<>();
-            members.add(new RecordValue.Field(TYPE, scoped(refValue(field.type()))));
+            members.add(new RecordValue.Field(TYPE, plain(refValue(field.type()))));
             addFacts(members, field.optional(), field.voidable(), field.role());
             // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
             // is a bare name standing where the literal would.
             field.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE,
-                    scoped(new TokenValue(token.text(), tokenForm(token.form()))))));
+                    plain(new TokenValue(token.text(), tokenForm(token.form()))))));
             fields.add(fieldEntry(declared.getKey(),
-                    scoped(new RecordValue(members), annotations(field.annotations(), annotationValue))));
+                    plain(new RecordValue(members), annotations(field.annotations(), annotationValue))));
         }
-        List<ScopedValue> groups = new ArrayList<>();
+        List<DataValue> groups = new ArrayList<>();
         for (FieldGroup group : body.groups()) {
             groups.add(group(group, List.of()));
         }
@@ -256,21 +255,21 @@ final class WireForm {
             // Held text's one chain slot, the parents as written (TypeChain.parents). Through refValue like every
             // other reference: a closed parent is a bare token and only a parent still applied to a parameter
             // carries `arguments`, which is what lets substitution close it.
-            binding.add(new RecordValue.Field(CHAIN, scoped(new RecordValue(List.of(new RecordValue.Field(PARENTS,
-                    scoped(new ArrayValue(body.parents().stream().map(parent -> scoped(refValue(parent)))
+            binding.add(new RecordValue.Field(CHAIN, plain(new RecordValue(List.of(new RecordValue.Field(PARENTS,
+                    plain(new ArrayValue(body.parents().stream().map(parent -> plain(refValue(parent)))
                             .toList()))))))));
         }
         body.nameType().ifPresent(stated -> binding.add(nameField(NAME_TYPE, stated)));
-        binding.add(new RecordValue.Field(FIELDS, scoped(fieldMap(fields))));
+        binding.add(new RecordValue.Field(FIELDS, plain(fieldMap(fields))));
         if (!groups.isEmpty()) {
-            binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
+            binding.add(new RecordValue.Field(GROUPS, plain(new ArrayValue(groups))));
         }
         // The base's own statement about which fields select a member (§5.2). Without it a held body keeps
         // each pin and loses what gives the pins meaning, so a template family could never be sealed.
         if (!body.discriminators().isEmpty()) {
-            binding.add(new RecordValue.Field(DISCRIMINATORS, scoped(new ArrayValue(
+            binding.add(new RecordValue.Field(DISCRIMINATORS, plain(new ArrayValue(
                     body.discriminators().stream()
-                            .map(name -> scoped(declaredName(name))).toList()))));
+                            .map(name -> plain(declaredName(name))).toList()))));
         }
         if (body.extension() != RecordExtensionType.OPEN) {
             binding.add(nameField(EXTENSION, body.extension().name()));
@@ -286,7 +285,7 @@ final class WireForm {
     /** One member's token text, or {@code null} where it is absent or is not a bare token. */
     private static String memberToken(RecordValue record, String member) {
         for (RecordValue.Field field : record.fields()) {
-            if (field.name().equals(member) && field.value().value().coreValue() instanceof TokenValue token) {
+            if (field.name().equals(member) && field.value().coreValue() instanceof TokenValue token) {
                 return token.text();
             }
         }
@@ -320,18 +319,18 @@ final class WireForm {
         if (ref.arguments().isEmpty()) {
             return new TokenValue(ref.name(), TokenForm.UNQUOTED);
         }
-        List<ScopedValue> arguments = new ArrayList<>();
+        List<DataValue> arguments = new ArrayList<>();
         for (TypeArgument argument : ref.arguments()) {
-            arguments.add(scoped(new RecordValue(List.of(switch (argument) {
+            arguments.add(plain(new RecordValue(List.of(switch (argument) {
                 case TypeArgument.Ref reference ->
-                        new RecordValue.Field(NAME, scoped(refValue(reference.ref())));
+                        new RecordValue.Field(NAME, plain(refValue(reference.ref())));
                 case TypeArgument.Value literal ->
-                        new RecordValue.Field(VALUE, scoped(new TokenValue(literal.value().text(),
+                        new RecordValue.Field(VALUE, plain(new TokenValue(literal.value().text(),
                                 tokenForm(literal.value().form()))));
             }))));
         }
         return new RecordValue(List.of(nameField(NAME, ref.name()),
-                new RecordValue.Field(ARGUMENTS, scoped(new ArrayValue(arguments)))));
+                new RecordValue.Field(ARGUMENTS, plain(new ArrayValue(arguments)))));
     }
 
 
@@ -355,8 +354,8 @@ final class WireForm {
                 : typeRefOf((RecordValue) name).name();
         List<TypeArgument> arguments = new ArrayList<>();
         if (field(record, ARGUMENTS).orElseThrow() instanceof ArrayValue array) {
-            for (ScopedValue element : array.elements()) {
-                arguments.add(argumentOf((RecordValue) element.value().coreValue()));
+            for (DataValue element : array.elements()) {
+                arguments.add(argumentOf((RecordValue) element.coreValue()));
             }
         }
         return new TypeRef(head, arguments);
@@ -390,8 +389,8 @@ final class WireForm {
             return List.of();
         }
         List<TypeRef> written = new ArrayList<>();
-        for (ScopedValue parent : parents.elements()) {
-            switch (parent.value().coreValue()) {
+        for (DataValue parent : parents.elements()) {
+            switch (parent.coreValue()) {
                 case TokenValue token -> written.add(TypeRef.of(token.text()));
                 case RecordValue application when isApplication(application) -> written.add(typeRefOf(application));
                 default -> {
@@ -403,7 +402,7 @@ final class WireForm {
 
     static Optional<CoreValue> field(RecordValue record, String name) {
         return record.fields().stream().filter(f -> f.name().equals(name))
-                .map(f -> f.value().value().coreValue()).findFirst();
+                .map(f -> f.value().coreValue()).findFirst();
     }
 
     // ── Substituting a parameter standing in a held body (§5.10) ───────────────────────────────
@@ -434,18 +433,17 @@ final class WireForm {
                     && parameters.contains(token.text()) ->
                     argumentValue(argumentFor(token.text(), head, bindings));
             case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> rescope(element, substitute(element.value().coreValue(), head, parameters,
+                    .map(element -> rewritten(element, substitute(element.coreValue(), head, parameters,
                             bindings))).toList());
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> substituteField(field, head, parameters, bindings)).toList());
-            // Both halves of an entry, because a parameter reaches either: core's `extern_of => <S> !scoped
-            // { scope: [EXTERN]  schemas: { S => _ } }` puts one in a key, and `extern_type`'s `T` inside the
-            // array its value names. A key is a data-value and a value a scoped-value ([TSON-DATA] §2.6), so
-            // the two are rebuilt through their own carriers rather than one.
+            // Both halves of an entry, because a parameter reaches either: one may stand in a key, and another
+            // inside the array its value names. Each half is a data-value ([TSON-DATA] §2.6), rebuilt with its
+            // own annotations and type-ref kept.
             case MapValue map -> new MapValue(map.entries().stream()
                     .map(entry -> new MapValue.MapEntry(
                             retyped(entry.key(), substitute(entry.key().coreValue(), head, parameters, bindings)),
-                            rescope(entry.value(), substitute(entry.value().value().coreValue(), head, parameters,
+                            rewritten(entry.value(), substitute(entry.value().coreValue(), head, parameters,
                                     bindings))))
                     .toList());
             default -> value;
@@ -464,14 +462,14 @@ final class WireForm {
      */
     private static RecordValue.Field substituteField(RecordValue.Field field, String head,
             List<String> parameters, Map<String, TypeArgument> bindings) {
-        CoreValue held = field.value().value().coreValue();
+        CoreValue held = field.value().coreValue();
         if (NAME.equals(field.name()) && held instanceof TokenValue token
                 && token.form() == TokenForm.UNQUOTED && parameters.contains(token.text())
                 && argumentFor(token.text(), head, bindings) instanceof TypeArgument.Value literal) {
-            return new RecordValue.Field(VALUE, rescope(field.value(), argumentValue(literal)));
+            return new RecordValue.Field(VALUE, rewritten(field.value(), argumentValue(literal)));
         }
         return new RecordValue.Field(field.name(),
-                rescope(field.value(), substitute(held, head, parameters, bindings)));
+                rewritten(field.value(), substitute(held, head, parameters, bindings)));
     }
 
     private static TypeArgument argumentFor(String parameter, String head, Map<String, TypeArgument> bindings) {
@@ -519,10 +517,8 @@ final class WireForm {
         };
     }
 
-    /** The same scoped value carrying a rewritten core value -- annotations and type-ref kept as written. */
-    static ScopedValue rescope(ScopedValue original, CoreValue rewritten) {
-        DataValue value = original.value();
-        return new ScopedValue(original.schemaRef(),
-                new DataValue(value.annotations(), value.typeRef(), rewritten));
+    /** The same data value carrying a rewritten core value -- annotations and type-ref kept as written. */
+    static DataValue rewritten(DataValue original, CoreValue rewritten) {
+        return new DataValue(original.annotations(), original.typeRef(), rewritten);
     }
 }

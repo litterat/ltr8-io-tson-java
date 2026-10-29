@@ -34,7 +34,7 @@ individually; stated inside whichever phase happens to need it first, such a fac
 once.
 
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
-the `scoped`/`nameField` builders every producer goes through; `refValue` and its inverse
+the `plain`/`nameField` builders every producer goes through; `refValue` and its inverse
 `typeRefOf`/`argumentOf`; the held-record writer `heldRecord`, which spells `fields` as a map
 from each field's declared name to its `record_field` (`fieldMap`/`fieldEntry`); and §5.10 `substitute` over a
 held body. Every walk over a held body descends into a map's keys and values as it does into a record or an
@@ -58,18 +58,17 @@ array, `fields` being one.
   (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
   materialisation note (`design/template-materialisation.md`).
-- **Every walk over a held body descends into a map slot.** meta.tn's
-  `scoped.schemas` is `{schema_identity => [type_name; 1..]?; 1..}`, so core's `extern_of => <S> !scoped { scope:
-  [EXTERN]  schemas: { S => _ } }` and `extern_type => <S, T> ... { S => [T] }` put a parameter inside a
-  map — one in a key, one inside the array its value names. Each of the three walks fails differently if it
+- **Every walk over a held body descends into a map slot.** A constructor with a map-typed field lets a template
+  put a parameter inside a map — in a key, or inside the array its value names. Each of the three walks fails
+  differently if it
   skips one: `substitute` leaves the parameter name standing where the argument belongs; `ParameterTypes`
   never observes the parameter, so its kind is never inferred and a `type_name` argument stays on the
   reference channel and fails as an unresolved reference; and `DerivedName`'s canonical rendering — the half
   §8.2 keys identity on — renders the whole map as the unknown-value mark, so two bindings differing only
   inside one hash alike while the readable half masks it, which is the `startsWith` hazard inverted and why
-  `DerivedNameTest` asserts `canonicalBinding` directly. A map key is a `data-value` and its
-  value a `scoped-value` ([TSON-DATA] §2.6), so the two halves rebuild through their own carriers
-  (`WireForm.rescope` and `WireForm.retyped`); both halves descend, because a parameter reaches either.
+  `DerivedNameTest` asserts `canonicalBinding` directly. A map key and its value are each a `data-value`
+  ([TSON-DATA] §2.6), rebuilt through `WireForm.rewritten` and `WireForm.retyped`; both halves descend, because a
+  parameter reaches either.
 
 **`MetaRefs`** — the `schema.meta` reference walk, `mapRefs` over a definition and `mapBodyRefs` over a body.
 Three callers use it and only one is closing a template: materialisation rewrites an application onto the entry it

@@ -176,13 +176,13 @@ public final class HeldBody {
             case RecordValue record when WireForm.isApplication(record) ->
                     into.add(WireForm.typeRefOf(record));
             case RecordValue record -> record.fields()
-                    .forEach(field -> collectApplications(field.value().value().coreValue(), into));
+                    .forEach(field -> collectApplications(field.value().coreValue(), into));
             case ArrayValue array -> array.elements()
-                    .forEach(element -> collectApplications(element.value().coreValue(), into));
+                    .forEach(element -> collectApplications(element.coreValue(), into));
             // `record.fields` is a map, and an application stands in a field's value as readily as in an array.
             case MapValue map -> map.entries().forEach(entry -> {
                 collectApplications(entry.key().coreValue(), into);
-                collectApplications(entry.value().value().coreValue(), into);
+                collectApplications(entry.value().coreValue(), into);
             });
             default -> { } // a token names a type but applies nothing
         }
@@ -192,14 +192,14 @@ public final class HeldBody {
         switch (value) {
             case TokenValue token when token.form() == TokenForm.UNQUOTED -> into.add(token.text());
             case ArrayValue array -> array.elements()
-                    .forEach(element -> collect(element.value().coreValue(), into));
+                    .forEach(element -> collect(element.coreValue(), into));
             case RecordValue record -> record.fields()
-                    .forEach(field -> collect(field.value().value().coreValue(), into));
+                    .forEach(field -> collect(field.value().coreValue(), into));
             // A map's keys carry names as readily as its values do -- `{ S => [T] }` puts one parameter in
             // each -- and a key is a full data-value (§2.6), so it is walked rather than read as a token.
             case MapValue map -> map.entries().forEach(entry -> {
                 collect(entry.key().coreValue(), into);
-                collect(entry.value().value().coreValue(), into);
+                collect(entry.value().coreValue(), into);
             });
             default -> { } // a quoted token is a literal, and nothing else carries a name
         }

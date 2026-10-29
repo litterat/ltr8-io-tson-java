@@ -18,7 +18,7 @@ import io.ltr8.tson.compiler.Position;
  * MapEnd}, or {@link ArrayStart}/{@link ArrayEnd} pair.
  */
 public sealed interface TsonEvent
-        permits DocumentStart, DocumentEnd, AnnotationStart, AnnotationEnd, TypeRef, SchemaRef,
+        permits DocumentStart, DocumentEnd, AnnotationStart, AnnotationEnd, TypeRef,
         RecordStart, FieldName, RecordEnd, MapStart, MapArrow, MapEnd, ArrayStart, ArrayEnd,
         TokenEvent, VoidEvent, EmptyBraceEvent {
 

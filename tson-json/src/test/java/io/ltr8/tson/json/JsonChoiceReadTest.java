@@ -219,7 +219,7 @@ class JsonChoiceReadTest {
         assertTrue(refusal.expected().contains("circle"), refusal.expected());
     }
 
-    /** §8.5 admits `$schema` at a scoped position; a choice is the closed sum, so it is refused here. */
+    /** §3.3: `$schema` stands on the root alone, so a choice position refuses it like every other. */
     @Test
     void aSchemaMemberIsRefusedAtAChoicePosition() {
         assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, read("shape", """

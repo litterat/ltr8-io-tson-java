@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 
@@ -164,7 +163,7 @@ public final class Sidecar {
     public static DataValue fieldValue(RecordValue record, String name) {
         for (RecordValue.Field field : record.fields()) {
             if (field.name().equals(name)) {
-                return field.value().value();
+                return field.value();
             }
         }
         throw new AssertionError("sidecar record is missing field '" + name + "'");
@@ -196,8 +195,8 @@ public final class Sidecar {
     /** Each element of an array-of-tokens field (e.g. {@code import}), as plain text. */
     public static List<String> fieldTextArray(RecordValue record, String name) {
         List<String> result = new ArrayList<>();
-        for (ScopedValue element : ((ArrayValue) fieldCore(record, name)).elements()) {
-            result.add(assertInstanceOf(TokenValue.class, element.value().coreValue(),
+        for (DataValue element : ((ArrayValue) fieldCore(record, name)).elements()) {
+            result.add(assertInstanceOf(TokenValue.class, element.coreValue(),
                     "field '" + name + "' element").text());
         }
         return result;
@@ -206,8 +205,8 @@ public final class Sidecar {
     /** Each element of an array-of-records field, as its own record. */
     public static List<RecordValue> fieldRecordArray(RecordValue record, String name) {
         List<RecordValue> result = new ArrayList<>();
-        for (ScopedValue element : ((ArrayValue) fieldCore(record, name)).elements()) {
-            result.add(assertInstanceOf(RecordValue.class, element.value().coreValue(),
+        for (DataValue element : ((ArrayValue) fieldCore(record, name)).elements()) {
+            result.add(assertInstanceOf(RecordValue.class, element.coreValue(),
                     "field '" + name + "' element"));
         }
         return result;

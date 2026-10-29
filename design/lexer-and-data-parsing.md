@@ -151,7 +151,7 @@ grammar, split by role, not duplicated:
 
 - **`TsonDataStream` (Tier 2)** is the only thing that walks source text: a lazy, pull-based
   `TsonEventSource` (`stream` package — `hasNext()`/`next()`/`peek()` over a sealed `TsonEvent` hierarchy:
-  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`SchemaRef`/`TokenEvent`/`VoidEvent`/... each carrying
+  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`TokenEvent`/`VoidEvent`/... each carrying
   its own `Position`). Driven off `Lexer.nextToken()` with an explicit frame stack (memory is proportional
   to open-container depth, never document size) and at most two tokens of lookahead (only to disambiguate
   `{}` record-vs-map).

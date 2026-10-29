@@ -90,7 +90,6 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                             @Field("max_fields") int maxFields,
                             @Field("max_annotations") int maxAnnotations,
                             @Field("max_values") int maxValues,
-                            @Field("max_foreign_schemas") int maxForeignSchemas,
                             @Field("max_import_closure") int maxImportClosure,
                             @Field("max_schema_entries") int maxSchemaEntries,
                             @Field("max_reference_chain") int maxReferenceChain,
@@ -101,7 +100,7 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
             return new CliLimits(limits.maxDepth(), limits.maxTokenLength(), limits.maxTextLength(),
                     limits.maxNumericLiteralLength(), limits.maxBinarySize(), limits.maxDocumentSize(),
                     limits.maxElements(), limits.maxEntries(), limits.maxFields(), limits.maxAnnotations(),
-                    limits.maxValues(), limits.maxForeignSchemas(), limits.maxImportClosure(),
+                    limits.maxValues(), limits.maxImportClosure(),
                     limits.maxSchemaEntries(), limits.maxReferenceChain(), limits.maxSupertypeChain(),
                     limits.maxMaterialisationDepth());
         }

@@ -24,7 +24,7 @@ import java.util.Optional;
  * the void sentinel (§7), spent before any class question arises -- and the remaining five map one-to-one.
  *
  * <p><b>A type with no class needs no verdict.</b> {@code rational} and {@code complex} (both strings, but
- * §5.4 gives them no class), {@code value} and {@code void}, a nested choice and the {@code scoped} instances all
+ * §5.4 gives them no class), {@code value} and {@code void}, a nested choice and the {@code declared_type} instances all
  * answer empty -- and a choice containing one is not disjoint ([TSON-SCHEMA] §5.4), so §8.2's untagged route never
  * consults them. So do §5.4's two straddling kinds: an approximate atom whose {@code allow_nan} or
  * {@code allow_infinity} is true, whose special values are JSON strings (§5.4), and a map whose key type takes the
@@ -58,7 +58,7 @@ enum DiscriminationClass {
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
             // Every remaining atom family is string-content (§5.6). `rational`, `complex`, `value`,
-            // `void`, a nested choice and `scoped` fall through to empty: §5.4 gives them no class, so
+            // `void`, a nested choice and `declared` fall through to empty: §5.4 gives them no class, so
             // they can only be reached with a tag.
             case io.ltr8.tson.schema.meta.TextType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.meta.IdentifierType ignored -> Optional.of(STRING);

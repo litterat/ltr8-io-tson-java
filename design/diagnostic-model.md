@@ -18,7 +18,7 @@ rule deciding when a fact earns a component. Current form only; history lives in
   `expectedIfStated()`/`actualIfStated()` answer absence for the three plain strings, and nothing does for the pointers.
 - A fact constant for a run (`ProcessorPolicy`, `LimitsPolicy`) is stated once per run, never per diagnostic.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/name-hygiene-read-path.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`.
 

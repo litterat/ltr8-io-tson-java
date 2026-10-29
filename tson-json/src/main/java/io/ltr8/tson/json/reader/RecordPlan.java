@@ -196,7 +196,7 @@ final class RecordPlan {
     }
 
     /**
-     * One of §3.2's three where none may stand (§3.3): a {@code $schema}, which no record position admits, or a
+     * One of §3.2's three where none may stand (§3.3): a {@code $schema}, which no value position admits, or a
      * {@code $type} or {@code $value} out of its leading place.
      */
     void refuseTagMember(JsonReadContext ctx, String member, boolean tagged) {

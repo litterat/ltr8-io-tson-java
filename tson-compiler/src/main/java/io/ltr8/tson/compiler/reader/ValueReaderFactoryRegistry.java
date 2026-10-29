@@ -37,12 +37,8 @@ import java.util.function.UnaryOperator;
  * ChoiceReader#FACTORY} -- see that class's own Javadoc for why it has no {@code
  * DataClassUnion}-bounded counterpart the way {@code record} does.
  *
- * <p><b>{@code scoped} is the one constructor whose two modes differ in what they keep rather than in what
- * they build</b> ({@link ScopedReader#TREE}/{@link ScopedReader#BIND}): both read a foreign value through the
- * foreign schema's own compiled reader, and only tree mode has somewhere to record the scope the document
- * pushed. Every scoped instance -- core's {@code declared}, {@code extern} and {@code dynamic}, and every
- * narrowing {@code extern_of}/{@code extern_type} materialises -- shares the one reader, what separates them
- * being two constraint values rather than a shape.
+ * <p><b>{@code declared_type} is shared between both modes</b>, registered once via {@link
+ * DeclaredReader#FACTORY}: it selects the reader of the type the value names and builds nothing of its own.
  *
  * <p><b>Every {@code ~}-marked constructor meta-kernel.tn/meta.tn declare has an entry</b> -- verified
  * against both files directly, not assumed -- and every one of them now builds a real reader.
@@ -74,7 +70,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
                 AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, AtomTypeReader.VALUE, UnaryOperator.identity(),
-                ChoiceReader.FACTORY, ScopedReader.BIND));
+                ChoiceReader.FACTORY));
     }
 
     /**
@@ -89,7 +85,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
                 new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, TREE_VALUE,
                 AtomTreeFactory::new,
-                ChoiceReader.FACTORY, ScopedReader.TREE));
+                ChoiceReader.FACTORY));
     }
 
     /** Tree mode's {@code void_type} factory: {@link VoidTreeReader} over {@link AtomTypeReader#VOID}'s reader. */
@@ -114,7 +110,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
             ValueReaderFactory voidFactory, ValueReaderFactory valueFactory, UnaryOperator<ValueReaderFactory> leaf,
-            ValueReaderFactory choice, ValueReaderFactory scoped) {
+            ValueReaderFactory choice) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
         // meta-kernel.tn
@@ -129,7 +125,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("choice", choice);
 
         // meta.tn
-        factories.put("scoped", scoped);
+        factories.put("declared_type", DeclaredReader.FACTORY);
 
         // Every atom constructor routes to one factory, so what varies is the key and not the value:
         // AtomTypeReader.ATOM asks AtomParsers which parser the resolved body wants, and that mapping is

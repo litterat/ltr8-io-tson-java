@@ -48,7 +48,6 @@ class TsonDataStreamTest {
             case AnnotationStart a -> "AnnotationStart(" + a.name() + ")";
             case AnnotationEnd a -> "AnnotationEnd";
             case TypeRef t -> "TypeRef(" + t.name() + ")";
-            case SchemaRef s -> "SchemaRef(" + s.uri() + ")";
             case TokenEvent t -> "Token(" + t.text() + "," + t.form() + ")";
             case VoidEvent a -> "Absent";
             case EmptyBraceEvent e2 -> "EmptyBrace";
@@ -392,11 +391,8 @@ class TsonDataStreamTest {
     }
 
     @Test
-    void arrayElementCanHaveOwnSchemaDirective() {
-        assertEquals(List.of("DocumentStart(|)", "ArrayStart",
-                "SchemaRef(https://example.com/s.tn)", "Token(1,UNQUOTED)", "Token(2,UNQUOTED)",
-                "ArrayEnd", "DocumentEnd"),
-                shape("[ !!schema:\"https://example.com/s.tn\" 1 2 ]"));
+    void schemaDirectiveOnArrayElementIsParseError() {
+        assertThrows(ParseException.class, () -> shape("[ !!schema:\"https://example.com/s.tn\" 1 2 ]"));
     }
 
     // ── Unterminated structures must fail fast, not hang (bounded lookahead, no infinite loop) ──

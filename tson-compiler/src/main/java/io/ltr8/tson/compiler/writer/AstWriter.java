@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 
@@ -85,7 +84,7 @@ public final class AstWriter {
 			}
 			case ArrayValue array -> {
 				emitter.beginArray();
-				for (ScopedValue element : array.elements()) {
+				for (DataValue element : array.elements()) {
 					emitter.beforeArrayElement();
 					write(element, emitter);
 				}
@@ -99,11 +98,5 @@ public final class AstWriter {
 				emitter.endRecord();
 			}
 		}
-	}
-
-	/** A scoped value keeps its {@code !!schema} reference, which is part of the source too. */
-	private static void write(ScopedValue value, TsonDataEmitter emitter) {
-		value.schemaRef().ifPresent(emitter::schemaRef);
-		write(value.value(), emitter);
 	}
 }

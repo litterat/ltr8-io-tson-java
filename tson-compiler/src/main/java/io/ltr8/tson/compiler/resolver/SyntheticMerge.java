@@ -139,11 +139,11 @@ final class SyntheticMerge {
     private static boolean holdsApplication(CoreValue value) {
         return switch (value) {
             case RecordValue record -> WireForm.isApplication(record)
-                    || record.fields().stream().anyMatch(f -> holdsApplication(f.value().value().coreValue()));
+                    || record.fields().stream().anyMatch(f -> holdsApplication(f.value().coreValue()));
             case ArrayValue array ->
-                    array.elements().stream().anyMatch(e -> holdsApplication(e.value().coreValue()));
+                    array.elements().stream().anyMatch(e -> holdsApplication(e.coreValue()));
             case MapValue map -> map.entries().stream().anyMatch(e -> holdsApplication(e.key().coreValue())
-                    || holdsApplication(e.value().value().coreValue()));
+                    || holdsApplication(e.value().coreValue()));
             default -> false;
         };
     }

@@ -74,10 +74,10 @@ class DerivedNameTest {
     }
 
     /**
-     * <b>A map slot renders both halves of every entry, and rendered none of either.</b> meta.tn's
-     * {@code scoped.schemas} is the first map-typed slot a binding record holds, and the two names below
-     * were one -- the map fell to the unknown-value mark, so {@code extern_of<"a.tn">} and
-     * {@code extern_of<"b.tn">}, which are two types, shared one entry and one set of constraints.
+     * <b>A map slot renders both halves of every entry.</b> A binding record whose map-typed slot differs
+     * only in a key is a different type, so the two names below must differ: were the map to fall to an
+     * unknown-value mark, two applications that are two types would share one entry and one set of
+     * constraints.
      *
      * <p>Asserted as inequality rather than by value: what matters is that the slot contributes, and the two
      * spellings above are the pair that has to differ. The values themselves are pinned by the two tests
@@ -85,27 +85,27 @@ class DerivedNameTest {
      */
     @Test
     void aMapSlotContributesBothHalvesOfEveryEntry() {
-        assertNotEquals(DerivedName.ofBinding("scoped", List.of(schemas("a.tn"))),
-                DerivedName.ofBinding("scoped", List.of(schemas("b.tn"))));
+        assertNotEquals(DerivedName.ofBinding("keyed", List.of(keys("a.tn"))),
+                DerivedName.ofBinding("keyed", List.of(keys("b.tn"))));
 
         // Asserted against the canonical rendering and not only the whole name, because the readable half
         // splices the same text and would mask a hash that does not distinguish them -- the inverse of the
         // startsWith hazard this class's own Javadoc names. §8.2 keys identity on the hashed rendering, so
         // that is the half that has to be injective on its own.
-        assertNotEquals(DerivedName.canonicalBinding("scoped", List.of(schemas("a.tn"))),
-                DerivedName.canonicalBinding("scoped", List.of(schemas("b.tn"))));
-        assertNotEquals(DerivedName.canonicalBinding("scoped", List.of(schemas("a.tn"))),
-                DerivedName.canonicalBinding("scoped", List.of(WireForm.nameField("schemas", "a.tn"))),
+        assertNotEquals(DerivedName.canonicalBinding("keyed", List.of(keys("a.tn"))),
+                DerivedName.canonicalBinding("keyed", List.of(keys("b.tn"))));
+        assertNotEquals(DerivedName.canonicalBinding("keyed", List.of(keys("a.tn"))),
+                DerivedName.canonicalBinding("keyed", List.of(WireForm.nameField("keys", "a.tn"))),
                 "a one-entry map and a bare token are different slots and must not render alike");
     }
 
-    /** {@code schemas: { <uri> => _ }} -- the shape `extern_of<S>` closes to. */
-    private static RecordValue.Field schemas(String uri) {
+    /** {@code keys: { <key> => _ }} -- a one-entry map slot. */
+    private static RecordValue.Field keys(String key) {
         MapValue map = new MapValue(List.of(new MapValue.MapEntry(
                 new DataValue(List.of(), java.util.Optional.empty(),
-                        new TokenValue(uri, TokenForm.SINGLE_LINE_QUOTED)),
-                WireForm.scoped(new VoidValue()))));
-        return new RecordValue.Field("schemas", WireForm.scoped(map));
+                        new TokenValue(key, TokenForm.SINGLE_LINE_QUOTED)),
+                WireForm.plain(new VoidValue()))));
+        return new RecordValue.Field("keys", WireForm.plain(map));
     }
 
     /**

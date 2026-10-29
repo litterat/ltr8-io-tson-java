@@ -550,7 +550,7 @@ final class ParameterTypes {
         /** Each written slot walked against the field the constructor declares for it. */
         private void record(RecordValue wire, String constructor, RecordBody vocabulary) {
             for (RecordValue.Field written : wire.fields()) {
-                CoreValue value = written.value().value().coreValue();
+                CoreValue value = written.value().coreValue();
                 if (RECORD_FIELD.equals(constructor) && WireForm.VALUE.equals(written.name())
                         && value instanceof TokenValue token && occurrences.declares(token.text())) {
                     routed(token.text(), wire);
@@ -598,14 +598,12 @@ final class ParameterTypes {
 
         /**
          * A map slot: the key against {@code key_type}, the value against {@code value_type}. Both halves, because
-         * a parameter reaches either -- core's {@code extern_type => <S, T> !scoped { scope: [EXTERN] schemas:
-         * { S => [T] } }} puts one in each, {@code S} in a {@code uri}-typed key and {@code T} inside the
-         * {@code [type_name]} the value names.
+         * a parameter reaches either -- one in a key, and another inside the array the value names.
          */
         private void entries(MapValue map, MapBody declared, String slot) {
             for (MapValue.MapEntry entry : map.entries()) {
                 value(entry.key().coreValue(), declared.keyType(), "a key of " + slot);
-                value(entry.value().value().coreValue(), declared.valueType(), slot);
+                value(entry.value().coreValue(), declared.valueType(), slot);
             }
         }
 
@@ -638,7 +636,7 @@ final class ParameterTypes {
                 TypeRef declared = element != null ? element
                         : ((TupleBody) type).elements().get(Math.min(i, ((TupleBody) type).elements().size() - 1))
                                 .elementType();
-                value(array.elements().get(i).value().coreValue(), declared, slot);
+                value(array.elements().get(i).coreValue(), declared, slot);
             }
         }
 
@@ -659,7 +657,7 @@ final class ParameterTypes {
                 return;
             }
             for (int i = 0; i < list.elements().size(); i++) {
-                argument(list.elements().get(i).value().coreValue(), head, i);
+                argument(list.elements().get(i).coreValue(), head, i);
             }
         }
 
@@ -669,7 +667,7 @@ final class ParameterTypes {
                 return;
             }
             for (RecordValue.Field member : record.fields()) {
-                CoreValue value = member.value().value().coreValue();
+                CoreValue value = member.value().coreValue();
                 if (member.name().equals(WireForm.VALUE)) {
                     continue; // a literal argument says nothing about this declaration's parameters
                 }

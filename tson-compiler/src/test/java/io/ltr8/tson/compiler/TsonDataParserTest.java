@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -186,11 +185,6 @@ class TsonDataParserTest {
     }
 
     @Test
-    void schemaDirectiveArgumentOnFieldValueMustBeAValidUri() {
-        assertThrows(ParseException.class, () -> parse("{ x: !!schema:\"not a uri\" 1 }"));
-    }
-
-    @Test
     void metaDirectiveArgumentMustBeAValidUriEvenThoughTheDocumentIsRejectedEitherWay() {
         // A malformed !!meta argument is a genuine ParseException, not merely "a well-formed
         // schema document this processor doesn't support" -- TsonUnsupportedDocumentException requires the
@@ -205,13 +199,13 @@ class TsonDataParserTest {
         RecordValue rec = assertInstanceOf(RecordValue.class, root("{ name: Alice }").coreValue());
         assertEquals(1, rec.fields().size());
         assertEquals("name", rec.fields().get(0).name());
-        assertEquals("Alice", token(rec.fields().get(0).value().value()).text());
+        assertEquals("Alice", token(rec.fields().get(0).value()).text());
     }
 
     @Test
     void recordNoSeparatorNeededAroundBraces() {
         RecordValue rec = assertInstanceOf(RecordValue.class, root("{name:Alice}").coreValue());
-        assertEquals("Alice", token(rec.fields().get(0).value().value()).text());
+        assertEquals("Alice", token(rec.fields().get(0).value()).text());
     }
 
     @Test
@@ -235,8 +229,8 @@ class TsonDataParserTest {
         // "last value wins" is a resolver-layer rule (§2.5); the structural compiler keeps both.
         RecordValue rec = assertInstanceOf(RecordValue.class, root("{ x: 1 x: 2 }").coreValue());
         assertEquals(2, rec.fields().size());
-        assertEquals("1", token(rec.fields().get(0).value().value()).text());
-        assertEquals("2", token(rec.fields().get(1).value().value()).text());
+        assertEquals("1", token(rec.fields().get(0).value()).text());
+        assertEquals("2", token(rec.fields().get(1).value()).text());
     }
 
     @Test
@@ -244,14 +238,14 @@ class TsonDataParserTest {
         RecordValue outer = assertInstanceOf(RecordValue.class,
                 root("{ customer: { name: Alice } }").coreValue());
         RecordValue inner = assertInstanceOf(RecordValue.class,
-                outer.fields().get(0).value().value().coreValue());
-        assertEquals("Alice", token(inner.fields().get(0).value().value()).text());
+                outer.fields().get(0).value().coreValue());
+        assertEquals("Alice", token(inner.fields().get(0).value()).text());
     }
 
     @Test
     void recordFieldValueCanBeVoid() {
         RecordValue rec = assertInstanceOf(RecordValue.class, root("{ x: _ }").coreValue());
-        assertInstanceOf(VoidValue.class, rec.fields().get(0).value().value().coreValue());
+        assertInstanceOf(VoidValue.class, rec.fields().get(0).value().coreValue());
     }
 
     /**
@@ -293,7 +287,7 @@ class TsonDataParserTest {
         MapValue map = assertInstanceOf(MapValue.class, root("{ WELCOME10 => \"10%\" }").coreValue());
         assertEquals(1, map.entries().size());
         assertEquals("WELCOME10", token(map.entries().get(0).key()).text());
-        assertEquals("10%", token(map.entries().get(0).value().value()).text());
+        assertEquals("10%", token(map.entries().get(0).value()).text());
     }
 
     @Test
@@ -301,7 +295,7 @@ class TsonDataParserTest {
         MapValue map = assertInstanceOf(MapValue.class,
                 root("{ WELCOME10 => \"10%\" loyalty => _ }").coreValue());
         assertEquals(2, map.entries().size());
-        assertInstanceOf(VoidValue.class, map.entries().get(1).value().value().coreValue());
+        assertInstanceOf(VoidValue.class, map.entries().get(1).value().coreValue());
     }
 
     @Test
@@ -358,7 +352,7 @@ class TsonDataParserTest {
     void arrayWithElements() {
         ArrayValue arr = assertInstanceOf(ArrayValue.class, root("[1 2 3]").coreValue());
         assertEquals(3, arr.elements().size());
-        assertEquals("1", token(arr.elements().get(0).value()).text());
+        assertEquals("1", token(arr.elements().get(0)).text());
     }
 
     @Test
@@ -372,7 +366,7 @@ class TsonDataParserTest {
         // [1 _ 3] has three elements (§2.9).
         ArrayValue arr = assertInstanceOf(ArrayValue.class, root("[1 _ 3]").coreValue());
         assertEquals(3, arr.elements().size());
-        assertInstanceOf(VoidValue.class, arr.elements().get(1).value().coreValue());
+        assertInstanceOf(VoidValue.class, arr.elements().get(1).coreValue());
     }
 
     @Test
@@ -380,8 +374,8 @@ class TsonDataParserTest {
         ArrayValue arr = assertInstanceOf(ArrayValue.class,
                 root("[ { sku: A-100 } { sku: B-205 } ]").coreValue());
         assertEquals(2, arr.elements().size());
-        RecordValue first = assertInstanceOf(RecordValue.class, arr.elements().get(0).value().coreValue());
-        assertEquals("A-100", token(first.fields().get(0).value().value()).text());
+        RecordValue first = assertInstanceOf(RecordValue.class, arr.elements().get(0).coreValue());
+        assertEquals("A-100", token(first.fields().get(0).value()).text());
     }
 
     /**
@@ -423,11 +417,10 @@ class TsonDataParserTest {
     }
 
     @Test
-    void arrayElementCanHaveOwnSchemaDirective() {
-        ArrayValue arr = assertInstanceOf(ArrayValue.class,
-                root("[ !!schema:\"https://example.com/s.tn\" 1 2 ]").coreValue());
-        assertEquals("https://example.com/s.tn", arr.elements().get(0).schemaRef().orElseThrow());
-        assertTrue(arr.elements().get(1).schemaRef().isEmpty());
+    void schemaDirectiveOnArrayElementIsParseError() {
+        ParseException e = assertThrows(ParseException.class,
+                () -> parse("[ !!schema:\"https://example.com/s.tn\" 1 2 ]"));
+        assertTrue(e.getMessage().contains("stands only in the document header"), e::getMessage);
     }
 
     // ── Type annotations (§3.2) ──────────────────────────────────────────
@@ -497,7 +490,7 @@ class TsonDataParserTest {
         // !person { name: Alice } tags the record, not the field.
         DataValue v = root("!person { name: Alice }");
         RecordValue rec = assertInstanceOf(RecordValue.class, v.coreValue());
-        assertTrue(rec.fields().get(0).value().value().typeRef().isEmpty());
+        assertTrue(rec.fields().get(0).value().typeRef().isEmpty());
     }
 
     @Test
@@ -595,27 +588,22 @@ class TsonDataParserTest {
         assertThrows(ParseException.class, () -> parse("{ x: @foo\"bar\" }"));
     }
 
-    // ── !!schema on scoped values (§2.3, §3.3) ──────────────────────────
+    // ── A directive at a value position (§3.3) ──────────────────────────
 
     @Test
-    void schemaDirectiveOnFieldValue() {
-        RecordValue rec = assertInstanceOf(RecordValue.class, root("""
+    void schemaDirectiveOnFieldValueIsParseError() {
+        assertThrows(ParseException.class, () -> parse("""
                 { database: !!schema:"https://example.com/db-config.tn" !db_config { host: db1 } }
-                """).coreValue());
-        ScopedValue fieldValue = rec.fields().get(0).value();
-        assertEquals("https://example.com/db-config.tn", fieldValue.schemaRef().orElseThrow());
-        assertEquals("db_config", fieldValue.value().typeRef().orElseThrow());
+                """));
     }
 
     @Test
-    void schemaDirectiveOnMapEntryValue() {
-        MapValue map = assertInstanceOf(MapValue.class,
-                root("{ k => !!schema:\"https://example.com/s.tn\" 1 }").coreValue());
-        assertEquals("https://example.com/s.tn", map.entries().get(0).value().schemaRef().orElseThrow());
+    void schemaDirectiveOnMapEntryValueIsParseError() {
+        assertThrows(ParseException.class, () -> parse("{ k => !!schema:\"https://example.com/s.tn\" 1 }"));
     }
 
     @Test
-    void otherDirectiveNamesInScopedValuePositionAreParseErrors() {
+    void otherDirectiveNamesAtAValuePositionAreParseErrors() {
         assertThrows(ParseException.class, () -> parse("{ x: !!id:\"https://example.com/x.tn\" 1 }"));
     }
 
@@ -653,7 +641,7 @@ class TsonDataParserTest {
                     { sku: B-205 qty: 1 price: 100.00 discount: _ }
                   ]
                   discounts: { @expires:"2026-12-31" WELCOME10 => "10%" loyalty => _ }
-                  shipping: !!schema:"https://example.com/address.tn" !address {
+                  shipping: !address {
                     street: "12 Byron Rd"
                     city:   London
                   }
@@ -677,40 +665,39 @@ class TsonDataParserTest {
         assertEquals(10, order.fields().size());
 
         assertEquals("order_id", order.fields().get(0).name());
-        assertEquals("1042", token(order.fields().get(0).value().value()).text());
+        assertEquals("1042", token(order.fields().get(0).value()).text());
 
         assertEquals("reference", order.fields().get(1).name());
-        DataValue reference = order.fields().get(1).value().value();
+        DataValue reference = order.fields().get(1).value();
         assertEquals("uuid", reference.typeRef().orElseThrow());
 
         RecordValue customer = assertInstanceOf(RecordValue.class,
-                order.fields().get(2).value().value().coreValue());
+                order.fields().get(2).value().coreValue());
         assertEquals(3, customer.fields().size());
-        DataValue tier = customer.fields().get(2).value().value();
+        DataValue tier = customer.fields().get(2).value();
         assertEquals("deprecated", tier.annotations().get(0).name());
         assertEquals("GOLD", token(tier).text());
 
         ArrayValue items = assertInstanceOf(ArrayValue.class,
-                order.fields().get(6).value().value().coreValue());
+                order.fields().get(6).value().coreValue());
         assertEquals(2, items.elements().size());
-        RecordValue item0 = assertInstanceOf(RecordValue.class, items.elements().get(0).value().coreValue());
-        assertEquals(".5", token(item0.fields().get(3).value().value()).text());
-        RecordValue item1 = assertInstanceOf(RecordValue.class, items.elements().get(1).value().coreValue());
-        assertInstanceOf(VoidValue.class, item1.fields().get(3).value().value().coreValue());
+        RecordValue item0 = assertInstanceOf(RecordValue.class, items.elements().get(0).coreValue());
+        assertEquals(".5", token(item0.fields().get(3).value()).text());
+        RecordValue item1 = assertInstanceOf(RecordValue.class, items.elements().get(1).coreValue());
+        assertInstanceOf(VoidValue.class, item1.fields().get(3).value().coreValue());
 
         MapValue discounts = assertInstanceOf(MapValue.class,
-                order.fields().get(7).value().value().coreValue());
+                order.fields().get(7).value().coreValue());
         assertEquals(2, discounts.entries().size());
         assertEquals("expires", discounts.entries().get(0).key().annotations().get(0).name());
 
-        ScopedValue shipping = order.fields().get(8).value();
-        assertEquals("https://example.com/address.tn", shipping.schemaRef().orElseThrow());
-        assertEquals("address", shipping.value().typeRef().orElseThrow());
-        RecordValue shippingRecord = assertInstanceOf(RecordValue.class, shipping.value().coreValue());
+        DataValue shipping = order.fields().get(8).value();
+        assertEquals("address", shipping.typeRef().orElseThrow());
+        RecordValue shippingRecord = assertInstanceOf(RecordValue.class, shipping.coreValue());
         assertEquals("street", shippingRecord.fields().get(0).name());
 
         assertEquals("notes", order.fields().get(9).name());
-        DataValue notes = order.fields().get(9).value().value();
+        DataValue notes = order.fields().get(9).value();
         TokenValue notesToken = assertInstanceOf(TokenValue.class, notes.coreValue());
         assertEquals(TokenForm.MULTI_LINE_QUOTED, notesToken.form());
         assertEquals("Leave the parcel with the concierge.\nGift wrap — no prices on the slip.",
@@ -725,7 +712,7 @@ class TsonDataParserTest {
         Document document = parser.parseDocument();
         RecordValue record = assertInstanceOf(RecordValue.class, document.root().coreValue());
         TokenValue value = assertInstanceOf(TokenValue.class,
-                record.fields().get(0).value().value().coreValue());
+                record.fields().get(0).value().coreValue());
 
         Map<CoreValue, Position> positions = parser.positions();
         assertEquals(new Position(1, 1, 0), positions.get(record));
@@ -793,8 +780,8 @@ class TsonDataParserTest {
         Document document = parser.parseDocument();
         ArrayValue array = assertInstanceOf(ArrayValue.class, document.root().coreValue());
 
-        CoreValue first = array.elements().get(0).value().coreValue();
-        CoreValue second = array.elements().get(1).value().coreValue();
+        CoreValue first = array.elements().get(0).coreValue();
+        CoreValue second = array.elements().get(1).coreValue();
         assertEquals(first, second, "structurally identical -- both TokenValue(\"42\", UNQUOTED)");
         assertNotSame(first, second, "but two distinct occurrences, never the same object");
 

@@ -222,8 +222,7 @@ public final class TsonDataEmitter {
      * is what makes a data document self-describing: a reader resolves this, validates against it, and needs
      * nothing out of band.
      *
-     * <p>Legal in a document header and at a scoped-value position (§3.3); this emits it wherever the
-     * caller is, exactly like every other method here.
+     * <p>Legal in a document header alone (§2.2, §3.3); a directive at a value position is a parse error.
      */
     public TsonDataEmitter schemaRef(String uri) {
         return directive("schema", uri);

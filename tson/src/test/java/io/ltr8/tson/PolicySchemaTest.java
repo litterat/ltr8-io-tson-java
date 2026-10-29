@@ -52,7 +52,6 @@ class PolicySchemaTest {
         expected.put("max_fields", 65_536L);
         expected.put("max_annotations", 64L);
         expected.put("max_values", 16_777_216L);
-        expected.put("max_foreign_schemas", 16L);
         expected.put("max_import_closure", 64L);
         expected.put("max_schema_entries", 65_536L);
         expected.put("max_reference_chain", 64L);

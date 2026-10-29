@@ -157,7 +157,7 @@ class LimitsPolicyTest {
                 l -> l.withMaxTokenLength(0), l -> l.withMaxTextLength(0), l -> l.withMaxNumericLiteralLength(0),
                 l -> l.withMaxBinarySize(0), l -> l.withMaxDocumentSize(0), l -> l.withMaxElements(0),
                 l -> l.withMaxEntries(0), l -> l.withMaxFields(0), l -> l.withMaxAnnotations(0),
-                l -> l.withMaxValues(0), l -> l.withMaxForeignSchemas(0), l -> l.withMaxImportClosure(0),
+                l -> l.withMaxValues(0), l -> l.withMaxImportClosure(0),
                 l -> l.withMaxSchemaEntries(0), l -> l.withMaxReferenceChain(0), l -> l.withMaxSupertypeChain(0),
                 l -> l.withMaxMaterialisationDepth(0));
         for (var wither : zeroed) {

@@ -26,7 +26,7 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
   token is otherwise a value by name, read only by a `TypeRef` component at a record-typed slot.
   `ReferenceNameReader.nameIn` is the one statement of which tokens are names; their segment grammar is the linker's.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`. §7.2's subsumption guard is
 `design/class2-compilation.md`.

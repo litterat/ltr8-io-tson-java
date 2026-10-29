@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=8467f255a229022b240b607186c7374433c163e384b4d6f5e54333bad497bc48"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=f271892f662de4ec256c596b58d675ed7a470afccf0f06c10d23200b8aea822f"
 !!meta:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=373302d4cb3437e360d0fc39a50bb971d79eb7c09731589d38bb7f299259f4b5"
 !!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=373302d4cb3437e360d0fc39a50bb971d79eb7c09731589d38bb7f299259f4b5"
 @doc:"""
@@ -21,10 +21,8 @@
 
   1. Structural constructors: `bytes_type` (with the `bytes_encoding` enum
      selecting its text spelling), whose instance in core is `bytes`; and
-     `scoped` (with the `scope_kind` enum), whose instances in core are
-     `declared`, `extern` and `dynamic` and whose applications are `extern_of`
-     and `extern_type`, with `schema_identity` typing the schemas it names. Fixed-size arrays have no constructor of their own:
-     `[T; N]` is the spelling.
+     `declared_type`, whose instance in core is `declared`. Fixed-size arrays
+     have no constructor of their own: `[T; N]` is the spelling.
 
   2. The `set` template — the `set<T>` spelling of the kernel's `set_type`
      constructor, declared here for meta-layer extensions; core declares a
@@ -128,41 +126,16 @@
   }
 
   @doc:"""
-    Which namespace a value's type may be drawn from. LOCAL is the governing
-    namespace — the schema's own declarations and its imports ([TSON-SCHEMA]
-    §2.2.3); EXTERN is a foreign schema, whose identity the value carries with
-    it (in TSON text, a nested !!schema on the value; [TSON-DATA] §2.3).
+    Constructor for the open sum over the governing closure: the value names
+    its own type, among the types the schema declares or imports ([TSON-SCHEMA]
+    §2.2.3), and is validated in full against it. A value naming no type is
+    invalid. Instance is `declared` in core.
+
+    Where `choice` is the closed sum, enumerating its variants, this is the
+    open one, drawing them from the closure; `disjoint` is absent, as on every
+    non-choice sum.
     """
-  scope_kind => !enum [LOCAL EXTERN]
-
-  @doc:"The non-empty set of namespaces a scoped instance admits."
-  scope_set => !set_type { element_type: scope_kind  min_items: 1 }
-
-  @doc:"""
-    Constructor for open sum types: the value names its own type, and the
-    instance names the namespaces that name may be resolved in.
-
-    `scope` says which namespaces are admitted. `schemas` narrows the foreign
-    ones: absent is any foreign schema, a keyed map is those schemas, and a
-    key's void value is every type that schema declares where a list is those
-    types. The map is keyed by schema identity, so one schema cannot be listed
-    twice, and keys are compared by canonical identity ([TSON-DATA] §2.2.1) so a
-    pinned key and an unpinned !!schema in the data match; each pin is verified
-    by the loader on its own.
-
-    One coherence rule: `schemas` requires EXTERN in `scope`.
-    """
-  scoped => sum & {
-    scope:    scope_set
-    schemas?: {schema_identity => [type_name; 1..]?; 1..}
-  }
-
-  @doc:"""
-    A schema's identity as a reference names it ([TSON-DATA] §2.2.1): an
-    IRI-reference, so a host or path may carry characters beyond US-ASCII and
-    a path-only reference names a library entry, and never a fragment.
-    """
-  schema_identity => !iri_type { allow_fragment: false }
+  declared_type => sum & {}
 
   @doc:"""
     IEEE 754-2019 interchange formats, both radices. Selects the representable

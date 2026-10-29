@@ -76,8 +76,8 @@ its base), and an application nothing declares is its expansion.
   - **Why text, not a value of the constructor's vocabulary.** A parameter stands wherever a token stands —
     `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a collection — so a
     body carrying one is typed by no constructor's record shape until it closes. Read as one, `min_items: N` fails
-    against `non_negative_integer`, and core.tn's `extern_of` reads *cleanly*, binding `S` as a schema identity
-    literally named `S`. `OpenEntryResolvedFormTest` pins that both read back as held text.
+    against `non_negative_integer`, and `!enum { members: [a b M] }` reads *cleanly*, binding `M` as a third member
+    spelled `M`. `OpenEntryResolvedFormTest` pins that it reads back as held text.
   - **The tree is built, not held.** `HeldBody.held` writes the tree it is given (`DataClassObjectWriter`,
     vocabulary-free, token forms preserved) and keeps none of it; `HeldBody.of` parses the text back. Handing back the
     tree in hand would hide a writer/parser disagreement about §5.10's one spelling, which instead fails in

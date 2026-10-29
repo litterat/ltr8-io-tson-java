@@ -24,6 +24,7 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.ComplexType;
+import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.EnumBody;
@@ -44,8 +45,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.ScopeKind;
-import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
@@ -1074,13 +1073,12 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void resolvesComplexAndScopedInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+    void resolvesComplexAndDeclaredInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
         // complex => !complex_type {} -- ComplexType, same record-only/no-compiler treatment as the
         // other atom families above.
         //
-        // declared => !scoped { scope: [LOCAL] } -- Scoped's own constructor (scoped => sum & { ... })
-        // composes with `sum`, not `atom`; resolves fine since bindAtomInstance binds against Top,
-        // not the narrower Atom.
+        // declared => !declared_type {} -- its constructor (declared_type => sum & {}) composes with
+        // `sum`, not `atom`; resolves fine since bindAtomInstance binds against Top, not the narrower Atom.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
@@ -1090,7 +1088,7 @@ class DefinitionResolverTest {
 
         assertEquals(ComplexType.UNCONSTRAINED, complex);
         assertEquals(EntryKind.SUM, EntryKind.of(declared, n -> true));
-        assertEquals(new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), declared);
+        assertEquals(new DeclaredType(), declared);
     }
 
     @Test
@@ -1620,7 +1618,7 @@ class DefinitionResolverTest {
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn").normalize());
         // Through SchemaResolver, exactly as meta-kernel goes two lines above, rather than a hand-rolled
         // declaration loop. The loop skipped every phase that runs *between* declarations -- materialisation
-        // most of all -- so a field typed by a template application (`scope: set<scope_kind>`) stayed an
+        // most of all -- so a field typed by a template application (`tags: set<text>`) stayed an
         // unclosed application and the first read against it met the template instead of the entry it closes.
         TsonSchema meta = new SchemaResolver(throwawayLoader)
                 .resolveSchema(new TsonSchemaParser(source).parseSchemaDocument());

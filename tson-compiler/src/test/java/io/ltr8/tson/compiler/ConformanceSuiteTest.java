@@ -10,7 +10,6 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.compiler.lexer.Token;
@@ -185,7 +184,7 @@ class ConformanceSuiteTest {
                 ArrayValue expectedTokens = (ArrayValue) fieldCore(outcomePayload(sidecar), "tokens");
                 assertEquals(expectedTokens.elements().size(), actual.size(), "token count");
                 for (int i = 0; i < actual.size(); i++) {
-                    RecordValue expTok = (RecordValue) expectedTokens.elements().get(i).value().coreValue();
+                    RecordValue expTok = (RecordValue) expectedTokens.elements().get(i).coreValue();
                     String expKind = fieldText(expTok, "kind");
                     String expText = fieldText(expTok, "text");
                     assertEquals(expKind, kindName(actual.get(i).type()), "token[" + i + "].kind");
@@ -265,8 +264,8 @@ class ConformanceSuiteTest {
 
     private static void assertDataValueMatches(RecordValue expected, DataValue actual) {
         List<DataValue> expectedAnnotations = new ArrayList<>();
-        for (ScopedValue sv : ((ArrayValue) fieldCore(expected, "annotations")).elements()) {
-            expectedAnnotations.add(sv.value());
+        for (DataValue sv : ((ArrayValue) fieldCore(expected, "annotations")).elements()) {
+            expectedAnnotations.add(sv);
         }
         assertEquals(expectedAnnotations.size(), actual.annotations().size(), "annotation count");
         for (int i = 0; i < expectedAnnotations.size(); i++) {
@@ -293,7 +292,7 @@ class ConformanceSuiteTest {
         String kind = member.name();
         RecordValue payload = kind.equals("absent") || kind.equals("empty-brace")
                 ? null
-                : (RecordValue) member.value().value().coreValue();
+                : (RecordValue) member.value().coreValue();
         switch (kind) {
             case "token" -> {
                 TokenValue tv = assertInstanceOf(TokenValue.class, actual, "core-value kind 'token'");
@@ -313,10 +312,10 @@ class ConformanceSuiteTest {
                 ArrayValue expFields = (ArrayValue) fieldCore(payload, "fields");
                 assertEquals(expFields.elements().size(), rv.fields().size(), "record field count");
                 for (int i = 0; i < rv.fields().size(); i++) {
-                    RecordValue expField = (RecordValue) expFields.elements().get(i).value().coreValue();
+                    RecordValue expField = (RecordValue) expFields.elements().get(i).coreValue();
                     assertEquals(fieldText(expField, "name"), rv.fields().get(i).name(),
                             "record field[" + i + "].name");
-                    assertScopedValueMatches((RecordValue) fieldValue(expField, "value").coreValue(),
+                    assertDataValueMatches((RecordValue) fieldValue(expField, "value").coreValue(),
                             rv.fields().get(i).value());
                 }
             }
@@ -325,10 +324,10 @@ class ConformanceSuiteTest {
                 ArrayValue expEntries = (ArrayValue) fieldCore(payload, "entries");
                 assertEquals(expEntries.elements().size(), mv.entries().size(), "map entry count");
                 for (int i = 0; i < mv.entries().size(); i++) {
-                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).value().coreValue();
+                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).coreValue();
                     assertDataValueMatches((RecordValue) fieldValue(expEntry, "key").coreValue(),
                             mv.entries().get(i).key());
-                    assertScopedValueMatches((RecordValue) fieldValue(expEntry, "value").coreValue(),
+                    assertDataValueMatches((RecordValue) fieldValue(expEntry, "value").coreValue(),
                             mv.entries().get(i).value());
                 }
             }
@@ -337,17 +336,12 @@ class ConformanceSuiteTest {
                 ArrayValue expElements = (ArrayValue) fieldCore(payload, "elements");
                 assertEquals(expElements.elements().size(), av.elements().size(), "array element count");
                 for (int i = 0; i < av.elements().size(); i++) {
-                    RecordValue expScoped = (RecordValue) expElements.elements().get(i).value().coreValue();
-                    assertScopedValueMatches(expScoped, av.elements().get(i));
+                    RecordValue expElement = (RecordValue) expElements.elements().get(i).coreValue();
+                    assertDataValueMatches(expElement, av.elements().get(i));
                 }
             }
             default -> fail("unknown expected core-value kind: " + kind);
         }
-    }
-
-    private static void assertScopedValueMatches(RecordValue expected, ScopedValue actual) {
-        assertEquals(fieldTextOrAbsent(expected, "schema-ref"), actual.schemaRef().orElse(null), "schema-ref");
-        assertDataValueMatches((RecordValue) fieldValue(expected, "value").coreValue(), actual.value());
     }
 
     // ── Reader-layer vectors ─────────────────────────────────────────────
@@ -460,7 +454,7 @@ class ConformanceSuiteTest {
 
     private static void assertReaderValueMatches(RecordValue expected, TsonValue actual) {
         RecordValue.Field member = soleField(expected, "reader-value");
-        CoreValue payload = member.value().value().coreValue();
+        CoreValue payload = member.value().coreValue();
         switch (member.name()) {
             case "absent" -> assertInstanceOf(TsonVoid.class, actual, "reader-value 'absent'");
             case "atom" -> assertAtomMatches((RecordValue) payload,
@@ -471,7 +465,7 @@ class ConformanceSuiteTest {
                 assertEquals(expFields.elements().size(), record.fields().size(), "record field count");
                 List<Map.Entry<String, TsonValue>> actualFields = new ArrayList<>(record.fields().entrySet());
                 for (int i = 0; i < actualFields.size(); i++) {
-                    RecordValue expField = (RecordValue) expFields.elements().get(i).value().coreValue();
+                    RecordValue expField = (RecordValue) expFields.elements().get(i).coreValue();
                     assertEquals(fieldText(expField, "name"), actualFields.get(i).getKey(),
                             "record field[" + i + "].name");
                     assertReaderValueMatches((RecordValue) fieldCore(expField, "value"),
@@ -483,7 +477,7 @@ class ConformanceSuiteTest {
                 ArrayValue expEntries = (ArrayValue) fieldCore((RecordValue) payload, "entries");
                 assertEquals(expEntries.elements().size(), map.entries().size(), "map entry count");
                 for (int i = 0; i < map.entries().size(); i++) {
-                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).value().coreValue();
+                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).coreValue();
                     assertReaderValueMatches((RecordValue) fieldCore(expEntry, "key"), map.entries().get(i).key());
                     assertReaderValueMatches((RecordValue) fieldCore(expEntry, "value"), map.entries().get(i).value());
                 }
@@ -494,7 +488,7 @@ class ConformanceSuiteTest {
                 assertEquals(expElements.elements().size(), array.elements().size(), "array element count");
                 for (int i = 0; i < array.elements().size(); i++) {
                     assertReaderValueMatches(
-                            (RecordValue) expElements.elements().get(i).value().coreValue(),
+                            (RecordValue) expElements.elements().get(i).coreValue(),
                             array.elements().get(i));
                 }
             }
@@ -509,7 +503,7 @@ class ConformanceSuiteTest {
      */
     private static void assertAtomMatches(RecordValue expected, TsonAtom actual) {
         RecordValue.Field member = soleField(expected, "reader atom");
-        String text = ((TokenValue) member.value().value().coreValue()).text();
+        String text = ((TokenValue) member.value().coreValue()).text();
         switch (member.name()) {
             case "boolean" -> assertEquals(Boolean.parseBoolean(text), actual.value(), "boolean atom");
             case "string" -> assertEquals(text, String.valueOf(actual.value()), "string atom");
@@ -534,7 +528,7 @@ class ConformanceSuiteTest {
 
     private static void assertBaseValueMatches(RecordValue expected, BaseValue actual) {
         RecordValue.Field member = soleField(expected, "base-value");
-        CoreValue payload = member.value().value().coreValue();
+        CoreValue payload = member.value().coreValue();
         switch (member.name()) {
             case "boolean" -> {
                 BaseValue.BooleanValue bv = assertInstanceOf(BaseValue.BooleanValue.class, actual, "base-value kind 'boolean'");
@@ -554,7 +548,7 @@ class ConformanceSuiteTest {
 
     private static void assertNumberFormMatches(RecordValue group, NumberForm actual) {
         RecordValue.Field member = soleField(group, "number-form");
-        RecordValue expected = (RecordValue) member.value().value().coreValue();
+        RecordValue expected = (RecordValue) member.value().coreValue();
         String shape = member.name();
         switch (shape) {
             case "integer" -> {
@@ -658,7 +652,7 @@ class ConformanceSuiteTest {
 
     private static void checkValidVocabularyVector(String typeRef, AtomType<?> atomType, String token, RecordValue valid) {
         RecordValue.Field family = soleField((RecordValue) fieldCore(valid, "value"), "vocabulary value");
-        CoreValue payload = family.value().value().coreValue();
+        CoreValue payload = family.value().coreValue();
         switch (typeRef) {
             case "rational" -> {
                 Rational actual = (Rational) atomType.boundTo(Rational.class).orElseThrow().read(token);

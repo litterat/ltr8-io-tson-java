@@ -5,7 +5,6 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.ArrayRef;
@@ -385,7 +384,7 @@ final class SchemaDesugarer {
                     // pair<text, B> }`, so it is written that way here and closes by the same walk as
                     // every other template. Spellable only because `reference.target` is a `type_ref`.
                     yield instance(new Binding(REFERENCE, List.of(
-                            new RecordValue.Field(TARGET, WireForm.scoped(refValue(reference.ref()))))),
+                            new RecordValue.Field(TARGET, WireForm.plain(refValue(reference.ref()))))),
                             reference.typeParams());
                 }
                 TypeRef ref = argumentsOnly(reference.ref());
@@ -543,7 +542,7 @@ final class SchemaDesugarer {
 
     /** One scalar type slot as the wire field a construction writes -- see {@link #refValue}. */
     private static void refSlot(String slot, TypeRef ref, List<RecordValue.Field> fields) {
-        fields.add(new RecordValue.Field(slot, WireForm.scoped(refValue(ref))));
+        fields.add(new RecordValue.Field(slot, WireForm.plain(refValue(ref))));
     }
 
     /**
@@ -569,18 +568,18 @@ final class SchemaDesugarer {
      * is [TSON-SCHEMA] §8.2's rule exactly: recorded as written, compared as the value the token denotes.
      */
     private static RecordValue refRecord(GenericRef generic) {
-        List<ScopedValue> arguments = new ArrayList<>();
+        List<DataValue> arguments = new ArrayList<>();
         for (TypeArg argument : generic.args()) {
-            arguments.add(WireForm.scoped(new RecordValue(List.of(switch (argument) {
+            arguments.add(WireForm.plain(new RecordValue(List.of(switch (argument) {
                 case TypeArg.Ref reference when reference.ref() instanceof GenericRef nested ->
-                        new RecordValue.Field(WireForm.NAME, WireForm.scoped(refRecord(nested)));
+                        new RecordValue.Field(WireForm.NAME, WireForm.plain(refRecord(nested)));
                 case TypeArg.Ref reference ->
                         WireForm.nameField(WireForm.NAME, ((SimpleRef) reference.ref()).name());
-                case TypeArg.Value value -> new RecordValue.Field(WireForm.VALUE, WireForm.scoped(value.value()));
+                case TypeArg.Value value -> new RecordValue.Field(WireForm.VALUE, WireForm.plain(value.value()));
             }))));
         }
         return new RecordValue(List.of(WireForm.nameField(WireForm.NAME, generic.name()),
-                new RecordValue.Field(WireForm.ARGUMENTS, WireForm.scoped(new ArrayValue(arguments)))));
+                new RecordValue.Field(WireForm.ARGUMENTS, WireForm.plain(new ArrayValue(arguments)))));
     }
 
     /** One position of a tuple after expansion: the type it names, and whether it is marked voidable. */
@@ -680,17 +679,17 @@ final class SchemaDesugarer {
      * exactly as a variant is.
      */
     private static Optional<Binding> tupleBinding(List<Position> positions) {
-        List<ScopedValue> elements = new ArrayList<>();
+        List<DataValue> elements = new ArrayList<>();
         for (Position position : positions) {
             List<RecordValue.Field> members = new ArrayList<>();
-            members.add(new RecordValue.Field(ELEMENT_TYPE, WireForm.scoped(refValue(position.typeRef()))));
+            members.add(new RecordValue.Field(ELEMENT_TYPE, WireForm.plain(refValue(position.typeRef()))));
             if (position.voidable()) {
                 members.add(WireForm.nameField(WireForm.VOIDABLE, "true"));
             }
-            elements.add(WireForm.scoped(new RecordValue(members)));
+            elements.add(WireForm.plain(new RecordValue(members)));
         }
         return Optional.of(new Binding(TUPLE,
-                List.of(new RecordValue.Field(ELEMENTS, WireForm.scoped(new ArrayValue(elements))))));
+                List.of(new RecordValue.Field(ELEMENTS, WireForm.plain(new ArrayValue(elements))))));
     }
 
     /**
@@ -712,12 +711,12 @@ final class SchemaDesugarer {
      * after reference flattening, which this phase has no answer to.
      */
     private static Optional<Binding> choiceBinding(List<TypeRef> variants) {
-        List<ScopedValue> members = new ArrayList<>();
+        List<DataValue> members = new ArrayList<>();
         for (TypeRef variant : variants) {
-            members.add(WireForm.scoped(refValue(variant)));
+            members.add(WireForm.plain(refValue(variant)));
         }
         return Optional.of(new Binding(CHOICE,
-                List.of(new RecordValue.Field(VARIANTS, WireForm.scoped(new ArrayValue(members))))));
+                List.of(new RecordValue.Field(VARIANTS, WireForm.plain(new ArrayValue(members))))));
     }
 
     /**
@@ -747,8 +746,8 @@ final class SchemaDesugarer {
      */
     private Binding recordBinding(RecordDef record) {
         List<MapValue.MapEntry> fields = new ArrayList<>();
-        List<ScopedValue> groups = new ArrayList<>();
-        List<ScopedValue> discriminators = new ArrayList<>();
+        List<DataValue> groups = new ArrayList<>();
+        List<DataValue> discriminators = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (RecordEntry entry : record.entries()) {
             switch (entry) {
@@ -761,7 +760,7 @@ final class SchemaDesugarer {
                     // refinement template pinning a constructor's own facet (`array ^ { element_type: = T }`)
                     // states nothing about a family and flattens through another path.
                     if (FieldModifiers.discriminates(field) || parametricallyPinned(field)) {
-                        discriminators.add(WireForm.scoped(WireForm.declaredName(field.name())));
+                        discriminators.add(WireForm.plain(WireForm.declaredName(field.name())));
                     }
                 }
                 case GroupDef group -> {
@@ -772,26 +771,26 @@ final class SchemaDesugarer {
                         // says so, and the group records its options, their optional members and its own state
                         // (§5.11) -- the shape the resolver builds.
                         List<RecordValue.Field> memberFields = new ArrayList<>(List.of(
-                                new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(member.typeRef())))));
+                                new RecordValue.Field(WireForm.TYPE, WireForm.plain(refValue(member.typeRef())))));
                         WireForm.addFacts(memberFields, true, member.voidable(), FieldRole.FREE);
                         fields.add(WireForm.fieldEntry(member.name(),
-                                WireForm.scoped(new RecordValue(memberFields), member.annotations())));
+                                WireForm.plain(new RecordValue(memberFields), member.annotations())));
                     }
                     groups.add(WireForm.group(group.fieldGroup(), group.annotations()));
                 }
             }
         }
         List<RecordValue.Field> binding = new ArrayList<>();
-        binding.add(new RecordValue.Field(WireForm.FIELDS, WireForm.scoped(WireForm.fieldMap(fields))));
+        binding.add(new RecordValue.Field(WireForm.FIELDS, WireForm.plain(WireForm.fieldMap(fields))));
         if (!groups.isEmpty()) {
-            binding.add(new RecordValue.Field(WireForm.GROUPS, WireForm.scoped(new ArrayValue(groups))));
+            binding.add(new RecordValue.Field(WireForm.GROUPS, WireForm.plain(new ArrayValue(groups))));
         }
         // The record's own statement about which of its fields select a member (§5.2). Written here rather
         // than per field, so a held body carries the list a base states and a member simply states none --
         // §5.8 flattens a base's fields into every member, which a per-field mark had to be cleared from.
         if (!discriminators.isEmpty()) {
             binding.add(new RecordValue.Field(WireForm.DISCRIMINATORS,
-                    WireForm.scoped(new ArrayValue(discriminators))));
+                    WireForm.plain(new ArrayValue(discriminators))));
         }
         return new Binding(WireForm.RECORD, binding);
     }
@@ -844,7 +843,7 @@ final class SchemaDesugarer {
      * cannot appear in the fresh record body this builds -- {@link FieldModifiers} has no view of an
      * inherited field, and neither does this phase.
      */
-    private ScopedValue recordField(FieldDef field) {
+    private DataValue recordField(FieldDef field) {
         if (field.type().isEmpty()) {
             throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
                     + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
@@ -855,10 +854,10 @@ final class SchemaDesugarer {
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), field.omittable(), type.voidable(), field.modifier());
         List<RecordValue.Field> members = new ArrayList<>();
-        members.add(new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(type.typeRef()))));
+        members.add(new RecordValue.Field(WireForm.TYPE, WireForm.plain(refValue(type.typeRef()))));
         WireForm.addFacts(members, resolved.optional(), resolved.voidable(), resolved.role());
-        resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));
-        return WireForm.scoped(new RecordValue(members), field.annotations());
+        resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.plain(token))));
+        return WireForm.plain(new RecordValue(members), field.annotations());
     }
 
     /**
@@ -972,7 +971,7 @@ final class SchemaDesugarer {
     private List<String> parametersIn(Binding binding) {
         List<String> found = new ArrayList<>();
         for (String parameter : currentParameters) {
-            if (binding.fields().stream().anyMatch(field -> namesToken(field.value().value().coreValue(),
+            if (binding.fields().stream().anyMatch(field -> namesToken(field.value().coreValue(),
                     parameter))) {
                 found.add(parameter);
             }
@@ -985,12 +984,12 @@ final class SchemaDesugarer {
         return switch (value) {
             case TokenValue token -> token.text().equals(text);
             case ArrayValue array -> array.elements().stream()
-                    .anyMatch(element -> namesToken(element.value().coreValue(), text));
+                    .anyMatch(element -> namesToken(element.coreValue(), text));
             case RecordValue record -> record.fields().stream()
-                    .anyMatch(field -> namesToken(field.value().value().coreValue(), text));
+                    .anyMatch(field -> namesToken(field.value().coreValue(), text));
             case MapValue map -> map.entries().stream()
                     .anyMatch(entry -> namesToken(entry.key().coreValue(), text)
-                            || namesToken(entry.value().value().coreValue(), text));
+                            || namesToken(entry.value().coreValue(), text));
             default -> false;
         };
     }
@@ -1016,7 +1015,7 @@ final class SchemaDesugarer {
             }
             boolean clash = names.stream().anyMatch(name -> !parameters.contains(name)
                     && binding.fields().stream().anyMatch(field ->
-                            namesToken(field.value().value().coreValue(), name)));
+                            namesToken(field.value().coreValue(), name)));
             if (!clash) {
                 return names;
             }
@@ -1031,14 +1030,12 @@ final class SchemaDesugarer {
             substitution.put(parameters.get(i), renamed.get(i));
         }
         return new Binding(binding.head(), binding.fields().stream()
-                .map(field -> new RecordValue.Field(field.name(), renameScoped(field.value(), substitution)))
+                .map(field -> new RecordValue.Field(field.name(), renameData(field.value(), substitution)))
                 .toList());
     }
 
-    private static ScopedValue renameScoped(ScopedValue scoped, Map<String, String> substitution) {
-        DataValue value = scoped.value();
-        return new ScopedValue(scoped.schemaRef(), new DataValue(value.annotations(), value.typeRef(),
-                renameValue(value.coreValue(), substitution)));
+    private static DataValue renameData(DataValue value, Map<String, String> substitution) {
+        return new DataValue(value.annotations(), value.typeRef(), renameValue(value.coreValue(), substitution));
     }
 
     private static CoreValue renameValue(CoreValue value, Map<String, String> substitution) {
@@ -1047,14 +1044,14 @@ final class SchemaDesugarer {
                     ? new TokenValue(substitution.get(token.text()), token.form())
                     : token;
             case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> renameScoped(element, substitution)).toList());
+                    .map(element -> renameData(element, substitution)).toList());
             case RecordValue record -> new RecordValue(record.fields().stream()
-                    .map(field -> new RecordValue.Field(field.name(), renameScoped(field.value(), substitution)))
+                    .map(field -> new RecordValue.Field(field.name(), renameData(field.value(), substitution)))
                     .toList());
             case MapValue map -> new MapValue(map.entries().stream()
                     .map(entry -> new MapValue.MapEntry(new DataValue(entry.key().annotations(),
                             entry.key().typeRef(), renameValue(entry.key().coreValue(), substitution)),
-                            renameScoped(entry.value(), substitution)))
+                            renameData(entry.value(), substitution)))
                     .toList());
             default -> value;
         };

@@ -57,9 +57,9 @@ including records, record groups, enums and some in-built types. The `2026/39` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=f0b933855ba08b525c122201a0c57d9a31ee77d69bd9a07fae136cbb76f6c0cf"
-!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=8467f255a229022b240b607186c7374433c163e384b4d6f5e54333bad497bc48"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=58021a47465d9dd4c13e24eb44a11034a5b6b8b995411e00ccd47535b069ff31"
+!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=52f1696e9327ed672e3f6ab231d235fb8dde9b5c48fde5c591bf335705c0f035"
+!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=f271892f662de4ec256c596b58d675ed7a470afccf0f06c10d23200b8aea822f"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=9adb1b91117146334e26d4b0f031bca5622e3680b3f4a7d1ebae5985f1bff645"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -432,8 +432,8 @@ String schemaUri = peek.header().schema().orElse(DEFAULT);    // route on what i
 ```
 
 It is **total**: a header it cannot read yields nothing rather than throwing, and what it never does is
-answer with a schema the document does not name — a `!!schema` written *inside* the value is that value's
-text. Whatever is wrong with the document is reported properly by the read that follows.
+answer with a schema the document does not name — a `!!schema` anywhere but the header is a parse error,
+which the read that follows reports along with whatever else is wrong with the document.
 
 **The peek keeps the rest of the document**, so nothing is rewound and nothing is re-read — which is what
 makes this work on a source that can only be read once, an HTTP request body or a socket. Hand the peek to
@@ -634,7 +634,6 @@ max entries:                1048576
 max fields:                 65536
 max annotations:            64
 max values:                 16777216
-max foreign schemas:        16
 max import closure:         64
 max schema entries:         65536
 max reference chain:        64
