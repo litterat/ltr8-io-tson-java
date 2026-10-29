@@ -150,8 +150,9 @@ import java.util.function.Predicate;
  *   {@code !!meta}, consulted for a constructor-application target ({@link #resolveConstructorTarget}) and
  *   for an annotation's name. Atom refinement never consults it.</li>
  * </ul>
- * Either getter can be an always-{@code null} lookup for a resolver that never needs it (e.g. {@link
- * MetaKernelBootstrapResolver}'s first pass, which never reaches {@link #resolveInstance}).
+ * Either getter can be an always-{@code null} lookup for a resolver that never needs it. For {@link
+ * MetaKernelBootstrapResolver} the two are one: the kernel governs itself, so the structure namespace is the one being
+ * built.
  *
  * <p><b>Kind determination</b> (§4.1, {@link #determineKind}) checks the transitive supertype chain for the
  * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum}/{@code namespace} -- not a general

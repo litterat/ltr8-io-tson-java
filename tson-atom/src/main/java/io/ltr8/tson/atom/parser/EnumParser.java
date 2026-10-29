@@ -17,9 +17,9 @@ import java.util.List;
  *
  * <p><b>Matches on the token's text directly, never through {@code BaseTypeResolver}'s
  * boolean/number/string identification.</b> This is the one thing that makes {@code boolean
- * => !enum [true false]} readable at all: routed through generic identification (as {@code
- * MetaKernelBootstrapResolver}'s own binding of the *schema* {@code !enum [true false]} instance necessarily
- * is, since it binds via {@code TsonObjectReader}'s ordinary array/atom path), {@code "true"}/
+ * => !enum [true false]} readable at all: routed through generic identification (as a binding of the *schema*
+ * {@code !enum [true false]} instance through {@code TsonObjectReader}'s ordinary array/atom path would be),
+ * {@code "true"}/
  * {@code "false"} get identified as actual TSON booleans before {@code EnumBody.members: List
  * <String>} ever sees them -- a real, permanent limit of generic binding (see this repo's own
  * CLAUDE.md). This class exists specifically for callers -- {@code reader}'s
@@ -28,8 +28,8 @@ import java.util.List;
  * token's text against {@link EnumBody#members} directly never invokes identification at all, so the
  * collision simply doesn't arise. It matches by text alone and <b>cannot do otherwise</b> -- an
  * {@link AtomType} is handed a {@code String} and never sees which form carried it, which is the same
- * form-agnostic behavior {@code MetaKernelBootstrapResolver}'s own hand-written enum converter already uses,
- * "correct for every enum member regardless of what it happens to look like".
+ * form-agnostic behavior the meta-kernel bootstrap's hand-built enums rely on, "correct for every enum member
+ * regardless of what it happens to look like".
  *
  * <p><b>The match is in the name type's form</b> ({@link #form}): an enum over a case-folding identifier admits
  * a member however it is cased, and the value is the token in that form. The form is not on the body -- the label

@@ -136,15 +136,20 @@ is left to pre-loading (§3.4). Under the ladder every constructor an ordinary s
 resolved document, so the gap shows only in the kernel and in composition chains; once a constructor and its instances
 share a document, an order has to be computed and its cycles defined.
 
-**What is running.** None of the rule below as a rule. Pass 2 resolves on demand and refuses "a circular
-composition/refinement chain" (rule 1's operand edge); the kernel bootstrap orders its entries by three hand-written
-passes (ordinary declarations, instances, atom refinements); defaults and pins are `value`-typed and judged at link
-(rule 3). A test harness measures the kernel's wait graph from `meta-kernel-resolved.tn`'s own declarations, no
-compiled reader consulted: one cycle, holding `record` and 29 more of the 77 entries (`boolean`, `integer`, `text`,
-`identifier`, `non_negative_integer`, the enum and set machinery, `field_group`, and the synthetics they name), every
-other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with
-`@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap's passes are not yet
-replaced by this order. Compilation follows rule 3: a record's reader holds its pins and defaults as written while
+**What is running.** In an ordinary schema, Pass 2 resolves on demand and refuses "a circular composition/refinement
+chain" (rule 1's operand edge); defaults and pins are `value`-typed and judged at link (rule 3). A test harness
+measures the kernel's wait graph from `meta-kernel-resolved.tn`'s own declarations, no compiled reader consulted: one
+cycle, holding `record` and 29 more of the 77 entries (`boolean`, `integer`, `text`, `identifier`,
+`non_negative_integer`, the enum and set machinery, `field_group`, and the synthetics they name), every other entry
+ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with `@annotation`
+would be a second cycle, and the marker changes no value (§6). The kernel bootstrap runs rules 1 to 4: it builds by
+hand exactly the instances and the one refinement on that cycle (a test holds the set to the measurement), resolves
+every declaration no read produces from its grammar, and reads the other 19 instances through the ordinary instance
+path against readers compiled from the entries ready so far. A read that reaches an entry not yet ready makes it ready
+first, on demand, and an entry waiting on itself is refused naming the chain; the order is computed and source order is
+not consulted. A pin reached through an entry not yet ready binds as written (rule 3), which is what lets `iri` be read
+against `iri_type`, whose `spec` pin is typed by `iri`. The output equals the kernel's ordinary resolution against it,
+entry for entry. Compilation follows rule 3: a record's reader holds its pins and defaults as written while
 it is built and decodes them through their types once every reader of the schema exists, before the schema is handed
 out, so building `iri_type`'s reader reads nothing through `iri`'s (the `spec` pin). Link remains the one place a pin
 is judged, and a bad pin or default still fails the load (rule 6).

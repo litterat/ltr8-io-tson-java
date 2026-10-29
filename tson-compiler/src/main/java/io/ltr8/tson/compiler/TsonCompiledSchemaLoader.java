@@ -22,8 +22,8 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
  * <p>Not a plain registry lookup, because meta-kernel's own document names <i>itself</i> as its {@code
  * !!meta} (Part 2 §1.5's one deliberate circularity): a "look it up, fail if missing" registry would need
  * meta-kernel already registered before it could register meta-kernel. An implementation recognizes that
- * request and answers it directly, via {@link MetaKernelBootstrapResolver#getMetaKernelSchema()}'s own
- * hand-written bootstrap, instead of trying (and failing) to resolve it the ordinary way.
+ * request and answers it directly, via {@link MetaKernelBootstrapResolver#getMetaKernelSchema()}'s bootstrap,
+ * instead of trying (and failing) to resolve it the ordinary way.
  *
  * <p>Also the natural, single place to enforce policy over <i>what</i> gets resolved from <i>where</i>
  * (whitelisting/blacklisting hosts, disk-only resolution) -- see {@link SchemaSource}, the pluggable

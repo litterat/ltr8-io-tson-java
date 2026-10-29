@@ -18,11 +18,18 @@ import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonSchemaLinker;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -30,14 +37,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifies the bootstrap against meta-kernel.tn as packaged on the classpath (see this module's
- * {@code build.gradle.kts}): the header directives carry straight through, the 36 declarations
- * {@code DefinitionResolver} already resolves via ordinary schema-grammar resolution are all present,
- * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
- * {@code integer}, {@code text}/{@code iri}/{@code regex}, and six {@code enum} instances,
- * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
- * resolve to the expected kind/body -- all 60 of the real fixture's declarations resolve, alongside the
- * eight entries {@link SchemaDesugarer} injects for their argument-bearing applications.
+ * Verifies the bootstrap against meta-kernel.tn as packaged on the classpath (see this module's {@code
+ * build.gradle.kts}): the header directives carry straight through, every declaration resolves -- the hand-built
+ * pre-loaded set, the declarations resolved from their grammar, and the instances read through the readers compiled
+ * from what is ready -- and its output is the kernel's ordinary resolution entry for entry. The pre-loaded set is
+ * held to the kernel's measured wait cycle ({@code SPEC-FEEDBACK.md #4}, rule 4).
  */
 class MetaKernelBootstrapResolverTest {
 
@@ -93,8 +97,8 @@ class MetaKernelBootstrapResolverTest {
 
     @Test
     void booleanResolvesEvenThoughEnumItselfIsDeclaredLaterInTheFile() {
-        // boolean => !enum [true false] appears near the top of the file; enum => atom & {...}
-        // isn't declared until much later -- the two-pass design exists precisely for this.
+        // boolean => !enum [true false] appears near the top of the file and enum much later: the order is the
+        // entries' waits, never the order they are written in.
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         Top booleanDef = schema.entries().get("boolean");
@@ -129,7 +133,8 @@ class MetaKernelBootstrapResolverTest {
         assertEquals(EntryKind.ATOM, EntryKind.of(regex, n -> true));
         assertEquals(RegexType.UNCONSTRAINED, regex);
 
-        // The kernel's second identifier_type instance, told apart from `identifier` by its entry name.
+        // The kernel's second identifier_type instance, read rather than built: it comes out as the constant the
+        // readers of iri_type.schemes hold.
         Top schemeName = schema.entries().get("scheme_name");
         assertEquals(EntryKind.ATOM, EntryKind.of(schemeName, n -> true));
         assertEquals(IdentifierType.SCHEME_NAME, schemeName);
@@ -157,24 +162,85 @@ class MetaKernelBootstrapResolverTest {
         }
     }
 
-    // ── instanceBody's own defensive branches -- neither reachable through the real fixture ──
+    // ── The pre-loaded set, and what the rest of the kernel comes out as ──
+
+    /**
+     * Rule 4 of {@code SPEC-FEEDBACK.md #4}: the pre-loaded set is exactly the kernel's one wait cycle. The bootstrap
+     * builds by hand the instances and refinements on it, so they are measured here from {@code
+     * meta-kernel-resolved.tn}'s own declarations ({@link WaitGraph}) rather than trusted: a kernel edit that moves
+     * the cycle fails this test, not a read. An entry on the cycle written {@code !record} or {@code !reference} is
+     * resolved from its grammar, and reads nothing.
+     */
+    @Test
+    void theHandBuiltEntriesAreTheInstancesOnTheKernelsOneWaitCycle() throws Exception {
+        WaitGraph graph = WaitGraph.of(KernelWaitGraphTest.fixture());
+        Set<String> cycle = graph.components().stream().filter(graph::isCycle)
+                .filter(component -> component.contains("record")).findFirst().orElseThrow();
+        Set<String> read = new TreeSet<>();
+        for (String entry : cycle) {
+            if (!Set.of("record", "reference").contains(graph.head(entry))) {
+                read.add(entry);
+            }
+        }
+        Set<String> handBuilt = new TreeSet<>();
+        // A content hash is §8.2's to spell, and the fixture writes a placeholder for it.
+        MetaKernelBootstrapResolver.preLoaded().forEach(name ->
+                handBuilt.add(name.replaceFirst("_[0-9a-f]{8}$", "_xxhash")));
+        assertEquals(read, handBuilt);
+    }
+
+    /**
+     * The bootstrap's output is the kernel's resolved form: linked, every entry and every entry's constructor is what
+     * the kernel's ordinary resolution against it produces, which {@code ResolvedFixtureTest} holds to the spec's
+     * {@code meta-kernel-resolved.tn}. A hand-built body that drops a fact the source states -- a set's {@code
+     * min_items} -- differs here.
+     */
+    @Test
+    void theBootstrapComesOutAsTheKernelsOrdinaryResolution() {
+        TsonSchema bootstrap = TsonSchemaLinker.linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema())
+                .schema();
+        TsonSchema ordinary = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
+                        SchemaSource.registeredOnly()).schemaRegistry().get(TsonBundledSchemas.META_KERNEL_ID)
+                .orElseThrow().schema();
+
+        assertEquals(List.copyOf(ordinary.entries().keySet()), List.copyOf(bootstrap.entries().keySet()));
+        for (String name : ordinary.entries().keySet()) {
+            assertEquals(ordinary.entries().get(name), bootstrap.entries().get(name), name);
+            assertEquals(ordinary.constructorOf(name), bootstrap.constructorOf(name), name);
+        }
+    }
+
+    /** The partial link and the bootstrap compile are the bootstrap's alone: an ordinary schema leaves nothing pending. */
+    @Test
+    void onlyTheBootstrapLinksOrCompilesWithEntriesPending() {
+        TsonSchema ordinary = new TsonSchema("https://example.com/s.tn", "https://example.com/m.tn", List.of(),
+                Map.of());
+
+        assertThrows(IllegalArgumentException.class, () -> TsonSchemaLinker.linkBootstrap(ordinary, Set.of("x")));
+        assertThrows(IllegalArgumentException.class, () -> io.ltr8.tson.compiler.TsonSchemaCompiler.compileBootstrap(
+                new io.ltr8.tson.schema.TsonLinkedSchema(ordinary), SchemaMetaNameBinder.defaultContext(), Set.of("x")));
+    }
+
+    // ── instanceBody's own refusals -- neither reachable through the real fixture ──
 
     private static Instance emptyInstance(String target) {
         return new Instance(new DataValue(List.of(), Optional.of(target), new EmptyBrace()));
     }
 
     @Test
-    void unrecognizedInstanceTargetCompilesToEmpty() {
-        assertEquals(Optional.empty(), MetaKernelBootstrapResolver.instanceBody(emptyInstance("something_else")));
+    void aTargetNoPreLoadedInstanceAppliesIsRefused() {
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> MetaKernelBootstrapResolver.instanceBody("x", emptyInstance("void_type")));
+        assertTrue(thrown.getMessage().contains("void_type"));
     }
 
     @Test
     void aNonEmptyBodyForAnEmptyBodiedTargetThrows() {
-        Instance nonEmpty = new Instance(new DataValue(List.of(), Optional.of("void_type"),
+        Instance nonEmpty = new Instance(new DataValue(List.of(), Optional.of("text_type"),
                 new TokenValue("oops", TokenForm.UNQUOTED)));
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> MetaKernelBootstrapResolver.instanceBody(nonEmpty));
-        assertTrue(thrown.getMessage().contains("void_type"));
+                () -> MetaKernelBootstrapResolver.instanceBody("text", nonEmpty));
+        assertTrue(thrown.getMessage().contains("text_type"));
     }
 }

@@ -201,7 +201,29 @@ public final class TsonSchemaLinker {
         }
         // The bootstrap is this library's own artifact, not user input, so it is linked under the default
         // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
-        return linkWith(bootstrap, null, null, IdentifierPolicy.defaults(), null);
+        return linkWith(bootstrap, null, null, IdentifierPolicy.defaults(), null, Set.of());
+    }
+
+    /**
+     * Links the part of meta-kernel's bootstrap that is ready, {@code pending} naming the kernel's declarations not
+     * yet read: the one partial link. {@code MetaKernelBootstrapResolver} reads each instance outside the pre-loaded
+     * set through readers compiled from the entries ready so far ({@code TsonSchemaCompiler.compileBootstrap}), and
+     * those need a linked schema while some of the names its entries hold have no entry yet.
+     *
+     * <p>A reference to a name in {@code pending} is therefore not a refusal; every other verdict stands as {@link
+     * #linkBootstrap(TsonSchema)} gives it, so a name the kernel does not declare is still refused. An entry's walk
+     * stops at its first pending reference, so what follows it in that entry is judged when the whole kernel is
+     * linked, which every bootstrap ends with. Nothing else may leave a name unresolved: an ordinary link refuses an
+     * undeclared name whatever called it.
+     *
+     * @throws IllegalArgumentException if {@code bootstrap.bootstrap()} is {@code false}
+     */
+    public static TsonLinkedSchema linkBootstrap(TsonSchema bootstrap, Set<String> pending) {
+        if (!bootstrap.bootstrap()) {
+            throw new IllegalArgumentException("'" + bootstrap.id() + "' was not produced by the meta-kernel "
+                    + "bootstrap -- only its partial kernel links with references pending");
+        }
+        return linkWith(bootstrap, null, null, IdentifierPolicy.defaults(), null, Set.copyOf(pending));
     }
 
     /**
@@ -211,12 +233,12 @@ public final class TsonSchemaLinker {
      * DataBindContext)}).
      */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
-        return linkWith(schema, loader, null, IdentifierPolicy.defaults(), null);
+        return linkWith(schema, loader, null, IdentifierPolicy.defaults(), null, Set.of());
     }
 
     /** {@link #link(TsonSchema, TsonSchemaLoader)} with the §5.2 restriction level for declared names chosen. */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, IdentifierPolicy identifiers) {
-        return linkWith(schema, loader, null, identifiers, null);
+        return linkWith(schema, loader, null, identifiers, null, Set.of());
     }
 
     /**
@@ -226,7 +248,7 @@ public final class TsonSchemaLinker {
      */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, IdentifierPolicy identifiers,
                                         DataBindContext values) {
-        return linkWith(schema, loader, null, identifiers, Objects.requireNonNull(values, "values"));
+        return linkWith(schema, loader, null, identifiers, Objects.requireNonNull(values, "values"), Set.of());
     }
 
     /**
@@ -256,7 +278,7 @@ public final class TsonSchemaLinker {
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
                                         DiagnosticsReceiver receiver, IdentifierPolicy identifiers) {
         Objects.requireNonNull(receiver, "receiver");
-        return linkWith(schema, loader, receiver, identifiers, null);
+        return linkWith(schema, loader, receiver, identifiers, null, Set.of());
     }
 
     /** The reporting overload with the bind context the namespace values were bound under, as for throwing. */
@@ -264,7 +286,7 @@ public final class TsonSchemaLinker {
                                         DiagnosticsReceiver receiver, IdentifierPolicy identifiers,
                                         DataBindContext values) {
         Objects.requireNonNull(receiver, "receiver");
-        return linkWith(schema, loader, receiver, identifiers, Objects.requireNonNull(values, "values"));
+        return linkWith(schema, loader, receiver, identifiers, Objects.requireNonNull(values, "values"), Set.of());
     }
 
     /**
@@ -633,7 +655,7 @@ public final class TsonSchemaLinker {
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
                                              DiagnosticsReceiver receiver, IdentifierPolicy identifiers,
-                                             DataBindContext values) {
+                                             DataBindContext values, Set<String> pending) {
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
         Map<String, Top> nameTypes = new LinkedHashMap<>();
@@ -766,6 +788,9 @@ public final class TsonSchemaLinker {
                         merged, structureNamespace,
                         constructors);
             } catch (UnresolvedReference e) {
+                if (pending.contains(e.name())) {
+                    continue; // a bootstrap's kernel entry not yet read: judged when the whole kernel links
+                }
                 String author = heldDeclarationNaming(e.name(), entry.getKey(), merged, facts);
                 if (author == null) { // the applier's own text, or a name no held body wrote: blame the entry
                     reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged, facts), facts,

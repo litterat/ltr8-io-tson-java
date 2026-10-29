@@ -45,13 +45,6 @@ spec-required case:
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the five bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-- [ ] **The meta-kernel bootstrap drops `min_items` and `max_items` from its array and set instances.**
-  `MetaKernelBootstrapResolver.toArrayBody` builds every `!set_type`/`!array` body with both bounds empty, so
-  `enum_set`, `integer_member_set`, `text_member_set`, `scheme_set` and the `array_text_1` synthetics come out
-  unbounded where the source says `min_items: 1`; a schema the kernel governs directly likely admits `!enum []`.
-  `ResolvedFixtureTest` compares the ordinarily re-resolved kernel, not the bootstrap's output, and nothing asserts the
-  two agree. Fix with that assertion, or retire the hand path when the resolver reads the kernel in wait order
-  (`SPEC-FEEDBACK.md #4`, Revision 39 step 5).
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
   so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest verifies rather than
   recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`

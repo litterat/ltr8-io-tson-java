@@ -30,7 +30,6 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -501,7 +500,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
 
         // The same entry set a genuinely registered meta-kernel has: the bootstrap desugars its own document,
-        // so TsonSchemaLinker.linkBootstrap has nothing left to add. Never cached (see the next test).
+        // so TsonSchemaLinker.linkBootstrap has nothing left to add. Never registered (see the next test).
         assertEquals(77, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
@@ -510,9 +509,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     @Test
-    void loaderNeverCachesTheBootstrapResultAndReBootstrapsEachTime() {
-        // The one-off bootstrap must never be registered or cached here -- the "real", permanent,
-        // materialized registry entry for meta-kernel is meant to come from a separate, deliberate
+    void loaderBuildsTheBootstrapOnceAndNeverRegistersIt() {
+        // The bootstrap stand-in is built once per registry and answers every lookup, but is never registered
+        // -- the permanent, materialized registry entry for meta-kernel comes from a separate, deliberate
         // "load and register" step done once elsewhere.
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
         TsonCompiledSchemaLoader loader = registry;
@@ -520,7 +519,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaSchema first = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
         TsonCompiledMetaSchema second = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
 
-        assertNotSame(first, second);
+        assertSame(first, second);
         assertTrue(registry.get(TsonBundledSchemas.META_KERNEL_ID).isEmpty());
         assertTrue(registry.schemaRegistry().get(TsonBundledSchemas.META_KERNEL_ID).isEmpty());
     }
