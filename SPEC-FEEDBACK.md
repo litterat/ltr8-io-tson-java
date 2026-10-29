@@ -206,3 +206,54 @@ With `nni => !integer ^ { min: 0 }`:
 Sections amended: §3.4 (the pre-loaded set is rule 4's), §6 (its "one exception is structural" sentence goes, the
 kernel's `annotation` no longer annotating itself), §3.4.1 (Pass 2 runs in rule 1's order; rule 5), §5.10.1
 (its cycle sentence cites rule 4), §11.5 (rule 7's row).
+
+## 5. [TSON-DATA] §1, §7.2.5; [TSON-SCHEMA] §5.5, §12.1 — `!` marks a value in data and a construction in a schema
+
+**Problem.** In data and in resolved output `!T x` is a value of `T`. In a schema declaration `!C { … }` builds a
+type from the constructor `C`, and `!I ^ { … }` refines the instance `I`: the same mark asserts a construction, and
+`^` is overloaded between record refinement (field declarations) and atom refinement (data). Under one level a `!`
+head would take both roles, a type from `!decimal_type { … }` and a value from `!operation { … }`, so the line could
+not be classified before its head resolves.
+
+**What is running.** None of the proposal below.
+
+**Resolution, a proposal.** One binary operator, `<-`, at a declaration's right-hand side:
+
+1. **Construction is `c <- payload`.** `c` resolves to `top` or an entry IS-A it, and the payload is a core value read
+   against `c`'s vocabulary, braced or positional (§5.6): today's `!C payload`. Kind transfers, no IS-A (§5.5).
+2. **Atom refinement is `i <- { … }`.** `i` resolves to an atom-family instance and the body is a `record` or
+   `empty-brace` merged over `i`'s bindings, under §5.7's tightening rules: today's `!I ^ { … }`. IS-A `i` (§5.5).
+   Which of the two applies is decided by what the left operand resolves to (§3.3.1), not by the grammar.
+3. **A parameter list requires a constructor operand.** `<N> integer_type <- { max: N }` is a template, as
+   `<N> !integer_type { … }` is today; `<N> integer <- { min: N }` is refused, as `<N> !integer ^ { … }` has no form
+   today (§5.10).
+4. **`<-` builds types.** An operand whose instances are not types, a namespace type (§4.1), is refused naming `!`:
+   `orders => !interface { … }` keeps `!`, the entry being a value. A record-type operand is refused naming `^`, which
+   owns record refinement.
+5. **`!` at a declaration head builds no type.** `!C { … }` with `C` a constructor whose instances are types, and
+   `!I ^ { … }`, are refused naming `<-`. `!` keeps one meaning in every grammar: a value of the named type.
+6. **Resolved output is unchanged.** It is a data document, and `!record { … }`, `!integer_type { … }` there are data
+   tags describing a construction, not asserting one.
+
+Grammar (§12.1): `instance` and `atom-refinement` become one production,
+
+```abnf
+construction = [type-params ws] type-name ws "<-" ws core-value
+             ; rules 1-4: a constructor operand takes any core value and
+             ; may carry type-params; an atom-instance operand takes a
+             ; record or empty-brace and none
+```
+
+`refined-def` is unchanged, and §12.3 drops the prefix `!` row and adds `<-`: binary, whitespace on either side
+optional.
+
+**Lexer ([TSON-DATA] §7.2.5, §1).** `<-` is a compound special token, lexed as `=>` is: `<` immediately followed by
+`-`, where that `-` would otherwise lex as the bare special token. A `-` that begins an unquoted token keeps doing so,
+so `box<-3>` lexes as `<`, `-3`, `>` as today. No new character, and no data document lexes differently, `<` being a
+parse error in the data grammar. §1's list of lexer changes under principle 6 gains it.
+
+**Kept out.** The operator's generalisations: refining a non-atom constructed type (`names => [text]`,
+`few_names => names <- { max_items: 3 }`), and a type as the right operand, its bindings merged over the left's
+(`pos_int32 => int32 <- positive`, `smallint => integer <- maxint<10>`). Each adds a capability with rules of its own
+(which constructors state a tightening rule; whether the right operand adds IS-A), and neither is needed to retire the
+`!` head.
