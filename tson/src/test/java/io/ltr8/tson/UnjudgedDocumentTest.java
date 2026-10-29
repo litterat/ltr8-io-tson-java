@@ -37,8 +37,8 @@ class UnjudgedDocumentTest {
     void aSchemaThatDoesNotLoadLeavesTheDocumentUnjudged() {
         String broken = """
                 !!id:"https://example.test/unjudged.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   json_name => !identifier_type { start_add: "@" }
                   node => !record { name_type: json_name  fields: { "@id" => { type: nonesuch } } }
@@ -54,8 +54,8 @@ class UnjudgedDocumentTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/unjudged.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 { other => { a: text } }
                 """);
         List<Diagnostic> problems = tson.validate(DOCUMENT);

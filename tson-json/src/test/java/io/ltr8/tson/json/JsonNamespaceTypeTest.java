@@ -28,8 +28,8 @@ class JsonNamespaceTypeTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-headers.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             {
               header_name => !identifier_type { continue_add: "-" }
               headers     => namespace & { key_type: = header_name  value_type: = text }
@@ -38,7 +38,7 @@ class JsonNamespaceTypeTest {
 
     private static final String USER_TEXT = """
             !!id:"https://example.test/request.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://example.test/meta-headers.tn"
             {
               request => { headers: headers }
@@ -74,7 +74,7 @@ class JsonNamespaceTypeTest {
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_TEXT))))).resolve("""
                 !!id:"https://example.test/defaults.tn"
                 !!meta:"https://example.test/meta-headers.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   defaults => !headers { accept => "text/plain"  user-agent => "probe" }
                   greeting => text

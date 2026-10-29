@@ -29,9 +29,9 @@ class NetSchemaTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            !!import:"https://tson.io/2026/38/m/net.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/39/m/net.tn"
             {
               listener => { host: host  port: uint16 }
               site => { name: hostname }
@@ -115,9 +115,9 @@ class NetSchemaTest {
     void allowIdnIsWithdrawnButNeverGrantedBack() {
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/regrant.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                !!import:"https://tson.io/2026/38/m/net.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/net.tn"
                 {
                   ascii => !hostname ^ { allow_idn: false }
                   again => !ascii ^ { allow_idn: true }
@@ -131,8 +131,8 @@ class NetSchemaTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/own-mac.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   mac => { vendor: text  model: text }
                   hostname => text
@@ -148,8 +148,8 @@ class NetSchemaTest {
     void aSchemaImportingCoreAloneDoesNotSeeTheNetworkTypes() {
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/no-net.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 { server => { address: ipv4 } }
                 """));
     }

@@ -41,8 +41,8 @@ class KindSlotGapsTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/gap-meta.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
+                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 {
                   gap_status        => !integer_type { min: 100  max: 599 }
                   gap_reply         => { status: gap_status  body: type_kind }
@@ -80,7 +80,7 @@ class KindSlotGapsTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!meta:"https://example.test/gap-meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   order => { sku: text }
                   box   => <T> { v: T }

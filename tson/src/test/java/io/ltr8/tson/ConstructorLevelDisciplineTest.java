@@ -39,9 +39,9 @@ class ConstructorLevelDisciplineTest {
                 .validateSchema(source);
     }
 
-    private static final String KERNEL = "https://tson.io/2026/38/m/meta-kernel.tn";
-    private static final String META = "https://tson.io/2026/38/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/38/m/core.tn";
+    private static final String KERNEL = "https://tson.io/2026/39/m/meta-kernel.tn";
+    private static final String META = "https://tson.io/2026/39/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
 
     /** In a meta-schema, deriving from a constructor is ordinary — and the result is one. */
     @Test
@@ -63,8 +63,8 @@ class ConstructorLevelDisciplineTest {
     void theDerivedEntryIsItselfConstructorLevel() {
         String source = """
                 !!id:"https://example.test/m.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 {
                   c        => product & { id: identifier }
                   composed => c & { extra: identifier }

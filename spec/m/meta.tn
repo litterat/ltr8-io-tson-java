@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/38/m/meta.tn?sha256=62dde2f344853848cd0ce4f722a0305d979e5883c0dcd14308959ad6a01bff47"
-!!meta:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=9cc191d3390ba7c7495d016bfda63cfca861135b671804957bb216daafc1e95b"
-!!import:"https://tson.io/2026/38/m/meta-kernel.tn?sha256=9cc191d3390ba7c7495d016bfda63cfca861135b671804957bb216daafc1e95b"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=557fc58ae63efc942143760ac6a5dc3d77a176a04c65923e388e052e085ca317"
+!!meta:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=82c280810e8e0079a200af146a5ee686819c282ae28f9a1120cfb128a536769d"
+!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=82c280810e8e0079a200af146a5ee686819c282ae28f9a1120cfb128a536769d"
 @doc:"""
-  TSON meta-schema (2026 Revision 38 draft).
+  TSON meta-schema (2026 Revision 39 draft).
 
   The canonical meta-schema for user schemas: a schema governed by the
   meta-kernel that adds the type constructors the core type library (core.tn)

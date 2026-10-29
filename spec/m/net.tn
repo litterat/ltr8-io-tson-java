@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/38/m/net.tn?sha256=06a939fac91c6f27d02f105ea248d33504b4d437484884a20acd3b6ddcb8c32a"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=62dde2f344853848cd0ce4f722a0305d979e5883c0dcd14308959ad6a01bff47"
+!!id:"https://tson.io/2026/39/m/net.tn?sha256=afe3693e1f86bc0ca085cf14dd7f8774ae6a732dd95710a1a7a66fd4977d2795"
+!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=557fc58ae63efc942143760ac6a5dc3d77a176a04c65923e388e052e085ca317"
 @doc:"""
   TSON Network Type Library — addresses, networks and host names
-  (2026 Revision 38 draft).
+  (2026 Revision 39 draft).
 
   A library a schema imports when it wants these names, and only then: every
   name a schema imports is one it may not declare ([TSON-SCHEMA] §2.2.3). The

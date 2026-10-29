@@ -44,8 +44,8 @@ class ValuesByNameTest {
     static {
         DOCUMENTS.put(META_SERVICE, """
                 !!id:"https://example.test/meta-service.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
+                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 {
                   method_name => identifier
                   status_name => identifier
@@ -70,7 +70,7 @@ class ValuesByNameTest {
         return """
                 !!id:"%s"
                 !!meta:"https://example.test/meta-service.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   order               => { sku: text  quantity: int32 }
                   place_order_request => { order: order }
@@ -106,7 +106,7 @@ class ValuesByNameTest {
                 !!id:"%s"
                 !!meta:"https://example.test/meta-service.tn"
                 !!import:"https://example.test/orders.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   %s
                 }
@@ -336,8 +336,8 @@ class ValuesByNameTest {
         String id = "https://example.test/meta-" + constructor.replace('_', '-') + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
+                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 {
                   %s => { a: %s }
                 }

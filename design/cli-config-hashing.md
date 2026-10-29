@@ -58,7 +58,7 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
   idempotent: the hashed bytes never change, so the pin stays valid.
 - **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read,
   never to load. The `!!id`, header pins and `@doc`/`@title`/`@examples`/`@comment` go; a header reference to
-  meta-kernel, meta or core shortens to `"38/core"`; each directive and declaration gets one line. `--keep-docs`
+  meta-kernel, meta or core shortens to `"39/core"`; each directive and declaration gets one line. `--keep-docs`
   (`stripKeepingDocs`) keeps the three written for the schema's readers and drops `@comment`, written for its
   maintainers. It never re-pins and never rewrites the file: the output claims no identity, because its bytes are
   not the published document's. **Whitespace collapses to one space and is never removed**, so tokens that touched

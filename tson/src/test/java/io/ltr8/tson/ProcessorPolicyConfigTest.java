@@ -91,8 +91,8 @@ class ProcessorPolicyConfigTest {
     void theIdentifierHalfOfAWholePolicyReachesTheLinker() {
         List<Diagnostic> refused = Tson.of(ProcessorConfig.defaults().withProcessorPolicy(TIGHTENED)).validateSchema("""
                 !!id:"https://example.test/whole-policy.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 { p%sy => text }
                 """.formatted(CYR_A));
 

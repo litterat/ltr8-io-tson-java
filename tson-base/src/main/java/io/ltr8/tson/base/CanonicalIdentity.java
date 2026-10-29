@@ -39,8 +39,8 @@ import java.nio.charset.StandardCharsets;
  *
  * <p><b>An identity without a host has an absolute path.</b> A path-only or {@code file:}-style reference has the
  * path alone as its identity, resolved only against a library entry. A relative path would then be a string a host
- * and path also spell -- {@code tson.io/2026/38/m/core.tn} written without its scheme is
- * {@code https://tson.io/2026/38/m/core.tn}'s identity -- so the path must begin with {@code /}, and the two kinds
+ * and path also spell -- {@code tson.io/2026/39/m/core.tn} written without its scheme is
+ * {@code https://tson.io/2026/39/m/core.tn}'s identity -- so the path must begin with {@code /}, and the two kinds
  * of identity are disjoint by their first character. {@code /local/orders.tn}, {@code file:/local/orders.tn} and
  * {@code file:///local/orders.tn} are one identity.
  *

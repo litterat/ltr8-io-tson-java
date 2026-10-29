@@ -18,7 +18,7 @@ class HashCommandTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/thing-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
             { thing => int32 }
             """;
 

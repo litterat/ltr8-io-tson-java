@@ -39,8 +39,8 @@ class BindMismatchClassificationTest {
     /** A meta layer declaring a record held in a namespace type of its own -- and no Java class for it. */
     private static final String META_SCHEMA = """
             !!id:"https://example.test/meta-bindmismatch.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             {
               notification  => { path: text }
               notifications => namespace & { key_type: = identifier  value_type: = notification }
@@ -50,13 +50,13 @@ class BindMismatchClassificationTest {
     private static final String GOVERNED_HEADER = """
             !!id:"https://example.test/api-bindmismatch.tn"
             !!meta:"https://example.test/meta-bindmismatch.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
             """;
 
     private static final String ORDINARY_HEADER = """
             !!id:"https://example.test/bindmismatch.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
             """;
 
     private static Tson tson() {

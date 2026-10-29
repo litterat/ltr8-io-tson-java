@@ -115,7 +115,7 @@ class OpenEntryResolvedFormTest {
     @Test
     void anOpenEntryWithAValueParameterValidates() {
         assertEquals(List.of(), tson().validate("""
-                !!schema:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!schema:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !schema {
                   vector => !template {
                     parameters: [ { name: T  type: type_ref } { name: N  type: non_negative_integer } ]
@@ -139,7 +139,7 @@ class OpenEntryResolvedFormTest {
     void aHeldBodyReadsBackAsTheApplicationItHolds() {
         Tson tson = metaBoundTson();
         String resolved = """
-                !!schema:"https://tson.io/2026/38/m/meta.tn"
+                !!schema:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   extern_of => !template {
                     parameters: [ { name: S  type: schema_identity } ]
@@ -179,8 +179,8 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   base           => { id: text }
                   pair           => <A, B> { first: A  second: B }
@@ -243,8 +243,8 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/kinds.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   port   => !integer_type { min: 0  max: 65535 }
                   age    => !int32 ^ { min: 0  max: 150 }
@@ -264,8 +264,8 @@ class OpenEntryResolvedFormTest {
         // whose kind is its chain's base kind and not its !record body's PRODUCT.
         tson.resolve("""
                 !!id:"https://example.com/kind-constructors.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
+                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 {
                   listed      => <T> atom & { members: [T] }
                   listed_text => listed<text>

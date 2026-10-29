@@ -207,7 +207,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
             {
               void => !void_type {}
             }
@@ -276,8 +276,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String KERNEL_GOVERNED_MARKS = """
             !!id:"https://example.test/marks.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             {
               pet => abstract { pet_type: identifier =?  nick: identifier }
             }
@@ -285,15 +285,15 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String KERNEL_GOVERNED_UNKNOWN_MARK = """
             !!id:"https://example.test/unknown-mark.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             {
               pet => @totally_unknown_xyz { nick: identifier }
             }
             """;
 
     private static final String MINI_DOCUMENT_NO_ID = """
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
             {
               void => !void_type {}
             }
@@ -314,7 +314,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
             !!id:"mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
             {
               void => !void_type {}
             }
@@ -332,7 +332,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
               void => !void_type {}
@@ -351,8 +351,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             {
               my_type => atom & {}
             }
@@ -379,8 +379,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             {
               void => !void_type {}
             }
@@ -402,9 +402,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             {
               placeholder => unit
             }
@@ -438,14 +438,14 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         String ordinaryImportingTheKernel = """
                 !!id:"https://example.test/mini.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 { my_type => { v: identifier } }
                 """;
         String kernelGovernedImportingCore = """
                 !!id:"https://example.test/mini.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 { my_type => { v: text } }
                 """;
         for (String source : List.of(ordinaryImportingTheKernel, kernelGovernedImportingCore)) {
@@ -468,14 +468,14 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         Map<String, String> sources = Map.of(
                 "https://example.test/meta-api.tn", """
                         !!id:"https://example.test/meta-api.tn"
-                        !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                        !!import:"https://tson.io/2026/38/m/meta.tn"
+                        !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                        !!import:"https://tson.io/2026/39/m/meta.tn"
                         { status_name => identifier }
                         """,
                 "https://example.test/orders.tn", """
                         !!id:"https://example.test/orders.tn"
                         !!meta:"https://example.test/meta-api.tn"
-                        !!import:"https://tson.io/2026/38/m/core.tn"
+                        !!import:"https://tson.io/2026/39/m/core.tn"
                         { order => { sku: text  quantity: int32 } }
                         """);
         SchemaSource local = SchemaSource.ofMap(sources);
@@ -531,7 +531,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
 
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> loader.loadMeta("https://tson.io/2026/38/m/meta.tn"));
+                () -> loader.loadMeta("https://tson.io/2026/39/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 

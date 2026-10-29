@@ -39,8 +39,8 @@ class ValueThroughFieldTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-shop.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             {
               endpoint     => { request?: kind<record>  response?: type_kind }
               endpoint_map => namespace & { key_type: = identifier  value_type: = endpoint }
@@ -72,7 +72,7 @@ class ValueThroughFieldTest {
         return """
                 !!id:"https://example.test/shop.tn"
                 !!meta:"https://example.test/meta-shop.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   order   => { sku: text }
                   receipt => { total: int64 }

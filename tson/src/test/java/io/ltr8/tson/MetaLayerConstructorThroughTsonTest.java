@@ -46,8 +46,8 @@ class MetaLayerConstructorThroughTsonTest {
     /** The meta-layer schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             {
               operation => {
                 path:     text
@@ -67,7 +67,7 @@ class MetaLayerConstructorThroughTsonTest {
     private static final String API_SCHEMA = """
             !!id:"https://example.test/api.tn"
             !!meta:"https://example.test/meta-http.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
             {
               search_request  => { q: text }
               search_response => { hits: [text] }

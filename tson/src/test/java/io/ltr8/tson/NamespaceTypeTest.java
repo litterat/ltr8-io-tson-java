@@ -29,8 +29,8 @@ class NamespaceTypeTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-headers.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
+            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             {
               header_name => !identifier_type { continue_add: "-" }
               headers     => namespace & { key_type: = header_name  value_type: = text }
@@ -85,7 +85,7 @@ class NamespaceTypeTest {
     void anOrdinarySchemaMayNotImportTheLayerToTypeAFieldByIt() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/request.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/meta-headers.tn"
                 {
                   request => { headers: headers }
@@ -139,8 +139,8 @@ class NamespaceTypeTest {
     void aNamespaceTypeIsDeclaredUnderTheMetaKernel() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/governed.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 {
                   hs => namespace & { key_type: = identifier  value_type: = text }
                 }

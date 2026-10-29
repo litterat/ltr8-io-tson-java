@@ -22,8 +22,8 @@ class RecordFieldsMapTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
             """;
 
     private static List<Diagnostic> validateSchema(String id, String declarations) {
@@ -50,7 +50,7 @@ class RecordFieldsMapTest {
     @Test
     void aNameWrittenTwiceInTheExplicitFormIsTheMapsDuplicateKey() {
         Diagnostic read = only(Tson.standard().validate("""
-                !!schema:"https://tson.io/2026/38/m/meta.tn"
+                !!schema:"https://tson.io/2026/39/m/meta.tn"
                 !record { fields: { x => { type: int32 }  x => { type: text } } }
                 """));
         assertEquals(Diagnostic.Code.DUPLICATE_MAP_KEY, read.code(), read.toString());

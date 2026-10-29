@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ReferenceLevelTest {
 
-    private static final String KERNEL = "https://tson.io/2026/38/m/meta-kernel.tn";
-    private static final String META = "https://tson.io/2026/38/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/38/m/core.tn";
+    private static final String KERNEL = "https://tson.io/2026/39/m/meta-kernel.tn";
+    private static final String META = "https://tson.io/2026/39/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
 
     private static String schema(String id, String meta, String imported, String declarations) {
         return """

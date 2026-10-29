@@ -40,8 +40,8 @@ class ApplicabilityIsIsATopTest {
     private static List<Diagnostic> problems(String declarations) {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                 %s }
                 """.formatted(declarations);
@@ -76,8 +76,8 @@ class ApplicabilityIsIsATopTest {
     void everySpellingOfAnAliasDenotesTheSameEntry() {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
+                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 {
                   bare    => int32
                   closed  => !reference { target: int32 }
@@ -112,8 +112,8 @@ class ApplicabilityIsIsATopTest {
     void applicationFollowsAnAliasToItsTarget() {
         String meta = """
                 !!id:"https://example.test/m.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 {
                   alias_array => array
                   two_hops    => alias_array
@@ -123,7 +123,7 @@ class ApplicabilityIsIsATopTest {
             String user = """
                     !!id:"https://example.test/u.tn"
                     !!meta:"https://example.test/m.tn"
-                    !!import:"https://tson.io/2026/38/m/core.tn"
+                    !!import:"https://tson.io/2026/39/m/core.tn"
                     { tags => !%s { element_type: text } }
                     """.formatted(head);
             List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
@@ -195,8 +195,8 @@ class ApplicabilityIsIsATopTest {
     void anAbstractConstructorWithNothingComposingItSaysSo() {
         String meta = """
                 !!id:"https://example.test/marker-meta.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
+                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 {
                   marker => abstract top & {}
                 }

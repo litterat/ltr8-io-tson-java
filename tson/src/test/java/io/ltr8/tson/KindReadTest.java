@@ -30,8 +30,8 @@ class KindReadTest {
 
     private static final String IDS_SCHEMA = """
             !!id:"https://example.test/kind-ids.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
             {
               stock_id    => !uuid_type {}
               customer_id => !uuid_type {}
