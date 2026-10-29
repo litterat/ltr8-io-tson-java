@@ -737,7 +737,7 @@ public final class JsonObjectReader {       // withProcessorPolicy, withDiagnost
 }
 public final class JsonTreeWriter {          // indented(), indented(indent)
     public String toJson(JsonValue v);  public void write(JsonValue v, OutputStream|Appendable|ByteSink out); }
-public final class JsonObjectWriter {        // standard(), using(context), indented(…)
+public final class JsonObjectWriter {        // standard(), using(context), indented(…), strippingAnnotations()
     public String toJson(Object v);     public void write(Object v, OutputStream|Appendable|ByteSink out); }
 
 public sealed interface JsonValue           // io.ltr8.tson.json.tree

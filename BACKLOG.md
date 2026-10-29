@@ -211,12 +211,6 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   member; an undeclared `$foo` as a validation error; a member outside its record's name type unknown, not refused;
   a member matched in a folding name type's form, its repeat a duplicate at its own spelling.
 
-- [ ] **The JSON object writer strips annotations unconditionally.** [TSON-JSON] §4.3 makes encoding an annotated value
-  an encode error, with stripping allowed only as explicit configuration; `DataClassObjectWriter` drops the
-  `Annotations` carrier and annotated-box annotations silently. Either the writer refuses unless configured to strip
-  (a `WriteException` with the position), or §4.3 is edited to admit silent stripping for a writer with no
-  annotation channel; `design/json-facades-binding-writing.md` states the conflict.
-
 ## Module structure
 
 - [ ] **The encoding-neutral reader parts move into a module both stacks share — `tson-encoding` or similar, not

@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.base.io.ByteSink;
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -206,18 +208,91 @@ class JsonObjectWriterTest {
         }
     }
 
+    /**
+     * [TSON-JSON] §4.3: annotations have no JSON carrier, so encoding a value that carries them is an encode
+     * error, and stripping them is an explicit configuration ({@link JsonObjectWriter#strippingAnnotations()}).
+     */
     @Nested
-    class WhatIsDroppedAndWhy {
+    class AnnotationsAreRefusedUnlessStripped {
+
+        private static final JsonObjectWriter STRIPPING = WRITER.strippingAnnotations();
+        private static final Annotations DOC =
+                Annotations.of(List.of(new Annotation("doc", Optional.of("a widget"))));
+        private static final Annotations UNIT_AND_DOC = Annotations.of(List.of(
+                new Annotation("unit", Optional.of("rgb")), new Annotation("doc", Optional.empty())));
+        private static final String PLAIN = "{\"name\":\"w1\",\"colour\":\"red\",\"sizes\":[3,5]}";
+
+        public record Widget(Annotations annotations, String name, io.ltr8.annotation.Annotated<String> colour,
+                             List<io.ltr8.annotation.Annotated<Integer>> sizes) {
+        }
+
+        public record Order(List<Widget> items) {
+        }
+
+        private static Widget widget(Annotations carrier, Annotations colour, Annotations secondSize) {
+            return new Widget(carrier, "w1", io.ltr8.annotation.Annotated.of("red", colour),
+                    List.of(io.ltr8.annotation.Annotated.of(3), io.ltr8.annotation.Annotated.of(5, secondSize)));
+        }
+
+        private static String refusal(Object value) {
+            String message = assertThrows(WriteException.class, () -> WRITER.toJson(value)).getMessage();
+            assertTrue(message.contains("[TSON-JSON] §4.3"), message);
+            assertTrue(message.contains("strippingAnnotations()"), message);
+            return message;
+        }
 
         @Test
-        void an_annotations_carrier_is_not_a_member() {
-            // §3.3's annotation object belongs to the schema-directed decode, and this module's reader binds
-            // every carrier to Annotations.empty() -- so writing the carrier would emit a member no reader
-            // here takes back, which is worse than the symmetric loss.
+        void a_non_empty_carrier_is_refused_naming_the_position_and_the_annotations() {
+            String message = refusal(widget(DOC, Annotations.empty(), Annotations.empty()));
+            assertTrue(message.contains("the value at Widget.annotations carries annotations (@doc)"), message);
+        }
+
+        @Test
+        void a_non_empty_annotated_field_is_refused() {
+            String message = refusal(widget(Annotations.empty(), UNIT_AND_DOC, Annotations.empty()));
+            assertTrue(message.contains("the value at Widget.colour carries annotations (@unit, @doc)"), message);
+        }
+
+        @Test
+        void a_non_empty_box_in_a_list_is_refused_at_its_index() {
+            String message = refusal(widget(Annotations.empty(), Annotations.empty(), UNIT_AND_DOC));
+            assertTrue(message.contains("the value at Widget.sizes[1] carries annotations (@unit, @doc)"), message);
+        }
+
+        @Test
+        void the_position_runs_from_the_root_through_every_container() {
+            String message = refusal(new Order(List.of(widget(DOC, Annotations.empty(), Annotations.empty()))));
+            assertTrue(message.contains("the value at Order.items[0].annotations"), message);
+        }
+
+        @Test
+        void stripping_drops_every_one_of_them_and_writes_the_value() {
+            assertEquals(PLAIN, STRIPPING.toJson(widget(DOC, Annotations.empty(), Annotations.empty())));
+            assertEquals(PLAIN, STRIPPING.toJson(widget(Annotations.empty(), UNIT_AND_DOC, Annotations.empty())));
+            assertEquals(PLAIN, STRIPPING.toJson(widget(Annotations.empty(), Annotations.empty(), UNIT_AND_DOC)));
+            assertEquals(PLAIN, STRIPPING.toJson(widget(DOC, UNIT_AND_DOC, UNIT_AND_DOC)));
+        }
+
+        @Test
+        void stripping_survives_indenting() {
+            assertEquals(WRITER.indented().toJson(widget(Annotations.empty(), Annotations.empty(),
+                            Annotations.empty())),
+                    STRIPPING.indented().toJson(widget(DOC, UNIT_AND_DOC, UNIT_AND_DOC)));
+        }
+
+        @Test
+        void an_empty_carrier_and_an_unannotated_box_need_no_configuration() {
+            // An empty set carries nothing to lose, and it is what this module's reader fills every carrier
+            // with, so what the reader produces the default writer writes back.
+            assertEquals(PLAIN, WRITER.toJson(widget(Annotations.empty(), Annotations.empty(), Annotations.empty())));
             assertEquals("{\"name\":\"a\"}", WRITER.toJson(new Annotated("a", Annotations.empty())));
             assertEquals(new Annotated("a", Annotations.empty()),
                     roundTrip(new Annotated("a", Annotations.empty()), Annotated.class));
         }
+    }
+
+    @Nested
+    class WhatIsDroppedAndWhy {
 
         @Test
         void a_null_component_is_left_out_rather_than_written_null() {

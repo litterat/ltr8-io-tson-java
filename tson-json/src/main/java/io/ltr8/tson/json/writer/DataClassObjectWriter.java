@@ -1,5 +1,7 @@
 package io.ltr8.tson.json.writer;
 
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -20,6 +22,7 @@ import io.ltr8.tson.schema.meta.Namespace;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Writes one Java object at one {@link DataClass} descriptor into an emitter a caller already owns, and
@@ -33,14 +36,25 @@ import java.util.Map;
  * leaf, and nothing here inspects a value to guess. That is what makes a {@code Map} an object and a tuple
  * an array without either being ambiguous at the point it is written.
  *
- * <p><b>What it refuses, it refuses because the reader could not take it back.</b> A choice has no
+ * <p><b>A choice is refused because the reader could not take it back.</b> A choice has no
  * schemaless dispatch (§8.2 admits an untagged one under a single condition, {@code disjoint: true}, which a
  * schema derives), so writing a union member would produce a document this library cannot read, and is a
  * {@link WriteException}. Refusing beats emitting something that only looks like a document. A non-finite
  * {@code double} is not refused: it has no JSON number form (§3.1), so it is written as the string
  * {@code ".inf"}, {@code "-.inf"} or {@code ".nan"} (§5.4).
  *
- * <p>Stateless past its atom table, so one instance serves every write.
+ * <p><b>Annotations are refused unless the writer was built to strip them.</b> [TSON-JSON] §4.3 gives
+ * annotations no JSON carrier and makes encoding a value that carries them an encode error, admitting
+ * stripping only as an explicit code-level configuration. So a non-empty {@code Annotations} carrier on a
+ * record, or a non-empty annotation set on an annotated box, is a {@link WriteException} naming the position
+ * and the annotations, unless {@code stripAnnotations} is set, when they are dropped and the value written
+ * without them. An empty set is never an error: it carries nothing to lose.
+ *
+ * <p>The position is found on the way out rather than tracked on the way in: the refusal is raised where the
+ * annotations are and each container it unwinds through prefixes its own step (a field name, an element
+ * index, a map key), so a write that succeeds builds no path at all.
+ *
+ * <p>Stateless past its atom table and its one flag, so one instance serves every write.
  */
 public final class DataClassObjectWriter {
 
@@ -60,8 +74,12 @@ public final class DataClassObjectWriter {
      */
     private final Map<Class<?>, VocabularyAtoms.Entry> vocabularyAtoms = VocabularyAtoms.defaults();
 
-    public DataClassObjectWriter(DataBindContext context) {
+    /** Whether a non-empty annotation set is dropped ({@code true}) or refused (§4.3's default). */
+    private final boolean stripAnnotations;
+
+    public DataClassObjectWriter(DataBindContext context, boolean stripAnnotations) {
         this.context = context;
+        this.stripAnnotations = stripAnnotations;
     }
 
     /**
@@ -80,6 +98,11 @@ public final class DataClassObjectWriter {
             write(value, context.getDescriptor(value.getClass()), out);
         } catch (DataBindException e) {
             throw new WriteException("cannot write " + value.getClass() + " as JSON: " + e.getMessage(), e);
+        } catch (AnnotationsRefused refused) {
+            String root = value.getClass().getSimpleName();
+            throw new WriteException(("cannot write %s as JSON: the value at %s carries annotations (%s), which "
+                    + "this encoding does not carry ([TSON-JSON] §4.3); configure strippingAnnotations() to drop "
+                    + "them").formatted(root, root + refused.path, refused.names));
         }
     }
 
@@ -98,10 +121,9 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (dataClass instanceof DataClassAnnotated boxed) {
-                // The box is framing, not a shape. Its annotations are dropped rather than written: §3.3's
-                // annotation object is the schema-directed decode's, and this module's reader binds every
-                // carrier to Annotations.empty() -- so writing them would produce members no reader here
-                // takes back, which is worse than the symmetric loss.
+                // The box is framing, not a shape: its value is written at this position and its annotations
+                // have no JSON carrier (§4.3), so a non-empty set is refused unless stripping was configured.
+                checkAnnotations(boxed.annotations().invoke(value), "");
                 write(boxed.value().invoke(value), boxed.valueClass(), out);
                 return;
             }
@@ -109,10 +131,11 @@ public final class DataClassObjectWriter {
                 value = dataClass.bridge().get().toData().invoke(value);
             }
             writeCore(value, dataClass, out);
-        } catch (DataBindException | WriteException | UncheckedIOException e) {
+        } catch (DataBindException | WriteException | UncheckedIOException | AnnotationsRefused e) {
             // Passed through rather than wrapped as "cannot write <class> as JSON", which would blame the
-            // object for what is not its fault: an UncheckedIOException is the sink failing and a
-            // WriteException already says exactly what the encoding would not take.
+            // object for what is not its fault: an UncheckedIOException is the sink failing, a
+            // WriteException already says exactly what the encoding would not take, and an AnnotationsRefused
+            // is collecting its position on the way out to the entry point.
             throw e;
         } catch (Throwable t) {
             throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);
@@ -195,18 +218,25 @@ public final class DataClassObjectWriter {
      *
      * <p>A null component is left out rather than written {@code null}: §7 makes JSON null the void
      * sentinel at a typed position, so the two say the same thing, and the shorter one is what a reader
-     * of any strictness takes. The annotations carrier is skipped because it is not data -- see {@link
-     * #write}.
+     * of any strictness takes. The annotations carrier is never a member: §4.3 gives annotations no JSON
+     * carrier, so a non-empty one is refused, or dropped where stripping was configured.
      */
     private void writeRecord(Object value, DataClassRecord dataClass, JsonDataEmitter out) throws Throwable {
         DataClassField carrier = dataClass.annotationsCarrier().orElse(null);
+        if (carrier != null) {
+            checkAnnotations(carrier.get(value), "." + carrier.name());
+        }
         out.beginObject();
         for (DataClassField field : dataClass.fields()) {
             if (field == carrier || !field.isPresent(value)) {
                 continue;
             }
             out.member(field.name());
-            write(field.get(value), field.dataClass(), out);
+            try {
+                write(field.get(value), field.dataClass(), out);
+            } catch (AnnotationsRefused refused) {
+                throw refused.under("." + field.name());
+            }
         }
         out.endObject();
     }
@@ -217,7 +247,11 @@ public final class DataClassObjectWriter {
         Object iterator = dataClass.iterator().invoke(value);
         DataClass elementClass = dataClass.arrayDataClass();
         for (int i = 0; i < size; i++) {
-            write(dataClass.get().invoke(value, iterator), elementClass, out);
+            try {
+                write(dataClass.get().invoke(value, iterator), elementClass, out);
+            } catch (AnnotationsRefused refused) {
+                throw refused.under("[" + i + "]");
+            }
         }
         out.endArray();
     }
@@ -243,8 +277,13 @@ public final class DataClassObjectWriter {
         DataClass valueClass = dataClass.valueDataClass();
         Object entry;
         while ((entry = dataClass.next().invoke(iterator)) != null) {
-            out.member(memberName(dataClass.key().invoke(entry), dataClass.keyDataClass()));
-            write(dataClass.value().invoke(entry), valueClass, out);
+            String name = memberName(dataClass.key().invoke(entry), dataClass.keyDataClass());
+            out.member(name);
+            try {
+                write(dataClass.value().invoke(entry), valueClass, out);
+            } catch (AnnotationsRefused refused) {
+                throw refused.under("[\"" + name + "\"]");
+            }
         }
         out.endObject();
     }
@@ -269,9 +308,54 @@ public final class DataClassObjectWriter {
      */
     private void writeTuple(Object value, DataClassTuple dataClass, JsonDataEmitter out) throws Throwable {
         out.beginArray();
-        for (DataClassElement element : dataClass.elements()) {
-            write(element.accessor().invoke(value), element.dataClass(), out);
+        DataClassElement[] elements = dataClass.elements();
+        for (int i = 0; i < elements.length; i++) {
+            try {
+                write(elements[i].accessor().invoke(value), elements[i].dataClass(), out);
+            } catch (AnnotationsRefused refused) {
+                throw refused.under("[" + i + "]");
+            }
         }
         out.endArray();
+    }
+
+    // ── Annotations ──────────────────────────────────────────────────────
+
+    /**
+     * Refuses a non-empty annotation set (§4.3) unless this writer strips, in which case it is dropped.
+     * {@code step} is where the set sits relative to the value being written: the carrier's field for a
+     * record, nothing for a box, whose annotations are its value's.
+     */
+    private void checkAnnotations(Object annotations, String step) {
+        if (stripAnnotations || !(annotations instanceof Annotations set) || set.isEmpty()) {
+            return;
+        }
+        String names = set.values().stream().map(Annotation::name).distinct()
+                .map(name -> "@" + name).collect(Collectors.joining(", "));
+        throw new AnnotationsRefused(names).under(step);
+    }
+
+    /**
+     * A §4.3 refusal on its way out to {@link #write(Object, JsonDataEmitter)}, gathering its position one
+     * container at a time; never seen outside this class, where it becomes a {@link WriteException}. No stack
+     * trace: its only content is the path and the names.
+     */
+    private static final class AnnotationsRefused extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        private final String names;
+        private String path = "";
+
+        AnnotationsRefused(String names) {
+            super(null, null, false, false);
+            this.names = names;
+        }
+
+        /** This refusal one step further out: {@code step} prefixes the path gathered so far. */
+        AnnotationsRefused under(String step) {
+            path = step + path;
+            return this;
+        }
     }
 }

@@ -118,7 +118,8 @@ source for it, or because reaching it would break documents already on the wire.
   `{K => V}` with a compound `K` never arises. §6.4's **pairs form is therefore unreachable**, and with it one
   of the two kinds [TSON-SCHEMA] §5.4 gives no discrimination class (§8.3).
 - **Annotations on data values.** No JSON carrier exists (§4.3) and JSON Schema has no source for one, so the
-  encode-side refusal never fires. It stays implemented, for values that arrive from the text encoding.
+  encode-side refusal never fires on a converted schema's data. It is `JsonObjectWriter`'s, for values bound from the
+  text encoding, and `strippingAnnotations()` is the explicit configuration that drops them instead.
 - **Approximate atoms admitting the special values.** `.nan` and the infinities encode as JSON *strings*
   (§5.4) and no JSON document carries one, JSON having no spelling for them. A converted `type: number`
   should narrow `allow_nan`/`allow_infinity` to false, which keeps the float's number class ([TSON-SCHEMA] §5.4),
