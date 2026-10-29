@@ -36,7 +36,7 @@ When an entry closes, its citations become spec citations and the entry is delet
 
 ---
 
-## 2. [TSON-SCHEMA] §5.7, §8.2 — a closed refinement source: "mints nothing" against "IS-A the source"
+## 1. [TSON-SCHEMA] §5.7, §8.2 — a closed refinement source: "mints nothing" against "IS-A the source"
 
 **Problem.** §8.2's trigger positions say an application at a composition target or a refinement source "is subsumed
 as an operand and mints nothing (§5.8)". §5.7 says a refinement produces "a new definition with its own identity that
@@ -68,7 +68,7 @@ closing order-independent, which §8.2's content identity is for. (b) keeps §8.
 edge from `x` to `box<text>`, so `x` would not be admissible where `box<text>` is expected. The implementation follows
 (a) once this closes; until then the behaviour above is what runs.
 
-## 3. [TSON-SCHEMA] §5.10 — an alias of a schema-namespace template: which namespace its value parameters read in
+## 2. [TSON-SCHEMA] §5.10 — an alias of a schema-namespace template: which namespace its value parameters read in
 
 **Problem.** §5.10 says a template whose body applies a constructor of the governing meta other than `record` reads
 its value parameters' types in the structure namespace, a record template reads them in the schema's own namespace,
@@ -93,7 +93,7 @@ The implementation then follows the target through `reference.target` in `readsI
 the resolved entry's constructor is the form in every case, is what runs and should then be stated in §5.10 with the
 alias named, since the third sentence reads against it.
 
-## 4. [TSON-DATA] §2.4, [TSON-SCHEMA] §5.4 — at a disjoint choice the form selects the variant, with no emitter rule
+## 3. [TSON-DATA] §2.4, [TSON-SCHEMA] §5.4 — at a disjoint choice the form selects the variant, with no emitter rule
 
 **Problem.** [TSON-DATA] §2.4 says a token's form is consulted exactly once, by base type resolution, that
 "quoting is a lexical necessity, not a semantic signal", and that content inside the profile "may be written in
