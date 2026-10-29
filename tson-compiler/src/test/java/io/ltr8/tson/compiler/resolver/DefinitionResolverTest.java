@@ -429,9 +429,10 @@ class DefinitionResolverTest {
         assertEquals(write(typeName), write(fieldName));
         assertEquals(write(typeName), write(paramName));
 
-        // annotation => @annotation void -- the @annotation marker is written after "=>", so §6 binds it to
-        // the value, and the entry's facts carry it: no constructor's record has an annotations field, and a
-        // resolved document writes it ahead of the value (§7.4's `*annotation [type-ref] core-value`).
+        // annotation => void is a plain alias. doc => @annotation text writes its marker after "=>", so §6
+        // binds it to the value, and the entry's facts carry it: no constructor's record has an annotations
+        // field, and a resolved document writes it ahead of the value (§7.4's `*annotation [type-ref]
+        // core-value`).
         assertEquals("{ target: void }", write(annotation));
 
         assertEquals("{ target: text }", write(doc));
