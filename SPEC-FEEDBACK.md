@@ -144,9 +144,10 @@ compiled reader consulted: one cycle, holding `record` and 29 more of the 77 ent
 `identifier`, `non_negative_integer`, the enum and set machinery, `field_group`, and the synthetics they name), every
 other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with
 `@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap's passes are not yet
-replaced by this order, and this implementation departs from rule 3: a reader decodes its pins and defaults
-through their types when it is built, so `iri_type`'s reader needs `iri` (the `spec` pin) and `iri` is read through
-`iri_type`, a cycle the rule does not have.
+replaced by this order. Compilation follows rule 3: a record's reader holds its pins and defaults as written while
+it is built and decodes them through their types once every reader of the schema exists, before the schema is handed
+out, so building `iri_type`'s reader reads nothing through `iri`'s (the `spec` pin). Link remains the one place a pin
+is judged, and a bad pin or default still fails the load (rule 6).
 
 **Resolution, a proposal.** Terms:
 

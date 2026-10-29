@@ -1795,17 +1795,16 @@ public final class TsonSchemaLinker {
      * type of fixed/default values, which must be the field's declared type" -- and calls it "a dependency
      * the schema language does not express directly", which is what leaves it to a check like this one.
      *
-     * <p><b>Here rather than at compile, because of who the verdict belongs to.</b> The same check also
-     * runs as a side effect of building the record's reader ({@code RecordAbstractReader} decodes every
-     * FIXED/DEFAULT value once, at construction), and a failure there becomes an {@code ErrorReader} -- so
-     * the author's own {@code tson compile} passes, and the mistake surfaces to whoever later sends data,
-     * coded as a gap in this library. The verdict does not change as this library improves, so by the
+     * <p><b>This is the one place a pin is judged.</b> It runs once every entry has resolved, over the field
+     * type's body rather than its compiled reader, so it waits on no reader ([TSON-SCHEMA] §5.2; a held value
+     * orders nothing). The compiled record reader decodes the same value once every reader exists ({@code
+     * RecordAbstractReader.settleHeldValues}), for what it injects and compares, and treats a refusal there as
+     * this check and the reader disagreeing. The verdict does not change as this library improves, so by the
      * project's own classification test it is the author's error, and this phase is where an author error
      * against one declaration is already reported with the declaration's own name and line.
      *
-     * <p><b>Atoms and enums only, and the rest is not silently blessed.</b> A field typed by a record,
-     * container or choice needs a compiled reader to check a value against, and compilation happens after
-     * linking; those keep the existing path. A field whose type is a parameter is skipped by construction --
+     * <p><b>Atoms and enums only, and the rest is refused.</b> A field typed by a record, container or choice
+     * carries no value ({@link #notAScalarType}). A field whose type is a parameter is skipped by construction --
      * a held body is not read as this vocabulary at all, so the only parametric field reaching here has
      * already been substituted by materialisation, and is checked against the argument it was closed with.
      */

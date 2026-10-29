@@ -27,10 +27,10 @@ import java.util.*;
  *
  * <p><b>{@code targetField}</b> (schema position -> bound {@code DataClassField}, or {@code null} if
  * the target class doesn't declare this schema field) is built once, right after {@link
- * RecordAbstractReader}'s own constructor returns, which is also where every inherited {@link
- * #precomputedValue} entry is decoded again through the field's now-bound parser -- {@link
- * RecordTreeReader} leaves those as that class computed them, a plain {@code Map} having no target to
- * decode toward.
+ * RecordAbstractReader}'s own constructor returns, which is also where each field is rebound to what its
+ * component holds -- so every inherited {@link #precomputedValue} entry, decoded once every reader exists, is
+ * decoded through the field's bound parser. {@link RecordTreeReader} keeps the natural value, a plain {@code
+ * Map} having no target to decode toward.
  *
  * <p><b>No separate "already filled" tracker is needed at all.</b>
  * {@link RecordAbstractReader#readFields}'s forward, single-pass, overwrite-on-duplicate design (see its own
@@ -120,11 +120,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                     "field '" + field.name() + "'", "component '" + target.name() + "'",
                     new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches), true);
             if (rebound != field.parser()) {
-                field = new CompiledField(field.name(), field.schema(), rebound);
-                fields.set(i, field);
-            }
-            if (field.schema().value().isPresent()) {
-                precomputedValue[i] = readSchemaDefault(fields.get(i));
+                fields.set(i, new CompiledField(field.name(), field.schema(), rebound));
             }
         }
         {
@@ -145,6 +141,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                         + "which fields it takes rather than dropping whatever it does not name");
             }
         }
+        // After the rebinding above, so each default and pin is decoded through the reader its field binds with.
+        CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }
 
     /** Whether any schema field of this type binds to {@code classField}. */
