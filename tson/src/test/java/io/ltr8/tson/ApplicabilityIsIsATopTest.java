@@ -40,9 +40,9 @@ class ApplicabilityIsIsATopTest {
     private static List<Diagnostic> problems(String declarations) {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                 %s }
                 """.formatted(declarations);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
@@ -76,9 +76,9 @@ class ApplicabilityIsIsATopTest {
     void everySpellingOfAnAliasDenotesTheSameEntry() {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   bare    => int32
                   closed  => !reference { target: int32 }
                   open    => <T> !reference { target: T }
@@ -112,9 +112,9 @@ class ApplicabilityIsIsATopTest {
     void applicationFollowsAnAliasToItsTarget() {
         String meta = """
                 !!id:"https://example.test/m.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !schema {
                   alias_array => array
                   two_hops    => alias_array
                 }
@@ -122,9 +122,9 @@ class ApplicabilityIsIsATopTest {
         for (String head : List.of("array", "alias_array", "two_hops")) {
             String user = """
                     !!id:"https://example.test/u.tn"
-                    !!meta:"https://example.test/m.tn"
+                    !!import:"https://example.test/m.tn"
                     !!import:"https://tson.io/2026/39/m/core.tn"
-                    { tags => !%s { element_type: text } }
+                    !schema { tags => !%s { element_type: text } }
                     """.formatted(head);
             List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
                     .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(
@@ -195,16 +195,16 @@ class ApplicabilityIsIsATopTest {
     void anAbstractConstructorWithNothingComposingItSaysSo() {
         String meta = """
                 !!id:"https://example.test/marker-meta.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   marker => abstract top & {}
                 }
                 """;
         String user = """
                 !!id:"https://example.test/marked.tn"
-                !!meta:"https://example.test/marker-meta.tn"
-                { bad => !marker {} }
+                !!import:"https://example.test/marker-meta.tn"
+                !schema { bad => !marker {} }
                 """;
         List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(

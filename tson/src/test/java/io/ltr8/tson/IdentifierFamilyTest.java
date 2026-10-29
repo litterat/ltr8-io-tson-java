@@ -25,9 +25,9 @@ class IdentifierFamilyTest {
     private static final String ID = "https://example.test/names-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/names-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               slug => !identifier_type { continue_add: "-" }
               snake_name => !slug ^ { pattern: "[a-z][a-z0-9_]*" }
               direction => !identifier_type { members: [north south] }
@@ -53,7 +53,7 @@ class IdentifierFamilyTest {
     }
 
     private static List<Diagnostic> validate(String body) {
-        return tson().validate("!!schema:\"" + ID + "\"\n" + body);
+        return tson().validate("!!import:\"" + ID + "\"\n" + body);
     }
 
     @Test
@@ -126,9 +126,9 @@ class IdentifierFamilyTest {
     private static String schemaWith(String declaration) {
         return """
                 !!id:"https://example.test/profiles-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   slug => !identifier_type { continue_add: "-" }
                   %s
                 }

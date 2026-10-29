@@ -19,7 +19,7 @@ import java.util.Optional;
  * self-contained (no dangling references) and safe to {@link TsonSchemaRegistry#register}.
  *
  * <p><b>Wraps a {@link TsonSchema} rather than duplicating its fields</b> -- a {@code TsonLinkedSchema} *is* a {@code
- * TsonSchema} (the post-link {@code id}/{@code meta}/{@code imports}/{@code entries}/{@code bootstrap}), plus the
+ * TsonSchema} (the post-link {@code id}/{@code imports}/{@code entries}/{@code bootstrap}), plus the
  * extra type-level fact "this one has been linked." Not a subtype ({@link TsonSchema} is a record, and records are
  * implicitly final) and not interchangeable with one -- a plain {@code TsonSchema} means "resolved, but not
  * necessarily linked"; a {@code TsonLinkedSchema} means "linked." Keeping them nominally distinct means {@link
@@ -58,8 +58,8 @@ import java.util.Optional;
  *
  * <p><b>{@code namespaces} is the fourth</b>: each namespace type -- a record IS-A the kernel's {@code namespace}
  * ({@link MapBody#isNamespace}) -- with the map a value of it is written and read as ({@link MapBody#ofNamespace}).
- * A namespace type names the kernel's {@code namespace} as a composition operand, which resolves in the governing
- * meta-schema, so whether the name is the kernel's is again a question only linking can answer where this schema
+ * A namespace type names the kernel's {@code namespace} as a composition operand, which resolves in its
+ * import closure, so whether the name is the kernel's is again a question only linking can answer where this schema
  * does not hold it ({@link #namespace}).
  */
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
@@ -138,20 +138,16 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /**
-     * Whether this schema is a meta layer -- its own {@code !!meta} names the meta-kernel ([TSON-SCHEMA] §2.2.2) --
-     * so that a document it governs is a schema or describes one (resolver output, [TSON-SCHEMA] §3.3.4). A name
-     * such a document writes at a kind-typed position resolves in the described schema's namespace or its
+     * Whether this schema describes schemas -- the kernel itself, or a schema importing it directly, as meta.tn does
+     * -- so that a document read under it is a schema or describes one (resolver output, [TSON-SCHEMA] §3.3.4). A
+     * name such a document writes at a kind-typed position resolves in the described schema's namespace or its
      * constructor's, where the position's prose says ([TSON-SCHEMA] §7.4 for {@code name_type}), and not in this
      * schema's: its readers check the name's grammar and leave membership to the schema's link, or to ingest
-     * ([TSON-SCHEMA] §4.2, §8.1). A {@code !!meta} that is no identity at all, as a schema assembled by hand may
-     * carry, names no meta-kernel.
+     * ([TSON-SCHEMA] §4.2, §8.1). A schema reaching the kernel only transitively, as core.tn does, governs data.
      */
     public boolean governsSchemas() {
-        try {
-            return CanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
-        } catch (SchemaValidationException notAnIdentity) {
-            return false;
-        }
+        return TsonBundledSchemas.isMetaKernel(schema.id())
+                || schema.imports().stream().anyMatch(TsonBundledSchemas::isMetaKernel);
     }
 
     /**

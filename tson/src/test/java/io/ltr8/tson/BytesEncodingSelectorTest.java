@@ -46,9 +46,9 @@ class BytesEncodingSelectorTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               hexdigest => !bytes_type { encoding: HEX  length: 4 }
               b32       => !bytes_type { encoding: BASE32 }
               aliased   => hexdigest
@@ -172,9 +172,9 @@ class BytesEncodingSelectorTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/refine-encoding.tn"
-                        !!meta:"https://tson.io/2026/39/m/meta.tn"
+                        !!import:"https://tson.io/2026/39/m/meta.tn"
                         !!import:"https://tson.io/2026/39/m/core.tn"
-                        { hexbytes => !bytes ^ { encoding: HEX } }
+                        !schema { hexbytes => !bytes ^ { encoding: HEX } }
                         """));
 
         assertTrue(thrown.getMessage().contains("not refinable"), thrown.getMessage());
@@ -188,9 +188,9 @@ class BytesEncodingSelectorTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"%s"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { sha4 => !bytes ^ { length: 4 }  holder => { d: sha4 } }
+                !schema { sha4 => !bytes ^ { length: 4 }  holder => { d: sha4 } }
                 """.formatted(id));
 
         assertArrayEquals(DEADBEEF, tson.treeReader().withSchema(id)
@@ -199,7 +199,7 @@ class BytesEncodingSelectorTest {
     }
 
     private static List<Diagnostic> problems(String body) {
-        return tson().validate("!!schema:\"" + ID + "\"\n!holder " + body);
+        return tson().validate("!!import:\"" + ID + "\"\n!holder " + body);
     }
 
     private static boolean hasProblem(String body) {

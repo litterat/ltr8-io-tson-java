@@ -26,8 +26,8 @@ options, exit codes and description — including the policy options for the thr
 
 |                       |                                                                                                     |
 | --------------------- | --------------------------------------------------------------------------------------------------- |
-| Arguments             | **a flat file list** — each `.tn` auto-classified as schema (its header carries `!!meta`) or data, by content, never by filename; a `.json` file is JSON data |
-| Schema selection      | a `.tn` data document's own: its `!!schema` names the schema, its root type-ref (`!person`) the type. JSON names neither, so `--schema <file|uri> --type <name>`, given together, bind every JSON input in the run |
+| Arguments             | **a flat file list** — each `.tn` auto-classified as schema (its root is tagged `!schema`) or data, by content, never by filename; a `.json` file is JSON data |
+| Schema selection      | a `.tn` data document's own: its `!!import`s name the schemas, its root type-ref (`!person`) the type. JSON names neither, so `--schema <file|uri> --type <name>`, given together, bind every JSON input in the run |
 | `-`                   | reads one data document from stdin, at most once, always data (a file really named `-` is `./-`); JSON when `--schema`/`--type` are given |
 | `--output`            | `text` (default), `json`, `tson`                                                                    |
 | Exit codes            | `0` accepted · `1` rejected, as invalid or refused (§8.2, §9.1) · `2` usage · `69` a schema nothing would supply · `75` a schema that could not be reached · `78` a type with no Java class here · `70` library gap or fault |
@@ -48,7 +48,7 @@ can act — a relaxed policy, `--max-depth`, a renamed field or a smaller docume
 tson init-example .                                   # writes person.tn + person-data.tn
 tson validate person.tn person-data.tn                # OK
 tson validate --output json person.tn bad-data.tn
-tson validate person.tn - < person-data.tn            # stdin; the data still names its own !!schema and type
+tson validate person.tn - < person-data.tn            # stdin; the data still names its own !!import and type
 tson compile person.tn                                # does the schema itself resolve and compile?
 tson hash person.tn                                   # stamp ?sha256=… onto its own !!id, in place
 tson validate --schema order.tn --type order a.json b.json          # JSON inputs, bound out of band
@@ -62,7 +62,7 @@ cached copy binds wherever it sits — or the `!!id` of a schema file on the com
 
 `tson strip <schema>` prints a schema's **reading form** to standard output — the same declarations in as few
 tokens as the syntax allows, for a reader that reads the schema rather than loading it, such as a language model
-given it in a prompt. The `!!id`, every `!!meta`/`!!import` pin, and every `@doc`, `@title`, `@examples` and
+given it in a prompt. The `!!id`, every `!!import` pin, and every `@doc`, `@title`, `@examples` and
 `@comment` are removed; a reference to the spec's own library is shortened to its revision and name
 (`!!import:"39/core"`); each directive and declaration gets one line. Other annotations stay, and other
 references keep their URLs. `--keep-docs` keeps `@doc`, `@title` and `@examples`; `@comment`, a note for
@@ -197,9 +197,9 @@ stopped the run before any document was read.
 | You wrote                                                    | Problem                                                                | Do this instead                                       |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------ |
 | a `null` expected where a field is absent                    | both formats omit an absent field rather than writing `null`           | test the key's presence, not its value                |
-| `--type`/`--schema` for a `.tn` data file                    | they bind JSON inputs only; a `.tn` document names its own             | put `!!schema` and a root type-ref in the data        |
+| `--type`/`--schema` for a `.tn` data file                    | they bind JSON inputs only; a `.tn` document names its own             | put `!!import` and a root type-ref in the data        |
 | a `LIMIT_EXCEEDED` file read as "invalid"                    | the depth bound refused it; rejected here, not invalid                 | raise `--max-depth` if the nesting is legitimate      |
-| a schema passed by filename convention                       | classification is by content (`!!meta`), and matching is by `!!id`      | check the `!!id` the schema declares                  |
+| a schema passed by filename convention                       | classification is by the root's `!schema` tag, matching by `!!id`      | check the `!!id` the schema declares                  |
 | exit `70` read as "invalid document"                         | it is a gap or a fault in this library, not a verdict                  | treat it as a bug report                              |
 | exit `69` read as "invalid document"                         | no schema was obtained, so nothing was judged                          | pass the schema file, or check the `!!id`             |
 | exit `75` retried forever, or `69` retried at all            | `75` says a rerun may help; `69` says it will not                      | retry `75`; fix the reference or allow-list for `69`  |

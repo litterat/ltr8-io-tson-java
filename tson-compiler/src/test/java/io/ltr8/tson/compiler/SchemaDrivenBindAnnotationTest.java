@@ -42,9 +42,9 @@ class SchemaDrivenBindAnnotationTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/annotated.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               note => text
               rank => int32
               marker => void

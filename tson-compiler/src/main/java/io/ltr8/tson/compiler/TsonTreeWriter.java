@@ -56,7 +56,7 @@ public final class TsonTreeWriter {
     }
 
     /**
-     * A writer whose documents are <b>self-describing</b>: {@code !!schema:"<schemaUri>"} in the header,
+     * A writer whose documents are <b>self-describing</b>: {@code !!import:"<schemaUri>"} in the header,
      * over a root value that already names its own type. The mirror of {@link TsonTreeReader#withSchema},
      * which is what reads such a document back.
      *
@@ -87,7 +87,7 @@ public final class TsonTreeWriter {
      * TsonTreeReader#readDocument} exists for, in one call.
      *
      * <p><b>The document's own header wins over this writer's</b>, component by component, and only where it
-     * has one: a {@code TsonDocument} carrying a {@code !!schema} is written with that schema whatever
+     * has one: a {@code TsonDocument} carrying {@code !!import}s is written with those imports whatever
      * {@link #describing} was set to, and one carrying none keeps whatever this writer already had. Reading
      * a document and writing it back therefore reproduces it, which is the point, while a writer configured
      * for something the document does not state still contributes it.
@@ -113,13 +113,22 @@ public final class TsonTreeWriter {
     /** This writer with {@code document}'s own directives applied over its own. */
     private TsonTreeWriter forDocument(TsonDocument document) {
         TsonTreeWriter writer = this;
-        if (document.schema().isPresent()) {
-            writer = writer.describing(document.schema().get());
+        if (!document.imports().isEmpty()) {
+            writer = new TsonTreeWriter(writer.header.importing(document.imports()));
         }
         if (document.id().isPresent()) {
             writer = writer.identifiedBy(document.id().get());
         }
         return writer;
+    }
+
+    /** A document importing a schema names its root's type ([TSON-DATA] §2.2), so a root without one is refused. */
+    private void requireRootType(TsonValue node) {
+        if (!header.imports().isEmpty() && node.typeRef().isEmpty()) {
+            throw new WriteException("a document importing " + header.imports() + " needs a root type-ref to "
+                    + "select a type, and this root node carries none -- read the tree against its schema (which "
+                    + "records each node's type) or set one on the root before writing", null);
+        }
     }
 
     /** Writes {@code node} as TSON text -- {@link #write(TsonValue, Appendable)} into a fresh buffer. */
@@ -154,12 +163,7 @@ public final class TsonTreeWriter {
      * The sink is flushed and not closed.
      */
     public void write(TsonValue node, ByteSink sink) {
-        if (header.schema().isPresent() && node.typeRef().isEmpty()) {
-            throw new WriteException("a document declaring !!schema \"" + header.schema().get()
-                    + "\" needs a root type-ref to select a type, and this root node carries none -- read"
-                    + " the tree against its schema (which records each node's type) or set one on the"
-                    + " root before writing", null);
-        }
+        requireRootType(node);
         try {
             TsonDataEmitter emitter = new TsonDataEmitter(sink);
             header.emit(emitter);
@@ -176,12 +180,7 @@ public final class TsonTreeWriter {
      */
     public void write(TsonValue node, Appendable out) {
         try {
-            if (header.schema().isPresent() && node.typeRef().isEmpty()) {
-                throw new WriteException("a document declaring !!schema \"" + header.schema().get()
-                        + "\" needs a root type-ref to select a type, and this root node carries none -- read"
-                        + " the tree against its schema (which records each node's type) or set one on the"
-                        + " root before writing", null);
-            }
+            requireRootType(node);
             TsonDataEmitter emitter = new TsonDataEmitter(out);
             header.emit(emitter);
             ENGINE.write(node, emitter);

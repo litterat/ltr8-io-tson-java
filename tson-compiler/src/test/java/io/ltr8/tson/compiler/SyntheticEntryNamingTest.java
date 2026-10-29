@@ -31,9 +31,9 @@ class SyntheticEntryNamingTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/naming.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { id: text }
               paged => <T> { items: [T; 1..] }
               order_response => paged<order>
@@ -83,7 +83,7 @@ class SyntheticEntryNamingTest {
         new TsonTreeReader(TsonCompiledSchemaRegistry.tree(
                 TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source)))
                 .withDiagnostics(problems)
-                .read("!!schema:\"" + ID + "\"\n" + document);
+                .read("!!import:\"" + ID + "\"\n" + document);
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics()::toString);
         return problems.diagnostics().getFirst();
     }

@@ -25,9 +25,9 @@ class NamespaceEntryResolvedFormTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-api.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !schema {
               status_name => identifier
               method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
                                replies?: {status_name => kind<record>} }
@@ -37,9 +37,9 @@ class NamespaceEntryResolvedFormTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/api.tn"
-            !!meta:"https://example.test/meta-api.tn"
+            !!import:"https://example.test/meta-api.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order      => { sku: text }
               order_list => [order]
               myapi      => !api {
@@ -64,7 +64,7 @@ class NamespaceEntryResolvedFormTest {
         assertEquals("!api { get_orders => { response: order_list } place_order => { request: order response: order } }",
                 written.replaceAll("\\s+", " "));
 
-        Map<String, Top> read = ResolvedForm.readResolved(tson, "!schema { myapi => " + written + " }", META);
+        Map<String, Top> read = ResolvedForm.readResolved(tson, "!schema { myapi => " + written + " }", List.of(META));
         Namespace<?> back = assertInstanceOf(Namespace.class, read.get("myapi"));
         assertEquals(myapi, back);
         assertEquals(List.of("get_orders", "place_order"), List.copyOf(back.entries().keySet()));

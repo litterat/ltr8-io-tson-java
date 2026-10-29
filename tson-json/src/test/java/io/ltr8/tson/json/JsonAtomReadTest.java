@@ -34,9 +34,9 @@ class JsonAtomReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/atoms-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               count      => int32
               exact_number      => number
               ratio      => float64

@@ -114,7 +114,7 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(raw.bootstrap());
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
-        assertEquals(raw.meta(), linked.schema().meta());
+        assertEquals(raw.imports(), linked.schema().imports());
         assertEquals(77, raw.entries().size());
         assertEquals(77, linked.schema().entries().size());
 

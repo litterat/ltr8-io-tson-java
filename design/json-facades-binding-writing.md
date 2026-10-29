@@ -72,7 +72,8 @@ hole. Each facade enforces it once per read by running the read on a copy of its
 .readAs(source, type)` in tree mode, `JsonObjectReader.withSchema(uri).readAs(source, type, Target.class)` in bind
 mode, the peer of `TsonObjectReader.readAs`. `withSchema` is available only on a reader from `Json.withSchemas(...)`
 (`IllegalStateException` otherwise). `read(source, Class)` stays class-directed: a JSON document names no schema of its
-own (§3.4's in-band route is not built), so reading against one is always the caller's statement. What stands in the
+own that this stack reads (§3.4's in-band route is not built), so reading against one is always the caller's
+statement. What stands in the
 way of a `readAs` is reported before any of the document is touched, each with the code a consumer routes on:
 
 - `SCHEMA_NOT_PERMITTED` — the loader holds no schema for the identity and has no source for it (not a verdict);
@@ -80,7 +81,11 @@ way of a `readAs` is reported before any of the document is touched, each with t
 - `BIND_MISMATCH` (bind mode) — `JsonCompiledSchemaRegistry.get` compiled the schema and the compile refused because
   the bound classes do not match its types;
 - `TYPE_MISMATCH` (bind mode) — the root type binds to a class `Target` cannot hold, checked from the descriptor
-  before the read where the type is bound by name, and on the produced value after it otherwise.
+  before the read where the type is bound by name, and on the produced value after it otherwise;
+- `NOT_IMPLEMENTED` — the root leads with `$import`, §3.4's in-band route (`InBandBinding`): it stands where §3.3 puts
+  a document's binding, so it is a gap of this processor's and not the `SCOPE_NOT_ADMITTED` every value position
+  gives the member. Found by a peek at the root's first member, the one thing either door reads before the root's
+  reader takes over.
 
 A schema type with no bound class at all reaches the caller as `MissingBindingException`, the reading application's
 own wiring, as on the TSON side. Both `readAs` paths root the read's context at the declaration the caller named

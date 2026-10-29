@@ -36,9 +36,9 @@ class ChoiceReadTest {
     private static TsonTypeReader<?> personReader(String contact) {
         String schema = """
                 !!id:"https://example.test/choice-read.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   contact => %s
                   person => {
                     name: text
@@ -140,9 +140,9 @@ class ChoiceReadTest {
      */
     private static final String STRADDLING = """
             !!id:"https://example.test/choice-straddling.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               loose => ( float64 | text )
               strict => !float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
               tight => ( strict | text )

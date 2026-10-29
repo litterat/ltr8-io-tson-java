@@ -50,7 +50,7 @@ class AliasedConstructorDispatchTest {
     @Test
     void aNameNothingBindsIsStillRefused() {
         assertEquals(1, tson().validate("""
-                !!schema:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema { x => !no_such_constructor { element_type: token } }""")
                 .size());
     }

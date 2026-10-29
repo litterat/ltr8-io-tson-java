@@ -35,9 +35,9 @@ class VoidHasOneSpellingTest {
     private static final String ID = "https://example.test/person-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/person-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               person => {
                 name: text
                 nickname?: text?
@@ -59,7 +59,7 @@ class VoidHasOneSpellingTest {
 
     private static TsonValue readPerson(String fields) {
         return tson().treeReader().read("""
-                !!schema:"https://example.test/person-1.tn"
+                !!import:"https://example.test/person-1.tn"
                 !person { name: "Ada"  %s }""".formatted(fields));
     }
 
@@ -152,7 +152,7 @@ class VoidHasOneSpellingTest {
     @Test
     void underASchemaTheSentinelAtARequiredPositionStillFails() {
         ReadException thrown = assertThrows(ReadException.class, () -> tson().treeReader().read("""
-                !!schema:"https://example.test/person-1.tn"
+                !!import:"https://example.test/person-1.tn"
                 !person { name: _  nickname: "Countess" }"""));
 
         assertEquals(Diagnostic.Code.FIELD_REQUIRED, thrown.diagnostic().code());

@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UnjudgedDocumentTest {
 
     private static final String DOCUMENT = """
-            !!schema:"https://example.test/unjudged.tn"
+            !!import:"https://example.test/unjudged.tn"
             !node { "@id": "x"  label: "y" }""";
 
     private static List<Diagnostic.Code> codes(List<Diagnostic> problems) {
@@ -37,9 +37,9 @@ class UnjudgedDocumentTest {
     void aSchemaThatDoesNotLoadLeavesTheDocumentUnjudged() {
         String broken = """
                 !!id:"https://example.test/unjudged.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   json_name => !identifier_type { start_add: "@" }
                   node => !record { name_type: json_name  fields: { "@id" => { type: nonesuch } } }
                 }
@@ -54,9 +54,9 @@ class UnjudgedDocumentTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/unjudged.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { other => { a: text } }
+                !schema { other => { a: text } }
                 """);
         List<Diagnostic> problems = tson.validate(DOCUMENT);
         assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE), codes(problems), problems::toString);
@@ -66,7 +66,7 @@ class UnjudgedDocumentTest {
     @Test
     void anUnjudgedDocumentsSyntaxIsStillChecked() {
         List<Diagnostic> problems = Tson.standard().validate("""
-                !!schema:"https://example.test/unjudged.tn"
+                !!import:"https://example.test/unjudged.tn"
                 !node { "@id": "x"  ]""");
         assertEquals(2, problems.size(), problems::toString);
         assertTrue(problems.get(1).message().contains("expected a record field name"), problems::toString);

@@ -30,9 +30,9 @@ class NamespaceSlotTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/slots.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               person => { name: text  age?: integer  nick?: text }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 

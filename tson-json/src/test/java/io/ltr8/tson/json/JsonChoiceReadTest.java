@@ -37,9 +37,9 @@ class JsonChoiceReadTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/choice-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               scalar_or_list => ( text | int32 | boolean | [text] )
               any_json       => ( text | number | boolean | [any_json?] | {text => any_json?} )
 
@@ -219,11 +219,11 @@ class JsonChoiceReadTest {
         assertTrue(refusal.expected().contains("circle"), refusal.expected());
     }
 
-    /** §3.3: `$schema` stands on the root alone, so a choice position refuses it like every other. */
+    /** §3.3: `$import` stands at the top of the document alone, so a choice position refuses it like every other. */
     @Test
-    void aSchemaMemberIsRefusedAtAChoicePosition() {
+    void anImportMemberIsRefusedAtAChoicePosition() {
         assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, read("shape", """
-                {"$schema": "https://example.test/other.tn", "$type": "circle", "radius": 1.0}""")
+                {"$import": ["https://example.test/other.tn"], "$type": "circle", "radius": 1.0}""")
                 .refusal().code());
     }
 

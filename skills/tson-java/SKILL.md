@@ -85,17 +85,18 @@ with no compatibility guarantee between revisions — so a schema `!!id` pinned 
 | a data document                    | a grammar-faithful AST                        | `new TsonDataParser(text).parseDocument()` |
 | a data document                    | to pull events lazily                         | `TsonDataStream`                          |
 
-**The two facade readers are the whole document-reading surface.** They own the `!!schema` decision,
+**The two facade readers are the whole document-reading surface.** They own the `!!import` decision,
 the target-class check, and the framing that rejects trailing content. Everything under them
 (`TsonCompiledSchemaRegistry`, `TsonTypeReader`) reads *one value at a cursor* and polices nothing
 around it.
 
 **Constructed directly** (`new TsonTreeReader()`, `new TsonObjectReader()`, and the two writers) a
-reader is schemaless, Jackson-style: it ignores any `!!schema` and binds to the wire, or your Java
+reader is schemaless, Jackson-style: it ignores any `!!import` and binds to the wire, or your Java
 class, alone — no standard-library bootstrap, no `Tson`. **Obtained from a `Tson`** it is schema-aware:
-a document that declares its own `!!schema` is resolved and validated as it is read, and one that
-declares none falls back to a schemaless read. `readWithoutSchema(…)` opts a schema-aware reader back
-out.
+a document that names its schemas with `!!import` is resolved and validated as it is read (several imports
+read as one namespace), and one that imports none falls back to a schemaless read. `readWithoutSchema(…)`
+opts a schema-aware reader back out. A *schema* document — root tagged `!schema` — is reported as unsupported
+by every read but `readAs`; `tson.validateSchema(text)` is its door.
 
 ## The front door
 
@@ -111,9 +112,8 @@ Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn, core.tn, net.
 
 String schema = """
         !!id:"https://example.com/2026/39/app/order-1.tn"
-        !!meta:"https://tson.io/2026/39/m/meta.tn"
         !!import:"https://tson.io/2026/39/m/core.tn"
-        {
+        !schema {
           order => {
             order_id: int32
             customer: text
@@ -134,9 +134,9 @@ value.get("customer").asString();     // Optional[Ada Lovelace]
 value.get("order_id").asInt();        // OptionalInt[1042]
 ```
 
-`withSchema(uri)` supplies what a `!!schema` directive would have said and `readAs(source, type)` what
-a root type-ref would have. A **self-describing** document needs neither — `tson.treeReader().read(doc)`
-resolves the schema the document names and picks the type from its own root `!order`.
+`withSchema(uri)` (or `withImports(List.of(…))` for several) supplies what `!!import` directives would have
+said and `readAs(source, type)` what a root type-ref would have. A **self-describing** document needs neither —
+`tson.treeReader().read(doc)` resolves the schema the document names and picks the type from its own root `!order`.
 
 **`Tson` methods that matter:**
 
@@ -260,14 +260,14 @@ unchanged.
 
 ## Routing on the header alone
 
-Whether a file is data or schema is a property of its header, not its extension, and §7.1 fixes the
-cost at two directives of lookahead:
+Whether a file is data or schema is a property of its root's tag, not its extension: a root tagged
+`!schema` is a schema document. A peek reads the header (`!!id`, then any `!!import`s) and the root's tag,
+looking past the root's leading annotations, and never parses the root's value:
 
 ```java
 TsonDocumentPeek peek = tson.begin(text);                    // or an InputStream
-TsonDocumentHeader header = peek.header();
-if (header.isSchemaDocument()) { … }                         // it carries !!meta
-String uri = header.schema().orElse(DEFAULT_SCHEMA);
+if (peek.isSchemaDocument()) { … }                           // its root is tagged !schema
+List<String> imports = peek.header().imports();              // what it names, in header order
 ```
 
 It is **total**: a header it cannot read yields nothing rather than throwing, and it never answers with
@@ -435,9 +435,9 @@ tson strip --keep-docs person.tn        # the same, keeping @doc, @title and @ex
 tson validate --schema order.tn --type order data.json        # JSON data, bound out of band
 ```
 
-**A flat file list**. Each `.tn` is auto-classified as schema or data by content and never by filename, and a
-data document's own `!!schema` plus its root type-ref select what it is checked against. A `.json` file is
-JSON data — the one place the tool reads an extension — and, naming neither its schema nor its type, takes
+**A flat file list**. Each `.tn` is auto-classified as schema or data by its root's tag (`!schema`) and never
+by filename, and a data document's own `!!import`s plus its root type-ref select what it is checked against. A
+`.json` file is JSON data — the one place the tool reads an extension — and, naming neither its schema nor its type, takes
 `--schema <file|uri> --type <name>` together; they bind every JSON input in the run. A schema file given to
 `--schema` joins the run and binds by the `!!id` it declares, wherever it sits. Nothing is fetched over the
 network. Exit codes: `0` accepted · `1` rejected, as invalid or refused (§8.2 name hygiene, a §9.1 limit) ·
@@ -468,7 +468,7 @@ node        => json_record & { "@id": text  "$ref"?: text  label: text }
 
 - **In TSON text a relaxed name is quoted** (`!node { "@id": "urn:x"  label: "y" }`); the writer quotes it for you.
 - **In JSON it is an ordinary member** (`{"@id": "urn:x", "label": "y"}`), and `$ref`/`$id` are field names: only
-  `$schema`, `$type` and `$value` mean anything to the encoding, so a record should not declare those three.
+  `$import`, `$type` and `$value` mean anything to the encoding, so a record should not declare those three.
 - **Bind it through the component that states it**: `public record Node(@Field("@id") String id,
   @Field("$ref") String ref, String label) {}`.
 - **Other name types**: words with a space (`!identifier_type { continue_add: "-"  medial: " " }`), names compared
@@ -527,7 +527,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | You wrote                                                       | Problem                                                             | Do this instead                                             |
 | --------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `tson.validateSchema(s)` then `tson.resolve(s)`                 | both register; the second throws "already registered"               | pick one — `validateSchema` registers when the schema is sound |
-| `new TsonTreeReader().read(doc)` on a self-describing document  | a directly-built reader ignores `!!schema` by design, so the root `!order` is an `UNKNOWN_TYPE_REF` | `tson.treeReader()`, from a built `Tson`  |
+| `new TsonTreeReader().read(doc)` on a self-describing document  | a directly-built reader ignores `!!import` by design, so the root `!order` is an `UNKNOWN_TYPE_REF` | `tson.treeReader()`, from a built `Tson`  |
 | `new TsonObjectReader().read(…, Server.class)` with a non-`public` record | binding is reflective across a module boundary            | make the target class `public`                              |
 | a `Tson` built per request                                       | it re-bootstraps and recompiles every schema                        | build one at startup and keep it                            |
 | registering schemas from several threads                        | only *reads* through one `Tson` are safe                            | resolve every schema at startup, then read                  |

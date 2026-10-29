@@ -21,7 +21,7 @@ import java.util.Map;
  * named type reads the value as a record, wrapper otherwise. Any other value -- a bare scalar, an array, an object
  * with no annotation member, one with no {@code $type} -- names no type, and is a validation error in every mode,
  * the position promising no type for it to be read as. A {@code $type} naming no type of the closure is an
- * unresolved reference, {@code UNKNOWN_TYPE}; a leading {@code $schema} is refused as at every value position
+ * unresolved reference, {@code UNKNOWN_TYPE}; a leading {@code $import} is refused as at every value position
  * ({@link Tags}).
  *
  * <p><b>Wired at compile.</b> A {@code declared} entry belongs to one schema, so every name its governing
@@ -41,7 +41,7 @@ final class DispatchDeclaredReader implements JsonTypeReader<Object> {
 
     private static final String UNTYPED_EXPECTED = "an annotation object naming the value's type";
 
-    /** How this position describes itself in the {@code $schema} refusal. */
+    /** How this position describes itself in the {@code $import} refusal. */
     private static final String WHAT = "is a declared type, whose values name a type of the governing schema";
 
     private final String displayName;

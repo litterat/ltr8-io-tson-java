@@ -40,8 +40,8 @@ layer is any schema declaring constructors; nothing else sets it apart (SPEC-FEE
   has its map's read API and is no `Map`, and its equality is `type`, the entries as a map and each key's
   annotations, never order.
 - An entry built by a constructor this library has no factory for compiles to an `ErrorReader`; it is never dropped.
-- A `!!meta` target contributes its namespace exactly as an `!!import` does, so a layer's shared types sit beside its
-  constructors and every schema reaching the layer names them; one name declared twice in a closure is §2.2.3's
+- A layer is reached by `!!import`, which contributes its whole namespace, so a layer's shared types sit beside its
+  constructors and every schema importing the layer names them; one name declared twice in a closure is §2.2.3's
   collision, by identity.
 - A namespace type IS-A `top`, and any schema declares one, types a field by one, or holds a value of one as an
   entry. The entry applying it sits in a schema importing the one declaring it: a constructor applied in its own
@@ -244,8 +244,8 @@ and makes the kernel's namespaces and a meta layer's one type.
 
 **One namespace, so shared vocabulary sits beside the constructors.** The instinct on declaring `method` in a meta
 layer is to put the shared types beside it -- a `status_code` atom, an envelope template -- and let the schemas
-importing the layer name them, and they can: a `!!meta` target contributes its whole namespace as an `!!import` does
-(SPEC-FEEDBACK.md #7), whether a name is written bare, in a field, or applied with its arguments. The cost is
+importing the layer name them, and they can: an `!!import` contributes its whole namespace (SPEC-FEEDBACK.md #7),
+whether a name is written bare, in a field, or applied with its arguments. The cost is
 reservation: every name in the closure is taken, so a schema importing core.tn cannot declare `identifier`, `record`,
 `namespace` or `title` of its own (`MetaLayerVocabularyTest`). The one thing a layer's own document cannot do is
 apply its constructors to itself: `!api { … }` beside `api => namespace & { … }` waits on `api` being resolved

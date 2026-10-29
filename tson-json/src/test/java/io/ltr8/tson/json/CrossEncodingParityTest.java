@@ -49,9 +49,9 @@ class CrossEncodingParityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/parity-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               person => {
                 name:   text
                 tries?: int32 ~ 0
@@ -156,7 +156,7 @@ class CrossEncodingParityTest {
     }
 
     private static List<Verdict> tson(String rootType, String body) {
-        return Verdict.of(TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, body)));
+        return Verdict.of(TSON.validate("!!import:\"%s\"\n!%s %s".formatted(ID, rootType, body)));
     }
 
     private static List<Verdict> json(String rootType, String body) {
@@ -212,7 +212,7 @@ class CrossEncodingParityTest {
      * here is right, that component being data rather than prose.
      */
     private static void sameRule(String rootType, String tsonBody, String jsonBody) {
-        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
+        List<Diagnostic> fromTson = TSON.validate("!!import:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
         assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
         List<Diagnostic> fromJson = jsonDiagnostics(rootType, jsonBody);
         assertEquals(fromTson.stream().map(Rule::of).toList(), fromJson.stream().map(Rule::of).toList(),
@@ -221,7 +221,7 @@ class CrossEncodingParityTest {
 
     /** Both encodings refuse on the same codes at the same pointers; the JSON diagnostics, for what is left. */
     private static List<Diagnostic> sameCodeAndPath(String rootType, String tsonBody, String jsonBody) {
-        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
+        List<Diagnostic> fromTson = TSON.validate("!!import:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
         assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
         List<Diagnostic> fromJson = jsonDiagnostics(rootType, jsonBody);
         assertEquals(fromTson.stream().map(d -> d.code() + " " + d.path()).toList(),
@@ -269,7 +269,7 @@ class CrossEncodingParityTest {
     @Test
     void bothTreesKeepWhichSpellingOfAVoidValueArrived() {
         TsonRecord text = (TsonRecord) TSON.treeReader().read("""
-                !!schema:"%s"
+                !!import:"%s"
                 !marks { from: _  timeout: _  version: "2.0" }""".formatted(ID));
         JsonObject json = (JsonObject) jsonTree("marks", """
                 {"from": null, "timeout": null, "version": "2.0"}""");
@@ -394,7 +394,7 @@ class CrossEncodingParityTest {
      */
     @Test
     void aTagContradictingTheDiscriminatorIsRefusedInBothAndStatedDifferently() {
-        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!kennel %s".formatted(ID,
+        List<Diagnostic> fromTson = TSON.validate("!!import:\"%s\"\n!kennel %s".formatted(ID,
                 "{ p: !cat { pet_type: dog  name: Rex  breed: corgi } }"));
         assertEquals(List.of(new Rule(Diagnostic.Code.TYPE_MISMATCH, "/p", "dog", fromTson.getFirst().message())),
                 fromTson.stream().map(Rule::of).toList());

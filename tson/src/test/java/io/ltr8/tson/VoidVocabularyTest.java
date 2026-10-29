@@ -23,9 +23,9 @@ class VoidVocabularyTest {
     private static final String ID = "https://example.test/2026/39/void-vocabulary-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/2026/39/void-vocabulary-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               slots   => !array { element_type: int32  voidable: true }
               entries => !map { key_type: text  value_type: int32  voidable: true }
               pair    => !tuple { elements: [{ element_type: int32 } { element_type: text  voidable: true }] }
@@ -47,7 +47,7 @@ class VoidVocabularyTest {
     }
 
     private static List<Diagnostic.Code> codes(String body) {
-        return tson(SCHEMA).validate("!!schema:\"" + ID + "\"\n" + body).stream().map(Diagnostic::code).toList();
+        return tson(SCHEMA).validate("!!import:\"" + ID + "\"\n" + body).stream().map(Diagnostic::code).toList();
     }
 
     @Test

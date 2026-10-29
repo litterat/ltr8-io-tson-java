@@ -254,7 +254,7 @@ final class SchemaDesugarer {
                         + "' collides with a declaration already in this schema");
             }
         }
-        return new SchemaDocument(document.id(), document.meta(), document.imports(),
+        return new SchemaDocument(document.id(), document.imports(),
                 new SchemaMap(body.annotations(), declarations));
     }
 

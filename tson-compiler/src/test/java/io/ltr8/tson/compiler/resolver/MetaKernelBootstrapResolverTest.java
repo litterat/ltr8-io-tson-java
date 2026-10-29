@@ -49,12 +49,8 @@ class MetaKernelBootstrapResolverTest {
     void headerDirectivesCarryThroughFromTheDocument() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        // §1.5: meta-kernel's own !!meta names itself -- the one deliberate circularity. By identity,
-        // not raw string: its !!id carries a ?sha256= pin its self-!!meta cannot (pinning it would be
-        // circular), so they differ as strings but name the same identity.
-        assertEquals(CanonicalIdentity.canonicalize(schema.id()),
-                CanonicalIdentity.canonicalize(schema.meta()));
-        assertTrue(schema.meta().endsWith("meta-kernel.tn"));
+        // The kernel's header is its !!id alone: it imports nothing, and is pre-loaded rather than resolved (§3.4).
+        assertTrue(CanonicalIdentity.canonicalize(schema.id()).endsWith("meta-kernel.tn"));
         assertEquals(List.of(), schema.imports());
         // getMetaKernelSchema() is the one and only place that ever sets this -- see TsonSchema's own Javadoc.
         assertTrue(schema.bootstrap());
@@ -213,7 +209,7 @@ class MetaKernelBootstrapResolverTest {
     /** The partial link and the bootstrap compile are the bootstrap's alone: an ordinary schema leaves nothing pending. */
     @Test
     void onlyTheBootstrapLinksOrCompilesWithEntriesPending() {
-        TsonSchema ordinary = new TsonSchema("https://example.com/s.tn", "https://example.com/m.tn", List.of(),
+        TsonSchema ordinary = new TsonSchema("https://example.com/s.tn", List.of(),
                 Map.of());
 
         assertThrows(IllegalArgumentException.class, () -> TsonSchemaLinker.linkBootstrap(ordinary, Set.of("x")));

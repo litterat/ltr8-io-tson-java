@@ -24,9 +24,9 @@ class NamespaceFacetsTest {
     private static List<Diagnostic> link(String declarations) {
         String text = """
                 !!id:"https://example.test/meta-facets.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   method => { request?: kind<record> }
                   %s
                 }

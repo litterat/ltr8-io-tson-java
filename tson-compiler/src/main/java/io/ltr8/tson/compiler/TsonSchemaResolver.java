@@ -16,7 +16,7 @@ import io.ltr8.tson.schema.TsonSchema;
  * reimplementation.
  *
  * <p>The {@link TsonCompiledSchemaLoader} it is constructed with resolves the document's own {@code
- * !!meta}/{@code !!import} targets on demand (fetch/resolve/register/compile), rather than requiring
+ * !!import} targets on demand (fetch/resolve/register/compile), rather than requiring
  * them to be pre-registered -- {@code TsonCompiledMetaRegistry} is the implementation a caller ordinarily
  * uses (it is both the compiled-schema registry and that loader).
  */
@@ -24,7 +24,7 @@ public class TsonSchemaResolver {
 
     private final SchemaResolver resolver;
 
-    /** @param loader consulted to resolve {@code document}'s own {@code !!meta}/{@code !!import} targets on demand. */
+    /** @param loader consulted to resolve {@code document}'s own {@code !!import} targets on demand. */
     public TsonSchemaResolver(TsonCompiledSchemaLoader loader) {
         this.resolver = new SchemaResolver(loader);
     }

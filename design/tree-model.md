@@ -14,7 +14,7 @@ only; history lives in git.
   position admits `_` and nothing else.
 - `as(Class)`/`asString`/… cast, `asInt`/`asLong`/`asDouble` convert — a test asserting which host type a
   reader produced must use `as(Class)`.
-- `TsonDocument` has no `meta` component; `TsonObjectDocument<T>` is a distinct type carrying `rootType`.
+- `TsonDocument` is `(id, imports, root)`; `TsonObjectDocument<T>` is a distinct type carrying `rootType`.
 - No node carries a `Node` suffix, and the model is read-side only: no builders, no transforms.
 
 Related: `design/facades-and-tree.md` (the readers producing a tree), `design/writers-and-document-header.md`
@@ -32,12 +32,12 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
 - **`TsonDocument` is the model's document, and `TsonValue` stays a pure value.** [TSON-DATA] §2.2 —
   "Header directives are properties of the document, not of the body's root value" — is why the header is a
   wrapper rather than two more components on every node, and it makes the tree model the counterpart of the
-  parser's own `ast.Document(id, schema, root)` rather than a value model with a hole where the document
+  parser's own `ast.Document(id, imports, root)` rather than a value model with a hole where the document
   should be. It needs no dependency, so `tson-tree` still requires nothing.
-  - **No `meta` component**, deliberately: a document carrying `!!meta` is a *schema* document, whose value
-    model is `schema.meta`. `TsonDocumentHeader` is the type that holds all three, and it answers a different
-    question — classifying a document from its opening bytes (`isSchemaDocument()`) before deciding how to
-    read it. Same reason `ast.Document` carries only the two.
+  - **Nothing says it is a data document**, because a data read is what produced it: a root tagged `!schema` is
+    a *schema* document, whose value model is `schema.meta`, and a Class 1 read refuses one. Classifying a
+    document before deciding how to read it is `TsonDocumentPeek.isSchemaDocument()`'s question, answered from
+    the root's tag, never from the header.
   - **`readDocument` sits beside `read`, which still hands back the root value.** Changing what a read
     hands back, and every caller with it, would be a cost of *replacing* `read`, not of the wrapper.
     `TsonTreeWriter.toTson(TsonDocument)` closes the loop from the other end, the document's own directives
@@ -48,7 +48,7 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
     fourth component, `rootType`, because a `TsonValue` carries its own `typeRef()` and a bound object
     carries nothing. Two arities are not siblings, so they are not named as such.
     - **What it carries is what the *read* established.** The class plus its bind context already fix which
-      schema governs an object — one context per schema version is the design — so `schema` is the weakest
+      schema governs an object — one context per schema version is the design — so `imports` is the weakest
       of the three. The other two are not recoverable from anything the caller holds: `!!id` is
       per-document data (§2.2 makes it a property of the document, so a class modelling it as a field would
       misstate its own shape), and `rootType` is a name a `DataNameBinder` cannot hand back, mapping name to

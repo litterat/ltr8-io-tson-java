@@ -28,16 +28,16 @@ class DurationValueSpaceTest {
 
     private record Fixture(Tson tson, String id) {
         List<Diagnostic> read(String body) {
-            return tson.validate("!!schema:\"" + id + "\"\n" + body);
+            return tson.validate("!!import:\"" + id + "\"\n" + body);
         }
     }
 
     private static String schemaDeclaring(String declarations) {
         return """
                 !!id:"https://example.test/duration-%d.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { %s }
+                !schema { %s }
                 """.formatted(NEXT.incrementAndGet(), declarations);
     }
 

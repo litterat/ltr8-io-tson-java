@@ -184,7 +184,7 @@ Three reasons this is the receiver's business rather than the caller's:
   problem has already been reported. Throwing past the receiver would leave a caller holding a populated
   collector *and* an exception, with nothing saying the two belong to one document, and `Tson.validate`
   either discarding the collector or losing the syntax error.
-- **It is the same shape the facade uses** for an unreachable `!!schema` (`readAgainstSchema`):
+- **It is the same shape the facade uses** for an unreachable `!!import` (`readAgainstSchema`):
   report once, abandon the value. "Nothing can continue past a document that will not parse" is an argument
   for not continuing, not for not reporting.
 - **A caller could not classify it themselves**: `LexException` is in the unexported `lexer` package, so

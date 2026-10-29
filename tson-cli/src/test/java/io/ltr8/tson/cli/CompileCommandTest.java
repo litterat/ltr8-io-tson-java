@@ -19,9 +19,9 @@ class CompileCommandTest {
     void aCleanSchemaCompilesAndExitsZero(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-compile-ok.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   my_int => int32
                   my_record => { value: int32 }
                 }
@@ -37,8 +37,8 @@ class CompileCommandTest {
     void aSchemaWithAnUnresolvableReferenceExitsOne(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "broken.tn", """
                 !!id:"https://example.test/cli-compile-broken.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   my_int => this_type_does_not_exist
                 }
                 """);
@@ -59,9 +59,9 @@ class CompileCommandTest {
     void aSchemaWhoseImportCannotBeObtainedExitsSixtyNine(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "needs-import.tn", """
                 !!id:"https://example.test/cli-compile-import.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/nobody-serves-this.tn"
-                {
+                !schema {
                   my_int => int32
                 }
                 """);
@@ -83,9 +83,9 @@ class CompileCommandTest {
     void aRefinementUsingJsonSchemaFacetNamesExitsOneAndNamesTheRealVocabulary(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "json-shaped.tn", """
                 !!id:"https://example.test/cli-compile-json-shaped.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   quantity_t => !integer ^ { minimum: 1  maximum: 100 }
                 }
                 """);

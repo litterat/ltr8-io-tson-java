@@ -25,7 +25,7 @@ final class CompileCommand {
     }
 
     /**
-     * @return exit code: 0 compiled cleanly, 1 it didn't, 69 an {@code !!import}/{@code !!meta} of its own
+     * @return exit code: 0 compiled cleanly, 1 it didn't, 69 an {@code !!import} of its own
      *         could not be obtained, so it was never wholly read, 75 one could not be reached and a rerun may
      *         reach it, 78 a type it needs has no Java class in this tool, 70 a construct in it is a gap in this
      *         library ({@link TsonCli#exitCodeFor} ranks a mixed run)

@@ -18,8 +18,8 @@ class HashCommandTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/thing-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
-            { thing => int32 }
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !schema { thing => int32 }
             """;
 
     @Test

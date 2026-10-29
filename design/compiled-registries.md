@@ -30,7 +30,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
 - **`TsonCompiledMetaRegistry`** is the shared **meta/resolution core**, and *is* the on-demand
   `TsonCompiledSchemaLoader`. It owns the paired `TsonSchemaRegistry`, a bind-mode resolver, a
   `SchemaSource`, content-hash verification, and the meta-kernel bootstrap. Its loader interface:
-  `resolveLinked(uri) → TsonLinkedSchema` (a `!!meta` or `!!import` target, or a user schema —
+  `resolveLinked(uri) → TsonLinkedSchema` (an `!!import` target, or a user schema —
   fetched/resolved/linked/registered), and `loadMeta(uri)` / `vocabularyOf(identity) → TsonCompiledMetaSchema`,
   a schema's **compiled vocabulary**: the readers a schema importing it reads a `!C { … }` body or an annotation
   value through, where it declared `C` or the annotation's type (`design/resolver-vocabulary-and-bootstrap.md`).
@@ -44,7 +44,10 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   via `TsonCompiledSchemaRegistry.tree(core)` / `bind(core, context)`. **The read mode is which registry
   you hold**, not a compile parameter. `get(uri)` resolves through the core (`resolveLinked`) and compiles
   the linked form standalone in its own mode, cached by identity; `compile(linked)` is the uncached
-  primitive.
+  primitive. `get(List<String> imports, receiver)` is a data document's read under several imports: one import is
+  that schema's own compilation, several are linked as a schema with no entries of its own importing each (a name
+  two declare differently being §2.2.3's collision), under a derived identity never registered, and compiled once
+  per set.
 - **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A
   schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue`
   can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile
@@ -59,11 +62,10 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   is unbounded recursion ending in a `StackOverflowError`: an `Error` raised by ordinary author input, which
   no `Diagnostic` ever sees and which the exception policy cannot classify. `resolving` holds the identities
   this thread is part-way through, and the chain closing the cycle is what the message names, so any one of
-  its links is the edge to break. The same guard covers a `!!meta` chain, every link of which is reached
-  through `resolveLinked`.
+  its links is the edge to break.
     - **Per thread, not per registry**, and that is not incidental: concurrent resolution of one identity by
       two threads is safe here by design (below), and a registry-wide set would make the second thread's
-      ordinary in-flight entry look like a cycle to the first. Recursion through `!!import`/`!!meta` is
+      ordinary in-flight entry look like a cycle to the first. Recursion through `!!import` is
       strictly within one thread, which is exactly the scope of the question.
     - It **throws even with a receiver in play**, on the same footing as an unloadable `!!import`: what fails is the
       namespace itself, so carrying on would report every reference into the unresolvable half as a second problem. What

@@ -178,7 +178,7 @@ class SidecarSchemaReadTest {
                   valid: {
                     document: {
                       id: _
-                      schema: _
+                      imports: []
                       root: {
                         annotations: []
                         type-ref: _
@@ -204,7 +204,7 @@ class SidecarSchemaReadTest {
                   description: "The void sentinel as a root value"
                   valid: {
                     document: {
-                      id: _  schema: _
+                      id: _  imports: []
                       root: { annotations: []  type-ref: _  core: { absent: _ } }
                     }
                   }
@@ -221,7 +221,7 @@ class SidecarSchemaReadTest {
                   description: "Both a token and a record"
                   valid: {
                     document: {
-                      id: _  schema: _
+                      id: _  imports: []
                       root: { annotations: []  type-ref: _  core: {
                         token: { form: unquoted  text: "1" }
                         record: { fields: [] } } }

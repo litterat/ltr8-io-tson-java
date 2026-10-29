@@ -14,6 +14,7 @@ import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.base.source.SchemaSource;
 import org.junit.jupiter.api.Test;
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -36,9 +37,9 @@ class TsonObjectDocumentRoundTripTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { sku: text  quantity: int32 }
             }
             """.formatted(SCHEMA_URI);
@@ -63,13 +64,13 @@ class TsonObjectDocumentRoundTripTest {
     void aDocumentSurvivesBeingReadAndWrittenBack() {
         String source = """
                 !!id:"https://example.test/orders/1.tn"
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI);
 
         TsonObjectDocument<Order> document = tson().objectReader().readDocument(source, Order.class);
 
         assertEquals(Optional.of("https://example.test/orders/1.tn"), document.id());
-        assertEquals(Optional.of(SCHEMA_URI), document.schema());
+        assertEquals(List.of(SCHEMA_URI), document.imports());
         assertEquals(Optional.of("order"), document.rootType());
         assertEquals(new Order("ABC-1", 3), document.value());
 
@@ -88,12 +89,12 @@ class TsonObjectDocumentRoundTripTest {
     void theIdAndRootTypeAreWhatTheObjectCannotCarry() {
         TsonObjectDocument<Order> document = tson().objectReader().readDocument("""
                 !!id:"https://example.test/orders/1.tn"
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI), Order.class);
 
         // The object alone -- what `read` hands back -- knows neither.
         Order plain = tson().objectReader().read("""
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI), Order.class);
 
         assertEquals(plain, document.value());
@@ -105,7 +106,7 @@ class TsonObjectDocumentRoundTripTest {
     @Test
     void readStillHandsBackTheObjectAlone() {
         String source = """
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI);
 
         assertEquals(tson().objectReader().read(source, Order.class),
@@ -118,7 +119,7 @@ class TsonObjectDocumentRoundTripTest {
         TsonObjectDocument<Order> document =
                 tson().objectReader().readDocument("{ sku: \"ABC-1\"  quantity: 3 }", Order.class);
 
-        assertEquals(Optional.empty(), document.schema());
+        assertEquals(List.of(), document.imports());
         assertEquals(Optional.empty(), document.rootType());
         assertEquals(new Order("ABC-1", 3), document.value());
     }
@@ -127,7 +128,7 @@ class TsonObjectDocumentRoundTripTest {
     @Test
     void aDocumentsOwnFactsWinOverTheWritersAndOnlyWhereItHasThem() {
         TsonObjectDocument<Order> governed = tson().objectReader().readDocument("""
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI), Order.class);
 
         String written = new TsonObjectWriter()
@@ -149,7 +150,7 @@ class TsonObjectDocumentRoundTripTest {
     @Test
     void aSchemaWithNoRootTypeIsRefusedRatherThanWrittenHalfDescribed() {
         TsonObjectDocument<Order> handAssembled = new TsonObjectDocument<>(
-                Optional.empty(), Optional.of(SCHEMA_URI), Optional.empty(), new Order("ABC-1", 3));
+                Optional.empty(), List.of(SCHEMA_URI), Optional.empty(), new Order("ABC-1", 3));
 
         WriteException thrown =
                 assertThrows(WriteException.class, () -> new TsonObjectWriter().toTson(handAssembled));
@@ -161,14 +162,14 @@ class TsonObjectDocumentRoundTripTest {
     void withValueKeepsTheHeaderAcrossAProjection() {
         TsonObjectDocument<Order> document = tson().objectReader().readDocument("""
                 !!id:"https://example.test/orders/1.tn"
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI), Order.class);
 
         TsonObjectDocument<String> projected = document.withValue(document.value().sku());
 
         assertEquals("ABC-1", projected.value());
         assertEquals(document.id(), projected.id());
-        assertEquals(document.schema(), projected.schema());
+        assertEquals(document.imports(), projected.imports());
         assertEquals(document.rootType(), projected.rootType());
     }
 

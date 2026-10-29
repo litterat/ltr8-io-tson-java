@@ -34,8 +34,8 @@ class ChoiceConstructionResolutionTest {
 
     private static final String CHOICE_DOCUMENT = """
             !!id:"https://example.test/choice.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !schema {
               contact => !choice { variants: [text integer] }
             }
             """;

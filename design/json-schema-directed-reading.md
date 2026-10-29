@@ -13,7 +13,8 @@ JSON inputs are in `design/cli-config-hashing.md`.
 - Selectors lead their object ([TSON-JSON] §3.3, §6.1.5, §6.1.6): every decision is a peek at the leading members
   (`TagMembers.lead`), bounded by the schema, and no reader scans an object.
 - The concrete record reader looks ahead at nothing: its member loop judges every annotation member as it arrives, and
-  `$schema` is refused at every value position (`Tags`, `SCOPE_NOT_ADMITTED`).
+  `$import` is refused at every value position (`Tags`, `SCOPE_NOT_ADMITTED`); a root led by one is declined as
+  `NOT_IMPLEMENTED` (`InBandBinding`), the in-band route being unbuilt.
 - `CompiledReaders` is rebound exactly once, from the in-progress compilation to the finished schema.
 - The map form is chosen by the factory from `K` and the record reader from `record.extension`, once at compile, never by
   inspecting a value.
@@ -55,9 +56,12 @@ which shows at a glance which TSON class a JSON class answers to. `tson-json` do
 
 ## Binding a document
 
-A JSON document can name neither its schema nor its root type. §3.4 gives two routes and this stack implements the
-first, **out of band** — the application supplies both, "the expected production route". The in-band route (a root
-annotation object carrying `$schema` and `$type`) is not built (`BACKLOG.md`).
+§3.4 gives a JSON document's binding two routes and this stack implements the first, **out of band** — the
+application supplies the schema and the root type, "the expected production route". The in-band route — a root
+annotation object led by `$import`, a list of schema references read as one namespace as a TSON data document's
+several `!!import`s are, then `$type` — is not built (`BACKLOG.md`). A root led by `$import` is declined as
+`NOT_IMPLEMENTED` by both doors (`InBandBinding`, a peek at the root's first member before its reader runs): the member
+stands where §3.3 puts it, so `SCOPE_NOT_ADMITTED` there would be a verdict that changes when the route is built.
 
 `Json.withSchemas(loader)` takes a `TsonSchemaLoader` (`tson-schema`'s interface): obtaining a linked schema is the TSON
 engine's job (`design/json-encoding.md`), so an application reading both encodings resolves once through `Tson` and
@@ -67,14 +71,14 @@ hands `tson.schemaRegistry()` over. `JsonCompiledSchemaRegistry` caches compiled
 declare; `Code.verdict()` separates these from anything the document did.
 
 **A pinned schema reference is not verified.** `JsonCompiledSchemaRegistry` keys on canonical identity and its
-loader takes nothing else, so a `?sha256=` pin — out of band or on a pushed `$schema` — is dropped before anything
-could check it (`BACKLOG.md`).
+loader takes nothing else, so a `?sha256=` pin — out of band, or in an `$import` once one is read — is dropped before
+anything could check it (`BACKLOG.md`).
 
 ## The annotation object, and the peek at its leading members
 
 §3.3's **annotation object** carries what TSON text attaches beside a value — wrapper (`{"$type": "age", "$value":
 42}`) or inline (`{"$type": "employee", "name": "Ada"}`, when the selected type reads the value as a record) — over
-§3.2's three members `$schema`, `$type`, `$value`. They are the only names the encoding gives a meaning: any other
+§3.2's three members `$import`, `$type`, `$value`. They are the only names the encoding gives a meaning: any other
 member name, `$`-initial or not, is a field name (`$ref` under a record whose `name_type` admits it) or a key. The
 class is `TagMembers`, not the spec's noun, because `Annotation` in this codebase means an `@name` annotation, which
 has no JSON carrier (§4.3); its Javadoc has the reasoning.
@@ -87,7 +91,7 @@ of positions that flatten cannot become whichever ones someone remembered. TSON 
 It is load-bearing for a template instantiation, whose entry name is minted and non-normative ([TSON-SCHEMA] §8.2): an
 alias is the only name a document has for one.
 
-**Recognising one is a bounded peek, because the selectors lead** (§4.1). `$schema` where present, then `$type`, then
+**Recognising one is a bounded peek, because the selectors lead** (§4.1). `$import` where present, then `$type`, then
 a sealed position's discriminators in any order among themselves (§6.1.5). `TagMembers.lead` reads those members and
 stops at the first that is none of them, and `JsonReadContext.lookingAhead` replays what it consumed. It holds a
 scalar value per selector and nothing else — a selector whose value is not a scalar stops the peek — so what a reader
@@ -99,7 +103,7 @@ extra member of an invalid object, refused by whoever reads it.
 member loop judges annotation members as they arrive: a `$type` in first place must restate the record
 (`RecordPlan.admitsTag`); `$value` straight after it makes the object a wrapper, read at the reader the enclosing
 position chose (`ExactReader`, `Route`), since the value inside may carry a tag of its own; a misplaced `$type` or
-`$value`, or any `$schema`, refuses the object and the rest of it is skipped (`RecordPlan.refuseTagMember`).
+`$value`, or any `$import`, refuses the object and the rest of it is skipped (`RecordPlan.refuseTagMember`).
 A member name is matched in NFC and then in the record's name type's form (`TsonLinkedSchema.nameForm`, held by
 `RecordPlan`; §6.1.1), so under a case-folding name type `NAME` is the field `name`; `TagMembers.lead` puts a sealed
 base's selectors in the same form. A member matching nothing is judged by that name type (`RecordPlan.unmatched`), as
@@ -111,9 +115,11 @@ Members read before a refusal have already reported, so an invalid document's di
 accepted deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid
 ones. The allocation harness measures the absent lookahead (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
 
-**`$schema` is refused at every value position.** It stands on the root's annotation object alone (§3.3, §3.4), so
-a record, a choice and a declared position refuse a leading one alike, through `Tags`, as `SCOPE_NOT_ADMITTED` (a
-resolver error) at the member's own path. TSON text refuses its `!!schema` there a layer earlier, as a parse error.
+**`$import` is refused at every value position.** It stands at the top of the document alone (§3.3, §3.4), so a
+record, a choice and a declared position refuse a leading one alike, through `Tags`, as `SCOPE_NOT_ADMITTED` (a
+resolver error) at the member's own path, whatever its value. `TagMembers.lead` stops at a leading `$import`, since
+every position that meets one refuses the object. TSON text refuses its `!!import` there a layer earlier, as a parse
+error.
 
 **`CompiledReaders` is how a factory reaches another entry's reader**, and it is **rebound exactly once**, from the
 in-progress compilation to the finished schema, because handing readers the compilation's resolve would leak its
@@ -269,7 +275,7 @@ changes.
 
 **The leading `$type` names the type** (`TagMembers.lead`). Anything else — a bare scalar, an array, an object leading
 with no annotation member, a wrapper with no `$type` — names no type: a validation error in every mode. A leading
-`$schema` is refused first, as at every value position (`Tags`).
+`$import` is refused first, as at every value position (`Tags`).
 
 **The closure is wired at compile.** Every name the governing closure holds is resolved to a `Route` when the entry
 compiles, so a read is one lookup and a route, as at a tagged record position. A name the closure does not hold is

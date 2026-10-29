@@ -34,8 +34,9 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `SCHEMA_TIMEOUT`            | the location did not answer in time                                                          |
 | `SCHEMA_TOO_LARGE`          | the location answered with more bytes than a schema document may be                          |
 
-In TSON text a `!!schema` anywhere but the header is a parse error, reported as `VALIDATION_ERROR` like any
-document that will not parse.
+In TSON text an `!!import` anywhere but the header is a parse error, reported as `VALIDATION_ERROR` like any
+document that will not parse — as are the retired `!!meta` and `!!schema` directives, an unknown directive and an
+`!!id` after an `!!import`.
 
 ### The eleven that are not verdicts on the document
 
@@ -219,13 +220,14 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 | a collecting facade read                                | nothing, for any bad document — a library fault still throws             |
 | `Tson.validate` / `validateSchema`                      | nothing, for any bad document — a library fault still throws             |
 | `Tson.resolve` on an already-registered `!!id`          | `SchemaValidationException`                                          |
-| `Tson.resolve` naming an unavailable `!!import`/`!!meta`| `SchemaFetchException`                                               |
+| `Tson.resolve` naming an unavailable `!!import`         | `SchemaFetchException`                                               |
 | a bind-mode compile whose class disagrees               | `BindMismatchException` — at compile, not at first read              |
 | the first read of a type with no bound class            | `MissingBindingException`, thrown unwrapped from its `ErrorReader`   |
 | a `SchemaSource`                                    | `SchemaFetchException` and nothing else — another type means a fault |
 
-**`!!meta` in a document handed to the data parser** throws `TsonUnsupportedDocumentException`, not
-`ParseException`: a schema document is unsupported there, not malformed.
+**A root tagged `!schema` in a document handed to the data parser** throws `TsonUnsupportedDocumentException`,
+not `ParseException`: a schema document is unsupported there, not malformed. `parseResolvedForm()` reads one
+without the refusal, the caller saying it holds a resolved form.
 
 ## CLI exit codes
 

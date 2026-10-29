@@ -36,9 +36,9 @@ class ValueParamFixedFieldTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/value-param.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order    => { id: text }
               literal  => { status?: int32 = 201  body: order }
               response => <T, S> { status?: int32 = S  body: T }
@@ -68,7 +68,7 @@ class ValueParamFixedFieldTest {
     }
 
     private static List<Diagnostic> validate(Tson tson, String type) {
-        return tson.validate("!!schema:\"" + ID + "\"\n!" + type + " { status: 999  body: { id: \"a\" } }");
+        return tson.validate("!!import:\"" + ID + "\"\n!" + type + " { status: 999  body: { id: \"a\" } }");
     }
 
     /**
@@ -148,9 +148,9 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeFixesARoutedValueTheSameWay() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   order    => { id: text }
                   base     => { status: int32  body: order }
                   fresh    => <T, S> { status?: int32 = S  body: T }
@@ -185,9 +185,9 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeResolvesAgainstTheSingleValueChannel() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   order    => { id: text }
                   base     => { status: int32  body: order }
                   fresh    => <T, S> { status?: int32 = S  body: T }

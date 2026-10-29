@@ -29,9 +29,9 @@ class NamespaceTypeTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-headers.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
-            {
+            !schema {
               header_name => !identifier_type { continue_add: "-" }
               headers     => namespace & { key_type: = header_name  value_type: = text }
               %s
@@ -40,8 +40,8 @@ class NamespaceTypeTest {
 
     private static final String USER_TEXT = """
             !!id:"https://example.test/request.tn"
-            !!meta:"https://example.test/meta-headers.tn"
-            {
+            !!import:"https://example.test/meta-headers.tn"
+            !schema {
               defaults => !headers %s
             }
             """;
@@ -85,9 +85,9 @@ class NamespaceTypeTest {
     void aSchemaImportingTheLayerTypesAFieldByIt() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/request.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/meta-headers.tn"
-                {
+                !schema {
                   request => { headers: headers }
                 }
                 """);
@@ -138,9 +138,9 @@ class NamespaceTypeTest {
     void anySchemaDeclaresANamespaceType() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/governed.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   hs => namespace & { key_type: = identifier  value_type: = text }
                 }
                 """);

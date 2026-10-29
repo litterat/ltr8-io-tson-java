@@ -51,7 +51,7 @@ class EnumTreeReaderTest {
         // requires it (the placeholder "meta.tn" this used to point at was never registered in
         // schemaRegistry below, so it was already functionally inert either way).
         TsonSchema schema = new TsonSchema("https://example.test/flag.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of(), entries);
+                List.of(), entries);
 
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry));

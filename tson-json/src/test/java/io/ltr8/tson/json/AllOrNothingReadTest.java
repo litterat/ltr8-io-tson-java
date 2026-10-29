@@ -32,9 +32,9 @@ class AllOrNothingReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/all-or-nothing-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               point  => { x: int32  y: int32 }
               route  => { name: text  stops: [point] }
             }

@@ -125,7 +125,7 @@ class MetaSchemaImportTest {
 
         // float_type's `format` is typed by ieee_format, which this schema deliberately leaves out.
         TsonSchema withFloatOnly =
-                new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("float_type", floatType));
+                new TsonSchema(meta.id(), meta.imports(), Map.of("float_type", floatType));
 
         assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> registry.register(TsonSchemaLinker.link(withFloatOnly, registry)));

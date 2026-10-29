@@ -103,10 +103,10 @@ public final class TsonCli {
             usage: tson validate [--output text|json|tson] [--schema <file|uri> --type <name>]
                                  [<policy options>] <file|->...
 
-            Validates data documents. Each .tn file is auto-classified as a schema document (its header
-            carries !!meta) or a data document, by content and never by filename, so the order of the
-            arguments does not matter. A data file's own !!schema selects the schema and its root
-            type-ref (!person) the type. A file with no !!schema gets a base-syntax and built-in-type
+            Validates data documents. Each .tn file is auto-classified as a schema document (its root is
+            tagged !schema) or a data document, by content and never by filename, so the order of the
+            arguments does not matter. A data file's own !!import selects the schema and its root
+            type-ref (!person) the type. A file with no !!import gets a base-syntax and built-in-type
             check instead. Nothing is fetched over the network: a schema no file here declares is
             reported as SCHEMA_NOT_PERMITTED -- this run will not supply it -- which is exit 69.
 
@@ -153,8 +153,8 @@ public final class TsonCli {
             """ + POLICY_OPTIONS + """
 
 
-            exit codes: 0 compiled cleanly, 1 checked and rejected, 2 usage error, 69 an !!import or
-                        !!meta of its own could not be obtained, 75 one that could not be reached,
+            exit codes: 0 compiled cleanly, 1 checked and rejected, 2 usage error, 69 an !!import of
+                        its own could not be obtained, 75 one that could not be reached,
                         78 a type with no Java class in this tool, 70 a gap in this library or a fault""";
 
     private static final String INIT_USAGE =
@@ -203,8 +203,8 @@ public final class TsonCli {
             !!id line) and stamps it onto that !!id as ?sha256=<hex>, in place and idempotently. Requires
             an !!id; the id line is excluded from the hash, which is what lets a document carry its own.
 
-            A pinned reference is verified on use: if a data file's !!schema, or a schema's !!import or
-            !!meta, carries ?sha256=..., validate hashes what it obtained and errors on a mismatch. The
+            A pinned reference is verified on use: if an !!import, in a data file or a schema, carries
+            ?sha256=..., validate hashes what it obtained and errors on a mismatch. The
             pin is not identity, so a pinned reference and a plain one still resolve to the same
             schema.""";
 
@@ -216,7 +216,7 @@ public final class TsonCli {
 
             Prints a schema document's reading form to standard output: the same declarations in as few
             tokens as the syntax allows, for a reader that reads the schema rather than loading it -- a
-            language model given it in a prompt. The !!id, every !!meta and !!import pin, and every @doc,
+            language model given it in a prompt. The !!id, every !!import pin, and every @doc,
             @title, @examples and @comment are removed; a reference to the spec's own library is shortened
             to its revision and name (!!import:"39/core"). Each directive and each declaration gets one
             line, with whitespace inside it collapsed to single spaces. Other annotations stay, and other

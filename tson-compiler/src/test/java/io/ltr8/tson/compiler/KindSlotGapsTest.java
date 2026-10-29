@@ -41,9 +41,9 @@ class KindSlotGapsTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/gap-meta.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   gap_status        => !integer_type { min: 100  max: 599 }
                   gap_reply         => { status: gap_status  body: type_kind }
                   gap_operation     => { request: type_kind  replies?: [gap_reply] }
@@ -79,9 +79,9 @@ class KindSlotGapsTest {
         String id = "https://example.test/gap-" + label + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://example.test/gap-meta.tn"
+                !!import:"https://example.test/gap-meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   order => { sku: text }
                   box   => <T> { v: T }
                   other => !gap_operations { o => { request: order } }

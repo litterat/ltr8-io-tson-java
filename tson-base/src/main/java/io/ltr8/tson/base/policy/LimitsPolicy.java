@@ -57,8 +57,7 @@ import java.util.List;
  * @param maxAnnotations          the annotations on one value
  * @param maxValues               all values in one document, containers and scalars alike -- an aggregate that
  *                                no per-container bound implies
- * @param maxImportClosure        the schema documents reachable from one header through {@code !!meta} and
- *                                {@code !!import}
+ * @param maxImportClosure        the schema documents reachable from one header through {@code !!import}
  * @param maxSchemaEntries        the declarations in one schema map, synthetic and instantiation entries
  *                                included
  * @param maxReferenceChain       the hops from a use site to a terminal entry

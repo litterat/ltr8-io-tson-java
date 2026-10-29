@@ -39,21 +39,21 @@ class HttpSchemaSourceThroughTsonTest {
 
     private static final String SCHEMA = """
             !!id:"https://schemas.example.com/2026/39/app/order-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { order => { sku: text  quantity: int32 } }""";
+            !schema { order => { sku: text  quantity: int32 } }""";
 
     private static final String BASE = """
             !!id:"https://schemas.example.com/2026/39/app/base-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { sku_code => !text ^ { min_length: 1 } }""";
+            !schema { sku_code => !text ^ { min_length: 1 } }""";
 
     private static final String DERIVED = """
             !!id:"https://schemas.example.com/2026/39/app/derived-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://schemas.example.com/2026/39/app/base-1.tn"
-            { boxed => { sku: sku_code } }""";
+            !schema { boxed => { sku: sku_code } }""";
 
     private HttpServer server;
     private String base;
@@ -98,12 +98,12 @@ class HttpSchemaSourceThroughTsonTest {
             tson.resolve(source.fetch(schemaUri));
 
             TsonValue order = tson.treeReader().read("""
-                    !!schema:"%s"
+                    !!import:"%s"
                     !order { sku: "ABC-1"  quantity: 3 }""".formatted(schemaUri));
             assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
 
             assertEquals(2, tson.validate("""
-                    !!schema:"%s"
+                    !!import:"%s"
                     !order { }""".formatted(schemaUri)).size(), "both required fields are missing");
         }
     }

@@ -22,7 +22,7 @@ What `!C { … }` may apply, how its head resolves, and why a template is never 
 - `!reference { target: X }` resolves to the alias's own entry — `kind: REFERENCE`, `X` as source and body — the same
   entry `name => X` denotes.
 - Construction transfers kind and no supertypes (§5.5), so an instance carries an empty chain and is not itself a
-  constructor. Any schema may declare a constructor; nothing ties it to the document's `!!meta`.
+  constructor. Any schema may declare a constructor; nothing ties it to what the document imports.
 - A constructor's parameters are confined to no channel: nothing is checked at the declaration, and each channel is
   decided where the argument lands.
 

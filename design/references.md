@@ -10,7 +10,8 @@ account, qualified type names and one reference atom over `kind_type`, `ref_type
 - A slot that names the type of a value is typed `type_kind` (`record_field.type`, `tuple_element.element_type`,
   `array.element_type`, `map.key_type` and `value_type`, `namespace.value_type`, `choice.variants`,
   `template_param.type` and `bound`). Its value is one bare name, judged a member of the kind at link (`KindMembers`),
-  never by the reader against the kernel's own members: a data document a meta layer governs describes a schema
+  never by the reader against the kernel's own members: a document read under a schema that `governsSchemas` (the
+  kernel, or a schema importing it directly, as meta.tn does) describes a schema
   whose namespace it does not carry, so its kind slots are read for grammar alone and membership waits for ingest
   ([TSON-SCHEMA] §4.2, §8.1). `namespace.key_type` is typed `identifier_kind`: a
   namespace's keys are names, which is what a qualified name's segment selects, so an enum-keyed map is no namespace.

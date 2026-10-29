@@ -17,9 +17,9 @@ class StripCommandTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/thing-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               @doc:"A thing."
               thing => int32
             }
@@ -31,7 +31,7 @@ class StripCommandTest {
 
         String out = capture(true, () -> assertEquals(0, TsonCli.run(new String[] {"strip", file.toString()})));
 
-        assertEquals("!!meta:\"39/meta\"\n!!import:\"39/core\"\n{\nthing => int32\n}\n", out);
+        assertEquals("!!import:\"39/meta\"\n!!import:\"39/core\"\n!schema {\nthing => int32\n}\n", out);
         assertEquals(SCHEMA, Files.readString(file));
     }
 
@@ -42,7 +42,7 @@ class StripCommandTest {
         String out = capture(true,
                 () -> assertEquals(0, TsonCli.run(new String[] {"strip", "--keep-docs", file.toString()})));
 
-        assertEquals("!!meta:\"39/meta\"\n!!import:\"39/core\"\n{\n@doc:\"A thing.\" thing => int32\n}\n", out);
+        assertEquals("!!import:\"39/meta\"\n!!import:\"39/core\"\n!schema {\n@doc:\"A thing.\" thing => int32\n}\n", out);
     }
 
     @Test
@@ -58,8 +58,8 @@ class StripCommandTest {
     @Test
     void aMalformedSchemaIsRejectedWhereItBreaks(@TempDir Path dir) throws IOException {
         Path file = Files.writeString(dir.resolve("broken.tn"), """
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { thing => }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { thing => }
                 """);
 
         String err = capture(false, () -> assertEquals(1, StripCommand.run(file, false)));

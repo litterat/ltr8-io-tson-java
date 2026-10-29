@@ -30,9 +30,9 @@ class KindReadTest {
 
     private static final String IDS_SCHEMA = """
             !!id:"https://example.test/kind-ids.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               stock_id    => !uuid_type {}
               customer_id => !uuid_type {}
               sku         => text
@@ -46,11 +46,11 @@ class KindReadTest {
     }
 
     private static TsonValue read(String data) {
-        return tson().treeReader().withSchema(IDS).read("!!schema:\"" + IDS + "\"\n" + data);
+        return tson().treeReader().withSchema(IDS).read("!!import:\"" + IDS + "\"\n" + data);
     }
 
     private static List<Diagnostic> problems(String data) {
-        return tson().validate("!!schema:\"" + IDS + "\"\n" + data);
+        return tson().validate("!!import:\"" + IDS + "\"\n" + data);
     }
 
     @Test
@@ -109,7 +109,7 @@ class KindReadTest {
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
 
-        Ledger ledger = tson.objectReader().read("!!schema:\"" + IDS + "\"\n!ledger { named: stock_id }",
+        Ledger ledger = tson.objectReader().read("!!import:\"" + IDS + "\"\n!ledger { named: stock_id }",
                 Ledger.class);
 
         assertEquals(new Ledger("stock_id", "customer_id"), ledger);

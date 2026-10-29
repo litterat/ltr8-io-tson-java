@@ -88,7 +88,8 @@ class OpenEntryResolvedFormTest {
     void everyPublishedResolvedFixtureValidatesAgainstItsGoverningSchema() throws Exception {
         Tson tson = tson();
         for (String fixture : List.of("meta-kernel-resolved.tn", "meta-resolved.tn", "core-resolved.tn")) {
-            List<Diagnostic> diagnostics = tson.validate(Files.readString(specDirectory().resolve(fixture)));
+            List<Diagnostic> diagnostics =
+                    ResolvedForm.validateResolved(tson, Files.readString(specDirectory().resolve(fixture)));
             assertEquals(List.of(), diagnostics, () -> fixture + " does not validate against the schema it names");
         }
     }
@@ -116,8 +117,8 @@ class OpenEntryResolvedFormTest {
      */
     @Test
     void anOpenEntryWithAValueParameterValidates() {
-        assertEquals(List.of(), tson().validate("""
-                !!schema:"https://tson.io/2026/39/m/meta-kernel.tn"
+        assertEquals(List.of(), ResolvedForm.validateResolved(tson(), """
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !schema {
                   vector => !template {
                     parameters: [ { name: T  type: type_ref } { name: N  type: non_negative_integer } ]
@@ -137,7 +138,7 @@ class OpenEntryResolvedFormTest {
     void aHeldBodyReadsBackAsTheApplicationItHolds() {
         Tson tson = metaBoundTson();
         String resolved = """
-                !!schema:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   e => !template {
                     parameters: [ { name: M  type: text } ]
@@ -145,7 +146,7 @@ class OpenEntryResolvedFormTest {
                   }
                 }
                 """;
-        assertEquals(List.of(), tson.validate(resolved), "the open entry is valid data");
+        assertEquals(List.of(), ResolvedForm.validateResolved(tson, resolved), "the open entry is valid data");
 
         Map<String, Top> read = ResolvedForm.readResolved(tson, resolved);
 
@@ -169,9 +170,9 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   base           => { id: text }
                   pair           => <A, B> { first: A  second: B }
                   uuid_pair      => <B> pair<text, B>
@@ -233,9 +234,9 @@ class OpenEntryResolvedFormTest {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/kinds.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   port   => !integer_type { min: 0  max: 65535 }
                   age    => !int32 ^ { min: 0  max: 150 }
                   alias  => port
@@ -254,9 +255,9 @@ class OpenEntryResolvedFormTest {
         // whose kind is its chain's base kind and not its !record body's PRODUCT.
         tson.resolve("""
                 !!id:"https://example.com/kind-constructors.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   listed      => <T> atom & { members: [T] }
                   listed_text => listed<text>
                   payloads     => <T> namespace & { key_type: = identifier  value_type: = T }

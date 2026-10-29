@@ -109,6 +109,8 @@ class Class2ConformanceSuiteTest {
     private static String fetchSuiteSchema(String uri) {
         String prefix = "https://tson.io/test-suite/schemas/";
         String identity = uri.startsWith("//") ? "https:" + uri : uri;
+        int query = identity.indexOf('?');
+        identity = query < 0 ? identity : identity.substring(0, query); // a ?sha256= pin is no part of the file
         if (identity.startsWith(prefix)) {
             Path file = SuiteCheckout.schemasRoot().orElseThrow().resolve(identity.substring(prefix.length()));
             try {
@@ -133,18 +135,21 @@ class Class2ConformanceSuiteTest {
     private static void checkSchemaVector(String bucket, java.nio.file.Path subject, RecordValue sidecar)
             throws IOException {
         Tson tson = newTson();
-        String source = Sidecar.splicedSource(subject, sidecar);
+        String source = Sidecar.subjectSource(subject);
         List<Diagnostic> problems = tson.validateSchema(source);
 
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 assertEquals(List.of(), problems, "a valid schema vector must load cleanly");
                 Map<String, Top> ours = ResolvedForm.ownEntries(tson, identityOf(source));
-                // Under the subject's own meta, which an instance of its namespace type needs (RUNNER.md).
+                // Under the subject's own imports, which an instance of its namespace type needs (RUNNER.md) -- its
+                // first, which is the one declaring the constructors its entries are written with. Reading under all
+                // of them binds every record of their closure, and SuiteBindings binds by name, one class per name
+                // across the whole corpus: a second fixture's `order` would meet a class written for another's.
+                List<String> imports = TsonDocumentPeek.of(source).header().imports();
                 Map<String, Top> expected = ResolvedForm.readResolved(tson,
                         fieldText(outcomePayload(sidecar), "resolved"),
-                        hasField(sidecar, "meta") ? Sidecar.resolveShortName(fieldText(sidecar, "meta"))
-                                : TsonBundledSchemas.META_ID);
+                        imports.isEmpty() ? imports : imports.subList(0, 1));
                 assertEquals(new TreeSet<>(expected.keySet()), new TreeSet<>(ours.keySet()),
                         "the resolved schema does not declare the entries the vector states");
                 expected.forEach((name, definition) -> assertEquals(
@@ -238,7 +243,7 @@ class Class2ConformanceSuiteTest {
     private static void checkLinkVector(String bucket, java.nio.file.Path subject, RecordValue sidecar)
             throws IOException {
         Tson tson = newTson();
-        String source = Sidecar.splicedSource(subject, sidecar);
+        String source = Sidecar.subjectSource(subject);
         List<Diagnostic> problems = tson.validateSchema(source);
 
         switch (outcomeOf(sidecar)) {
@@ -331,7 +336,7 @@ class Class2ConformanceSuiteTest {
      */
     private static void checkValidateVector(String bucket, java.nio.file.Path subject, RecordValue sidecar)
             throws IOException {
-        byte[] raw = Sidecar.subjectBytes(subject, sidecar);
+        byte[] raw = Sidecar.subjectBytes(subject);
         List<Diagnostic> reported = new ArrayList<>();
         newTson().treeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
 

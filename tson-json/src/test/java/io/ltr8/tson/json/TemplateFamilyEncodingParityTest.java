@@ -39,8 +39,9 @@ class TemplateFamilyEncodingParityTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     /** The template itself is the base, SEALED by the surviving discriminator -- dispatch by the pin. */
@@ -86,7 +87,7 @@ class TemplateFamilyEncodingParityTest {
     private static List<Diagnostic> fromTson(String schema, String body) {
         Tson tson = processor(schema);
         tson.resolve(schema);
-        return tson.validate("!!schema:\"" + idOf(schema) + "\"\n" + body);
+        return tson.validate("!!import:\"" + idOf(schema) + "\"\n" + body);
     }
 
     private static List<Diagnostic> fromJson(String schema, String rootType, String body) {

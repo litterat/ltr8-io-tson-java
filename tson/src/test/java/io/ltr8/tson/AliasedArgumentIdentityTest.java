@@ -38,9 +38,9 @@ class AliasedArgumentIdentityTest {
     private static TsonLinkedSchema resolve() {
         return Tson.standard().resolve("""
                 !!id:"%s"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   user_id  => uuid
                   stock_id => uuid
                   chained  => user_id

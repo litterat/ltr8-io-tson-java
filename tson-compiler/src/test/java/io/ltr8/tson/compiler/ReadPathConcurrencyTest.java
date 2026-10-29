@@ -43,9 +43,9 @@ class ReadPathConcurrencyTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/concurrent.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            { person => { name: text  age: int32 } }
+            !schema { person => { name: text  age: int32 } }
             """;
 
     public record Person(String name, long age) {

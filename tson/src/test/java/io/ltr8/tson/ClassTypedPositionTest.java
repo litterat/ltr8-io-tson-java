@@ -44,9 +44,9 @@ class ClassTypedPositionTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/typed.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               box => { i?: int32?  b?: int8?  s?: text?  d?: float64?  flag?: boolean? }
             }
             """;

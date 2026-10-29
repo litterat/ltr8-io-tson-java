@@ -60,9 +60,9 @@ class AllocationHarnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/orders-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
               line => { sku: text  quantity: int32  price: float64 }
               slug => !identifier_type { continue_add: "-" }
@@ -73,8 +73,8 @@ class AllocationHarnessTest {
 
     /** The same entries keyed by name and by text, so the difference is the two hygiene rules and nothing else. */
     private static final String ENTRIES = "{ create => a  read => b  update-all => c  delete => d  list => e }";
-    private static final String NAMED = "!!schema:\"" + ID + "\"\n!named { names: " + ENTRIES + " }";
-    private static final String LABELLED = "!!schema:\"" + ID + "\"\n!labelled { names: " + ENTRIES + " }";
+    private static final String NAMED = "!!import:\"" + ID + "\"\n!named { names: " + ENTRIES + " }";
+    private static final String LABELLED = "!!import:\"" + ID + "\"\n!labelled { names: " + ENTRIES + " }";
 
     /** The root value on its own, which is what a schemaless read is given -- it names no schema. */
     private static final String ROOT = """
@@ -90,7 +90,7 @@ class AllocationHarnessTest {
               note: "leave with the neighbour"
             }""";
 
-    private static final String DOCUMENT = "!!schema:\"" + ID + "\"\n" + ROOT;
+    private static final String DOCUMENT = "!!import:\"" + ID + "\"\n" + ROOT;
 
     public record Line(String sku, int quantity, double price) {
     }
@@ -365,7 +365,7 @@ class AllocationHarnessTest {
     private static String order(int lines, boolean describing) {
         StringBuilder document = new StringBuilder();
         if (describing) {
-            document.append("!!schema:\"").append(ID).append("\"\n");
+            document.append("!!import:\"").append(ID).append("\"\n");
         }
         document.append("!order { id: \"9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09\"  customer: \"Ada Lovelace\"")
                 .append("  placed: \"2026-08-24T10:00:00Z\"  lines: [");

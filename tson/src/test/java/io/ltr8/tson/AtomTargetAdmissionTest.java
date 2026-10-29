@@ -43,9 +43,9 @@ class AtomTargetAdmissionTest {
     private static Tson tson(String decls, Class<?> bound) {
         String schema = """
                 !!id:"https://example.test/a-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                 %s
                 }
                 """.formatted(decls);
@@ -57,7 +57,7 @@ class AtomTargetAdmissionTest {
     }
 
     private static String doc(String body) {
-        return "!!schema:\"https://example.test/a-1.tn\"\n" + body;
+        return "!!import:\"https://example.test/a-1.tn\"\n" + body;
     }
 
     // ── uri, the first family to state its targets ───────────────────────

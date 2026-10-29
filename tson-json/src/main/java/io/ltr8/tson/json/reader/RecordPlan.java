@@ -196,12 +196,12 @@ final class RecordPlan {
     }
 
     /**
-     * One of §3.2's three where none may stand (§3.3): a {@code $schema}, which no value position admits, or a
+     * One of §3.2's three where none may stand (§3.3): an {@code $import}, which no value position admits, or a
      * {@code $type} or {@code $value} out of its leading place.
      */
     void refuseTagMember(JsonReadContext ctx, String member, boolean tagged) {
         switch (member) {
-            case TagMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
+            case TagMembers.IMPORT -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
             case TagMembers.TYPE -> TagMembers.refuseMisplaced(ctx, member);
             case TagMembers.VALUE -> ctx.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
                     ? "'$value' follows members of the record's own, and an annotation object in wrapper form "

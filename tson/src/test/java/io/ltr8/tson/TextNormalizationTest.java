@@ -23,9 +23,9 @@ class TextNormalizationTest {
     private static final String ID = "https://example.test/normalized-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/normalized-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               header_name => !identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: NFKC_CASEFOLD }
@@ -62,7 +62,7 @@ class TextNormalizationTest {
     }
 
     private static String document(String body) {
-        return "!!schema:\"" + ID + "\"\n" + body;
+        return "!!import:\"" + ID + "\"\n" + body;
     }
 
     private static List<Diagnostic.Code> codes(String body) {
@@ -173,14 +173,14 @@ class TextNormalizationTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/normalized-enum.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   accented => !enum ["caf\u00e9" tea]
                   order    => { drink: accented }
                 }
                 """);
-        assertEquals(List.of(), tson.validate("!!schema:\"https://example.test/normalized-enum.tn\"\n"
+        assertEquals(List.of(), tson.validate("!!import:\"https://example.test/normalized-enum.tn\"\n"
                 + "!order { drink: \"cafe\u0301\" }"));
     }
 

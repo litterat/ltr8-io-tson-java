@@ -1,15 +1,14 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
-!!meta:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=cf460fa93a54cb544b0a69fa32c0f6e8e7fe923fb82725c1b0b11121c956ee04"
-!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=cf460fa93a54cb544b0a69fa32c0f6e8e7fe923fb82725c1b0b11121c956ee04"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=5dfc05aa95365a53b808cf6084814f38d8237aa0676e21639d2a31399df8195d"
+!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=f906da450f8e6f27c3e3e3195a97afbeb9c6c25b7092745cdd16aa05b0de2b07"
 @doc:"""
   TSON meta-schema (2026 Revision 39 draft).
 
   The canonical meta-schema for user schemas: it imports the meta-kernel and
   adds the type constructors the core type library (core.tn) instantiates. A
-  schema's namespace is its own entries and its whole import closure, a `!!meta`
-  target contributing as an `!!import` does ([TSON-SCHEMA] §2.2.3), so a schema
-  reaching this file has every name it and the kernel declare, and reserves
-  each. User schemas normally reach it through core.tn, which imports it.
+  schema's namespace is its own entries and its whole import closure
+  ([TSON-SCHEMA] §2.2.3), so a schema reaching this file has every name it and
+  the kernel declare, and reserves each. User schemas normally reach it through
+  core.tn, which imports it.
 
   Hash pins here are real digests over the bytes of this copy; see
   meta-kernel.tn's note.
@@ -76,7 +75,7 @@
   body or the schema fails to load. Refinement differs by tier — the numeric
   tiers shrink the set, `text_type` sets it once.
   """
-{
+!schema {
   @doc:"""
     The set spelling an author writes: `set<text>` where the bare construction
     is `!set_type { element_type: text }`. A §5.10 template, not a constructor:

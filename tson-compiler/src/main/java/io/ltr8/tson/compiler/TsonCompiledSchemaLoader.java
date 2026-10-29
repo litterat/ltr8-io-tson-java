@@ -6,12 +6,11 @@ import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 
 /**
- * On-demand resolution of a schema from its own URI -- a document's {@code !!import} or {@code !!meta}
- * target -- so a resolver reaching one needn't have it pre-registered. Two methods, split by what the
- * caller needs of the target:
+ * On-demand resolution of a schema from its own URI -- a document's {@code !!import} target -- so a resolver reaching
+ * one needn't have it pre-registered. Two methods, split by what the caller needs of the target:
  *
  * <ul>
- *   <li>{@link #resolveLinked} -- an {@code !!import} or {@code !!meta} target (or a user schema being read): its
+ *   <li>{@link #resolveLinked} -- an {@code !!import} target (or a user schema being read): its
  *       <i>resolved</i> form, merged into the importer's namespace, or compiled per-mode by a {@code
  *       TsonCompiledSchemaRegistry}.
  *   <li>{@link #loadMeta} -- the <i>compiled</i> vocabulary of the schema that declared a constructor or an
@@ -19,11 +18,9 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
  *       schema.meta} objects during the importer's own resolution.
  * </ul>
  *
- * <p>Not a plain registry lookup, because meta-kernel's own document names <i>itself</i> as its {@code
- * !!meta} (Part 2 §1.5's one deliberate circularity): a "look it up, fail if missing" registry would need
- * meta-kernel already registered before it could register meta-kernel. An implementation recognizes that
- * request and answers it directly, via {@link MetaKernelBootstrapResolver#getMetaKernelSchema()}'s bootstrap,
- * instead of trying (and failing) to resolve it the ordinary way.
+ * <p>Not a plain registry lookup, because meta-kernel is never resolved from a document: it is pre-loaded
+ * ([TSON-SCHEMA] §3.4), and an implementation answers a request for it directly, via {@link
+ * MetaKernelBootstrapResolver#getMetaKernelSchema()}'s bootstrap.
  *
  * <p>Also the natural, single place to enforce policy over <i>what</i> gets resolved from <i>where</i>
  * (whitelisting/blacklisting hosts, disk-only resolution) -- see {@link SchemaSource}, the pluggable
@@ -47,7 +44,7 @@ public interface TsonCompiledSchemaLoader {
      * Resolves {@code uri} to its compiled vocabulary -- the readers a schema importing it reads a construction
      * head or an annotation value through, where {@code uri} declared the constructor or the annotation type. Any
      * schema: one namespace per schema ([TSON-SCHEMA] §3.3.1) puts every schema's constructors in reach of the
-     * schemas importing it, and a {@code !!meta} target is one of those imports.
+     * schemas importing it.
      *
      * @throws RuntimeException whatever {@link #resolveLinked} may throw
      */

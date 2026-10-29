@@ -12,8 +12,8 @@ position is refused. Current form only; history lives in git.
   the same reader resolver every other dispatch uses.
 - A value naming no type is a **validation** error (`VALIDATION_ERROR`) in every mode; a tag naming no type of the
   closure is an unresolved reference (`UNKNOWN_TYPE`).
-- A directive stands only in the header. In TSON text a `!!schema` at a value position is a **parse** error, raised by
-  `TsonDataStream` like any directive out of place; in JSON a `$schema` at any value position is a resolver error,
+- A directive stands only in the header. In TSON text an `!!import` at a value position is a **parse** error, raised by
+  `TsonDataStream` like any directive out of place; in JSON an `$import` at any value position is a resolver error,
   `SCOPE_NOT_ADMITTED`, reported by `Tags` wherever the leading members are read.
 
 Related: `design/readers-and-diagnostics.md`, `design/record-dispatch.md`, `design/json-schema-directed-reading.md`,
@@ -37,10 +37,10 @@ as a record, wrapper otherwise (§3.3) — and any other value, or an annotation
 
 ## A schema reference at a value position
 
-A value names its type, never its schema. [TSON-DATA] §3.3's closed positional set admits `!!schema` in the header and
+A value names its type, never its schema. [TSON-DATA] §3.3's closed positional set admits `!!import` in the header and
 nowhere else, so the data stream refuses one prefixing a field value, a map entry value or an array element as it
 refuses any directive at a value position (`TsonDataStream.notAValue`): the grammar has no production for it, and the
 ast carries no slot for one — a record field, a map entry value and an array element are plain `DataValue`s. JSON has
-no grammar for the member, so the refusal is the reader's: `$schema` leads only the root's annotation object (§3.4),
-and a leading `$schema` anywhere else is refused by `Tags.refusesScope`, at a record, a choice and a declared position
-alike, as `SCOPE_NOT_ADMITTED` against the `$schema` member's own path.
+no grammar for the member, so the refusal is the reader's: `$import` leads only the root's annotation object (§3.3,
+§3.4), and an `$import` anywhere else is refused by `Tags.refusesScope`, at a record, a choice and a declared position
+alike, as `SCOPE_NOT_ADMITTED` against the `$import` member's own path, whatever its value.

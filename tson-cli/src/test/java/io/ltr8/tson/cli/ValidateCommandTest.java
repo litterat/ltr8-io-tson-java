@@ -27,15 +27,15 @@ class ValidateCommandTest {
 
     private static final String RECORD_SCHEMA = """
             !!id:"https://example.test/cli-validate.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               my_record => { a: int32  b: int32 }
             }
             """;
 
     private static String selfDescribing(String body) {
-        return "!!schema:\"https://example.test/cli-validate.tn\"\n!my_record " + body + "\n";
+        return "!!import:\"https://example.test/cli-validate.tn\"\n!my_record " + body + "\n";
     }
 
     // --- schema-driven (data carries !!schema) ---
@@ -106,7 +106,7 @@ class ValidateCommandTest {
     @Test
     void aDeclaredSchemaThatWasNotProvidedIsUnavailableRatherThanAVerdict(@TempDir Path dir) throws IOException {
         Path data = writeFile(dir, "data.tson",
-                "!!schema:\"https://example.test/not-provided.tn\"\n!my_record { a: 1  b: 2 }\n");
+                "!!import:\"https://example.test/not-provided.tn\"\n!my_record { a: 1  b: 2 }\n");
 
         String err = captureStderr(() -> {
             String output = captureStdout(() ->
@@ -128,7 +128,7 @@ class ValidateCommandTest {
     void anUnmatchedSchemaSaysWhatTheSuppliedFilesDeclare(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);   // declares .../cli-validate.tn
         Path data = writeFile(dir, "data.tson",
-                "!!schema:\"https://example.test/typo.tn\"\n!my_record { a: 1  b: 2 }\n");
+                "!!import:\"https://example.test/typo.tn\"\n!my_record { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
                 assertEquals(69, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
@@ -143,7 +143,7 @@ class ValidateCommandTest {
     @Test
     void anUnmatchedSchemaWithNoSchemaFilesSaysSo(@TempDir Path dir) throws IOException {
         Path data = writeFile(dir, "data.tson",
-                "!!schema:\"https://example.test/absent.tn\"\n!my_record { a: 1 }\n");
+                "!!import:\"https://example.test/absent.tn\"\n!my_record { a: 1 }\n");
 
         String output = captureStdout(() ->
                 assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
@@ -155,7 +155,7 @@ class ValidateCommandTest {
     void aRootTypeRefTheSchemaDoesNotDeclareIsAnUnknownType(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         Path data = writeFile(dir, "data.tson",
-                "!!schema:\"https://example.test/cli-validate.tn\"\n!no_such_type { a: 1  b: 2 }\n");
+                "!!import:\"https://example.test/cli-validate.tn\"\n!no_such_type { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
                 assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
@@ -168,13 +168,13 @@ class ValidateCommandTest {
         Path recordSchema = writeFile(dir, "record.tn", RECORD_SCHEMA);
         Path pointSchema = writeFile(dir, "point.tn", """
                 !!id:"https://example.test/cli-point.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { point => { x: int32  y: int32 } }
+                !schema { point => { x: int32  y: int32 } }
                 """);
         Path recordData = writeFile(dir, "rec.tson", selfDescribing("{ a: 1  b: 2 }"));
         Path pointData = writeFile(dir, "pt.tson",
-                "!!schema:\"https://example.test/cli-point.tn\"\n!point { x: 3  y: 4 }\n");
+                "!!import:\"https://example.test/cli-point.tn\"\n!point { x: 3  y: 4 }\n");
 
         String output = captureStdout(() -> assertEquals(0,
                 ValidateCommand.run(inputs(recordSchema, pointSchema, recordData, pointData),
@@ -341,9 +341,9 @@ class ValidateCommandTest {
     void aSchemaPinnedByItsOwnHashResolvesAgainstAPlainReference(@TempDir Path dir) throws IOException {
         // The schema's !!id carries a ?sha256= pin, its own content's (the id line is not hashed); the data's
         // !!schema is plain. Matching is by canonical identity (the hash is not identity), so it still validates.
-        String body = "!!meta:\"https://tson.io/2026/39/m/meta.tn\"\n"
+        String body = "!!import:\"https://tson.io/2026/39/m/meta.tn\"\n"
                 + "!!import:\"https://tson.io/2026/39/m/core.tn\"\n"
-                + "{ my_record => { a: int32  b: int32 } }\n";
+                + "!schema { my_record => { a: int32  b: int32 } }\n";
         String unpinned = "!!id:\"https://example.test/cli-validate.tn\"\n" + body;
         String pin = io.ltr8.tson.compiler.TsonContentHash.sha256(unpinned.getBytes(StandardCharsets.UTF_8));
         Path schema = writeFile(dir, "schema.tn",
@@ -362,8 +362,8 @@ class ValidateCommandTest {
         // note goes to stderr so it isn't silently dropped.
         Path fake = writeFile(dir, "core.tn", """
                 !!id:"https://tson.io/2026/39/m/core.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { my_thing => int32 }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { my_thing => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");   // plain -> schemaless -> valid
 

@@ -22,8 +22,8 @@ form only; history lives in git.
 - Neither tier dedupes fields or keys, resolves `EmptyBrace`, or interprets token text — intentional gaps (§1.2). A name
   is the exception: type-ref, annotation and field names are matched against `IdentifierProfile`, after NFC
   normalisation for a field name.
-- The stream judges no document kind: it reads §2.2's header once, leaves a directive the header does not admit
-  unconsumed, and frames the root value on first demand, not with the header.
+- The stream judges no document kind: it reads §2.2's header (`[!!id] *!!import`) once, refusing anything else there,
+  reports the root's tag on request (`rootTag()`), and frames the root value on first demand, not with the header.
 
 Related: `design/base-types-and-atom-vocabulary.md` (base type resolution, the atom vocabulary),
 `design/schema-grammar.md` (the schema grammar built on this parser), `design/readers-and-diagnostics.md`.
@@ -214,30 +214,27 @@ Key points:
   **Quoting buys the lexical accidents of the unquoted form** — a name that would otherwise resolve as a number — and
   never a key that is not a name; a key that is not a name is what a map is for, and the diagnostic says so. A map key
   keeps all three token forms.
-- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `ParseException`** (`tson-base`'s,
-  which is what a malformed document raises) — and the
-  throw is `parseDocument`'s, on the `DocumentStart` the stream hands it, never the stream's own. This is a
-  Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
-  parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic). The
-  *stream* judges nothing: it reads §2.2's header once, for everyone, and `TsonSchemaParser` sits on the same
-  stream and requires the very directive this parser refuses -- taking its own `!!id`/`!!meta` off the same
-  `DocumentStart`, through `TsonDataParser.documentStart()`, so the grammar has one implementation and each
-  parser applies only its own rule on top.
-  - **`DocumentStart` carries all three of §2.2's directives**, so classifying a schema document (§7.1) is an answer
-    the events give. Whether one may be *read* is a conformance-class question one tier up — `TsonDataParser` and both
-    read facades raise `TsonUnsupportedDocumentException` on it, while `TsonSchemaParser` requires the directive. What
-    stays with each parser is its own rule: §12.1 requires exactly one `!!meta` where §2.2 merely permits it, and a
-    schema document governed by `!!schema` is told which directive it needs.
-- **A directive §2.2 does not admit in a header is left unconsumed**, not refused by the stream. `!!import`
-  is a schema document's and `TsonSchemaParser` reads it; a data document carrying one is an error, but the
-  wording that names the broken rule belongs to the parser that knows which kind of document was expected.
-  A refusal in the stream could only say *"expected `!!schema`, `!!meta` or the start of the document's value"*,
-  to a schema document whose actual problem was a missing `!!meta`. What the stream keeps is the
-  **value-position** rule (`notAValue`), which names the directive rather than saying "found `!!`" — true
-  whoever is reading, because nothing spelled `!!` can start a value.
+- **A root tagged `!schema` throws `TsonUnsupportedDocumentException`, not `ParseException`** (`tson-base`'s,
+  which is what a malformed document raises) — and the throw is `parseDocument`'s, on the stream's `rootTag()`,
+  never the stream's own. This is a Class 1 processor; a schema document isn't malformed input, it's a well-formed
+  document of a kind this parser doesn't implement, and §8.1 requires that distinction be visible (a categorized
+  diagnostic). `parseResolvedForm()` reads the same document without the refusal: a resolved form is a data
+  document rooted `!schema`, and the caller says it is one. The *stream* judges nothing: `TsonSchemaParser` sits
+  on the same stream and requires the very tag this parser refuses, taking its `!!id`/`!!import`s off the same
+  `DocumentStart` through `TsonDataParser.documentStart()`, so the grammar has one implementation and each parser
+  applies only its own rule on top.
+  - **`rootTag()` looks past the root's leading annotations to its tag, consuming nothing** — the root is framed as
+    the first read would frame it and stepped only until the tag (or its absence) is known, so a schema map's sugar,
+    which no data frame reads, is never parsed to classify it. The annotations' values are: they stand before the
+    tag.
+- **The header grammar is judged in the stream, in full**, since it is one for every document: `!!meta` and
+  `!!schema` are refused naming their replacement (`!!import`, and the root's `!schema` tag), an unknown directive
+  and an `!!id` after an `!!import` naming §2.2's order. A directive past the header falls to the **value-position**
+  rule (`notAValue`), which names the directive rather than saying "found `!!`" — true whoever is reading, because
+  nothing spelled `!!` can start a value.
 - **The root value is framed on first demand, not with the header.** `fill()` pushes `RootFrame`/
   `DataValueFrame` the first time an event past `DocumentStart` is wanted, so reading only the header costs
-  nothing and leaves an empty frame stack — which is what lets a schema parser take `!!id`/`!!meta` off the
+  nothing and leaves an empty frame stack — which is what lets a schema parser take `!!id`/`!!import` off the
   event and then drive `drain` over a stack the header never touched. The stream therefore never needs to
   know what kind of document it holds: a schema document simply never asks for a value. `TsonDataStreamTest`
   pins both halves.

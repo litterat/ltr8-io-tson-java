@@ -50,7 +50,7 @@ class TsonSchemaCompilerTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("A", bodyA);
         entries.put("B", bodyB);
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         TsonCompiledSchema compiled = compile(linkedSchema);
@@ -66,7 +66,7 @@ class TsonSchemaCompilerTest {
                 RecordBody.of(RecordBody.fieldMap(Map.entry("child", RecordField.required(TypeRef.of("Node")))));
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("Node", selfReferencing);
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         TsonCompiledSchema compiled = compile(linkedSchema);
@@ -84,7 +84,7 @@ class TsonSchemaCompilerTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("used", RecordBody.of(RecordBody.fieldMap()));
         entries.put("orphan", new Namespace<>("endpoints", AnnotatedMap.of(Map.of("search", "/search"))));
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         TsonCompiledSchema compiled = compile(linkedSchema);
@@ -106,7 +106,7 @@ class TsonSchemaCompilerTest {
 
     @Test
     void getOnAnUnknownNameThrowsBeforeAnyCompilationHappens() {
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), Map.of());
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), Map.of());
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         TsonCompiledSchema compiled = compile(linkedSchema);
 
@@ -119,7 +119,7 @@ class TsonSchemaCompilerTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("first", RecordBody.of(RecordBody.fieldMap()));
         entries.put("second", RecordBody.of(RecordBody.fieldMap()));
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> compiled.get("frist"));

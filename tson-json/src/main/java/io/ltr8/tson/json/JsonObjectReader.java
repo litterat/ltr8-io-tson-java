@@ -386,6 +386,9 @@ public final class JsonObjectReader {
             // Rooted at the name the caller supplied, so a diagnostic names the declaration the author wrote rather
             // than whatever an alias resolves to -- JsonTreeReader.readAs does the same.
             ctx = root.declaration().map(ctx::underDeclaration).orElse(ctx);
+            if (InBandBinding.declines(ctx)) {
+                return null;
+            }
             Object value = root.reader().read(ctx);
             if (value != null && !type.isInstance(value)) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the schema's type `" + typeName + "` produced a "

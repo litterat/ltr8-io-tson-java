@@ -1,5 +1,4 @@
 !!id:"https://tson.io/2026/39/io/ltr8/cli/diagnostics.tn"
-!!meta:"https://tson.io/2026/39/m/meta.tn"
 !!import:"https://tson.io/2026/39/m/core.tn"
 !!import:"https://tson.io/2026/39/m/policy.tn"
 @doc:"""
@@ -19,7 +18,7 @@
   This enum copies Diagnostic.Code whole, not the subset one consumer happens to emit -- the same
   reason DUPLICATE_FIELD's absence was a defect rather than an economy.
   """
-{
+!schema {
   diagnostic_code => !enum [
     FIELD_REQUIRED FIELD_FIXED FIELD_GROUP TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF SCOPE_NOT_ADMITTED
     ATOM_FORM_INVALID ATOM_CONSTRAINT_VIOLATION

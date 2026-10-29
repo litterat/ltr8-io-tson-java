@@ -37,9 +37,9 @@ class SkeletonDistinctnessPolicyTest {
     private static final String ID = "https://example.test/skeletons-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/skeletons-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               slug => !identifier_type { continue_add: "-" }
               handlers => { slug => text }
               registry => { handlers: { slug => text } }
@@ -85,9 +85,9 @@ class SkeletonDistinctnessPolicyTest {
                 "pass => text  " + CYRILLIC_PASS + " => text")) {
             String schema = """
                     !!id:"https://example.test/skeletons-2.tn"
-                    !!meta:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
                     !!import:"https://tson.io/2026/39/m/core.tn"
-                    { %s }
+                    !schema { %s }
                     """.formatted(declarations);
             assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES),
                     codes(tson(IdentifierPolicy.defaults()).validateSchema(schema)), declarations);
@@ -97,7 +97,7 @@ class SkeletonDistinctnessPolicyTest {
 
     @Test
     void theKeysOfAnIdentifierKeyedMap() {
-        String document = "!!schema:\"" + ID + "\"\n!handlers { pass => a  " + CYRILLIC_PASS + " => b }";
+        String document = "!!import:\"" + ID + "\"\n!handlers { pass => a  " + CYRILLIC_PASS + " => b }";
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(tson(IdentifierPolicy.defaults())
                 .validate(document)));
         assertEquals(List.of(), tson(LOOK_ALIKES).validate(document));
@@ -105,7 +105,7 @@ class SkeletonDistinctnessPolicyTest {
 
     @Test
     void theElementsOfASetOfNames() {
-        String document = "!!schema:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }";
+        String document = "!!import:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }";
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(tson(IdentifierPolicy.defaults())
                 .validate(document)));
         assertEquals(List.of(), tson(LOOK_ALIKES).validate(document));
@@ -113,7 +113,7 @@ class SkeletonDistinctnessPolicyTest {
 
     @Test
     void theSameKeysBoundToAnObject() {
-        String document = "!!schema:\"" + ID + "\"\n!registry { handlers: { pass => a  " + CYRILLIC_PASS
+        String document = "!!import:\"" + ID + "\"\n!registry { handlers: { pass => a  " + CYRILLIC_PASS
                 + " => b } }";
         DiagnosticsCollector strict = new DiagnosticsCollector();
         tson(IdentifierPolicy.defaults()).objectReader().withDiagnostics(strict).read(document, Registry.class);

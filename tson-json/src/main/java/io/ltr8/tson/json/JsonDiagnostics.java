@@ -21,8 +21,8 @@ import java.util.Optional;
  * {@link ParseException} for both. Neither encoding's classifier carries the split further: a base-syntax
  * failure of either kind is one {@link Diagnostic.Code#VALIDATION_ERROR}, the code saying that the document
  * will not read and the message saying why. There is no counterpart to {@code
- * TsonUnsupportedDocumentException} either: a JSON document declares no conformance class to be refused for,
- * {@code !!meta} being TSON text syntax.
+ * TsonUnsupportedDocumentException} either: a JSON document declares no conformance class to be refused for, a
+ * schema document being TSON text whose root is tagged {@code !schema}.
  */
 public final class JsonDiagnostics {
 

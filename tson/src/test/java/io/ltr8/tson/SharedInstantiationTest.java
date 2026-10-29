@@ -37,9 +37,9 @@ class SharedInstantiationTest {
     void anInstantiationAnImportAlreadyClosedUnifiesWithTheLocalOne() {
         assertDoesNotThrow(() -> Tson.standard().resolve("""
                 !!id:"https://example.test/shared-instantiation.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                   mine => set<value>
                 }
                 """.formatted(KERNEL, META)));
@@ -50,9 +50,9 @@ class SharedInstantiationTest {
     void aConsumerClosingATemplateItsImportExportsLinks() {
         assertDoesNotThrow(() -> Tson.standard().resolve("""
                 !!id:"https://example.test/shared-instantiation-core.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                   tags => set<text>
                   box  => { a: tags }
                 }
@@ -65,9 +65,9 @@ class SharedInstantiationTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/shadowing.tn"
-                        !!meta:"%s"
                         !!import:"%s"
-                        {
+                        !!import:"%s"
+                        !schema {
                           int32 => { a: text }
                         }
                         """.formatted(META, CORE)));

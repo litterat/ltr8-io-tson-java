@@ -28,9 +28,9 @@ class ReferenceDeclarationTest {
     private static String schema(String id, String meta, String imported, String declarations) {
         return """
                 !!id:"%s"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                 %s
                 }""".formatted(id, meta, imported, declarations);
     }

@@ -36,9 +36,9 @@ class HostRefusalTest {
     private static final String ID = "https://example.test/host-refusal-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/host-refusal-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               voidable_map    => { m: {text => int32?} }
               plain_map       => { m: {text => int32} }
               voidable_array  => { a: [int32?] }

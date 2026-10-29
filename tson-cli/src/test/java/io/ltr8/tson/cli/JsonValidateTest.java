@@ -28,9 +28,9 @@ class JsonValidateTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/cli-json.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               person => { name: text  tries?: int32 ~ 0 }
             }
             """;
@@ -62,7 +62,7 @@ class JsonValidateTest {
         Path schema = write(dir, "person.tn", SCHEMA);
         Path json = write(dir, "good.json", """
                 {"name": "Ada"}""");
-        Path tson = write(dir, "good.tn", "!!schema:\"" + ID + "\"\n!person { name: \"Grace\" }\n");
+        Path tson = write(dir, "good.tn", "!!import:\"" + ID + "\"\n!person { name: \"Grace\" }\n");
         String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
                 "validate", "--schema", ID, "--type", "person",
                 schema.toString(), json.toString(), tson.toString()})));
@@ -107,7 +107,7 @@ class JsonValidateTest {
     @Test
     void aBindingWithNoJsonInputIsAUsageError(@TempDir Path dir) throws IOException {
         Path schema = write(dir, "person.tn", SCHEMA);
-        Path tson = write(dir, "good.tn", "!!schema:\"" + ID + "\"\n!person { name: \"Ada\" }\n");
+        Path tson = write(dir, "good.tn", "!!import:\"" + ID + "\"\n!person { name: \"Ada\" }\n");
         String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {
                 "validate", "--schema", ID, "--type", "person", schema.toString(), tson.toString()})));
         assertTrue(err.contains("bind JSON inputs"), err);

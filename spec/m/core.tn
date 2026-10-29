@@ -1,6 +1,5 @@
-!!id:"https://tson.io/2026/39/m/core.tn?sha256=ac38ef086a93dcea7c58a0e3bce4e74c5e1f2fbb40801c1194ed763f2d37d5cf"
-!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
+!!id:"https://tson.io/2026/39/m/core.tn?sha256=7893c2f71d61a7c0933b38f9bf8c1176c3ae7ae5c6ac3a43bdeb02eeb7a1a6e4"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=5dfc05aa95365a53b808cf6084814f38d8237aa0676e21639d2a31399df8195d"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 39 draft).
@@ -47,7 +46,7 @@
     RFC 9485              I-Regexp, the interoperable regular expression
     RFC 5322              Email address format
   """
-{
+!schema {
   @doc:"""
     Exact number of arbitrary magnitude and precision, finite, with no special
     values (SQL exact tier; ISO/IEC 11404 `scaled`, radix 10). The canonical

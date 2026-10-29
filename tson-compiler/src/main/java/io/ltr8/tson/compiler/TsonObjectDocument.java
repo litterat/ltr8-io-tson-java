@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import java.util.List;
 import java.util.Optional;
 
 import io.ltr8.tson.tree.TsonDocument;
@@ -11,7 +12,7 @@ import io.ltr8.tson.tree.TsonDocument;
  *
  * <p><b>What this carries is what the <em>read</em> established</b>, which is the whole of why it exists. A
  * bound object's class plus its {@code DataBindContext} already fix which schema governs it -- one context
- * per schema version is the design -- so the schema is the weakest of the three. The other two are not
+ * per schema version is the design -- so the imports are the weakest of the three. The other two are not
  * recoverable from anything the caller holds: {@code id} is per-document data (§2.2 makes it a property of
  * the document, so a class modelling it as a field would be lying about its shape), and {@code rootType} is
  * the type this document was resolved to, which a {@code DataNameBinder} cannot hand back -- it maps name to
@@ -26,23 +27,23 @@ import io.ltr8.tson.tree.TsonDocument;
  * resolves no type, so it leaves this empty rather than guessing from a wire type-ref it did not check.
  *
  * @param id       the document's own identity ({@code !!id}), or empty
- * @param schema   the schema governing its value ({@code !!schema}), or empty
+ * @param imports  the schemas its value is read under ({@code !!import}), in header order
  * @param rootType the schema type the value was read as, or empty where no schema applied
  * @param value    the bound object
  * @param <T>      the bound type
  */
-public record TsonObjectDocument<T>(Optional<String> id, Optional<String> schema, Optional<String> rootType,
+public record TsonObjectDocument<T>(Optional<String> id, List<String> imports, Optional<String> rootType,
                                      T value) {
 
     public TsonObjectDocument {
         id = id == null ? Optional.empty() : id;
-        schema = schema == null ? Optional.empty() : schema;
+        imports = imports == null ? List.of() : List.copyOf(imports);
         rootType = rootType == null ? Optional.empty() : rootType;
     }
 
     /** A document with no header directives and no schema type -- a bare value, which is every Class 1 document. */
     public static <T> TsonObjectDocument<T> of(T value) {
-        return new TsonObjectDocument<>(Optional.empty(), Optional.empty(), Optional.empty(), value);
+        return new TsonObjectDocument<>(Optional.empty(), List.of(), Optional.empty(), value);
     }
 
     /**
@@ -52,6 +53,6 @@ public record TsonObjectDocument<T>(Optional<String> id, Optional<String> schema
      * binding of the same document -- without restating what governed it.
      */
     public <U> TsonObjectDocument<U> withValue(U newValue) {
-        return new TsonObjectDocument<>(id, schema, rootType, newValue);
+        return new TsonObjectDocument<>(id, imports, rootType, newValue);
     }
 }

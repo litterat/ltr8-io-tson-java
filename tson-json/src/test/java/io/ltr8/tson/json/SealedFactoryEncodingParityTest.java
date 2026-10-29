@@ -40,9 +40,9 @@ class SealedFactoryEncodingParityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/sealed-factory.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               msg    => abstract { kind: text =? }
               msg_of => <T, V> msg & { kind?: = T  body: V }
 
@@ -72,7 +72,7 @@ class SealedFactoryEncodingParityTest {
     private static List<Diagnostic> fromTson(String body) {
         Tson tson = processor();
         tson.resolve(SCHEMA);
-        return tson.validate("!!schema:\"" + ID + "\"\n" + body);
+        return tson.validate("!!import:\"" + ID + "\"\n" + body);
     }
 
     private static List<Diagnostic> fromJson(String rootType, String body) {

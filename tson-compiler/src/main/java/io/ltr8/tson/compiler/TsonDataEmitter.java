@@ -218,21 +218,19 @@ public final class TsonDataEmitter {
     }
 
     /**
-     * {@code !!schema:"<uri>"} and its line terminator -- the schema governing the value that follows, which
-     * is what makes a data document self-describing: a reader resolves this, validates against it, and needs
-     * nothing out of band.
+     * {@code !!import:"<uri>"} and its line terminator -- a schema the value that follows is read under, which is
+     * what makes a data document self-describing: a reader resolves it, validates against it, and needs nothing out
+     * of band. A document may carry several, after its {@code !!id}.
      *
      * <p>Legal in a document header alone (§2.2, §3.3); a directive at a value position is a parse error.
      */
-    public TsonDataEmitter schemaRef(String uri) {
-        return directive("schema", uri);
+    public TsonDataEmitter importRef(String uri) {
+        return directive("import", uri);
     }
 
     /**
-     * One directive, terminated by a newline. Private because the name set is closed and positional (§3.3):
-     * of the four, only {@code id} and {@code schema} may appear in a <em>data</em> document, and those are
-     * the two methods above. {@code meta}/{@code import} belong to a schema document, which this emitter
-     * does not write.
+     * One directive, terminated by a newline. Private because the name set is closed and positional (§2.2):
+     * {@code id} then {@code import}, the two methods above.
      *
      * <p>{@code uri} is checked against the same atom the reader parses it with, so a caller cannot emit a
      * document that will not read back -- a directive argument is an IRI-reference (§3.3), and the failure belongs

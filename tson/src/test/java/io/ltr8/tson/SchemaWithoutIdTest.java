@@ -21,9 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SchemaWithoutIdTest {
 
     private static final String NO_ID = """
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               point => { x: int32  y: int32 }
             }
             """;

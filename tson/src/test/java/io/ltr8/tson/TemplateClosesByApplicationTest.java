@@ -44,9 +44,9 @@ class TemplateClosesByApplicationTest {
     private static String meta(String extraDeclarations) {
         return """
                 !!id:"https://example.test/m.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !schema {
                   base       => {}
                   my_bounded => <N> array ^ { max_items?: = N }
                   my_set     => <T> array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }
@@ -73,8 +73,8 @@ class TemplateClosesByApplicationTest {
     private static List<Diagnostic> schemaProblems(String body) {
         String user = """
                 !!id:"https://example.test/u.tn"
-                !!meta:"https://example.test/m.tn"
-                { %s }
+                !!import:"https://example.test/m.tn"
+                !schema { %s }
                 """.formatted(body);
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE, USER, user)))));

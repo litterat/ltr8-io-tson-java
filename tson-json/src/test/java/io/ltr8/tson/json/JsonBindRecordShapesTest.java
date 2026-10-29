@@ -30,9 +30,9 @@ class JsonBindRecordShapesTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/bind-shapes-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               argument => { ( name: text | count: int32 ) }
               contact  => { ( email: text | phone: text )+ }
               call     => { arg: argument }
@@ -49,9 +49,9 @@ class JsonBindRecordShapesTest {
      */
     private static final String FACETS_SCHEMA = """
             !!id:"https://example.test/bind-facets-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !schema {
               facet => { limit: value  scale: value  label: value }
             }
             """;

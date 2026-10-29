@@ -10,8 +10,8 @@ command-line application, and the default bind contexts. Current form only; hist
 - The content hash covers every byte past the `!!id` line's terminator; a leading BOM is stripped, never hashed.
 - Editing a bundled schema moves the whole pinned chain bottom-up; `scripts/restamp-bundled-schemas.sh` does it and
   `--check` reports staleness and writes nothing.
-- Files are classified as schema or data by header (`!!meta`) and matched by embedded `!!id`, never filename; `-` is
-  stdin, at most once, always data. `.json` is the one extension read.
+- Files are classified as schema or data by the root's tag (`!schema`) and matched by embedded `!!id`, never
+  filename; `-` is stdin, at most once, always data. `.json` is the one extension read.
 - `validate` emits one `ValidationRun` envelope per invocation; run-level `errors` are exit 2, a document's own are
   in its `FileReport`.
 - `TsonCli.exitCodeFor` reads diagnostic codes and nothing else, ranking `70 > 78 > 69 > 1 > 75`; 1 is a rejection,
@@ -47,13 +47,11 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
 
 - **The pin is not identity.** A pinned `!!id` resolves against a plain or differently-pinned reference because
   everything keys by canonical identity (scheme and query stripped).
-- **Verification is wired through the loader**: the top `!!schema` and each transitive `!!import`/`!!meta` carrying a
-  pin is checked before use, and a schema registered from text is hashed by the call that registers it.
-  `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — meta pins
-  meta-kernel (its `!!meta` and `!!import`), core, net and policy pin meta, and policy pins core — so bootstrap
-  verifies all of it. The one reference that can never carry a pin is meta-kernel's self-`!!meta`, whose hash input
-  would have to contain the pin: its `!!id` is pinned, its `!!meta` stays plain, and canonical comparison makes them
-  one identity.
+- **Verification is wired through the loader**: a data document's `!!import`s and each transitive `!!import` carrying
+  a pin are checked before use, and a schema registered from text is hashed by the call that registers it.
+  `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — meta imports
+  meta-kernel, core and net import meta, and policy imports core, each by a pinned reference — so bootstrap verifies
+  all of it. Meta-kernel imports nothing; its own `!!id` carries its pin.
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place, replacing any prior query. It is
   idempotent: the hashed bytes never change, so the pin stays valid.
 - **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read,
@@ -65,9 +63,9 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
   still touch and adjacency (§7.2) reads the same. The output is re-lexed against the intended tokens and
   re-parsed, either failure being a fault here. Every other annotation stays, since several are checked.
 - **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole chain, which no single-file
-  command can do: an edit to meta.tn moves meta's `!!id`, every `!!meta` pinning it, each of those documents' own
+  command can do: an edit to meta.tn moves meta's `!!id`, every `!!import` pinning it, each of those documents' own
   `!!id`, the `TsonBundledSchemas` constants, and the getting-started example's pins in `README.md` and
-  `InitCommand.java` — the example pins meta and core, so its own digest moves with theirs. It hashes with
+  `InitCommand.java` — the example pins core, so its own digest moves with core's. It hashes with
   `tail -n +2 | shasum -a 256` rather than calling `tson hash`, so it runs when the tree does not compile. Only a
   reference already carrying `?sha256=` is re-stamped: pinning is optional, and an unpinned mention is not a stale
   pin. When to run it and what it does not cover are in `design/process.md`.
@@ -75,9 +73,9 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
 ## `tson validate`
 
 `tson validate [--output text|json|tson] <file|->...` takes a **flat list of files** and classifies each as schema
-or data (`TsonDocumentPeek.of(…).isSchemaDocument()`: a header carrying `!!meta`). The schema files become the run's
-`SchemaSource`; each data document goes to `Tson.validate`, its `!!schema` selecting the schema and its root type-ref
-the type, no `!!schema` meaning schemaless. A TSON data document is self-describing, so it takes no `--type`;
+or data (`TsonDocumentPeek.of(…).isSchemaDocument()`: a root tagged `!schema`). The schema files become the run's
+`SchemaSource`; each data document goes to `Tson.validate`, its `!!import`s selecting the schemas and its root
+type-ref the type, no `!!import` meaning schemaless. A TSON data document is self-describing, so it takes no `--type`;
 `--schema`/`--type` exist for JSON inputs alone ("JSON inputs" below). One `Tson` judges the whole run, so a schema's
 declared names and a document's names answer to one policy.
 
@@ -87,7 +85,7 @@ diagnostics — `REJECTED` would claim a check never made — while every other 
 exits 2 unless the others reach 70 or 78: the schema file is the runner's to fix before anything else means much.
 
 **The run's source is the files on the command line**, its whole configuration, and nothing is fetched beyond them.
-A `!!schema` none of them declares is `SCHEMA_NOT_PERMITTED` — a refusal, outcome `REJECTED`, exit 69 — and the source
+An `!!import` none of them declares is `SCHEMA_NOT_PERMITTED` — a refusal, outcome `REJECTED`, exit 69 — and the source
 never answers `SCHEMA_NOT_FOUND`, which is a source that looks beyond its configuration and finds nothing. The
 message lists what the supplied files *declare*: matching is by embedded `!!id`, never filename (§2.2.1), so the
 common failure is the right file with the wrong identity in it. `declaredIds` keeps the ids verbatim and in argument
@@ -111,7 +109,8 @@ library fault as a bad command line, so only this CLI's argument parsing throws 
 
 Also: `tson compile <schema>` (resolves through compile, tree mode, and renders a bare `ValidationReport`), `tson
 hash`, `tson strip`, `tson policy` (below), and `tson init-example [<dir>]` (writes a working
-`person.tn`/`person-data.tn`, refusing to overwrite). The installed command is `tson`
+`person.tn`, a schema importing core.tn with root `!schema`, and `person-data.tn`, `!!import`ing it, refusing to
+overwrite). The installed command is `tson`
 (`application.applicationName`), launched on the classpath.
 
 ## Reports
@@ -145,8 +144,8 @@ document either way.
 `null`. `--output tson` binds through `CliDiagnostic`'s `@Field` names to what `diagnostics.tn` declares, and
 `--output json` writes the same keys by hand. Nothing in §8.1 fixes a CLI's wire shape, so the schema settles it.
 `diagnostics.tn` holds two hand-written enum copies, `diagnostic_code` and `outcome`, which `DiagnosticsSchemaTest`
-checks against `Diagnostic.Code` and `Outcome` in both directions; it imports the spec's `policy.tn` for `policy`,
-whose `restriction_level` `PolicySchemaTest` checks against `RestrictionLevel`.
+checks against `Diagnostic.Code` and `Outcome` in both directions; it imports the spec's `core.tn`, and its
+`policy.tn` for `policy`, whose `restriction_level` `PolicySchemaTest` checks against `RestrictionLevel`.
 
 ## Exit codes
 
@@ -171,8 +170,8 @@ declaration and a mistake in another reports both. `exitCodeFor`'s Javadoc carri
 why a bind mismatch is 78 rather than 70; the note printed with 78 omits the diagnostic's own remedy
 (`ProcessorConfig.withDataBindContext`, a `DataNameBinder`), which has no command-line surface.
 
-**69 and 75 are both `SchemaFetchException`, reached two ways.** A data document's `!!schema` that no source will
-serve arrives through `SchemaFailure` as a read diagnostic; a schema document's own `!!import`/`!!meta` that will not
+**69 and 75 are both `SchemaFetchException`, reached two ways.** A data document's `!!import` that no source will
+serve arrives through `SchemaFailure` as a read diagnostic; a schema document's own `!!import` that will not
 load arrives through `Tson.validateSchema`'s catch as `TsonDiagnostics.ofSchemaUnavailable`, located at the root
 pointer. So `validate` missing a schema file and `compile` on a schema importing something unfetchable land alike.
 The code is one per `Reason`: `SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_TOO_LARGE` are 69 because no rerun

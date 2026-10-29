@@ -30,9 +30,9 @@ class NumberIdentityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/identity-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               by_number  => { number => text }
               number_set => set<number>
               pinned     => { rate?: number = 1.0  label: text }
@@ -44,7 +44,7 @@ class NumberIdentityTest {
             .withSchemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA)));
 
     private static List<Diagnostic> validate(String rootType, String body) {
-        return TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, body));
+        return TSON.validate("!!import:\"%s\"\n!%s %s".formatted(ID, rootType, body));
     }
 
     private static List<Diagnostic.Code> codes(String rootType, String body) {

@@ -47,9 +47,9 @@ class ClosedOperandFamilyTest {
     private static String schema(String id, String body) {
         return """
                 !!id:"https://example.test/%s.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                 %s}
                 """.formatted(id, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, body);
     }

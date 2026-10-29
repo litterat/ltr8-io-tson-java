@@ -57,7 +57,7 @@ class HeldFieldValueTest {
         entries.put("point", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("n", RecordField.defaulted(TypeRef.of("wrap"), new Token("1", Token.Form.UNQUOTED))),
                 Map.entry("m", RecordField.fixed(TypeRef.of("wrap"), new Token("2", Token.Form.UNQUOTED))))));
-        return new TsonLinkedSchema(new TsonSchema("test-schema", "test-meta", List.of(), entries));
+        return new TsonLinkedSchema(new TsonSchema("test-schema", List.of(), entries));
     }
 
     @Test
@@ -77,8 +77,9 @@ class HeldFieldValueTest {
     private static TsonCompiledSchema load(String body) {
         String schema = """
                 !!id:"https://example.test/held-field-value.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema
                 """ + body;
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, SCHEMA_ID)) {

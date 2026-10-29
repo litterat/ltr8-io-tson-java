@@ -34,9 +34,9 @@ class DirectDefinitionShapeTest {
     private static TsonLinkedSchema resolve(String id, String declarations) {
         return Tson.standard().resolve("""
                 !!id:"https://example.test/%s.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                 %s}
                 """.formatted(id, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, declarations));
     }

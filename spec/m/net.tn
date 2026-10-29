@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/net.tn?sha256=d6bd4c485c76517ac7b490a0b2d0bb8cdccb6b2bdc7cae42d42e12aab5b6b006"
-!!meta:"https://tson.io/2026/39/m/meta.tn?sha256=0f1889f322af0d972dd43446f448ec810b1e54f67463eabfe8309df7ac38029b"
+!!id:"https://tson.io/2026/39/m/net.tn?sha256=ca64ece8f9708c1cf778a4c7847c0d7dfe77094e832989684f6c8abbbc5cdec7"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=5dfc05aa95365a53b808cf6084814f38d8237aa0676e21639d2a31399df8195d"
 @doc:"""
   TSON Network Type Library — addresses, networks and host names
   (2026 Revision 39 draft).
@@ -26,7 +26,7 @@
     RFC 9110 §8.3.1       Media type parameters
     RFC 9542              IEEE 802 parameters (EUI-48 format)
   """
-{
+!schema {
   @doc:"""
     IPv4 address, dotted-quad per the RFC 3986 IPv4address production. Totally
     ordered by numeric address value over a finite 32-bit space.

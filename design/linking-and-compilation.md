@@ -15,10 +15,10 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   a document's own `!!id`, which must already be written canonically. Neither rewrites an identity into validity.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds unless it is equal to the entry already there.
-- One namespace per schema (SPEC-FEEDBACK.md #7): its own entries and the whole closure of its `!!meta` target and
-  its `!!import`s (`TsonSchema.namespaceSources`, the `!!meta` target first), the target contributing exactly as an
-  import does. Every name the schema writes resolves there; no rule ties what a schema may declare or import to its
-  `!!meta`, so any schema declares a constructor, a namespace type or a reference, and imports any schema.
+- One namespace per schema (SPEC-FEEDBACK.md #7): its own entries and the whole closure of its `!!import`s
+  (`TsonSchema.namespaceSources`, header order, deduplicated by identity). Every name the schema writes resolves
+  there; no rule ties what a schema may declare to what it imports, so any schema declares a constructor, a namespace
+  type or a reference, and imports any schema document.
 - A reference to a namespace entry (a `Namespace`, `myapi => !api { … }`) is refused at every position a type-ref
   occupies: it is a value, and nothing is typed by it.
 - A kernel slot typed `type_kind` (`record_field.type`, the element and container type slots, `choice.variants`) is
@@ -70,7 +70,7 @@ half this one strips.
 `link` returns a `TsonLinkedSchema`, a thin wrapper that is a compile-time proof linking ran. The order is
 load-bearing, each step reading what an earlier one wrote:
 
-1. **Merge the closure** (`mergeImports`): the `!!meta` target and every `!!import`.
+1. **Merge the closure** (`mergeImports`): every `!!import`.
 2. **Add the local entries**: a collision with the closure is refused unless the two are equal. The merged map is
    the one namespace every later step reads.
 3. **`computeSubtypes`**, the reverse of `supertypes` over every `Type`, a record template included.
@@ -87,14 +87,15 @@ load-bearing, each step reading what an earlier one wrote:
 
 ## Import merge (`mergeImports`, §2.2.3)
 
-The `!!meta` target and each import contribute their **whole namespace**, copied in as-is, transitively (its own imports
+Each import contributes its **whole namespace**, copied in as-is, transitively (its own imports
 included: "an `!!import` contributes the imported schema's entire namespace"), keeping its home namespace: an imported
 entry is never re-validated against the importer's. **Each merged entry's origin is recorded** (`entryOrigins`), taken
 from the import's own `originOf`, so an entry two hops away keeps its author rather than the intermediary.
 
-- **A `!!meta` target the loader cannot produce is skipped**, an unregistered `!!import` refused: resolution already
-  loaded the target, so a schema linked from a registry always has it, and one linked standalone (hand-built, or the
-  kernel's bootstrap, whose self-naming `!!meta` contributes nothing) links its own entries.
+- **An unregistered `!!import` is refused**: resolution already loaded every import, so a schema linked from a
+  registry always has them. The kernel's bootstrap imports nothing, so it links its own entries with no loader.
+  Every target is a schema document: one whose root is not tagged `!schema` fails to parse as a schema, so its
+  importer fails to load before linking is reached.
 - **Collisions are decided by origin.** One schema reached by several routes unifies (the diamond every schema
   importing core.tn forms; the copies differ only in the `subtypes` each route credited, so they union, `unified`).
   Two *different* schemas declaring one name is an error naming both, an entry of the kernel or meta.tn included:
@@ -168,14 +169,15 @@ merged through imports with the import's entries.
 ## The registry (`TsonSchemaRegistry`)
 
 `register(TsonLinkedSchema)` keys on the canonical identity of `!!id`, refuses a duplicate (`putIfAbsent`: no
-overwrite) and any self-referential `bootstrap() == true` schema. `registerIfAbsent` is the idempotent form for the
-on-demand resolve path, where two threads resolving one document both arrive with equivalent results; it overwrites
-nothing either. `get(uri)` canonicalizes; `getByCanonicalIdentity` trusts its caller to have. `TsonSchemaLoader` is the
-pluggable import and `!!meta` lookup, registered-only by default (nothing fetched). `TsonSchemaLinker.linkBootstrap` is
-the one sanctioned way to link meta-kernel's raw bootstrap output without registering it. Its overload taking a
-`pending` set is the one partial link: the bootstrap links the kernel entries ready so far to compile readers for the
-next read, and a reference to a pending kernel declaration is passed over there and nowhere else. It refuses a schema
-that is not the bootstrap's; `design/resolver-vocabulary-and-bootstrap.md` has the mode.
+overwrite) and any `bootstrap() == true` schema, the kernel's pre-loaded form. `registerIfAbsent` is the idempotent
+form for the on-demand resolve path, where two threads resolving one document both arrive with equivalent results;
+it overwrites nothing either. `get(uri)` canonicalizes; `getByCanonicalIdentity` trusts its caller to have.
+`TsonSchemaLoader` is the pluggable import lookup, registered-only by default (nothing fetched).
+`TsonSchemaLinker.linkBootstrap` is the one sanctioned way to link meta-kernel's raw bootstrap output without
+registering it. Its overload taking a `pending` set is the one partial link: the bootstrap links the kernel entries
+ready so far to compile readers for the next read, and a reference to a pending kernel declaration is passed over
+there and nowhere else. It refuses a schema that is not the bootstrap's; `design/resolver-vocabulary-and-bootstrap.md`
+has the mode.
 
 ## Namespace types (`readAsMaps`, §4.1)
 

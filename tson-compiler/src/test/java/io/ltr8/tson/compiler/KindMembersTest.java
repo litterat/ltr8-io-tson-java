@@ -42,8 +42,9 @@ class KindMembersTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/kinds.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema
             """;
 
     private static TsonLinkedSchema link(String body) {
@@ -192,17 +193,17 @@ class KindMembersTest {
     void aMemberDeclaredInAnImportIsAMember() {
         TsonLinkedSchema linked = link("""
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/kind-ids.tn"
-                {
+                !schema {
                   customer_id => !uuid_type {}
                   any_id      => kind<uuid_type>
                 }
                 """, """
                 !!id:"https://example.test/kind-ids.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   stock_id => !uuid_type {}
                   some_id  => kind<uuid_type>
                 }
@@ -249,9 +250,9 @@ class KindMembersTest {
     void aKindOfNamespaceHoldsEveryNamespaceConstructor() {
         KindBody namespaces = kind(link("""
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   api        => namespace & { key_type: = identifier  value_type: = text }
                   namespaces => !kind_type { of: namespace }
                 }
@@ -268,9 +269,9 @@ class KindMembersTest {
     void aNamespaceTypeIsNoRecordAndNoMap() {
         TsonLinkedSchema linked = link("""
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   api        => namespace & { key_type: = identifier  value_type: = text }
                   labels     => !map { key_type: identifier  value_type: text }
                   types      => !kind_type { of: type }
@@ -328,9 +329,9 @@ class KindMembersTest {
         // One namespace per schema: meta.tn's `uuid_type` is in the closure, so the schema cannot declare its own.
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   uuid_type => text
                 }
                 """, ""));
@@ -342,8 +343,8 @@ class KindMembersTest {
     void anEmptyKindAdmitsNoValueAndIsRefusedAsUninhabited() {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   ids => !kind_type { of: uuid_type }
                 }
                 """, ""));
@@ -428,8 +429,9 @@ class KindMembersTest {
     void aPinnedNameTypeIsJudgedAMemberWhereThePinIsWritten() {
         String header = """
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema
                 """;
         link(header + """
                 {

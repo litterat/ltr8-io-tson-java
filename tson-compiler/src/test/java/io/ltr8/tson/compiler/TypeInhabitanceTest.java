@@ -40,9 +40,9 @@ class TypeInhabitanceTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/inhabit.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -247,7 +247,7 @@ class TypeInhabitanceTest {
                 RecordBody.fieldMap(Map.entry("x", RecordField.required(TypeRef.of("x"))))));
 
         TsonSchemaLinker.link(new TsonSchema("https://example.test/two.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of(), entries), null, problems);
+                List.of(), entries), null, problems);
 
         List<Diagnostic> reported = problems.diagnostics();
         assertTrue(reported.size() >= 2, () -> "expected one per entry, got " + reported);

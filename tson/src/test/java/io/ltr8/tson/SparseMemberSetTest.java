@@ -29,9 +29,9 @@ class SparseMemberSetTest {
     private static final String ID = "https://example.test/ports-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/ports-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               port => !integer ^ { members: [80 443 8080] }
               price => !number ^ { members: [1 2.50] }
               listing => { p: port  q: price }
@@ -51,7 +51,7 @@ class SparseMemberSetTest {
     }
 
     private static List<Diagnostic> validate(String body) {
-        return tson().validate("!!schema:\"" + ID + "\"\n" + body);
+        return tson().validate("!!import:\"" + ID + "\"\n" + body);
     }
 
     @Test
@@ -88,7 +88,7 @@ class SparseMemberSetTest {
     @Test
     void anAdmittedValueStillReadsBackAsWritten() {
         // The set decides admission; it never rewrites the value to whichever spelling the schema used.
-        TsonValue read = tson().treeReader().read("!!schema:\"" + ID + "\"\n!listing { p: 0x50  q: 2.5 }");
+        TsonValue read = tson().treeReader().read("!!import:\"" + ID + "\"\n!listing { p: 0x50  q: 2.5 }");
         assertEquals(BigInteger.valueOf(80), read.at("/p").as(BigInteger.class).orElseThrow());
         assertEquals(new BigDecimal("2.5"), read.at("/q").as(BigDecimal.class).orElseThrow());
     }
@@ -126,9 +126,9 @@ class SparseMemberSetTest {
     private static String schemaDeclaring(String body) {
         return """
                 !!id:"https://example.test/one-1.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                { t => %s }
+                !schema { t => %s }
                 """.formatted(body);
     }
 }

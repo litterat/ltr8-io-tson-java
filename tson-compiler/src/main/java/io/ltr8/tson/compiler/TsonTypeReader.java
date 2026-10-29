@@ -31,7 +31,7 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  * <p><b>One method, and no source or policy overloads -- this reads one value at {@code ctx}'s cursor and
  * nothing more.</b> Whole-document reading is not this interface's job: framing (consuming {@code
  * DocumentStart}, and pulling past the root value so a lazy {@code TsonDataStream} actually rejects trailing
- * content), the {@code !!schema} decision, and the choice of diagnostics receiver all belong to {@link
+ * content), the {@code !!import} decision, and the choice of diagnostics receiver all belong to {@link
  * TsonTreeReader}/{@link TsonObjectReader}, which is what a consumer reads through -- including for a schema
  * held out of band, via their {@code withSchema(uri).readAs(source, typeName)}.
  *

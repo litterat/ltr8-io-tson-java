@@ -40,10 +40,10 @@ class ImportCycleTest {
      * do, so it never appears in a reported chain.
      */
     private void schema(String id, String meta, List<String> imports, String body) {
-        StringBuilder text = new StringBuilder("!!id:\"" + id + "\"\n!!meta:\"" + meta + "\"\n");
+        StringBuilder text = new StringBuilder("!!id:\"" + id + "\"\n!!import:\"" + meta + "\"\n");
         text.append("!!import:\"").append(CORE).append("\"\n");
         imports.forEach(each -> text.append("!!import:\"").append(each).append("\"\n"));
-        documents.put(id, text.append("{\n").append(body).append("\n}\n").toString());
+        documents.put(id, text.append("!schema {\n").append(body).append("\n}\n").toString());
     }
 
     private Tson tson() {

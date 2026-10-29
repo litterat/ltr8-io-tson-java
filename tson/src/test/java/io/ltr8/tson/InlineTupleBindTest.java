@@ -33,9 +33,9 @@ class InlineTupleBindTest {
     private static final String ID = "https://example.test/inline-tuple-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/inline-tuple-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               holder   => { pair: [text, int32] }
               loose    => { pair: [text, int32?] }
               triple   => { pair: [text, int32, boolean] }

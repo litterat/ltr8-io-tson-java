@@ -230,9 +230,11 @@ only the kernel's and meta.tn's constructors reaches exactly those two.
 
 ## Meta-kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 
-Meta-kernel is special: its own `!!meta` names *itself* (§1.5's one deliberate circularity, closed by
-pre-loading, not resolution). Ordinary resolution can't bootstrap it — reading a constructor application needs that
-constructor's compiled reader, and every constructor meta-kernel applies is declared within meta-kernel.
+Meta-kernel is special: its header is its `!!id` alone and its root `!schema`, so it imports nothing and applies only
+its own constructors (§3.4's one cycle, closed by pre-loading, not resolution). It is never resolved from a document,
+and its names reach any other schema only by import. Ordinary resolution can't bootstrap it — reading a constructor
+application needs that constructor's compiled reader, and every constructor meta-kernel applies is declared within
+meta-kernel.
 
 `MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved kernel under
 `SPEC-FEEDBACK.md #4`'s order: reading a value against a type waits on the type being ready, and on each type a part

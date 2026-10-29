@@ -54,8 +54,8 @@ class SchemaDesugarerTest {
 
     private static SchemaDocument parse(String declarations) {
         return new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations)).parseSchemaDocument();
@@ -99,8 +99,8 @@ class SchemaDesugarerTest {
     @Test
     void aRewrittenDeclarationKeepsItsSourcePosition() {
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !schema {
                   plain => { a: text }
 
                   sugared => { tags: [text] }

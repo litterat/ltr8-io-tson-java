@@ -298,6 +298,7 @@ public final class TsonTreeReader {
     public TsonTreeReader(TsonCompiledSchemaRegistry tree);
 
     public TsonTreeReader withSchema(String schemaUri);
+    public TsonTreeReader withImports(List<String> imports);  // several, read as one namespace
     public TsonTreeReader withDiagnostics(DiagnosticsReceiver receiver);
     public TsonTreeReader withProcessorPolicy(ProcessorPolicy policy);
     public TsonTreeReader withTokenPolicy(ScriptPolicy policy);
@@ -308,10 +309,11 @@ public final class TsonTreeReader {
     public LimitsPolicy    limitsPolicy();
 
     // source is String, InputStream, ByteSource (tson-base's io) or a TsonDocumentPeek
-    public TsonValue    read(source);                        // honours the document's own !!schema
-    public TsonDocument readDocument(source);                // + its !!id and !!schema
+    public TsonValue    read(source);                        // honours the document's own !!imports
+    public TsonDocument readDocument(source);                // + its !!id and !!imports
     public TsonValue    readWithoutSchema(source);           // String, InputStream or peek
-    public TsonValue    readAs(source, String typeName);
+    public TsonValue    readAs(source, String typeName);     // the one read that accepts a !schema root
+    // every read but readAs reports a schema document (root tagged !schema) as unsupported
     public TsonValue    read(TsonReadContext ctx);
 }
 
@@ -336,10 +338,10 @@ original's compiled-schema registry, so a schema compiles once per `Tson`, not o
 `readDocument` returns what the read *established* about the document, not just its value:
 
 ```java
-public record TsonDocument(Optional<String> id, Optional<String> schema, TsonValue root) {}   // tson-tree
+public record TsonDocument(Optional<String> id, List<String> imports, TsonValue root) {}   // tson-tree
 
-public record TsonObjectDocument<T>(Optional<String> id, Optional<String> schema,
-                                    Optional<String> rootType, T value) {}                    // tson-compiler
+public record TsonObjectDocument<T>(Optional<String> id, List<String> imports,
+                                    Optional<String> rootType, T value) {}                  // tson-compiler
 ```
 
 Two types rather than one: the object side needs a fourth component, `rootType`, a name a
@@ -354,7 +356,7 @@ rejected. The facades do it; a caller driving the stream directly must.
 
 ```java
 public final class TsonTreeWriter {
-    public TsonTreeWriter describing(String schemaUri);      // adds !!schema
+    public TsonTreeWriter describing(String schemaUri);      // adds !!import
     public TsonTreeWriter identifiedBy(String documentId);   // adds !!id
     public String toTson(TsonValue|TsonDocument value);
     public void   write(TsonValue|TsonDocument value, OutputStream|Appendable out);
@@ -384,21 +386,20 @@ public final class TsonDocumentPeek {
     public static TsonDocumentPeek of(String|InputStream source);                   // total: never throws
     public static TsonDocumentPeek of(String|InputStream source, ProcessorPolicy policy);
     public TsonDocumentHeader header();
-    public boolean isSchemaDocument();
+    public boolean isSchemaDocument();                                  // its root is tagged !schema
 }                                   // then reader.read(peek) / readAs(peek, …) continues the same stream
 
-public record TsonDocumentHeader(Optional<String> id, Optional<String> schema, Optional<String> meta) {
+public record TsonDocumentHeader(Optional<String> id, List<String> imports) {
     public static final TsonDocumentHeader NONE;
-    public boolean isSchemaDocument();                                  // it carries !!meta
 }
 ```
 
 `tson.begin(source)` is `TsonDocumentPeek.of(source, tson.processorPolicy())`. The reader that continues
 from a peek must judge under the same policy the header was read under, and refuses the peek if not.
 
-§7.1's classification from the opening bytes — at most two directives of lookahead and no value parsing.
-A gigabyte document costs the same as a two-line one, and a document whose body will not parse still
-classifies.
+§7.1's classification from the opening bytes: the header (`!!id`, then any `!!import`s), then the root's
+leading annotations and its tag, never the root's value. A gigabyte document costs the same as a two-line
+one (bar a large root annotation), and a document whose root value will not parse still classifies.
 
 ### Content hashing
 
@@ -432,6 +433,7 @@ public final class TsonCompiledSchemaRegistry {
     public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext ctx);
     public TsonCompiledSchema get(String uri);
     public TsonCompiledSchema get(String uri, DiagnosticsReceiver receiver);
+    public TsonCompiledSchema get(List<String> imports, DiagnosticsReceiver receiver); // one namespace, once per set
     public TsonCompiledSchema compile(TsonLinkedSchema linked);
     public TsonCompiledMetaRegistry core();
 }
@@ -455,8 +457,8 @@ import-cycle guard.
 `TsonSchemaParser`, `TsonSchemaResolver`, `TsonSchemaLinker`, `TsonSchemaCompiler`, `TsonDataParser`,
 `TsonDataStream`, `TsonDiagnostics` (the classifiers over this engine's exceptions).
 `TsonSchemaParser` / `TsonSchemaResolver` / `TsonSchemaLinker` each have a reporting overload that collects
-every independent problem in one pass; namespace-level failures (unloadable `!!import`, ineligible
-`!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the lexer under
+every independent problem in one pass; namespace-level failures (an unloadable `!!import`, an import cycle, the
+`!!id` cross-check) still throw even with a receiver. Compilation, and the lexer under
 everything, are fail-fast by design.
 
 ### Exported sub-packages
@@ -511,20 +513,20 @@ public sealed interface TsonValue
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue { public static TsonAtom of(Object value[, String typeRef]); }
 
-public record TsonDocument(Optional<String> id, Optional<String> schema, TsonValue root) {}
+public record TsonDocument(Optional<String> id, List<String> imports, TsonValue root) {}
 ```
 
-**No `meta` component on `TsonDocument`** — that would be a *schema* document, whose model is
-`schema.meta`. Read-side only; no builders or transforms yet.
+A `TsonDocument` is always a *data* document: a schema document (root tagged `!schema`) has `schema.meta` as its
+model, and a data read refuses one. Read-side only; no builders or transforms yet.
 
 ---
 
 ## `io.ltr8.tson.schema` (module `tson-schema`)
 
 ```java
-public record TsonSchema(String id, String meta, List<String> imports,
-                         AnnotatedMap<String, Top> entries, boolean bootstrap,
+public record TsonSchema(String id, List<String> imports, Namespace<Top> entries, boolean bootstrap,
                          Map<String, List<ValueByName>> valuesByName, Map<String, EntryFacts> facts) {
+    public List<String> namespaceSources();              // the imports, deduplicated by identity
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
                              Optional<String> constructor, Optional<String> refines) {}
     public EntryFacts factsOf(String name);              // NONE for a name with no facts
@@ -541,6 +543,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public boolean isKernel(String entryName);      // the meta-kernel's own entry, judged by origin
     public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
     public boolean isConstructor(String name, Top value); // IS-A the kernel's top
+    public boolean governsSchemas();                 // the kernel, or a schema importing it directly (meta.tn)
 }
 
 public final class TsonSchemaRegistry implements TsonSchemaLoader {

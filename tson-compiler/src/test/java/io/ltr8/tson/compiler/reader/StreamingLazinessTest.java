@@ -79,7 +79,7 @@ class StreamingLazinessTest {
                 Map.entry("b", RecordField.required(TypeRef.of("integer"))),
                 Map.entry("huge", RecordField.required(TypeRef.of("numbers"))))));
         TsonSchema schema = new TsonSchema("https://example.test/laziness.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         // "b" is malformed (an array where an integer token is expected) -- a fail-fast read must

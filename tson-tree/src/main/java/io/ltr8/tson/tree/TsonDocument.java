@@ -1,5 +1,6 @@
 package io.ltr8.tson.tree;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -13,36 +14,33 @@ import java.util.Optional;
  * that means the same thing wherever it appears, and the one place a directive could attach is the one
  * place §2.2 puts it.
  *
- * <p><b>Only a data document is representable here</b>, which is why there is no {@code meta} component: a
- * document carrying {@code !!meta} is a <em>schema</em> document, and its value model is
- * {@code schema.meta}, not this one. {@code TsonDocumentHeader} is the type that does carry all three, and
- * it exists for a different question -- classifying a document from its opening bytes before deciding how
- * to read it.
+ * <p><b>Only a data document is representable here</b>: a document whose root is tagged {@code !schema} is a
+ * <em>schema</em> document, and its value model is {@code schema.meta}, not this one.
  *
- * <p><b>Both components are genuinely optional</b>, and neither absence is an error. A document may declare
- * an {@code !!id}, a {@code !!schema}, both, or neither; a bare value with no header at all is an ordinary
- * Class 1 document, and reading one yields a {@code TsonDocument} whose header components are empty rather
- * than one that pretends.
+ * <p><b>Neither component is required</b>, and neither absence is an error. A document may declare an {@code !!id},
+ * any number of {@code !!import}s, both, or neither; a bare value with no header at all is an ordinary Class 1
+ * document, and reading one yields a {@code TsonDocument} whose header components are empty rather than one that
+ * pretends.
  *
- * @param id     the document's own identity ({@code !!id}), or empty
- * @param schema the schema governing its value ({@code !!schema}), or empty
- * @param root   the document's single value, itself carrying any annotations and type-ref it was written
- *               with -- never a directive
+ * @param id      the document's own identity ({@code !!id}), or empty
+ * @param imports the schemas its value is read under ({@code !!import}), in header order
+ * @param root    the document's single value, itself carrying any annotations and type-ref it was written
+ *                with -- never a directive
  */
-public record TsonDocument(Optional<String> id, Optional<String> schema, TsonValue root) {
+public record TsonDocument(Optional<String> id, List<String> imports, TsonValue root) {
 
     public TsonDocument {
         id = id == null ? Optional.empty() : id;
-        schema = schema == null ? Optional.empty() : schema;
+        imports = imports == null ? List.of() : List.copyOf(imports);
     }
 
     /** A document with no header directives -- a bare value, which is every Class 1 document. */
     public static TsonDocument of(TsonValue root) {
-        return new TsonDocument(Optional.empty(), Optional.empty(), root);
+        return new TsonDocument(Optional.empty(), List.of(), root);
     }
 
     /** The same document under a different root, its header carried across unchanged. */
     public TsonDocument withRoot(TsonValue newRoot) {
-        return new TsonDocument(id, schema, newRoot);
+        return new TsonDocument(id, imports, newRoot);
     }
 }

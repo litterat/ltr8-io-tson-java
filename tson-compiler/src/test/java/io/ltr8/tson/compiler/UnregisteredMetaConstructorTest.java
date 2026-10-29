@@ -31,17 +31,17 @@ class UnregisteredMetaConstructorTest {
     static {
         DOCUMENTS.put("https://example.test/meta-unreg.tn", """
                 !!id:"https://example.test/meta-unreg.tn"
-                !!meta:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                {
+                !schema {
                   operation => top & { path: text }
                 }
                 """);
         DOCUMENTS.put("https://example.test/api-unreg.tn", """
                 !!id:"https://example.test/api-unreg.tn"
-                !!meta:"https://example.test/meta-unreg.tn"
+                !!import:"https://example.test/meta-unreg.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                {
+                !schema {
                   search => !operation { path: "/search" }
                 }
                 """);

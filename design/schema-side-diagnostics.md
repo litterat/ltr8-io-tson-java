@@ -144,7 +144,7 @@ mode. javac draws the boundary there (every entry is attributed before `shouldSt
 phase), and Swift never reaches SILGen after a Sema error. **A schema that reported anything is never registered.**
 
 `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)` composes the same three phases behind the same gates — it is
-how a *data* read reports on the schema its `!!schema` names — so `tson validate` and `tson compile` give the same
+how a *data* read reports on the schema its `!!import` names — so `tson validate` and `tson compile` give the same
 account of the same broken schema. It registers only a clean schema and otherwise returns `null`.
 
 **What still throws even with a receiver** makes the namespace itself unusable rather than one entry wrong: an

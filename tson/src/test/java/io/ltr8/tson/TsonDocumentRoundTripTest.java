@@ -10,6 +10,7 @@ import io.ltr8.tson.tree.TsonDocument;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,9 +31,9 @@ class TsonDocumentRoundTripTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               order => { sku: text  quantity: int32 }
             }
             """.formatted(SCHEMA_URI);
@@ -49,24 +50,24 @@ class TsonDocumentRoundTripTest {
     void aDocumentSurvivesBeingReadAndWrittenBack() {
         String source = """
                 !!id:"https://example.test/orders/1.tn"
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI);
 
         TsonDocument document = tson().treeReader().readDocument(source);
 
         assertEquals(Optional.of("https://example.test/orders/1.tn"), document.id());
-        assertEquals(Optional.of(SCHEMA_URI), document.schema());
+        assertEquals(List.of(SCHEMA_URI), document.imports());
         assertEquals("ABC-1", document.root().get("sku").asString().orElseThrow());
 
         String written = new TsonTreeWriter().toTson(document);
         assertTrue(written.contains("!!id:\"https://example.test/orders/1.tn\""), written);
-        assertTrue(written.contains("!!schema:\"" + SCHEMA_URI + "\""), written);
+        assertTrue(written.contains("!!import:\"" + SCHEMA_URI + "\""), written);
 
         // And the reproduction reads back as the same document, which is the assertion that matters --
         // the text may differ in whitespace, the document may not.
         TsonDocument reread = tson().treeReader().readDocument(written);
         assertEquals(document.id(), reread.id());
-        assertEquals(document.schema(), reread.schema());
+        assertEquals(document.imports(), reread.imports());
         assertEquals(document.root(), reread.root());
     }
 
@@ -74,7 +75,7 @@ class TsonDocumentRoundTripTest {
     @Test
     void readStillHandsBackTheValueAlone() {
         String source = """
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI);
 
         TsonValue value = tson().treeReader().read(source);
@@ -89,7 +90,7 @@ class TsonDocumentRoundTripTest {
         TsonDocument document = new TsonTreeReader().readDocument("{ sku: \"ABC-1\" }");
 
         assertEquals(Optional.empty(), document.id());
-        assertEquals(Optional.empty(), document.schema());
+        assertEquals(List.of(), document.imports());
         assertEquals("ABC-1", document.root().get("sku").asString().orElseThrow());
     }
 
@@ -100,13 +101,13 @@ class TsonDocumentRoundTripTest {
                 !!id:"https://example.test/orders/1.tn"
                 { sku: "ABC-1" }""");
         assertEquals(Optional.of("https://example.test/orders/1.tn"), identified.id());
-        assertEquals(Optional.empty(), identified.schema());
+        assertEquals(List.of(), identified.imports());
 
         TsonDocument governed = tson().treeReader().readDocument("""
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI));
         assertEquals(Optional.empty(), governed.id());
-        assertEquals(Optional.of(SCHEMA_URI), governed.schema());
+        assertEquals(List.of(SCHEMA_URI), governed.imports());
     }
 
     /**
@@ -117,7 +118,7 @@ class TsonDocumentRoundTripTest {
     @Test
     void aDocumentsOwnHeaderWinsOverTheWritersAndOnlyWhereItHasOne() {
         TsonDocument governed = tson().treeReader().readDocument("""
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI));
 
         String written = new TsonTreeWriter()
@@ -144,14 +145,14 @@ class TsonDocumentRoundTripTest {
     void withRootKeepsTheHeader() {
         TsonDocument document = tson().treeReader().readDocument("""
                 !!id:"https://example.test/orders/1.tn"
-                !!schema:"%s"
+                !!import:"%s"
                 !order { sku: "ABC-1"  quantity: 3 }""".formatted(SCHEMA_URI));
         TsonValue other = new TsonTreeReader().read("{ sku: \"OTHER\" }");
 
         TsonDocument replaced = document.withRoot(other);
 
         assertEquals(document.id(), replaced.id());
-        assertEquals(document.schema(), replaced.schema());
+        assertEquals(document.imports(), replaced.imports());
         assertEquals(other, replaced.root());
         assertEquals(document.root(), document.withRoot(other).withRoot(document.root()).root());
     }

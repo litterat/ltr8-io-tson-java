@@ -194,7 +194,7 @@ public final class HostAtoms {
      * is the only question.
      *
      * <p><b>What a reader asks when the class is what types the position</b> -- an object-binding read of a
-     * document with no {@code !!schema}, where the target class fixes the shape of every record, array and
+     * document with no {@code !!import}, where the target class fixes the shape of every record, array and
      * atom under it. [TSON-DATA] §4.1's base type resolution is for a position nothing types, which leaves
      * exactly tree mode; a declared host type naming a §5 family types the position, and that
      * family's own parsing contract reads the token.

@@ -23,9 +23,9 @@ class FieldGroupInTemplateTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/grouped-template.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               fragment => <T> { ( include: T | name?: T  type?: T )? }
               contact => <T> { ( email: T | phone: T )+ }
               text_fragment => fragment<text>

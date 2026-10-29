@@ -34,9 +34,9 @@ class AnnotationValidationTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/annotated-1.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            {
+            !schema {
               level => int32
               plain => { id: text }
               carrier => { id: text }
@@ -81,7 +81,7 @@ class AnnotationValidationTest {
 
     private static String document(String annotation, String type) {
         return """
-                !!schema:"https://example.test/annotated-1.tn"
+                !!import:"https://example.test/annotated-1.tn"
                 %s
                 !%s { id: "1" }""".formatted(annotation, type);
     }
@@ -152,7 +152,7 @@ class AnnotationValidationTest {
     @Test
     void aDispatchedValuesAnnotationsAreCheckedThoughNoReaderKeepsThem() {
         String document = """
-                !!schema:"https://example.test/annotated-1.tn"
+                !!import:"https://example.test/annotated-1.tn"
                 !holder { thing: @nosuchtype:"x" !circle { radius: "3" } }""";
 
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, only(binding(document, Holder.class)).code());

@@ -9,10 +9,10 @@ import java.util.Optional;
  * The schema and root type a JSON input is read against -- [TSON-JSON] §3.4's out-of-band binding, which is
  * the only route a JSON document on a command line has.
  *
- * <p>A TSON document names its own schema in its header and its own root type with a type-ref, so
- * {@code validate} auto-classifies it and needs nothing. A JSON document can do neither: {@code !!schema} is
- * TSON text syntax and there is no in-band channel (§3.4's second route needs the annotation object, which
- * this encoding gains with §8). So the binding comes from the command line or nowhere.
+ * <p>A TSON document names its schemas in its header's {@code !!import}s and its own root type with a type-ref,
+ * so {@code validate} auto-classifies it and needs nothing. A JSON document's counterpart is §3.4's in-band route,
+ * a root annotation object led by {@code $import} and {@code $type}, which the JSON reader does not read yet -- it
+ * declines such a root as {@code NOT_IMPLEMENTED}. So the binding comes from the command line or nowhere.
  *
  * <p><b>One binding per run.</b> It applies to every JSON input, and two bindings mean two runs -- stated
  * rather than solved with per-file syntax, which would invent a shape the format does not have.

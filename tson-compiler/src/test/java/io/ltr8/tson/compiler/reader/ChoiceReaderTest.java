@@ -39,7 +39,7 @@ class ChoiceReaderTest {
                 RecordField.required(TypeRef.of("integer"))))));
         entries.put("contact_method", new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone"))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());

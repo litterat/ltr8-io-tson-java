@@ -57,8 +57,8 @@ class PositionalReadErrorsTest {
     void missingRequiredFieldErrorCarriesBothDataAndSchemaLocations() {
         String schemaSource = """
                 !!id:"https://tson.io/test-suite/scratch/position-demo.tn"
-                !!meta:"https://tson.io/test-suite/scratch/fake-meta.tn"
-                {
+                !!import:"https://tson.io/test-suite/scratch/fake-meta.tn"
+                !schema {
                   placeholder => {}
 
                   my_record => {
@@ -82,7 +82,7 @@ class PositionalReadErrorsTest {
         Position myRecordPosition = declarationPositions.get(myRecordDeclaration);
         entries.put("my_record", resolver.resolve(myRecordDeclaration, Optional.of(myRecordPosition)));
 
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(),
+        TsonSchema schema = new TsonSchema("test-schema", List.of(),
                 io.ltr8.annotation.AnnotatedMap.of(entries), false, Map.of(),
                 Map.of("my_record", resolver.factsOf("my_record")));
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));

@@ -29,7 +29,7 @@ import java.math.BigInteger;
  *
  * <p>An object or array here is a validation error -- {@code value} admits scalars -- and so is JSON null at
  * this REQUIRED position, §7 having spent it as the void sentinel. Nothing here admits an object at all, so
- * an annotation object -- a {@code $schema} in one included -- is refused with the rest.
+ * an annotation object -- an {@code $import} in one included -- is refused with the rest.
  *
  * <p><b>Bound to a component, the component's host type says what the value was</b> ({@link #boundTo}). The four
  * cases are how the value is decoded, not what it means: {@code min: "PT30M"} on {@code duration_type} is the

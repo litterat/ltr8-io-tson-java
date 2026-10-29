@@ -26,9 +26,9 @@ class TsonValidateSchemaTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/validate-schema-test.tn"
-            !!meta:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
-            """;
+            !schema\s""";
 
     private static List<Diagnostic> check(String body) {
         return Tson.standard().validateSchema(HEADER + body);
@@ -50,9 +50,9 @@ class TsonValidateSchemaTest {
         };
         List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(refusing))).validateSchema("""
                 !!id:"https://example.test/importer.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/nowhere.tn"
-                { t => text }
+                !schema { t => text }
                 """);
 
         assertEquals(1, problems.size(), problems::toString);
@@ -476,9 +476,9 @@ class TsonValidateSchemaTest {
     void anUnloadableImportIsReportedAgainstTheDocument() {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/bad-import.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/nothing-here.tn"
-                { my_int => int32 }
+                !schema { my_int => int32 }
                 """);
 
         assertFalse(problems.isEmpty());
@@ -495,8 +495,8 @@ class TsonValidateSchemaTest {
     void anImportWhoseTargetOwnsAnotherIdentityIsReportedAgainstTheDocument() {
         String lib = """
                 !!id:"https://example.test/its-real-name.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
-                { widget => { name: text } }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { widget => { name: text } }
                 """;
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(uri -> {
@@ -508,9 +508,9 @@ class TsonValidateSchemaTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/mismatched-import.tn"
-                !!meta:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/fetched-as.tn"
-                { holder => { w: widget } }
+                !schema { holder => { w: widget } }
                 """);
 
         assertEquals(1, problems.size(), problems::toString);
