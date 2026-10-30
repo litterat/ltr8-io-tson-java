@@ -60,6 +60,15 @@ public interface TsonCompiledSchemaLoader {
     TsonCompiledMetaSchema vocabularyOf(String identity);
 
     /**
+     * The registered schema named by {@code identity}, compiled in tree mode: what a value entry's payload is read
+     * through where no class binds its type, so the value is held as a {@code TsonValue} and the schema holding it
+     * still loads and validates ([TSON-SCHEMA] §4.1).
+     *
+     * @throws IllegalStateException if no schema is registered under {@code identity}
+     */
+    TsonCompiledSchema treeVocabularyOf(String identity);
+
+    /**
      * [TSON-DATA] §8.2's identifier policy the schemas this loader resolves are judged under. The resolver reads
      * a constructor payload under it, so an identifier-typed value there -- a key of an identifier-keyed map in a
      * governed schema's namespace value -- is judged as a name, as it is in a data document.

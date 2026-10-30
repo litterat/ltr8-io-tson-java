@@ -37,10 +37,10 @@ class TypeRefAnnotationTest {
     void anAnnotationOnATypeRefIsKept() {
         TypeRef type = fieldType(read("""
                 !record { fields: {
-                  n => !record_field { type: @doc:"the token itself" token }
+                  n => !record_field { type: @doc:"the token itself" text }
                 } }"""));
 
-        assertEquals("token", type.name());
+        assertEquals("text", type.name());
         assertEquals("the token itself", type.annotations().get("doc").orElseThrow().value().orElseThrow());
     }
 
@@ -49,7 +49,7 @@ class TypeRefAnnotationTest {
     void anUnannotatedTypeRefCarriesNothing() {
         assertTrue(fieldType(read("""
                 !record { fields: {
-                  n => !record_field { type: token }
+                  n => !record_field { type: text }
                 } }""")).annotations().values().isEmpty());
     }
 
@@ -58,7 +58,7 @@ class TypeRefAnnotationTest {
     void anAnnotatedTypeRefWritesBackAsOne() {
         TypeRef type = fieldType(read("""
                 !record { fields: {
-                  n => !record_field { type: @doc:"the token itself" token }
+                  n => !record_field { type: @doc:"the token itself" text }
                 } }"""));
 
         String written = new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(type);

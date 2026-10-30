@@ -139,12 +139,13 @@ share a document, an order has to be computed and its cycles defined.
 **What is running.** In an ordinary schema, Pass 2 resolves on demand and refuses "a circular composition/refinement
 chain" (rule 1's operand edge); defaults and pins are `value`-typed and judged at link (rule 3). A test harness
 measures the kernel's wait graph from `meta-kernel-resolved.tn`'s own declarations, no compiled reader consulted: one
-cycle, holding `record` and 29 more of the 77 entries (`boolean`, `integer`, `text`, `identifier`,
-`non_negative_integer`, the enum and set machinery, `field_group`, and the synthetics they name), every other entry
+cycle, holding `record` and 29 more of the 79 entries (`boolean`, `integer`, `text`, `identifier`,
+`non_negative_integer`, the enum and set machinery, `field_group`, `namespace` and `field_map`, and the synthetics
+they name), every other entry
 ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with `@annotation`
 would be a second cycle, and the marker changes no value (§6). The kernel bootstrap runs rules 1 to 4: it builds by
 hand exactly the instances and the one refinement on that cycle (a test holds the set to the measurement), resolves
-every declaration no read produces from its grammar, and reads the other 19 instances through the ordinary instance
+every declaration no read produces from its grammar, and reads the other 21 instances through the ordinary instance
 path against readers compiled from the entries ready so far. A read that reaches an entry not yet ready makes it ready
 first, on demand, and an entry waiting on itself is refused naming the chain; the order is computed and source order is
 not consulted. A pin reached through an entry not yet ready binds as written (rule 3), which is what lets `iri` be read
@@ -279,7 +280,7 @@ The LOCAL cell needs none of this — a value naming, by its tag, a type of the 
 
 **What is running.** The push is gone and `declared` is its own constructor:
 
-- meta.tn declares `declared_type => sum & {}`, and core.tn `declared => !declared_type {}`. A `declared` position
+- The kernel declares `declared_type => sum & {}` and `declared => !declared_type {}` (#9). A `declared` position
   reads exactly as `!scoped { scope: [LOCAL] }` did: the value names its type by its tag, the name resolves in the
   governing schema's closure (§2.2.3), and the value is checked in full against it; an untagged value is a validation
   error in every mode, and a tag naming no type of the closure a resolver error. `declared` is SUM-kinded and has no
@@ -398,10 +399,8 @@ supplied at ingest (§8.1).
 - **A resolved form's header is its source's**, and its root `!schema`; nothing in it marks it resolved. Reading one is
   the caller's choice, as §10.1's ingest is: the reader is told the root's type, and reads under the form's own
   imports, the kernel's own form, which imports nothing, under the pre-loaded kernel. Nothing is supplied at ingest.
-- **What remains of the ladder is one reading rule.** A kind-typed position reads the name's grammar alone, leaving
-  membership to the described schema's link (§4.2, §8.1), when the schema read under is the kernel or imports it
-  directly, as meta.tn does; that was the schemas whose `!!meta` named the kernel. Whether a schema describes schemas
-  is open until value entries are ordinary types.
+- **No reading rule is left of the ladder.** A kind-typed position is judged by membership in every data document,
+  and read by its grammar alone in a schema document, whichever schema it is read under (#9).
 - [TSON-JSON] (edited in place): the binding member is `$import`, a list of references, at the top of a document only.
 
 **Resolution, a proposal.** Sections amended:
@@ -415,3 +414,82 @@ supplied at ingest (§8.1).
   `!!import`s bind it, several in one namespace, and the root names its type. §8.1: a resolved form carries its
   source's header, and nothing is supplied at ingest. §12.1: `schema-document = [id-directive ws] *(import-directive
   ws) *(annotation ws) "!schema" ws schema-map`.
+
+## 9. [TSON-SCHEMA] §4.1, §4.2, §5.12, §7.4, §8.1 — value entries are ordinary values; `namespace` builds map types
+
+**Problem.** §4.1 makes `namespace` a fourth kind beside `type`: a constructor IS-A `top` alone, whose instances are
+maps, so a namespace type is the one constructor whose instances are not types and the only way a schema map holds a
+value. Every rule that tells types from values carries an exception for it — `type_kind` holds the namespace
+constructors, `kind<namespace>` holds both namespace types and their values, `ref<T>`'s "`of` is no constructor"
+reads `api` as one — and a schema cannot hold a value of an ordinary record type at all
+(`create_order => !operation { … }` is refused as "not applicable"). The schema map's own `value_type: top` is false
+once any entry holds a value. And with one namespace per schema (#7), a meta layer's vocabulary is ordinary types, so
+"governed by a meta layer" no longer says which documents describe schemas.
+
+**What is running.**
+
+- **`namespace` is a constructor under `product`**, `namespace => product & { key_type?: identifier_kind  value_type:
+  type_kind  ordered?: boolean ~ false }`, and a namespace type is an instance of it, as a map type is one of `map`:
+  `schema => !namespace { key_type: type_name  value_type: declared }`, `field_map => !namespace { value_type:
+  record_field  ordered: true }`, `api => !namespace { key_type: identifier  value_type: method }`. A value of one is
+  the map its facets describe. `key_type` is optional: absent, the host of a value supplies the family, as a
+  record's `fields` are keyed by its `name_type`. A stated `key_type` is a member of `identifier_kind`, judged at link.
+  Its form is `map`'s: the same access and size facets, and a value of a namespace type is read as a map. It is
+  `map`'s sibling under `product` rather than `map ^ { … }`, so `kind<map>` holds no namespace type, and one thing
+  holds it there: the optional `key_type`. §5.7 is right to refuse a refinement that makes `map`'s required `key_type`
+  optional, since a value IS-A `map` is one a map's reader can read, and that needs its key type. The absent
+  `key_type` stands in for a value that depends on its host — `field_map`'s key family is its record's `name_type` —
+  which the kernel has no spelling for yet.
+- **An entry is a type exactly when its value is built by a constructor IS-A `type`.** `name => !T { … }` with `T` a
+  constructor builds a type; with `T` an ordinary type — a record, a namespace type, any type of the closure — the
+  entry is a value of `T`, read against `T` as a data value is, and marked by nothing but its tag. A value entry is a
+  member of no kind (`type_kind` excludes it unmarked), nothing is typed by it, and `ref<T>` names it where its type
+  IS-A `T`: `ref<api>` names `orders => !api { … }`. `kind<api>` is refused at the declaration, `api` being no
+  constructor. A value entry's payload lifts and mints nothing; its names at kind- and reference-typed slots are
+  judged at link, and a qualified name walks into it by key and by field. A template over an ordinary type closes to
+  a value entry (`fetch => <T> !operations { … }`, `get_order => fetch<order>`). Applying a type declared in the same
+  document stays `NOT_IMPLEMENTED` (#7).
+- **The schema map's values are `declared`.** The kernel now declares `declared_type` and `declared` (moved from
+  meta.tn and core.tn), and `schema`'s `value_type` is `declared`: every entry's value names its type by its tag — a
+  constructor for a type, an ordinary type for a value. `top` is the root of the constructors only. `declared` is
+  now a kernel name, reserved in every closure that imports the kernel (#7), and the descriptive annotations core put
+  on its copy (`@ordering`, `@bounded`) go with it.
+- **A kind-typed position is judged by membership in every data document**, over the reading document's closure. A
+  name in a schema document — a construction's or a value entry's payload, or a value of the kernel's `schema` read
+  as data, a resolved form — resolves in that schema, which the reading closure does not hold: its grammar is read
+  and its membership judged where that schema links, or at ingest. That replaces the stand-in that read grammar alone
+  under the kernel and any schema importing it directly: a data document importing meta.tn that writes
+  `!record_field { type: int32 }` is refused, `int32` being no member of `type_kind` in meta.tn's closure.
+- **The kernel's wait cycle** (#4) gains `namespace`, `field_map` being its instance, and loses `field_name`,
+  `field_map`'s keys being read by their spelling: 30 of the 79 entries, longest chain 4. The bootstrap builds
+  `field_map` by hand with the rest of the pre-loaded set.
+- **Hosts.** One bind context serves schemas and data; the names the kernel and meta.tn declare always bind to
+  the schema model, and every other name binds through the consumer's binder. A value entry whose type no class binds is
+  held as a tree, so a schema loads and validates without host classes; a schema obtained to bind refuses such an
+  entry with `BIND_MISMATCH` at the entry, anywhere in the closure it compiles, since a bound reference can reach a
+  value of any schema there. Applying a constructor a schema declares still needs a host class for its instances,
+  refused with `BIND_MISMATCH` without one, so such a schema does not yet load for validation alone. These are a
+  processor's choices, not the spec's.
+
+**Resolution, a proposal.** Sections amended:
+
+- §4.1: the kinds are `atom`, `product` and `sum` under `type`, beside `reference` and `template` under `top`;
+  `namespace` is a constructor under `product` whose instances are namespace types, and the paragraph making a
+  namespace type the one constructor whose instances are not types goes. An entry is a type exactly when its value
+  is built by a constructor IS-A `type`, and any other entry is a value, its tag naming its type. `schema`'s
+  `value_type` is `declared`, which with `declared_type` is the kernel's.
+- §4.2: `kind_type`'s exclusions are "not a constructor"; a namespace type is a member of `type_kind`, `kind<product>`
+  and `kind<namespace>`; a value entry is a member of no kind; `of` names `type` or a constructor below it.
+  `ref_type`'s `of` names any type, a namespace type included.
+- §5.7: "Constructor refinement in a meta-schema is the meta-level exception and MAY replace fixed values (§4.2)"
+  is ladder wording; with no meta-schema it is restated for a constructor refinement wherever it is written, or the
+  exception goes. The omission order stands: it is what keeps `namespace` from being `map ^ { … }` today.
+- §5.12: a qualified name's first segment names an entry holding a value; a further segment selects a key of a value
+  of a namespace type or a field of a record value.
+- §7.4, §8.1: a kind-typed position in a data document is judged by membership in the document's closure; in a
+  schema document, and a resolved form read as one, its grammar is read and membership is the schema's link's or
+  ingest's.
+
+**Open.** `namespace => map ^ { key_type: identifier_kind … }`, with `key_type` required, once a field's value can
+depend on its host (dependent fields): `field_map` then becomes a template applied to its record's `name_type`, and
+`kind<map>` holds every namespace type. §5.7 is unchanged by it.

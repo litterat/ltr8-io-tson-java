@@ -10,9 +10,9 @@ history lives in git.
 - What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`); `IdentifierGrammar.hygiene`
   returns a verdict rather than throwing.
 - A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
-- A namespace type's instance and an annotation value are judged at the payload read
-  (`SchemaResolver.payloadNames`), not in the walk, which cannot see into them; every other constructor payload is
-  read under no policy.
+- A value entry's payload and an annotation value are judged at the payload read (`SchemaResolver`, under the
+  loader's identifier policy), not in the walk, which cannot see into them; every constructor payload is read under
+  no policy.
 - A minted name is ASCII and an identifier by construction, and is never exempted from the walk.
 - Non-ASCII or non-admitted content in a minted name is hashed rather than dropped; a part is capped at 64 characters,
   hash included.
@@ -46,14 +46,14 @@ stands alone — but it is the schema's own copy of a value a read judges: a def
 omits the field, so a value the reader would refuse if written must not be one it injects
 (`design/name-hygiene-read-path.md`).
 
-**A namespace value and an annotation value are judged where they are read, not in the walk.** A namespace type's
-instance (`!api { … }`) is a map keyed by names whose values bind to the consumer's own classes
+**A value entry and an annotation value are judged where they are read, not in the walk.** A value entry's payload
+(`!api { … }`, a map keyed by names) binds to the consumer's own classes or is held as a tree
 (`design/meta-layer-namespaces.md`), and an annotation value binds to whatever its type binds, so by link time the
-field types that make a value a name are behind them — a meta layer's `replies: {status_name => …}` arrives as a
+field types that make a value a name are behind them — a schema's `replies: {status_name => …}` arrives as a
 `Map<String, …>`. `SchemaResolver` reads those two payloads under the registry's policy instead, and the readers
-apply §8.2 exactly as they do in a data document: the namespace's keys are one scope, so are the keys of each
-identifier-keyed map in it, and an identifier-typed value meets the per-name rules. Every other
-constructor builds the schema layer's own vocabulary and is read under `IdentifierPolicy.none()`: its names are
+apply §8.2 exactly as they do in a data document: a namespace value's keys are one scope, so are the keys of each
+identifier-keyed map in it, and an identifier-typed value meets the per-name rules. A
+constructor's payload builds the schema layer's own vocabulary and is read under `IdentifierPolicy.none()`: its names are
 the walk's scopes, and its identifier-typed values outside them are references — a choice's variants, a
 supertype — whose verdict belongs to the declaration they name, possibly in another schema. Judging a reference
 too would report one name twice, against the wrong declaration, and stop the schema reaching the linker.
@@ -80,7 +80,7 @@ requirements meet there, and the second is why meeting the first is not enough:
 
 - **[TSON-SCHEMA] §8.2's freshness MUST**, that an internal name is a valid `identifier`. Splicing raw text
   breaks it outright: a `text` field holding a path puts `/` in a name, and §7.7 admits only `XID_Continue` and
-  `-`. An HTTP operation is the case that finds it — a meta layer's vocabulary is motivated by one, and
+  `-`. An HTTP operation is the case that finds it — a schema's value entries are motivated by one, and
   every realistic path carries a slash.
 - **§8.2's hygiene must still be able to judge the result.** Admitting every `XID_Continue` character keeps
   the name legal and still lets author text shape it: a Cyrillic `о` in a value would sit in a namespace

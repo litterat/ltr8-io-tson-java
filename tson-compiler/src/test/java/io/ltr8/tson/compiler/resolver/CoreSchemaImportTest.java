@@ -76,7 +76,7 @@ class CoreSchemaImportTest {
 
         TsonSchema core = registered.get().schema();
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.CORE_ID);
-        assertEquals(31, core.entries().keySet().stream().filter(name -> registered.get().originOf(name).equals(own))
+        assertEquals(30, core.entries().keySet().stream().filter(name -> registered.get().originOf(name).equals(own))
                 .count(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements

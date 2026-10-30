@@ -241,8 +241,9 @@ public interface TsonReadContext {
     IdentifierPolicy identifierPolicy();
 
     /**
-     * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a data
-     * entry's body, replayed through the governing meta's readers by the resolver ({@link #schemaDocument}).
+     * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a value
+     * entry's payload, replayed through the readers of the schema declaring its head by the resolver ({@link
+     * #schemaDocument}).
      * There, and only there, a bare name at a record position is a value written by name rather than §5.6's
      * positional fill ([TSON-SCHEMA] §5.6): a schema has a namespace to resolve the name in, and a data document
      * has none. False for every data document, so a data read is unchanged by the rule.
@@ -250,8 +251,17 @@ public interface TsonReadContext {
     boolean readsSchemaDocument();
 
     /**
-     * Whether this reads a value body in a schema document -- an instance of a namespace type, whose values the
-     * resolver never lifts or mints -- rather than one of the kernel's own bodies, where a
+     * Whether a name at a kind- or reference-typed position here resolves in the document being read rather than
+     * in the closure this read's readers were compiled over: a schema document's value, which the resolver reads
+     * ({@link #readsSchemaDocument()}), or a value of the kernel's {@code schema} read as data, a resolved form.
+     * Such a name is read by its grammar alone, and what it names is judged where that schema links, or at ingest
+     * ([TSON-SCHEMA] §4.2, §8.1). False for every data document, whose kinds are judged by membership.
+     */
+    boolean readsSchemaNames();
+
+    /**
+     * Whether this reads a value body in a schema document -- a value entry's payload, a value of an ordinary type,
+     * which the resolver never lifts or mints in -- rather than a construction's binding record, where a
      * sugar lift may leave an application in a slot for the closer to mint.
      */
     boolean readsValueBody();
@@ -335,7 +345,7 @@ public interface TsonReadContext {
 
     /**
      * {@link #throwing} for a value inside a schema document, which {@link #readsSchemaDocument()} answers true
-     * for -- the resolver's replay of a constructor's binding record or a namespace entry's map, and nothing else.
+     * for -- the resolver's replay of a constructor's binding record or a value entry's payload, and nothing else.
      * Each reference the read produces by name reaches {@code heldByName} with its slot ({@link #heldByName}).
      */
     static TsonReadContext schemaDocument(TsonEventSource events, IdentifierPolicy identifierPolicy,

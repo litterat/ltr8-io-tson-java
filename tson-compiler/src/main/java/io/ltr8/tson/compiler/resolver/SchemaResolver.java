@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.BindMismatchException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.annotation.AnnotatedMap;
@@ -14,6 +15,8 @@ import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.reader.NamespaceInstanceReader;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -30,6 +33,8 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -282,21 +287,36 @@ public final class SchemaResolver {
         // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
-        TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
-                (type, value) -> (Top) read(vocabulary.constructor(type), value, vocabulary.payloadNames(type, names),
-                        heldByName, vocabulary.isValueBody(type)),
+        // A held body closes to whatever its head builds: a type where the head is a constructor, and a value entry
+        // where it is an ordinary type (`fetch => <T> !operations { ... }`, then `get_order => fetch<order>`).
+        DefinitionMetaReader reads = new DefinitionMetaReader() {
+
+            @Override
+            public Top read(String type, io.ltr8.tson.compiler.ast.DataValue value) {
+                Top head = vocabulary.definition(type);
+                if (head != null && !EntryKind.isConstructor(type, head, kernel)) {
+                    return new ValueEntry(type, readValue(type, value));
+                }
+                return (Top) SchemaResolver.read(vocabulary.constructor(type), value, IdentifierPolicy.none(),
+                        heldByName, false);
+            }
+
+            @Override
+            public Object readValue(String type, io.ltr8.tson.compiler.ast.DataValue value) {
+                return vocabulary.value(type, value, names, heldByName);
+            }
+        };
+        TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put, reads,
                 generated,
                 vocabulary::definition, namespaceGetter::current, facts, applications,
                 localConstructors, vocabulary::constructorOf, kernel);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
-        DefinitionResolver resolver = new DefinitionResolver(
-                (type, value) -> (Top) read(vocabulary.constructor(type), value, vocabulary.payloadNames(type, names),
-                        heldByName, vocabulary.isValueBody(type)),
+        DefinitionResolver resolver = new DefinitionResolver(reads,
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary. Its value is
-                // as opaque to the linker as a namespace value's, so it is read under the policy too.
+                // as opaque to the linker as a value entry's, so it is read under the policy too.
                 (type, value) -> read(vocabulary.type(type), value, names, heldByName, false),
                 vocabulary::definition, namespaceGetter, new ApplicationCloser() {
 
@@ -504,7 +524,8 @@ public final class SchemaResolver {
         Map<String, List<TsonSchema.ValueByName>> valuesByName = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> localFacts = new LinkedHashMap<>();
         localOnly.forEach((name, definition) -> {
-            List<TsonSchema.ValueByName> held = heldByName.get(definition);
+            List<TsonSchema.ValueByName> held = heldByName.get(
+                    definition instanceof ValueEntry value ? value.value() : definition);
             if (held != null) {
                 valuesByName.put(name, held);
             }
@@ -1042,30 +1063,33 @@ public final class SchemaResolver {
         }
 
         /**
-         * Whether {@code constructor}'s instances are value bodies: a namespace type, whose payload is a map of values
-         * the resolver reads into the consumer's host classes. Nothing in one is ever lifted or minted, so a
-         * kind-typed slot there holds a bare name and a braced application is refused rather than left for a closer
-         * that will not come.
+         * A value entry's payload, {@code name => !type { ... }}, read against the type {@code type} as the value it
+         * is: bound by the bind context where a class binds the type, and held as a tree where none does, through the
+         * declaring schema's tree-mode compilation, so a schema holding it loads and validates without host classes.
+         * A value of a namespace type is delivered as the {@link io.ltr8.tson.schema.meta.Namespace} it is.
+         *
+         * <p><b>A value is a payload the linker cannot see into</b> -- its fields' types are left behind in the
+         * declaring schema -- so its keys and its identifier-typed values, a key of an identifier-keyed map among
+         * them, are judged here under {@code names}, at the read, as the same values are in a data document. Nothing
+         * in one is ever lifted or minted ({@link TsonReadContext#readsValueBody()}), so a kind-typed slot holds a
+         * bare name. A constructor's payload builds the schema layer's own vocabulary, whose names [TSON-SCHEMA]
+         * §11.4's scopes cover and {@code TsonSchemaLinker} judges, and is read under no policy.
          */
-        boolean isValueBody(String constructor) {
-            return of(constructor).kindOf(constructor) == EntryKind.NAMESPACE;
+        Object value(String type, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
+                     Map<Object, List<TsonSchema.ValueByName>> heldByName) {
+            TsonCompiledMetaSchema bound = of(type);
+            try {
+                return read(asValue(bound, type), value, names, heldByName, true);
+            } catch (MissingBindingException unbound) {
+                return read(asValue(loader.treeVocabularyOf(origins.get(type)), type), value, names, heldByName, true);
+            }
         }
 
-        /**
-         * The identifier policy a constructor's payload is read under: the loader's for a namespace type, none for
-         * the rest.
-         *
-         * <p><b>A namespace value is a payload the linker cannot see into</b> -- a map keyed by names whose values
-         * bind to the consumer's own classes, their fields' types left behind in the declaring schema -- so its keys
-         * and its identifier-typed values, a key of an identifier-keyed map among them, are judged here, at the read,
-         * as the same values are in a data document. Every other constructor builds the schema layer's own
-         * vocabulary, whose names [TSON-SCHEMA] §11.4's scopes cover and {@code TsonSchemaLinker} judges: field
-         * names, enum members, parameters. Its identifier-typed values outside those scopes are references -- a
-         * choice's variants, a supertype -- whose verdict belongs to the declaration they name, which may be another
-         * schema's.
-         */
-        IdentifierPolicy payloadNames(String constructor, IdentifierPolicy names) {
-            return isValueBody(constructor) ? names : IdentifierPolicy.none();
+        /** The reader for a value of {@code type}, a namespace type's delivering the {@code Namespace} it is. */
+        private static TsonTypeReader<?> asValue(TsonCompiledSchema compiled, String type) {
+            TsonTypeReader<?> reader = compiled.get(type);
+            return compiled.schema().entries().get(type) instanceof NamespaceBody
+                    ? new NamespaceInstanceReader(type, reader) : reader;
         }
     }
 

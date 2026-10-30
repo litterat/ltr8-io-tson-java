@@ -55,10 +55,10 @@ class TypeChainTest {
 
     @Test
     void aBaseKindIsJudgedByWhereItIsDefinedNeverBySpelling() {
-        RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("namespace"));
+        RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom"));
 
-        assertEquals(EntryKind.NAMESPACE, EntryKind.of(payload, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `namespace` is a record");
+        assertEquals(EntryKind.ATOM, EntryKind.of(payload, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `atom` is a record");
     }
 
     @Test

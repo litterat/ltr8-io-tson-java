@@ -7,6 +7,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.consumer.GapOp;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -47,13 +48,13 @@ class KindSlotGapsTest {
                   gap_status        => !integer_type { min: 100  max: 599 }
                   gap_reply         => { status: gap_status  body: type_kind }
                   gap_operation     => { request: type_kind  replies?: [gap_reply] }
-                  gap_operations    => namespace & { key_type: = identifier  value_type: = gap_operation }
+                  gap_operations    => !namespace { key_type: identifier  value_type: gap_operation }
                   gap_ref_operation => { request: type_ref }
-                  gap_ref_ops       => namespace & { key_type: = identifier  value_type: = gap_ref_operation }
+                  gap_ref_ops       => !namespace { key_type: identifier  value_type: gap_ref_operation }
                   gap_endpoint      => { status?: gap_status ~ 200 }
                   gap_op            => gap_endpoint & { request: type_kind }
-                  gap_api           => namespace & { key_type: = identifier  value_type: = gap_endpoint }
-                  gap_replies       => namespace & { key_type: = identifier  value_type: = gap_reply }
+                  gap_api           => !namespace { key_type: identifier  value_type: gap_endpoint }
+                  gap_replies       => !namespace { key_type: identifier  value_type: gap_reply }
                 }
                 """);
     }
@@ -181,7 +182,8 @@ class KindSlotGapsTest {
     void aSlotOnATaggedSubtypeResolves() {
         String id = schema("family", "api => !gap_api { GET => !gap_op { request: order } }");
         assertEquals(List.of(), problems(id));
-        Namespace<?> api = assertInstanceOf(Namespace.class, registry().resolveLinked(id).schema().entries().get("api"));
+        Namespace<?> api = assertInstanceOf(Namespace.class,
+                valueOf(registry().resolveLinked(id).schema().entries().get("api")));
         assertEquals("order", assertInstanceOf(GapOp.class, api.get("GET")).request().name());
     }
 
@@ -202,5 +204,10 @@ class KindSlotGapsTest {
     void anAnnotatedKeyIsWrittenInThePointer() {
         refused(schema("annotated-key",
                 "r => !gap_replies { @doc:\"the success reply\" ok => { status: 200  body: no_such } }"), "/ok/body");
+    }
+
+    /** A value entry's value. */
+    private static Object valueOf(Object entry) {
+        return ((ValueEntry) entry).value();
     }
 }

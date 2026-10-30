@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/core.tn?sha256=7893c2f71d61a7c0933b38f9bf8c1176c3ae7ae5c6ac3a43bdeb02eeb7a1a6e4"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=5dfc05aa95365a53b808cf6084814f38d8237aa0676e21639d2a31399df8195d"
+!!id:"https://tson.io/2026/39/m/core.tn?sha256=1c918afb33a5447fbcca0be1eb9710dbced11686756206bd6f37be23febb5b1e"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=ff628c7cafe5b1f515b186b9c700e62172080df172ce51ec08745972ddfcb740"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 39 draft).
@@ -25,10 +25,10 @@
   Core imports meta.tn, which imports the meta-kernel, so a schema importing
   core has the whole vocabulary in one namespace, each type under one
   identity: the kernel's `void`, `boolean`, `integer`, `text`, `regex`, `iri`,
-  `kind` and `doc`, meta.tn's `set` and its annotation types (`@ordering`,
-  `@bounded`, `@exact`, `@numeric`, `@disjoint`, `@deprecated`, `@title`,
-  `@comment`, `@examples`, `@read_only`, `@write_only`), and core's own atoms
-  below. Every one of those names is reserved in such a schema
+  `kind`, `declared` and `doc`, meta.tn's `set` and its annotation types
+  (`@ordering`, `@bounded`, `@exact`, `@numeric`, `@disjoint`, `@deprecated`,
+  `@title`, `@comment`, `@examples`, `@read_only`, `@write_only`), and core's
+  own atoms below. Every one of those names is reserved in such a schema
   ([TSON-SCHEMA] §2.2.3).
 
   References:
@@ -233,16 +233,6 @@
   @doc:"Email address per RFC 5322."
   @ordering:NONE @bounded:false
   email => !email_type {}
-
-  @doc:"""
-    A type this schema declares or imports, chosen by the value: the value
-    names its type (in TSON text, with a !type-ref), that name resolves in the
-    governing namespace ([TSON-SCHEMA] §2.2.3) exactly as it does anywhere
-    else, and the value is validated in full against it. A value naming no
-    type is invalid here.
-    """
-  @ordering:NONE @bounded:false
-  declared => !declared_type {}
 
   @doc:"""
     A tuple of exactly one element: `tuple1<text>` admits `[a]` and

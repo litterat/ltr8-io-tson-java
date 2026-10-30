@@ -11,23 +11,21 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 /**
- * A value of a namespace type: an instance of a constructor IS-A the kernel's {@code namespace} ([TSON-SCHEMA]
- * §4.1), written and read as the map its facets describe. The kernel declares two, and every resolved schema holds
- * values of both: the schema map is a value of {@code schema} ({@code TsonSchema.entries}), and a record's fields
- * are a value of {@code field_map} ({@link RecordBody#fields}). A meta layer declares its own, {@code api =>
- * namespace & { key_type: = identifier  value_type: = method }}, and {@code myapi => !api { get_orders => { ... }
- * }} in a schema it governs is a third.
+ * A value of a namespace type -- an instance of the kernel's {@code namespace} constructor ([TSON-SCHEMA] §4.1,
+ * {@link NamespaceBody}) -- written and read as the map its facets describe. The kernel declares two, and every
+ * resolved schema holds values of both: the schema map is a value of {@code schema} ({@code TsonSchema.entries}),
+ * and a record's fields are a value of {@code field_map} ({@link RecordBody#fields}). A schema declares its own,
+ * {@code api => !namespace { key_type: identifier  value_type: method }}, and the entry {@code myapi => !api {
+ * get_orders => { ... } }} in a schema importing it holds a third, as a {@link ValueEntry}.
  *
- * <p>{@link #type} names the namespace constructor the value is an instance of, which fixes the family its keys are
- * names of and the type of its values ({@code TsonLinkedSchema.namespace}); it is the tag resolved output writes
- * where the value stands as a schema entry, and the entry's constructor, since a value of this class carries no
- * {@code @Typename}. At a named position, {@code fields: { ... }}, the position's type says which constructor it is,
- * and the value writes as the map alone. {@link #entries} keeps each key's annotations and the order the keys were
- * written in.
+ * <p>{@link #type} names the namespace type the value is a value of, which fixes the family its keys are names of
+ * and the type of its values; it is the tag resolved output writes where the value stands as a schema entry. At a
+ * named position, {@code fields: { ... }}, the position's type says which namespace type it is, and the value writes
+ * as the map alone. {@link #entries} keeps each key's annotations and the order the keys were written in.
  *
  * <p>The read API of the map it holds is the value's own ({@link #get}, {@link #keySet}, {@link #getAnnotations},
- * ...), so a consumer reads a namespace as it would its map. It is not a {@link Map}: it is a {@code Top}, and a
- * binder or writer testing {@code instanceof Map} would take it for a bare map and lose the constructor.
+ * ...), so a consumer reads a namespace as it would its map. It is not a {@link Map}: a binder or writer testing
+ * {@code instanceof Map} would take it for a bare map and lose the namespace type.
  *
  * <p><b>Equal namespaces are one constructor's values with the same keys, values and key annotations.</b> Key order
  * is not compared: whether order is part of the value is a facet of the constructor ({@code ordered}), so an owner
@@ -37,14 +35,11 @@ import java.util.function.BiConsumer;
  * of a namespace value (and a field of a record value); a map that is no namespace is not entered, whatever its
  * key type.
  *
- * <p>An entry whose value is a {@code Namespace} is no type: nothing is typed by it, and a slot typed by a kind
- * holds it only where the kind's {@code of} is the namespace constructor or one it IS-A.
- *
- * @param type    the namespace constructor this value is an instance of
+ * @param type    the namespace type this is a value of
  * @param entries each key, with its annotations, mapped to its value, in the order written; immutable
  * @param <V>     the host class a value of the constructor's {@code value_type} binds to
  */
-public record Namespace<V>(String type, AnnotatedMap<String, V> entries) implements Top {
+public record Namespace<V>(String type, AnnotatedMap<String, V> entries) {
 
     public Namespace {
         Objects.requireNonNull(type, "type");

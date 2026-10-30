@@ -252,11 +252,13 @@ and its failures list the `!!id`s those files declare.
 list**, distinct because a `DataNameBinder` is fixed when a `DataBindContext` is built:
 
 - `AtomContext.defaultContext()` — the built-in atoms' host types, **no name binder**. The consumer and schemaless
-  default: what `Tson.dataBindContext()` returns unless `ProcessorConfig.withDataBindContext` states one, and the base
-  a consumer layers a binder onto. `registerAtoms(AtomContext.hostTypes())` adds the same list to any builder, so it
-  lives in one place.
+  default: what `ProcessorConfig.dataBindContext()` holds unless `withDataBindContext` states one, and the base a
+  consumer layers a binder onto. `Tson.of` composes the schema model's binder and registrations onto whichever it is
+  (`SchemaMetaNameBinder.over`), and `Tson.dataBindContext()` returns that composition.
+  `registerAtoms(AtomContext.hostTypes())` adds the same list to any builder, so it lives in one place.
 - `SchemaMetaNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three
   registrations for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose
   `SourcePositionStringBridge` names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a
-  `DataNameBinder` scoped to `io.ltr8.tson.schema.meta`. The library's internal context for binding meta instances to
-  `schema.meta` classes, not a consumer default.
+  `DataNameBinder` over `io.ltr8.tson.schema.meta` that answers only for the names meta-kernel.tn and meta.tn
+  declare. The context of the kernel's bootstrap and of a registry built
+  directly with no consumer classes, not a consumer default.

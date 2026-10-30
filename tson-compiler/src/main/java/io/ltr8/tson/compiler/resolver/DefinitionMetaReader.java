@@ -20,4 +20,14 @@ import io.ltr8.tson.schema.meta.Top;
 interface DefinitionMetaReader {
 
     Top read(String type, DataValue value);
+
+    /**
+     * Reads a value entry's payload, {@code name => !T { ... }} with {@code T} no constructor, against the type
+     * {@code type}: the value it is, bound where a class binds the type and held as a tree where none does. A reader
+     * over vocabulary with no value entries (the kernel's bootstrap) has none to read.
+     */
+    default Object readValue(String type, DataValue value) {
+        throw new UnsupportedOperationException("'!" + type + " { ... }' is a value of the type '" + type
+                + "', and this resolution reads no value entries");
+    }
 }

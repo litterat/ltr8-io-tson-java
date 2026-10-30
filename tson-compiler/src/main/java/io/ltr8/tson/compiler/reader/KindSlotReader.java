@@ -12,8 +12,8 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * A kind-typed position whose bound component is a {@link TypeRef}: {@code record_field.type}, typed {@code type_kind}
  * in the kernel, or a meta layer's own {@code request: kind<record>}. The value is a type's name, read by the kind's own
  * atom reader (the type-name grammar, and the members where the document is data) into a {@code TypeRef} whose
- * {@code name} is the token, and recorded with the kind ({@link TsonReadContext#heldByName}) so the linker judges it a
- * member of the kind where the body is a meta layer's own, and by resolution where it is the kernel's.
+ * {@code name} is the token. In a schema document the kind's reader reads the grammar alone and records the name
+ * with the kind ({@link TsonReadContext#heldByName}), so the linker judges it a member of the kind.
  *
  * <p><b>An application is still a value here while a kernel body resolves.</b> Resolved output holds a bare name at
  * every kind-typed slot, since an inline application lifts to a synthetic entry; but a sugar form's lift writes the
@@ -26,25 +26,19 @@ import io.ltr8.tson.schema.meta.TypeRef;
 final class KindSlotReader implements TsonTypeReader<TypeRef> {
 
     private final AtomTypeReader<?> kind;
-    private final TsonSchema.SlotType type;
     private final TsonTypeReaderResolver resolver;
 
     KindSlotReader(AtomTypeReader<?> kind, TsonTypeReaderResolver resolver) {
         this.kind = kind;
-        this.type = kind.slotType();
         this.resolver = resolver;
     }
 
     @Override
     public TypeRef read(TsonReadContext ctx) {
         if (ReferenceNameReader.nameIn(ctx.peek()).isPresent()) {
+            // The kind's reader records the name in a schema document, as it does whatever the host holds.
             Object name = kind.read(ctx);
-            if (name == null) {
-                return null; // refused by the kind, and reported there
-            }
-            TypeRef reference = TypeRef.of(name.toString());
-            ctx.heldByName(reference, type, null);
-            return reference;
+            return name == null ? null : TypeRef.of(name.toString()); // a refusal is reported by the kind
         }
         if (ctx.readsValueBody()) {
             // A value body is never lifted or minted, so an application here would have no entry to be the name

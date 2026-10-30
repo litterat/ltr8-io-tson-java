@@ -8,7 +8,8 @@ import io.ltr8.tson.compiler.reader.DeferredTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
@@ -244,14 +245,25 @@ public final class TsonSchemaCompiler {
                         EntryDisplayName.of(name, definition, linked.schema().factsOf(name),
                                 linked.schema().applicationOf(name)));
             }
-            // A namespace type resolves to a record of the facets it states, and a value of it is the map they
-            // describe, never a record of those facets. Its keys are read under a pinned key family, and by their
-            // spelling alone where the family is a default the host supplies (MapBody.Namespace#read): a record's
-            // field names, which linking judges by the record's name_type.
-            Top read = linked.namespace(name).<Top>map(MapBody.Namespace::read).orElse(body);
+            if (body instanceof ValueEntry value) {
+                // A value, which nothing is read against: a data tag naming it is the document's mistake.
+                return new ValueEntryReader(name, value.type(),
+                        new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
+            }
+            // A namespace type's value is the map it describes. Its keys are read under its key family, and by
+            // their spelling alone where the host supplies the family (NamespaceBody#read): a record's field
+            // names, which linking judges by the record's name_type.
+            Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(read));
             TsonTypeReader<?> built = factory.create(name, read,
                     new ValueReaderContext(linked, readers, namesMeaning, referrers));
+            if (body instanceof NamespaceBody && TsonSchema.SCHEMA.equals(name) && linked.isKernel(name)) {
+                // A value of the kernel's `schema` is a schema document, a resolved form read as data: a name at a
+                // kind or reference in it resolves in that document, which these readers' closure does not hold, so
+                // its grammar is read and what it names is left to that schema's link or to ingest (§4.2, §8.1).
+                TsonTypeReader<?> map = built;
+                built = ctx -> DefaultTsonReadContext.readingSchemaNames(ctx, () -> map.read(ctx));
+            }
             // §7.2's subsumption rule, applied at every position it governs rather than only where a record
             // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.
             return Subsumption.guard(name, definition, built, namesMeaning, readers);

@@ -14,7 +14,7 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
   it are judged like any other, so a template nobody applies is judged nowhere.
 - An unresolved reference is inhabited by fiat, and the check runs after `validateEntry`, so one defect is reported
   once.
-- A kind is inhabited exactly when it has a member; a `Namespace` and every atom are inhabited here. An atom whose
+- A kind is inhabited exactly when it has a member; a value entry and every atom are inhabited here. An atom whose
   facets admit nothing is its family's coherence question, not this one.
 - `RecordExtension`'s FINAL check reads the entry's chain (`TypeChain.supertypesOf`), a template's included, which a
   §5.9 subtraction leaves empty.
@@ -61,8 +61,8 @@ the schema, at a line the data's author does not control. The diagnostic spells 
   calling it uninhabited too would report one defect twice, the second time naming a different problem.
 - **Scope is structural.** An atom whose facets admit nothing (`int8 ^ { min: 300 }`) is uninhabited too, but that is
   its family's coherence rule (`Atom.coherenceCheck`, over `AtomCoherence`), asked by the resolver of each written
-  body and by the linker's `checkCoherent` of every entry (`design/atom-refinement-and-coherence.md`). A `Namespace` is
-  inhabited because nothing may be typed by it, which is what makes that refusal load-bearing
+  body and by the linker's `checkCoherent` of every entry (`design/atom-refinement-and-coherence.md`). A value entry
+  (`ValueEntry`) is inhabited because nothing may be typed by it, which is what makes that refusal load-bearing
   (`design/meta-layer-namespaces.md`).
 
 ## What `record.extension` obliges (`RecordExtension`)

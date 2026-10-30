@@ -96,7 +96,7 @@ class MetaSchemaImportTest {
         // Every written declaration, plus the entries the desugar phase hoists: meta.tn's `within`/`excluding`
         // fields are `[value]`, which becomes an `!array { element_type: value }` declaration -- one entry for
         // all eight occurrences, since identical forms share a name.
-        assertEquals(40, meta.entries().size(), "expected every meta.tn declaration to resolve");
+        assertEquals(39, meta.entries().size(), "expected every meta.tn declaration to resolve");
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(meta, registry));
 

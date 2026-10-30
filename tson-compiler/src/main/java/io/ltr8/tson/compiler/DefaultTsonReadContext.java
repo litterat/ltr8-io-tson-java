@@ -96,6 +96,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Whether the document is a value body ({@link TsonReadContext#readsValueBody()}). */
         final boolean valueBody;
 
+        /** Depth of {@link #readingSchemaNames} reads the cursor is inside; {@code 0} for a data document's read. */
+        int schemaNames;
+
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy,
                TsonReadContext.HeldByName heldByName,
                boolean valueBody) {
@@ -324,6 +327,26 @@ final class DefaultTsonReadContext implements TsonReadContext {
     @Override
     public boolean readsSchemaDocument() {
         return cursor.heldByName != null;
+    }
+
+    @Override
+    public boolean readsSchemaNames() {
+        return cursor.heldByName != null || cursor.schemaNames > 0;
+    }
+
+    /**
+     * Runs {@code read} with names at kind- and reference-typed positions resolving in the document ({@link
+     * TsonReadContext#readsSchemaNames()}): the read of a value of the kernel's {@code schema}. The cast cannot fail
+     * for a context this library made (see {@link #lookingAhead}).
+     */
+    static <T> T readingSchemaNames(TsonReadContext ctx, java.util.function.Supplier<T> read) {
+        Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
+        cursor.schemaNames++;
+        try {
+            return read.get();
+        } finally {
+            cursor.schemaNames--;
+        }
     }
 
     @Override

@@ -4,9 +4,10 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 /**
- * meta.tn's {@code declared_type} constructor: the open sum over the governing closure, whose one instance is
- * core's {@code declared}. A value at a position of this type names its own type, by its tag, among the types
- * the governing schema declares or imports, and is read in full against it ([TSON-SCHEMA] §7.8).
+ * The kernel's {@code declared_type} constructor: the open sum over the governing closure, whose one instance is
+ * the kernel's {@code declared}, the type of a schema map's values. A value at a position of this type names its own
+ * type, by its tag, among the types the governing schema declares or imports, and is read in full against it
+ * ([TSON-SCHEMA] §7.8).
  *
  * <p>The distinction against {@link ChoiceBody} is closed against open. A choice enumerates its variants; a
  * {@code declared_type} instance draws them from the closure, which is why {@code disjoint} is absent here as on

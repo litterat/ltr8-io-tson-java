@@ -15,7 +15,11 @@ choices. Current form only; history lives in git.
 - `ErrorReader` reports `NOT_IMPLEMENTED` and skips the value. Two causes are deliberately not reported that way: a
   `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile.
 - A `TEMPLATE`-kinded entry never reaches a factory: a family base (its held body carries `extension`) compiles to an
-  `AbstractTemplateReader`, every other template to an `OpenTemplateReader`.
+  `AbstractTemplateReader`, every other template to an `OpenTemplateReader`. A value entry (`ValueEntry`) never
+  reaches one either: it compiles to a `ValueEntryReader`, which refuses a data tag naming it as `TYPE_MISMATCH`.
+- A namespace type compiles through the `map` factory with the map `NamespaceBody.read()` states; the kernel's
+  `schema` entry's reader marks its read as a schema document's (`readsSchemaNames`), so a resolved form read as data
+  reads its kind and reference names by grammar alone.
 - The read mode is which factory registry you hold; `ValueReaderFactoryResolver` stays in the unexported `reader` package.
 - The subsumption guard follows the body, not `kind()`, admits an entry's aliases as the entry itself, and is transparent
   to `UseSite` renaming and bind-mode container rebinding.

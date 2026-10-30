@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/net.tn?sha256=ca64ece8f9708c1cf778a4c7847c0d7dfe77094e832989684f6c8abbbc5cdec7"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=5dfc05aa95365a53b808cf6084814f38d8237aa0676e21639d2a31399df8195d"
+!!id:"https://tson.io/2026/39/m/net.tn?sha256=a29befd854bbe66865a3d369e9552a19fb4e87c70812f79adcd805421a857317"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=ff628c7cafe5b1f515b186b9c700e62172080df172ce51ec08745972ddfcb740"
 @doc:"""
   TSON Network Type Library — addresses, networks and host names
   (2026 Revision 39 draft).

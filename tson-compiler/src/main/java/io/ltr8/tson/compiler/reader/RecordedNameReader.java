@@ -9,9 +9,9 @@ import java.util.Optional;
 
 /**
  * A kind- or reference-typed slot whose host component is neither a {@link TypeRef} nor a {@code Ref} -- a {@code
- * String}, say: the host receives what its bound atom reader produces, and in a schema document the name read there is
- * recorded with the slot's declared type ({@link TsonReadContext#heldByName}), so the linker judges it as it judges the
- * same name under a {@code TypeRef} host. Whether a name is judged is the slot's to say, never the host's.
+ * String}, say: the host receives what its bound atom reader produces, and in a schema document that reader records
+ * the name read there with the slot's declared type ({@link TsonReadContext#heldByName}), so the linker judges it as it
+ * judges the same name under a {@code TypeRef} host. Whether a name is judged is the slot's to say, never the host's.
  *
  * <p><b>The spelling is the slot's too.</b> What is no name -- a quoted token, a braced value, a framed name -- is
  * refused as the {@code TypeRef} host's reader refuses it ({@code refusing}): at a reference-typed slot in any schema
@@ -45,10 +45,6 @@ final class RecordedNameReader implements TsonTypeReader<Object> {
             boolean refused = type.role() == TsonSchema.SlotType.Role.REFERENCE || ctx.readsValueBody();
             return refused ? refusing.read(ctx) : inner.read(ctx);
         }
-        Object value = inner.read(ctx);
-        if (value != null) {
-            ctx.heldByName(TypeRef.of(name.get()), type, null);
-        }
-        return value;
+        return inner.read(ctx);
     }
 }

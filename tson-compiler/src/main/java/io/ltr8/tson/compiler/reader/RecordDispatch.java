@@ -60,7 +60,6 @@ final class RecordDispatch {
     /** A tag dispatcher over {@code subtypes}, a namespace type among them read as an instance of its constructor. */
     private static RecordTagDispatchReader tagDispatch(Set<String> selfNames, String displayName, Set<String> subtypes,
                                                        List<String> named, ValueReaderContext context) {
-        return new RecordTagDispatchReader(selfNames, displayName, subtypes, named,
-                RecordTagDispatchReader.namespaces(subtypes, context), context.readers());
+        return new RecordTagDispatchReader(selfNames, displayName, subtypes, named, context.readers());
     }
 }

@@ -39,8 +39,7 @@ class NamespaceSlotTest {
     /** A fresh instance, binding the schema model as resolved output does. */
     private static Tson tson() {
         return Tson.of(ProcessorConfig.defaults()
-                .withDataBindContext(SuiteBindings.context())
-                .withMetaNameBinder(SuiteBindings.names()));
+                .withDataBindContext(SuiteBindings.context()));
     }
 
     private static RecordBody person(Tson tson) {
@@ -64,7 +63,7 @@ class NamespaceSlotTest {
         assertTrue(written.replaceAll("\\s+", " ").contains("fields: { name => "), written);
         assertFalse(written.contains("!field_map"), written);
 
-        Map<String, Top> read = ResolvedForm.readResolved(tson, """
+        Map<String, Object> read = ResolvedForm.readResolved(tson, """
                 !schema { person => !record { fields: {
                   name => { type: text }
                   age  => { type: integer  optional: true }

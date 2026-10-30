@@ -10,7 +10,7 @@ import java.util.List;
  * {@code set}/{@code map}/{@code tuple}, the kernel's own structural-type family (Part 2 §4.1: "record,
  * array, set, map, and tuple compose with product, fixing access_pattern and size_type").
  */
-public sealed interface Product extends Type permits RecordBody, ArrayBody, MapBody, TupleBody {
+public sealed interface Product extends Type permits RecordBody, ArrayBody, MapBody, TupleBody, NamespaceBody {
 
     /**
      * Reports how this body's own structural facets contradict <em>each other</em> -- an empty list means it

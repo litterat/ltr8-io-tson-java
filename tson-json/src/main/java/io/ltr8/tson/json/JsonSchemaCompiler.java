@@ -7,8 +7,8 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -123,24 +123,23 @@ public final class JsonSchemaCompiler {
                 // than walked on every value.
                 return resolve(reference.target().name());
             }
-            // A namespace type resolves to a record of the facets it states, and a value of it is the map they
-            // describe, never a record of those facets. Its keys are read under a pinned key family, and by their
-            // spelling alone where the family is a default the host supplies (MapBody.Namespace#read): a record's
-            // field names, which linking judges by the record's name_type.
-            Top read = linked.namespace(name).<Top>map(MapBody.Namespace::read).orElse(body);
+            // A namespace type's value is the map it describes. Its keys are read under its key family, and by
+            // their spelling alone where the host supplies the family (NamespaceBody#read): a record's field
+            // names, which linking judges by the record's name_type.
+            Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
             ValueReaderFactory factory = factories.resolve(constructorOf(read));
             return factory.create(name, read, context);
         }
     }
 
     /**
-     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, and the one a
-     * namespace value names itself. An open entry reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape
-     * holds it, so it takes the template's reader. A namespace value names a meta layer's own
-     * constructor, which has no factory: nothing is typed by such an entry, and its reader is the refusal.
+     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries. An open entry
+     * reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape holds it, so it takes the template's reader. A
+     * value entry names the ordinary type it is a value of, which has no factory: nothing is typed by such an entry,
+     * and its reader is the refusal.
      */
     private static String constructorOf(Top body) {
-        if (body instanceof Namespace<?> value) {
+        if (body instanceof ValueEntry value) {
             return value.type();
         }
         Class<?> leaf = OpenEntry.isOpen(body) ? TemplateBody.class : body.getClass();

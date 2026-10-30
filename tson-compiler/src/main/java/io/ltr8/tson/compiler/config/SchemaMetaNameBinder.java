@@ -3,51 +3,48 @@ package io.ltr8.tson.compiler.config;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 /**
- * The {@link DataNameBinder} object-binding mode builds its default {@code DataBindContext}
- * against (see {@link #defaultContext}) -- a fixed namespace plus a snake_case-to-PascalCase
- * mangling of the schema type name (e.g. {@code "integer_size"} -> {@code IntegerSize}, {@code
- * "record_field"} -> {@code RecordField}), which holds directly for every genuine
- * constraint-vocabulary/helper record in that package, with one confirmed exception (found by
- * actually running this against the real, registered meta-kernel.tn fixture, not guessed in
- * advance): {@link #ALIASES}.
+ * The {@link DataNameBinder} for the schema model ({@code io.ltr8.tson.schema.meta}): the names meta-kernel.tn and
+ * meta.tn declare, bound by a snake_case-to-PascalCase mangling of the name into that package ({@code
+ * "integer_size"} -> {@code IntegerSize}, {@code "record_field"} -> {@code RecordField}), with {@link #ALIASES} where
+ * the mangling does not reach the class.
  *
- * <p>Meta-kernel's own description of a composite constructor's shape (e.g. {@code record =>
- * ~product & { fields: ... groups: ... } }) is structurally identical to the {@code *Body} class
- * that represents a *bound instance* of that same constructor ({@link
- * io.ltr8.tson.schema.meta.RecordBody}, {@link io.ltr8.tson.schema.meta.ArrayBody}, {@link
- * io.ltr8.tson.schema.meta.MapBody}, {@link io.ltr8.tson.schema.meta.TupleBody}, {@link
- * io.ltr8.tson.schema.meta.EnumBody}, {@link io.ltr8.tson.schema.meta.ChoiceBody}, {@link
- * io.ltr8.tson.schema.meta.KindBody}, {@link io.ltr8.tson.schema.meta.TemplateBody}) -- but each of those
- * classes' own {@code @Typename} is the *bare* constructor name (matching the instance side,
- * e.g. {@code RecordBody}'s own is {@code "record"}, not {@code "record_body"}), so this forward
- * (schema-name -> Class) direction needs the {@code "_body"} suffix added explicitly; nothing
- * recovers it mechanically from the bare name alone. A constructor that tightens another -- {@code set_type}
- * over {@code array}, {@code enum} over {@code enum_type} -- needs no entry here: it
- * restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
- * tightens ({@code ValueReaderContext.bindingNamesFor}). {@code namespace => map & {}} composes rather than
- * tightens, so the fallback does not reach it, and it is mapped here to {@code map}'s body, whose shape it has.
+ * <p><b>It answers only for that vocabulary.</b> The two schemas are the ones whose values the schema model
+ * describes; core.tn, net.tn and policy.tn declare ordinary types over them, whose values are data. The package
+ * also holds classes no schema declares -- {@code Token}, {@code EntryKind}, {@code OpenEntry}, {@code ValueEntry},
+ * {@code AtomCoherence} and the like, the resolver's own model -- and a name that merely mangles to one of them
+ * ({@code token}) is not this binder's: it refuses it, so a consumer's type of that name binds through the
+ * consumer's binder. The vocabulary is read from the bundled sources themselves, once ({@link Vocabulary}), so it
+ * cannot drift from them.
  *
- * <p><b>A handful of real entries resolve to a genuine Java class that isn't a record at all</b> --
- * {@code atom}/{@code product}/{@code sum}/{@code top} (meta-kernel's own empty-bodied base-kind
- * declarations) mangle to the real, sealed marker interfaces {@link
- * io.ltr8.tson.schema.meta.Atom}/{@link io.ltr8.tson.schema.meta.Product}/{@link
- * io.ltr8.tson.schema.meta.Sum}/{@link io.ltr8.tson.schema.meta.Top}, and {@code type_argument}
- * mangles to {@link io.ltr8.tson.schema.meta.TypeArgument}, deliberately a sealed interface, not a
- * plain record (see that class's own Javadoc on the mutual-recursion trap that forced this). This
- * binder resolves the class either way -- it isn't this class's job to decide whether a resolved
- * class is usable as a record; a caller resolving one of these against a {@code Record*Reader} sees
- * that decision surface as an ordinary compile-time failure for that one entry instead.
+ * <p>A constructor's description in meta-kernel ({@code record => ~product & { fields: ... groups: ... }}) has the
+ * shape of the {@code *Body} class that represents a bound instance of it ({@link
+ * io.ltr8.tson.schema.meta.RecordBody}, {@link io.ltr8.tson.schema.meta.ArrayBody}, ...), and each such class's own
+ * {@code @Typename} is the bare constructor name, so the schema-name-to-class direction needs the {@code "_body"}
+ * suffix added explicitly ({@link #ALIASES}). A constructor that tightens another -- {@code set_type} over {@code
+ * array}, {@code enum} over {@code enum_type} -- needs no alias: it restates fields and adds none, and the bind
+ * lookup falls back along its chain to the constructor it tightens ({@code ValueReaderContext.bindingNamesFor}).
  *
- * <p><b>The namespace is fixed; the binder is not the last word.</b> A meta-schema of a consumer's own may
- * declare constructors the kernel never heard of, and their instances bind to that consumer's classes --
- * {@link #contextExtendedWith} is how those names join this one's, by composition rather than replacement.
+ * <p>Some entries resolve to a class that is not a record: {@code atom}/{@code product}/{@code sum}/{@code top}
+ * mangle to the sealed marker interfaces {@link io.ltr8.tson.schema.meta.Atom}/{@link
+ * io.ltr8.tson.schema.meta.Product}/{@link io.ltr8.tson.schema.meta.Sum}/{@link io.ltr8.tson.schema.meta.Top}, and
+ * {@code type_argument} to the sealed interface {@link io.ltr8.tson.schema.meta.TypeArgument}. This binder resolves
+ * the class either way; whether it is usable as a record is the reader's decision, surfacing as a compile-time
+ * failure for that one entry.
+ *
+ * <p><b>The vocabulary is fixed; the binder is not the last word.</b> A schema may hold values of types the kernel
+ * never heard of ({@code create_order => !operation { ... }}), and a data document values of its own types; both
+ * bind to the consumer's classes through one context. {@link #over} is that context: a name in the vocabulary binds
+ * here and nowhere else, so a consumer cannot rebind it, and every other name goes to the consumer's binder.
  */
 public final class SchemaMetaNameBinder {
 
@@ -60,6 +57,7 @@ public final class SchemaMetaNameBinder {
             Map.entry("record", "record_body"),
             Map.entry("array", "array_body"),
             Map.entry("map", "map_body"),
+            Map.entry("namespace", "namespace_body"),
             Map.entry("tuple", "tuple_body"),
             Map.entry("choice", "choice_body"),
             Map.entry("kind_type", "kind_body"),
@@ -70,64 +68,101 @@ public final class SchemaMetaNameBinder {
             Map.entry("field_name", "identifier"),
             Map.entry("type_name", "identifier"),
             Map.entry("param_name", "identifier"));
-            ;
 
-    public static final DataNameBinder INSTANCE = new DataNameBinder.DefaultDataNameBinder(Set.of(NAMESPACE), ALIASES);
+    private static final DataNameBinder MANGLED = new DataNameBinder.DefaultDataNameBinder(Set.of(NAMESPACE), ALIASES);
+
+    /**
+     * The schema model's binder: a name meta-kernel.tn or meta.tn declares, mangled into {@code
+     * io.ltr8.tson.schema.meta}; any other name is refused, whatever class it would mangle to.
+     */
+    public static final DataNameBinder INSTANCE = name -> {
+        if (!Vocabulary.NAMES.contains(name)) {
+            throw new DataBindException("'" + name + "' is not declared by meta-kernel.tn or meta.tn, so the schema "
+                    + "model does not bind it");
+        }
+        return MANGLED.resolve(name);
+    };
 
     /**
      * The {@code io.ltr8.tson.schema.meta} default -- {@link ResolverBindContext}'s own built-in atom
-     * registrations, plus a {@link DataNameBinder} scoped to {@link #INSTANCE}'s own namespace/alias
-     * table. A {@link DataNameBinder} is fixed at a {@link DataBindContext}'s own construction, so
-     * it can't be attached after the fact -- a caller binding their own schema to their own Java
-     * library builds their own {@link DataBindContext} instead (typically {@link
-     * ResolverBindContext#registerDefaults} applied to a {@link DataBindContext.Builder} configured with
-     * their own {@link DataNameBinder}) and passes it to {@link ValueReaderFactoryRegistry#bind}
-     * directly.
+     * registrations, plus {@link #INSTANCE}. A {@link DataNameBinder} is fixed at a {@link DataBindContext}'s
+     * own construction, so it can't be attached after the fact -- a caller binding their own schema to their own
+     * Java library builds the context with {@link #contextExtendedWith} or {@link #over} instead and passes it to
+     * {@link ValueReaderFactoryRegistry#bind}.
      */
     public static DataBindContext defaultContext() {
         return context(INSTANCE);
     }
 
     /**
-     * {@link #defaultContext()} extended with the names a consumer's own <b>meta layer</b> adds -- the
-     * context to resolve a schema against when its governing meta declares vocabulary of its own -- a record
-     * {@code operation => { ... }} and a namespace of it, {@code api => namespace & { key_type: = identifier
-     * value_type: = operation }} -- whose values bind to that consumer's Java classes.
-     * {@code ProcessorConfig.metaNameBinder} is the front-door route to it.
+     * {@link #defaultContext()} extended with the names {@code additional} binds -- the records a schema's value
+     * entries are values of ({@code create_order => !operation { ... }}) and a data document's own types -- whose
+     * values bind to that consumer's Java classes.
      *
-     * <p>Composition, never replacement: {@link #INSTANCE} answers first and {@code additional} is asked
-     * only for a name the kernel's own vocabulary does not know. So a consumer cannot shadow {@code
+     * <p>Composition, never replacement: a name in {@link #INSTANCE}'s vocabulary binds there and {@code
+     * additional} is asked for every other name ({@link #extendedWith}). So a consumer cannot shadow {@code
      * record}/{@code enum}, and cannot lose {@link ResolverBindContext}'s registrations by building a context
      * that forgets them -- what the extension adds is names, and nothing else.
-     *
-     * <p>This is the whole seam. A meta layer's record needs three things and no more: the meta schema
-     * declaring it, a class for it ({@code @Typename} only where the binder's convention would not find it),
-     * and a binder that can find that class.
      */
     public static DataBindContext contextExtendedWith(DataNameBinder additional) {
         return context(extendedWith(additional));
     }
 
     /**
-     * {@link #INSTANCE} first, {@code additional} for anything it does not resolve -- the binder half of
-     * {@link #contextExtendedWith}, for a caller assembling a {@link DataBindContext} themselves.
+     * The one context a processor binds schemas and data through, from the context a consumer configured: that
+     * context's binder, profile and atom registrations, with {@link #INSTANCE} composed with its binder ({@link
+     * #extendedWith}), and the schema model's own registrations added where it lacks them ({@link
+     * ResolverBindContext#registerAbsent}). The kernel's and meta.tn's names are fixed; every other name is the
+     * consumer's binder's to answer.
+     */
+    public static DataBindContext over(DataBindContext consumer) {
+        Objects.requireNonNull(consumer, "consumer");
+        DataBindContext.Builder builder = consumer.toBuilder().nameBinder(extendedWith(consumer.nameBinder()));
+        return ResolverBindContext.registerAbsent(builder).build();
+    }
+
+    /**
+     * {@link #INSTANCE} for a name meta-kernel.tn or meta.tn declares, {@code additional} for every other -- the
+     * binder half of {@link #contextExtendedWith}, for a caller assembling a {@link DataBindContext} themselves.
      *
-     * <p>A {@link DataBindException} from {@code additional} propagates as it stands: it names the packages
-     * that consumer's own binder searched, which is where a name the kernel does not declare was expected
-     * to be.
+     * <p>Decided by the name, never by a failed lookup: a vocabulary name {@link #INSTANCE} binds no class for
+     * ({@code enum}, {@code set}) is still not the consumer's, so the bind lookup moves on to the constructor it
+     * tightens rather than to a consumer class of that name; and a name outside the vocabulary never reaches the
+     * schema model, whatever class it would mangle to. A {@link DataBindException} from {@code additional}
+     * propagates as it stands: it names what that consumer's own binder searched, which is where the name was
+     * expected to be.
      */
     public static DataNameBinder extendedWith(DataNameBinder additional) {
         Objects.requireNonNull(additional, "additional");
-        return name -> {
-            try {
-                return INSTANCE.resolve(name);
-            } catch (DataBindException notKernelVocabulary) {
-                return additional.resolve(name);
-            }
-        };
+        return name -> Vocabulary.NAMES.contains(name) ? INSTANCE.resolve(name) : additional.resolve(name);
     }
 
     private static DataBindContext context(DataNameBinder binder) {
         return ResolverBindContext.registerDefaults(DataBindContext.builder().nameBinder(binder)).build();
+    }
+
+    /**
+     * The names {@link #INSTANCE} answers for: every declaration of the bundled meta-kernel.tn and meta.tn, read
+     * from their source by the schema parser on first use. An {@link #ALIASES} key outside it would be an alias
+     * nothing can ask for, so one is a broken invariant.
+     */
+    private static final class Vocabulary {
+
+        static final Set<String> NAMES = read();
+
+        private static Set<String> read() {
+            Set<String> names = new LinkedHashSet<>();
+            for (String id : new String[] {TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID}) {
+                names.addAll(new TsonSchemaParser(TsonBundledSchemas.fetch(id)).parseSchemaDocument()
+                        .body().declarations().keySet());
+            }
+            for (String alias : ALIASES.keySet()) {
+                if (!names.contains(alias)) {
+                    throw new IllegalStateException("alias '" + alias + "' names no declaration of meta-kernel.tn "
+                            + "or meta.tn");
+                }
+            }
+            return Set.copyOf(names);
+        }
     }
 }

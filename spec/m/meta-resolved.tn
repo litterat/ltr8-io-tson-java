@@ -27,9 +27,6 @@
 
   set => !template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }
 
-  declared_type => !record { chain: { supertypes: [sum top type] }  fields: {
-    chain => !record_field { type: type_chain  optional: true }
-  } }
 
   ieee_format => !enum { members: [BINARY16 BINARY32 BINARY64 BINARY128 BINARY256 DECIMAL32 DECIMAL64 DECIMAL128] }
 

@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=5dfc05aa95365a53b808cf6084814f38d8237aa0676e21639d2a31399df8195d"
-!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=f906da450f8e6f27c3e3e3195a97afbeb9c6c25b7092745cdd16aa05b0de2b07"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=ff628c7cafe5b1f515b186b9c700e62172080df172ce51ec08745972ddfcb740"
+!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=afc2c2135a5aa442d259a40f1327e8a97b6a6bf2b4158b3be2a9d1c5864ca062"
 @doc:"""
   TSON meta-schema (2026 Revision 39 draft).
 
@@ -16,9 +16,10 @@
   Three families of declarations live here:
 
   1. Structural constructors: `bytes_type` (with the `bytes_encoding` enum
-     selecting its text spelling), whose instance in core is `bytes`; and
-     `declared_type`, whose instance in core is `declared`. Fixed-size arrays
-     have no constructor of their own: `[T; N]` is the spelling.
+     selecting its text spelling), whose instance in core is `bytes`.
+     Fixed-size arrays have no constructor of their own: `[T; N]` is the
+     spelling, and the open sum over the closure, `declared`, is the
+     kernel's.
 
   2. The `set` template — the `set<T>` spelling of the kernel's `set_type`
      constructor.
@@ -114,18 +115,6 @@
     min_length?: non_negative_integer
     max_length?: non_negative_integer
   }
-
-  @doc:"""
-    Constructor for the open sum over the governing closure: the value names
-    its own type, among the types the schema declares or imports ([TSON-SCHEMA]
-    §2.2.3), and is validated in full against it. A value naming no type is
-    invalid. Instance is `declared` in core.
-
-    Where `choice` is the closed sum, enumerating its variants, this is the
-    open one, drawing them from the closure; `disjoint` is absent, as on every
-    non-choice sum.
-    """
-  declared_type => sum & {}
 
   @doc:"""
     IEEE 754-2019 interchange formats, both radices. Selects the representable

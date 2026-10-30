@@ -20,12 +20,14 @@ the registries a `Tson` holds, and `validate`. Current form only; history lives 
   its one compiled-schema cache.
 - `validate` never throws for a bad input document, and `TsonDiagnostics.ofBaseSyntaxError` rethrows
   anything that is not a base-syntax failure.
-- Two binding seams, never merged: `withDataBindContext` binds data, `withMetaNameBinder` binds a meta's own
-  vocabulary, composed over `SchemaMetaNameBinder.INSTANCE`.
+- One bind context serves schemas and data: `Tson.of` composes `SchemaMetaNameBinder.INSTANCE` with the configured
+  context's binder (`SchemaMetaNameBinder.over`). A name meta-kernel.tn or meta.tn declares binds to the schema model
+  and never the consumer's; every other name is the consumer's, even one that mangles to a `schema.meta` class
+  (`token`). `Tson.dataBindContext()` is that context, not the configured instance.
 
 Related: `design/facades-and-tree.md` (the readers a `Tson` hands out), `design/writers-and-document-header.md`
 (`TsonDocumentPeek`, the writers), `design/tree-model.md`, `design/linking-and-compilation.md` (registries),
-`design/meta-layer-namespaces.md` (a meta layer's own vocabulary), `design/cli-config-hashing.md`.
+`design/meta-layer-namespaces.md` (value entries and how they bind), `design/cli-config-hashing.md`.
 
 ## Front door: `Tson` (`tson` module) and `ProcessorConfig` (`tson-base`)
 
@@ -211,8 +213,8 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   `TsonCompiledSchemaRegistry` rather than a `TsonCompiledMetaRegistry` for exactly that reason; since the
   read mode isn't visible in the registry's type, each constructor checks a package-private `mode()` and
   rejects the wrong one up front instead of failing on a cast at the first value.
-  `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
-  `ProcessorConfig.withDataBindContext`, default `AtomContext.defaultContext()`). `schemaRegistry()`/`loader()`
+  `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (built from
+  `ProcessorConfig.withDataBindContext`, default `AtomContext.defaultContext()`, as above). `schemaRegistry()`/`loader()`
   reach the underlying machinery.
 - **A `Tson` is one profile, and the schema being read never picks it.** Routing a document to the right
   profile stays the application's job. The alternative — the schema declaring its own profile through a
@@ -221,10 +223,19 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   same reason it is not by matching the schema's field set: no serialization library does that, and the
   parameter names it would need are not retained for a secondary constructor. Reconsider only if something
   needs to re-derive the binding without the application in between.
-- **Two binding seams, never merged.** `ProcessorConfig.withDataBindContext` binds the *data* a schema
-  describes (`order` → `Order`); `ProcessorConfig.withMetaNameBinder` binds a meta layer's own *vocabulary*
-  (`method` → `Method`, a record a namespace constructor holds — `design/meta-layer-namespaces.md`). One
-  namespace holding both would collide the first time a schema type and a meta-layer constructor shared a
-  name. The meta binder is composed over `SchemaMetaNameBinder.INSTANCE` rather than replacing it, so what a
-  consumer supplies adds names and gives up nothing: the standard library still compiles in object-binding
-  mode, which is the thing the internal context is fixed to protect, and every kernel name still wins.
+- **One bind context, schemas and data.** `ProcessorConfig.withDataBindContext` configures the classes types bind
+  to, whether a data document's `order` → `Order` or a schema's value entry `create_order => !operation { … }` →
+  `Operation` (`design/meta-layer-namespaces.md`); both are values of types some schema declares, and one namespace
+  per schema leaves no second vocabulary to bind separately. `Tson.of` builds the context the core resolves schemas
+  through and the bind registry and object readers read data through, `SchemaMetaNameBinder.over(configured)`: the
+  configured binder, profile and atom registrations (`DataBindContext.toBuilder`, `nameBinder`), composed with
+  `SchemaMetaNameBinder.INSTANCE`, and the schema model's own registrations (`Token`, `SourcePosition`, `Ref`, the
+  atom host types) added where absent (`ResolverBindContext.registerAbsent`). The split is by name, not by a failed
+  lookup: `INSTANCE` answers for exactly the declarations of meta-kernel.tn and meta.tn, read from the bundled
+  sources (so the set cannot drift), and the consumer's binder for everything else. So a kernel name always binds to
+  the schema model, a vocabulary name the model binds no class for (`enum`) falls back along its tightening chain
+  rather than to a consumer class, and a name no library schema declares never reaches the model's package however it
+  mangles -- `schema.meta` also holds the resolver's own classes (`Token`, `EntryKind`, `OpenEntry`, `ValueEntry`),
+  which are no schema's vocabulary. core.tn, net.tn and policy.tn are outside the set: their values are data (the
+  CLI binds policy.tn's `policy` to its own class). A value entry whose type the context binds no class for is held as a
+  tree, so the schema still loads and validates; the bind registry refuses it (`design/compiled-registries.md`).

@@ -52,7 +52,7 @@ class RecordFieldsMapTest {
     void aNameWrittenTwiceInTheExplicitFormIsTheMapsDuplicateKey() {
         Diagnostic read = only(Tson.standard().validate("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !record { fields: { x => { type: int32 }  x => { type: text } } }
+                !record { fields: { x => { type: integer }  x => { type: text } } }
                 """));
         assertEquals(Diagnostic.Code.DUPLICATE_MAP_KEY, read.code(), read.toString());
 

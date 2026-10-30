@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -40,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>The wiring, in full, is three things</b> -- there is nothing else to register:
  * <ol>
  *   <li>a meta-layer schema chaining {@code !!meta} to meta-kernel and declaring a record
- *       {@code operation => { ... }} and a namespace of it, {@code operations => namespace & { ... }}
+ *       {@code operation => { ... }} and a namespace of it, {@code operations => !namespace { ... }}
  *       ({@link #META_HTTP_SCHEMA});</li>
  *   <li>a Java class for {@code operation} ({@link Operation}), a plain record;</li>
  *   <li>a {@link DataBindContext} whose {@link DataNameBinder} can find that class
@@ -65,12 +66,12 @@ class MetaLayerVocabularyTest {
                 request:  type_kind
                 response: type_kind
               }
-              operations => namespace & { key_type: = identifier  value_type: = operation }
+              operations => !namespace { key_type: identifier  value_type: operation }
               webhook => {
                 path:     text
                 delivers?: [type_kind]?
               }
-              webhooks    => namespace & { key_type: = identifier  value_type: = webhook }
+              webhooks    => !namespace { key_type: identifier  value_type: webhook }
               status_code => text
               plain       => { a: text }
               envelope    => <T> { body: T }
@@ -139,34 +140,37 @@ class MetaLayerVocabularyTest {
     // ── The meta-layer declaration ───────────────────────────────────────────────────────────────
 
     /**
-     * {@code operations => namespace & { ... }} is a namespace type: a constructor, IS-A {@code top} through the
-     * kernel's {@code namespace}. The record its values are is an ordinary record type, and no constructor.
+     * {@code operations => !namespace { ... }} is a namespace type: an instance of the kernel's {@code namespace},
+     * a type whose values are maps, and no constructor. The record its values are is an ordinary record type too.
      */
     @Test
     void theMetaSchemaDeclaresANamespaceOfOperations() {
         TsonLinkedSchema meta = core(consumerContext()).resolveLinked(META_HTTP);
         Top operations = meta.schema().entries().get("operations");
 
-        assertEquals(EntryKind.NAMESPACE, meta.kindOf("operations"));
-        assertEquals(List.of("namespace", "top"), TypeChain.supertypesOf(operations),
-                "the transitive chain, and IS-A `top` is what makes `!operations { ... }` applicable");
+        assertEquals(EntryKind.PRODUCT, meta.kindOf("operations"));
+        assertEquals(List.of(), TypeChain.supertypesOf(operations), "construction transfers kind, not IS-A");
+        assertFalse(meta.isConstructor("operations", operations),
+                "a namespace type is a type: `!operations { ... }` builds a value of it");
         assertEquals(EntryKind.PRODUCT, meta.kindOf("operation"));
         assertFalse(meta.isConstructor("operation", meta.schema().entries().get("operation")),
-                "the record its values are is a type, applied by no tag of its own in a governed schema");
+                "the record its values are is a type too");
     }
 
     /**
-     * The other side of the same predicate: a record-bodied entry with an empty chain is a <em>part</em> of a
-     * type ({@code record_field}, {@code type_ref}, {@code integer_size}, …) and is refused where it is
-     * written. Without the check it fails anyway, on {@code Top} being sealed -- but as a {@code
-     * ClassCastException} surfaced as {@code NOT_IMPLEMENTED}, a non-verdict, for an author's mistake.
+     * The other side of the same predicate: a record type that is no constructor ({@code record_field}, {@code
+     * type_ref}, {@code integer_size}, …) builds no type, and {@code !record_field { ... }} is a value of it, read
+     * against it as a data value is -- so a field it does not declare is refused there.
      */
     @Test
-    void aComponentOfATypeIsNotApplicable() {
+    void aComponentOfATypeBuildsAValueOfIt() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("component", "  bad => !record_field { name: x  type: text }"));
 
-        assertTrue(thrown.getMessage().contains("not IS-A 'top'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("the body is no value of the type 'record_field'")
+                && thrown.getMessage().contains("unknown field 'name'"), thrown.getMessage());
+        assertEquals(EntryKind.VALUE, linked("component-value", "  good => !record_field { type: text }")
+                .kindOf("good"));
     }
 
     // ── Binding the record to the consumer's class ───────────────────────────────────────────────
@@ -186,9 +190,9 @@ class MetaLayerVocabularyTest {
 
         Object read = core(consumerContext()).loadMeta(META_HTTP).compiledSchema().find("operation")
                 .orElseThrow()
-                .read(TestDocuments.document("{ path: \"/p\"  method: \"GET\"  request: a  response: b }"));
+                .read(TestDocuments.document("{ path: \"/p\"  method: \"GET\"  request: text  response: integer }"));
 
-        assertEquals(new Operation("/p", "GET", TypeRef.of("a"), TypeRef.of("b")), read);
+        assertEquals(new Operation("/p", "GET", TypeRef.of("text"), TypeRef.of("integer")), read);
     }
 
     /**
@@ -201,8 +205,8 @@ class MetaLayerVocabularyTest {
     void anOperationValueIsRetrievedFromTheLinkedSchema() {
         TsonLinkedSchema schema = linked("retrieve", SEARCH);
 
-        Namespace<?> api = assertInstanceOf(Namespace.class, schema.schema().entries().get("api"));
-        assertEquals(EntryKind.NAMESPACE, schema.kindOf("api"));
+        Namespace<?> api = assertInstanceOf(Namespace.class, ((ValueEntry) schema.schema().entries().get("api")).value());
+        assertEquals(EntryKind.VALUE, schema.kindOf("api"));
         assertEquals(Optional.of("operations"), schema.schema().constructorOf("api"), "§8.2 records what built it");
 
         Operation operation = assertInstanceOf(Operation.class, api.get("search"));
@@ -227,7 +231,8 @@ class MetaLayerVocabularyTest {
 
         Map<String, Operation> operations = new LinkedHashMap<>();
         schema.schema().entries().forEach((name, entry) -> {
-            if (entry instanceof Namespace<?> namespace && namespace.type().equals("operations")) {
+            if (entry instanceof ValueEntry held && held.value() instanceof Namespace<?> namespace
+                    && namespace.type().equals("operations")) {
                 namespace.entries().forEach((key, value) -> operations.put(name + "." + key, (Operation) value));
             }
         });
@@ -266,9 +271,9 @@ class MetaLayerVocabularyTest {
     /** A value whose optional list of names is written links: the class declares nothing, so there is nothing to guard. */
     @Test
     void aValueThatNamesItsReferencesLinks() {
-        Namespace<?> hooks = assertInstanceOf(Namespace.class, linked("withrefs", """
+        Namespace<?> hooks = assertInstanceOf(Namespace.class, ((ValueEntry) linked("withrefs", """
                 hooks => !webhooks { hook => { path: "/hook"  delivers: [ search_request ] } }""")
-                .schema().entries().get("hooks"));
+                .schema().entries().get("hooks")).value());
         assertNotNull(hooks.get("hook"));
     }
 
@@ -295,7 +300,7 @@ class MetaLayerVocabularyTest {
                     getOrder => fetch<search_request>""".formatted(path)),
                     () -> "a declared application mints nothing, so no name of its own can be refused");
 
-            assertEquals(EntryKind.NAMESPACE, resolved.kindOf("getOrder"), "the declaration is the value it denotes");
+            assertEquals(EntryKind.VALUE, resolved.kindOf("getOrder"), "the declaration is the value it denotes");
             assertEquals("fetch", resolved.schema().applicationOf("getOrder").orElseThrow().name(),
                     "and records the application, which is what §8.2 keys its identity on");
 
@@ -347,7 +352,7 @@ class MetaLayerVocabularyTest {
 
             assertTrue(thrown.getMessage().startsWith(position.context()),
                     position.label() + ": " + thrown.getMessage());
-            assertTrue(thrown.getMessage().contains("a value of the namespace type 'operations'"),
+            assertTrue(thrown.getMessage().contains("a value of the type 'operations'"),
                     position.label() + ": " + thrown.getMessage());
         }
     }

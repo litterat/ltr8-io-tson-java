@@ -13,6 +13,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -55,7 +56,7 @@ class MetaLayerConstructorThroughTsonTest {
                 request:  type_kind
                 response: type_kind
               }
-              operations => namespace & { key_type: = identifier  value_type: = operation }
+              operations => !namespace { key_type: identifier  value_type: operation }
               webhook => {
                 path:     text
                 delivers?: [type_kind]?
@@ -93,7 +94,8 @@ class MetaLayerConstructorThroughTsonTest {
             new DataNameBinder.DefaultDataNameBinder(Set.of("io.ltr8.tson.consumer"), Map.of());
 
     private static Tson tson() {
-        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)).withMetaNameBinder(CONSUMER_NAMES));
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE))
+                .withDataBindContext(io.ltr8.bind.DataBindContext.builder().nameBinder(CONSUMER_NAMES).build()));
     }
 
     /** The point of the whole exercise: each resolved value of the namespace <em>is</em> the consumer's own class. */
@@ -101,7 +103,7 @@ class MetaLayerConstructorThroughTsonTest {
     void aConsumersMetaLayerRecordBindsThroughTheDefaults() {
         TsonLinkedSchema linked = tson().resolve(API_SCHEMA);
 
-        Namespace<?> api = assertInstanceOf(Namespace.class, linked.schema().entries().get("api"));
+        Namespace<?> api = assertInstanceOf(Namespace.class, ((ValueEntry) linked.schema().entries().get("api")).value());
         Operation search = assertInstanceOf(Operation.class, api.get("search"));
         assertEquals("/search", search.path());
         assertEquals("GET", search.method());
@@ -109,23 +111,23 @@ class MetaLayerConstructorThroughTsonTest {
     }
 
     /**
-     * Without the binder the same schema fails at resolution -- the schema, the source and every other
-     * option identical. Pins that the option is what carries the case, not something else in the wiring.
+     * Without the binder the same schema loads with the value held as a tree, and is refused where a consumer
+     * obtains it to bind -- the schema, the source and every other option identical. Pins that the option is what
+     * carries the case, not something else in the wiring.
      *
      * <p>And it fails as a <b>misconfiguration</b>, not a library gap: the consumer never registered a class
-     * for their own record, which is a line of wiring rather than something this library cannot do. The
-     * distinction is not cosmetic -- it used to arrive as an {@code UnsupportedOperationException}, which a
-     * downstream service mapped to a 501.
+     * for their own record, which is a line of wiring rather than something this library cannot do.
      */
     @Test
     void withoutTheBinderTheSameSchemaHasNoBoundClass() {
         Tson unextended = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)));
 
-        MissingBindingException thrown =
-                assertThrows(MissingBindingException.class, () -> unextended.resolve(API_SCHEMA));
+        unextended.resolve(API_SCHEMA); // held as a tree: the schema loads and validates without the class
+        MissingBindingException thrown = assertThrows(MissingBindingException.class,
+                () -> unextended.bindRegistry().get("https://example.test/api.tn"));
 
-        assertTrue(thrown.getMessage().contains("no bound Java class for 'operation'"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("ProcessorConfig.bindings"), "it names the way to fix it: "
+        assertTrue(thrown.getMessage().contains("binds no class for it"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("bind 'operations'"), "it names the way to fix it: "
                 + thrown.getMessage());
     }
 

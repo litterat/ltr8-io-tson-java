@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.consumer.RhKindText;
 import io.ltr8.tson.compiler.consumer.RhRefText;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -39,15 +40,15 @@ class RefHostShapeTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   rh_method         => { request?: kind<record> }
-                  rh_interface      => namespace & { key_type: = identifier  value_type: = rh_method }
+                  rh_interface      => !namespace { key_type: identifier  value_type: rh_method }
                   rh_ref_type_ref   => { method: ref<rh_method> }
                   rh_ref_text       => { method: ref<rh_method> }
                   rh_kind_type_ref  => { request: kind<record> }
                   rh_kind_text      => { request: kind<record> }
-                  rh_ref_type_refs  => namespace & { key_type: = identifier  value_type: = rh_ref_type_ref }
-                  rh_ref_texts      => namespace & { key_type: = identifier  value_type: = rh_ref_text }
-                  rh_kind_type_refs => namespace & { key_type: = identifier  value_type: = rh_kind_type_ref }
-                  rh_kind_texts     => namespace & { key_type: = identifier  value_type: = rh_kind_text }
+                  rh_ref_type_refs  => !namespace { key_type: identifier  value_type: rh_ref_type_ref }
+                  rh_ref_texts      => !namespace { key_type: identifier  value_type: rh_ref_text }
+                  rh_kind_type_refs => !namespace { key_type: identifier  value_type: rh_kind_type_ref }
+                  rh_kind_texts     => !namespace { key_type: identifier  value_type: rh_kind_text }
                 }
                 """);
     }
@@ -92,7 +93,7 @@ class RefHostShapeTest {
 
     /** The value under the key {@code one} of the namespace entry {@code entry}. */
     private static Object held(String id, String entry) {
-        return ((Namespace<?>) registry().resolveLinked(id).schema().entries().get(entry)).get("one");
+        return ((Namespace<?>) ((ValueEntry) registry().resolveLinked(id).schema().entries().get(entry)).value()).get("one");
     }
 
     private static void refused(String id, String... expected) {
@@ -162,7 +163,7 @@ class RefHostShapeTest {
     @Test
     void aKindNamingANamespaceEntryWithATextHostIsJudged() {
         refused(schema("kind-text-namespace", "k => !rh_kind_texts { one => { request: orders } }"),
-                "'orders' is a value of the namespace type 'rh_interface'", "not a type");
+                "'orders' is a value of the type 'rh_interface'", "not a type");
     }
 
     @Test

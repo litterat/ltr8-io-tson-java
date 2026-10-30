@@ -81,6 +81,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private final DataBindContext context;
     private final SchemaSource source;
     private final Map<String, TsonCompiledMetaSchema> compiled = new LinkedHashMap<>();
+    private final Map<String, TsonCompiledSchema> trees = new ConcurrentHashMap<>();
     /**
      * Meta-kernel's bootstrap stand-in, compiled on the first lookup of its identity and reused until the
      * ordinarily resolved kernel is registered. The bootstrap is a function of the bundled bytes and this
@@ -539,6 +540,19 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * instance per identity is the property a cache is supposed to have. {@link #register}'s own path
      * cannot reach a duplicate at all: {@code schemaRegistry.register} refuses one first.
      */
+    @Override
+    public TsonCompiledSchema treeVocabularyOf(String identity) {
+        TsonCompiledSchema cached = trees.get(identity);
+        if (cached != null) {
+            return cached;
+        }
+        TsonLinkedSchema registered = schemaRegistry.getByCanonicalIdentity(identity).orElseThrow(
+                () -> new IllegalStateException("'" + identity + "' is named as the schema that declared a value "
+                        + "entry's type, and no schema is registered under it"));
+        return trees.computeIfAbsent(identity,
+                id -> TsonSchemaCompiler.compile(registered, ValueReaderFactoryRegistry.tree()));
+    }
+
     private synchronized TsonCompiledMetaSchema compileAndCache(TsonLinkedSchema registered) {
         String identity = CanonicalIdentity.canonicalize(registered.schema().id());
         TsonCompiledMetaSchema existing = compiled.get(identity);

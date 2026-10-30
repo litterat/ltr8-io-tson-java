@@ -1,6 +1,6 @@
 # Constructor application
 
-What `!C { … }` may apply, how its head resolves, and why a template is never one of the things it applies — the
+What `!C { … }` builds, how its head resolves, and why a template is never one of the things it applies — the
 `DefinitionResolver` rules behind §4.1/§4.2/§5.5 construction. Current form only; history lives in git.
 
 **Invariants**
@@ -13,8 +13,10 @@ What `!C { … }` may apply, how its head resolves, and why a template is never 
 - A head declared in the same document is a gap, refused as `NOT_IMPLEMENTED` (`DefinitionResolver.notYetReadable`):
   its instance waits on it being ready, which only the kernel's bootstrap orders. The body is read through the
   compiled form of the schema that declared the head (`design/resolver-vocabulary-and-bootstrap.md`).
-- What `!C { … }` may apply is IS-A `top` (§4.1) — there is no constructor marker — and
-  `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so a head the gate admits has a reader.
+- `!C { … }` builds a type exactly when `C` IS-A `top` (§4.1) — there is no constructor marker — and
+  `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so every constructor head has a reader.
+  With `C` any other type the entry is a value of `C` (`resolveValueEntry`, `design/meta-layer-namespaces.md`), never
+  a refusal for want of applicability.
 - `template` is resolver vocabulary (§8.1): IS-A `top`, yet a source declaration applying it, closed or open, is an
   author error (`requireAuthorable`).
 - An atom instance is **ATOM-kinded and not itself applicable**; both halves are needed, and IS-A `atom` alone runs
@@ -49,29 +51,25 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   Asking the alias would answer all four from an empty supertype chain and a `REFERENCE` kind, which is what
   a hop looks like rather than what it points at. The author's spelling survives where it is visible: the tag resolved output
   writes (`EntryFacts.constructor`) is the name they wrote, so the chain stays walkable from resolved output.
-- **What `!C { … }` may apply is IS-A `top` (§4.1)** (`requireApplicable`), asked of that terminal entry. §4.1
-  makes every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
-  instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond them,
-  exactly the entries describing *a type* rather than a part of one. Over the bundled schemas that is every
-  vocabulary constructor plus `top`, `type`, the three base kinds, `namespace` (and the namespace types, `schema`
-  and `field_map` among them), `reference` and `template` — judged by where `top` is defined
-  (`EntryKind.isConstructor`, one predicate the resolver's gate, the compiled vocabulary's reader table and the
-  linker all ask), and over a template's chain as over a closed one's. **A per-entry
-  constructor marker would be both too narrow and inconsistent.** `reference` describes no value, so it would go
-  unmarked, and the language needs it applicable — which takes a by-name exception that the open and closed paths
-  must then both remember, or `<T> !reference { target: T }` resolves while `!reference { target: int32 }` does
-  not, one construction with two answers. IS-A `top` needs no exception. `top`, `type`, the base kinds and
-  `namespace` are admitted and then refused as abstract (§4.1): each is `extension: ABSTRACT`, so
-  its reader is the abstract dispatch every abstract record has, and a tag naming the base itself is refused naming
-  the subtypes that would satisfy the position, which is the better message. What stays out is the component set —
-  `record_field`, `type_ref`, `type_argument`, `tuple_element`, `field_group`, `integer_size`, `atom_specification`
-  — record-bodied with empty chains; without a check those fail anyway on `Top` being sealed, but as a
-  `ClassCastException` surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error.
-  `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so a head the gate admits has a reader.
+- **`!C { … }` builds a type exactly when `C` IS-A `top` (§4.1)** (`EntryKind.isConstructor`), asked of that terminal
+  entry. §4.1 makes every base kind IS-A `top` and every constructor transitively so, while IS-A stops at
+  construction — an instance or a fresh record carries an empty chain — so the predicate admits every constructor and
+  nothing else. Over the bundled schemas that is every vocabulary constructor plus `top`, `type`, the three base kinds,
+  `namespace`, `reference` and `template` — judged by where `top` is defined (one predicate the resolver, the
+  compiled vocabulary's reader table and the linker all ask), and over a template's chain as over a closed one's.
+  Every other head is an ordinary type, and the entry is a value of it (`resolveValueEntry`): a component record,
+  `!record_field { … }`, a namespace type, `!api { … }`, and a consumer's record type, `!operation { … }`, alike. **A
+  per-entry constructor marker would be both too narrow and inconsistent.** `reference` describes no value, so it
+  would go unmarked, and the language needs it applicable — which takes a by-name exception that the open and closed
+  paths must then both remember, or `<T> !reference { target: T }` resolves while `!reference { target: int32 }`
+  does not, one construction with two answers. IS-A `top` needs no exception. `top`, `type` and the base kinds are
+  admitted and then refused as abstract (§4.1, `refuseAbstractHead`): each is `extension: ABSTRACT`, so its reader
+  is the abstract dispatch every abstract record has, and a tag naming the base itself is refused naming the subtypes
+  that would satisfy the position, which is the better message.
   **Admitting `reference` closed means giving it the alias's own entry**, not just letting it through: `!reference
   { target: X }` resolves to `kind: REFERENCE` with `X` as its body, the same entry `name => X` denotes (§8.3),
-  where a construction of any other head takes the head's kind and records the head as its constructor (a namespace
-  type's, `!api { … }`, is `NAMESPACE` with a `Namespace` for body, `design/schema-resolution.md`). The closed
+  where a construction of any other head takes the head's kind and records the head as its constructor
+  (`design/schema-resolution.md`). The closed
   path dispatches on the *body* being a `Reference`, having already read it; `resolveInstanceTemplate` holds its
   body unread and so goes by the head's name. **`template` is admitted by the predicate and refused by name**
   (`requireAuthorable`, on both paths). It is IS-A `top` because resolved output is typed by it, but it is resolver

@@ -106,9 +106,6 @@
   @ordering:NONE @bounded:false
   email => !email_type {}
 
-  @ordering:NONE @bounded:false
-  declared => !declared_type {}
-
   tuple1 => !template { parameters: [{ name: T  type: type_kind }]  template: "!tuple { elements: [{ element_type: T }] }" }
 
   voidable_tuple1 => !template {

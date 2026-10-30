@@ -16,6 +16,10 @@ import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.tree.TsonMap;
+import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -31,7 +35,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * The names a value entry holds -- a {@link Namespace}, a value of a namespace type -- resolved and judged by their slots
+ * The names a value entry holds ({@link ValueEntry}) resolved and judged by their slots
  * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the
  * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
  * judged a member ({@link #judgeMember}).
@@ -61,15 +65,14 @@ import java.util.function.Function;
  * is in the closure that declared it, which this schema's closure contains, so every type is looked up in the one
  * namespace and compared by identity, declaring schema and name.
  *
- * <p><b>The value is walked beside its type.</b> A namespace entry holds the map its constructor describes, so a
- * segment selects a key of it and the value reached is of the constructor's {@code value_type}; a value of a namespace
- * type reached that way is the map the read built for it, entered the same way. A segment selecting a field of a
- * record value reads that field of the host object the read bound ({@link #fieldOf}), through the descriptor of the
- * bind context it was bound under, by the field's wire name, so the walk agrees with the binding on what the field is
- * called and where it lives; it never reflects over the host's class itself. A field the record declares and the
- * value does not hold is refused as not present, after the referent's type is judged, so a name wrong by type is told
- * so whatever the value holds. The resolver reads every namespace value in bind mode, so a value in hand is a bound
- * host object, never a tree.
+ * <p><b>The value is walked beside its type.</b> A value entry holds a value of its type: of a namespace type, the map
+ * it describes, so a segment selects a key of it and the value reached is of the namespace type's {@code value_type};
+ * of a record type, a record, so a segment selects a field. A segment selecting a field of a bound record value reads
+ * that field of the host object the read bound ({@link #fieldOf}), through the descriptor of the bind context it was
+ * bound under, by the field's wire name, so the walk agrees with the binding on what the field is called and where it
+ * lives; it never reflects over the host's class itself. A value no class binds is held as a tree, and a segment
+ * selects in the tree by key or field name. A field the record declares and the value does not hold is refused as
+ * not present, after the referent's type is judged, so a name wrong by type is told so whatever the value holds.
  *
  * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed.
  */
@@ -81,22 +84,20 @@ final class ValuesByName {
     private final DataBindContext values;
 
     /**
-     * @param namespaces the map a value of each namespace type in the closure is read as
      * @param values the bind context the schema's namespace values were bound under, which a field step reads a
      *               record value through; {@code null} where the link was given none
      */
     ValuesByName(TsonSchema schema, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                 Map<String, String> origins, Map<String, MapBody.Namespace> namespaces, DataBindContext values) {
+                 Map<String, String> origins, DataBindContext values) {
         this.merged = merged;
         this.facts = facts;
         String ownIdentity = CanonicalIdentity.canonicalize(schema.id());
-        this.space = new Space(merged, name -> origins.getOrDefault(name, ownIdentity), namespaces);
+        this.space = new Space(merged, name -> origins.getOrDefault(name, ownIdentity));
         this.values = values;
     }
 
-    /** The schema's one namespace: its entries, where each was declared, and the map each namespace type reads as. */
-    private record Space(Map<String, Top> entries, Function<String, String> originOf,
-                         Map<String, MapBody.Namespace> namespaces) {
+    /** The schema's one namespace: its entries, and where each was declared. */
+    private record Space(Map<String, Top> entries, Function<String, String> originOf) {
 
         /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link EntryKind#isConstructor}). */
         boolean isConstructor(String name, Top value) {
@@ -128,22 +129,8 @@ final class ValuesByName {
             return space.originOf().apply(terminal) + "#" + terminal;
         }
 
-        /**
-         * What a value of this type is read as: the map a namespace type's value is ({@link
-         * MapBody#ofNamespace}), and the definition otherwise.
-         */
         Top body() {
-            return Optional.ofNullable(space.namespaces().get(terminal())).<Top>map(MapBody.Namespace::map)
-                    .orElseGet(this::definition);
-        }
-
-        /**
-         * Whether this type is a namespace type, IS-A the kernel's {@code namespace}: a map whose keys name its
-         * entries, which is the one map a qualified name enters ({@code method_map => namespace & { ... }}); a
-         * {@code {K => V}} sugar map is built with {@code map} and is not.
-         */
-        boolean isNamespace() {
-            return space.namespaces().containsKey(terminal());
+            return definition();
         }
 
         /** §7.2: this type is {@code wanted}, or lists it among its supertypes. */
@@ -237,14 +224,14 @@ final class ValuesByName {
                         + " is an entry whose body is built by '" + at.name() + "', which is no '" + wanted.name()
                         + "'");
             }
-            cell.ifPresent(c -> c.deliver(referent));
+            cell.ifPresent(c -> c.deliver(referent instanceof ValueEntry value ? value.value() : referent));
             return;
         }
-        if (!(referent instanceof Namespace<?> namespace)) {
+        if (!(referent instanceof ValueEntry valueEntry)) {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
                     + "type: a type entry admits no further segment, so '" + segments.get(1) + "' selects in no value");
         }
-        Object value = namespace;
+        Object value = valueEntry.value();
         String absent = null;
         String reached = head;
         for (String segment : segments.subList(1, segments.size())) {
@@ -258,8 +245,9 @@ final class ValuesByName {
                                 + String.join(", ", record.fields().keySet()));
                     }
                     if (value != null) {
-                        value = fieldOf(value, segment, where + " names '" + name + "', and '" + reached + '.'
-                                + segment + "'");
+                        value = value instanceof TsonValue tree ? present(tree.get(segment))
+                                : fieldOf(value, segment, where + " names '" + name + "', and '" + reached + '.'
+                                        + segment + "'");
                         if (value == null) {
                             absent = "'" + reached + "' is " + a(at.name()) + " whose field '" + segment + "' is "
                                     + "not present in the value";
@@ -267,22 +255,19 @@ final class ValuesByName {
                     }
                     at = at.of(field.type().name());
                 }
-                case MapBody map -> {
-                    if (!at.isNamespace()) {
-                        throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
-                                + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "
-                                + "name -- a segment selects a key of a namespace value or a field of a record value");
-                    }
+                case MapBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
+                        + reached + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "
+                        + "name -- a segment selects a key of a namespace value or a field of a record value");
+                case NamespaceBody namespace -> {
                     if (value != null) {
-                        Map<?, ?> entries = asMap(value, reached);
-                        Optional<Object> found = keyed(entries, segment);
+                        Optional<Object> found = keyed(value, segment, reached);
                         if (found.isEmpty()) {
                             throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
-                                    + "' has no key '" + segment + "' -- it holds " + keysOf(entries));
+                                    + "' has no key '" + segment + "' -- it holds " + keysOf(value, reached));
                         }
                         value = found.get();
                     }
-                    at = at.of(map.valueType().name());
+                    at = at.of(namespace.valueType().name());
                 }
                 case ArrayBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
                         + reached + "' is a list, whose elements have no names -- a segment selects a field of a "
@@ -308,16 +293,16 @@ final class ValuesByName {
     /**
      * A kind-typed slot holds a type's name, one segment, and the name is a member of the kind or refused
      * ({@link KindMembers}): the referent's construction chain reaches the kind's {@code of}, and the referent is no
-     * constructor. A namespace entry is refused as a value, however many segments name it. A type reached through
-     * a namespace of types is not yet a spelling this library reads.
+     * constructor. A value entry is refused as a value, however many segments name it. A type reached through a
+     * namespace of types is not yet a spelling this library reads.
      */
     private void judgeMember(String where, String name, List<String> segments, TsonSchema.SlotType slot,
                              Top referent, String entry) {
         String wants = where + " wants the name of a type built with '" + slot.of() + "' (a member of '"
                 + slot.name() + "'), and ";
-        if (segments.size() > 1 && referent instanceof Namespace<?> namespace) {
+        if (segments.size() > 1 && referent instanceof ValueEntry value) {
             throw new SchemaValidationException(wants + "'" + name + "' reaches into " + entry + ", which is "
-                    + aValueNoType(namespace) + " -- and what a further segment selects in a value is a value too");
+                    + aValueNoType(value) + " -- and what a further segment selects in a value is a value too");
         }
         if (segments.size() > 1) {
             throw new UnsupportedOperationException(where + " names '" + name + "' at a position typed by the kind '"
@@ -329,8 +314,8 @@ final class ValuesByName {
                 merged::get)) {
             return;
         }
-        if (referent instanceof Namespace<?> namespace) {
-            throw new SchemaValidationException(wants + entry + " is " + aValueNoType(namespace));
+        if (referent instanceof ValueEntry value) {
+            throw new SchemaValidationException(wants + entry + " is " + aValueNoType(value));
         }
         String terminal = ReferenceChain.terminal(name, merged);
         throw new SchemaValidationException(wants + entry + " is an entry whose body is built by '"
@@ -351,8 +336,8 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " names '" + name + "', which is no type declared in this "
                     + "schema or its imports");
         }
-        if (referent instanceof Namespace<?> namespace) {
-            throw new SchemaValidationException(where + " names '" + name + "', which is " + aValueNoType(namespace));
+        if (referent instanceof ValueEntry value) {
+            throw new SchemaValidationException(where + " names '" + name + "', which is " + aValueNoType(value));
         }
         int parameters = OpenEntry.isOpen(referent) ? OpenEntry.parameterNames(referent).size() : 0;
         if (reference.arguments().size() != parameters) {
@@ -367,17 +352,19 @@ final class ValuesByName {
         }
     }
 
-    /** What a namespace entry is, where a type is wanted: a value, which nothing can be typed by (§4.1). */
-    private static String aValueNoType(Namespace<?> namespace) {
-        return "a value of the namespace type '" + namespace.type() + "', a map of names -- a value and not a type, so "
-                + "nothing can be typed by it";
+    /** What a value entry is, where a type is wanted: a value, which nothing can be typed by (§4.1). */
+    static String aValueNoType(ValueEntry value) {
+        return "a value of the type '" + value.type() + "' -- a value and not a type, so nothing can be typed by it";
     }
 
     /**
-     * The constructor that built {@code definition}'s body: its tag where that names a constructor, and otherwise
-     * the kernel constructor the body's class mirrors.
+     * The type {@code definition} is a value of: a value entry's type, and otherwise the constructor that built the
+     * body, its tag where that names a constructor and the kernel constructor the body's class mirrors where not.
      */
     private static Typed constructorOf(String tag, Top definition, Space space) {
+        if (definition instanceof ValueEntry value) {
+            return new Typed(space, value.type());
+        }
         Typed source = new Typed(space, tag);
         Top constructor = source.definition();
         if (constructor != null && space.isConstructor(tag, constructor)) {
@@ -435,6 +422,28 @@ final class ValuesByName {
         }
         throw new IllegalStateException("'" + reached + "' is a value of a namespace type, read as a "
                 + value.getClass().getName() + " rather than a map");
+    }
+
+    /** A tree's value at a key or field, {@code null} where the tree holds none. */
+    private static Object present(TsonValue value) {
+        return value.isMissing() ? null : value;
+    }
+
+    /** The value under the key spelled {@code segment} of a namespace value, bound or held as a tree. */
+    private static Optional<Object> keyed(Object value, String segment, String reached) {
+        if (value instanceof TsonValue tree) {
+            return Optional.ofNullable(present(tree.get(segment)));
+        }
+        return keyed(asMap(value, reached), segment);
+    }
+
+    /** The keys a namespace value holds, as a message lists them. */
+    private static String keysOf(Object value, String reached) {
+        if (value instanceof TsonMap tree) {
+            return tree.entries().isEmpty() ? "none" : String.join(", ", tree.entries().stream()
+                    .map(entry -> entry.key().asString().orElse(String.valueOf(entry.key()))).toList());
+        }
+        return keysOf(asMap(value, reached));
     }
 
     /** The value under the key spelled {@code segment}: a {@code String} key directly, any other by its text. */

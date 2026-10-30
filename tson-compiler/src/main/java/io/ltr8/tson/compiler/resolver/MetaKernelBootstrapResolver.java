@@ -28,6 +28,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TextType;
@@ -93,10 +94,11 @@ public final class MetaKernelBootstrapResolver {
     /**
      * The kernel's named instances and refinements on its one wait cycle, built by hand: {@code value}, the
      * {@code boolean} and {@code field_role} enums, {@code enum}'s member set, the {@code integer}, {@code text} and
-     * {@code identifier} atoms, {@code type_kind}, and {@code non_negative_integer}, the one refinement.
+     * {@code identifier} atoms, {@code type_kind}, {@code field_map}, the namespace type a record's fields are a value
+     * of, and {@code non_negative_integer}, the one refinement.
      */
     private static final Set<String> PRE_LOADED = Set.of("value", "boolean", "field_role", "enum_set", "integer",
-            "non_negative_integer", "text", "identifier", "type_kind");
+            "non_negative_integer", "text", "identifier", "type_kind", "field_map");
 
     /**
      * The element types whose lifted arrays are on the cycle: {@code [type_name]}, {@code [field_group]} and {@code
@@ -380,8 +382,8 @@ public final class MetaKernelBootstrapResolver {
      * its constructors in four shapes, each checked rather than assumed: a bare {@code {}} for {@code value_type},
      * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; {@code identifier}'s
      * profile, checked against the constant the lexer and resolver already hold; a bare token array for {@code
-     * enum}; and a record of tokens for {@code kind_type} and for the {@code array}/{@code set_type} binding records
-     * {@link SchemaDesugarer} lifts.
+     * enum}; and a record of tokens for {@code kind_type}, for {@code namespace} and for the {@code
+     * array}/{@code set_type} binding records {@link SchemaDesugarer} lifts.
      *
      * <p>Package-private so {@code MetaKernelBootstrapResolverTest} can reach the refusals the real kernel never
      * does.
@@ -408,6 +410,10 @@ public final class MetaKernelBootstrapResolver {
             // `!kind_type { of: type }`: `of` is the one authored field, and the members are derived when the kernel
             // links, as every kind's are.
             case "kind_type" -> new KindBody(bindingField(instance.value(), "of"));
+            // `field_map => !namespace { value_type: record_field  ordered: true }`: keys of the host's family.
+            case "namespace" -> new NamespaceBody(fieldToken(instance.value(), "key_type").map(TypeRef::of),
+                    TypeRef.of(bindingField(instance.value(), "value_type")),
+                    fieldToken(instance.value(), "ordered").map(Boolean::parseBoolean).orElse(false));
             // array and set differ only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
             case "array" -> toArrayBody(instance.value(), false);
             case "set_type" -> toArrayBody(instance.value(), true);

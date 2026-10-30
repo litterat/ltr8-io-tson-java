@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -43,7 +44,7 @@ class BindMismatchClassificationTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               notification  => { path: text }
-              notifications => namespace & { key_type: = identifier  value_type: = notification }
+              notifications => !namespace { key_type: identifier  value_type: notification }
             }
             """;
 
@@ -95,21 +96,25 @@ class BindMismatchClassificationTest {
     }
 
     /**
-     * The constructor case, which reaches the same condition through {@code bindAtomInstance} rather than
-     * through an annotation: a meta layer's own constructor the consumer never registered a class for.
-     *
-     * <p>It is reported <b>per declaration, with a position</b>. Escaping resolution instead left {@code
-     * Tson.validateSchema}'s own outer catch to report it against the document as a whole -- the right code,
-     * with no declaration name and no line, for a problem that has both.
+     * A value entry of a type the consumer binds no class for -- {@code pings => !notifications { ... }}, whose
+     * values are {@code notification} records -- is held as a tree: the schema loads and validates. Obtained to
+     * bind, it is refused, <b>per entry, with a position</b>: the {@code BIND_MISMATCH} names the entry and carries
+     * the line the author can open.
      */
     @Test
-    void anUnboundMetaLayerConstructorIsReportedAtTheDeclarationThatAppliedIt() {
-        Diagnostic d = only(GOVERNED_HEADER + "{\npings => !notifications { ping => { path: \"/ping\" } }\n}\n");
+    void anUnboundValueEntryValidatesAndIsRefusedWhereTheSchemaIsBound() {
+        Tson tson = tson();
+        assertEquals(List.of(), tson.validateSchema(
+                GOVERNED_HEADER + "{\npings => !notifications { ping => { path: \"/ping\" } }\n}\n"));
 
+        List<Diagnostic> problems = new java.util.ArrayList<>();
+        assertNull(tson.bindRegistry().get("https://example.test/api-bindmismatch.tn", problems::add));
+        assertEquals(1, problems.size(), problems::toString);
+        Diagnostic d = problems.getFirst();
         assertEquals(Diagnostic.Code.BIND_MISMATCH, d.code());
         assertEquals("/pings", d.schemaPointer().orElseThrow());
         assertTrue(d.schemaPosition().isPresent(), "and carries the line the author can open");
-        assertTrue(d.message().contains("no bound Java class for 'notification'"), d::message);
+        assertTrue(d.message().contains("binds no class for it"), d::message);
     }
 
     /** The contrast: a name the governing meta does not declare is the author's error, in either position. */

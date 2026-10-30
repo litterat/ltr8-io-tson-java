@@ -184,7 +184,7 @@ annotation is: there is no author to resolve against, and the value is fixed.
   little, so `SyntheticEntryMarkerTest` asserts both halves.
 - **`@application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
   closes a template application, the application it is the instantiation of, `@application:{ name: box  arguments:
-  [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a namespace entry
+  [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a value entry
   (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Reference` a
   non-record template's application closes to — which is why it is no field of `type_chain`. The materialiser records
   each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
@@ -222,9 +222,11 @@ only the kernel's and meta.tn's constructors reaches exactly those two.
   only those have compiled readers; type uses resolve in the whole namespace (`namespaceDefinitions`). A head or an
   annotation type declared in the document itself is in the namespace and has no reader yet, and is refused as a gap
   before the vocabulary is asked (`DefinitionResolver.notYetReadable`, `design/schema-resolution.md`).
-- **Whether a payload is a value body** (`isValueBody`, `payloadNames`) is asked of the declaring schema's compiled
-  form: a namespace type's instance is read under the loader's identifier policy and lifts nothing
-  (`design/meta-layer-namespaces.md`).
+- **A payload is a value body exactly when its head is no constructor**: a value entry's payload is read against
+  the type, under the loader's identifier policy, and lifts nothing; a construction's binding record is read under
+  no policy (`SchemaResolver`'s `DefinitionMetaReader`, `design/meta-layer-namespaces.md`). The value is bound where
+  the context binds its type, and otherwise read through the declaring schema's tree-mode compilation
+  (`treeVocabularyOf`) and held as a tree.
 - **The kernel reads through itself.** Its resolution is handed the pre-loaded stand-in, which answers for every
   name, the one cycle being closed by pre-loading (§3.4).
 
@@ -242,16 +244,18 @@ of the value is read against as the read reaches it; a reference and a held valu
 Its output is what ordinary resolution of the kernel against it produces, entry for entry and constructor for
 constructor, positions included (the bootstrap resolves with the parser's positions).
 
-- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the
-  kernel's one wait cycle, the one holding `record`: `value`, `boolean`, `field_role`, `enum_set`, `integer`,
-  `non_negative_integer`, `text`, `identifier`, `type_kind` (`PRE_LOADED`), and the arrays lifted over `type_name`,
-  `field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted array is named by its content, so it is
-  designated by what it holds). `instanceBody` covers the four shapes those apply — a bare `{}` (each target's
-  unconstrained constant), `identifier`'s profile (checked against the constant the lexer already holds), a bare token
-  array (`enum`), and a record of tokens (`kind_type`, the `array`/`set_type` binding records the desugar phase lifts,
-  with their `min_items`/`max_items`) — and refuses any other target; `refinedBody` merges the integer family's `min`
-  and `max`. `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from `meta-kernel-resolved.tn` and
-  asserts the hand-built names equal it, so a kernel edit that moves the cycle fails there.
+- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the kernel's
+  one wait cycle, the one holding `record`: `value`, `boolean`, `field_role`, `enum_set`, `integer`,
+  `non_negative_integer`, `text`, `identifier`, `type_kind`, `field_map` (`PRE_LOADED`), and the arrays lifted over
+  `type_name`, `field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted array is named by its
+  content, so it is designated by what it holds). `instanceBody` covers the four shapes those apply — a bare `{}` (each
+  target's unconstrained constant), `identifier`'s profile (checked against the constant the lexer already holds), a
+  bare token array (`enum`), and a record of tokens (`kind_type`, `namespace` for `field_map`, the `array`/`set_type`
+  binding records the desugar phase lifts, with their `min_items`/`max_items`) — and refuses any other target;
+  `refinedBody` merges the integer family's `min` and `max`. `MetaKernelBootstrapResolverTest` measures the cycle with
+  `WaitGraph` from `meta-kernel-resolved.tn` and asserts the hand-built names equal it, so a kernel edit that moves the
+  cycle fails there. `KernelWaitGraphTest` prints the measurement: one cycle, 30 of the kernel's 79 entries (70
+  declarations and 9 desugared arrays), longest wait chain 4.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies.
@@ -267,9 +271,9 @@ constructor, positions included (the bootstrap resolves with the parser's positi
 - **The order is computed.** The bootstrap is the `DefinitionGetter` every lookup goes through, making an entry ready
   the first time anything asks for it, as `SchemaResolver`'s getter does; its `resolving` stack refuses an entry that
   waits on itself, naming the chain (an `IllegalStateException`: only a kernel edit can put a cycle outside the
-  pre-loaded set). The driving loop's order changes how many compiles run, never the output. Against the current kernel
-  the nineteen instances outside the cycle read in two compiles: the first holds every resolved declaration and the
-  pre-loaded set; `scheme_name` reaching `identifier_base` and `normalization` forces the second.
+  pre-loaded set). The driving loop's order changes how many compiles run, never the output: the first compile holds
+  every resolved declaration and the pre-loaded set, and an instance whose read reaches one not yet ready
+  (`scheme_name` reaching `identifier_base` and `normalization`) forces another.
 - **Parameter types are derived after every entry is ready**, through `ParameterTypes.inferAll` as `SchemaResolver`
   derives a schema's, so `kind` and `ref` carry `T: type_name` as their ordinary resolution does.
 - **The partial link and the bootstrap compile are contained.** Both refuse a schema whose `bootstrap()` is false.

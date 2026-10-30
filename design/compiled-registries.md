@@ -18,6 +18,8 @@ form only; history lives in git.
 - On a race, what is duplicated is work, never state; explicit `register` on an identity already present is still an
   error.
 - A cache hit takes no lock; a read canonicalizes its schema URI once.
+- A value entry no class binds is held as a tree by the core, read through the declaring schema's tree-mode compilation
+  (`treeVocabularyOf`); the bind registry refuses one anywhere in the closure it compiles, the tree registry nothing.
 
 Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/meta-layer-namespaces.md`,
 `design/cli-config-hashing.md`, `design/facades-and-tree.md`.
@@ -34,6 +36,9 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   fetched/resolved/linked/registered), and `loadMeta(uri)` / `vocabularyOf(identity) → TsonCompiledMetaSchema`,
   a schema's **compiled vocabulary**: the readers a schema importing it reads a `!C { … }` body or an annotation
   value through, where it declared `C` or the annotation's type (`design/resolver-vocabulary-and-bootstrap.md`).
+  `treeVocabularyOf(identity)` is the same schema compiled in tree mode, cached per identity beside it: what a value
+  entry's payload is read through where the bind context binds no class for its type, so the entry holds a
+  `TsonValue` and the schema still loads and validates (`design/meta-layer-namespaces.md`).
   Any schema compiles to one (`TsonCompiledMetaSchema.compile`), **on first use and cached per identity**, never
   per closure: a schema applying only the kernel's and meta.tn's constructors reaches exactly those two compiled
   schemas, and core.tn, net.tn and policy.tn are compiled here only if something applies a constructor or an
@@ -52,10 +57,18 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue`
   can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile
   runs in the registry's mode (one factory set, no scoping: linking already established that every head the
-  schema applies is in its namespace). The bind read registry takes the *caller's own* `DataBindContext` (their
-  user-class name binder), deliberately distinct from the core's internal `SchemaMetaNameBinder`-based resolution
-  context, which every vocabulary compile in the core uses. A user schema importing core.tn gets core.tn's entries
-  merged into its own linked form (by `link`) and compiled inline in the read registry's mode.
+  schema applies is in its namespace). The core and the bind read registry share one `DataBindContext`, the
+  configured one composed with `SchemaMetaNameBinder.INSTANCE`, which owns the names meta-kernel.tn and meta.tn
+  declare (`SchemaMetaNameBinder.over`, `design/front-door-and-config.md`), so a schema's value entry and a data document's
+  value of the same type bind to the same class. A user schema importing core.tn gets core.tn's entries merged into
+  its own linked form (by `link`) and compiled inline in the read registry's mode.
+- **A schema obtained to bind holds no tree.** The bind registry's `get(uri)`, `get(uri, receiver)`, `get(imports,
+  receiver)` and `compile(linked)` refuse a value entry of the compiled closure that the core held as a tree
+  (`refuseUnbound`): `MissingBindingException`, a `BIND_MISMATCH` naming the entry, or one `BIND_MISMATCH` per entry
+  through the receiver, `schemaPointer` `/entry`. That is the narrowest point a consumer first obtains a schema for
+  binding, and a consumer binding under it expects every value of its closure as the class its context names; the
+  tree registry, `Tson.resolve` and `validateSchema` refuse nothing, so a schema loads and validates without host
+  classes.
 - **An import cycle is caught by what is *in flight*, not by a cache lookup** (§2.2.3). A schema is
   registered only once it has linked, so while `a.tn` is resolving it is in no registry at all and `b.tn`
   importing it back re-enters `resolveLinked` for the same identity and fetches it again — unguarded, that

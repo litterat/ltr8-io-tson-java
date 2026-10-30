@@ -123,8 +123,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("tuple", tuple);
         factories.put("enum", leaf.apply(enumFactory));
         factories.put("choice", choice);
-
-        // meta.tn
         factories.put("declared_type", DeclaredReader.FACTORY);
 
         // Every atom constructor routes to one factory, so what varies is the key and not the value:

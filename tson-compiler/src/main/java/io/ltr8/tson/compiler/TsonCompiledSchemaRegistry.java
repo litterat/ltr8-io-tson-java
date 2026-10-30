@@ -1,6 +1,9 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.CountingReceiver;
+import io.ltr8.tson.base.MissingBindingException;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
@@ -76,11 +79,9 @@ public final class TsonCompiledSchemaRegistry {
     /**
      * A registry that reads user schemas to real, object-bound Java values -- a {@code RecordBindReader}
      * produces a bound object (a caller's own class, resolved via {@code context}'s own {@code
-     * DataNameBinder}), not a plain {@code Map}. {@code context} is the caller's own read-side binding
-     * configuration, deliberately independent of the object-binding context the core uses internally to
-     * resolve meta-schema instances into {@code schema.meta} objects -- a caller binding {@code person}
-     * data to their own {@code Person} class supplies a {@code context} whose {@code DataNameBinder} knows
-     * that mapping.
+     * DataNameBinder}), not a plain {@code Map}. {@code Tson.of} hands it the one context the core resolves
+     * schemas through, so the class a schema's value entry binds to binds the same type's values in data. A schema
+     * obtained here is refused where its closure holds a value entry no class binds ({@code refuseUnbound}).
      */
     public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext context) {
         return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.bind(context), Mode.BIND);
@@ -98,6 +99,7 @@ public final class TsonCompiledSchemaRegistry {
     public TsonCompiledSchema get(String uri) {
         String identity = CanonicalIdentity.canonicalize(uri);
         TsonLinkedSchema linked = core.resolveLinked(uri, identity, null);
+        refuseUnbound(linked, null);
         return compiledFor(identity, linked);
     }
 
@@ -113,7 +115,7 @@ public final class TsonCompiledSchemaRegistry {
     public TsonCompiledSchema get(String uri, DiagnosticsReceiver receiver) {
         String identity = CanonicalIdentity.canonicalize(uri);
         TsonLinkedSchema linked = core.resolveLinked(uri, identity, receiver);
-        if (linked == null) {
+        if (linked == null || refuseUnbound(linked, receiver)) {
             return null;
         }
         return compiledFor(identity, linked);
@@ -147,7 +149,7 @@ public final class TsonCompiledSchemaRegistry {
         CountingReceiver counting = new CountingReceiver(receiver);
         TsonLinkedSchema linked = TsonSchemaLinker.link(new TsonSchema(identity, imports, Map.of()),
                 core.schemaRegistry(), counting, core.identifierPolicy());
-        return counting.reported() ? null : compiledFor(identity, linked);
+        return counting.reported() || refuseUnbound(linked, receiver) ? null : compiledFor(identity, linked);
     }
 
     /**
@@ -179,7 +181,41 @@ public final class TsonCompiledSchemaRegistry {
 
     /** Compiles an already-resolved, already-linked schema in this registry's mode, uncached. */
     public TsonCompiledSchema compile(TsonLinkedSchema linked) {
+        refuseUnbound(linked, null);
         return TsonSchemaCompiler.compile(linked, factories);
+    }
+
+    /**
+     * A schema obtained to bind holds no value entry no class binds ([TSON-SCHEMA] §4.1). The resolution core holds
+     * such an entry as a tree, so the schema loads and validates without host classes; a consumer binding under it
+     * expects every value of its closure as the class its bind context names, and a tree in its place is the
+     * consumer's wiring, a {@code BIND_MISMATCH} at the entry. Each such entry of the closure is reported through
+     * {@code receiver}, or the first thrown where it is {@code null}; true where one was reported. A tree registry
+     * refuses nothing.
+     */
+    private boolean refuseUnbound(TsonLinkedSchema linked, DiagnosticsReceiver receiver) {
+        if (mode != Mode.BIND) {
+            return false;
+        }
+        boolean refused = false;
+        for (Map.Entry<String, Top> entry : linked.schema().entries().entrySet()) {
+            if (!(entry.getValue() instanceof ValueEntry value) || !(value.value() instanceof TsonValue)) {
+                continue;
+            }
+            String name = entry.getKey();
+            MissingBindingException unbound = new MissingBindingException("'" + name + "' is a value of the type '"
+                    + value.type() + "', and the bind context binds no class for it -- the schema loads and validates "
+                    + "with the value held as a tree, and is bound only where every value of its closure has a class "
+                    + "to bind to: bind '" + value.type() + "' (and the types its fields name) to a class");
+            if (receiver == null) {
+                throw unbound;
+            }
+            receiver.report(TsonDiagnostics.ofSchemaBindMismatch(
+                    linked.originOf(name), name, unbound,
+                    linked.schema().positionOf(name)));
+            refused = true;
+        }
+        return refused;
     }
 
     /** The bind-mode resolution core this registry reads user schemas against. */

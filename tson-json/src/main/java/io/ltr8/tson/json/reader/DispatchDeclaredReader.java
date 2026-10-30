@@ -13,7 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * meta.tn's {@code declared_type} constructor, whose instance is core's {@code declared}: the open sum over the
+ * The kernel's {@code declared_type} constructor, whose instance is its {@code declared}: the open sum over the
  * governing closure, where the value names its own type and is read in full against it ([TSON-JSON] §8.5,
  * [TSON-SCHEMA] §7.8). It selects a reader and builds nothing, so one class serves every mode.
  *

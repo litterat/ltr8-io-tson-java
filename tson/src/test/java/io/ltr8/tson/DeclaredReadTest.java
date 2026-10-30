@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * meta.tn's {@code declared_type} constructor read end to end through core's {@code declared}: the value names
+ * The kernel's {@code declared_type} constructor read end to end through its {@code declared}: the value names
  * its own type, by its tag, among the types the governing schema declares or imports, and is read in full
  * against it ([TSON-SCHEMA] §7.8).
  */

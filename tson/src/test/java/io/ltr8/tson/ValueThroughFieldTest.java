@@ -11,6 +11,7 @@ import io.ltr8.tson.consumer.Route;
 import io.ltr8.tson.consumer.Service;
 import io.ltr8.tson.consumer.Shape;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
@@ -43,17 +44,17 @@ class ValueThroughFieldTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               endpoint     => { request?: kind<record>  response?: type_kind }
-              endpoint_map => namespace & { key_type: = identifier  value_type: = endpoint }
+              endpoint_map => !namespace { key_type: identifier  value_type: endpoint }
               service      => { extends?: [identifier]  fallback?: endpoint  endpoints: endpoint_map }
-              services     => namespace & { key_type: = identifier  value_type: = service }
+              services     => !namespace { key_type: identifier  value_type: service }
               route        => { endpoint: ref<endpoint>  verb: text }
-              routes       => namespace & { key_type: = identifier  value_type: = route }
+              routes       => !namespace { key_type: identifier  value_type: route }
               shape        => { fields: field_map }
-              shapes       => namespace & { key_type: = identifier  value_type: = shape }
+              shapes       => !namespace { key_type: identifier  value_type: shape }
               pick         => { field: ref<record_field> }
-              picks        => namespace & { key_type: = identifier  value_type: = pick }
+              picks        => !namespace { key_type: identifier  value_type: pick }
               unbound      => { endpoints: endpoint_map }
-              unbounds     => namespace & { key_type: = identifier  value_type: = unbound }
+              unbounds     => !namespace { key_type: identifier  value_type: unbound }
             }
             """;
 
@@ -64,7 +65,7 @@ class ValueThroughFieldTest {
     private static Tson tson() {
         return Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_TEXT))))
-                .withMetaNameBinder(CONSUMER));
+                .withDataBindContext(io.ltr8.bind.DataBindContext.builder().nameBinder(CONSUMER).build()));
     }
 
     /** A schema under the meta above holding a shop of two services, and {@code more}. */
@@ -94,11 +95,11 @@ class ValueThroughFieldTest {
     }
 
     private static Route route(Map<String, ?> entries) {
-        return assertInstanceOf(Route.class, assertInstanceOf(Namespace.class, entries.get("web")).get("r"));
+        return assertInstanceOf(Route.class, assertInstanceOf(Namespace.class, valueOf(entries.get("web"))).get("r"));
     }
 
     private static Service service(Map<String, ?> entries, String key) {
-        return assertInstanceOf(Service.class, assertInstanceOf(Namespace.class, entries.get("shop")).get(key));
+        return assertInstanceOf(Service.class, assertInstanceOf(Namespace.class, valueOf(entries.get("shop"))).get(key));
     }
 
     /** The one diagnostic a refused name reports, and that it says {@code expected}. */
@@ -151,8 +152,9 @@ class ValueThroughFieldTest {
                 point => !shapes { p => { fields: { x => { type: int64 } } } }
                 look  => !picks { a => { field: point.p.fields.x } }""")).schema().entries().entries();
 
-        Pick pick = assertInstanceOf(Pick.class, assertInstanceOf(Namespace.class, entries.get("look")).get("a"));
-        Shape shape = assertInstanceOf(Shape.class, assertInstanceOf(Namespace.class, entries.get("point")).get("p"));
+        Pick pick = assertInstanceOf(Pick.class, assertInstanceOf(Namespace.class, valueOf(entries.get("look"))).get("a"));
+        Shape shape = assertInstanceOf(Shape.class,
+                assertInstanceOf(Namespace.class, valueOf(entries.get("point"))).get("p"));
         RecordField x = assertInstanceOf(RecordField.class, pick.field().get());
         assertEquals(TypeRef.of("int64"), x.type());
         assertSame(shape.fields().get("x"), x);
@@ -195,17 +197,28 @@ class ValueThroughFieldTest {
     // ── No host class ───────────────────────────────────────────────────────────────────────────────
 
     /**
-     * A record no class binds is refused where it is applied, before any link: no walk meets a value the read did not
-     * bind, so a field step always has a host object in hand.
+     * A value entry whose records no class binds is held as a tree, and a qualified name walks it by key and field as
+     * it walks a bound one: the schema validates. Obtained to bind, it is refused at the entry, {@code BIND_MISMATCH}.
      */
     @Test
-    void aRecordWithNoHostClassIsABindMismatchBeforeAnyWalk() {
-        List<Diagnostic> problems = tson().validateSchema(shop("""
+    void aValueWithNoHostClassIsWalkedAsATreeAndRefusedWhereBound() {
+        Tson tson = tson();
+        assertEquals(List.of(), tson.validateSchema(shop("""
                 loose => !unbounds { x => { endpoints: { e => { response: order } } } }
-                web   => !routes { r => { endpoint: loose.x.endpoints.e  verb: POST } }"""));
+                web   => !routes { r => { endpoint: loose.x.endpoints.e  verb: POST } }""")));
 
+        Route route = route(tson.bindRegistry().core().resolveLinked("https://example.test/shop.tn").schema()
+                .entries().entries());
+        assertEquals("loose.x.endpoints.e", route.endpoint().name());
+        // A tree delivered where the host's class is no tree: the schema holds it, and only a bound read refuses it.
+        Object delivered = ((io.ltr8.tson.schema.meta.Ref<?>) route.endpoint()).get();
+        assertEquals("order", ((io.ltr8.tson.tree.TsonValue) delivered).get("response").asString().orElseThrow());
+
+        List<Diagnostic> problems = new java.util.ArrayList<>();
+        tson.bindRegistry().get("https://example.test/shop.tn", problems::add);
         assertEquals(1, problems.size(), problems::toString);
         assertEquals(Diagnostic.Code.BIND_MISMATCH, problems.getFirst().code(), problems::toString);
+        assertEquals("/loose", problems.getFirst().schemaPointer().orElseThrow());
     }
 
     /** The binding's own naming, which the walk follows: each wire name lands in the component it names. */
@@ -215,5 +228,10 @@ class ValueThroughFieldTest {
         assertEquals(List.of("reads"), orders.bases());
         assertEquals(Optional.of(new Endpoint(null, TypeRef.of("receipt"))), orders.fallback());
         assertEquals(Set.of("place_order"), orders.byName().keySet());
+    }
+
+    /** A value entry's value. */
+    private static Object valueOf(Object entry) {
+        return ((ValueEntry) entry).value();
     }
 }

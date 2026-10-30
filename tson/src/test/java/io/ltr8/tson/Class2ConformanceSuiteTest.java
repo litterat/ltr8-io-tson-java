@@ -101,7 +101,6 @@ class Class2ConformanceSuiteTest {
         // corpus publishes those under its own identity prefix rather than inventing a file convention.
         return Tson.of(ProcessorConfig.defaults()
                 .withDataBindContext(SuiteBindings.context())
-                .withMetaNameBinder(SuiteBindings.names())
                 .withSchemaAccess(SchemaAccess.of(Class2ConformanceSuiteTest::fetchSuiteSchema)));
     }
 
@@ -147,7 +146,7 @@ class Class2ConformanceSuiteTest {
                 // of them binds every record of their closure, and SuiteBindings binds by name, one class per name
                 // across the whole corpus: a second fixture's `order` would meet a class written for another's.
                 List<String> imports = TsonDocumentPeek.of(source).header().imports();
-                Map<String, Top> expected = ResolvedForm.readResolved(tson,
+                Map<String, Object> expected = ResolvedForm.readResolved(tson,
                         fieldText(outcomePayload(sidecar), "resolved"),
                         imports.isEmpty() ? imports : imports.subList(0, 1));
                 assertEquals(new TreeSet<>(expected.keySet()), new TreeSet<>(ours.keySet()),

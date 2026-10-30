@@ -829,7 +829,7 @@ public final class TsonObjectReader {
         return new RootReader(reader, name, compiled.rootDeclaration(name), namespace);
     }
 
-    /** {@code namespace} is the namespace constructor the root type is, {@code null} where it is none. */
+    /** {@code namespace} is the namespace type the root type is, {@code null} where it is none. */
     private record RootReader(TsonTypeReader<?> reader, String typeName,
                                Optional<SchemaLocation> rootDeclaration, String namespace) {
     }

@@ -57,8 +57,8 @@ including records, record groups, enums and some in-built types. The `2026/39` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=7a2686013936632f53fa876184988a9f7edd1a8d6da4860f8001aae4d26b00e6"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=7893c2f71d61a7c0933b38f9bf8c1176c3ae7ae5c6ac3a43bdeb02eeb7a1a6e4"
+!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=40041b94e09839228394d093b74492e552380aab59849b76dba586750e97cafb"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=1c918afb33a5447fbcca0be1eb9710dbced11686756206bd6f37be23febb5b1e"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 !schema {
   role => !enum [admin member guest]
@@ -580,9 +580,11 @@ than resolving it from a document. See
 [design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
 including how meta-kernel/meta.tn/core.tn are loaded and registered together.
 
-A layer of your own — a schema declaring constructors or namespace types for others to apply — is a schema like
-any other, reached by `!!import` through the configured `SchemaAccess`; the records its namespace types hold bind
-through `ProcessorConfig.withMetaNameBinder`.
+Vocabulary of your own — a schema declaring record types or namespace types
+(`api => !namespace { key_type: identifier  value_type: method }`) whose values other schemas hold as entries
+(`orders => !api { … }`) — is a schema like any other, reached by `!!import` through the configured `SchemaAccess`.
+Those values bind through the same `ProcessorConfig.withDataBindContext` as data does; where no class binds a value's
+type it is held as a tree, so the schema still loads and validates, and only a schema obtained to bind refuses it.
 
 ## Command-line interface
 

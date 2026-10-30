@@ -187,8 +187,8 @@ resolves, before the batch pass runs. They are handled differently.
 
 - **`kind` is derived, never stored.** `EntryKind.of(value, kernel)` reads it off the value — a record's chain
   (`ofChain`), otherwise its branch of `Top` — so no slot in the model carries it. A base kind in the chain counts
-  only as the kernel's own entry: a schema's own `namespace => { … }` composed into `payload => namespace & { … }`
-  leaves `payload` a PRODUCT. The reader stack branches on the body itself.
+  only as the kernel's own entry: a schema's own `atom => { … }` composed into `payload => atom & { … }` leaves
+  `payload` a PRODUCT. The reader stack branches on the body itself.
   - **The atom-refinement test rests on it** (`DefinitionResolver`): an atom *instance's* body is an `Atom`
     (`integer` carries `!integer_type {}`), where its constructor's is the vocabulary record describing one
     (`integer_type` carries a `!record { ... }`). So `body instanceof Atom` separates the pair, where neither the
@@ -202,8 +202,9 @@ resolves, before the batch pass runs. They are handled differently.
   - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }` makes
     `listed<text>` a constructor whose `!record` body describes its instances, so its kind is the base kind its chain
     reaches (ATOM), as for a declared entry (`EntryKind.ofChain`, which `DefinitionResolver.determineKind` guards);
-    construction then transfers it to `!listed_text [...]`. `payloads => <T> namespace & { … }` closes to a
-    namespace type the same way.
+    construction then transfers it to `!listed_text [...]`. A template over a constructor closes to what that
+    constructor builds: `payloads => <T> !namespace { key_type: identifier  value_type: T }` closes to a namespace
+    type, and one over an ordinary type to a value entry.
   - **This keeps the derivation total**: every entry's kind follows from what it states, where an open entry
     claiming its application's kind would need a lookup outside itself. `OpenEntryResolvedFormTest` covers both
     templates above and asserts the rule over every entry of every schema.
