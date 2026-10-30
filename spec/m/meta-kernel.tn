@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=72358541782e99cd74babcee921c40ece8213e4eed21e07d1a9a636ba11eeb75"
+!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=76cacf9710449f0bcb350415f341fdb6e4bae702472d6811132935651a25dc05"
 @doc:"""
   TSON meta-kernel — pre-loaded bootstrap layer (2026 Revision 39 draft).
 
@@ -113,8 +113,7 @@
   @doc:"""
     Aliasing body — the entry `target` names: a type, or a constructor, since
     an alias of a constructor is applied as its target is ([TSON-SCHEMA]
-    §3.3.1). So `target` is typed `type_ref` and judged by resolution alone,
-    the one slot beside `kind_type.of` whose name may be a constructor's. A
+    §3.3.1). So `target` is typed `type_ref` and judged by resolution alone. A
     partial application ([TSON-SCHEMA] §5.10, `uuid_pair => <B> pair<uuid, B>`)
     is an open entry, and its target, the arguments it already binds and the
     parameter alike, sits inside the `template.template` text as parsed.
@@ -484,7 +483,7 @@
     An application stands where one may: `type_chain.parents`,
     `type_argument.name`, the `application` annotation, and held text. Every
     other slot that names a type is typed by a kind, `type_kind` for the type
-    of a value, and holds the name alone; `alias.target` and `kind_type.of`
+    of a value, and holds the name alone; `alias.target` and `reference.of`
     may name a constructor and are not. `name` is the only required field,
     so the positional form ([TSON-SCHEMA] §5.6, general over schema-backed
     data) applies at every type_ref-typed position: a bare name token fills
@@ -893,82 +892,60 @@
   declared => !declared_type {}
 
   @doc:"""
-    The names of the types built with the constructor `of`: an atom whose
-    values are type names, as an enum's are the names it lists. An entry of the
-    governing schema's closure is a member when, past its alias hops
-    ([TSON-SCHEMA] §8.3), the constructor its value applies is `of` or IS-A
-    `of`, a constructor template followed to the constructor it applies, and
-    it is not itself a constructor: it is not IS-A `top`. A
-    record written in braces is built with `record`, and so is a record
-    template, which is a type, and so is `top` itself: a fresh abstract record
-    IS-A nothing, so it is a member of every kind whose `of` is `record` or
-    above it. A template over another constructor is no type and no member; an
-    application of one is, as the type it expands to, and so is an alias of a
-    member. A namespace type is built with `namespace`, so `kind<namespace>`
-    and `type_kind` hold it and `kind<record>` does not. An entry whose value
-    is an instance of an ordinary type is no member of any kind: it is a
-    value, named by a reference (`ref<api>`). Membership is by construction,
-    so a kind holds an abstract type: `kind<record>` holds
-    `pet => abstract { ... }`.
+    A name held in a slot: an atom whose values are names, each naming an
+    entry whose value's type, past the entry's alias hops ([TSON-SCHEMA]
+    §8.3), is `of` or IS-A it. Every entry is a name and a value, and the
+    value has a type, its tag: `order => { ... }` holds a value of `record`,
+    `int32 => !integer ^ { ... }` a value of `integer_type`, and
+    `orders => !api { ... }` a value of `api`. A field's type position, a
+    `kind<record>` slot and a `ref<method>` slot all admit a name by that one
+    predicate, and differ only in `of`.
 
-    `of` names a constructor of the writer's namespace ([TSON-SCHEMA] §3.3.1),
-    never a type that is no constructor. It is `type` or a constructor below
-    it; any other `of` (`kind<alias>`, `kind<api>`) is a resolver error at
-    the declaration.
+    `of` names any type or constructor of the writer's namespace
+    ([TSON-SCHEMA] §3.3.1), never a value or an open entry. Where it is a
+    constructor, `top` or IS-A it, the values it admits are types, and a slot
+    holds a type's name, which takes part in structural identity
+    ([TSON-SCHEMA] §8.2). A record written in braces is built with `record`,
+    and so is a record template, `top` itself, and a constructor whose
+    declaration is a record, so `kind<record>` holds all of them; a template
+    over another constructor is no type, and an application of one is the type
+    it expands to. Where `of` is any other type, the values it admits are
+    values, and a slot holds a value's qualified name: the first segment
+    resolves in the writer's namespace and names an entry, and each further
+    segment selects a key of a value of a named product, a namespace value's
+    key or a record value's field, the record being a namespace whose keys its
+    type fixes. A map that is no namespace is not entered.
 
-    A value is a type name ([TSON-DATA] §7.7), and conforms when it resolves to
-    a member. In a data document it resolves in the namespace of the governing
-    schema. In a schema document it resolves where the slot holding
-    it says, `name_type`'s by [TSON-SCHEMA] §7.4, and is judged a member when
-    that schema links. The value is the name, never a value of the type it
-    names.
-
-    `members` is a resolver-derived index, parallel to `subtypes`: computed at
-    link over the governing schema's closure and sorted as `subtypes` is.
-    Declarations never set it; on ingest it MUST be discarded and recomputed.
-    A kind with no members admits no value.
+    A value is the name, never a value of the type it names. In a data
+    document it resolves in the namespace of the governing schema and is
+    judged there. In a schema document its grammar is read where it is
+    written, and the name is judged when that schema links: the set of names
+    a reference admits is the closure's, derived and never written.
     """
-  kind_type => atom & {
-    of:       type_name
-    members?: [type_name]
-  }
-
-  @doc:"""
-    The spelling of a kind an author writes inline: `kind<uuid_type>` is
-    `!kind_type { of: uuid_type }`.
-    """
-  kind => <T> !kind_type { of: T }
-
-  @doc:"The names of the identifier families, which a `name_type` names."
-  identifier_kind => !kind_type { of: identifier_type }
-
-  @doc:"The names of the atoms."
-  atom_kind => !kind_type { of: atom }
-
-  @doc:"The names of the types a value can have."
-  type_kind => !kind_type { of: type }
-
-  @doc:"""
-    A reference to a value: an atom whose values are qualified names, each
-    segment a [TSON-DATA] §7.7 identifier, naming a value whose type is `of`
-    or IS-A it. The first segment resolves in the writer's namespace and names
-    an entry; each further segment selects a key in a namespace value or a
-    field in a record value, and a map that is no namespace is not entered. The
-    referent is judged when the schema links, and delivered to a host with the
-    name as written. A slot typed by a reference holds the name and nothing
-    else; a slot typed by the value's type holds the value inline and nothing
-    else.
-
-    `of` names a type of the writer's own namespace, never a constructor: a
-    reference to a type is a kind (`kind<record>`), and `ref<record>` is a
-    resolver error at the declaration.
-    """
-  ref_type => atom & {
+  reference => atom & {
     of: type_name
   }
 
-  @doc:"The spelling of a reference an author writes inline: `ref<method>` is `!ref_type { of: method }`."
-  ref => <T> !ref_type { of: T }
+  @doc:"""
+    The spelling of a reference whose `of` is a constructor: `kind<uuid_type>`
+    is `!reference { of: uuid_type }`, the names of the types built with it.
+    """
+  kind => <T> !reference { of: T }
+
+  @doc:"The names of the identifier families, which a `name_type` names."
+  identifier_kind => !reference { of: identifier_type }
+
+  @doc:"The names of the atoms."
+  atom_kind => !reference { of: atom }
+
+  @doc:"The names of the types a value can have."
+  type_kind => !reference { of: type }
+
+  @doc:"""
+    The spelling of a reference to a value: `ref<method>` is
+    `!reference { of: method }`, one reference with `kind<method>`.
+    """
+  ref => <T> !reference { of: T }
 
   @doc:"""
     Resolver output: a schema map, from each name to the value its entry

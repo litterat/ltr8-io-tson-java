@@ -43,8 +43,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
-import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.RefBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.HostType;
 import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.MediaTypeType;
@@ -112,12 +111,12 @@ public final class AtomParsers {
      * meta may hold, which only linking sees, so the caller supplies what linking recorded
      * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
      *
-     * <p>A reference body is this library's gap here, an {@link UnsupportedOperationException}: these callers judge a
-     * value a schema writes ({@code ~}/{@code =}, a template argument) by its token, and a reference's value is judged
-     * by what its name reaches, which only a value body's recorded names are.
+     * <p>A reference that names values is this library's gap here, an {@link UnsupportedOperationException}: these
+     * callers judge a value a schema writes ({@code ~}/{@code =}, a template argument) by its token, and such a
+     * reference's value is judged by what its name reaches, which only a value body's recorded names are.
      */
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
-        if (body instanceof RefBody reference) {
+        if (body instanceof ReferenceBody reference && !reference.namesTypes()) {
             throw new UnsupportedOperationException("a value a schema writes at a reference-typed position ('ref<"
                     + reference.of() + ">') is not yet judged: a reference's value is judged by what its name reaches");
         }
@@ -126,29 +125,30 @@ public final class AtomParsers {
 
     /**
      * How a value read at a position typed by {@code body} reads in a schema document's value -- a constructor's or
-     * a value entry's payload -- where that differs from a data document's ({@link #forRead}): a kind reads the
-     * type-name grammar alone ({@link KindParser#namesOnly}), and a reference its qualified name ({@link RefParser}).
-     * A name there resolves in the schema being resolved, which the closure the kind's members were computed over
-     * does not hold, so the read records it and the schema's link judges it ([TSON-SCHEMA] §4.2, §5.12). Empty for
-     * every other body, which reads alike in both.
+     * a value entry's payload -- where that differs from a data document's ({@link #forRead}): a reference that names
+     * types reads the type-name grammar alone ({@link KindParser#namesOnly}), and one that names values its qualified
+     * name ({@link RefParser}). A name there resolves in the schema being resolved, which the closure the members were
+     * computed over does not hold, so the read records it and the schema's link judges it ([TSON-SCHEMA] §4.2, §5.12).
+     * Empty for every other body, which reads alike in both.
      */
     public static Optional<AtomType<?>> inSchemaDocument(Top body) {
         return switch (body) {
-            case KindBody kind -> Optional.of(KindParser.namesOnly(kind));
-            case RefBody reference -> Optional.of(new RefParser(reference));
+            case ReferenceBody reference -> Optional.of(reference.namesTypes() ? KindParser.namesOnly(reference)
+                    : new RefParser(reference));
             default -> Optional.empty();
         };
     }
 
     /**
-     * {@link #forType(Top, Normalization)} for a position a data document is read at. A kind judges membership in
-     * the closure its members were computed over, which is the reading document's ([TSON-SCHEMA] §4.2). A reference
-     * reads its qualified name ({@link RefParser}), and what the name reaches is judged only where a schema links:
+     * {@link #forType(Top, Normalization)} for a position a data document is read at. A reference that names types
+     * judges membership in the closure its members were computed over, which is the reading document's ([TSON-SCHEMA]
+     * §4.2). One that names values reads its qualified name ({@link RefParser}), and what the name reaches is judged
+     * only where a schema links:
      * a reader of a data document reports the position as this library's gap, a data document never being linked.
      */
     public static Optional<AtomType<?>> forRead(Top body, Normalization enumForm) {
-        if (body instanceof RefBody reference) {
-            return Optional.of(new RefParser(reference));
+        if (body instanceof ReferenceBody reference) {
+            return Optional.of(reference.namesTypes() ? new KindParser(reference) : new RefParser(reference));
         }
         return Optional.ofNullable(switch (body) {
             case ValueType ignored -> null;
@@ -175,7 +175,6 @@ public final class AtomParsers {
             case Cidr4Type t -> new Cidr4Parser(t);
             case Cidr6Type t -> new Cidr6Parser(t);
             case EnumBody t -> new EnumParser(t, enumForm);
-            case KindBody t -> new KindParser(t);
             case ComplexType ignored -> ComplexParser.UNCONSTRAINED;
             case Ipv4Type t -> Ipv4Parser.of(t);
             case HostnameType t -> new HostnameParser(t);

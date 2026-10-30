@@ -49,6 +49,12 @@ spec-required case:
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the five bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
+- [ ] **A value entry read against a type declared beside it cannot read a field typed by an inline application.**
+  `holder => { r: kind<record> }` with `held => !holder { r: order }` in one schema is refused: "'kind' is a
+  template taking 1 type argument … a data type-ref carries no arguments". The reader compiled from the entries
+  ready so far (`SchemaResolver.readySoFar`) reaches the field's application before its minted entry is ready.
+  Naming the application (`records => kind<record>`, `holder => { r: records }`) reads. Make the field's application
+  wait in the order, as a named one does, and add a `link/valid` vector writing it inline.
 - [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1;
   `SPEC-FEEDBACK.md #4`, the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
   `schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
@@ -122,9 +128,9 @@ spec-required case:
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
   channel: `record_field` `( type: type_kind | type_param: param_name )` and `( value: value | value_param: param_name
-  )`, `type_argument` a `param` member, so `type_ref.name` always names an entry. Sequenced with the collapse of
-  `kind_type`, `ref_type` and the name-only `type_ref` into one reference atom, a Revision 39 direction, which needs
-  exactly that, and with what `@application` means on a declared entry that is no record.
+  )`, `type_argument` a `param` member, so `type_ref.name` always names an entry. Sequenced with folding the
+  name-only `type_ref` into the kernel's `reference` atom, a Revision 39 direction, which needs exactly that, and
+  with what `@application` means on a declared entry that is no record.
 
 ## Checked annotations
 
@@ -360,13 +366,13 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   … }` is read as a value of it, a value entry, rather than building a type; nothing in the suite or the corpus
   exercises it. Add a vector stating the outcome §5.9 rule 8 gives.
 - [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
-  kind's members, and the list holds `kind_type_type_c430c650`, the entry minted for the application `kind<type>`
-  itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an
-  author can write (`InternalName`), so `KindMembers` should pass over `@synthetic` entries, in the message's list
-  and in `expected` alike, or the walk should exclude an application's minted entry from every kind.
-- [ ] **A linker refusal of an atom application names its minted entry.** `pick => { m: ref<record> }` reads
-  "'ref_type_record_3034e1a1' is a reference whose 'of' names 'record', a constructor …", and an unresolved
-  `ref<nope>` or `kind<nope>` the same way: an application nothing declares is its expansion, which
+  kind's members, and the list holds `reference_type_…`, the entry minted for the application `kind<type>` itself:
+  a `reference` instance's value is of `reference`, which IS-A `type`, so the walk admits it. A minted name is no
+  spelling an author can write (`InternalName`), so `KindMembers` should pass over `@synthetic` entries, in the
+  message's list and in `expected` alike, or the walk should exclude an application's minted entry from every kind.
+- [ ] **A linker refusal of an atom application names its minted entry.** An unresolved `ref<nope>` or
+  `kind<nope>` is refused as "'reference_nope_…' of has an unresolved reference 'nope'": an application nothing
+  declares is its expansion, which
   `EntryDisplayName` gives no authored name, so `TsonSchemaLinker.validateEntry`'s subject falls back to the key.
   Name it by the application the key's facts carry (`ref<record>`), or state the refusal without a subject, since
   the diagnostic is already located at the declaration that wrote it.

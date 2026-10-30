@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -10,11 +9,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A reference ({@code ref<T>}, the meta-kernel's {@code ref_type}) is declared in any schema: one namespace per schema
+ * A reference ({@code ref<T>}, the meta-kernel's {@code reference}) is declared in any schema: one namespace per schema
  * (SPEC-FEEDBACK.md #7) puts the kernel's {@code ref} in every closure reaching core.tn or meta.tn, a schema a meta
  * layer governs among them, and the constructor applied directly is no different from the template that spells it.
  * What a reference may name is still judged: a type, never a constructor, whose types a kind names.
@@ -64,7 +61,7 @@ class ReferenceDeclarationTest {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/picks.tn", META, CORE,
                 """
                   order => { id: text }
-                  oref  => !ref_type { of: order }
+                  oref  => !reference { of: order }
                   rpick => { m: oref }""")));
     }
 
@@ -74,14 +71,13 @@ class ReferenceDeclarationTest {
                 META, PICKS)));
     }
 
-    /** A constructor's types are named by a kind: {@code ref<record>} is refused, and the refusal names the kind. */
+    /**
+     * {@code ref<record>} is {@code kind<record>}: one reference whose {@code of} is a constructor, so the slot holds a
+     * type's name. Which template spelled it makes no difference.
+     */
     @Test
-    void aReferenceToAConstructorIsRefused() {
-        List<Diagnostic> problems = Tson.standard().validateSchema(schema("https://example.test/ref-to-constructor.tn",
-                META, CORE, "  pick => { m: ref<record> }"));
-
-        assertFalse(problems.isEmpty());
-        assertTrue(problems.stream().anyMatch(problem -> problem.message().contains("kind<record>")),
-                problems.toString());
+    void aReferenceToAConstructorNamesTypes() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/ref-to-constructor.tn",
+                META, CORE, "  pick => { m: ref<record> }")));
     }
 }

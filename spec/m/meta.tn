@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=51349c140268717b7b8f321f76a8edfa61fe06066737ef8bbf4b2085b2edbfb8"
-!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=72358541782e99cd74babcee921c40ece8213e4eed21e07d1a9a636ba11eeb75"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=bf3040f4f7157895532b3ceb723a1bb134fc93c53c8c2fdfef6843298251e045"
+!!import:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=76cacf9710449f0bcb350415f341fdb6e4bae702472d6811132935651a25dc05"
 @doc:"""
   TSON meta-schema (2026 Revision 39 draft).
 

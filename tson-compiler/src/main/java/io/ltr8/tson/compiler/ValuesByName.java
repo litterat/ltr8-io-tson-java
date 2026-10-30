@@ -49,15 +49,18 @@ import java.util.function.Function;
  * {@code orders.1x}, {@code .orders} and {@code orders.} are refused as no qualified name before anything is looked
  * up. A reference carrying arguments is no value by name.
  *
- * <p><b>One namespace holds both sides.</b> The slot's type arrives with the name: the reader that read the name was
- * built from the slot's declared type and recorded it beside the name ({@link TsonSchema.SlotType}), a kind's {@code
- * of} or a reference's {@code T}, whatever the host class holds there. Both it and the name resolve in this schema's
- * one namespace, its own entries and its import closure: the first segment, alias hops followed ([TSON-SCHEMA] §8.3),
- * and each further segment selects in the value reached -- a key of a namespace value, a field of a record, never a
- * position in a list -- and a type entry admits none. An open entry is no referent at all: a template denotes no value
- * until it is applied. The referent's declared type is then judged against the slot's by §7.2's IS-A, comparing
- * canonical identities: an entry's declared type is the constructor that built its body, a field's is its type, and a
- * map value's is the map's value type. Found first, judged after, never a choice among candidates.
+ * <p><b>One namespace holds both sides.</b> The slot's type arrives with the name: the reader that read the name was built
+ * from the slot's declared type and recorded it beside the name ({@link TsonSchema.SlotType}), the slot's reference's {@code
+ * of}, whatever the host class holds there. What {@code of} names decides what the name is, judged here over this namespace
+ * whatever the read guessed: a constructor's values are types, so the name is a type's and a member or refused ({@link
+ * KindMembers}); any other type's values are values. Both it and the name resolve in this schema's one namespace, its own
+ * entries and its import closure: the first segment, alias hops followed ([TSON-SCHEMA] §8.3), and each further segment
+ * selects a key of a value of a named product -- a namespace value's key, or a record value's field, the record being a
+ * namespace whose keys its type fixes; never a position in a list or a key of a map that is no namespace -- and a type entry
+ * admits none. An open entry is no referent at all: a template denotes no value until it is applied. The referent's declared
+ * type is then judged against the slot's by §7.2's IS-A, comparing canonical identities: an entry's declared type is the
+ * constructor that built its body, a field's is its type, and a map value's is the map's value type. Found first, judged
+ * after, never a choice among candidates.
  *
  * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor, and
  * otherwise the kernel constructor its body mirrors ({@code @Typename}): a record declaration or a composition is
@@ -193,9 +196,12 @@ final class ValuesByName {
         List<String> segments = segments(where, reference);
         String name = reference.name();
         String head = segments.getFirst();
+        // What the slot's `of` names decides which names it holds, judged here over the final namespace whatever
+        // the read guessed: a constructor's values are types, and any other type's values are values.
+        boolean namesTypes = KindMembers.namesTypes(slot.of(), merged::get);
         if (!merged.containsKey(head)) {
             throw new SchemaValidationException(where + " names '" + name + "', and '" + head + "' is no "
-                    + (slot.role() == TsonSchema.SlotType.Role.KIND && segments.size() == 1
+                    + (namesTypes && segments.size() == 1
                             ? "type declared in this schema or its imports"
                             : "entry of this schema or its imports -- the first segment names the entry a value is "
                                     + "reached through, and a member is reached through its entry"));
@@ -211,7 +217,7 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is an open "
                     + "entry: a template denotes no value until it is applied (§5.10), so nothing is there to name");
         }
-        if (slot.role() == TsonSchema.SlotType.Role.KIND) {
+        if (namesTypes) {
             judgeMember(where, name, segments, slot, referent, entry);
             return;
         }
@@ -291,14 +297,14 @@ final class ValuesByName {
     }
 
     /**
-     * A kind-typed slot holds a type's name, one segment, and the name is a member of the kind or refused
-     * ({@link KindMembers}): the referent's construction chain reaches the kind's {@code of}, and the referent is no
-     * constructor. A value entry is refused as a value, however many segments name it. A type reached through a
-     * namespace of types is not yet a spelling this library reads.
+     * A slot whose {@code of} is a constructor holds a type's name, one segment, and the name is a member or refused
+     * ({@link KindMembers}): the referent's value is of the slot's {@code of}. A value entry is refused as a value,
+     * however many segments name it. A type reached through a namespace of types is not yet a spelling this library
+     * reads.
      */
     private void judgeMember(String where, String name, List<String> segments, TsonSchema.SlotType slot,
                              Top referent, String entry) {
-        String wants = where + " wants the name of a type built with '" + slot.of() + "' (a member of '"
+        String wants = where + " wants the name of a type whose value is of '" + slot.of() + "' (a member of '"
                 + slot.name() + "'), and ";
         if (segments.size() > 1 && referent instanceof ValueEntry value) {
             throw new SchemaValidationException(wants + "'" + name + "' reaches into " + entry + ", which is "

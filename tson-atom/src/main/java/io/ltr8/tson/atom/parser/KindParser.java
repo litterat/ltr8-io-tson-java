@@ -2,15 +2,16 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 
 import java.util.Optional;
 
 /**
- * Parses and validates against a kind -- an instance of the meta-kernel's {@code kind_type} ([TSON-SCHEMA] §4.2),
- * the atom whose values are the names of the types built with one constructor. A value is a type name: §7.7's
- * grammar, read as the kernel's {@code type_name} reads it ({@link IdentifierParser#IDENTIFIER}), and then a
- * member of the kind's linked {@code members}. The value is the name, never a value of the type it names.
+ * Parses and validates against a reference that names types -- an instance of the meta-kernel's {@code reference}
+ * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, spelled {@code kind<record>} or {@code ref<record>} alike.
+ * A value is a type name: §7.7's grammar, read as the kernel's {@code type_name} reads it ({@link
+ * IdentifierParser#IDENTIFIER}), and then one of the reference's linked members. The value is the name, never a value
+ * of the type it names.
  *
  * <p><b>Membership is judged where the names resolve.</b> A kind's members are the names of the reading
  * document's closure, so a name a data document writes is a member or refused here, as an enum refuses a label it
@@ -21,15 +22,15 @@ import java.util.Optional;
  * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link EnumParser}: the members are the
  * closure's.
  */
-public record KindParser(KindBody kind, boolean judgesMembers) implements AtomTypeParser<String> {
+public record KindParser(ReferenceBody kind, boolean judgesMembers) implements AtomTypeParser<String> {
 
     /** A kind read under the schema whose closure its members were computed over. */
-    public KindParser(KindBody kind) {
+    public KindParser(ReferenceBody kind) {
         this(kind, true);
     }
 
     /** {@code kind}, read where a name resolves in the document being read: the type-name grammar alone. */
-    public static KindParser namesOnly(KindBody kind) {
+    public static KindParser namesOnly(ReferenceBody kind) {
         return new KindParser(kind, false);
     }
 
@@ -40,7 +41,7 @@ public record KindParser(KindBody kind, boolean judgesMembers) implements AtomTy
             return name;
         }
         throw new AtomValidationException("'" + name + "' is not a member of this kind -- expected the name of a "
-                + "type built with '" + kind.of() + "', one of " + kind.memberNames(),
+                + "type whose value IS-A '" + kind.of() + "', one of " + kind.memberNames(),
                 "one of (" + String.join(", ", kind.memberNames()) + ")");
     }
 

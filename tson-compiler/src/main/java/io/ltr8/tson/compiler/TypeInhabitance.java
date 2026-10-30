@@ -8,8 +8,7 @@ import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.RefBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -113,10 +112,10 @@ final class TypeInhabitance {
             // branches rather than conjoins, and the reason `(leaf | node)` survives a non-productive `node`.
             case ChoiceBody choice -> choice.variants().stream()
                     .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
-            // A kind's values are the names of its members, whatever the types they name admit, so it is
-            // inhabited exactly when linking found a member.
-            case KindBody kind -> !kind.memberNames().isEmpty();
-            case RefBody ignored -> true; // a name; what it reaches is the linker's judgement
+            // A reference that names types admits the names of its members, whatever the types they name admit,
+            // so it is inhabited exactly when linking found a member. One that names values admits a name whose
+            // referent only the linker judges.
+            case ReferenceBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited);
             case TemplateBody ignored -> true; // open, answered above
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one

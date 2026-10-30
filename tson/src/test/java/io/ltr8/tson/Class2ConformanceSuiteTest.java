@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -298,10 +298,11 @@ class Class2ConformanceSuiteTest {
         if (hasField(expected, "members")) {
             for (RecordValue claim : Sidecar.fieldRecordArray(expected, "members")) {
                 String name = fieldText(claim, "name");
-                // A kind's derived index, compared as a set and normalised as the subtypes index is: an
-                // instantiation a kind lists carries a minted name (RUNNER.md rule 6).
-                if (!(definitionOf(entries, name) instanceof KindBody kind)) {
-                    throw new AssertionError(name + " is not a kind, so it has no members index");
+                // The names a reference over a constructor admits, derived at link and compared as a set,
+                // normalised as the subtypes index is: an instantiation listed carries a minted name (RUNNER.md
+                // rule 6).
+                if (!(definitionOf(entries, name) instanceof ReferenceBody kind) || !kind.namesTypes()) {
+                    throw new AssertionError(name + " is no reference over a constructor, so it admits no members");
                 }
                 assertEquals(new TreeSet<>(fieldTextArray(claim, "members").stream()
                                 .map(ResolvedForm::withoutHash).toList()),

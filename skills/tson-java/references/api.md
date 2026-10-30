@@ -599,8 +599,9 @@ map of them, a namespace type (`operations => !namespace { key_type: identifier 
 member of no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind
 context binds one (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its
 references. A slot
-typed by a kind (`request: kind<record>`) binds a `TypeRef` holding a type's name; a slot typed by a reference
-(`method: ref<method>`) binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and then
+typed by a reference (`ReferenceBody`, spelled `kind<T>` or `ref<T>` alike) holds what its `T` decides: over a
+constructor (`request: kind<record>`) it binds a `TypeRef` holding a type's name; over any other type
+(`method: ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and then
 a key of its namespace value, or a field of a record value) and, once the schema has linked, the value it names
 (`method().get()`), or a `TypeRef` for the name alone. The resolver records each with its slot as it reads the value,
 and the linker judges it there.

@@ -254,11 +254,11 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   `type_name`, `field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted array is named by its
   content, so it is designated by what it holds). `instanceBody` covers the four shapes those apply — a bare `{}` (each
   target's unconstrained constant), `identifier`'s profile (checked against the constant the lexer already holds), a
-  bare token array (`enum`), and a record of tokens (`kind_type`, `namespace` for `field_map`, the `array`/`set_type`
+  bare token array (`enum`), and a record of tokens (`reference`, `namespace` for `field_map`, the `array`/`set_type`
   binding records the desugar phase lifts, with their `min_items`/`max_items`) — and refuses any other target;
   `refinedBody` merges the integer family's `min` and `max`. `MetaKernelBootstrapResolverTest` measures the cycle with
   `WaitGraph` from `meta-kernel-resolved.tn` and asserts the hand-built names equal it, so a kernel edit that moves the
-  cycle fails there. `KernelWaitGraphTest` prints the measurement: one cycle, 30 of the kernel's 79 entries (70
+  cycle fails there. `KernelWaitGraphTest` prints the measurement: one cycle, 30 of the kernel's 78 entries (69
   declarations and 9 desugared arrays), longest wait chain 4.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and

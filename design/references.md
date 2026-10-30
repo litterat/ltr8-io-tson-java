@@ -1,12 +1,36 @@
 # References: the forms a name takes, and the two facts a reference carries
 
 Design notes for every position in a schema that holds a name: which are references, what a reference's store and
-judgement are, and which kernel slot is typed by what. Current form only; history lives in git. What extends this
-account, qualified type names and one reference atom over `kind_type`, `ref_type` and the name-only `type_ref`, is
-`BACKLOG.md`'s parameter-channel entry and a Revision 40 direction.
+judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape,
+one reference atom with a constructor an ordinary record type, is SPEC-FEEDBACK.md #11's. What extends this account,
+qualified type names and folding the name-only `type_ref` into the `reference` atom, is `BACKLOG.md`'s
+parameter-channel entry.
 
 **Invariants**
 
+- A name held in a slot, the application form `type_ref` aside, is a value of the kernel's one atom of names,
+  `reference => atom & { of: type_name }` (`ReferenceBody`). It admits a name exactly when the type of the named
+  entry's value, its tag, past its alias hops, IS-A `of`: `order => { … }` holds a value of `record`, `int32 =>
+  !integer ^ { … }` one of `integer_type`, `orders => !api { … }` one of `api`. `kind => <T> !reference { of: T }`
+  and `ref => <T> !reference { of: T }` are its two spellings, so `kind<order>` and `ref<order>` mint one entry;
+  `identifier_kind`, `atom_kind` and `type_kind` are `!reference { of: … }`. A field's type position, `kind<record>`
+  and `ref<method>` differ only in `of`.
+- **What `of` names decides what the slot holds, never the spelling** (`KindMembers.namesTypes`). Over a constructor,
+  `top` or IS-A it, the values admitted are types: the slot holds a type's name, one segment, judged a member over the
+  governing closure (`KindMembers`) and delivered to a host as a `TypeRef`. Over any other type the values admitted
+  are values: the slot holds a value's qualified name, judged at link (`ValuesByName`) and delivered as the referent
+  (`Ref<T>`). So `kind<bar>` over a record type names values of `bar`, `ref<record>` is `kind<record>`, and
+  `kind<api>` names `myapi`. These notes call a reference over a constructor a *kind*, whichever spelling wrote it.
+- The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members)`), and
+  `ValuesByName` re-derives it from `of` over the final namespace whatever the read guessed; `TsonSchema.SlotType`'s
+  `KIND` and `REFERENCE` roles are only how the read read the name. The index is never written: a resolved form states
+  `!reference { of: … }` alone, a written `members:` is refused as an unknown field, and equality and `toString`
+  exclude it (`ReferenceBody.memberNames()` is the processor's own).
+- `of` names any type or constructor of the writer's namespace. Refused are a name resolving to nothing (an unresolved
+  reference), an open entry and a value entry (`KindMembers.ofRefusal`, from `validateBody`). `kind<top>` holds every
+  type. `kind<alias>` admits nothing, no entry past its hops being an alias, and a required field typed by it is
+  refused by §5.10.1's productivity check (`TypeInhabitance`). A reference is not a bound: `template_param.bound`
+  still refuses a constructor (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
 - A slot that names the type of a value is typed `type_kind` (`record_field.type`, `tuple_element.element_type`,
   `array.element_type`, `map.key_type` and `value_type`, `namespace.value_type`, `choice.variants`,
   `template_param.type` and `bound`). Its value is one bare name. In a schema document (a construction's or a value
@@ -17,22 +41,28 @@ account, qualified type names and one reference atom over `kind_type`, `ref_type
   `key_type` is the family every key is read and judged under; an absent one is the value's host's to supply:
   `field_map`'s keys are the record's `name_type`'s, its supertypes' where it states none, and `field_name` where
   neither does.
-- A constructor is no member of any kind, its instances being types; `namespace` is one. A namespace type is an
-  instance of `namespace` (`field_map`, `schema`, a schema's own `api`), so `type_kind`, `kind<product>` and
-  `kind<namespace>` hold it and `kind<record>` and `kind<map>` do not. A value entry, `myapi => !api { … }`, is a
-  member of no kind: its tag names an ordinary type, which no walk reaches a constructor through. `kind<api>` is
-  refused at the declaration (`api` is no constructor; its values are named by `ref<api>`), and every type position
-  refuses a value entry (`validateTypeRef`, `ValuesByName.judgeApplication`, `judgeMember`).
+- **A constructor is an ordinary record type** (SPEC-FEEDBACK.md #11). A constructor whose declaration is a record
+  (`uuid_type => atom & { … }`) holds a value of `record`, so `type_kind`, `kind<record>` and `kind<product>` hold
+  it, and `record`, `top`, `alias`, `template`, `namespace` and `reference` themselves. A field typed `spec:
+  uuid_type` holds a declaration body as data (`!holder { spec: { version: 4 } }`), in a TSON tree, bound to the
+  constructor's model class (`UuidType`) and read from JSON; `boxed<uuid_type>` and `[uuid_type]` close as any
+  application does (`ConstructorAsRecordTypeTest`). A declaration read as data is judged by its record shape alone:
+  it is not resolved, so a derived field such as `chain` is admitted as written.
+- A namespace type is an instance of `namespace` (`field_map`, `schema`, a schema's own `api`), so `type_kind`,
+  `kind<product>` and `kind<namespace>` hold it and `kind<record>` and `kind<map>` do not. A value entry, `myapi =>
+  !api { … }`, is a member of no kind: its tag names an ordinary type, which no walk reaches a constructor through.
+  `kind<api>` (one entry with `ref<api>`) names it, and every type position refuses it (`validateTypeRef`,
+  `ValuesByName.judgeApplication`, `judgeMember`).
 - `type_ref` is the application form. It stands where an application may (`type_chain.parents`,
   `type_argument.name`, the `application` annotation, held text) and at `alias.target`, which may name a
   constructor. A `type_ref` slot is judged by resolution and arity alone.
-- Three positions may name a constructor, and keep an IS-A `top` check in Java: `kind_type.of`, a `!C` head (a
-  constructor builds a type, any other type a value entry) and a composition operand (constructor or record).
-  `alias.target` admits either, an alias being applied as its target is (§3.3.1). No kind covers "a constructor":
-  the series has no classifier of constructors.
-- `top` is a member of `type_kind`, `kind<product>` and `kind<record>`: a fresh abstract record IS-A nothing is a type
-  by the rule on `kind_type`. `EntryKind.isConstructor` answers a different question, applicability, and counts `top`
-  by name.
+- Two positions single out a constructor, and keep an IS-A `top` check in Java: a `!C` head (a constructor builds a
+  type, any other type a value entry) and a composition operand (constructor or record). `alias.target` admits
+  either, an alias being applied as its target is (§3.3.1). No reference covers "a constructor" alone: its value is a
+  record, as a record type's is, and the series has no classifier of constructors.
+- `top` is a member of `type_kind`, `kind<product>` and `kind<record>`: a fresh abstract record IS-A nothing holds a
+  value of `record` by the one predicate. `EntryKind.isConstructor` answers a different question, applicability, and
+  counts `top` by name.
 - A type parameter is one whose `type` is `type_kind` (`TemplateParam.TYPE_KIND`); a parameter standing at a
   `type_kind` or a `type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the kind's own
@@ -45,26 +75,26 @@ account, qualified type names and one reference atom over `kind_type`, `ref_type
 - A `type_ref` slot of a value body is recorded too (`RecordedApplicationReader`) and judged by resolution, arity and
   §4.1 (`ValuesByName.judgeApplication`), as the resolver judges a kernel body's own.
 - A recorded name carries its slot's declared type from the reader that read it (`TsonSchema.SlotType`: the role and
-  the kind's `of` or the reference's `T`), so the linker never walks the path back through the meta's declarations,
-  and a slot only a tagged subtype declares is judged however deep the value sits.
-- A name at a kind- or reference-typed slot is recorded and judged whatever the host component holds, since the
+  the reference's `of`), so the linker never walks the path back through the meta's declarations, and a slot only a
+  tagged subtype declares is judged however deep the value sits.
+- A name at a reference-typed slot is recorded and judged whatever the host component holds, since the
   slot's `AtomTypeReader` records it: a host other than `TypeRef`/`Ref` (a `String`) receives what the slot's atom
   reads, through a `RecordedNameReader` that refuses what is no name as a `TypeRef` host's reader refuses it.
-- A slot that names a value is typed `ref<T>` (`ref_type => atom & { of: type_name }`, `ref => <T> !ref_type { of: T }`).
-  Its value is a qualified name; `of` is a type of the writer's namespace, never a constructor (`ref<record>` is
-  refused: that is `kind<record>`). A slot typed by a record holds the record's value inline and takes no name.
-- Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `ref` is in every closure reaching meta.tn or
-  core.tn, and `!ref_type { of: order }` applied directly is no different (`ReferenceDeclarationTest`). A reference's
-  value is judged by what its name reaches, which only a link can judge: a `ref_type` position reads its qualified
-  name in a schema document (`AtomParsers.inSchemaDocument`), and in a data document `AtomTypeReader` reports it as
-  a gap (`NOT_IMPLEMENTED`), a data document never being linked.
+- A slot that names a value is typed by a reference over a type that is no constructor, `ref<method>` by convention
+  and `kind<method>` alike. Its value is a qualified name. A slot typed by a record holds the record's value inline
+  and takes no name.
+- Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `kind` and `ref` are in every closure reaching
+  meta.tn or core.tn, and `!reference { of: order }` applied directly is no different (`ReferenceDeclarationTest`). A
+  value's qualified name is judged by what it reaches, which only a link can judge: a reference over a type that is
+  no constructor reads its grammar in a schema document (`AtomParsers.inSchemaDocument`), and in a data document
+  `AtomTypeReader` reports it as a gap (`NOT_IMPLEMENTED`), a data document never being linked.
 - A recorded name at a kind-typed slot of a value body is judged a member by `ValuesByName.judgeMember`; a qualified
   name there is refused where it reaches a value, and is a gap where it would reach a type through a namespace of
-  types. A recorded name at a reference-typed slot resolves its first segment in the schema map and each further
-  one as a key of a namespace value or a field of a record value, never into a map that is no namespace; the
-  referent IS-A `of`, and the value reached is delivered into the host's `Ref<T>` (`Ref.deliver`), a `TypeRef` host
-  taking the name alone. A field step reads the record value the read bound, through its binding's descriptor, so
-  a value reached through a field is delivered as one reached by key.
+  types. A recorded name at a slot over a type that is no constructor resolves its first segment in the schema map
+  and each further one as a key of a namespace value or a field of a record value, never into a map that is no
+  namespace; the referent's type IS-A `of`, and the value reached is delivered into the host's `Ref<T>`
+  (`Ref.deliver`), a `TypeRef` host taking the name alone. A field step reads the record value the read bound,
+  through its binding's descriptor, so a value reached through a field is delivered as one reached by key.
 - One host shape for every reference: a `TypeRef`, whatever the slot. Only the judgement differs by slot, and it is
   the slot's, never the host's.
 
@@ -97,19 +127,19 @@ A name stands in a schema in one of five forms. Two are not references.
 | **Reference** | names something declared elsewhere, by its key | **store** (where the first segment resolves) and **judgement** (what the referent must be) |
 | **Application** | names an open entry and closes it with arguments; a use site then holds a reference to the minted entry | the head, and the arguments |
 | **Tag** | names the type of the value it is written on, `!T v` | store and judgement, as a reference, and the payload is read under the referent |
-| **Index** | computed at link and written out: `supertypes`, `subtypes`, `members`, the `application` annotation | none; never read as a reference on ingest |
+| **Index** | computed at link and written out: `supertypes`, `subtypes`, the `application` annotation | none; never read as a reference on ingest |
 
 **Stores**, positional: the writer's namespace, its own entries and its import closure (every type a declaration
-names, every `!C` and `!I ^` head, `kind_type.of`, a tag in a schema map, an annotation, the first segment of a
+names, every `!C` and `!I ^` head, `reference.of`, a tag in a schema map, an annotation, the first segment of a
 qualified name; SPEC-FEEDBACK.md #7); and the enclosing collection (`discriminators` and group members in `fields`, a
 parameter in held text, the later segments of a qualified name).
 
 **Judgement.** One predicate covers every reference row: *the referent's value is a value of `T`*. For a constructor
-`T` that is `kind<T>`, the referent being a type built with `T`, less the constructors whose instances are types
-(`KindMembers`); for
-a type `T` it is a value entry, a key of a namespace value or a field of a record value whose declared type IS-A `T`,
-which is §5.12's by-name slot (`ValuesByName`). The two relations behind it are distinct and both recorded: IS-A
-(`supertypes`, inverse `subtypes`) and instance-of (the body's tag, inverse `kind_type.members`). Folding instance-of
+`T` the referent is a type built with `T` (`KindMembers`), a constructor whose declaration is a record being built
+with `record`; for any other `T` it is a value entry, a key of a namespace value or a field of a record value whose
+declared type IS-A `T`, which is §5.12's by-name slot (`ValuesByName`). The two relations behind it are distinct and
+both recorded: IS-A (`supertypes`, inverse `subtypes`) and instance-of (the body's tag, inverse the names a kind
+admits, derived at link and never written). Folding instance-of
 into the chain would claim a value of `uuid` is a value of `uuid_type`, whose values are types, which it is not. A
 namespace type is no exception: `api => !namespace { … }` is an instance of `namespace`, and a value of `api` is a map.
 
@@ -120,7 +150,7 @@ namespace type is no exception: `api => !namespace { … }` is an instance of `n
 | schema-map key, `field_map` key, `template_param.name` | key | — | spelling under the key type; `fields` by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
 | `enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
 | `type_chain.parents`, `type_argument.name`, `application` | application | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head | resolver, `checkArity` |
-| `type_chain.supertypes`, `subtypes`, `kind_type.members` | index | — | — | link |
+| `type_chain.supertypes`, `subtypes` | index | — | — | link |
 | `alias.target` | reference | namespace | any entry, type or constructor; `type_ref`, by resolution | `validateTypeRef` |
 | `template_param.type`, `bound` | reference | namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
 | `template.template` | parameters and applications as parsed | `parameters`, then namespace | §5.10's shadowing rule | `HeldBody` |
@@ -128,9 +158,8 @@ namespace type is no exception: `api => !namespace { … }` is an instance of `n
 | `record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference | namespace | member of the slot's kind | `checkKindValue` |
 | `record.discriminators`, `field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `record.name_type`, `enum_type.name_type` | reference | namespace | `identifier_kind` | `NameType.admits` |
-| `kind_type.of` | reference | namespace | a constructor, `type` or IS-A it | `KindMembers.ofRefusal` |
-| `ref_type.of` | reference | namespace | a type, a namespace type included, never a constructor | `validateBody` |
-| a slot typed `ref<T>` | reference by key, a path | schema map, then namespace values and record fields | `ref<T>`: the referent IS-A `T` | `ValuesByName.judge` |
+| `reference.of` | reference | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |
+| a slot typed by a reference over a type that is no constructor | reference by key, a path | schema map, then namespace values and record fields | the referent's type IS-A `of` | `ValuesByName.judge` |
 | a schema-map value (`schema.value_type: declared`) | tag | namespace | a constructor builds a type; any other type a value of it | `DefinitionResolver` |
 | `myapi => !api { … }` | tag | namespace | a type that is no constructor; the payload a value of `api`, here a map of its keys and values | `DefinitionResolver` |
 | `!I ^ { … }` head | reference | namespace | an atom instance, never the family's constructor | resolver |

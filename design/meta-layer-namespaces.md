@@ -24,9 +24,10 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   of a value supplies the family: keys read as `text` (`NamespaceBody.HOST_KEYS`) and are judged by the host, as a
   record's `fields` are by its `name_type`.
 - A namespace type is a member of `type_kind`, `kind<product>` and `kind<namespace>`, and of no `kind<record>` or
-  `kind<map>`; `namespace` itself is a constructor and a member of no kind. **A value entry is a member of no kind**,
-  nothing is typed by it, and `ref<T>` names it where its type IS-A `T`. `kind<api>` is refused at the declaration
-  (`KindMembers.ofRefusal`: `api` is no constructor, write `ref<api>`).
+  `kind<map>`; `namespace` itself is a constructor whose declaration is a record, so `type_kind` and `kind<record>`
+  hold it. **A value entry is a member of no kind** (no reference over a constructor), nothing is typed by it, and a
+  reference over a type that is no constructor names it where its type IS-A `of`: `ref<api>` and `kind<api>` are one
+  entry, and either names `myapi`.
 - A value entry is refused at every type position, in one sentence (`ValuesByName.aValueNoType`): a `type_ref` in a
   type declaration (`validateTypeRef`), a `type_ref` slot in a value body (`judgeApplication`), a kind-typed slot
   (`judgeMember`). A data tag naming one compiles to a `ValueEntryReader` and is `TYPE_MISMATCH`.
@@ -36,14 +37,16 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   tree mode (the declaring schema's `TsonCompiledSchemaLoader.treeVocabularyOf`, or for a type of the same document
   `compileReady(…, tree)`), so the schema loads and validates. The bind registry refuses such an entry in the closure it
   compiles, `BIND_MISMATCH` at `/entry` (`TsonCompiledSchemaRegistry.refuseUnbound`); the tree registry refuses nothing.
-- A host declares none of its references; the slot declares the spelling. A slot naming a type is typed by a kind
-  (`request: kind<record>`), a slot naming a value by a reference (`method: ref<method>`), and a record-typed slot
-  holds the record's value inline. In a schema document the kind's or reference's reader (`AtomTypeReader`) reads the
-  name's grammar and records it with its path and the slot's declared type (`TsonSchema.valuesByName`,
-  `TsonSchema.SlotType`); the linker judges it by that type, whatever the host component is.
+- A host declares none of its references; the slot declares them, by the reference's `of`. A slot naming a type is
+  typed by a reference over a constructor (`request: kind<record>`), a slot naming a value by a reference over any
+  other type (`method: ref<method>`), and a record-typed slot holds the record's value inline. In a schema document
+  the kind's or reference's reader (`AtomTypeReader`) reads the name's grammar and records it with its path and the
+  slot's declared type (`TsonSchema.valuesByName`, `TsonSchema.SlotType`); the linker judges it by that type, whatever
+  the host component is.
 - A value by name is entered through a value entry only. Its first segment resolves in the schema's one namespace; a
-  further segment selects a key of a namespace value or a field of a record value, bound or tree-held; a map that is
-  no namespace, `{text => method}`, is not entered whatever its key type.
+  further segment selects a key of a value of a named product, a namespace value's key or a record value's field
+  (bound or tree-held), the record being a namespace whose keys its type fixes; a map that is no namespace, `{text =>
+  method}`, is not entered whatever its key type.
 - A field step through a bound record value reads the host object through the descriptor of the bind context it was
   bound under, by wire name, never by reflection (`TsonCompiledMetaRegistry.link`). An optional field the value does
   not hold is refused as not present, after the referent's type is judged.
@@ -156,13 +159,15 @@ binding; a missing line of wiring says nothing about the schema (`design/schema-
 
 ## Names inside a value: the slot declares the spelling (§4.2, §5.12)
 
-A slot naming a type is typed by a kind, `request: kind<record>`, and a slot naming a value by a reference,
-`method: ref<method>`; a slot typed by a record holds the record's value inline. In a schema document
+A slot naming a type is typed by a reference over a constructor, `request: kind<record>`, and a slot naming a value
+by a reference over any other type, `method: ref<method>`; the spelling is a convention, `of` decides
+(`KindMembers.namesTypes`), and a slot typed by a record holds the record's value inline. In a schema document
 (`TsonReadContext.readsSchemaNames`) the kind's or reference's `AtomTypeReader` reads the name's grammar alone
 (`AtomParsers.inSchemaDocument`) and records it with the path it descended (`["post_orders", "method"]`) and the
-slot's declared type (`TsonSchema.SlotType`: role, and the kind's `of` or the reference's `T`). `SchemaResolver`
-keeps them per entry in `TsonSchema.valuesByName`, and the linker judges each by that type: a member of the kind
-(`ValuesByName.judgeMember`), or a value IS-A the reference's `T` (`ValuesByName.judge`). The type comes from the
+slot's declared type (`TsonSchema.SlotType`: the role the read read it in, and the reference's `of`).
+`SchemaResolver` keeps them per entry in `TsonSchema.valuesByName`, and the linker judges each by what `of` names
+over the final namespace, whatever role the read recorded: a member of the kind (`ValuesByName.judgeMember`), or a
+value whose type IS-A `of` (`ValuesByName.judge`). The type comes from the
 reader built from the slot's declaration, so it is right however the value was reached -- under a key, behind a
 record field, through the subtype a tag selected -- and the path serves only to say where.
 
@@ -173,9 +178,10 @@ them, and a `Ref` receives the value the name reaches when the schema links (`Re
 `RecordedNameReader`, which refuses what is no name as a `TypeRef` host's reader would; the name is recorded by the
 atom reader either way, so `method: nobody.place` is refused under a `String` exactly as under a `TypeRef`.
 
-**In a data document a kind is judged by membership**, over the reading document's closure, and a reference-typed
-position is `NOT_IMPLEMENTED` at read (nothing links a data document). So a data document importing only meta.tn
-that writes `!record_field { type: int32 }` is refused, `int32` being core's (`design/kinds-and-name-types.md`).
+**In a data document a kind is judged by membership**, over the reading document's closure, and a value's qualified
+name at a reference over any other type is `NOT_IMPLEMENTED` at read (nothing links a data document). So a data
+document importing only meta.tn that writes `!record_field { type: int32 }` is refused, `int32` being core's
+(`design/kinds-and-name-types.md`).
 
 ## The walk: by key and by field (`ValuesByName`)
 

@@ -169,9 +169,10 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     /**
      * The declared type of a slot holding a reference by name, in the namespace of the schema declaring the slot's
      * record, which the reading schema's closure contains: what the reader of that slot was built from, so the linker
-     * judges the name without walking the path back through the declarations. {@code of} is a kind's {@code of} (a
-     * constructor), a reference's {@code T} (a type), and {@code type_ref} itself for the application form; {@code
-     * name} is the declared type as a message names it, {@code kind<record>} or {@code type_kind}.
+     * judges the name without walking the path back through the declarations. {@code of} is the slot's reference's
+     * {@code of}, and {@code type_ref} itself for the application form; {@code name} is the declared type as a message
+     * names it, {@code kind<record>} or {@code type_kind}. The role is how the read read the name; the linker judges
+     * it by what {@code of} names, a constructor's names being types' and any other type's values'.
      */
     public record SlotType(Role role, String of, String name) {
 
@@ -180,9 +181,9 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
 
         /** What the slot holds, which decides how the name it holds is judged. */
         public enum Role {
-            /** A type's name, a member of the kind ({@code kind<record>}, {@code type_kind}). */
+            /** A type's name, read where {@code of} is a constructor ({@code kind<record>}, {@code type_kind}). */
             KIND,
-            /** A value's qualified name, IS-A the reference's {@code T} ({@code ref<method>}). */
+            /** A value's qualified name, read where {@code of} is any other type ({@code ref<method>}). */
             REFERENCE,
             /** A name or application, judged by resolution and arity ({@code type_ref}). */
             APPLICATION

@@ -3,11 +3,11 @@ package io.ltr8.tson.schema.meta;
 import java.util.Objects;
 
 /**
- * A value held by name, as a host receives it at a slot typed {@code ref<T>} (the kernel's {@code ref_type}): the
- * qualified name as written, {@code myapi.get_orders}, and the value it names once the schema has linked. The read
- * creates it with the name alone; the linker resolves the name, judges the referent a value of {@code T}, and
- * delivers it here exactly once. Before that {@link #get} throws, so a host that reads references out of an
- * unlinked body is told rather than handed {@code null}.
+ * A value held by name, as a host receives it at a slot typed {@code ref<T>} with {@code T} no constructor (the kernel's
+ * {@code reference}): the qualified name as written, {@code myapi.get_orders}, and the value it names once the schema has
+ * linked. The read creates it with the name alone; the linker resolves the name, judges the referent a value of {@code T},
+ * and delivers it here exactly once. Before that {@link #get} throws, so a host that reads references out of an unlinked
+ * body is told rather than handed {@code null}.
  *
  * <p>Equality is by name: two references to one address are one reference, delivered or not. A {@code TypeRef}
  * component at the same slot receives the name and nothing else, for a host that wants no delivery.

@@ -20,9 +20,9 @@ JSON inputs are in `design/cli-config-hashing.md`.
   inspecting a value.
 - A choice value may omit its tag only when the choice is disjoint; no member-shape matching, no trying variants in
   order. A missing required tag is `TYPE_MISMATCH`.
-- A kind (`kind_type`) is an atom, read by `AtomReader` from a string naming a member, and never a discrimination case
-  ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the reading document's
-  closure, whatever it imports (`AtomParsers.forType`).
+- A kind (a `reference` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and never
+  a discrimination case ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the
+  reading document's closure, whatever it imports (`AtomParsers.forType`).
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
 - Every mode is all-or-nothing: no builder builds where anything was reported while its value was read.

@@ -6,7 +6,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
-import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Alias;
@@ -281,18 +281,19 @@ class NamespaceEntryTest {
         }
     }
 
-    /** {@code api} is a type and no constructor: a kind of it is refused, and the reference named. */
+    /**
+     * {@code api} is a type and no constructor, so a reference over it names values: {@code kind<api>} is {@code
+     * ref<api>}, and the names it admits are the entries holding a value of {@code api}, judged where one is written.
+     */
     @Test
-    void aKindOfANamespaceTypeIsRefused() {
-        Diagnostic first = problems(schema("kind-of-api", "apis => kind<api>")).getFirst();
-        assertTrue(first.message().contains("its 'of' names 'api'") && first.message().contains("ref<api>"),
-                first.message());
+    void aKindOfANamespaceTypeNamesItsValues() {
+        assertEquals(List.of(), problems(schema("kind-of-api", "apis => kind<api>")));
     }
 
     private static List<String> members(TsonLinkedSchema linked, String kind) {
         String terminal = linked.schema().entries().get(kind) instanceof Alias alias
                 ? alias.target().name() : kind;
-        return assertInstanceOf(KindBody.class, linked.schema().entries().get(terminal)).members().orElseThrow();
+        return assertInstanceOf(ReferenceBody.class, linked.schema().entries().get(terminal)).memberNames();
     }
 
     // ── Resolved output ───────────────────────────────────────────────────────────────────────────────

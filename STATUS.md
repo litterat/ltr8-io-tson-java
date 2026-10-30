@@ -29,10 +29,15 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Typed field names — `record.name_type` names the identifier family a record's field names belong to, as
       `enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
       judged under its own name type in both encodings (Part 2 §5.2)
-- [x] Kinds — `kind<uuid_type>`, or `!kind_type { of: uuid_type }`, is the atom whose values are the names of the
-      types in the schema's closure built with a constructor: its members are computed at link, never listed, and a
-      value is a type name that must name one, in both encodings. The kernel types `enum_type.name_type` and
-      `record.name_type` by its `identifier_kind`, and judges a name type by membership (Part 2 §4.2)
+- [x] References ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — one atom, `!reference { of: T }`, spelled `kind<T>`
+      or `ref<T>` alike, admits a name exactly when the named entry's value, past its alias hops, is of a type IS-A
+      `T`. Over a constructor (`kind<uuid_type>`) its values are the names of the types in the schema's closure built
+      with it: computed at link, never listed or written, and judged by membership in both encodings. Over any other
+      type its values are qualified names of values. The kernel types `enum_type.name_type` and `record.name_type` by
+      its `identifier_kind`, and judges a name type by membership (Part 2 §4.2)
+- [x] A constructor is an ordinary record type ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — `uuid_type`'s value is
+      a record, so `type_kind` and `kind<record>` hold it and a field typed `uuid_type` holds a declaration body as
+      data, in TSON tree and bind mode and in JSON
 - [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
       opt-in carrier component
 - [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above,
@@ -71,8 +76,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       locks a schema into a registry keyed by its canonical `!!id`
 - [x] Value entries ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #9) — an entry whose tag names an ordinary type
       (`create_order => !operation { … }`, `orders => !api { … }` over a namespace type `api => !namespace { … }`)
-      is a value of it, no type and in no kind, named by `ref<T>` and walked by key and field; bound through the
-      one bind context, or held as a tree where no class binds its type, so the schema loads and validates
+      is a value of it, no type and in no kind, named by a reference over its type and walked by key and field;
+      bound through the one bind context, or held as a tree where no class binds its type, so the schema loads and
+      validates
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see the README's [Schema pipeline](README.md#schema-pipeline))

@@ -103,7 +103,7 @@
 !schema {
   top => !record {
     chain: {
-      subtypes: [alias array atom choice declared_type enum enum_type identifier_type integer_type iri_type kind_type map namespace product record ref_type regex_type set_type sum template text_type tuple type value_type void_type]
+      subtypes: [alias array atom choice declared_type enum enum_type identifier_type integer_type iri_type map namespace product record reference regex_type set_type sum template text_type tuple type value_type void_type]
     }
     fields: {}
     extension: ABSTRACT
@@ -118,7 +118,7 @@
   type => !record {
     chain: {
       supertypes: [top]
-      subtypes: [array atom choice declared_type enum enum_type identifier_type integer_type iri_type kind_type map namespace product record ref_type regex_type set_type sum text_type tuple value_type void_type]
+      subtypes: [array atom choice declared_type enum enum_type identifier_type integer_type iri_type map namespace product record reference regex_type set_type sum text_type tuple value_type void_type]
     }
     fields: {
       chain => !record_field { type: type_chain  optional: true }
@@ -129,7 +129,7 @@
   atom => !record {
     chain: {
       supertypes: [top type]
-      subtypes: [enum enum_type identifier_type integer_type iri_type kind_type ref_type regex_type text_type value_type void_type]
+      subtypes: [enum enum_type identifier_type integer_type iri_type reference regex_type text_type value_type void_type]
     }
     fields: {
       chain => !record_field { type: type_chain  optional: true }
@@ -423,46 +423,20 @@
 
   declared => !declared_type {}
 
-  kind_type => !record { chain: { supertypes: [atom top type] }  fields: {
-    chain   => !record_field { type: type_chain  optional: true }
-    of      => !record_field { type: type_name }
-    members => !record_field { type: array_type_name_xxhash  optional: true }
-  } }
-
-  kind => !template { parameters: [{ name: T  type: type_name }]  template: "!kind_type { of: T }" }
-
-  identifier_kind => !kind_type { of: identifier_type  members: [field_name identifier param_name scheme_name type_name] }
-
-  atom_kind => !kind_type {
-    of: atom
-    members: [
-      annotation atom_kind boolean doc field_name field_role identifier identifier_base identifier_kind
-      integer iri non_negative_integer normalization param_name product_access_type product_size_type
-      record_extension_type regex scheme_name synthetic text type_kind type_name value void
-    ]
-  }
-
-  ref_type => !record { chain: { supertypes: [atom top type] }  fields: {
+  reference => !record { chain: { supertypes: [atom top type] }  fields: {
     chain => !record_field { type: type_chain  optional: true }
     of    => !record_field { type: type_name }
   } }
 
-  ref => !template { parameters: [{ name: T  type: type_name }]  template: "!ref_type { of: T }" }
+  kind => !template { parameters: [{ name: T  type: type_name }]  template: "!reference { of: T }" }
 
-  type_kind => !kind_type {
-    of: type
-    members: [
-      annotation application array_array_text_1_3600e7d5_1_xxhash array_field_group_xxhash
-      array_template_param_xxhash array_text_1_xxhash array_tuple_element_xxhash
-      array_type_argument_xxhash array_type_kind_xxhash array_type_name_xxhash array_type_ref_xxhash atom_kind
-      atom_specification
-      boolean declared doc enum_set field_group field_map field_name field_role identifier identifier_base
-      identifier_kind integer integer_member_set integer_size iri non_negative_integer normalization
-      param_name product_access_type product_size_type record_extension_type record_field regex schema
-      scheme_name scheme_set synthetic template_param text text_member_set top tuple_element type_argument
-      type_chain type_kind type_name type_ref value void
-    ]
-  }
+  identifier_kind => !reference { of: identifier_type }
+
+  atom_kind => !reference { of: atom }
+
+  type_kind => !reference { of: type }
+
+  ref => !template { parameters: [{ name: T  type: type_name }]  template: "!reference { of: T }" }
 
   schema => !namespace { key_type: type_name  value_type: declared }
 
