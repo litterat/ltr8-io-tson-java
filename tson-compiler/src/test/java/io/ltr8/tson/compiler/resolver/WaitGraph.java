@@ -37,7 +37,7 @@ import java.util.TreeSet;
  *   <li>An alias ({@code !alias { target: X }}) is ready when its target is: an edge alias → {@code X}, beside
  *       what reading its own declaration reaches.</li>
  *   <li><b>A reference orders nothing.</b> A token at a slot typed by a kind ({@code type_kind},
- *       {@code identifier_kind}, any {@code !reference} instance) or {@code type_ref}
+ *       {@code identifier_kind}, any {@code !reference} instance)
  *       waits on the slot's own type and what reading that reaches, never on the entry the name names. This falls
  *       out of the walk: a kind is an atom, so reading against one reaches nothing further.</li>
  *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only, and a template's
@@ -59,7 +59,7 @@ import java.util.TreeSet;
  * not against the enclosing schema's {@code value_type} (the document read waits on that, see
  * {@link #documentWaits()}); a schema-map key's annotations ({@code @synthetic}) belong to the schema map, so
  * they too are waits of the document read and not of the entry they mark; a bare token at a record position is
- * that record's shorthand for its one required field ({@code type_ref}'s {@code name}); a namespace type stating no
+ * that record's shorthand for its one required field; a namespace type stating no
  * {@code key_type} has its keys read by their spelling, as {@code text}, the host judging them later.
  */
 final class WaitGraph {

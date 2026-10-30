@@ -303,8 +303,10 @@ the report, located at the value it could not read (`TsonCli.exitCodeFor` lifts 
 One Java type per kernel record or enum; `Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as
 Java subtyping, and an entry's kind is `EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record
 carries `TypeChain chain` as its first component, mirroring the constructor's flattened shape (`type`'s field first);
-`Alias`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), the
-kernel's labelled choice, because a record of two `Optional`s would not say that exactly one is present.
+`Alias`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), one
+argument of a reference, because a record of two `Optional`s would not say that exactly one is present; it compares
+by its canonical text, the head's parameter and not the grammar deciding which it binds. `TypeRef` is the parsed form
+of a reference value, registered as an atom host type (`TypeRefTextBridge`, in `ResolverBindContext`).
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the
 model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtures are listed in
 `DefinitionResolverTest`'s Javadoc.

@@ -17,7 +17,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Type;
@@ -49,45 +48,6 @@ class RecordBindReaderTest {
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.bind(context));
-    }
-
-    /**
-     * The kernel's {@code type_argument} is an <b>untagged labelled choice</b>: a record whose fields form one
-     * REQUIRED group, bound onto a sealed interface. There is no {@code !typeName} to dispatch on -- §5.6
-     * gives the record no positional form precisely because a bare token could not say which member it was --
-     * so the member is chosen by which field arrived ({@code GroupUnionBindReader}).
-     */
-    @Test
-    void anUntaggedLabelledChoiceBindsTheMemberThePresentFieldSelects() {
-        TsonCompiledSchema compiled = compiled();
-
-        assertEquals(new TypeArgument.Ref(TypeRef.of("text")),
-                compiled.get("type_argument").read(TestDocuments.document("{ name: text }")));
-    }
-
-    /** The group is REQUIRED, so neither zero members nor two of them is a reading of one. */
-    @Test
-    void anUntaggedLabelledChoiceStillObeysItsGroupRule() {
-        TsonCompiledSchema compiled = compiled();
-
-        assertThrows(ReadException.class,
-                () -> compiled.get("type_argument").read(TestDocuments.document("{}")));
-        assertThrows(ReadException.class, () -> compiled.get("type_argument")
-                .read(TestDocuments.document("{ name: text  value: 3 }")));
-    }
-
-    /**
-     * The whole point of making it readable: a {@code type_ref} carrying arguments has one, so an application
-     * can survive the wire hop a closed container's binding record makes through its constructor's reader.
-     */
-    @Test
-    void aTypeRefCarryingArgumentsReadsBecauseItsArgumentsDo() {
-        TsonCompiledSchema compiled = compiled();
-
-        TypeRef read = (TypeRef) compiled.get("type_ref")
-                .read(TestDocuments.document("{ name: box  arguments: [ { name: text } ] }"));
-
-        assertEquals(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text")))), read);
     }
 
     @Test
@@ -193,7 +153,7 @@ class RecordBindReaderTest {
     @Test
     void theWholeRealMetaKernelSchemaCompilesCleanlyInBindMode() {
         // Every one of the real, registered entries -- including the 5 pure marker roots
-        // (atom/product/sum/top/type_argument, which resolve to real but deliberately non-record
+        // (atom/product/sum/top, which resolve to real but deliberately non-record
         // sealed interfaces) -- gets a compiled reader; TsonSchemaCompiler's own eager walk builds
         // the whole schema regardless of whether any given entry is ever actually read.
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
@@ -203,7 +163,7 @@ class RecordBindReaderTest {
         for (String name : linked.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(78, linked.schema().entries().size());
+        assertEquals(74, linked.schema().entries().size());
     }
 
     @Test

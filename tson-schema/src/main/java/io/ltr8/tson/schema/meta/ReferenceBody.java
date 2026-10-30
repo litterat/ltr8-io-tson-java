@@ -5,6 +5,7 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Unbound;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -33,12 +34,15 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
 
     /**
      * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are
-     * types, and the members where it does -- the names of the closure the slot admits, sorted.
+     * types, and the members where it does -- the names of the closure the slot admits, sorted -- with the entry each
+     * application the closure records denotes ({@code @application}), so a value written as an application is
+     * judged through the entry it names.
      */
-    public record Index(boolean namesTypes, List<String> members) {
+    public record Index(boolean namesTypes, List<String> members, Map<TypeRef, String> applications) {
 
         public Index {
             members = List.copyOf(members);
+            applications = Map.copyOf(applications);
         }
     }
 
@@ -59,9 +63,10 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
         return new ReferenceBody(chain, of, index);
     }
 
-    /** This reference with its derived index: {@code namesTypes}, and the members sorted. */
-    public ReferenceBody linked(boolean namesTypes, List<String> members) {
-        return new ReferenceBody(chain, of, Optional.of(new Index(namesTypes, members.stream().sorted().toList())));
+    /** This reference with its derived index: {@code namesTypes}, the members sorted, and the closure's applications. */
+    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<TypeRef, String> applications) {
+        return new ReferenceBody(chain, of, Optional.of(new Index(namesTypes, members.stream().sorted().toList(),
+                applications)));
     }
 
     /**
@@ -75,6 +80,11 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
     /** The names a slot that names types admits, or none where linking has not computed them. */
     public List<String> memberNames() {
         return index.map(Index::members).orElse(List.of());
+    }
+
+    /** The entry the closure records {@code application} as denoting, or empty where it records none. */
+    public Optional<String> entryOf(TypeRef application) {
+        return index.map(found -> found.applications().get(application));
     }
 
     /**

@@ -182,9 +182,8 @@ import java.util.function.Predicate;
  *
  * <p>Note the two {@code TypeRef}s in play: this class imports the grammar-layer {@link TypeRef} (a
  * source-text reference) for reading the AST, and refers to {@code io.ltr8.tson.schema.meta.TypeRef} (the
- * resolved reference it produces) by its fully-qualified name -- the two share a name, matching the
- * kernel's single {@code type_ref} vocabulary type, but are different concepts, so only one can be the
- * unqualified import.
+ * resolved reference it produces) by its fully-qualified name -- the two share a name but are different
+ * concepts, so only one can be the unqualified import.
  *
  * <p>Package-private, no {@code Tson} prefix -- internal machinery a consumer of this library never names.
  * {@link SchemaResolver} is the document-level counterpart: it validates a document's header directives,
@@ -247,8 +246,8 @@ final class DefinitionResolver {
      * Closes a fully-bound template application into the entry it denotes, returning that entry's name.
      * Needed at the two positions that absorb a supertype's <em>fields</em> -- a composition supertype and a
      * refinement source -- because those resolve here, while the rest of §5.10 materialisation runs as a
-     * pass afterwards. Everywhere else an application is simply carried as a {@code type_ref} and closed
-     * later.
+     * pass afterwards. Everywhere else an application is simply carried as a reference with arguments and
+     * closed later.
      *
      * <p>Defaults to refusing, for the callers that resolve a declaration outside a whole-schema pass (the
      * meta-kernel bootstrap, and unit tests) -- there is no materialiser in those, and no schema for an
@@ -540,7 +539,7 @@ final class DefinitionResolver {
 
     /**
      * A container sugar form that reached resolution. {@link SchemaDesugarer} lifts every one -- closed or open, at
-     * any depth, an element that is itself an application included (written in {@code type_ref}'s record form and
+     * any depth, an element that is itself an application included (written as its quoted reference and
      * rewritten to its entry at materialisation) -- to an entry before this resolver runs, so no schema an author
      * writes can produce one here: it is a caller resolving raw AST without that phase, an invariant of the pipeline
      * rather than a gap in it.
@@ -1337,7 +1336,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * One argument of an application as the {@code type_argument} it denotes: a literal keeps its own token
+     * One argument of an application as the {@link TypeArgument} it denotes: a literal keeps its own token
      * form, and a reference resolves through {@link #resolveTypeRef}, so an argument may itself be an
      * application ({@code box<box<text>>}). §12.1 defers the reference/literal classification to this layer,
      * and the grammar has already made it -- a quoted or numeric token parsed as a {@link TypeArg.Value}.
@@ -1816,7 +1815,7 @@ final class DefinitionResolver {
     /**
      * A refinement's source ({@code target}) is always a {@link SimpleRef} or a {@link
      * GenericRef} by grammar (see {@code RefinedDef}'s own Javadoc) -- a bare name resolves to a
-     * bare {@code type_ref}; a generic application (e.g. {@code box<T>}, {@code T} shadowing the
+     * reference without arguments; a generic application (e.g. {@code box<T>}, {@code T} shadowing the
      * refining declaration's own parameter) resolves each argument the way every other application does
      * ({@link #typeArgument}).
      */
@@ -1948,8 +1947,8 @@ final class DefinitionResolver {
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArg arg : application.args()) {
             // An argument that is itself an application needs no special case: substitution writes a bound
-            // reference in `type_ref`'s record form when it carries arguments, so `box<inner<T>>` keeps
-            // `inner<T>` whole and the absorbing declaration's own materialisation closes it.
+            // reference as its canonical text when it carries arguments, so `box<inner<T>>` keeps `inner<T>`
+            // whole and the absorbing declaration's own materialisation closes it.
             arguments.add(typeArgument(arg));
         }
         // §5.10's argument kinds, which an operand absorbed by value would otherwise never get: §12.1 reads

@@ -1,39 +1,36 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Annotations;
-import io.ltr8.annotation.Record;
 
 import java.util.List;
 import java.util.Objects;
 
 /**
- * The meta-kernel's {@code type_ref} record (Part 2 §8.1): a resolved reference to a named entry
- * -- {@code name} is its only REQUIRED field, so an argument-free reference always writes in the
- * positional (bare-token) form, never {@code !type_ref { name: ... }} (§5.6's positional-form
- * rule, general over schema-backed data). {@code arguments}, when present, is a resolved {@code
- * type_argument} list; empty means "no {@code <...>}" was applied, i.e. a simple reference.
+ * A reference, parsed: the value of the kernel's {@code reference} atom ([TSON-SCHEMA] §4.2) wherever a slot holds
+ * one, and the host shape every reference-typed slot delivers into. {@code name} is the head, segments joined by
+ * {@code .}; {@code arguments}, when present, is the argument list, so {@code result<T>} is
+ * {@code TypeRef("result", [Ref(T)])} (SPEC-FEEDBACK.md #12).
  *
- * <p>Same name as {@code tson-compiler}'s grammar-layer {@code io.ltr8.tson.compiler.ast.schema.TypeRef}
- * -- a different package, a deliberately different concept (source-text reference vs. resolved
- * reference), matching the kernel's own choice to call both "type_ref" too.
+ * <p><b>The text is the value.</b> A reference is read from a token by {@code io.ltr8.tson.atom.ReferenceGrammar} and
+ * written as {@link #text}: no whitespace, arguments separated by one space, so {@code map<text integer>}; one without
+ * arguments is one unquoted token, and one with arguments is written quoted wherever it stands in data
+ * ({@code target: "result<T>"}), {@code <} being reserved there. Identity is the parsed form and never the spelling,
+ * so {@code result< T >} and {@code result<T>} are one reference.
  *
- * <p>{@code arguments} is bound from {@code type_ref}'s OPTIONAL {@code arguments: [type_argument]?}
- * field, so a void value arrives as {@code null} -- which, per the "empty means no {@code <...>}"
- * rule above, is the same thing as no arguments. The constructor therefore normalizes {@code null} to
- * the empty list rather than rejecting it: absent and empty are one state for a reference, and there is
- * no wire form for "present but empty" arguments to keep distinct.
+ * <p>An argument-carrying reference survives only where an application is still open: a record template's
+ * {@code chain.parents} and field types, held text, and the {@code @application} annotation. A closed application
+ * lifts to an entry and is named bare where it stands (§5.3).
  *
- * <p><b>{@code annotations} carries the wire annotations written on the reference itself</b>, which is a
- * type-ref's own channel rather than the enclosing field's: [TSON-SCHEMA] §8.3 attaches {@code
- * @alias:name} to the <em>type value</em> when a use site is flattened past an {@code ALIAS} entry, so
- * {@code type: @alias:field_name token} records both where the reference now points and what the author
- * wrote. Without somewhere on this record to keep it, a read discards it and a write cannot produce it.
- * Excluded from {@link #equals} for the same reason {@code RecordField} excludes its own: an alias is
- * metadata about where a reference came from, and §8.2 keys entry identity on where it points.
+ * <p>{@code arguments} normalises {@code null} to empty: absent and empty are one state, and there is no spelling of
+ * an empty argument list.
+ *
+ * <p><b>{@code annotations} carries the annotations written on the reference itself</b>: [TSON-SCHEMA] §8.3 attaches
+ * {@code @alias:name} to the type value when a use site is flattened past an alias entry, so
+ * {@code type: @alias:field_name token} records both where the reference points and what the author wrote. Excluded
+ * from {@link #equals}: it is metadata about where a reference came from, and §8.2 keys identity on where it points.
  */
 public record TypeRef(String name, List<TypeArgument> arguments, Annotations annotations) {
 
-    @Record
     public TypeRef {
         Objects.requireNonNull(name, "name");
         arguments = arguments == null ? List.of() : List.copyOf(arguments);
@@ -45,7 +42,7 @@ public record TypeRef(String name, List<TypeArgument> arguments, Annotations ann
         this(name, arguments, Annotations.empty());
     }
 
-    /** A bare reference with no type arguments, e.g. a plain field type like {@code integer}. */
+    /** A reference with no arguments, e.g. a plain field type like {@code integer}. */
     public static TypeRef of(String name) {
         return new TypeRef(name, null);
     }
@@ -53,6 +50,45 @@ public record TypeRef(String name, List<TypeArgument> arguments, Annotations ann
     /** A copy of this reference with {@code annotations} replaced -- every other component unchanged. */
     public TypeRef withAnnotations(Annotations annotations) {
         return new TypeRef(name, arguments, annotations);
+    }
+
+    /**
+     * The canonical text: the head, then, where there are arguments, {@code <}, each argument's {@link
+     * TypeArgument#text} separated by one space, and {@code >}. What resolved output writes, quoted where it carries
+     * arguments.
+     */
+    public String text() {
+        if (arguments.isEmpty()) {
+            return name;
+        }
+        StringBuilder out = new StringBuilder(name).append('<');
+        for (int i = 0; i < arguments.size(); i++) {
+            out.append(i == 0 ? "" : " ").append(arguments.get(i).text());
+        }
+        return out.append('>').toString();
+    }
+
+    /**
+     * {@code text} as a quoted token inside a reference's argument list: {@code "} and {@code \} escaped, and a
+     * control character as {@code \}{@code uXXXX}, so the argument reads back as the one token it is.
+     */
+    static String quoted(String text) {
+        StringBuilder out = new StringBuilder(text.length() + 2).append('"');
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                default -> {
+                    if (c < 0x20 || c == 0x7f) {
+                        out.append(String.format("\\u%04X", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.append('"').toString();
     }
 
     /** Excludes {@code annotations} -- metadata does not change a reference's identity, as on {@code RecordField}. */

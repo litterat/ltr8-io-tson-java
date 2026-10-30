@@ -107,9 +107,9 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>A collection-valued slot holds an application like every other {@code type_ref}-typed slot.</b>
-     * {@code variants} is a {@code [type_ref]}, so a §5.10 application standing in one is spelled in {@code
-     * type_ref}'s record form and rewritten to the entry it denotes one pass later -- the same route a field
+     * <b>A collection-valued slot holds an application like every other {@code type_kind}-typed slot.</b>
+     * {@code variants} is a {@code [type_kind]}, so a §5.10 application standing in one is spelled as its quoted
+     * reference and rewritten to the entry it denotes one pass later -- the same route a field
      * type, an {@code element_type} and a map's {@code key_type}/{@code value_type} already took. Refusing the
      * variant in {@code choiceBinding} instead would leave the <em>whole</em> choice unlifted, and an unlifted
      * sugar form at {@code DefinitionResolver} is a broken invariant, never a verdict on the author's schema.
@@ -148,7 +148,7 @@ class ContainerSugarEndToEndTest {
     /**
      * <b>The open case, which failed worse than the closed one.</b> With the variant refused, the choice was
      * never lifted, so holding {@code w}'s body handed the un-lifted {@code ChoiceRef} to the producer that
-     * spells a {@code type_ref} -- a {@code ClassCastException} out of the resolver, where the two shapes it
+     * spells a reference -- a {@code ClassCastException} out of the resolver, where the two shapes it
      * accepts are {@code SimpleRef} and {@code GenericRef}. Lifting the choice is what keeps that producer's
      * input to the two shapes it documents.
      */

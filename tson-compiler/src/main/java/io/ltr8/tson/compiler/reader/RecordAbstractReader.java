@@ -92,11 +92,11 @@ import java.util.stream.Collectors;
  * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
  * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
  * ReferenceNameReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
- * positional field is <b>atom</b>-typed -- {@code type_ref}'s {@code name}, a {@code type_name}, and {@code
- * record_field}'s {@code type}, a {@code type_kind}, so {@code !record { fields: { p => text } }} fills {@code type}
- * -- and loses it where that field is a product or a sum, where the explicit record is the only spelling. The record
- * reader refuses a name it does not take as no record, since a component that holds the name is read by {@link
- * ReferenceNameReader} instead and never reaches this class. A data document has no namespace to resolve a name in,
+ * positional field is <b>atom</b>-typed -- {@code record_field}'s {@code type}, a {@code type_kind}, so {@code
+ * !record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,
+ * where the explicit record is the only spelling. The record reader refuses a name it does not take as no record,
+ * since a component that holds the name is read by {@link ReferenceNameReader} instead and never reaches this
+ * class. A data document has no namespace to resolve a name in,
  * so its reads are untouched: there a bare token fills the positional field whatever its type. Whether the positional
  * field is atom-typed is read off its own compiled reader ({@link #bareTokenFillsPositionally}), the one this class
  * was built with.
@@ -313,7 +313,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * false where the record has none, and where that field is product- or sum-typed, so a token well-formed as a
      * qualified name there is a value by name ([TSON-SCHEMA] §5.6). {@link BindTargets} asks it before giving a
      * {@code TypeRef} component at a slot of this type a {@link ReferenceNameReader}: a type whose bare token is
-     * positional binds the reference through its own reader, as {@code type_ref} does.
+     * positional binds the reference through its own reader.
      *
      * <p>Asked of the field's own reader rather than of its declaration, at the read rather than at construction:
      * a recursive schema hands this class a {@link DeferredTypeReader} for a field still being built, which can

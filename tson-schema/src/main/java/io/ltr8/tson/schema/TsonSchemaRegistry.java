@@ -10,7 +10,7 @@ import java.util.Optional;
  * A store of linked schemas keyed by canonical identity ({@code [TSON-DATA] §2.2.1}), mirroring
  * Part 2 §10.1's "schema library" concept. {@link #register} only accepts a {@link
  * TsonLinkedSchema} -- proof, at the type level, that {@code TsonSchemaLinker.link} already ran (import
- * merging, argument-bearing {@code type_ref} synthesis, reference validation) -- and does nothing
+ * merging, subtype and kind indexes, reference validation) -- and does nothing
  * but store it; once admitted, a schema is never overwritten or removed -- together with {@link
  * TsonSchema#entries()} already being an unmodifiable map, this registration-time rejection of
  * re-registering the same identity *is* the "locked, no mutations allowed" guarantee.

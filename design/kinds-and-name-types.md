@@ -10,9 +10,10 @@ is why they are the linker's. Current form only; history lives in git.
   it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling:
   `kind<record>` and `ref<record>` are one entry, and `kind<api>`, over a type that is no constructor, names values
   (`ValuesByName`, `design/references.md`).
-- Every reference's derived `index` (`Index(namesTypes, members)`, the members sorted) is recomputed for **every**
-  reference in the closure, imports included, and never trusted from a body. It is `@Unbound` and never written: a
-  resolved form states `!reference { of: … }` alone, and a written `members:` is refused as an unknown field.
+- Every reference's derived `index` (`Index(namesTypes, members, applications)`, the members sorted, and the entry
+  each recorded `@application` denotes) is recomputed for **every** reference in the closure, imports included, and
+  never trusted from a body. It is `@Unbound` and never written: a resolved form states `!reference { of: … }`
+  alone, and a written `members:` is refused as an unknown field.
   `ReferenceBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
   unifies with it.
 - `of` resolves in the schema's one namespace and names any type or constructor; refused are a name resolving to

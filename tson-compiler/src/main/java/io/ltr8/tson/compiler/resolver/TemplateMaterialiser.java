@@ -753,7 +753,7 @@ final class TemplateMaterialiser {
         CoreValue target = closed instanceof RecordValue record ? WireForm.field(record, TARGET).orElse(null) : null;
         if (!(target instanceof TokenValue token)) {
             throw new IllegalStateException("'" + head + "<...>' is an alias whose target did not close to a "
-                    + "name: " + target + " -- SchemaDesugarer writes `!alias { target: <type_ref> }` and "
+                    + "name: " + target + " -- SchemaDesugarer writes `!alias { target: <reference> }` and "
                     + "closeApplications reduces an application there to the entry it denotes");
         }
         return token.text();
@@ -904,7 +904,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * Every application still written in {@code type_ref}'s record form, closed to a bare reference to the
+     * Every application still written in a slot ({@link WireForm#applicationIn}), closed to a bare reference to the
      * entry it denotes -- the inverse of the shape {@code SchemaDesugarer} writes when a slot holds one.
      *
      * <p>It runs on the wire value rather than on the body read from it because the <em>name</em> depends on
@@ -914,8 +914,8 @@ final class TemplateMaterialiser {
      */
     private CoreValue closeApplications(CoreValue value) {
         return switch (value) {
-            case RecordValue record when WireForm.isApplication(record) ->
-                    new TokenValue(close(WireForm.typeRefOf(record)).name(), TokenForm.UNQUOTED);
+            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
+                    new TokenValue(close(WireForm.applicationIn(token).get()).name(), TokenForm.UNQUOTED);
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> new RecordValue.Field(field.name(),
                             WireForm.rewritten(field.value(), closeApplications(field.value().coreValue()))))

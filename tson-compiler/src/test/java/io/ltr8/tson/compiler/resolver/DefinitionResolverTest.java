@@ -365,7 +365,7 @@ class DefinitionResolverTest {
 
         // alias: one brand-new field.
         assertEquals("{ chain: { parents: [] supertypes: [ \"top\" ] subtypes: [] } fields: { target => { "
-                + "type: type_ref optional: false "
+                + "type: type_kind optional: false "
                 + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                         write(alias));
     }
@@ -695,11 +695,11 @@ class DefinitionResolverTest {
      */
     @Test
     void aParametricFixedValueRidesTheValueSlotOfAFixedField() {
-        RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: type_ref = T }"));
+        RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: type_kind = T }"));
         RecordField value = sized.fields().get("value");
 
         assertEquals(List.of("T"), OpenEntry.parameterNames(sized));
-        assertEquals(TypeRef.of("type_ref"), value.type());
+        assertEquals(TypeRef.of("type_kind"), value.type());
         assertEquals("T", value.value().orElseThrow().text());
         assertEquals(FieldRole.FIXED, value.role());
         assertFalse(value.optional());
@@ -1675,7 +1675,7 @@ class DefinitionResolverTest {
 
     /**
      * meta-kernel.tn's declarations, desugared as {@code SchemaResolver} desugars them: {@code type}'s own
-     * fields are {@code [type_ref]} and {@code [type_name]} sugar, and every constructor composes them in.
+     * fields are {@code [type_kind]} and {@code [type_name]} sugar, and every constructor composes them in.
      */
     private SchemaMap kernelDeclarations() throws IOException {
         return SchemaDesugarer.desugar(new TsonSchemaParser(readFixture()).parseSchemaDocument(), Set.of()).body();

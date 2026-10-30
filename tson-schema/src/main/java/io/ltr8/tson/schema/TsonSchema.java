@@ -75,9 +75,9 @@ import java.util.Optional;
  *
  * <p><b>{@link #valuesByName()}</b> -- for each value entry ({@code ValueEntry}), the references that value holds
  * by name ([TSON-SCHEMA] §5.12), each with the
- * slot it fills and that slot's declared type, as the resolver's read collected them: the reader at a kind-, reference-
- * or {@code type_ref}-typed slot records the name it read there whatever the host class holds, so the list depends on
- * nothing the host declares. The linker resolves each and judges it against the slot's declared type. A fact the
+ * slot it fills and that slot's declared type, as the resolver's read collected them: the reader at a reference-typed
+ * slot records the name it read there whatever the host class holds, so the list depends on nothing the host
+ * declares. The linker resolves each and judges it against the slot's declared type. A fact the
  * resolver hands the linker, never part of §8's output: no resolved document writes it.
  */
 public record TsonSchema(String id, List<String> imports, Namespace<Top> entries,
@@ -153,8 +153,8 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * One reference a value body holds by name: {@code slot} is the path from the body to the position it
      * fills -- a field name at a record, a key at a map, an index at an array, as the read descended --, {@code
      * type} that position's declared type, as the reader that read the name knows it, and {@code reference} the
-     * {@code type_ref} value read there, its {@code name} the qualified name as written; {@code cell} is the host's
-     * {@code Ref} where the host holds one.
+     * reference read there, its {@code name} the qualified name as written; {@code cell} is the host's {@code Ref}
+     * where the host holds one.
      */
     public record ValueByName(List<String> slot, SlotType type, TypeRef reference,
                               Optional<io.ltr8.tson.schema.meta.Ref<?>> cell) {
@@ -170,23 +170,18 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * The declared type of a slot holding a reference by name, in the namespace of the schema declaring the slot's
      * record, which the reading schema's closure contains: what the reader of that slot was built from, so the linker
      * judges the name without walking the path back through the declarations. {@code of} is the slot's reference's
-     * {@code of}, and {@code type_ref} itself for the application form; {@code name} is the declared type as a message
+     * {@code of}; {@code name} is the declared type as a message
      * names it, {@code kind<record>} or {@code type_kind}. The role is how the read read the name; the linker judges
      * it by what {@code of} names, a constructor's names being types' and any other type's values'.
      */
     public record SlotType(Role role, String of, String name) {
-
-        /** A {@code type_ref}-typed slot, which holds the application form. */
-        public static final SlotType APPLICATION = new SlotType(Role.APPLICATION, "type_ref", "type_ref");
 
         /** What the slot holds, which decides how the name it holds is judged. */
         public enum Role {
             /** A type's name, read where {@code of} is a constructor ({@code kind<record>}, {@code type_kind}). */
             KIND,
             /** A value's qualified name, read where {@code of} is any other type ({@code ref<method>}). */
-            REFERENCE,
-            /** A name or application, judged by resolution and arity ({@code type_ref}). */
-            APPLICATION
+            REFERENCE
         }
 
         public SlotType {

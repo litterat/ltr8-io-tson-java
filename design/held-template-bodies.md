@@ -26,8 +26,12 @@ substitution rewrites and the declaration-time checks inspect. This note also ow
 - Closing dispatches on the held tree's constructor head: `alias` closes to a name, `record` to a record,
   anything else to a synthetic construction.
 - Every parameter is substituted, inside nested applications included, before any application in the body closes.
-- A parameter is a TYPE parameter exactly when its recorded type is `type_kind` (§5.10); a slot typed `type_kind` or
-  `type_ref` gives one, an `Atom`-typed slot gives a VALUE parameter, and anything else is refused at the declaration.
+- A parameter is a TYPE parameter exactly when its recorded type is `type_kind` (§5.10); a slot typed `type_kind`
+  gives one, an `Atom`-typed slot gives a VALUE parameter, and anything else is refused at the declaration.
+- An application in a held tree is one quoted token, its canonical text (`"result<T>"`, SPEC-FEEDBACK.md #12):
+  `WireForm.refValue` writes it and `WireForm.applicationIn` recognises it, and `HeldBody.names()` includes the names
+  its text writes. The cost: a held body's quoted text literal that is itself a well-formed application is read as
+  one.
 - Parameter types are derived twice: before materialisation (feeding the call-site check) and after everything has
   closed (stamping minted open entries). The second pass reports nothing.
 
@@ -59,20 +63,20 @@ edges in every application, a parameter list creates the one further edge (decla
 its base), and an application nothing declares is its expansion.
 
 - **A record template is the record it is.** Every slot a record template admits a parameter in already holds a name
-  or an uninterpreted token — a field's `type` (a `type_ref` while open, §4.2), its `value`, an application's
-  arguments — so the open record is a value of the vocabulary as it stands: a `RecordBody` with `parameters`, its
-  chain keeping the parents as written. `DefinitionResolver.openRecord` binds the desugared `!record { … }` payload
-  through `record`'s own reader once `ParameterTypes.checkSlots` has confined its parameters; a composition or
-  refinement template is the *flattened* record resolution builds, with its parameters stated
+  or an uninterpreted token — a field's `type` (a `type_kind` reference, with arguments while open), its `value`, an
+  application's arguments — so the open record is a value of the vocabulary as it stands: a `RecordBody` with
+  `parameters`, its chain keeping the parents as written. `DefinitionResolver.openRecord` binds the desugared
+  `!record { … }` payload through `record`'s own reader once `ParameterTypes.checkSlots` has confined its parameters;
+  a composition or refinement template is the *flattened* record resolution builds, with its parameters stated
   (`DefinitionResolver.parameterised`), because both absorb fields from a source. Either way a selector typed by a
-  parameter is refused (`refuseParameterTypedSelector`). An error placeholder for an open declaration is an open
-  empty record (`SchemaResolver.unresolved`), so it closes like any record template.
+  parameter is refused (`refuseParameterTypedSelector`). An error placeholder for an open declaration is an open empty
+  record (`SchemaResolver.unresolved`), so it closes like any record template.
 - **Every other open entry is held text.** `set` resolves to
   `!template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }`. That covers
   an open instance (`<T, N> !array { … }`), an open sugar form (`<T> [T]`, `<T> ( T | error )`), and §5.10's partial
-  application, `uuid_pair => <B> pair<uuid, B>`, held as the `!alias { target: pair<uuid, B> }` §8.1 says it
-  denotes — spellable because `alias.target` is a `type_ref`. Its kind is `TEMPLATE` whatever its head
-  (`design/template-materialisation.md`).
+  application, `uuid_pair => <B> pair<uuid, B>`, held as the `!alias { target: "pair<uuid B>" }` §8.1 says it
+  denotes — spellable because `alias.target` is a reference, which may carry arguments. Its kind is `TEMPLATE` whatever
+  its head (`design/template-materialisation.md`).
   - **Why text, not a value of the constructor's vocabulary.** A parameter stands wherever a token stands —
     `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a collection — so a
     body carrying one is typed by no constructor's record shape until it closes. Read as one, `min_items: N` fails
@@ -131,7 +135,7 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
   form it writes already names the entry its inner form became, and a form closed here must agree, or
   `[[pixel; 3]; 3]` written out and `grid<pixel, 3>` closed would be two entries for one type (§5.10).
 - **A container position holding an application needs no name before it closes.** An open binding holds the
-  `type_ref` whole, arguments intact, so `[tree<T>; 1..]` inside `tree` lifts to a synthetic whose `element_type` is
+  reference whole, arguments intact, so `[tree<T>; 1..]` inside `tree` lifts to a synthetic whose `element_type` is
   `tree<p0>`. Substitution rewrites `p0` inside that application before anything closes; closing first would close
   `tree<p0>`, an application of an argument nothing supplied. That is what ties §8's `tree` knot: closing
   `tree<text>` reaches the synthetic, whose binding reaches `tree<text>` again and finds it in `closing`, so the
@@ -139,9 +143,8 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
 - **An application in a held body closes when the body does**, whether or not it names a parameter: the held text is
   not scanned at the declaration. Only the two field-absorbing positions, a composition operand and a refinement
   source, close during resolution (`DefinitionResolver.closedApplication`; `design/template-materialisation.md`).
-- **A closed container position takes one too** (`[box<text>]`): its slot is written in `type_ref`'s record form, and
+- **A closed container position takes one too** (`[box<text>]`): its slot is written as the quoted reference, and
   the batch pass closes it like every other ref; `close()` builds `pair<int32>` before `box<pair<int32>>` names it.
-  The wire hop rests on `type_argument`, an untagged labelled choice, being readable (`design/class2-compilation.md`).
 - **The synthetic merge is where the two lift channels meet** (§8.2; `SyntheticMerge`, whose Javadoc carries the
   rationale). A form the desugar phase lifted *closed* with an application in a slot was named from an unreduced
   record, so `[box<text>]` written directly lands apart from `[box<T>]` closed with `T := text`. After
@@ -149,11 +152,12 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
   references onto that name, and drops the eager entry where the other channel already published the form or moves
   it where it did not. **The closed-record name wins**, being a function of the resolved form alone; only a form whose
   binding held an application moves.
-- **An argument keeps the channel it was applied on.** An argument list is the one position where a type and a value
-  are equally at home, so a value parameter passed straight through (`array_p0_…<N>` inside `<N> { a: [text; N] }`)
-  stays a value: substitution moves a literal bound at a `type_ref`'s `name` to its `value` member
-  (`WireForm.substituteField`). What a held body admits beyond that — collection-valued slots, value arguments and
-  their numeric identity — is `design/desugaring-open-forms-and-templates.md`'s.
+- **An argument keeps what it was applied as.** An argument list is the one position where a type and a value are
+  equally at home, so a value parameter passed straight through (`array_p0_…<N>` inside `<N> { a: [text; N] }`)
+  stays a value: substitution puts the bound `TypeArgument` itself where the parameter stood and writes the
+  application again as its canonical text (`WireForm.substituted`). What a held body admits beyond that —
+  collection-valued slots, value arguments and their numeric identity — is
+  `design/desugaring-open-forms-and-templates.md`'s.
 
 ## Parameter types (`ParameterTypes`)
 
@@ -162,8 +166,8 @@ positions it stands in; the kind follows from it. §12.1 decides an argument's c
 non-numeric argument arrives as a reference — wrong for `e => <M> !enum { members: [a b M] }` applied as `e<c>`, where
 `c` is a member. What settles it is the declared type of the slot the parameter stands in, read from the constructor's
 own vocabulary: `array.element_type` is `type_kind`, `enum.members` is `enum_set` (of `text`), `record_field.value` is
-`value`. §4.2 types every slot that names a type `type_kind` and every application position `type_ref`, so a
-schema's own constructors classify by the same walk. The class Javadoc lists the four sources of a use type.
+`value`. §4.2 types every slot that names a type `type_kind`, an application included, so a schema's own
+constructors classify by the same walk. The class Javadoc lists the four sources of a use type.
 Beyond those:
 
 - **Stamped twice.** A held body is built before anything can be typed. `SchemaResolver` runs
@@ -171,11 +175,12 @@ Beyond those:
   templates and feeding `TemplateMaterialiser.parameterKinds`; and again after materialisation and the merge, over
   every local open entry, declared and minted, with a reporter that discards — its failures are the first pass's,
   already reported.
-- **A fixed point, not one walk.** meta-kernel's `type_argument` puts a parameter of either kind on the reference
-  channel, so a parameter passed to another template says nothing locally: it takes the callee's recorded type at that
-  position, and two templates may wait on each other. A parameter the fixed point leaves ungrounded is a TYPE
-  parameter (`type_kind`), as §5.10 states, so `loop => <T> loop<T>` is judged on what is wrong with it — it applies
-  itself forever. An imported template is taken as recorded, since its held body does not carry what its author wrote.
+- **A fixed point, not one walk.** An argument list holds a parameter of either kind, a reference by the grammar
+  until the head's parameter judges it, so a parameter passed to another template says nothing locally: it takes the
+  callee's recorded type at that position, and two templates may wait on each other. A parameter the fixed point leaves
+  ungrounded is a TYPE parameter (`type_kind`), as §5.10 states, so `loop => <T> loop<T>` is judged on what is wrong
+  with it — it applies itself forever. An imported template is taken as recorded, since its held body does not carry
+  what its author wrote.
 - **Several uses must agree**: the type is the use type that IS-A every other, uses unordered by IS-A are refused at
   the declaration, and a parameter standing in both kinds of position keeps its own message. A parameter standing for a
   whole collection or record (`<T> !enum { members: T }`) is refused as neither a kind of type nor a scalar.

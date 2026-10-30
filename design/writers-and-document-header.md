@@ -18,10 +18,10 @@ keeps the rest of the document. Current form only; history lives in git.
   will not read back.
 - `TsonDataEmitter.field` writes a name that is no identifier as a quoted string: a relaxed `name_type`
   ([TSON-SCHEMA] §5.2) admits `"@id"`, which written bare would not lex back.
-- `DataClassObjectWriter` writes a `type_ref` value (`schema.meta.TypeRef`) with no arguments as its bare name, as
-  [TSON-SCHEMA] §8.1 writes it positionally and as a value written by name has only that spelling
-  ([TSON-SCHEMA] §5.12); an application keeps the explicit `{ name: … arguments: [ … ] }` record. A name some
-  segment of which is no identifier is written as the record too, so it never comes back as text.
+- `DataClassObjectWriter` writes a reference (`schema.meta.TypeRef`, a `type_kind` value) with no arguments as its
+  bare name, as a value written by name has only that spelling ([TSON-SCHEMA] §5.12), and an application as one
+  quoted token, its canonical text (`"result<T>"`, `<` being reserved in data; SPEC-FEEDBACK.md #12). A name some
+  segment of which is no identifier is written quoted too, never as a bare token that would not lex back.
 - `DataClassObjectWriter` writes a `Namespace` as the map it holds: each key keeps its annotations and is bare where
   it is an identifier, quoted otherwise; a value is tagged only where its class carries `@Typename`, which is what
   selects a subtype of the value type on the way back in. A value entry (`ValueEntry`) is written as its `type` for

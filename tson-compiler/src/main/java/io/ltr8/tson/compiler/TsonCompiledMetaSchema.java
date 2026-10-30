@@ -84,7 +84,7 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * Every entry IS-A {@code top} ([TSON-SCHEMA] §4.1), with the reader for an instance of it -- the same predicate
      * {@code DefinitionResolver}'s own gate asks, so a head that gate admits has a reader here, and one it refuses
      * never reaches this table. Wider than {@code constructor}, by the base kinds and {@code alias}; narrower than
-     * the whole namespace, by every component record ({@code record_field}, {@code type_ref}, …), which is a part of
+     * the whole namespace, by every component record ({@code record_field}, {@code template_param}, …), which is a part of
      * a type and not one.
      */
     private static Map<String, TsonTypeReader<?>> buildConstructors(TsonCompiledSchema compiledSchema) {

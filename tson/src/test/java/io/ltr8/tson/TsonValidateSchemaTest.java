@@ -208,7 +208,7 @@ class TsonValidateSchemaTest {
      *
      * <p>The literal case is refused for a sharper reason than the typo in {@link
      * #anUnresolvedArgumentStaysWithTheApplier}: {@code 3} is not an unresolved <em>name</em>, it is not a
-     * name at all, and {@code type_ref.name} is typed {@code identifier}, so it fails where the substituted
+     * name at all, and {@code record_field.type} is typed {@code type_kind}, so it fails where the substituted
      * body is read against the kernel's own vocabulary rather than later at reference resolution. The verdict
      * is the same and the explanation is better — "an identifier never begins with a digit or a sign" is
      * actionable where "unresolved reference '3'" implies an author could go and declare one.

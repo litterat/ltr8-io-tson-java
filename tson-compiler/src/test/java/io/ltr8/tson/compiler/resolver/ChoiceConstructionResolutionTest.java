@@ -17,13 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression: a {@code !choice { variants: [...] }} construction resolves. Each variant is a bare type
- * name -- a positional-form {@code type_ref} whose OPTIONAL {@code arguments} field is absent. That
- * absence binds to {@code null} (the faithful binding of an absent {@code ?} field), which NPEd in {@code
- * schema.meta.TypeRef}'s own {@code List.copyOf(arguments)}, so no choice type could be declared at all
- * (`bindAtomInstance` wrapped it as an {@code UnsupportedOperationException}). {@code TypeRef} now
- * normalizes an absent ({@code null}) {@code arguments} to the empty list -- its own documented "empty
- * means no arguments" state.
+ * A {@code !choice { variants: [...] }} construction resolves. Each variant is a bare type name -- a
+ * reference with no argument list, which {@code schema.meta.TypeRef} holds as an empty {@code arguments}, its
+ * one "no arguments" state.
  */
 class ChoiceConstructionResolutionTest {
 
@@ -50,7 +46,7 @@ class ChoiceConstructionResolutionTest {
         Top contact = resolved.entries().get("contact");
         ChoiceBody body = assertInstanceOf(ChoiceBody.class, contact);
         assertEquals(List.of("text", "integer"), body.variants().stream().map(TypeRef::name).toList());
-        // Each variant is a bare reference -- empty arguments (the null that used to be here was the NPE).
+        // Each variant is a bare reference -- empty arguments, never null.
         assertTrue(body.variants().stream().allMatch(variant -> variant.arguments().isEmpty()));
     }
 }

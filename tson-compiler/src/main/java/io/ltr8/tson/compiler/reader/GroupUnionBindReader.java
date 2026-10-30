@@ -17,24 +17,20 @@ import java.util.Map;
 
 /**
  * Binds an <b>untagged labelled choice</b> -- a record whose fields form one REQUIRED group, exactly one of
- * which is present, onto a Java sealed interface whose members carry those fields one apiece. The kernel's
- * {@code type_argument} is the case that forces it:
+ * which is present, onto a Java sealed interface whose members carry those fields one apiece:
  *
  * <pre>
- *   type_argument =&gt; { ( name: type_ref | value: value ) }
+ *   amount =&gt; { ( cents: int64 | text: text ) }
  * </pre>
  *
  * <p><b>The present field is the discriminator</b>, which is what separates this from {@link
  * VariantBindReader}: there is no {@code !typeName} tag to dispatch on, and §5.6's positional form makes one
- * unavailable in principle -- the kernel deliberately gives this record no positional form at all, because a
- * bare token could not say which member it was. So the record is read the ordinary way and the member is
- * chosen by what arrived.
+ * unavailable in principle -- such a record has no positional form, because a bare token could not say which
+ * member it was. So the record is read the ordinary way and the member is chosen by what arrived.
  *
  * <p><b>Why a Java union rather than a record with two {@code Optional}s</b>, which is the more literal
- * translation: {@link io.ltr8.tson.schema.meta.TypeArgument} holds a {@code type_ref} whose {@code arguments}
- * hold {@code type_argument}s right back, and {@code ltr8-bind}'s record resolution has no cycle detection.
- * The union defers member resolution and breaks the loop -- see that type's own Javadoc. This reader is what
- * makes the shape chosen for the <em>write</em> side readable on the way back in.
+ * translation: a choice modelled as a choice says in its type that exactly one is present. This reader is what
+ * makes that shape readable on the way back in.
  *
  * <p><b>Members are matched to fields by the member's own single component wire-name</b> ({@code @Field} where
  * present, the component name otherwise). A member of a labelled choice carries exactly the field it is the

@@ -36,10 +36,9 @@ import java.util.Set;
  *
  * <p>Some entries resolve to a class that is not a record: {@code atom}/{@code product}/{@code sum}/{@code top}
  * mangle to the sealed marker interfaces {@link io.ltr8.tson.schema.meta.Atom}/{@link
- * io.ltr8.tson.schema.meta.Product}/{@link io.ltr8.tson.schema.meta.Sum}/{@link io.ltr8.tson.schema.meta.Top}, and
- * {@code type_argument} to the sealed interface {@link io.ltr8.tson.schema.meta.TypeArgument}. This binder resolves
- * the class either way; whether it is usable as a record is the reader's decision, surfacing as a compile-time
- * failure for that one entry.
+ * io.ltr8.tson.schema.meta.Product}/{@link io.ltr8.tson.schema.meta.Sum}/{@link io.ltr8.tson.schema.meta.Top}. This
+ * binder resolves the class either way; whether it is usable as a record is the reader's decision, surfacing as a
+ * compile-time failure for that one entry.
  *
  * <p><b>The vocabulary is fixed; the binder is not the last word.</b> A schema may hold values of types the kernel
  * never heard of ({@code create_order => !operation { ... }}), and a data document values of its own types; both

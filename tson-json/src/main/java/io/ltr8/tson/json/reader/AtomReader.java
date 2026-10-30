@@ -2,6 +2,7 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -116,9 +117,16 @@ final class AtomReader<T> implements JsonTypeReader<T> {
         }
         try {
             T value = parser.read(content);
-            // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
-            return names != null && NameHygiene.refusesValue(ctx, value instanceof String name ? name : content, names)
-                    ? null : value;
+            // Hygiene judges the name the value is, in its type's normalization form, not the spelling -- each name
+            // an application writes, where a kind's value is one.
+            String named = value instanceof String name ? name : content;
+            JsonReadContext reading = ctx;
+            return names != null && ReferenceGrammar.anyRefused(named,
+                    each -> NameHygiene.refusesValue(reading, each, names)) ? null : value;
+        } catch (UnsupportedOperationException gap) {
+            // A value this library cannot judge yet, such as an application its closure records no entry for.
+            ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge", content);
+            return null;
         } catch (AtomTypeException e) {
             AtomRefusal refusal = AtomRefusal.of(e, content, Object.class).named(name);
             ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());

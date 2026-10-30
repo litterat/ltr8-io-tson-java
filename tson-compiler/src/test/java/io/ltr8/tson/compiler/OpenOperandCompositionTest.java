@@ -234,10 +234,9 @@ class OpenOperandCompositionTest {
 
     /**
      * One template applied to another, at an absorbing position and still open. Substitution writes a bound
-     * reference through {@code SchemaDesugarer.refValue}, which spells one carrying arguments in {@code
-     * type_ref}'s record form rather than as a bare token, so {@code inner<T>} survives whole and the
-     * absorbing declaration's own materialisation closes it. Writing the head name alone dropped the argument
-     * list with no diagnostic, which is why this was refused as a gap rather than closed wrongly.
+     * reference through {@code WireForm.refValue}, which spells one carrying arguments as its quoted canonical
+     * text rather than as its head name, so {@code inner<T>} survives whole and the absorbing declaration's own
+     * materialisation closes it. Writing the head name alone would drop the argument list with no diagnostic.
      */
     @Test
     void anArgumentThatIsItselfAnApplicationSurvivesSubstitutionWhole() {
@@ -263,7 +262,7 @@ class OpenOperandCompositionTest {
     }
 
     /**
-     * The one position a bound reference cannot be written into: a {@code type_ref}'s own head, which is a
+     * The one position a bound reference cannot be written into: a reference's own head, which is a
      * {@code type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
      * at the template's declaration, before substitution has anything to say about it.
      */

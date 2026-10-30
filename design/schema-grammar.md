@@ -79,7 +79,8 @@ materialization, no validation (those are the resolver's/linker's jobs).
   - **What it cannot spell is an application**, and neither can a closed instance: `!array { element_type:
     box<text> }` is not a `core-value`, in either form. That line falls where the grammars already divide --
     a *type* position is schema grammar and takes `box<text>` directly, while `!C value` takes data, so an
-    application inside one is written in `type_ref`'s record form, which is what the sugar expands to anyway.
+    application inside one is written as its quoted reference (`element_type: "box<text>"`), which is what the
+    sugar expands to anyway.
   - A parameterized **atom refinement** is no form at all: §12.1 gives `atom-refinement` no parameter
     list, a refinement of an atom instance having no parameter to take, and the parser says so where the
     `^` is read.

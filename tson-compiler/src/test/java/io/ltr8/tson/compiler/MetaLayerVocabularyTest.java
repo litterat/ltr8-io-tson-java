@@ -159,7 +159,7 @@ class MetaLayerVocabularyTest {
 
     /**
      * The other side of the same predicate: a record type that is no constructor ({@code record_field}, {@code
-     * type_ref}, {@code integer_size}, …) builds no type, and {@code !record_field { ... }} is a value of it, read
+     * template_param}, {@code integer_size}, …) builds no type, and {@code !record_field { ... }} is a value of it, read
      * against it as a data value is -- so a field it does not declare is refused there.
      */
     @Test

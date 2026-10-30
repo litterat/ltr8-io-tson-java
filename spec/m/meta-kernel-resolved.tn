@@ -49,11 +49,13 @@
     `tuple_element.element_type`, a container's type slots, choice
     variants, a parameter's `type` and `bound`) is typed `type_kind`,
     the kind of the types, and holds a bare name: a type's name,
-    judged a member of the kind when the schema links. `type_ref` is
-    the application form and stands only where one may:
-    `type_chain.parents`, `type_argument.name`, the `application`
-    annotation, held text, and `alias.target`, which may name a
-    constructor (Part 2 Section 8.1).
+    judged a member of the kind when the schema links. An
+    application is a reference with an argument list, written quoted
+    in its canonical text, `"result<T>"`: no whitespace, and one
+    space between arguments. A closed one lifts to an entry and is
+    named bare, so one stands only where an application is still
+    open: a record template's `parents` and field types, held text,
+    and the `application` annotation.
   - The container constructors carry no parameters: their type
     slots are plain required `type_kind`-typed fields, filled by the
     construction (or by a sugar form's desugaring) like any other
@@ -66,10 +68,10 @@
     materialisation substitutes the argument into `value` and changes
     no other fact, and `optional` is the name's mark as written
     (Part 2 Section 5.7).
-  - `arguments` elements are type_argument records: `{ name: ... }`
-    is a reference — including, in template bodies, parameter
-    references of either kind, read against `parameters` — and
-    `{ value: ... }` is a concrete literal.
+  - An argument is a reference or a token, positional against the
+    head's parameters and typed where it lands: in a template body a
+    parameter of either kind stands as its name, read against
+    `parameters`.
   - An open entry is one of two values (Part 2 Sections 5.10, 8.1).
     A record template is a `!record` with `parameters`, read as the
     vocabulary and not held: a parameter stands at a field's type, a
@@ -110,7 +112,7 @@
   }
 
   type_chain => !record { fields: {
-    parents    => !record_field { type: array_type_ref_xxhash  optional: true }
+    parents    => !record_field { type: array_type_kind_xxhash  optional: true }
     supertypes => !record_field { type: array_type_name_xxhash  optional: true }
     subtypes   => !record_field { type: array_type_name_xxhash  optional: true }
   } }
@@ -157,7 +159,7 @@
   } }
 
   alias => !record { chain: { supertypes: [top] }  fields: {
-    target => !record_field { type: type_ref }
+    target => !record_field { type: type_kind }
   } }
 
   template_param => !record { fields: {
@@ -289,19 +291,6 @@
 
   param_name => !alias { target: identifier }
 
-  type_ref => !record { fields: {
-    name      => !record_field { type: type_name }
-    arguments => !record_field { type: array_type_argument_xxhash  optional: true }
-  } }
-
-  type_argument => !record { fields: {
-    name  => !record_field { type: type_ref  optional: true }
-    value => !record_field { type: value  optional: true }
-  }
-  groups: [
-    !field_group { members: [[name] [value]] }
-  ] }
-
   product_access_type => !enum { members: [INDEX NAMED] }
 
   product_size_type => !enum { members: [FIXED VARIABLE] }
@@ -316,7 +305,7 @@
 
   synthetic => @annotation !alias { target: void }
 
-  application => @annotation !alias { target: type_ref }
+  application => @annotation !alias { target: type_kind }
 
   record_field => !record { fields: {
     type     => !record_field { type: type_kind }
@@ -444,11 +433,7 @@
 
   @synthetic array_template_param_xxhash => !array { element_type: template_param }
 
-  @synthetic array_type_ref_xxhash => !array { element_type: type_ref }
-
   @synthetic array_type_kind_xxhash => !array { element_type: type_kind }
-
-  @synthetic array_type_argument_xxhash => !array { element_type: type_argument }
 
   @synthetic array_array_text_1_3600e7d5_1_xxhash => !array { element_type: array_text_1_xxhash  min_items: 1 }
 

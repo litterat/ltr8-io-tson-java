@@ -1,43 +1,59 @@
 package io.ltr8.tson.schema.meta;
 
-import io.ltr8.annotation.Field;
-
 /**
- * The meta-kernel's {@code type_argument} record (Part 2 §8.1, §9): one positional argument of a
- * resolved {@link TypeRef} -- {@code { (name: type_ref | value: value) }}, a REQUIRED field
- * *group* (§5.11) in the kernel's own terms: exactly one of {@code name}/{@code value} is present,
- * never both, never neither.
+ * One positional argument of a {@link TypeRef}, as the reference grammar parses it ([TSON-SCHEMA] §12.1,
+ * SPEC-FEEDBACK.md #12): {@code argument = reference / token}, a reference first.
  *
- * <p><b>Modeled as a sealed interface ({@code Ref}/{@code Value}), not a plain record with two
- * {@code Optional} fields.</b> It is the labelled choice the kernel declares, and modelling a choice as a
- * choice is the whole of the reason. A plain record with two {@code Optional} fields would be the more
- * literal translation of the wire shape and a worse model of it: nothing in the type would say that exactly
- * one is present.
+ * <p><b>Modeled as a sealed interface ({@code Ref}/{@code Value}), not a record with two {@code Optional}s.</b> An
+ * argument is one of two things and never both, and the type says so.
  *
- * <p>It also used to be the only shape that <em>worked</em>. {@link TypeRef} and {@code TypeArgument} are
- * mutually recursive ({@code TypeRef.arguments: List<TypeArgument>}, and a reference argument wraps a
- * {@code TypeRef} right back) -- {@code box<box<text>>}, an ordinary nested application -- and
- * {@code ltr8-bind} resolved every component's descriptor eagerly with no cycle detection, so a plain record
- * here recursed until the stack went. {@code DataBindContext} carries a cycle guard now, so that constraint
- * is gone and this shape stands on its own merits.
- *
- * <p>The cost: since {@code Ref}/{@code Value} are {@code DataClassUnion} members with no {@code
- * @Typename}, {@code TsonObjectWriter.toTson} writes them with a spurious {@code !ref}/{@code !value}
- * type-ref the kernel's own resolved form doesn't have (a real, {@code toTson}-surfaced divergence,
- * not silently swept aside) -- same value, same field-group semantics, just an extra tag; no
- * {@code @Typename} choice removes it, since the divergence is the tag's *presence*, not its name.
- *
- * <p><b>{@code @Field("name")} on {@code Ref} is what makes the shape readable again.</b> A labelled choice
- * has no tag to dispatch on, so its member is chosen by which field arrived, and the member a field selects
- * is found by that member's own single component wire-name -- which is therefore the field's name, not the
- * component's incidental Java one ({@code GroupUnionBindReader}). It also brings {@code toTson}'s output
- * closer to the kernel's own spelling, which writes {@code name} here.
+ * <p><b>The grammar classifies; the head's parameters judge.</b> A token that parses as a reference is a {@link Ref},
+ * and a {@link Value} is a token that does not: a number or a quoted token. Whether an argument binds a type or a
+ * value is the parameter's, reached only through the head (§5.10), so a resolver that has reached the head may file
+ * an unquoted {@code red} at a value parameter as a {@code Value}. That filing is the resolver's and not part of the
+ * reference, so <b>equality is by {@link #text}</b>: {@code Ref(red)} and an unquoted {@code Value(red)} are one
+ * argument, as {@code names<red>} is one reference whoever read it.
  */
 public sealed interface TypeArgument {
 
-    record Ref(@Field("name") TypeRef ref) implements TypeArgument {
+    /** The argument's canonical text, as it stands inside a reference's argument list. */
+    String text();
+
+    /** An argument that parses as a reference, itself possibly an application. */
+    record Ref(TypeRef ref) implements TypeArgument {
+
+        @Override
+        public String text() {
+            return ref.text();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof TypeArgument other && text().equals(other.text());
+        }
+
+        @Override
+        public int hashCode() {
+            return text().hashCode();
+        }
     }
 
+    /** A token: a number or a quoted token, or an unquoted one a resolver has judged a value at its parameter. */
     record Value(Token value) implements TypeArgument {
+
+        @Override
+        public String text() {
+            return value.form() == Token.Form.UNQUOTED ? value.text() : TypeRef.quoted(value.text());
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof TypeArgument other && text().equals(other.text());
+        }
+
+        @Override
+        public int hashCode() {
+            return text().hashCode();
+        }
     }
 }

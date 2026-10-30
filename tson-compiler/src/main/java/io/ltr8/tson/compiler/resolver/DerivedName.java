@@ -71,6 +71,8 @@ final class DerivedName {
     /** The readable half of a derived name: every scalar the binding record holds, in order, under {@code _}. */
     private static void appendReadable(StringBuilder out, CoreValue value) {
         switch (value) {
+            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
+                    appendReadable(out, WireForm.applicationIn(token).get());
             case TokenValue token -> out.append('_')
                     .append(InternalName.part(
                             NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
@@ -83,6 +85,17 @@ final class DerivedName {
                 appendReadable(out, entry.value().coreValue());
             });
             default -> out.append("_v");
+        }
+    }
+
+    /** An application in a slot, readable as its head and arguments. */
+    private static void appendReadable(StringBuilder out, TypeRef application) {
+        out.append('_').append(InternalName.part(application.name()));
+        for (TypeArgument argument : application.arguments()) {
+            switch (argument) {
+                case TypeArgument.Ref ref -> appendReadable(out, ref.ref());
+                case TypeArgument.Value value -> out.append('_').append(InternalName.part(canonicalText(value.value())));
+            }
         }
     }
 
@@ -105,6 +118,12 @@ final class DerivedName {
 
     private static void appendValue(StringBuilder out, CoreValue value) {
         switch (value) {
+            // An application in a slot is its parsed form, so two spellings of one are one binding (§8.2).
+            case TokenValue token when WireForm.applicationIn(token).isPresent() -> {
+                TypeRef application = WireForm.applicationIn(token).get();
+                out.append('p');
+                appendRef(out, application);
+            }
             case TokenValue token -> {
                 // The form by name, not ordinal: inserting a TokenForm constant would renumber every ordinal
                 // invisibly, which is the same hazard as hashing a record's toString.
@@ -154,15 +173,7 @@ final class DerivedName {
         appendText(canonical.append('A'), head);
         canonical.append('(');
         for (TypeArgument argument : arguments) {
-            switch (argument) {
-                case TypeArgument.Ref ref -> appendRef(canonical.append('r'), ref.ref());
-                case TypeArgument.Value value -> {
-                    // The form by name, not ordinal: inserting a constant would renumber every ordinal.
-                    appendText(canonical.append('v'), value.value().form().name());
-                    appendNumberAware(canonical, value.value().text(),
-                            value.value().form() == Token.Form.UNQUOTED);
-                }
-            }
+            appendArgument(canonical, argument);
         }
         return canonical.append(')').toString();
     }
@@ -171,16 +182,28 @@ final class DerivedName {
         appendText(out.append('n'), ref.name());
         out.append('(');
         for (TypeArgument argument : ref.arguments()) {
-            switch (argument) {
-                case TypeArgument.Ref nested -> appendRef(out.append('r'), nested.ref());
-                case TypeArgument.Value value -> {
-                    appendText(out.append('v'), value.value().form().name());
-                    appendNumberAware(out, value.value().text(),
-                            value.value().form() == Token.Form.UNQUOTED);
-                }
-            }
+            appendArgument(out, argument);
         }
         out.append(')');
+    }
+
+    /**
+     * One argument, as the reference grammar parses it: an unquoted token that is no number renders as the
+     * reference it parses as, whether a resolver filed it as a value at its parameter or not, so {@code names<red>}
+     * is one application however it was read (SPEC-FEEDBACK.md #12).
+     */
+    private static void appendArgument(StringBuilder out, TypeArgument argument) {
+        switch (argument) {
+            case TypeArgument.Ref ref -> appendRef(out.append('r'), ref.ref());
+            case TypeArgument.Value value when value.value().form() == Token.Form.UNQUOTED
+                    && NumericIdentity.of(value.value().text(), true) == null ->
+                    appendRef(out.append('r'), TypeRef.of(value.value().text()));
+            case TypeArgument.Value value -> {
+                // The form by name, not ordinal: inserting a constant would renumber every ordinal.
+                appendText(out.append('v'), value.value().form().name());
+                appendNumberAware(out, value.value().text(), value.value().form() == Token.Form.UNQUOTED);
+            }
+        }
     }
 
     /** A value argument's readable segment, with §4.3's numeric equivalence applied ({@link NumericIdentity}). */

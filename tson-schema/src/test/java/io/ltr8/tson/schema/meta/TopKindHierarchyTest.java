@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.meta;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -11,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies the {@link Top}/{@link Atom}/{@link Product}/{@link Sum} hierarchy actually replicates
  * the kernel's own composition chain (`atom => top & {}`, `product => top & { ... }`, `sum => top &
- * {}`, `alias => top & { target: type_ref }`, Part 2 §4.1) as real Java subtyping.
+ * {}`, `alias => top & { target: type_kind }`, Part 2 §4.1) as real Java subtyping.
  *
  * <p>There's no need to also assert e.g. {@code !(unit instanceof Product)} -- {@code Product}'s
  * own {@code permits} list doesn't name {@link ValueType} (a {@code final} record), so the compiler
@@ -64,7 +65,7 @@ class TopKindHierarchyTest {
      */
     @Test
     void aReferenceIsItsOf() {
-        ReferenceBody linked = new ReferenceBody("uuid_type").linked(true, List.of("stock_id", "customer_id"));
+        ReferenceBody linked = new ReferenceBody("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of());
 
         assertEquals(new ReferenceBody("uuid_type"), linked);
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
@@ -75,7 +76,7 @@ class TopKindHierarchyTest {
 
     @Test
     void aliasIsTopDirectlyNotThroughAnyBaseKind() {
-        // alias => top & { target: type_ref } -- composes with top directly, not through
+        // alias => top & { target: type_kind } -- composes with top directly, not through
         // atom/product/sum, so Alias implements Top but is sealed out of all three base kinds
         // (Alias isn't in Atom's/Product's/Sum's own permits lists).
         Alias alias = new Alias(TypeRef.of("token"));

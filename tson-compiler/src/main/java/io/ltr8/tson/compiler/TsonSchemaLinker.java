@@ -71,6 +71,7 @@ import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.Type;
@@ -114,7 +115,7 @@ import java.util.stream.Collectors;
  * link a schema before registering it, same as any other caller. Identities are canonicalized through
  * {@link CanonicalIdentity}, which lives in {@code tson-base}, shared with the registries that key on it.
  *
- * <p><b>No materialization.</b> An argument-bearing {@code type_ref} does not become a synthesized entry
+ * <p><b>No materialization.</b> A reference carrying arguments does not become a synthesized entry
  * here. {@code SchemaDesugarer} turns every sugar form into a real declaration plus a bare reference, where
  * the AST and the closure's constructor vocabulary are both still in hand -- which is what lets it
  * bind the constructor generically and so cover every shape, rather than the per-shape assemblers a
@@ -700,7 +701,7 @@ public final class TsonSchemaLinker {
                 enumForms.put(name, form);
             }
         }
-        merged = computeKinds(merged, facts, merged::get);
+        merged = computeKinds(merged, facts, merged::get, applications);
         merged = computeDisjointness(merged);
         // Before the name checks: a member that is not a value of its enum's name type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
@@ -769,7 +770,7 @@ public final class TsonSchemaLinker {
      *
      * <p><b>Local entries only</b>, as for inhabitance: an imported body's names were judged when its own schema
      * linked, in its own namespace, and judging them again here would be judging them in the wrong one. Runs
-     * after {@link #validateEntry}, so a body's unresolved {@code type_ref} is reported first and on its own.
+     * after {@link #validateEntry}, so a body's unresolved reference is reported first and on its own.
      */
     private static void checkValuesByName(TsonSchema schema, Map<String, Top> merged,
                                           Map<String, TsonSchema.EntryFacts> facts,
@@ -1058,7 +1059,9 @@ public final class TsonSchemaLinker {
      * names a constructor ({@link KindMembers#namesTypes}), and for one that does, the names it admits, by {@link
      * KindMembers}' construction walk. Every reference in the closure is recomputed, an imported one included: the
      * index is computed over the <em>governing</em> schema's closure, so one reference holds different members in two
-     * schemas importing different sets, and whatever a body arrived carrying is discarded rather than trusted. The
+     * schemas importing different sets, and whatever a body arrived carrying is discarded rather than trusted. A
+     * reference over a constructor also carries the applications the closure records ({@code @application}), each
+     * with the entry it denotes, so a data value written as an application is judged through that entry. The
      * index is never written: resolved output states {@code of} alone.
      *
      * <p>Before the name-type checks, {@code checkNames} and validation, and after {@link #computeSubtypes}, which
@@ -1069,7 +1072,9 @@ public final class TsonSchemaLinker {
      * @param structure where a constructor is looked up first: the schema's one namespace, as {@code merged} is
      */
     private static Map<String, Top> computeKinds(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                                 Function<String, Top> structure) {
+                                                 Function<String, Top> structure, Map<String, TypeRef> applications) {
+        Map<TypeRef, String> denoted = new LinkedHashMap<>();
+        applications.forEach((name, application) -> denoted.putIfAbsent(application, name));
         Map<String, Top> result = null;
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             if (entry.getValue() instanceof ReferenceBody reference) {
@@ -1079,7 +1084,7 @@ public final class TsonSchemaLinker {
                 if (result == null) {
                     result = new LinkedHashMap<>(merged);
                 }
-                result.put(entry.getKey(), reference.linked(namesTypes, members));
+                result.put(entry.getKey(), reference.linked(namesTypes, members, namesTypes ? denoted : Map.of()));
             }
         }
         return result == null ? merged : result;
@@ -1687,8 +1692,9 @@ public final class TsonSchemaLinker {
      *
      * <p>A slot typed {@code type_kind} holds the name of a type a value can have: resolved, then judged a member of
      * the kind ({@link KindMembers}) where {@code constructors} is given, and a value entry refused with its own
-     * diagnostic. A constructor is a member: its value is a record, whose instances are declarations. A {@code
-     * type_ref} slot passes {@code null} and is judged by resolution alone.
+     * diagnostic. A constructor is a member: its value is a record, whose instances are declarations. An alias's
+     * target passes {@code null} and is judged by resolution alone, an alias of a constructor being applied as its
+     * target is.
      */
     private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace,
                                          List<String> ownParameters, Function<String, Optional<String>> constructors,
@@ -1713,13 +1719,29 @@ public final class TsonSchemaLinker {
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is no type a value "
                     + "can have -- a slot typed 'type_kind' holds the name of an entry whose value is of 'type'");
         }
-        for (TypeArgument arg : ref.arguments()) {
-            if (arg instanceof TypeArgument.Ref nested) {
-                validateTypeRef(nested.ref(), namespace, ownParameters, constructors, subject,
-                        trail);
-            }
-            // TypeArgument.Value is a literal token, not a type reference -- nothing to validate.
+        for (TypeRef nested : typeArguments(ref, namespace)) {
+            validateTypeRef(nested, namespace, ownParameters, constructors, subject, trail);
         }
+    }
+
+    /**
+     * The arguments of {@code application} that bind a type: each reference at a type parameter of its head, or
+     * every reference where the head's parameters are not in reach. An argument is a reference or a token and is
+     * typed where it lands (§5.10), so {@code names<red>} at a value parameter is the token {@code red}, judged
+     * against the parameter's type when the application closes and never as a type's name.
+     */
+    private static List<TypeRef> typeArguments(TypeRef application, Map<String, Top> namespace) {
+        Top head = namespace.get(application.name());
+        List<TemplateParam> parameters = head == null ? List.of() : OpenEntry.parameters(head);
+        boolean judged = parameters.size() == application.arguments().size();
+        List<TypeRef> types = new ArrayList<>();
+        for (int i = 0; i < application.arguments().size(); i++) {
+            if (application.arguments().get(i) instanceof TypeArgument.Ref nested
+                    && (!judged || parameters.get(i).isTypeParameter())) {
+                types.add(nested.ref());
+            }
+        }
+        return types;
     }
 
     /**
@@ -1744,10 +1766,8 @@ public final class TsonSchemaLinker {
             Map<String, Top> namespace, List<String> ownParameters) {
         for (TypeRef application : HeldBody.of(held).applications()) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
-            for (TypeArgument argument : application.arguments()) {
-                if (argument instanceof TypeArgument.Ref nested) {
-                    checkArity(nested.ref(), namespace, ownParameters, "'" + entryName + "'");
-                }
+            for (TypeRef nested : typeArguments(application, namespace)) {
+                checkArity(nested, namespace, ownParameters, "'" + entryName + "'");
             }
         }
     }
@@ -1771,9 +1791,8 @@ public final class TsonSchemaLinker {
      * <p>A reference naming one of the enclosing declaration's own <em>parameters</em> has no arity to check
      * -- a parameter is not an entry and declares nothing -- but it is not simply skipped: §5.10 admits no
      * head abstraction, so a parameter carrying an argument list is refused here, where the author wrote it.
-     * Left to run, {@code <T> { v: T<text> }} substitutes whatever {@code T} binds into a {@code type_name}
-     * slot, and an argument-bearing binding lands there as {@code type_ref}'s record form -- reported one
-     * phase later as a wire-vocabulary mismatch, which names none of what the author did.
+     * Left to run, {@code <T> { v: T<text> }} would substitute whatever {@code T} binds into an application's
+     * head, which names none of what the author did.
      */
     private static void checkArity(TypeRef ref, Map<String, Top> namespace,
                                     List<String> ownParameters, String context) {

@@ -161,7 +161,7 @@ refusal and not a verdict, whichever order the chain is reached in; the bundled 
 whatever a deployment sets.
 
 The kernel measured from `meta-kernel-resolved.tn`'s own declarations, no compiled reader consulted, has one wait
-cycle, holding `record` and 29 more of the 79 entries (`boolean`, `integer`, `text`, `identifier`,
+cycle, holding `record` and 28 more of the 74 entries (`boolean`, `integer`, `text`, `identifier`,
 `non_negative_integer`, the enum and set machinery, `field_group`, `namespace` and `field_map`, and the synthetics
 they name), every other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`:
 annotating itself with `@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap
@@ -197,11 +197,11 @@ The rule is 1; the rest are its consequences.
    declaration is read against its head (`C` in `!C { … }`, the source's constructor in `!I ^ { … }`) and waits as
    well on each refinement source and `&` operand, since it starts from their declarations. An alias is ready when its
    target is; a closed application when its materialised body is.
-2. **A reference orders nothing.** A name at a slot typed `type_kind`, `kind<C>`, `ref<T>` or `type_ref` is read by
-   its atom's grammar alone; what it names is resolved and judged once every entry is ready (§4.2, §8.3). So
-   `tree => { t: tree }`, mutual recursion, and a constructor whose facet is typed by its own instance
+2. **A reference orders nothing.** A name at a slot typed `type_kind`, `kind<C>` or `ref<T>`, an application among
+   them (#12), is read by its atom's grammar alone; what it names is resolved and judged once every entry is ready
+   (§4.2, §8.3). So `tree => { t: tree }`, mutual recursion, and a constructor whose facet is typed by its own instance
    (`decimal_type => atom & { min?: number }` beside `number => !decimal_type {}`) are sound.
-3. **A held value orders nothing.** A `value`-typed slot (a field's default or pin, a type argument's value) and a
+3. **A held value orders nothing.** A `value`-typed slot (a field's default or pin) and a
    template's body hold what a schemaless read gives ([TSON-DATA] §4), and bind as written: a pin or default is not
    decoded through its type when the reader carrying it is built, but judged against its type once every entry is
    ready, still at load (rule 6). Where a declaration names the type a form reads against, a read reaches that type
@@ -521,7 +521,7 @@ says "reference" leaves the reader to work out which of the two it means.
 
 **What is running.**
 
-- **The kernel declares `alias => top & { target: type_ref }`.** An alias body is `!alias { target: T }`, written
+- **The kernel declares `alias => top & { target: type_kind }`** (#12). An alias body is `!alias { target: T }`, written
   explicitly or derived from `name => T`, and its kind is ALIAS. The kernel's and meta.tn's resolved forms state
   `!alias` for `type_name`, `field_name`, `param_name`, `annotation`, `doc` and the annotation markers.
 - **§8.3's walk is the alias chain.** Policy's limit is `max_alias_chain`, default 64, and diagnostics that walk it say
@@ -536,8 +536,8 @@ entry: `!alias { target: T }`". §8.1's record paragraph and table name `alias` 
 "reference chain" becomes "alias chain": §4.3, §5.2, §5.4, §5.7, §5.10, §5.12, §6, §7.2, §8.1 to §8.3, and §11.5's
 row. §7.2's phrase becomes "after alias flattening of both", §5.10's "reference template" (`id => <T> T`, a partial
 application) becomes "alias template", and §12.1's `instance` comment names the kernel's `alias`.
-"Reference" keeps one meaning: a name held in a slot, as in §4.2's `ref<T>`, §5.12's qualified name and §8.1's
-`type_ref`.
+"Reference" keeps one meaning: a name held in a slot, as in §4.2's `ref<T>` and §5.12's qualified name, an
+application being one with arguments (#12).
 
 ## 11. [TSON-SCHEMA] §4.1, §4.2, §5.12, §7.4, §8.1 — one reference atom, and a constructor is a record type
 
@@ -555,8 +555,9 @@ atom & { … }`) and a record type's values are records.
 
 - **One atom.** The kernel declares `reference => atom & { of: type_name }`, with `kind => <T> !reference { of: T }`
   and `ref => <T> !reference { of: T }` its two spellings; `identifier_kind`, `atom_kind` and `type_kind` are
-  `!reference { of: … }`. `kind_type` and `ref_type` are gone, and the kernel holds 78 entries (69 declarations).
-  `kind<order>` and `ref<order>` expand to one content and mint one entry.
+  `!reference { of: … }`. `kind_type` and `ref_type` are gone, and with #12's removal of `type_ref` and
+  `type_argument` the kernel holds 74 entries (67 declarations). `kind<order>` and `ref<order>` expand to one content
+  and mint one entry.
 - **The slot's meaning comes from `of`, never from the spelling.** Where `of` is a constructor, `top` or IS-A it, the
   values it admits are types: the slot holds a type's name, judged a member over the governing closure and delivered
   to a host as a `TypeRef`. Where `of` is any other type, the values it admits are values: the slot holds a value's
@@ -597,3 +598,136 @@ atom & { … }`) and a record type's values are records.
 **Open.** One spelling or two: `kind<X>` and `ref<X>` are one application and cannot differ by spelling, so a
 remaining difference would have to be in what the slot does with the name. A type's name is one segment and a value's
 a qualified name; one grammar for both waits on qualified names at type positions.
+
+## 12. [TSON-SCHEMA] §4.2, §5.10, §8.1, §8.2, §12.1 — an application is a reference value
+
+**Problem.** A type is named in two value forms. A bare name is a value of the `reference` atom (#11); an application
+still open in resolved output, an alias's target, a record template's parents, the `application` annotation, is the
+§8.1 record `type_ref { name  arguments?: [type_argument] }`, with `type_argument { ( name: type_ref | value: value ) }`.
+The record exists only so a value argument has somewhere to sit, and that somewhere is the kernel's last `value`-typed
+slot outside facets and defaults. It also says nothing the token does not: §12.1 already reads an argument by its
+token, a number or quoted token as a value and anything else as a reference, and leaves the head's parameters to
+judge which it binds.
+
+**What is running.**
+
+- **One grammar, one value.** A reference is segments joined by `.`, optionally followed by `<` arguments `>`; an
+  argument is a reference or a token (a number or a quoted token), positional against the head's parameters, and
+  separated as §12.1's `type-args` are. The `reference` atom's values are this grammar, read by one parser
+  (`ReferenceGrammar`) into the same parsed form the schema grammar's type positions produce; those keep their own
+  parser, since a type position also admits the sugar forms a reference never holds.
+- **`type_ref` and `type_argument` are gone.** `alias.target`, `type_chain.parents` and the `application` annotation
+  are typed `type_kind`. The kernel holds 74 entries (67 declarations).
+- **Canonical text, quoted in data.** No whitespace, one space between arguments: `result<T>`, `map<text integer>`,
+  `maxint<10>`. `<` is reserved in data ([TSON-DATA] §7.1), so a reference carrying arguments is written as one quoted
+  token wherever it stands in data: `@application:"response<order 201>"`, `chain: { parents: ["result<T>"] }`, an
+  open alias's held text `!alias { target: "pair<uuid B>" }`, and a value document's `t: "set<text>"`. A reference
+  without arguments stays one unquoted token. A quoted token that does not parse as a reference with arguments is
+  text, and one that opens an argument list it never closes is refused with the grammar's reason. Part 1 is
+  unchanged.
+- **Identity is the parsed form.** Whitespace inside an argument list is free: `"box< text >"` at an element type and
+  `box<text>` at a type position close to one entry. An argument's channel is no part of the reference: `names<red>`
+  is one application whether `red` was read as a reference or filed as a value at its parameter.
+- **Arguments are typed where they land.** A type argument is judged against the parameter's `bound`; a value
+  argument is a token of the parameter's type, substituted into the body, which is read as the constructor's
+  instance (`maxint<10>` closes to `!integer_type { max: 10 }`). The linker judges as type names only the arguments
+  at the head's type parameters.
+- **A closed application still lifts and is named bare** (§5.3); arguments survive only where an application is open.
+- **In a held body** an application is the quoted token, and substitution rewrites a parameter named among its
+  arguments. The cost: a quoted text literal in a held body that is itself a well-formed application is read as one.
+- **In a value body** an application at a kind-typed slot is refused, as the braced record was, and the alias
+  spelling named: nothing lifts or mints there.
+- **In a data document** a kind-typed slot may name an applied type, `t: "set<text>"`, judged through the entry it
+  denotes: the one the closure records it as (`names => set<text>`, an instantiation entry). An application the
+  closure records no entry for is this library's gap (`NOT_IMPLEMENTED`): an expansion nothing declares is named
+  by its content, which a data read does not compute.
+- `value_type` stays: meta.tn's facets and `record_field.value` still use `value`.
+
+**Resolution, a proposal.**
+
+- §4.2: the `reference` atom's values are the reference grammar above, with its canonical text; a value carrying
+  arguments is an application and stands where one is still open.
+- §8.1: `type_ref` and `type_argument` go from the kernel table; `alias.target`, `type_chain.parents` and
+  `application` are typed `type_kind`; resolved output writes an open application as its quoted canonical text.
+- §8.2: identity compares a reference's parsed form, its head, and its arguments as references or tokens, never the
+  text or the channel a processor filed an argument in.
+- §5.10 and §12.1: an argument is a reference or a token by the grammar, and typed by the head's parameter; a
+  parameter standing in an argument is its name, in held text as in a record template.
+- §4.2: a kind-typed slot in data may hold an application, quoted, resolving to the entry it denotes by structural
+  identity.
+
+**Open.** How a data read finds the entry an application nothing declares denotes: by expanding it against the
+closure, which needs the resolver at read time, or by the resolver recording every application it closes beside the
+entries, which resolved output does not carry.
+
+## 13. [TSON-DATA] §4, §7.2.5, §7.4, §7.5, §7.7; [TSON-SCHEMA] §8.1, §12.1, §12.3 — a reference in data is grammar
+
+**Problem.** #12 writes a reference that carries arguments as one quoted token wherever it stands in data
+(`target: "result<T>"`), because `<` and `>` are reserved there (§7.2.5). A quoted token is then text or a reference
+by its shape, so a held body's text literal that parses as an application is read as one. The production a data value
+needs already exists: [TSON-SCHEMA] §12.1's `type-ref` has `type-name "<" type-args ">"`. Under one level a `!T { … }`
+body is data read against `T` — a value entry, a constructor body, a resolved form, the schema document itself — so
+whatever can stand in one is data grammar. The line between the two grammars is values against sugar: [TSON-DATA] is
+every value, a reference with its arguments included, and [TSON-SCHEMA]'s grammar is the sugar at type positions that
+desugars into values (`{ a: text }`, `[T]`, `{K => V}`, `(A | B)`, `^`, `&`, `-`, `~`, `=`, `?`).
+
+**What is running.** Nothing yet; #12's quoted spelling runs. This entry is the grammar proposed to replace it, for
+agreement before it is built.
+
+**Resolution, a proposal.** Grammar only.
+
+[TSON-DATA] §7.2.5: `<` and `>` join `!` and `@` as the special characters with a grammar role in data values; the
+other eleven stay reserved by [TSON-SCHEMA]. The lexer is unchanged: each is a single-character special token, so
+`map<text list<int32>>` lexes as `map` `<` `text` `list` `<` `int32` `>` `>`.
+
+[TSON-DATA] §7.4: the reference production, [TSON-SCHEMA] §12.1's `type-name "<" type-args ">"` with a qualified
+head, moves into the data grammar, with arguments limited to what data can spell.
+
+```
+core-value  = record / map / array
+            / empty-brace / void / reference / token
+
+reference   = qualified-name "<" ws type-args ws ">"
+            ; "<" adjacent to the qualified-name (§7.5)
+type-args   = type-arg *(separator type-arg) [ ws "," ]
+            ; separator = ws "," ws / ws1, as [TSON-SCHEMA] §12.1
+type-arg    = reference / token
+            ; a token that is a qualified-name is a reference with no
+            ; arguments; any other token (a number, a quoted token)
+            ; is a value argument. A quoted token is never a reference.
+qualified-name = unquoted-token
+            ; segments joined by "." (§7.7), each an identifier:
+            ; `order`, `geo.address`. One token, since "." is a
+            ; token character.
+```
+
+- **One value.** `geo.address<T>` is data syntax delivered as one `reference` atom value, the arguments part of the
+  reference. The parser builds the head and its arguments, nested to any depth, and a position typed by the
+  `reference` atom rolls the tree up into one value; a qualified name without arguments is one token, rolled up the
+  same way. An atom says what a value is, not how many tokens spell it. At any other typed position a reference with
+  arguments is a type mismatch.
+- **Where it stands.** Anywhere a core value does, a map key included. A `!` tag stays `"!" identifier`, with no
+  arguments.
+- **No sugar in data.** `[T]`, `{K => V}` and `(A | B)` are [TSON-SCHEMA]'s, and `[` and `{` are structure in data, so
+  a data argument is a reference or a token. An applied sugar form is named by the entry that declares it.
+
+[TSON-DATA] §7.5: one row, `<` (reference arguments) MUST be adjacent to the preceding unquoted token; whitespace inside the
+argument list is free. `>>` is two tokens.
+
+[TSON-DATA] §4: a schemaless read keeps a reference with arguments as a structured value, its head and arguments,
+resolving nothing; a Class 1 processor no longer refuses one.
+
+[TSON-SCHEMA] §12.1: `type-ref`'s `type-name "<" type-args ">"` is the data production with the schema's wider
+`type-arg = type-ref / value-literal`, so a schema argument may be sugar; `type-name` becomes `qualified-name` there,
+in `supertype-ref` and in `map-key`. §12.3 gains the adjacency row for `<`.
+
+[TSON-SCHEMA] §8.1: an open application in resolved output is written as it is in source, unquoted:
+`!alias { target: result<T> }`, `@application: response<order 201>`, `parents: [result<T>]`. Identity is the parsed
+tree (§8.2), so whitespace inside the list is free; canonical output has one space between arguments and no comma.
+
+[TSON-JSON]: a JSON string holding the same text, read by the same production; JSON has no unquoted form.
+
+**Open.**
+- Resolving a qualified head (`geo.address<T>` walking `geo`'s `!schema` map) lands with qualified names at type
+  positions and qualified tags (one-level step 6c); the grammar admits it here.
+- Whether a value argument may be any token, or only those §12.1's `value-literal` admits.

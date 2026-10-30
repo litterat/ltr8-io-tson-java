@@ -80,7 +80,7 @@ class OpenEntryResolvedFormTest {
      * implementation's.
      *
      * <p>It passes because the only templates the bundled schemas declare put every parameter in a {@code
-     * type_ref} slot ({@code set<T>}, {@code kind<T>}, {@code tuple1<T>}), which is exactly the
+     * type_kind} slot ({@code set<T>}, {@code kind<T>}, {@code tuple1<T>}), which is exactly the
      * case §8.1's premise covers. It is a regression guard, not evidence that the premise is sound; the next
      * test is the counterexample.
      */
@@ -121,7 +121,7 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !schema {
                   vector => !template {
-                    parameters: [ { name: T  type: type_ref } { name: N  type: non_negative_integer } ]
+                    parameters: [ { name: T  type: type_kind } { name: N  type: non_negative_integer } ]
                     template: "!array { element_type: T  min_items: N  max_items: N }"
                   }
                 }

@@ -8,7 +8,7 @@ package io.ltr8.tson.schema.meta;
  * the kernel's own composition chain as real Java subtyping: {@code type => top & {}} becomes
  * {@link Type}, and {@code atom => type & {}}, {@code product => type & { ... }} and
  * {@code sum => type & {}} become {@link Atom}/{@link Product}/{@link Sum} each {@code extends Type};
- * {@code alias => top & { target: type_ref } } (which composes with {@code top} directly, not
+ * {@code alias => top & { target: type_kind } } (which composes with {@code top} directly, not
  * through {@code type}) becomes {@link Alias} implementing this interface directly. Lets a consumer
  * test kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product} rather than
  * switching on {@link EntryKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same

@@ -983,9 +983,8 @@ public final class SchemaResolver {
      * <p><b>It cannot wait for the linker</b>, which checks the rest of §5.10's arity rule off the same
      * accessor: materialisation runs first, and by then the parameter has been substituted away. What
      * arrives at the {@code type_name} head is then whatever bound it -- a bare entry name if the argument
-     * was closed, reported as an arity error against a content-derived name nobody typed, or {@code
-     * type_ref}'s record form if it was not, reported as a wire-vocabulary mismatch. Neither names what the
-     * author did.
+     * was closed, reported as an arity error against a content-derived name nobody typed, or an application if
+     * it was not. Neither names what the author did.
      */
     private static void refuseHeadAbstraction(String name, Top resolved) {
         if (!OpenEntry.isOpen(resolved)) {

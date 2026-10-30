@@ -14,6 +14,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -137,9 +138,9 @@ public final class HeldBody {
      * Every unquoted name this body mentions, at any depth -- the one question §5.10 asks at link time: a
      * declared parameter the body never references is an author error.
      *
-     * <p>What it returns is exactly the set of tokens substitution would rewrite -- unquoted ones, a quoted
-     * token in a value slot being a literal and never a name -- or the check and the rewrite disagree about
-     * what a parameter reference is.
+     * <p>What it returns is exactly the set of names substitution would rewrite -- unquoted tokens, and the names
+     * an application's text writes, any other quoted token being a literal and never a name -- or the check and the
+     * rewrite disagree about what a parameter reference is.
      */
     public Set<String> names() {
         Set<String> names = new LinkedHashSet<>();
@@ -167,14 +168,14 @@ public final class HeldBody {
     }
 
     /**
-     * Every {@code type_ref} record form the held tree holds. It does <b>not</b> descend into one it finds:
-     * an application's own arguments come back inside the {@link TypeRef} it yields, and the caller that
-     * cares about nesting walks those -- descending here as well would report each nested application twice.
+     * Every application the held tree holds ({@link WireForm#applicationIn}). An application's own arguments come
+     * back inside the {@link TypeRef} it yields, and the caller that cares about nesting walks those -- descending
+     * here as well would report each nested application twice.
      */
     private static void collectApplications(CoreValue value, List<TypeRef> into) {
         switch (value) {
-            case RecordValue record when WireForm.isApplication(record) ->
-                    into.add(WireForm.typeRefOf(record));
+            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
+                    into.add(WireForm.applicationIn(token).get());
             case RecordValue record -> record.fields()
                     .forEach(field -> collectApplications(field.value().coreValue(), into));
             case ArrayValue array -> array.elements()
@@ -191,6 +192,8 @@ public final class HeldBody {
     private static void collect(CoreValue value, Set<String> into) {
         switch (value) {
             case TokenValue token when token.form() == TokenForm.UNQUOTED -> into.add(token.text());
+            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
+                    collect(WireForm.applicationIn(token).get(), into);
             case ArrayValue array -> array.elements()
                     .forEach(element -> collect(element.coreValue(), into));
             case RecordValue record -> record.fields()
@@ -202,6 +205,16 @@ public final class HeldBody {
                 collect(entry.value().coreValue(), into);
             });
             default -> { } // a quoted token is a literal, and nothing else carries a name
+        }
+    }
+
+    /** An application's head and every name its arguments write, at any depth. */
+    private static void collect(TypeRef application, Set<String> into) {
+        into.add(application.name());
+        for (TypeArgument argument : application.arguments()) {
+            if (argument instanceof TypeArgument.Ref ref) {
+                collect(ref.ref(), into);
+            }
         }
     }
 }

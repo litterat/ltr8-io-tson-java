@@ -193,38 +193,27 @@ a singleton, which is the overwhelming majority of them.
 ## Untagged labelled choices (`reader/GroupUnionBindReader`)
 
 **A record whose fields form one non-optional group, bound onto a Java sealed interface whose members carry those
-fields one apiece.** The kernel's `type_argument => { ( name: type_ref | value: value ) }` is the case that
-forces it: a record with no subtypes otherwise binds only onto a record descriptor (`requireRecord`), so
-without this reader no `type_ref` carrying `arguments` could be read at all.
+fields one apiece**, such as `amount => { ( cents: int64 | text: text ) }`. A record with no subtypes otherwise binds
+only onto a record descriptor (`requireRecord`), so without this reader a sealed-interface host could not hold one.
 
 - **The present field is the discriminator**, which is what separates this from `VariantBindReader`. There is
-  no `!typeName` to dispatch on, and §5.6 makes one unavailable in principle: the kernel gives this record no
-  positional form precisely because a bare token could not say which member it was. So the record is read the
-  ordinary way — `RecordAbstractReader` already owns the framing — and the member is chosen by what arrived.
+  no `!typeName` to dispatch on, and §5.6 makes one unavailable in principle: such a record has no positional
+  form, because a bare token could not say which member it was. So the record is read the ordinary way —
+  `RecordAbstractReader` already owns the framing — and the member is chosen by what arrived.
 - **Members match fields by the member's own single component wire-name** (`@Field` where present, the
   component name otherwise). A member of a labelled choice carries exactly the field it is the label for, so
   the component *is* the field; matching on anything else would need a second table to keep in step with the
-  first. `TypeArgument.Ref` carries `@Field("name")` for this reason, which also brings `toTson` closer to the
-  kernel's own spelling.
+  first.
 - **Three conditions are checked, not assumed** — union target, one non-optional group covering every field, and
   every member carrying one component named for one of those fields. A near-miss falls through to the
   ordinary record path and is reported there; guessing at a partial match would bind a member to a field it
   does not carry.
 - **The group rule is the whole contract**, so `validateGroups` is what guarantees exactly one member arrived
   — an empty record and a two-field one are both reported before anything is constructed.
-- **A slot may want the raw token rather than the value it denotes**, and the choice has to be made *before*
-  the read: `type_argument`'s value channel is typed `value`, whose reader decodes (§4), but the union member
-  it fills carries a `Token` — §5.10 calls a type argument's literal a bare token rather than the value it
-  denotes, and a decoded host object cannot fill one. So the factory picks `RawTokenParser` for a slot whose
-  bound component is `schema.meta.Token`, by the component's own Java type — and refuses to build at all if
-  two group members share a slot type and disagree, since the resolver is keyed by type name and could not
-  serve both.
-  - **The token reaches identity, and §4.3's equivalence is applied there** (`NumericIdentity`), so
-    `vector<float32, 255>` and `vector<float32, 0xFF>` are one application rather than two entries with
-    byte-identical bodies. The stake is a verdict: §5.4 can only ask "are these variants distinct types?" of
-    entry names, so two names for one type admitted `( [float32; 255] | [float32; 0xFF] )` — a choice between
-    two identical, non-disjoint variants no untagged read can discriminate — where two spellings of one name
-    were refused. §8.2 settles it in exactly these terms — a value argument is "recorded as written" and
-    compared as the value the token denotes under §4, "and no wider" — so resolved output still shows the
-    author's spelling while identity sees one argument.
+- **A member may want the raw token rather than the value it denotes**, and the choice has to be made *before*
+  the read: a `value`-typed field's reader decodes (§4), and a member whose component is a `schema.meta.Token`
+  gets `RawTokenParser` instead, by the component's own Java type. The factory refuses to build at all if two
+  group members share a slot type and disagree, since the resolver is keyed by type name and could not serve
+  both. (A value argument of an application never comes this way: the reference grammar keeps its token,
+  and `NumericIdentity` applies §4.3's equivalence to it, `design/desugaring-open-forms-and-templates.md`.)
 - **Bind mode only.** Tree mode reads into `TsonValue` and has no Java shape to satisfy.
