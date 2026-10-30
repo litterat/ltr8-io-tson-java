@@ -10,9 +10,12 @@ facts and refinement, groups, subtraction, and the exception boundary.
   `!!import`s (SPEC-FEEDBACK.md #7). An annotation on a declaration resolves there (§3.3.3); a
   name that misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its
   type. Only the meta-kernel bootstrap, resolving `meta-kernel.tn` itself, skips the check.
-- A read against a declaration of the same document — `!C { … }` with `C` local, or an annotation whose type is
-  local — is a gap, refused as `NOT_IMPLEMENTED` (`DefinitionResolver.notYetReadable`); the kernel's bootstrap,
-  which reads in wait order, is the exception.
+- Every declaration is made ready in wait order (`WaitOrder`, §3.4.1), never source order: a read against an entry
+  of the same document — `!C { … }` with `C` local, a value of a local type, an annotation whose type is local —
+  makes that entry ready first, in either order. Entries waiting on each other are a `SchemaValidationException`
+  naming the cycle; a chain past §11.5's wait depth is a `SchemaRefusalException(LIMIT_EXCEEDED)`.
+- A judgement that walks a name to what it names (§5.8's one name type, `requireOneNameType`) is deferred and run by
+  `DefinitionResolver.judgeDeferred` once every entry is ready, so it never makes an entry wait.
 - `abstract`/`final` are grammar, not annotations; `=?` is field syntax; and the definition mark is applied once, in
   `DefinitionResolver.resolve` (`withExtension`), never inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
@@ -40,8 +43,8 @@ facts and refinement, groups, subtraction, and the exception boundary.
 - A field's name is its key in `record.fields` (`RecordBody.fields`, the kernel's `field_map`) and never one of its
   facts; declaration order is part of the value, and `RecordBody.equals` compares it.
 - The exception's class picks the diagnostic code (`SchemaResolver.Problems.report`): `SchemaValidationException` →
-  `SCHEMA_ERROR` (a `SchemaRefusalException` keeps its §8.2 rule's code), `UnsupportedOperationException` →
-  `NOT_IMPLEMENTED`, `BindMismatchException` → `BIND_MISMATCH`.
+  `SCHEMA_ERROR` (a `SchemaRefusalException` keeps its rule's code, §8.2's or `LIMIT_EXCEEDED`),
+  `UnsupportedOperationException` → `NOT_IMPLEMENTED`, `BindMismatchException` → `BIND_MISMATCH`.
 
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
@@ -58,28 +61,60 @@ local declaration resolves, recording each imported entry's origin. That merge m
 — transitive, collisions decided by entry identity (§2.2.3) — because it is the same concept met one phase earlier,
 and the two are kept in step deliberately. The origins key its vocabulary: each `!C` body and annotation value is
 read through the compiled form of the schema that declared `C` or the type
-(`design/resolver-vocabulary-and-bootstrap.md`). Local declarations resolve on demand
-(`OnDemand`), so a supertype or source may be declared later; a cycle through those edges is the author's error.
+(`design/resolver-vocabulary-and-bootstrap.md`); one of this document's own is read through readers compiled from
+its entries ready so far. Local declarations are made ready in wait order (below), `OnDemand` being the `Readiness`
+that resolves one declaration and reports its failure.
 
 `DefinitionResolver` (package-private) resolves one `SchemaMap.Declaration` and never sees a document. Everything it
-consults is fixed at construction: two `DefinitionGetter`s over the one namespace, `namespaceDefinitions` the whole
-of it and `metaDefinitions` its imported part (where a construction head and an annotation name resolve, since only
-an imported entry has a compiled reader), a `sameDocument` predicate naming the local entries, the vocabulary's
+consults is fixed at construction: two `DefinitionGetter`s, `namespaceDefinitions` the whole namespace and
+`metaDefinitions` where a construction head and an annotation name resolve — the same wait order, except in the
+kernel's ordinary resolution, which resolves heads through its pre-loaded stand-in (§3.4) — the vocabulary's
 compiled reader (`DefinitionMetaReader`) and annotation reader (`AnnotationValueReader`), the `ApplicationCloser` onto the
 schema's one `TemplateMaterialiser`, and the `EntryFacts` map it shares with `SchemaResolver` and the materialiser,
 so an atom refinement finds the constructor of a source another schema declared. Its class Javadoc lists the
 shapes it dispatches and the exact exception boundary.
 
+## The wait order (`WaitOrder`, §3.4.1)
+
+One algorithm for every schema; the kernel's bootstrap and `SchemaResolver` both drive it, and what differs is only
+what is ready before it starts — the kernel's hand-built pre-loaded set, or the import closure
+(`design/resolver-vocabulary-and-bootstrap.md`). `WaitOrder` is the `DefinitionGetter` every lookup of a resolution
+goes through, so an entry is made ready the first time anything asks for it, and `readyAll` drives the rest.
+
+- **What waits.** A declaration waits on its head (`C` in `!C { … }`), its refinement source and `&` operands, the
+  types of its annotations, and every type a read of its value reaches. A name at a type position (a field's, a
+  variant's, an element's) is carried as a name for the linker and orders nothing, as a held value (a default or pin)
+  does, which a read reaching a pending declaration binds as written.
+- **Reads restart.** A value read against an entry of the same document goes through `WaitOrder.read`: readers
+  compiled from the entries ready so far, every declaration not yet ready a `PendingTypeReader`. A read reaching one
+  throws `NotReady`, that entry is made ready as a wait of the one being made ready, and the read starts over.
+- **Cycles are the author's error.** An entry reached again while it is being made ready is a
+  `SchemaValidationException` naming the cycle in wait order: `'a' waits on 'b' waits on 'a': entries waiting on each
+  other are never ready -- …`, or `'step' waits on 'step'`. A composition or refinement cycle is this same rule,
+  reached through an application too (`design/template-materialisation.md`). An alias loop is §8.3's reference-chain
+  refusal, not a wait (`WaitOrderTest.anAliasLoopIsRefusedAsAReferenceChainNotAWaitCycle`).
+- **Wait depth is counted here**, order-independently, and a chain past `LimitsPolicy.maxWaitDepth` refuses its head
+  with `LIMIT_EXCEEDED` (`design/processor-policy.md`).
+- **Rule 6: a judgement that walks a name waits for everything.** §5.8's one name type over a composition's
+  supertypes (`requireOneNameType`) walks a name type to its terminal (`field_name` → `identifier`); run during
+  resolution it would make the composition wait on what it only names. `DefinitionResolver` defers it, and
+  `judgeDeferred` runs it once every entry is ready, a failure reported against its declaration
+  (`DefinitionResolverTest.aCompositionsNameTypesAreJudgedOnceEveryEntryIsReady`).
+
+`ResolutionOrderTest` resolves each bundled schema, and a schema whose entries read each other, with its declarations
+reversed and shuffled, and gets identical output; `MetaKernelBootstrapResolverTest.theBootstrapIsTheSameInAnyOrder`
+does the same for the bootstrap.
+
 ## Annotations on a declaration
 
 Both annotation sets go through `annotationsFor`: those after `=>` land on the entry's facts (on its value), those
 before the name on the entry's key (§6 — a resolver does not hoist key to value). `SchemaResolver` catches the
-key set's failures itself, since that loop runs outside the memoized getter that catches the value set's.
+key set's failures itself, since that loop runs outside the wait order that catches the value set's.
 
 The name is checked whether or not a value was written — §6 makes `@T` shorthand for `@T:_` — so silence is never
 the outcome: an annotation keeping its name and losing its value would let the schema load clean with the
-metadata gone (`SchemaAnnotationScopeTest`). A type the schema itself declares is in the namespace but has no
-compiled reader yet, and is refused as a gap naming the remedy (declare it in a schema this one imports). A resolved
+metadata gone (`SchemaAnnotationScopeTest`). A type the schema itself declares is made ready before the value is
+read against it, and a type annotated with itself (`note => @note:"x" text`) is a wait cycle of one. A resolved
 value is read by that type's own compiled reader, a bare mark as a
 synthetic `_` (`BareAnnotationTest`). The bootstrap passes no `AnnotationValueReader`, because it is producing the
 entries such a reader would read through; there the name is kept and the value dropped.
@@ -232,10 +267,11 @@ library improves; a gap's does.* Misfiling an author error as `NOT_IMPLEMENTED` 
 fix and lifts the CLI to exit 70. All three kinds are collected per declaration, each leaving a placeholder
 (`SchemaResolver.unresolved`) that keeps the failed declaration's type parameters.
 
-- **One schema construct reaches `NOT_IMPLEMENTED`: a read against the same document** (`notYetReadable`).
-  Applying a constructor declared beside its instance, or annotating with a local type, waits on that declaration
-  being ready, which needs the wait order of SPEC-FEEDBACK.md #4; a type used by name, and an atom refinement whose
-  source is local but whose constructor is imported, order nothing and resolve. The other
+- **One schema construct reaches `NOT_IMPLEMENTED`: an instance of a user constructor of types**
+  (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `type` (`c => product & { … }`) builds
+  types, and a type's body is one of the schema model's, built only by the kernel's and meta.tn's constructors. An
+  instance of a constructor composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a
+  tree where no class binds the head — as a value entry's payload is (`design/meta-layer-namespaces.md`). The other
   `UnsupportedOperationException` sites are the catch-alls around the compiled reader (an exception none of the
   classified ones), a failed re-serialisation of an atom refinement's source, a closed application with no
   `ApplicationCloser` (a resolver built standalone), and the bootstrap's closed switch over `meta-kernel.tn`'s own

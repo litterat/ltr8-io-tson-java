@@ -9,7 +9,8 @@ check.
 - A parse that reported anything hands back no document at all; a declaration start is `name =>` back at schema-map
   depth, with depth the cursor's (`TsonDataStream.nesting()`).
 - The fail-fast paths do not route through `DiagnosticsReceiver.throwing()`; they rethrow the original untouched.
-- The resolver catches inside its memoized namespace getter (`SchemaResolver.OnDemand`), not around the driving loop.
+- The resolver catches inside its wait order (`WaitOrder`, through `SchemaResolver.OnDemand.failed`), not around the
+  driving loop.
 - A failed declaration leaves an empty-record placeholder that keeps the declaration's own type parameters; a
   desugar-reported declaration is replaced with an `absorbed` stand-in, never passed through.
 - A phase runs only if the one before it reported nothing, and a schema that reported anything is never registered —
@@ -76,10 +77,12 @@ first problem. **The fail-fast paths do not route through `DiagnosticsReceiver.t
 `ReadException`, and a schema that fails to resolve is not a read failure; the CLI's exit 1 against 70 turns on the
 distinction. They rethrow the original untouched (the linker re-states only an `UnresolvedReference`, below).
 
-- **The resolver catches inside `SchemaResolver.OnDemand`, not around the driving loop.** Resolution follows
-  dependencies, not source order, so a failure usually happens inside a *nested* resolve; catching at the loop would
-  attribute it to whichever declaration triggered it and then report the real one a second time. The memo makes it
-  exactly once, against itself — the shape `TsonSchemaCompiler.Compilation.resolve` has substituting an `ErrorReader`.
+- **The resolver catches inside its wait order, not around the driving loop.** Resolution follows waits, not source
+  order, so a failure usually happens inside a *nested* resolve; catching at the loop would attribute it to whichever
+  declaration triggered it and then report the real one a second time. `WaitOrder` hands each failure to
+  `OnDemand.failed` for the declaration that failed, exactly once, against itself; a wait-depth refusal travels to
+  the head of its chain before it is reported. It is the shape `TsonSchemaCompiler.Compilation.resolve` has
+  substituting an `ErrorReader`.
 - **A failed declaration leaves an empty-record placeholder** (`SchemaResolver.unresolved`), so its dependents still
   resolve. That is javac's error-type contract (it answers every question) rather than Swift's (every questioner must
   check first), and the choice is load-bearing: a `Sum`-bodied placeholder makes `parent => child & { ... }` fail
@@ -167,8 +170,9 @@ deliberately not deferred and throws at compile.
 exception's class: `SchemaValidationException` → `SCHEMA_ERROR` (the author's mistake), `UnsupportedOperationException`
 → `NOT_IMPLEMENTED` (a construct beyond this library), `BindMismatchException` → `BIND_MISMATCH` (the reading
 application's wiring, `ofSchemaBindMismatch`), and `SchemaRefusalException` — a `SchemaValidationException` subtype —
-keeps its [TSON-DATA] §8.2 refusal code (`ofSchemaRefusal`). The test for author error against gap: *a schema
-error's verdict doesn't change when this library improves; a gap's does.*
+keeps its refusal code (`ofSchemaRefusal`): [TSON-DATA] §8.2's for a name, `LIMIT_EXCEEDED` for §11.5's wait depth.
+The test for author error against gap: *a schema error's verdict doesn't change when this library improves; a gap's
+does.*
 
 - **Why not the channel.** Throwing a gap out of a phase that reports per declaration takes every other declaration's
   verdict with it: one unimplemented construct and a document with three ordinary mistakes reports none of them. A

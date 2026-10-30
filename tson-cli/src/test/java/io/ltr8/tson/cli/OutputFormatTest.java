@@ -41,7 +41,8 @@ class OutputFormatTest {
                     + "\"max_document_size\":16777216,\"max_elements\":1048576,\"max_entries\":1048576,"
                     + "\"max_fields\":65536,\"max_annotations\":64,\"max_values\":16777216,"
                     + "\"max_import_closure\":64,\"max_schema_entries\":65536,"
-                    + "\"max_reference_chain\":64,\"max_supertype_chain\":64,\"max_materialisation_depth\":64}}";
+                    + "\"max_reference_chain\":64,\"max_supertype_chain\":64,\"max_materialisation_depth\":64,"
+                    + "\"max_wait_depth\":64}}";
 
     @Test
     void parseAcceptsTheThreeKnownFormatsCaseInsensitively() {
@@ -365,7 +366,8 @@ class OutputFormatTest {
                 "max schema entries:         65536",
                 "max reference chain:        64",
                 "max supertype chain:        64",
-                "max materialisation depth:  64"), text);
+                "max materialisation depth:  64",
+                "max wait depth:             64"), text);
 
         Object reread = DiagnosticsSchema.compiled().get("policy")
                 .read(TestDocuments.document(OutputFormat.TSON.render(POLICY)));

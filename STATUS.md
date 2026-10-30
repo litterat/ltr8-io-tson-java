@@ -59,7 +59,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       the spec's own real `meta-kernel.tn`/`meta.tn`/`core.tn` fixtures
 - [x] Part 2 schema resolution — composition (`&`), refinement (`^`) including tightening, bare and
       generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
-      and generalized constructor-application/atom-refinement resolution (`!C value`); every declaration
+      and generalized constructor-application/atom-refinement resolution (`!C value`), every declaration
+      made ready in wait order whatever order it is written in, so a constructor, a type or an annotation
+      type may be used in the document that declares it; every declaration
       in `meta-kernel.tn`, `meta.tn` and `core.tn` resolves end to end (see [BACKLOG.md](BACKLOG.md) for
       the specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
@@ -78,9 +80,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       can `!!import` `core.tn` (itself importing `meta.tn`, which imports `meta-kernel.tn`) and
       compile cleanly with real, manually-registered Java classes bound against records composed
       from its imported vocabulary, reading real TSON data through the whole chain
-- [x] Resource limits (§9.1) — nesting depth is bounded (64 by default, `ProcessorConfig.withLimits`,
-      `tson validate --max-depth`), and a refusal is reported as `LIMIT_EXCEEDED` rather than as a
-      verdict on the document
+- [x] Resource limits (§9.1, §11.5) — nesting depth is bounded (64 by default, `ProcessorConfig.withLimits`,
+      `tson validate --max-depth`), and so is a schema's wait depth (64 by default, `--max-wait-depth`); a
+      refusal is reported as `LIMIT_EXCEEDED` rather than as a verdict on the document or schema
 - [x] The JSON encoding ([spec/tson-part3-json.md](spec/tson-part3-json.md), drafted here) — a stack of its
       own in `tson-json`: lexer, event stream, `JsonValue` tree, schemaless binding, and schema-directed
       tree reads against the same TSON schemas; `tson validate` reads `.json` files with `--schema`/`--type`

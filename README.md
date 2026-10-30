@@ -568,15 +568,16 @@ vocabulary — parse → resolve → link → register → compile → read:
    against one of its own types — the schema-validating reader (Class 2) that the schemaless
    `TsonObjectReader`/`TsonDataParser` don't attempt on their own.
 
-`Tson.standard()` wires all of this together for the standard library and hands you a `Tson`
-whose `resolve`/`compile` run the pipeline for you (as shown in the [reader table](#reading-and-writing-tson-choosing-an-entry-point)'s
-schema example) — so you rarely touch the individual stages directly. Under the hood, resolving a schema
-reads each constructor it applies (`!enum`, `!integer_type`) through the compiled form of the schema in its
-import closure that declares it. Every name a schema writes resolves in that one namespace — its own entries
-and its imports, transitively — and every name of the kernel reaches it only by import (core.tn imports
-meta.tn, which imports meta-kernel). The kernel itself imports nothing and applies only its own
-constructors, a cycle closed by pre-loading a hand-written bootstrap (`MetaKernelBootstrapResolver`) rather
-than resolving it from a document. See
+`Tson.standard()` wires all of this together for the standard library and hands you a `Tson` whose `resolve`/`compile`
+run the pipeline for you (as shown in the [reader table](#reading-and-writing-tson-choosing-an-entry-point)'s schema
+example) — so you rarely touch the individual stages directly. Under the hood, resolving a schema reads each constructor
+it applies (`!enum`, `!integer_type`) through the compiled form of the schema in its import closure that declares it,
+or, for one the schema declares itself, through readers compiled from its entries ready so far: every declaration is
+made ready in wait order, whatever order it is written in, so a constructor and its instances, or a type and a value of
+it, may share a document either way round. Every name a schema writes resolves in that one namespace — its own entries
+and its imports, transitively — and every name of the kernel reaches it only by import (core.tn imports meta.tn, which
+imports meta-kernel). The kernel itself imports nothing and applies only its own constructors, a cycle closed by
+pre-loading a hand-written bootstrap (`MetaKernelBootstrapResolver`) rather than resolving it from a document. See
 [design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
 including how meta-kernel/meta.tn/core.tn are loaded and registered together.
 
@@ -622,12 +623,13 @@ policy options (validate, compile, policy):
   --token-policy <level>        level for values (default: unrestricted, which scans nothing)
   --token-scripts <A+B>         the same for values (repeatable)
   --max-depth <n>               how deeply a document may nest before this refuses it (default: 64)
+  --max-wait-depth <n>          the longest chain of waits resolving a schema may run (default: 64)
 ```
 
 **`tson policy`** prints what this build applies — the [TSON-DATA] §8.2 restriction level for names and for
 values, whether it applies per `_`/`-` segment, any script combinations specially admitted, the Unicode data
 version behind them, and the resource limits of [TSON-DATA] §9.1 and [TSON-SCHEMA] §11.5 — every one stated,
-nesting depth the only one this build counts so far:
+nesting depth and wait depth the two this build counts so far:
 
 ```
 $ tson policy
@@ -650,12 +652,15 @@ max schema entries:         65536
 max reference chain:        64
 max supertype chain:        64
 max materialisation depth:  64
+max wait depth:             64
 ```
 
 **A limit refusal is not a verdict on your document's validity.** A document nested deeper than
 `--max-depth` is reported as `LIMIT_EXCEEDED` with the run's outcome `REJECTED`: this processor will not accept
 it, though one configured for more would read it in full. `tson validate` exits 1, because you hold the fix —
-raise the bound, or send something shallower.
+raise the bound, or send something shallower. A schema whose entries wait on a chain of more than
+`--max-wait-depth` others (each declaration read against, composing or refining the next, in one document) is
+refused the same way, at the entry heading the chain.
 
 Every `validate`/`compile` report carries the same record in its `policy` field, so a refusal is always
 readable beside what produced it. The useful direction is the other one: read the policy *before* you

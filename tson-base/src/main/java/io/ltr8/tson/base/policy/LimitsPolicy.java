@@ -32,13 +32,13 @@ import java.util.List;
  * it where its own tokens are consumed. That is why it lives here rather than in either engine: a second
  * record would be a second default to drift.
  *
- * <p><b>The whole table, one limit counted.</b> The components are §9.1's eleven document-side limits and
- * §11.5's five schema-side ones, in that order, each defaulting to the spec's value -- the same table, names
+ * <p><b>The whole table, two limits counted.</b> The components are §9.1's eleven document-side limits and
+ * §11.5's six schema-side ones, in that order, each defaulting to the spec's value -- the same table, names
  * and defaults as {@code policy.tn}'s {@code limits} record. Nesting depth is counted, as containers open in
- * the token stream ({@code TsonDataStream.advance}, {@code JsonStream}). The other fifteen are this policy's
- * stated thresholds: configured and reported by the same surfaces as depth, and not yet counted, so a
- * document or schema past one of them is not refused for it. {@code BACKLOG.md} carries where each is
- * counted.
+ * the token stream ({@code TsonDataStream.advance}, {@code JsonStream}), and wait depth as a schema's resolution
+ * makes its entries ready ({@code SchemaResolver}). The other fifteen are this policy's stated thresholds:
+ * configured and reported by the same surfaces as depth, and not yet counted, so a document or schema past one
+ * of them is not refused for it. {@code BACKLOG.md} carries where each is counted.
  *
  * <p>Every limit is at least 1. A size in code points, octets or bytes is a {@code long}, the schema's
  * {@code int64}; a count or depth is an {@code int}, its {@code int32}.
@@ -63,12 +63,14 @@ import java.util.List;
  * @param maxReferenceChain       the hops from a use site to a terminal entry
  * @param maxSupertypeChain       the length of one type's {@code chain.supertypes}
  * @param maxMaterialisationDepth the nested open synthetics closed for one template application
+ * @param maxWaitDepth            the longest chain of waits resolving one schema runs, each entry waiting on the
+ *                                next being ready -- see {@link #maxWaitDepth()}
  */
 public record LimitsPolicy(int maxDepth, long maxTokenLength, long maxTextLength, int maxNumericLiteralLength,
                            long maxBinarySize, long maxDocumentSize, int maxElements, int maxEntries,
                            int maxFields, int maxAnnotations, int maxValues,
                            int maxImportClosure, int maxSchemaEntries, int maxReferenceChain,
-                           int maxSupertypeChain, int maxMaterialisationDepth) {
+                           int maxSupertypeChain, int maxMaterialisationDepth, int maxWaitDepth) {
 
     /**
      * The default nesting depth, 64.
@@ -131,12 +133,15 @@ public record LimitsPolicy(int maxDepth, long maxTokenLength, long maxTextLength
     /** The default materialisation depth, 64 nested open synthetics. */
     public static final int DEFAULT_MAX_MATERIALISATION_DEPTH = 64;
 
+    /** The default wait depth, 64 waits in one chain. */
+    public static final int DEFAULT_MAX_WAIT_DEPTH = 64;
+
     private static final LimitsPolicy DEFAULTS = new LimitsPolicy(DEFAULT_MAX_DEPTH, DEFAULT_MAX_TOKEN_LENGTH,
             DEFAULT_MAX_TEXT_LENGTH, DEFAULT_MAX_NUMERIC_LITERAL_LENGTH, DEFAULT_MAX_BINARY_SIZE,
             DEFAULT_MAX_DOCUMENT_SIZE, DEFAULT_MAX_ELEMENTS, DEFAULT_MAX_ENTRIES, DEFAULT_MAX_FIELDS,
             DEFAULT_MAX_ANNOTATIONS, DEFAULT_MAX_VALUES, DEFAULT_MAX_IMPORT_CLOSURE,
             DEFAULT_MAX_SCHEMA_ENTRIES, DEFAULT_MAX_REFERENCE_CHAIN, DEFAULT_MAX_SUPERTYPE_CHAIN,
-            DEFAULT_MAX_MATERIALISATION_DEPTH);
+            DEFAULT_MAX_MATERIALISATION_DEPTH, DEFAULT_MAX_WAIT_DEPTH);
 
     /**
      * Refuses a limit below 1: it admits no document or schema at all, so it is refused where it is stated
@@ -159,6 +164,7 @@ public record LimitsPolicy(int maxDepth, long maxTokenLength, long maxTextLength
         atLeastOne("maxReferenceChain", maxReferenceChain);
         atLeastOne("maxSupertypeChain", maxSupertypeChain);
         atLeastOne("maxMaterialisationDepth", maxMaterialisationDepth);
+        atLeastOne("maxWaitDepth", maxWaitDepth);
     }
 
     private static void atLeastOne(String name, long value) {
@@ -184,112 +190,131 @@ public record LimitsPolicy(int maxDepth, long maxTokenLength, long maxTextLength
     public LimitsPolicy withMaxDepth(int depth) {
         return new LimitsPolicy(depth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the token length replaced. */
     public LimitsPolicy withMaxTokenLength(long length) {
         return new LimitsPolicy(maxDepth, length, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the decoded text length replaced. */
     public LimitsPolicy withMaxTextLength(long length) {
         return new LimitsPolicy(maxDepth, maxTokenLength, length, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the numeric literal length replaced. */
     public LimitsPolicy withMaxNumericLiteralLength(int length) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, length, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the decoded binary size replaced. */
     public LimitsPolicy withMaxBinarySize(long size) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, size,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the document size replaced. */
     public LimitsPolicy withMaxDocumentSize(long size) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 size, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the element count of one array or set replaced. */
     public LimitsPolicy withMaxElements(int count) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, count, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the entry count of one map replaced. */
     public LimitsPolicy withMaxEntries(int count) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, count, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the field count of one record replaced. */
     public LimitsPolicy withMaxFields(int count) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, count, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the annotation count on one value replaced. */
     public LimitsPolicy withMaxAnnotations(int count) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, count, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the total value count of one document replaced. */
     public LimitsPolicy withMaxValues(int count) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, count,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                maxWaitDepth);
     }
 
     /** These limits with the import closure replaced. */
     public LimitsPolicy withMaxImportClosure(int count) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                count, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                count, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth, maxWaitDepth);
     }
 
     /** These limits with the declaration count of one schema map replaced. */
     public LimitsPolicy withMaxSchemaEntries(int count) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, count, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, count, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth, maxWaitDepth);
     }
 
     /** These limits with the reference chain replaced. */
     public LimitsPolicy withMaxReferenceChain(int hops) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, hops, maxSupertypeChain, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, hops, maxSupertypeChain, maxMaterialisationDepth, maxWaitDepth);
     }
 
     /** These limits with the supertype chain replaced. */
     public LimitsPolicy withMaxSupertypeChain(int length) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, length, maxMaterialisationDepth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, length, maxMaterialisationDepth, maxWaitDepth);
     }
 
     /** These limits with the materialisation depth replaced. */
     public LimitsPolicy withMaxMaterialisationDepth(int depth) {
         return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
                 maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
-                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, depth);
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, depth, maxWaitDepth);
+    }
+
+    /** These limits with the wait depth replaced. */
+    public LimitsPolicy withMaxWaitDepth(int depth) {
+        return new LimitsPolicy(maxDepth, maxTokenLength, maxTextLength, maxNumericLiteralLength, maxBinarySize,
+                maxDocumentSize, maxElements, maxEntries, maxFields, maxAnnotations, maxValues,
+                maxImportClosure, maxSchemaEntries, maxReferenceChain, maxSupertypeChain, maxMaterialisationDepth,
+                depth);
     }
 
     /**
@@ -304,6 +329,18 @@ public record LimitsPolicy(int maxDepth, long maxTokenLength, long maxTextLength
     @Override
     public int maxDepth() {
         return maxDepth;
+    }
+
+    /**
+     * The longest chain of waits resolving one schema may run ([TSON-SCHEMA] §11.5's wait depth): an entry whose
+     * declaration is read against another entry of the same document waits on that entry being ready, and that
+     * one on the next, so the chain counts the waits from an entry to one that waits on nothing. An import is ready
+     * before the document's resolution starts, so a wait ends at one. A schema past it is refused with {@link
+     * Diagnostic.Code#LIMIT_EXCEEDED} at the entry whose chain is too long.
+     */
+    @Override
+    public int maxWaitDepth() {
+        return maxWaitDepth;
     }
 
     /** The nesting depth, then each other limit that differs from its default; the defaults go unsaid. */
@@ -326,6 +363,7 @@ public record LimitsPolicy(int maxDepth, long maxTokenLength, long maxTextLength
         differs(parts, "max reference chain", maxReferenceChain, DEFAULT_MAX_REFERENCE_CHAIN);
         differs(parts, "max supertype chain", maxSupertypeChain, DEFAULT_MAX_SUPERTYPE_CHAIN);
         differs(parts, "max materialisation depth", maxMaterialisationDepth, DEFAULT_MAX_MATERIALISATION_DEPTH);
+        differs(parts, "max wait depth", maxWaitDepth, DEFAULT_MAX_WAIT_DEPTH);
         return String.join(", ", parts);
     }
 

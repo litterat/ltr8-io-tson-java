@@ -17,7 +17,8 @@ command-line application, and the default bind contexts. Current form only; hist
 - `TsonCli.exitCodeFor` reads diagnostic codes and nothing else, ranking `70 > 78 > 69 > 1 > 75`; 1 is a rejection,
   2 a usage error or a schema file that does not load, and the rest the run declining to give a verdict.
 - A policy flag never means nothing: `--token-scripts` alone raises the token level to `SINGLE_SCRIPT`, a relaxation
-  against a stated level that scans nothing is a usage error, and `--max-depth` below 1 is refused rather than clamped.
+  against a stated level that scans nothing is a usage error, and `--max-depth` or `--max-wait-depth` below 1 is
+  refused rather than clamped.
 - The two default bind contexts share one atom list (`AtomContext.hostTypes()`); the resolver's adds a name binder and
   the schema model's own three atom registrations, and nothing else.
 
@@ -127,10 +128,10 @@ document is read — an unreadable file during classification, a schema with no 
 files, a bad `--schema`/`--type` binding — and is exit 2 with the run `UNDETERMINED`. A document that read reports in
 its own `FileReport`. A consumer tells "your invocation was wrong" from "your document was" without reading messages.
 
-**`outcome` answers "will this be accepted"** ([TSON-DATA] §8.1): `ACCEPTED`; `REJECTED` for an invalidity or a
-refusal under this processor's §8.2 policy or §9.1 limits, one rejection settling it whatever else went unjudged;
-`UNDETERMINED` where nothing rejected the document but something could not be judged. Which kind a rejection was is
-each diagnostic's code (`Code.verdict()`, `Code.isRefusal()`). It is an enum rather than a `valid` boolean so that
+**`outcome` answers "will this be accepted"** ([TSON-DATA] §8.1): `ACCEPTED`; `REJECTED` for an invalidity or a refusal
+under this processor's §8.2 policy or its §9.1 or §11.5 limits, one rejection settling it whatever else went unjudged;
+`UNDETERMINED` where nothing rejected the document but something could not be judged. Which kind a rejection was is each
+diagnostic's code (`Code.verdict()`, `Code.isRefusal()`). It is an enum rather than a `valid` boolean so that
 `if (!valid)` cannot read "undetermined" as "rejected".
 
 **`CliDiagnostic` renders an absent field as absent.** `Diagnostic` spells "nothing to say" as `""` for
@@ -191,7 +192,8 @@ name the way to write the thing today, and a trace and a bug-report banner would
 **What §8.2 requires a refusal to name rides on the envelope**, as `policy` on both `validation_run` and
 `validation_report`: `CliPolicy`, the shape of `policy.tn`'s `policy` — `identifier_policy` (level, `per_segment`,
 `skeleton_distinctness`, `permitting` combinations with each script by its UAX #24 alias), `token_policy` (level,
-`permitting`), `unicode_data_version`, and `limits` (§9.1, a `max_depth`). It is on the envelope rather than each
+`permitting`), `unicode_data_version`, and `limits` (all seventeen of §9.1's and §11.5's, `max_depth` and
+`max_wait_depth` among them). It is on the envelope rather than each
 diagnostic because it is a fact about the processor: constant for the run, and needed by a sender *before* it writes
 a document, which a channel that opens only on failure cannot give. `limits` sits inside `policy` because the
 envelope's one question is "what judged this run", and a limit refusal answers it as much as a name refusal. The
@@ -213,20 +215,20 @@ positionals. §8.2 asks that a relaxation not be *silent*; the rule targets ambi
 a CI file is the opposite. A CLI with no way to configure this would tell the runner which policy refused their
 document and leave them unable to change it.
 
-**The flags:** `--max-depth` takes §9.1's nesting bound; `--identifier-policy`/`--token-policy` a UTS #39 §5.2 level,
-in the spelling a person types (`highly-restrictive`) or the one `tson policy` prints (`HIGHLY_RESTRICTIVE`);
-`--identifier-per-segment` the unit; `--identifier-allow-look-alikes` drops skeleton distinctness; and
-`--identifier-scripts`/`--token-scripts` a `Latin+Cyrillic` combination, repeatable. Allow-look-alikes is no
-relaxation of the level, so it is valid under every level. There is no `--token-per-segment`: a token policy is a
-`ScriptPolicy`, which has no unit.
+**The flags:** `--max-depth` takes §9.1's nesting bound and `--max-wait-depth` [TSON-SCHEMA] §11.5's wait depth;
+`--identifier-policy`/`--token-policy` a UTS #39 §5.2 level, in the spelling a person types (`highly-restrictive`) or
+the one `tson policy` prints (`HIGHLY_RESTRICTIVE`); `--identifier-per-segment` the unit;
+`--identifier-allow-look-alikes` drops skeleton distinctness; and `--identifier-scripts`/`--token-scripts` a
+`Latin+Cyrillic` combination, repeatable. Allow-look-alikes is no relaxation of the level, so it is valid under every
+level. There is no `--token-per-segment`: a token policy is a `ScriptPolicy`, which has no unit.
 
 **Three rules keep a flag from meaning nothing.** `--token-scripts` alone raises the token level from its
 `UNRESTRICTED` default to `SINGLE_SCRIPT`, because `permitting(…)` is consulted only by a level that scans, and Single
 Script is the level at which a list of combinations is the whole configuration. A relaxation (scripts, per-segment)
 against a *stated* level that scans nothing is a usage error: `--token-policy unrestricted --token-scripts
 Latin+Cyrillic` configures nothing, and accepting it would leave the caller believing a restriction is in force.
-And `--max-depth` below 1 is refused rather than clamped: reading under a bound the caller did not ask for is the
-one outcome that leaves them unable to explain the result.
+And `--max-depth` or `--max-wait-depth` below 1 is refused rather than clamped: reading under a bound the caller did
+not ask for is the one outcome that leaves them unable to explain the result.
 
 ## JSON inputs (`--schema`, `--type`)
 

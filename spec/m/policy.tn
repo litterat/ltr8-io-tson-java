@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/policy.tn?sha256=b57d6088a1c5caefaeb5c425702a6cb48190953f4b6e97424500b52a5bd1fb10"
+!!id:"https://tson.io/2026/39/m/policy.tn?sha256=994e74e48729b70a12b6c5b5214d2b09cd87eecc79db19a35cfa1ad77b92c07d"
 !!import:"https://tson.io/2026/39/m/core.tn?sha256=1c918afb33a5447fbcca0be1eb9710dbced11686756206bd6f37be23febb5b1e"
 @doc:"""
   TSON processor policy — what a processor admits and spends (2026 Revision 39
@@ -58,8 +58,9 @@
     schemas one header reaches through `!!import`, the
     declarations in one schema map (synthetic and instantiation entries
     included), the hops from a use site to a terminal entry, the length of
-    one type's supertype chain, and the nested open synthetics closed for
-    one application.
+    one type's supertype chain, the nested open synthetics closed for one
+    application, and the longest chain of waits one schema's resolution
+    runs, an entry waiting on the next being ready.
     """
   limits => {
     max_depth?:                 int32 ~ 64
@@ -78,6 +79,7 @@
     max_reference_chain?:       int32 ~ 64
     max_supertype_chain?:       int32 ~ 64
     max_materialisation_depth?: int32 ~ 64
+    max_wait_depth?:            int32 ~ 64
   }
 
   @doc:"""

@@ -161,9 +161,10 @@ throws `SchemaValidationException` ("a schema is already registered under …").
 `withIdentifierPolicy(…)` / `withTokenPolicy(…)` / `withLimits(…)` components). Every setter returns a
 new value, so a configuration may be derived from without the holder losing what they stated.
 
-**Resource limits (§9.1)** are `LimitsPolicy`, today one bound: `maxDepth`, how deeply a document may nest,
-**64 by default**. Raise it with `withLimits(LimitsPolicy.defaults().withMaxDepth(256))` on the config or on
-either reader. A document past it is refused with `LIMIT_EXCEEDED` — **not a verdict**: the bytes may be valid
+**Resource limits (§9.1, §11.5)** are `LimitsPolicy`, today two bounds counted: `maxDepth`, how deeply a document
+may nest, **64 by default**, and `maxWaitDepth`, how long a chain of waits one schema's resolution may run (also
+64). Raise depth with `withLimits(LimitsPolicy.defaults().withMaxDepth(256))` on the config or on either reader.
+A document past it is refused with `LIMIT_EXCEEDED` — **not a verdict**: the bytes may be valid
 and read in full by a processor configured for more.
 
 Where schemas come from is one value, `SchemaAccess` — the source plus the `FetchPolicy` governing it.
@@ -449,7 +450,8 @@ answers the question a sender asks, "will this be accepted": `ACCEPTED`, `REJECT
 this processor's policy or limits) or `UNDETERMINED` (nothing rejected it, but something could not be judged).
 
 `tson --help` lists the commands; `tson <command> --help` carries that command's own options, including
-the policy flags (§8.2's name hygiene and §9.1's `--max-depth`) for the three that judge a document.
+the policy flags (§8.2's name hygiene, §9.1's `--max-depth` and §11.5's `--max-wait-depth`) for the three that
+judge a document.
 
 **`references/cli.md` has the rest** — every flag, the policy options and the rules that keep one from
 meaning nothing, the `--output json`/`tson` shapes field by field, and the CLI's own pitfalls.

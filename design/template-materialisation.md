@@ -164,10 +164,10 @@ resolves, before the batch pass runs. They are handled differently.
   closing of the same application land on one entry, and each entry is **published into the namespace as it is
   built**: the source's fields are read through the namespace the very next step. A source applied to the
   declaration's own parameters is absorbed by `openOperand` instead, as composition is.
-- **The cycle guard still applies.** An operand's or source's head resolves through `SchemaResolver`'s namespace
-  getter, the memo the circular-composition check rides on, so a cycle reached through an application
-  (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a circular composition rather than
-  recursing (`RecordTemplateTest.aCycleThroughAnApplicationIsStillCaughtAsACircularComposition`).
+- **The cycle guard still applies.** An operand's or source's head resolves through the resolution's `WaitOrder`,
+  where an entry waiting on itself is refused, so a cycle reached through an application
+  (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on
+  'a'`) rather than recursing (`RecordTemplateTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).
 - **An argument that is itself an application survives whole.** Substitution writes a bound reference through
   `WireForm.refValue` — positionally with no arguments, in `type_ref`'s record form with them — so `box<inner<T>>`
   keeps `inner<T>` for the absorbing declaration's own materialisation to close. Sharing that producer is the

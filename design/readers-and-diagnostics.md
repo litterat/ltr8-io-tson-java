@@ -44,7 +44,9 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   `readsSchemaDocument()` is true: the readers consult it for the one rule that is a schema document's alone (a bare
   name at a record position is a value by name, `design/record-dispatch.md`), and it alone **keeps** every name read at
   a kind-, reference- or `type_ref`-typed slot, handing it to `heldByName` with the slot's path and declared type
-  (`TsonSchema.SlotType`) for `SchemaResolver` to keep per entry for the linker. Every other read drops it.
+  (`TsonSchema.SlotType`) for `SchemaResolver` to keep per entry for the linker. Every other read drops it. It also
+  tells `heldByName` each declaration a reader reads against (`HeldByName.reached`, from `inRecord` and
+  `underDeclaration`): the waits a resolution counts toward §11.5's wait depth (`design/processor-policy.md`).
 - **No error policy.** `report` builds the `Diagnostic` from the path and positions the context tracks and hands it to
   the receiver: `DiagnosticsReceiver.throwing()` raises `ReadException` at the first problem, `collecting()`
   accumulates into a `DiagnosticsCollector`, and a caller's own `report(Diagnostic)` can stream them anywhere.

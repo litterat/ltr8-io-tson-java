@@ -149,16 +149,14 @@ import java.util.function.Predicate;
  *   by this class: the caller supplies a {@link DefinitionGetter} over a map it owns. A supertype or source
  *   must be answerable when asked for, so a caller wanting forward references resolves on demand, as
  *   {@link SchemaResolver} does.</li>
- *   <li>{@code metaDefinitions} -- the part of it this schema imports, already resolved and compiled, consulted for
- *   a constructor-application target ({@link #resolveConstructorTarget}) and for an annotation's name: both are
- *   read through a compiled reader, which exists only for an imported entry.</li>
+ *   <li>{@code metaDefinitions} -- where a constructor-application target ({@link #resolveConstructorTarget}) and
+ *   an annotation's name resolve, both read through a compiled reader. For every schema but the kernel it is the
+ *   whole namespace too, made ready in wait order ({@link WaitOrder}): a head or an annotation type declared in the
+ *   same document is made ready before the value read against it. The kernel's ordinary resolution resolves them
+ *   among its pre-loaded stand-in's entries instead, the one cycle being closed by pre-loading ([TSON-SCHEMA]
+ *   §3.4).</li>
  * </ul>
- * A name {@code sameDocument} holds is in the namespace but not yet readable: applying a constructor declared in the
- * same document, or annotating with a type declared there, waits on that declaration being ready, which needs the
- * wait-order resolution of SPEC-FEEDBACK.md #4, and is refused as {@code NOT_IMPLEMENTED} ({@link
- * #notYetReadable}). Either getter can be an always-{@code null} lookup for a resolver that never needs it. For {@link
- * MetaKernelBootstrapResolver} the two are one: the kernel is read in wait order over itself, so the entries a head
- * resolves in are the ones being built.
+ * Either getter can be an always-{@code null} lookup for a resolver that never needs it.
  *
  * <p><b>Kind determination</b> (§4.1, {@link #determineKind}) checks the transitive supertype chain for the
  * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum}/{@code namespace} -- not a general
@@ -236,9 +234,6 @@ final class DefinitionResolver {
     /** {@link #kernel} for {@code metaDefinitions}, where every construction head resolves (§3.3.1). */
     private final Predicate<String> metaKernel;
 
-    /** Whether a name is declared by the document being resolved -- see {@link #notYetReadable}. */
-    private final Predicate<String> sameDocument;
-
     /**
      * Whether this resolver can bind annotation values at all -- false only for a caller with no compiled
      * reader to read one through (the meta-kernel bootstrap, which is producing the very entries such
@@ -276,6 +271,9 @@ final class DefinitionResolver {
      */
     private final Map<String, TsonSchema.EntryFacts> facts;
 
+    /** The judgements left for after every entry is ready ({@link #judgeDeferred}). */
+    private final List<Deferred> deferred = new ArrayList<>();
+
     /**
      * No annotation reader: an annotation's name is kept, its value is out of reach, and no name is checked
      * against the imported entries. See {@link AnnotationValueReader}.
@@ -283,17 +281,16 @@ final class DefinitionResolver {
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
                         DefinitionGetter namespaceDefinitions) {
         this(definitionMetaReader, null, metaDefinitions, namespaceDefinitions, null,
-                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true, name -> false);
+                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true);
     }
 
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
                         DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
                         ApplicationCloser applicationCloser, SchemaPositions positions,
                         Map<String, TsonSchema.EntryFacts> facts, Predicate<String> kernel,
-                        Predicate<String> metaKernel, Predicate<String> sameDocument) {
+                        Predicate<String> metaKernel) {
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.metaKernel = Objects.requireNonNull(metaKernel, "metaKernel");
-        this.sameDocument = Objects.requireNonNull(sameDocument, "sameDocument");
         this.positions = Objects.requireNonNull(positions, "positions");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
@@ -426,8 +423,8 @@ final class DefinitionResolver {
      * namespace (§3.3.3, SPEC-FEEDBACK.md #7), and its value is read by that type's own compiled reader -- so {@code
      * @doc:"..."} arrives as a {@code String}. <b>A name that does not resolve there is the author's error</b>
      * ({@link #unresolvedAnnotation}), not a silently valueless annotation: an annotation whose type is unreachable
-     * has no contract to validate its value against. A type this document declares itself is in the namespace but
-     * has no compiled reader yet, and is refused as not yet supported ({@link #notYetReadable}).
+     * has no contract to validate its value against. A type this document declares itself is made ready before its
+     * value is read against it, in wait order.
      *
      * <p>The check is skipped entirely by a resolver constructed with no {@link AnnotationValueReader}: there
      * is no compiled reader to resolve against, so every name would fail it. That is the meta-kernel
@@ -449,9 +446,7 @@ final class DefinitionResolver {
             // marker whose type nothing can reach is as unresolved as a valued one, and a bare mark whose type
             // is not void is refused as `_` would be.
             if (annotationsResolve && metaDefinitions.definition(annotation.name()) == null) {
-                throw sameDocument.test(annotation.name())
-                        ? notYetReadable(name, "'@" + annotation.name() + "' is annotated with a type")
-                        : unresolvedAnnotation(name, annotation.name());
+                throw unresolvedAnnotation(name, annotation.name());
             }
             refuseWrittenApplication(name, annotation.name());
             if (annotation.value().isEmpty()) {
@@ -470,21 +465,6 @@ final class DefinitionResolver {
         return new SchemaValidationException("'" + declaration + "': '@" + annotationName + "' does not name "
                 + "a type in this schema's namespace -- its own entries and every entry its !!imports bring in "
                 + "(§3.3.3)");
-    }
-
-    /**
-     * A read against an entry this same document declares: applying its constructor ({@code !C { ... }}), or reading
-     * an annotation's value against its type. The entry is in the namespace, and the read waits on it being ready --
-     * the wait-order resolution of SPEC-FEEDBACK.md #4, which this resolver does not yet run outside the kernel, so
-     * the declaration is refused as a gap ({@code NOT_IMPLEMENTED}), not as the author's error. A type used by name
-     * (a field, a supertype, a refinement source whose constructor is imported) orders nothing, and resolves.
-     *
-     * @param what the read, as a message opens: {@code "'!C' applies a constructor"}
-     */
-    private static UnsupportedOperationException notYetReadable(String declaration, String what) {
-        return new UnsupportedOperationException("'" + declaration + "': " + what + " declared in this same "
-                + "schema, which is not yet supported -- reading against a declaration of the same document waits "
-                + "on that declaration being resolved first; declare it in a schema this one imports");
     }
 
     /** An annotation's value through the type its name refers to, or {@code null} when that type is out of reach. */
@@ -509,6 +489,10 @@ final class DefinitionResolver {
             String where = "'" + declaration + "': " + e.getMessage();
             throw e instanceof MissingBindingException ? new MissingBindingException(where)
                     : new BindMismatchException(where);
+        } catch (SchemaValidationException e) {
+            // A verdict reached while the value was read -- the annotation's type waiting on an entry that waits
+            // back, a wait chain past the limit -- is the schema's, whatever read reached it.
+            throw e;
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException("'" + declaration + "': failed to bind the value of "
                     + "annotation '@" + annotationName + "' via the compiled meta-schema reader: "
@@ -790,6 +774,28 @@ final class DefinitionResolver {
                     + "states on the key of every entry that closes one (§8.2). Write the application itself: '"
                     + name + " => template<arguments>'");
         }
+    }
+
+    /**
+     * Runs the judgements resolution left for after every entry is ready ([TSON-SCHEMA] §3.4.1's sixth rule), in the
+     * order they were left, handing each failure to {@code failure} with the declaration it is against. A judgement
+     * that walks a name to the entry it names belongs here: a name at a type position orders nothing, so walking it
+     * while entries are still being made ready would make one wait on what it only names.
+     */
+    void judgeDeferred(java.util.function.BiConsumer<String, SchemaValidationException> failure) {
+        List<Deferred> judging = List.copyOf(deferred);
+        deferred.clear();
+        for (Deferred judgement : judging) {
+            try {
+                judgement.check().run();
+            } catch (SchemaValidationException e) {
+                failure.accept(judgement.declaration(), e);
+            }
+        }
+    }
+
+    /** One judgement left for after every entry is ready, against the declaration that needs it. */
+    private record Deferred(String declaration, Runnable check) {
     }
 
     /** §5.8's one name type over a subtype's supertypes: {@code a} from {@code aFrom} and {@code b} from {@code bFrom}. */
@@ -1123,9 +1129,6 @@ final class DefinitionResolver {
      */
     private ConstructorHead resolveConstructorTarget(String name, String target) {
         if (metaDefinitions.definition(target) == null) {
-            if (sameDocument.test(target)) {
-                throw notYetReadable(name, "'!" + target + "' applies a constructor");
-            }
             throw new SchemaValidationException("'" + name + "': '!" + target + "' names no entry of this "
                     + "schema's namespace -- its own entries and every entry its !!imports bring in (§3.3.1)");
         }
@@ -1182,6 +1185,10 @@ final class DefinitionResolver {
             String where = "'" + name + "': " + e.getMessage();
             throw e instanceof MissingBindingException ? new MissingBindingException(where)
                     : new BindMismatchException(where);
+        } catch (SchemaRefusalException e) {
+            // The processor's policy refusing the schema -- a wait chain past its limit, reached while this body was
+            // read -- keeps its code: restated as a plain schema error, it would read as a verdict.
+            throw e;
         } catch (SchemaValidationException e) {
             // A constructor's own record refusing the values it was handed. `decimal_type`'s member set is the
             // case: `members` is typed `set<value>`, so the wire admits anything and the family itself is what
@@ -1495,7 +1502,13 @@ final class DefinitionResolver {
                 nameType = supertypeBody.nameType();
                 nameTypeFrom = supertypeName;
             } else {
-                requireOneNameType(name, nameTypeFrom, nameType, supertypeName, supertypeBody.nameType());
+                // Judged once every entry is ready: a name type is a name at a type position, which orders
+                // nothing, and walking it to its terminal now would wait on an entry that may wait on this one.
+                String firstFrom = nameTypeFrom;
+                Optional<String> first = nameType;
+                Optional<String> other = supertypeBody.nameType();
+                deferred.add(new Deferred(name,
+                        () -> requireOneNameType(name, firstFrom, first, supertypeName, other)));
             }
         }
 

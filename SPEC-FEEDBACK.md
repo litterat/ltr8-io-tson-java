@@ -136,28 +136,48 @@ is left to pre-loading (§3.4). Under the ladder every constructor an ordinary s
 resolved document, so the gap shows only in the kernel and in composition chains; once a constructor and its instances
 share a document, an order has to be computed and its cycles defined.
 
-**What is running.** In an ordinary schema, Pass 2 resolves on demand and refuses "a circular composition/refinement
-chain" (rule 1's operand edge); defaults and pins are `value`-typed and judged at link (rule 3). A test harness
-measures the kernel's wait graph from `meta-kernel-resolved.tn`'s own declarations, no compiled reader consulted: one
+**What is running.** Rules 1 to 7 run for every schema, by one algorithm; what differs is only what is ready before
+a document's resolution starts: the pre-loaded set for the kernel, the import closure for every other schema. An
+entry is made ready the first time anything asks for it, and source order is not consulted (rule 5). A declaration
+waits on its head (`C` in `!C { … }`, the source in `!I ^ { … }`), on its refinement source and `&` operands, on the
+type of each annotation it carries, and on every type a read of its value reaches; a value read against an entry of
+the same document is read through readers compiled from the entries ready so far, and a read that reaches one not
+yet ready makes it ready first, then starts over. A name at a type position, and a held value, wait on nothing
+(rules 2, 3). So a constructor and its instances, a type and a value of it, and an annotation type and its uses share
+a document in either order, and a test resolves each bundled schema, and a schema whose entries read each other, with
+its declarations reversed and shuffled and gets the same output entry for entry.
+
+Entries waiting on each other through rule 1 are refused naming the cycle in wait order (`'a' waits on 'b' waits on
+'a'`, `'step' waits on 'step'`); a composition cycle (`a => b & {}`, `b => a & {}`) is the same rule, and a type
+annotated with itself on its value (`note => @note:"x" text`) is a cycle of one. An alias loop is refused by §8.3, not
+as a wait. A judgement that walks a name to what it names waits for every entry to be ready (rule 6): §5.8's one name
+type over a composition's supertypes is judged then, so walking it never makes the composition wait on an entry that
+waits on it.
+
+Rule 7 is counted: the wait depth of an entry is none where it waits on nothing of its own document and one more than
+the deepest entry it waits on otherwise, an import being ready before the resolution starts, so a chain is counted
+within one document's resolution. A chain past the limit (default 64) refuses its head with `LIMIT_EXCEEDED`, a
+refusal and not a verdict, whichever order the chain is reached in; the bundled schemas resolve under the default
+whatever a deployment sets.
+
+The kernel measured from `meta-kernel-resolved.tn`'s own declarations, no compiled reader consulted, has one wait
 cycle, holding `record` and 29 more of the 79 entries (`boolean`, `integer`, `text`, `identifier`,
 `non_negative_integer`, the enum and set machinery, `field_group`, `namespace` and `field_map`, and the synthetics
-they name), every other entry
-ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with `@annotation`
-would be a second cycle, and the marker changes no value (§6). The kernel bootstrap runs rules 1 to 4: it builds by
-hand exactly the instances and the one refinement on that cycle (a test holds the set to the measurement), resolves
-every declaration no read produces from its grammar, and reads the other 21 instances through the ordinary instance
-path against readers compiled from the entries ready so far. A read that reaches an entry not yet ready makes it ready
-first, on demand, and an entry waiting on itself is refused naming the chain; the order is computed and source order is
-not consulted. A pin reached through an entry not yet ready binds as written (rule 3), which is what lets `iri` be read
-against `iri_type`, whose `spec` pin is typed by `iri`. The output equals the kernel's ordinary resolution against it,
-entry for entry. Compilation follows rule 3: a record's reader holds its pins and defaults as written while
-it is built and decodes them through their types once every reader of the schema exists, before the schema is handed
-out, so building `iri_type`'s reader reads nothing through `iri`'s (the `spec` pin). Link remains the one place a pin
-is judged, and a bad pin or default still fails the load (rule 6).
+they name), every other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`:
+annotating itself with `@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap
+builds by hand exactly the instances and the one refinement on that cycle (a test holds the set to the measurement),
+and makes every other entry ready by the algorithm above. A pin reached through an entry not yet ready binds as
+written (rule 3), which is what lets `iri` be read against `iri_type`, whose `spec` pin is typed by `iri`. The output
+equals the kernel's ordinary resolution against it, entry for entry. Compilation follows rule 3: a record's reader
+holds its pins and defaults as written while it is built and decodes them through their types once every reader of
+the schema exists, before the schema is handed out. Link remains the one place a pin is judged, and a bad pin or
+default still fails the load (rule 6).
 
-Outside the kernel the wait order is not yet run: one namespace per schema (#7) lets a constructor and its instance
-share a document, and this library refuses applying a constructor, or reading an annotation value against a type,
-declared in the same document as `NOT_IMPLEMENTED`, a gap and not a verdict, until rules 1 to 6 run in every schema.
+What is not running: a resolved form is still read under its source's imports rather than by this algorithm over its
+own entries (§8.1, "Resolved forms" in the proposal), so a fixture holding an instance of a constructor it declares
+does not read back. And rule 2's example pair, a constructor whose facet is typed by its own instance (`decimal_type`
+beside `number`), is expressible only in the kernel: an instance of a constructor of types the kernel and meta.tn do
+not declare has no body this library models, and is refused as `NOT_IMPLEMENTED`.
 
 **Resolution, a proposal.** Terms:
 
@@ -337,11 +357,9 @@ importer applies, unexpressible. Each is a rule about levels, which the dependen
 - **core.tn imports meta.tn** and no longer declares `void`, `boolean`, `integer`, `text`, `regex`, `iri`, `kind` or
   `doc` (the kernel's) or `set` (meta.tn's). Core's `iri` was IS-A its `iri_reference`; the kernel's is not, and core
   keeps `iri_reference`. The descriptive annotations core put on its copies (`@ordering`, `@bounded`, …) go with them.
-- **A same-document read is a gap, refused as `NOT_IMPLEMENTED`:** applying a constructor declared in the same
-  document (`!C { … }` with `C` local), and reading an annotation value against a type declared there. Both wait on
-  that declaration being ready, which #4's wait order provides and which runs only in the kernel's bootstrap so far.
-  A type used by name, and an atom refinement whose source is local but whose constructor is imported, are
-  unaffected.
+- **A same-document read waits:** applying a constructor declared in the same document (`!C { … }` with `C` local),
+  reading a value of a type declared there, and reading an annotation value against one each wait on that
+  declaration being ready, in #4's wait order, whichever is written first. A type used by name waits on nothing.
 - **The cost:** every name in the closure is reserved. A schema importing core reserves every name of meta.tn and
   the kernel — `identifier`, `field_name`, `record`, `map`, `namespace`, `bounded`, `exact`, `title`, `comment`,
   `examples` among them — until the kernel moves under one name of its own.
@@ -447,8 +465,8 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   IS-A `T`: `ref<api>` names `orders => !api { … }`. `kind<api>` is refused at the declaration, `api` being no
   constructor. A value entry's payload lifts and mints nothing; its names at kind- and reference-typed slots are
   judged at link, and a qualified name walks into it by key and by field. A template over an ordinary type closes to
-  a value entry (`fetch => <T> !operations { … }`, `get_order => fetch<order>`). Applying a type declared in the same
-  document stays `NOT_IMPLEMENTED` (#7).
+  a value entry (`fetch => <T> !operations { … }`, `get_order => fetch<order>`). A type declared in the same
+  document is applied in wait order (#4).
 - **The schema map's values are `declared`.** The kernel now declares `declared_type` and `declared` (moved from
   meta.tn and core.tn), and `schema`'s `value_type` is `declared`: every entry's value names its type by its tag — a
   constructor for a type, an ordinary type for a value. `top` is the root of the constructors only. `declared` is
@@ -467,8 +485,8 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   the schema model, and every other name binds through the consumer's binder. A value entry whose type no class binds is
   held as a tree, so a schema loads and validates without host classes; a schema obtained to bind refuses such an
   entry with `BIND_MISMATCH` at the entry, anywhere in the closure it compiles, since a bound reference can reach a
-  value of any schema there. Applying a constructor a schema declares still needs a host class for its instances,
-  refused with `BIND_MISMATCH` without one, so such a schema does not yet load for validation alone. These are a
+  value of any schema there. An instance of a constructor whose instances are no types (one composing `top` and not
+  `type`, `s => !step { … }` over `step => top & { … }`) is held the same way, as the value it is. These are a
   processor's choices, not the spec's.
 
 **Resolution, a proposal.** Sections amended:

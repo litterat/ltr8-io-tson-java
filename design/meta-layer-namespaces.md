@@ -31,12 +31,11 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   type declaration (`validateTypeRef`), a `type_ref` slot in a value body (`judgeApplication`), a kind-typed slot
   (`judgeMember`). A data tag naming one compiles to a `ValueEntryReader` and is `TYPE_MISMATCH`.
 - **One bind context serves schemas and data** (`Tson.dataBindContext()`, `SchemaMetaNameBinder.over`): a name
-  meta-kernel.tn or meta.tn declares binds to the schema model, every other to the consumer's binder, so a value
-  entry binds to the consumer's class by the type's name. **A value entry no class
-  binds is held as a `TsonValue`**, read through the declaring schema's tree-mode compilation
-  (`TsonCompiledSchemaLoader.treeVocabularyOf`), so the schema loads and validates. The bind registry refuses such an
-  entry in the closure it compiles, `BIND_MISMATCH` at `/entry` (`TsonCompiledSchemaRegistry.refuseUnbound`); the tree
-  registry refuses nothing.
+  meta-kernel.tn or meta.tn declares binds to the schema model, every other to the consumer's binder, so a value entry
+  binds to the consumer's class by the type's name. **A value entry no class binds is held as a `TsonValue`**, read in
+  tree mode (the declaring schema's `TsonCompiledSchemaLoader.treeVocabularyOf`, or for a type of the same document
+  `compileReady(…, tree)`), so the schema loads and validates. The bind registry refuses such an entry in the closure it
+  compiles, `BIND_MISMATCH` at `/entry` (`TsonCompiledSchemaRegistry.refuseUnbound`); the tree registry refuses nothing.
 - A host declares none of its references; the slot declares the spelling. A slot naming a type is typed by a kind
   (`request: kind<record>`), a slot naming a value by a reference (`method: ref<method>`), and a record-typed slot
   holds the record's value inline. In a schema document the kind's or reference's reader (`AtomTypeReader`) reads the
@@ -55,8 +54,10 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
 - The model holds every bound value of a namespace type as a `Namespace`: a value entry's value, the schema map
   (`TsonSchema.entries`) and a record's fields (`RecordBody.fields`). `Namespace` has its map's read API and is no
   `Map`; its equality is `type`, the entries as a map and each key's annotations, never order.
-- Applying a type declared in the same document, `!T { … }` with `T` local, is a gap refused as `NOT_IMPLEMENTED`
-  (`design/constructor-application.md`); the value entry goes in a schema importing the one declaring `T`.
+- A value entry of a type declared in the same document, `!T { … }` with `T` local, is read once `T` is ready, in
+  wait order, whichever is written first (`design/schema-resolution.md`). An instance of a constructor whose
+  instances are no types (`!step { … }` over `step => top & { … }`) is held as a `ValueEntry` too, on the same
+  terms (`design/constructor-application.md`).
 
 Related: `design/linking-and-compilation.md` (link order and values by name), `design/references.md`,
 `design/kinds-and-name-types.md`, `design/class2-compilation.md`, `design/compiled-registries.md`,

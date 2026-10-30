@@ -132,7 +132,7 @@ public final class Tson {
         DataBindContext context = SchemaMetaNameBinder.over(config.dataBindContext());
         SchemaSource source = config.schemaAccess().source();
         TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
-                context, source, config.processorPolicy().identifierPolicy());
+                context, source, config.processorPolicy().identifierPolicy(), config.processorPolicy().limits());
         return new Tson(core, context, config.processorPolicy());
     }
 

@@ -148,7 +148,7 @@ class DefinitionResolverTest {
                         .read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)),
                                 IdentifierPolicy.none(), (slot, slotType, reference, cell) -> { }, false)), null,
                 metaParser.schema().entries()::get, definitionGetter, null, SchemaPositions.none(), facts,
-                n -> true, metaParser.compiledSchema()::isKernel, n -> false);
+                n -> true, metaParser.compiledSchema()::isKernel);
     }
 
     /** The facts {@link #resolveSnippet} and {@link #resolveSnippetsAgainstMetaKernel} recorded. */
@@ -573,6 +573,43 @@ class DefinitionResolverTest {
         assertEquals(List.of("base"), TypeChain.supertypesOf(box), "a template is IS-A what its parents reach");
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "and keeps them as written");
         assertEquals(TypeRef.of("T"), box.fields().get("value").type());
+    }
+
+    /**
+     * §5.8's one name type over a composition's supertypes is judged once every entry is ready ([TSON-SCHEMA]
+     * §3.4.1's sixth rule), not while the composition resolves: a name type is a name at a type position, which
+     * orders nothing, and walking it to its terminal during resolution would make the composition wait on an entry
+     * that may wait on it. Resolving the composition never looks the name type up; the deferred judgement does, and
+     * refuses two that differ.
+     */
+    @Test
+    void aCompositionsNameTypesAreJudgedOnceEveryEntryIsReady() {
+        List<String> lookedUp = new java.util.ArrayList<>();
+        DefinitionResolver judging = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, name -> {
+            lookedUp.add(name);
+            return resolved.get(name);
+        });
+        resolved.put("p", new RecordBody(RecordBody.fieldMap(), List.of(), RecordExtensionType.OPEN, List.of(),
+                Optional.of("words")));
+        resolved.put("q", new RecordBody(RecordBody.fieldMap(), List.of(), RecordExtensionType.OPEN, List.of(),
+                Optional.of("slug")));
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !schema {
+                  both => p & q & { label: text }
+                }""").parseSchemaDocument().body();
+
+        judging.resolve(schemaMap.declarations().get("both"));
+        assertFalse(lookedUp.contains("words") || lookedUp.contains("slug"), lookedUp::toString);
+
+        resolved.put("words", new io.ltr8.tson.schema.meta.Reference(TypeRef.of("identifier")));
+        resolved.put("slug", new io.ltr8.tson.schema.meta.Reference(TypeRef.of("text")));
+        List<String> refused = new java.util.ArrayList<>();
+        judging.judgeDeferred((name, error) -> refused.add(name + ": " + error.getMessage()));
+        assertTrue(lookedUp.contains("words") && lookedUp.contains("slug"), lookedUp::toString);
+        assertEquals(1, refused.size(), refused::toString);
+        assertTrue(refused.getFirst().startsWith("both: 'both': supertypes 'p' and 'q' have different name types"),
+                refused::toString);
     }
 
     /**

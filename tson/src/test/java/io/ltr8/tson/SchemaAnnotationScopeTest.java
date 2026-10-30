@@ -19,8 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * [TSON-SCHEMA] §3.3.3 on the schema side, under one namespace per schema (SPEC-FEEDBACK.md #7): a schema document's
  * annotations resolve in its own namespace, its entries and its whole import closure, the {@code !!meta} target
  * among them. An annotation type an import declares binds its value through that schema's compiled reader; one this
- * document declares itself is in the namespace, but reading a value against it waits on wait-order resolution, a
- * gap reported as {@code NOT_IMPLEMENTED}; a name nowhere in the closure is the author's error.
+ * document declares itself binds it too, the annotated entry waiting on the type being ready ([TSON-SCHEMA] §3.4.1's
+ * wait order), whichever is written first; a name nowhere in the closure is the author's error.
  *
  * <p><b>Every case is loud.</b> An annotation kept by name with its value quietly discarded is the worst outcome:
  * the schema loads clean and the metadata is not there. Every case asserts a value bound or a diagnostic naming the
@@ -70,29 +70,53 @@ class SchemaAnnotationScopeTest {
     }
 
     /**
-     * {@code method} is this schema's own declaration, so reading {@code @method:"POST"} waits on it -- on the name
-     * side of {@code =>} and on the definition side alike, the two §6 keeps separate. Each is reported against the
-     * declaration that wrote it, as a gap and never a verdict.
+     * {@code method} is this schema's own declaration, so reading {@code @method:"POST"} waits on it being ready -- on
+     * the name side of {@code =>} and on the definition side alike, the two §6 keeps separate -- and binds, whether
+     * the type is written before its uses or after.
      */
     @Test
-    void aLocallyDeclaredAnnotationTypeIsNotYetImplementedAtEveryUseSite() {
-        List<Diagnostic> problems = validate("""
-                !!id:"https://example.test/local-annotations.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
-                !schema {
+    void aLocallyDeclaredAnnotationTypeBindsItsValueAtEveryUseSite() {
+        for (String body : List.of("""
                   method => @annotation text
                   @method:"POST" order => { id: int32 }
                   item => @method:"GET" { id: int32 }
+                """, """
+                  @method:"POST" order => { id: int32 }
+                  item => @method:"GET" { id: int32 }
+                  method => @annotation text
+                """)) {
+            Tson tson = tson();
+            assertEquals(List.of(), tson.validateSchema("""
+                    !!id:"https://example.test/local-annotations.tn"
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !schema {
+                    %s}
+                    """.formatted(body)));
+
+            var local = tson.schemaRegistry().get("https://example.test/local-annotations.tn").orElseThrow().schema();
+            assertEquals(Optional.of("POST"), local.entries().getAnnotations("order").value("method", String.class));
+            assertEquals(Optional.of("GET"), local.factsOf("item").annotations().value("method", String.class));
+        }
+    }
+
+    /** A value that is no value of a locally declared annotation type is the author's error, as for an import's. */
+    @Test
+    void aLocallyDeclaredAnnotationTypeJudgesItsValue() {
+        List<Diagnostic> problems = validate("""
+                !!id:"https://example.test/local-annotation-value.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
+                  status => @annotation int32
+                  order => @status:"created" { id: int32 }
                 }
                 """);
 
-        assertEquals(List.of("/item", "/order"),
-                problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
-        assertTrue(problems.stream().allMatch(d -> d.message().contains("'@method'")
-                && d.code() == Diagnostic.Code.NOT_IMPLEMENTED), problems.toString());
-        assertTrue(problems.getFirst().message().contains("declared in this same schema, which is not yet supported"),
-                problems.getFirst().message());
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code(), problems.toString());
+        assertEquals("/order", problems.getFirst().schemaPointer().orElseThrow());
+        assertTrue(problems.getFirst().message().contains("'@status'"), problems.getFirst().message());
     }
 
     /** An annotation type an {@code !!import} declares is in the namespace, and its value binds. */
@@ -131,22 +155,27 @@ class SchemaAnnotationScopeTest {
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
     }
 
-    /** A bare marker names a type too ({@code @T} is {@code @T:_}, §6), so it waits like a valued one. */
+    /**
+     * A bare marker names a type too ({@code @T} is {@code @T:_}, §6), so it waits like a valued one and is read
+     * against its type: a marker of a {@code void} type is admitted, one of a type {@code _} is no value of refused.
+     */
     @Test
     void aValuelessMarkerIsCheckedAsWell() {
-        List<Diagnostic> problems = validate("""
+        String marker = """
                 !!id:"https://example.test/marker-annotation.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  reviewed => @annotation void
+                  reviewed => @annotation %s
                   order => @reviewed { id: int32 }
                 }
-                """);
+                """;
+        assertEquals(List.of(), validate(marker.formatted("void")));
 
+        List<Diagnostic> problems = validate(marker.formatted("text"));
         assertEquals(1, problems.size(), problems.toString());
         assertTrue(problems.getFirst().message().contains("'@reviewed'"), problems.getFirst().message());
-        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
     }
 
     /**
