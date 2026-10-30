@@ -557,7 +557,7 @@ class SchemaDesugarerTest {
                 payload.fields().getFirst().value().coreValue());
 
         // `box` itself is `!record { ... }` by the time it leaves this phase (§5.2), so the field applying
-        // the lifted form is a `type_ref` record inside the held binding record rather than a `GenericRef`
+        // the lifted form is a quoted reference inside the held binding record rather than a `GenericRef`
         // in the AST.
         Instance boxTemplate =
                 assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
@@ -742,14 +742,9 @@ class SchemaDesugarerTest {
                 .value().coreValue();
     }
 
-    /** {@code type_ref}'s record form, {@code { name: head  arguments: [ { name: arg } ] }}. */
+    /** An application in a slot: the reference's canonical text, quoted, {@code "head<arg>"}. */
     private static CoreValue applicationValue(String head, String argument) {
-        CoreValue argumentRecord = new RecordValue(List.of(new RecordValue.Field("name",
-                plain(new TokenValue(argument, TokenForm.UNQUOTED)))));
-        CoreValue arguments = new ArrayValue(List.of(plain(argumentRecord)));
-        return new RecordValue(List.of(
-                new RecordValue.Field("name", plain(new TokenValue(head, TokenForm.UNQUOTED))),
-                new RecordValue.Field("arguments", plain(arguments))));
+        return new TokenValue(head + "<" + argument + ">", TokenForm.SINGLE_LINE_QUOTED);
     }
 
     private static DataValue plain(CoreValue value) {

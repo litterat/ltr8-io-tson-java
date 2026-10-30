@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>The position has no name at desugar time, which is the whole difficulty.</b> A closed form
  * ({@code [box<text>]}) names the entry {@code box<text>} denotes, and that entry does not exist until
  * materialisation runs a phase later -- so it stays refused, and {@link #aClosedContainerCannotHoldAn
- * Application} pins the reason. An <b>open</b> form needs no name: its binding holds a {@code type_ref}
+ * Application} pins the reason. An <b>open</b> form needs no name: its binding holds the reference
  * directly, arguments intact, and materialisation closes it once the parameters are bound.
  */
 class ApplicationInContainerPositionTest {
@@ -393,7 +393,7 @@ class ApplicationInContainerPositionTest {
 
     /**
      * The closed counterpart, which needs no parameters anywhere: {@code [box<text>]} lifts to a synthetic
-     * whose {@code element_type} is the application itself, written in {@code type_ref}'s record form, and
+     * whose {@code element_type} is the application itself, written as its quoted reference, and
      * materialisation rewrites it to the instantiation entry one pass later.
      *
      * <p><b>The synthetic names something that is not an entry yet, and that is the point.</b> The window is
@@ -436,9 +436,9 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * A <b>value</b> argument makes the wire trip too. {@code type_argument}'s value channel binds a raw
-     * {@code Token}, so the slot reads the token rather than the value it denotes -- §4 decoding would leave
-     * {@code <3>} and {@code <"3">} indistinguishable, and the form is exactly what identity needs.
+     * A <b>value</b> argument makes the wire trip too. The reference grammar keeps a value argument as its
+     * {@code Token}, not the value it denotes -- §4 decoding would leave {@code <3>} and {@code <"3">}
+     * indistinguishable, and the form is exactly what identity needs.
      */
     @Test
     void aValueArgumentInAClosedContainerKeepsItsToken() {
@@ -491,8 +491,8 @@ class ApplicationInContainerPositionTest {
      * A binding whose application names no parameter is fully bound already, so it closes where it is written.
      *
      * <p>Written as sugar rather than as an explicit binding, because §12.1's {@code instance} takes a
-     * {@code core-value} and {@code box<text>} is schema grammar, not data: an application reaches a slot in
-     * {@code type_ref}'s record form, which is what the sugar expands to. The open and closed forms share one
+     * {@code core-value} and {@code box<text>} is schema grammar, not data: an application reaches a slot as
+     * its quoted reference, which is what the sugar expands to. The open and closed forms share one
      * production now, so this is the same rule that has always governed a closed instance's payload.
      */
     @Test

@@ -2,14 +2,14 @@
 
 Design notes for every position in a schema that holds a name: which are references, what a reference's store and
 judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape,
-one reference atom with a constructor an ordinary record type, is SPEC-FEEDBACK.md #11's. What extends this account,
-qualified type names and folding the name-only `type_ref` into the `reference` atom, is `BACKLOG.md`'s
-parameter-channel entry.
+one reference atom with a constructor an ordinary record type, is SPEC-FEEDBACK.md #11's; an application is a value
+of that atom, a reference carrying an argument list, SPEC-FEEDBACK.md #12's. What extends this account, a channel of
+its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel entry.
 
 **Invariants**
 
-- A name held in a slot, the application form `type_ref` aside, is a value of the kernel's one atom of names,
-  `reference => atom & { of: type_name }` (`ReferenceBody`). It admits a name exactly when the type of the named
+- A name held in a slot is a value of the kernel's one atom of names, `reference => atom & { of: type_name }`
+  (`ReferenceBody`). It admits a name exactly when the type of the named
   entry's value, its tag, past its alias hops, IS-A `of`: `order => { … }` holds a value of `record`, `int32 =>
   !integer ^ { … }` one of `integer_type`, `orders => !api { … }` one of `api`. `kind => <T> !reference { of: T }`
   and `ref => <T> !reference { of: T }` are its two spellings, so `kind<order>` and `ref<order>` mint one entry;
@@ -21,9 +21,10 @@ parameter-channel entry.
   are values: the slot holds a value's qualified name, judged at link (`ValuesByName`) and delivered as the referent
   (`Ref<T>`). So `kind<bar>` over a record type names values of `bar`, `ref<record>` is `kind<record>`, and
   `kind<api>` names `myapi`. These notes call a reference over a constructor a *kind*, whichever spelling wrote it.
-- The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members)`), and
-  `ValuesByName` re-derives it from `of` over the final namespace whatever the read guessed; `TsonSchema.SlotType`'s
-  `KIND` and `REFERENCE` roles are only how the read read the name. The index is never written: a resolved form states
+- The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members,
+  applications)`, the last the entry each `@application` the closure records denotes), and `ValuesByName` re-derives
+  it from `of` over the final namespace whatever the read guessed; `TsonSchema.SlotType`'s `KIND` and `REFERENCE`
+  roles are only how the read read the name. The index is never written: a resolved form states
   `!reference { of: … }` alone, a written `members:` is refused as an unknown field, and equality and `toString`
   exclude it (`ReferenceBody.memberNames()` is the processor's own).
 - `of` names any type or constructor of the writer's namespace. Refused are a name resolving to nothing (an unresolved
@@ -31,9 +32,24 @@ parameter-channel entry.
   type. `kind<alias>` admits nothing, no entry past its hops being an alias, and a required field typed by it is
   refused by §5.10.1's productivity check (`TypeInhabitance`). A reference is not a bound: `template_param.bound`
   still refuses a constructor (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
+- **A reference may carry an argument list** (SPEC-FEEDBACK.md #12), and that is what an application is in a slot:
+  `reference = segment *("." segment) [ws "<" ws arguments ws ">"]`, arguments separated by whitespace or a comma,
+  each a number or a quoted token (a value) or a reference (`io.ltr8.tson.atom.ReferenceGrammar`). The canonical text
+  (`TypeRef.text()`) has no whitespace and one space between arguments, `map<text integer>`, and in data a reference
+  with arguments is one quoted token, `"result<T>"`, `<` being reserved there; one without stays an unquoted token.
+  Identity is the parsed form, never the text, so `result< T >` is `result<T>`. The grammar classifies an argument,
+  a reference first; the head's parameters judge whether it binds a type or a value (§5.10), so `TypeArgument`
+  compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
+- A reference carries arguments only where an application is still open: a record template's `chain.parents` and
+  field types, held text (`!alias { target: "pair<uuid B>" }` inside `template.template`), and the `application`
+  annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
+  resolution and arity, and its arguments by the head's parameters: only an argument at a type parameter is judged
+  as a type's name (`TsonSchemaLinker.typeArguments`).
 - A slot that names the type of a value is typed `type_kind` (`record_field.type`, `tuple_element.element_type`,
   `array.element_type`, `map.key_type` and `value_type`, `namespace.value_type`, `choice.variants`,
-  `template_param.type` and `bound`). Its value is one bare name. In a schema document (a construction's or a value
+  `template_param.type` and `bound`, `alias.target`, `type_chain.parents`, and the `application` annotation). Its
+  value is one bare name, or, where an application is still open, a quoted reference with arguments. In a schema
+  document (a construction's or a value
   entry's payload, or a resolved form read as data) the reader reads its grammar alone and the name is judged a
   member where that schema links, or at ingest ([TSON-SCHEMA] §4.2, §8.1); in a data document the reader judges
   membership over the reading document's closure. `namespace.key_type` is typed `identifier_kind`: a namespace's keys
@@ -52,10 +68,7 @@ parameter-channel entry.
   `kind<product>` and `kind<namespace>` hold it and `kind<record>` and `kind<map>` do not. A value entry, `myapi =>
   !api { … }`, is a member of no kind: its tag names an ordinary type, which no walk reaches a constructor through.
   `kind<api>` (one entry with `ref<api>`) names it, and every type position refuses it (`validateTypeRef`,
-  `ValuesByName.judgeApplication`, `judgeMember`).
-- `type_ref` is the application form. It stands where an application may (`type_chain.parents`,
-  `type_argument.name`, the `application` annotation, held text) and at `alias.target`, which may name a
-  constructor. A `type_ref` slot is judged by resolution and arity alone.
+  `judgeMember`).
 - Two positions single out a constructor, and keep an IS-A `top` check in Java: a `!C` head (a constructor builds a
   type, any other type a value entry) and a composition operand (constructor or record). `alias.target` admits
   either, an alias being applied as its target is (§3.3.1). No reference covers "a constructor" alone: its value is a
@@ -64,16 +77,19 @@ parameter-channel entry.
   value of `record` by the one predicate. `EntryKind.isConstructor` answers a different question, applicability, and
   counts `top` by name.
 - A type parameter is one whose `type` is `type_kind` (`TemplateParam.TYPE_KIND`); a parameter standing at a
-  `type_kind` or a `type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
-- A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the kind's own
-  atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the slot's declared
-  type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A braced value is read through the `type_ref` reader in a
-  kernel body, where a sugar lift writes an application into the slot it fills and the closer mints its entry afterwards; in
-  a value body (`TsonReadContext.readsValueBody`, a value entry's payload) nothing lifts or mints, so it is refused and
-  the alias spelling named: `order_box => box<order>`, then the bare name. The name itself is recorded by the kind's
-  `AtomTypeReader`, in a schema document only.
-- A `type_ref` slot of a value body is recorded too (`RecordedApplicationReader`) and judged by resolution, arity and
-  §4.1 (`ValuesByName.judgeApplication`), as the resolver judges a kernel body's own.
+  `type_kind` slot is a type parameter (`ParameterTypes.typePosition`).
+- A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the
+  kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the
+  slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A quoted token with a `<` is an
+  application, parsed by `ReferenceGrammar`; a malformed one (`"box<text"`) is refused with the grammar's reason
+  (`ATOM_FORM_INVALID`). In a kernel body it is a value: resolved output holds one where an application is open, and
+  a sugar lift writes one into the slot it fills, which the closer mints an entry for afterwards. In a value body
+  (`TsonReadContext.readsValueBody`, a value entry's payload) nothing lifts or mints, so it is refused and the alias
+  spelling named: `order_box => box<order>`, then the bare name. In a data document the kind's reader (`KindParser`)
+  judges an application through the entry the closure records for it (`@application`, `ReferenceBody.entryOf`); one
+  the closure records no entry for is a gap (`NOT_IMPLEMENTED`), an expansion nothing declares being named by
+  content, which a data read does not compute. The name itself is recorded by the kind's `AtomTypeReader`, in a
+  schema document only, and name hygiene judges each name an application writes.
 - A recorded name carries its slot's declared type from the reader that read it (`TsonSchema.SlotType`: the role and
   the reference's `of`), so the linker never walks the path back through the meta's declarations, and a slot only a
   tagged subtype declares is judged however deep the value sits.
@@ -125,7 +141,7 @@ A name stands in a schema in one of five forms. Two are not references.
 |---|---|---|
 | **Key** | declares: the name an entry, field, parameter or namespace value is addressed by | the map's key type, which judges spelling and equality |
 | **Reference** | names something declared elsewhere, by its key | **store** (where the first segment resolves) and **judgement** (what the referent must be) |
-| **Application** | names an open entry and closes it with arguments; a use site then holds a reference to the minted entry | the head, and the arguments |
+| **Application** | a reference carrying an argument list: names an open entry and closes it with arguments; a use site then holds a reference to the minted entry | the head, and the arguments |
 | **Tag** | names the type of the value it is written on, `!T v` | store and judgement, as a reference, and the payload is read under the referent |
 | **Index** | computed at link and written out: `supertypes`, `subtypes`, the `application` annotation | none; never read as a reference on ingest |
 
@@ -149,9 +165,9 @@ namespace type is no exception: `api => !namespace { … }` is an instance of `n
 |---|---|---|---|---|
 | schema-map key, `field_map` key, `template_param.name` | key | — | spelling under the key type; `fields` by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
 | `enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
-| `type_chain.parents`, `type_argument.name`, `application` | application | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head | resolver, `checkArity` |
+| `type_chain.parents`, `application` | reference, `type_kind`, with arguments where open | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
 | `type_chain.supertypes`, `subtypes` | index | — | — | link |
-| `alias.target` | reference | namespace | any entry, type or constructor; `type_ref`, by resolution | `validateTypeRef` |
+| `alias.target` | reference, `type_kind` | namespace | any entry, type or constructor, by resolution; arguments only in an open alias's held text | `validateTypeRef` |
 | `template_param.type`, `bound` | reference | namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
 | `template.template` | parameters and applications as parsed | `parameters`, then namespace | §5.10's shadowing rule | `HeldBody` |
 | `record_field.type`, `tuple_element.element_type`, `array.element_type`, `map.key_type`, `map.value_type`, `namespace.value_type`, `choice.variants` | reference | namespace | `type_kind`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |

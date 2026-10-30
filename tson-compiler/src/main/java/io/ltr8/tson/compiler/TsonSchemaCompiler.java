@@ -25,7 +25,7 @@ import java.util.function.Function;
  * Compiles a {@link TsonLinkedSchema} into a {@link TsonCompiledSchema} -- the "compile" stage of
  * this project's own parse -&gt; resolve -&gt; link -&gt; register -&gt; compile -&gt; read
  * pipeline vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces.
- * Requires a {@link TsonLinkedSchema}, not a bare {@code TsonSchema} -- every {@code type_ref}
+ * Requires a {@link TsonLinkedSchema}, not a bare {@code TsonSchema} -- every reference
  * reachable from a body must already be argument-free (materialisation closes every {@code <...>}
  * application into a reference to the entry it mints), and every name a body refers to must
  * actually be present in {@code linkedSchema.schema().entries()}; a referenced-but-missing name is

@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * §5.6's positional form in a data document, which values by name ([TSON-SCHEMA] §5.12) do not reach: a data
  * document has no namespace to resolve a name in, so a bare token at a record position fills the one positional
  * field whatever that field's type. A kind-typed field reaches a data document through core.tn's own {@code kind};
- * a field typed by a kernel record ({@code type_ref}, {@code record_field}) does not, since an ordinary schema
+ * a field typed by a kernel record ({@code record_field}, {@code template_param}) does not, since an ordinary schema
  * imports only ordinary ones (§2.2.3). The one schema-document case here is the contrast: there a bare token fills
  * the positional field only where that field is atom-typed, which {@code record_field}'s {@code type_kind} is.
  */

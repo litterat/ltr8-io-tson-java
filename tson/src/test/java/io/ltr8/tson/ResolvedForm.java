@@ -67,6 +67,11 @@ final class ResolvedForm {
         return SYNTHETIC_HASH.matcher(name).replaceFirst(HASH_PLACEHOLDER);
     }
 
+    /** Every synthetic content hash in {@code text} reduced to {@link #HASH_PLACEHOLDER}, wherever it stands. */
+    static String withoutHashes(String text) {
+        return SYNTHETIC_HASH_ANYWHERE.matcher(text).replaceAll(HASH_PLACEHOLDER);
+    }
+
     /**
      * A chain's {@code supertypes}/{@code subtypes} sorted. Both are sets the representation happens to write as
      * lists, so one side's alphabetical order and another's resolution order say the same thing. Nothing else is
@@ -172,10 +177,10 @@ final class ResolvedForm {
     private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "synthetic", "application");
 
     /**
-     * Each schema-map key's {@code @application} in a §8 resolved-schema document, rendered {@code head<arg, ...>},
+     * Each schema-map key's {@code @application} in a §8 resolved-schema document, as the reference's canonical text,
      * hashes normalised -- the instantiation each entry is (§8.2), read from the text parsed as data, a key
-     * annotation being dropped when the document is bound. A record value, so compared on its own terms rather
-     * than among {@link #fixtureKeyAnnotations}' tokens.
+     * annotation being dropped when the document is bound. Compared as its parsed form, so whitespace inside the
+     * argument list is free.
      */
     static Map<String, String> markedApplications(String resolvedText) {
         MapValue map = (MapValue) new TsonDataParser(resolvedText).parseResolvedForm().root().coreValue();
@@ -185,7 +190,7 @@ final class ResolvedForm {
             entry.key().annotations().stream()
                     .filter(annotation -> annotation.name().equals("application"))
                     .forEach(annotation -> marked.put(withoutHash(name),
-                            withoutHash(writtenApplication(annotation.value().orElseThrow().coreValue()))));
+                            withoutHashes(writtenApplication(annotation.value().orElseThrow().coreValue()))));
         }
         return marked;
     }
@@ -198,44 +203,20 @@ final class ResolvedForm {
         linked.schema().entries().keySet().forEach(name -> {
             if (linked.originOf(name).equals(canonical)) {
                 linked.schema().applicationOf(name).ifPresent(application ->
-                        marked.put(withoutHash(name), withoutHash(application(application))));
+                        marked.put(withoutHash(name), withoutHashes(application(application))));
             }
         });
         return marked;
     }
 
-    /** A written {@code type_ref}, positional or in record form, as {@code head<arg, ...>}. */
+    /** A written application, a reference's quoted text, as its canonical text. */
     private static String writtenApplication(CoreValue value) {
-        if (value instanceof TokenValue token) {
-            return token.text();
-        }
-        RecordValue record = (RecordValue) value;
-        String head = null;
-        List<String> arguments = new java.util.ArrayList<>();
-        for (RecordValue.Field field : record.fields()) {
-            CoreValue held = field.value().coreValue();
-            if (field.name().equals("name")) {
-                head = writtenApplication(held);
-            } else if (field.name().equals("arguments")) {
-                for (var element : ((ArrayValue) held).elements()) {
-                    RecordValue argument = (RecordValue) element.coreValue();
-                    RecordValue.Field only = argument.fields().getFirst();
-                    arguments.add(writtenApplication(only.value().coreValue()));
-                }
-            }
-        }
-        return arguments.isEmpty() ? head : head + "<" + String.join(", ", arguments) + ">";
+        return io.ltr8.tson.atom.ReferenceGrammar.parse(((TokenValue) value).text()).text();
     }
 
-    /** A bound application as {@code head<arg, ...>}, on the same terms. */
+    /** A bound application as its canonical text, on the same terms. */
     private static String application(TypeRef ref) {
-        if (ref.arguments().isEmpty()) {
-            return ref.name();
-        }
-        return ref.name() + ref.arguments().stream().map(argument -> switch (argument) {
-            case io.ltr8.tson.schema.meta.TypeArgument.Ref nested -> application(nested.ref());
-            case io.ltr8.tson.schema.meta.TypeArgument.Value literal -> literal.value().text();
-        }).collect(java.util.stream.Collectors.joining(", ", "<", ">"));
+        return ref.text();
     }
 
     /**

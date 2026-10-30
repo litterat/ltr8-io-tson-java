@@ -152,8 +152,8 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof Ref<?> reference) {
-                // A value held by name writes as the name, a bare token, as a type_ref does: resolved output states
-                // the reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not what is wanted.
+                // A value held by name writes as the name, a bare token, as a type's name does: resolved output
+                // states the reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not wanted.
                 writeAnnotations(value, dataClass, writer);
                 writer.unquotedToken(reference.name());
                 return;
@@ -174,6 +174,20 @@ public final class DataClassObjectWriter {
                     writer.typeRef(namespace.type());
                 }
                 writeNamespace(namespace, writer);
+                return;
+            }
+            if (value instanceof TypeRef reference) {
+                // A reference is its text, with the annotations written on it ahead: one unquoted token where it
+                // reads back as written, quoted where it carries arguments, `<` being reserved in data.
+                writeAnnotations(reference.annotations(), writer);
+                if (typeRef != null) {
+                    writer.typeRef(typeRef);
+                }
+                if (bare(reference)) {
+                    writer.unquotedToken(reference.name());
+                } else {
+                    writer.quotedString(reference.text());
+                }
                 return;
             }
             if (dataClass.bridge().isPresent()) {
@@ -226,8 +240,6 @@ public final class DataClassObjectWriter {
         try {
             switch (dataClass) {
                 case DataClassAtom atom -> writeAtom(value, writer);
-                case DataClassRecord record when value instanceof TypeRef reference && bare(reference) ->
-                        writer.unquotedToken(reference.name());
                 case DataClassRecord record -> writeRecord(value, record, writer);
                 case DataClassArray array -> writeArray(value, array, writer);
                 case DataClassMap map -> writeMap(value, map, writer);
@@ -248,9 +260,8 @@ public final class DataClassObjectWriter {
 
     /**
      * Whether {@code reference} writes as its bare name: no arguments, and a name every {@code .}-separated segment
-     * of which is an identifier, so the token reads back as written. [TSON-SCHEMA] §8.1 writes an argument-free
-     * {@code type_ref} positionally, and a value written by name ([TSON-SCHEMA] §5.12) has only that spelling; an
-     * application keeps the explicit record, which carries its arguments.
+     * of which is an identifier, so the token reads back as written. An application is written quoted, as its
+     * canonical text (SPEC-FEEDBACK.md #12).
      */
     private static boolean bare(TypeRef reference) {
         if (!reference.arguments().isEmpty()) {

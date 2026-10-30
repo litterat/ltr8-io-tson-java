@@ -25,9 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * slot's declared type.
  *
  * <ol>
- *   <li>A braced application at a kind-typed slot of a value body is refused, the alias spelling named: nothing lifts
- *       or mints in a value body, so an application there would have no entry to be the name of.
- *   <li>A name at a {@code type_ref}-typed slot of a value body is judged by resolution, arity and §4.1.
+ *   <li>An application at a kind-typed slot of a value body, written quoted, is refused, the alias spelling named:
+ *       nothing lifts or mints in a value body, so an application there would have no entry to be the name of.
  *   <li>A slot that only the subtype the value's tag selected declares, below a record family base, is judged by
  *       its declared type ({@code SubtypeBehindFieldTest} has the same one record field further down).
  *   <li>A slot's pointer writes the key for a map key that carries annotations.
@@ -49,8 +48,6 @@ class KindSlotGapsTest {
                   gap_reply         => { status: gap_status  body: type_kind }
                   gap_operation     => { request: type_kind  replies?: [gap_reply] }
                   gap_operations    => !namespace { key_type: identifier  value_type: gap_operation }
-                  gap_ref_operation => { request: type_ref }
-                  gap_ref_ops       => !namespace { key_type: identifier  value_type: gap_ref_operation }
                   gap_endpoint      => { status?: gap_status ~ 200 }
                   gap_op            => gap_endpoint & { request: type_kind }
                   gap_api           => !namespace { key_type: identifier  value_type: gap_endpoint }
@@ -108,7 +105,7 @@ class KindSlotGapsTest {
         }
     }
 
-    // ── 1. A braced application at a kind-typed slot ────────────────────────────────────────────────────
+    // ── 1. An application at a kind-typed slot ──────────────────────────────────────────────────────────
 
     /** The bare form is judged: an undeclared name is refused at the slot, as no type declared. */
     @Test
@@ -118,17 +115,14 @@ class KindSlotGapsTest {
     }
 
     /**
-     * A value body is never lifted or minted, so a braced application at a kind-typed slot has no entry to be the
-     * name of: it is refused, sound or not, and the alias spelling named ({@code order_box => box<order>}).
+     * A value body is never lifted or minted, so an application at a kind-typed slot has no entry to be the name
+     * of: it is refused, sound or not, and the alias spelling named ({@code order_box => box<order>}).
      */
     @Test
-    void aBracedApplicationAtAKindSlotIsRefusedNamingTheAlias() {
-        for (String application : List.of("{ name: box  arguments: [ { name: order } ] }",
-                "{ name: box  arguments: [ { name: no_such } ] }",
-                "{ name: no_box  arguments: [ { name: order } ] }",
-                "{ name: box  arguments: [ { name: order } { name: order } ] }",
-                "{ name: box  arguments: [ { name: other } ] }")) {
-            refused(schema("braced-" + application.hashCode(),
+    void anApplicationAtAKindSlotIsRefusedNamingTheAlias() {
+        for (String application : List.of("\"box<order>\"", "\"box<no_such>\"", "\"no_box<order>\"",
+                "\"box<order order>\"", "\"box< other >\"")) {
+            refused(schema("quoted-" + application.hashCode(),
                             "op => !gap_operations { o => { request: " + application + " } }"),
                     "a position typed by a kind holds the name of a type", "declare an alias");
         }
@@ -136,11 +130,11 @@ class KindSlotGapsTest {
 
     /** The same one level down, in a record value inside the body. */
     @Test
-    void aBracedApplicationInANestedRecordIsRefused() {
+    void anApplicationInANestedRecordIsRefused() {
         refused(schema("nested", """
                 op => !gap_operations { o => {
                   request: order
-                  replies: [ { status: 200  body: { name: box  arguments: [ { name: no_such } ] } } ]
+                  replies: [ { status: 200  body: "box<no_such>" } ]
                 } }"""),
                 "a position typed by a kind holds the name of a type");
     }
@@ -156,24 +150,7 @@ class KindSlotGapsTest {
                 op => !gap_operations { o => { request: bad_box } }"""), "'no_such'");
     }
 
-    // ── 2. A type_ref-typed slot of a value body ─────────────────────────────────────────────────────────
-
-    /**
-     * {@code design/references.md}: "A {@code type_ref} slot is judged by resolution and arity alone", and
-     * {@code design/meta-layer-namespaces.md} gives {@code response: orders} at a {@code type_ref} slot as §4.1's
-     * refusal. Both hold in a value body as they do in a type's.
-     */
-    @Test
-    void anUndeclaredNameAtATypeRefSlotIsRefused() {
-        refused(schema("ref-undeclared", "op => !gap_ref_ops { o => { request: no_such } }"), "'no_such'");
-    }
-
-    @Test
-    void aNamespaceEntryAtATypeRefSlotIsRefused() {
-        refused(schema("ref-namespace", "op => !gap_ref_ops { o => { request: other } }"), "'other'");
-    }
-
-    // ── 3. A slot a tagged subtype declares ──────────────────────────────────────────────────────────────
+    // ── 2. A slot a tagged subtype declares ──────────────────────────────────────────────────────────────
 
     /**
      * The namespace's value type is the base; the value is the subtype its tag names, which declares {@code request}.
@@ -193,7 +170,7 @@ class KindSlotGapsTest {
                 "/GET/request", "'no_such'");
     }
 
-    // ── 4. The pointer through an annotated key ──────────────────────────────────────────────────────────
+    // ── 3. The pointer through an annotated key ──────────────────────────────────────────────────────────
 
     @Test
     void baselineAPlainKeyIsWrittenInThePointer() {

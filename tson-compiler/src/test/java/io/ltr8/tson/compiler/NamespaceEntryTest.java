@@ -251,12 +251,15 @@ class NamespaceEntryTest {
         refused(schema("field", "holder => { s: myapi }"), "'myapi'", "a value of the type 'api'", "not a type");
     }
 
-    /** Nothing lifts or mints in a value body: a braced application at a kind slot is refused, the alias named. */
+    /**
+     * A kind slot of a value body holds a type's name, one token: an application there, written quoted, is refused,
+     * nothing lifting or minting in a value body, and the alias spelling named.
+     */
     @Test
-    void aBracedApplicationInANamespaceValueIsRefused() {
-        refused(schema("braced", """
+    void anApplicationInANamespaceValueIsRefused() {
+        refused(schema("quoted", """
                 box   => <T> { v: T }
-                other => !api { m => { response: { name: box  arguments: [ { name: order } ] } } }"""),
+                other => !api { m => { response: "box<order>" } }"""),
                 "a position typed by a kind holds the name of a type", "declare an alias");
     }
 

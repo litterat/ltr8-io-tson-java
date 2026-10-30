@@ -133,6 +133,7 @@ class CrossEncodingParityTest {
               stock_id    => !uuid_type {}
               customer_id => !uuid_type {}
               ided        => { id: kind<uuid_type> }
+              typed       => { t: type_kind }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -560,6 +561,31 @@ class CrossEncodingParityTest {
     void aValueOfAMemberAtAKindIsRefusedByBoth() {
         sameVerdict("ided", "{ id: \"7d3e5f8a-1b2c-4d5e-8f90-a1b2c3d4e5f6\" }", """
                 {"id": "7d3e5f8a-1b2c-4d5e-8f90-a1b2c3d4e5f6"}""");
+    }
+
+    /**
+     * A kind may hold an applied type, written quoted, judged through the entry the closure records it as: {@code
+     * unique => set<text>} is a type, and no type built with {@code uuid_type} (SPEC-FEEDBACK.md #12).
+     */
+    @Test
+    void anApplicationAtAKindIsJudgedThroughItsEntryByBoth() {
+        bothAccept("typed", "{ t: \"set< text >\" }", """
+                {"t": "set<text>"}""");
+        sameVerdict("ided", "{ id: \"set<text>\" }", """
+                {"id": "set<text>"}""");
+    }
+
+    /** A malformed reference is refused by the grammar, and an application nothing records is the same gap, in both. */
+    @Test
+    void aMalformedOrUnrecordedApplicationAtAKindIsTheSameVerdictInBoth() {
+        sameVerdict("typed", "{ t: \"set<text\" }", """
+                {"t": "set<text"}""");
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID),
+                tson("typed", "{ t: \"set<text\" }").stream().map(Verdict::code).toList());
+        sameVerdict("typed", "{ t: \"set<int32>\" }", """
+                {"t": "set<int32>"}""");
+        assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED),
+                tson("typed", "{ t: \"set<int32>\" }").stream().map(Verdict::code).toList());
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

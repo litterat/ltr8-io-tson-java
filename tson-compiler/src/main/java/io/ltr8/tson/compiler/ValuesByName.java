@@ -189,10 +189,6 @@ final class ValuesByName {
     }
 
     private void judge(String where, TypeRef reference, TsonSchema.SlotType slot, Optional<Ref<?>> cell) {
-        if (slot.role() == TsonSchema.SlotType.Role.APPLICATION) {
-            judgeApplication(where, reference);
-            return;
-        }
         List<String> segments = segments(where, reference);
         String name = reference.name();
         String head = segments.getFirst();
@@ -327,35 +323,6 @@ final class ValuesByName {
         throw new SchemaValidationException(wants + entry + " is an entry whose body is built by '"
                 + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("nothing") + "', which is no '"
                 + slot.of() + "'");
-    }
-
-    /**
-     * A {@code type_ref}-typed slot of a value body holds the application form: a name that resolves, with as many
-     * arguments as the entry it names declares parameters, each argument the same; and never a value (§4.1).
-     * Judged by resolution and arity alone, as a {@code type_ref} slot is everywhere.
-     */
-    private void judgeApplication(String where, TypeRef reference) {
-        String name = reference.name();
-        String terminal = AliasChain.terminal(name, merged);
-        Top referent = merged.get(terminal);
-        if (referent == null) {
-            throw new SchemaValidationException(where + " names '" + name + "', which is no type declared in this "
-                    + "schema or its imports");
-        }
-        if (referent instanceof ValueEntry value) {
-            throw new SchemaValidationException(where + " names '" + name + "', which is " + aValueNoType(value));
-        }
-        int parameters = OpenEntry.isOpen(referent) ? OpenEntry.parameterNames(referent).size() : 0;
-        if (reference.arguments().size() != parameters) {
-            throw new SchemaValidationException(where + " applies '" + name + "' to " + reference.arguments().size()
-                    + " argument" + (reference.arguments().size() == 1 ? "" : "s") + ", and it declares "
-                    + parameters + " parameter" + (parameters == 1 ? "" : "s"));
-        }
-        for (io.ltr8.tson.schema.meta.TypeArgument argument : reference.arguments()) {
-            if (argument instanceof io.ltr8.tson.schema.meta.TypeArgument.Ref nested) {
-                judgeApplication(where, nested.ref());
-            }
-        }
     }
 
     /** What a value entry is, where a type is wanted: a value, which nothing can be typed by (§4.1). */

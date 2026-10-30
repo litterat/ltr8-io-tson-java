@@ -20,7 +20,7 @@ Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the 
 |---|---|
 | **Lexing and data parsing** | `lexer-and-data-parsing.md` (lexer, Tier 2 stream, Tier 3 AST) · `base-types-and-atom-vocabulary.md` (§4 resolution, `tson-atom`) |
 | **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, lifts) · `desugaring-open-forms-and-templates.md` |
-| **Resolution** | `references.md` (the forms a name takes; which slot is typed `type_kind`, `type_ref` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@synthetic`, meta-kernel bootstrap) |
+| **Resolution** | `references.md` (the forms a name takes, an application's argument list; which slot is typed `type_kind` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@synthetic`, meta-kernel bootstrap) |
 | **Templates (§5.10)** | `held-template-bodies.md` (`TemplateBody`, parameter kinds) · `template-materialisation.md` (`TemplateMaterialiser`, `SyntheticMerge`, regularity) |
 | **Linking** | `linking-and-compilation.md` (registry, identity, import merge, link order, values by name) · `kinds-and-name-types.md` (`KindMembers`, `name_type`) · `inhabitance-and-record-extension.md` · `choice-disjointness.md` · `meta-layer-namespaces.md` (namespace types, value entries, `ValueEntry`) · `name-hygiene-and-minted-names.md` (`checkNames`, `InternalName`) |
 | **Compilation** | `class2-compilation.md` (`TsonSchemaCompiler`, `CompiledReaders`, `ErrorReader`, untagged choices) · `compiled-registries.md` (the two registries, concurrency) |
@@ -155,7 +155,7 @@ edited in place; a release fixes the document under its identity (§10). Use `.t
 
 One line each; the class Javadoc and the note carry the why. Read before touching the class involved.
 
-- `TypeArgument` is a sealed interface (`Ref`/`Value`), never a record with two `Optional`s.
+- `TypeArgument` is a sealed interface (`Ref`/`Value`), never a record with two `Optional`s, and compares by its text.
 - `SchemaDesugarer` returns un-rewritten nodes **by identity** — positions live in an `IdentityHashMap`.
 - A desugar-reported declaration is replaced with an absorbing stand-in that **keeps its type parameters**; injected
   declarations are never rolled back.

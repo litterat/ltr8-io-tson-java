@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
@@ -42,20 +43,20 @@ import java.util.function.Function;
  * tokens. What separates them is the constructor's own vocabulary: {@code array.element_type} is typed
  * {@code type_kind}, {@code array.min_items} {@code non_negative_integer}, {@code enum.members} a set of
  * {@code text}. §4.2 makes that reading general rather than a table of kernel names -- every slot that names the
- * type of a value is typed {@code type_kind}, and {@code type_ref} is the application form -- so an extension
+ * type of a value is typed {@code type_kind}, its value a name or an application -- so an extension
  * meta-schema's own constructors classify by the same walk with nothing added here.
  *
  * <p><b>Four sources of a use type</b>, and the last is why this is not one pass over one declaration:
  *
  * <ul>
- *   <li>a slot typed {@code type_kind} or {@code type_ref} gives a type use, recorded as {@code type_kind};</li>
+ *   <li>a slot typed {@code type_kind} gives a type use;</li>
  *   <li>a slot whose type resolves to an {@link Atom} gives that declared type;</li>
  *   <li>a <b>routed default or fixed value</b> -- a parameter at {@code record_field.value} -- gives the field's
  *   own declared type, read from the sibling {@code type} slot, and not {@code record_field.value}'s own type
  *   {@code value}, which says nothing. Where that field is typed by a parameter, the use type names the
  *   parameter ({@code <T, N> { w?: T ~ N }} gives {@code N} the type {@code T});</li>
- *   <li>a parameter riding another template's argument list, where meta-kernel's own {@code type_argument} doc
- *   says a parameter of <em>either</em> kind travels on the reference channel. That occurrence says nothing on
+ *   <li>a parameter riding another template's argument list, where a parameter of <em>either</em> kind is its
+ *   name, as any argument is a reference or a token and typed where it lands. That occurrence says nothing on
  *   its own: the type comes from the callee's parameter at that position, so it is recorded as a dependency and
  *   settled by a fixed point over the whole open-entry set.</li>
  * </ul>
@@ -96,12 +97,9 @@ final class ParameterTypes {
     /** The kind every type slot is typed by, {@code kind<type>}. */
     private static final String TYPE_KIND = TemplateParam.TYPE_KIND.name();
 
-    /** The application form, which stands where an application may: a composition operand, an argument. */
-    private static final String TYPE_REF = "type_ref";
-
-    /** Whether a slot declared {@code name} holds a type: the kind of the types, or the application form. */
+    /** Whether a slot declared {@code name} holds a type: the kind of the types, a name or an application. */
     private static boolean typePosition(String name) {
-        return TYPE_KIND.equals(name) || TYPE_REF.equals(name);
+        return TYPE_KIND.equals(name);
     }
 
     /** The kernel record whose {@code value} slot routes a default or fixed value into its sibling's type. */
@@ -564,12 +562,10 @@ final class ParameterTypes {
          */
         private void routed(String parameter, RecordValue field) {
             Optional<CoreValue> declared = WireForm.field(field, WireForm.TYPE);
-            TypeRef type = switch (declared.orElse(null)) {
-                case TokenValue token -> TypeRef.of(token.text());
-                case RecordValue application when WireForm.isApplication(application) ->
-                        WireForm.typeRefOf(application);
+            TypeRef type = declared.flatMap(WireForm::applicationIn).orElse(switch (declared.orElse(null)) {
+                case TokenValue token when token.form() == TokenForm.UNQUOTED -> TypeRef.of(token.text());
                 case null, default -> null;
-            };
+            });
             if (type == null) {
                 return; // no type to route into: record_field's own reader refuses the field
             }
@@ -584,7 +580,8 @@ final class ParameterTypes {
                         token(token.text(), declared, type, slot);
                 case ArrayValue array -> elements(array, type, slot);
                 case MapValue map when type instanceof MapBody entries -> entries(map, entries, slot);
-                case RecordValue record when typePosition(declared.name()) -> application(record);
+                case TokenValue token when typePosition(declared.name())
+                        && WireForm.applicationIn(token).isPresent() -> application(WireForm.applicationIn(token).get());
                 case RecordValue record when type instanceof RecordBody nested ->
                         record(record, declared.name(), nested);
                 default -> {
@@ -637,40 +634,20 @@ final class ParameterTypes {
         }
 
         /**
-         * A slot typed {@code type_ref} holding an application rather than a bare name. The head is a type name;
-         * each argument that names a parameter of this declaration is <b>deferred</b>, since meta-kernel's
-         * {@code type_argument} puts a parameter of either kind on the reference channel.
-         *
-         * <p>The members are read through {@link WireForm}, not by matching {@code "name"} and {@code "arguments"}
-         * here: what an application looks like on the wire is one class's answer, and a walk that re-derives it
-         * is a second opinion waiting to disagree.
+         * A type slot holding an application rather than a bare name, read through {@link WireForm#applicationIn}:
+         * what an application looks like on the wire is one class's answer. Each argument that names a parameter of
+         * this declaration is <b>deferred</b>: an argument is a reference or a token, typed where it lands, so its
+         * type is the head's parameter's at that position. A literal argument says nothing about this declaration's
+         * parameters, and a nested application ({@code box<inner<T>>}) is walked in turn.
          */
-        private void application(RecordValue application) {
-            String head = WireForm.field(application, WireForm.NAME)
-                    .filter(TokenValue.class::isInstance).map(v -> ((TokenValue) v).text()).orElse(null);
-            Optional<CoreValue> arguments = WireForm.field(application, WireForm.ARGUMENTS);
-            if (head == null || arguments.isEmpty() || !(arguments.get() instanceof ArrayValue list)) {
-                return;
-            }
-            for (int i = 0; i < list.elements().size(); i++) {
-                argument(list.elements().get(i).coreValue(), head, i);
-            }
-        }
-
-        /** One {@code type_argument}: a bare parameter name under {@code name} defers, everything else does not. */
-        private void argument(CoreValue argument, String head, int index) {
-            if (!(argument instanceof RecordValue record)) {
-                return;
-            }
-            for (RecordValue.Field member : record.fields()) {
-                CoreValue value = member.value().coreValue();
-                if (member.name().equals(WireForm.VALUE)) {
-                    continue; // a literal argument says nothing about this declaration's parameters
-                }
-                if (value instanceof TokenValue token && occurrences.declares(token.text())) {
-                    occurrences.deferred.add(new Deferred(token.text(), head, index));
-                } else if (value instanceof RecordValue nested) {
-                    application(nested); // a nested application: `box<inner<T>>`
+        private void application(TypeRef application) {
+            for (int i = 0; i < application.arguments().size(); i++) {
+                if (application.arguments().get(i) instanceof TypeArgument.Ref ref) {
+                    if (ref.ref().arguments().isEmpty() && occurrences.declares(ref.ref().name())) {
+                        occurrences.deferred.add(new Deferred(ref.ref().name(), application.name(), i));
+                    } else {
+                        application(ref.ref());
+                    }
                 }
             }
         }

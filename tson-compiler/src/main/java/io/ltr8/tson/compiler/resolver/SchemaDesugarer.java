@@ -382,7 +382,7 @@ final class SchemaDesugarer {
                     // §5.10's partial application, and the last open form that was not a constructor
                     // application: `uuid_pair => <B> pair<text, B>` denotes `!alias { target:
                     // pair<text, B> }`, so it is written that way here and closes by the same walk as
-                    // every other template. Spellable only because `alias.target` is a `type_ref`.
+                    // every other template. `alias.target` is a reference, which carries the arguments.
                     yield instance(new Binding(ALIAS, List.of(
                             new RecordValue.Field(TARGET, WireForm.plain(refValue(reference.ref()))))),
                             reference.typeParams());
@@ -546,40 +546,40 @@ final class SchemaDesugarer {
     }
 
     /**
-     * What a {@code type_ref}-typed slot holds: a bare token for a plain name, {@code type_ref}'s record
-     * form for an application. <b>One spelling per shape, produced in one place</b> -- a slot written two
-     * ways is a slot two phases disagree about, and {@link DerivedName#ofBinding} hashes what is written, so a
-     * second spelling of one reference splits one type across two entries.
+     * What a type slot holds: a bare token for a plain name, and an application as its canonical text, quoted
+     * ({@link WireForm#refValue}). <b>One spelling per shape, produced in one place</b> -- a slot written two ways
+     * is a slot two phases disagree about, and {@link DerivedName#ofBinding} hashes what is written, so a second
+     * spelling of one reference would split one type across two entries.
+     *
+     * <p>A <em>value</em> argument makes the trip intact, its token as written: §5.10 describes a type argument's
+     * literal as a bare token rather than as the value it denotes. The spelling is therefore what reaches identity,
+     * and {@link NumericIdentity} applies [TSON-DATA] §4.3's equivalence there so {@code <255>} and {@code <0xFF>}
+     * are one application -- [TSON-SCHEMA] §8.2's rule exactly: recorded as written, compared as the value the
+     * token denotes.
      */
     private static CoreValue refValue(TypeRef ref) {
-        return ref instanceof SimpleRef simple ? new TokenValue(simple.name(), TokenForm.UNQUOTED)
-                : refRecord((GenericRef) ref);
+        return WireForm.refValue(reference(ref));
     }
 
-    /**
-     * <code>{ name: head  arguments: [ { name: A } ] }</code> -- {@code type_ref}'s record form, which is how
-     * a closed slot carries an application through the constructor's own reader.
-     *
-     * <p>A <em>value</em> argument makes the trip intact: {@code type_argument}'s value channel binds a raw
-     * {@code Token}, §5.10 describing a type argument's literal as a bare token rather than as the value it
-     * denotes, so the reader that fills it preserves the token instead of decoding it ({@code
-     * RawTokenParser}). The spelling is therefore what reaches identity, and {@link NumericIdentity} applies
-     * [TSON-DATA] §4.3's equivalence there so {@code <255>} and {@code <0xFF>} are one application -- which
-     * is [TSON-SCHEMA] §8.2's rule exactly: recorded as written, compared as the value the token denotes.
-     */
-    private static RecordValue refRecord(GenericRef generic) {
-        List<DataValue> arguments = new ArrayList<>();
-        for (TypeArg argument : generic.args()) {
-            arguments.add(WireForm.plain(new RecordValue(List.of(switch (argument) {
-                case TypeArg.Ref reference when reference.ref() instanceof GenericRef nested ->
-                        new RecordValue.Field(WireForm.NAME, WireForm.plain(refRecord(nested)));
-                case TypeArg.Ref reference ->
-                        WireForm.nameField(WireForm.NAME, ((SimpleRef) reference.ref()).name());
-                case TypeArg.Value value -> new RecordValue.Field(WireForm.VALUE, WireForm.plain(value.value()));
-            }))));
+    /** A grammar-level reference as the reference value it spells: a name, or an application of names and tokens. */
+    private static io.ltr8.tson.schema.meta.TypeRef reference(TypeRef ref) {
+        if (ref instanceof SimpleRef simple) {
+            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
-        return new RecordValue(List.of(WireForm.nameField(WireForm.NAME, generic.name()),
-                new RecordValue.Field(WireForm.ARGUMENTS, WireForm.plain(new ArrayValue(arguments)))));
+        GenericRef generic = (GenericRef) ref;
+        List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new ArrayList<>();
+        for (TypeArg argument : generic.args()) {
+            arguments.add(switch (argument) {
+                case TypeArg.Ref reference -> new io.ltr8.tson.schema.meta.TypeArgument.Ref(reference(reference.ref()));
+                case TypeArg.Value value -> new io.ltr8.tson.schema.meta.TypeArgument.Value(
+                        new io.ltr8.tson.schema.meta.Token(value.value().text(), switch (value.value().form()) {
+                            case UNQUOTED -> io.ltr8.tson.schema.meta.Token.Form.UNQUOTED;
+                            case SINGLE_LINE_QUOTED -> io.ltr8.tson.schema.meta.Token.Form.SINGLE_LINE_QUOTED;
+                            case MULTI_LINE_QUOTED -> io.ltr8.tson.schema.meta.Token.Form.MULTI_LINE_QUOTED;
+                        }));
+            });
+        }
+        return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments);
     }
 
     /** One position of a tuple after expansion: the type it names, and whether it is marked voidable. */
@@ -669,13 +669,13 @@ final class SchemaDesugarer {
      * {@code !tuple { elements: [{ element_type: T } { element_type: U }] }} -- the tuple row of the table.
      *
      * <p><b>Why this is not {@link #choiceBinding}.</b> Both are variadic and both fill one collection-typed
-     * vocabulary field. What differs is what one position <em>is</em>: a variant is a bare {@code type_ref},
+     * vocabulary field. What differs is what one position <em>is</em>: a variant is a bare reference,
      * while an element is a {@code tuple_element} record carrying a type <em>and</em> its own {@code voidable},
      * so each position needs a record built for it rather than a name token. {@code voidable} is written only
      * for a marked position, for the reason {@link #arrayBinding} omits an unmarked element's.
      *
      * <p>What the two do share is that a position's type is written through {@link #refValue}: an element
-     * holding a §5.10 application is spelled in {@code type_ref}'s record form and rewritten one pass later,
+     * holding a §5.10 application is spelled as its quoted text and rewritten one pass later,
      * exactly as a variant is.
      */
     private static Optional<Binding> tupleBinding(List<Position> positions) {
@@ -698,9 +698,9 @@ final class SchemaDesugarer {
      * SimpleRef} or -- for a §5.10 application, which has no entry to be hoisted to until materialisation
      * mints one -- a {@code GenericRef}.
      *
-     * <p><b>A variant is written through {@link #refValue}, like every other {@code type_ref}-typed slot.</b>
+     * <p><b>A variant is written through {@link #refValue}, like every other type slot.</b>
      * A collection-valued slot is no different from a named one in what it holds: {@code variants} is a
-     * {@code [type_ref]}, so an application standing in it is spelled in {@code type_ref}'s record form and
+     * {@code [type_kind]}, so an application standing in it is spelled as its quoted text and
      * rewritten to the entry it denotes one pass later ({@code TemplateMaterialiser.mapBodyRefs}, which maps
      * a choice's variants like any other reference). Refusing the application here instead left the whole
      * choice unlifted, and a form the desugar table did not reduce reaches {@code DefinitionResolver} as a
@@ -727,10 +727,8 @@ final class SchemaDesugarer {
      * <p><b>Why here rather than in the resolver.</b> The alternative is to resolve the body and write the
      * result back out, and it does not work: the wire form is what {@link DerivedName#ofBinding} hashes and what
      * substitution walks, so a second producer of it is a second spelling of the same thing --
-     * {@code DataClassObjectWriter} states a no-argument {@code type_ref} in the explicit record form where this
-     * phase states it positionally, which makes a {@code type_argument} indistinguishable from a
-     * {@code type_ref} application to a walk that reads neither against a vocabulary. §5.2's rewrite is
-     * syntactic, as fixed and as closed as the sugar table above, so it belongs beside it.
+     * {@code DataClassObjectWriter} quotes tokens this phase leaves bare, and a quoted token is a literal to
+     * substitution. §5.2's rewrite is syntactic, as fixed and as closed as the sugar table above, so it belongs beside it.
      *
      * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
      * fixed on the {@code record} constructor and an unmarked field's facts are {@code record_field}'s own
@@ -894,7 +892,7 @@ final class SchemaDesugarer {
     /**
      * {@code !head { field: value ... }} -- the construction a binding record denotes.
      *
-     * <p><b>A slot holding an application is written in {@code type_ref}'s record form</b>, since an
+     * <p><b>A slot holding an application is written as its quoted text</b>, since an
      * application has no bare-token spelling: the entry it denotes does not exist until materialisation, one
      * phase later. The construction therefore names something that is not yet an entry, and that is fine --
      * materialisation rewrites every closed entry's references afterwards, so {@code [box<text>]} resolves to
@@ -982,6 +980,8 @@ final class SchemaDesugarer {
     /** Whether {@code value}, or anything nested inside it, is the bare token {@code text}. */
     private static boolean namesToken(CoreValue value, String text) {
         return switch (value) {
+            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
+                    WireForm.namesIn(WireForm.applicationIn(token).get()).contains(text);
             case TokenValue token -> token.text().equals(text);
             case ArrayValue array -> array.elements().stream()
                     .anyMatch(element -> namesToken(element.coreValue(), text));
@@ -1040,6 +1040,8 @@ final class SchemaDesugarer {
 
     private static CoreValue renameValue(CoreValue value, Map<String, String> substitution) {
         return switch (value) {
+            case TokenValue token when WireForm.applicationIn(token).isPresent() -> WireForm.refValue(
+                    WireForm.renamedArguments(WireForm.applicationIn(token).get(), substitution));
             case TokenValue token -> substitution.containsKey(token.text())
                     ? new TokenValue(substitution.get(token.text()), token.form())
                     : token;

@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.TsonSchema;
@@ -294,9 +295,17 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                 return formSensitive.read(tokenValue);
             }
             T value = delegate.read(tokenValue.text());
-            // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
-            return names != null && ctx.refusesName(value instanceof String name ? name : token.text(), names)
-                    ? null : value;
+            // Hygiene judges the name the value is, in its type's normalization form, not the spelling -- each name
+            // an application writes, where a kind's value is one.
+            String named = value instanceof String name ? name : token.text();
+            TsonReadContext reading = ctx;
+            return names != null && (kindOf != null ? ReferenceGrammar.anyRefused(named,
+                    each -> reading.refusesName(each, names)) : ctx.refusesName(named, names)) ? null : value;
+        } catch (UnsupportedOperationException gap) {
+            // A value this library cannot judge yet, such as an application its closure records no entry for.
+            ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge",
+                    token.text());
+            return null;
         } catch (AtomTypeException ex) {
             // The entry's own name leads the sentence -- see `name` above -- and AtomRefusal decides the
             // code: §8.1 files a contract rejection apart from a range violation, and this reader is not a

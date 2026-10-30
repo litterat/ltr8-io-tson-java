@@ -52,7 +52,8 @@ the registry is storage over the `schema.meta` value model and stays in `tson-sc
 
 **The linker materializes nothing.** `SchemaDesugarer` and `TemplateMaterialiser` have turned every sugar form and
 closable application into a declaration one phase earlier, in the module that can bind a constructor generically. The
-argument-bearing `type_ref`s the linker sees are inside open entries, validated and never rewritten; an application
+references carrying arguments the linker sees are inside open entries, validated and never rewritten, an argument
+judged as a type's name only where the head's parameter is a type parameter (`typeArguments`); an application
 whose head names nothing in scope keeps its argument list rather than collapsing to its bare head
 (`design/template-materialisation.md`), so what the linker judges is what the author wrote.
 
@@ -216,8 +217,8 @@ descriptor, is `design/meta-layer-namespaces.md`'s; what is the linker's is belo
 
 - **The grammar is judged here.** `ValuesByName.segments` splits the name at each `.` and requires each segment to be
   a [TSON-DATA] §7.7 identifier, none empty and no arguments, so `orders.1x`, `.orders` and `orders.` are refused
-  before anything is looked up. A `type_ref` slot of a value body holds an application, judged by resolution, arity
-  and §4.1 (`judgeApplication`).
+  before anything is looked up. An application in a value body is refused where it is read, the alias spelling
+  named (`design/references.md`).
 - **One namespace for the slot's type and the name.** The first segment resolves in `merged`, alias hops followed
   (§8.3), and only there, so `method: place_order` is unresolved even though `orders` holds that key. Found first,
   judged after: nothing is a choice among candidates. A type entry admits no further segment, an open entry is no

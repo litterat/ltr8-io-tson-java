@@ -43,7 +43,7 @@ class BootstrapReferencesTest {
         assertEquals("param_name", name.type().name());
         assertTrue(name.type().annotations().isEmpty(), "nothing records where it points");
 
-        assertEquals("type_name", field(kernel.entries().get("type_ref"), "name").type().name());
+        assertEquals("type_name", field(kernel.entries().get("reference"), "of").type().name());
     }
 
     /** And a position naming something that is not an alias is unaffected here as well. */

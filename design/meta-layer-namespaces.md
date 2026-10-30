@@ -28,9 +28,9 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   hold it. **A value entry is a member of no kind** (no reference over a constructor), nothing is typed by it, and a
   reference over a type that is no constructor names it where its type IS-A `of`: `ref<api>` and `kind<api>` are one
   entry, and either names `myapi`.
-- A value entry is refused at every type position, in one sentence (`ValuesByName.aValueNoType`): a `type_ref` in a
-  type declaration (`validateTypeRef`), a `type_ref` slot in a value body (`judgeApplication`), a kind-typed slot
-  (`judgeMember`). A data tag naming one compiles to a `ValueEntryReader` and is `TYPE_MISMATCH`.
+- A value entry is refused at every type position, in one sentence (`ValuesByName.aValueNoType`): a reference in a
+  type declaration (`validateTypeRef`), a kind-typed slot in a value body (`judgeMember`). A data tag naming one
+  compiles to a `ValueEntryReader` and is `TYPE_MISMATCH`.
 - **One bind context serves schemas and data** (`Tson.dataBindContext()`, `SchemaMetaNameBinder.over`): a name
   meta-kernel.tn or meta.tn declares binds to the schema model, every other to the consumer's binder, so a value entry
   binds to the consumer's class by the type's name. **A value entry no class binds is held as a `TsonValue`**, read in
@@ -125,10 +125,9 @@ as the entry's constructor fact, so resolved output writes the tag. A payload th
 against the entry with the read's path.
 
 A value entry's payload is a **value body** (`TsonReadContext.readsValueBody`): nothing in it lifts or mints, so a
-kind-typed slot holds one bare name and a braced application is refused with the alias spelling named (`order_box =>
-box<order>`, then `request: order_box`); a `type_ref` slot is judged by resolution, arity and §4.1
-(`ValuesByName.judgeApplication`). A template over an ordinary type closes to a value entry (`fetch => <T>
-!operations { … }`, `get_order => fetch<order>`).
+kind-typed slot holds one bare name and an application (`request: "box<order>"`) is refused with the alias spelling
+named (`order_box => box<order>`, then `request: order_box`). A template over an ordinary type closes to a value entry
+(`fetch => <T> !operations { … }`, `get_order => fetch<order>`).
 
 **§8.2 reaches the payload at the read, not at the link.** The linker cannot see into a value -- its fields' types are
 left in the declaring schema -- so the payload is read under the loader's identifier policy (`SchemaResolver`'s `value`)
@@ -171,12 +170,12 @@ value whose type IS-A `of` (`ValuesByName.judge`). The type comes from the
 reader built from the slot's declaration, so it is right however the value was reached -- under a key, behind a
 record field, through the subtype a tag selected -- and the path serves only to say where.
 
-**One host shape for every reference.** A `type_ref` slot binds a `TypeRef`, a kind-typed slot a `TypeRef`, and a
-reference-typed slot a `Ref<T>` or a `TypeRef`; `BindTargets` sets a `KindSlotReader` or `ReferenceNameReader` for
-them, and a `Ref` receives the value the name reaches when the schema links (`Ref.deliver`): the bound object, the
-`Namespace`, or the tree. A host holding the slot as a `String` gets the atom's reader wrapped in a
-`RecordedNameReader`, which refuses what is no name as a `TypeRef` host's reader would; the name is recorded by the
-atom reader either way, so `method: nobody.place` is refused under a `String` exactly as under a `TypeRef`.
+**One host shape for every reference.** A kind-typed slot binds a `TypeRef`, and any other reference-typed slot a
+`Ref<T>` or a `TypeRef`; `BindTargets` sets a `KindSlotReader` or `ReferenceNameReader` for them, and a `Ref` receives
+the value the name reaches when the schema links (`Ref.deliver`): the bound object, the `Namespace`, or the tree. A host
+holding the slot as a `String` gets the atom's reader wrapped in a `RecordedNameReader`, which refuses what is no name
+as a `TypeRef` host's reader would; the name is recorded by the atom reader either way, so `method: nobody.place` is
+refused under a `String` exactly as under a `TypeRef`.
 
 **In a data document a kind is judged by membership**, over the reading document's closure, and a value's qualified
 name at a reference over any other type is `NOT_IMPLEMENTED` at read (nothing links a data document). So a data

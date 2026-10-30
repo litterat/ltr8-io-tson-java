@@ -46,8 +46,10 @@ individually; stated inside whichever phase happens to need it first, such a fac
 once.
 
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
-the `plain`/`nameField` builders every producer goes through; `refValue` and its inverse
-`typeRefOf`/`argumentOf`; the held-record writer `heldRecord`, which spells `fields` as a map
+the `plain`/`nameField` builders every producer goes through; `refValue`, which writes a reference as a bare token
+or, carrying arguments, as one quoted token of its canonical text (SPEC-FEEDBACK.md #12), and its inverse
+`applicationIn`; `substituted`, which rewrites a parameter named among an application's arguments and writes the
+application again as its text; the held-record writer `heldRecord`, which spells `fields` as a map
 from each field's declared name to its `record_field` (`fieldMap`/`fieldEntry`); and §5.10 `substitute` over a
 held body. Every walk over a held body descends into a map's keys and values as it does into a record or an
 array, `fields` being one.
@@ -56,11 +58,12 @@ array, `fields` being one.
   by two phases (`SchemaDesugarer` lifting a sugar form, `HeldBody.of` writing an open record's) and read by
   four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
   declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterTypes`
-  walking one for parameter kinds). `isApplication`'s own contract is that a held body is written by one
+  walking one for parameter kinds). `applicationIn`'s own contract is that a held body is written by one
   phase and read by several, so a second opinion about what an application looks like is what makes one of
-  them wrong. The writer, the reader and `ParameterTypes` all go through it; a walker matching
-  `name`/`arguments` against its own string literals is the copy that drifts silently, since nothing fails,
-  only a parameter kind quietly not inferred.
+  them wrong. The writer, the reader and `ParameterTypes` all go through it; a walker parsing quoted tokens
+  on its own is the copy that drifts silently, since nothing fails, only a parameter kind quietly not
+  inferred. The cost of the quoted spelling: a held body's text literal that is itself a well-formed
+  application is read as one.
 - **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
   gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
   `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
@@ -185,9 +188,9 @@ annotation is: there is no author to resolve against, and the value is fixed.
   application. Marking too much would be as wrong as marking too
   little, so `SyntheticEntryMarkerTest` asserts both halves.
 - **`@application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
-  closes a template application, the application it is the instantiation of, `@application:{ name: box  arguments:
-  [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a value entry
-  (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Alias` a
+  closes a template application, the application it is the instantiation of, `@application:"box<int32>"`, a
+  `type_kind` reference carrying arguments. It is about the entry, not about a type — a record template's member, a
+  value entry (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Alias` a
   non-record template's application closes to — which is why it is no field of `type_chain`. The materialiser records
   each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
   it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`;
@@ -258,8 +261,8 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   binding records the desugar phase lifts, with their `min_items`/`max_items`) — and refuses any other target;
   `refinedBody` merges the integer family's `min` and `max`. `MetaKernelBootstrapResolverTest` measures the cycle with
   `WaitGraph` from `meta-kernel-resolved.tn` and asserts the hand-built names equal it, so a kernel edit that moves the
-  cycle fails there. `KernelWaitGraphTest` prints the measurement: one cycle, 30 of the kernel's 78 entries (69
-  declarations and 9 desugared arrays), longest wait chain 4.
+  cycle fails there. `KernelWaitGraphTest` prints the measurement: one cycle, 29 of the kernel's 74 entries (67
+  declarations and 7 desugared arrays), longest wait chain 4.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies.

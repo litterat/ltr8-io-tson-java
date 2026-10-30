@@ -123,8 +123,9 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   follows, and `RecordTemplateTest` pins both:
   - **A literal applied where the body uses the parameter as a type** (`box<3>`) passes the argument check — a type
     parameter's check reads only a reference — and is refused after substitution, where the body is read against
-    the kernel's vocabulary: `type_ref.name` is an `identifier`, so `'3': U+0033 at index 0 cannot start an
-    identifier`. That is sharper than an unresolved reference, which would imply a type called `3` could be declared.
+    the kernel's vocabulary: `record_field.type` is a `type_kind`, whose names are identifiers, so `'3': U+0033 at
+    index 0 cannot start an identifier`. That is sharper than an unresolved reference, which would imply a type called
+    `3` could be declared.
   - **A type name applied where the body routes the parameter into a field's value** (`retry<text>` over
     `<N> { attempts?: int32 ~ N }`) is refused at the application: `N`'s recorded type is the field's `int32`, so
     `text` is no value of it. A value written literally in that slot (`int32 ~ text`) is §5.2's value conformance,
@@ -169,7 +170,7 @@ resolves, before the batch pass runs. They are handled differently.
   (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on
   'a'`) rather than recursing (`RecordTemplateTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).
 - **An argument that is itself an application survives whole.** Substitution writes a bound reference through
-  `WireForm.refValue` — positionally with no arguments, in `type_ref`'s record form with them — so `box<inner<T>>`
+  `WireForm.refValue` — a bare token with no arguments, its quoted canonical text with them — so `box<inner<T>>`
   keeps `inner<T>` for the absorbing declaration's own materialisation to close. Sharing that producer is the
   requirement: two spellings of one form would be two entries for one type, since a name derives from what is
   written.

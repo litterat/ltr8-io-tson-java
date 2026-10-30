@@ -146,7 +146,7 @@ class ApplicabilityIsIsATopTest {
      */
     @Test
     void aComponentOfATypeBuildsAValueOfIt() {
-        for (String component : List.of("record_field { name: x  type: text }", "type_ref { label: text }",
+        for (String component : List.of("record_field { name: x  type: text }", "tuple_element { label: text }",
                 "field_group { members: g }", "integer_size { bits: 32  sign: true }")) {
             List<Diagnostic> problems = problems("  bad => !" + component);
 

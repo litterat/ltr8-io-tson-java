@@ -24,8 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>The edge cannot be minted where the author writes it.</b> At {@code ok}'s declaration {@code
  * result<T>} denotes no entry -- a template is not a type (§5.10) -- so there is nothing to name in a chain.
- * What the held body keeps is the application itself as a written parent, {@code supertypes} being a
- * {@code [type_ref]} channel, and materialisation substitutes and closes it with the rest of the held body.
+ * What the held body keeps is the application itself as a written parent, {@code parents} being a
+ * {@code [type_kind]} slot whose reference may carry arguments, and materialisation substitutes and closes it
+ * with the rest of the held body.
  *
  * <p><b>Why a reference and not the head name.</b> §5.8 describes {@code supertypes} as recording head names
  * only, with substitutability then a two-part check against the bodies. A head name cannot work here: no

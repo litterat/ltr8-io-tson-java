@@ -13,12 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A {@code type_ref} keeps the wire annotations written on the reference itself.
+ * A reference keeps the wire annotations written on the reference itself.
  *
- * <p>§6 lets an annotation precede any value, and a {@code type_ref} at a field's type position is one:
+ * <p>§6 lets an annotation precede any value, and a reference at a field's type position is one:
  * {@code type: @doc:"..." token} annotates the <em>reference</em>, not the field around it, so {@link
- * TypeRef} is where it has to live. Before it had a carrier, a read discarded one and a write could not
- * produce one.
+ * TypeRef} is where it has to live, and a read keeps it and a write produces it.
  */
 class TypeRefAnnotationTest {
 

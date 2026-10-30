@@ -43,7 +43,7 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   implementation. The last is the resolver's replay of a value inside a schema document and the one read whose
   `readsSchemaDocument()` is true: the readers consult it for the one rule that is a schema document's alone (a bare
   name at a record position is a value by name, `design/record-dispatch.md`), and it alone **keeps** every name read at
-  a kind-, reference- or `type_ref`-typed slot, handing it to `heldByName` with the slot's path and declared type
+  a reference-typed slot, a kind's included, handing it to `heldByName` with the slot's path and declared type
   (`TsonSchema.SlotType`) for `SchemaResolver` to keep per entry for the linker. Every other read drops it. It also
   tells `heldByName` each declaration a reader reads against (`HeldByName.reached`, from `inRecord` and
   `underDeclaration`): the waits a resolution counts toward §11.5's wait depth (`design/processor-policy.md`).

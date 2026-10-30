@@ -13,7 +13,7 @@ registry and identity, `design/meta-layer-namespaces.md` for `NamespaceBody`, `N
 - An atom body's components mirror its constructor's *resolved*, flattened shape — one component per schema field name.
   A nested or missing component binds `null` silently.
 - A bind target with more than one public constructor needs `@Record` on the canonical one.
-- `TypeArgument` stays a sealed interface. `RecordField.position` is `@Unbound`; an entry's position, annotations
-  and constructor tag live beside the map in `TsonSchema`'s per-entry facts, never in a body.
+- `TypeArgument` stays a sealed interface, compared by its text. `RecordField.position` is `@Unbound`; an entry's
+  position, annotations and constructor tag live beside the map in `TsonSchema`'s per-entry facts, never in a body.
 - The registry never overwrites an identity. Bundled schema text comes from `spec/m/` at build time and is verified
   against `TsonBundledSchemas`' digests on every load: after editing one, run `scripts/restamp-bundled-schemas.sh`.

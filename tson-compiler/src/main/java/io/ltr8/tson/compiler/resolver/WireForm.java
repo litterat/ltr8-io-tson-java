@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -28,9 +29,9 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * How schema vocabulary is spelled as data, in both directions -- the one place that knows what a {@code
- * type_ref} and a held application look like on the wire, an open record's tree included, and the one that
- * rewrites a parameter standing inside one.
+ * How schema vocabulary is spelled as data, in both directions -- the one place that knows what a reference and a
+ * held application look like on the wire, an open record's tree included, and the one that rewrites a parameter
+ * standing inside one.
  *
  * <p><b>Why one class rather than a producer over here and a consumer over there.</b> A held body is written
  * by two phases and read by four: {@code SchemaDesugarer} lifts a sugar form and {@link HeldBody} writes an open
@@ -43,13 +44,13 @@ import java.util.function.Function;
  * writer's output is canonical-explicit and fully quoted, which is a different language from the one a held
  * body is written in: {@code TemplateBody.names()} and {@link #substitute} both key on a token being
  * unquoted, so a quoted body references no parameters at all. What is written here is what an author would
- * have written -- an unquoted token where the writer would quote, a bare name where it would state
- * {@code { name: X  arguments: [] }}, and nothing at all where the constructor's own default says it.
+ * have written -- an unquoted token where the writer would quote, a reference as its canonical text, and nothing at
+ * all where the constructor's own default says it.
  *
  * <p><b>One spelling per shape is the requirement, not the tidiness.</b> An entry name derives from what is
  * written ({@code SchemaDesugarer.internalName}), so a second spelling of one reference splits one type
  * across two entries. That is why {@link #refValue} is what every producer goes through, and why
- * {@link #typeRefOf} -- its inverse -- lives beside it rather than in the phase that happens to read.
+ * {@link #applicationIn} -- its inverse -- lives beside it rather than in the phase that happens to read.
  */
 final class WireForm {
 
@@ -58,16 +59,7 @@ final class WireForm {
 
     // ── The vocabulary's own member names ────────────────────────────────────────────────────────
 
-    /**
-     * {@code type_ref.name}, carrying a reference. What tells an application from anything else is never this
-     * member alone but its pairing with {@link #ARGUMENTS}; see {@link #isApplication}.
-     */
-    static final String NAME = "name";
-
-    /** {@code type_ref.arguments} -- the second half of what makes a record an application. */
-    static final String ARGUMENTS = "arguments";
-
-    /** {@code record_field.value} and {@code type_argument.value}: §8.1's literal channel. */
+    /** {@code record_field.value}: §8.1's literal channel. */
     static final String VALUE = "value";
 
     /** The constructor an open record's held tree applies. */
@@ -207,13 +199,13 @@ final class WireForm {
     // ── Writing: a resolved value as the wire form it was written in ───────────────────────────
 
     /**
-     * The held body of an <b>open alias</b> -- {@code <B> !alias { target: pair<uuid, B> }}, the form
-     * [TSON-SCHEMA] §8.1 says a partial application denotes. Spellable because {@code alias.target} is a
-     * {@code type_ref}, so an alias that still binds arguments states them in its own body (§8.1).
+     * The held body of an <b>open alias</b> -- {@code <B> !alias { target: "pair<uuid B>" }}, the form
+     * [TSON-SCHEMA] §8.1 says a partial application denotes: {@code alias.target} is a reference, and a reference
+     * may carry the arguments the alias already binds.
      *
      * <p>The target goes through {@link #refValue} like every other reference this package writes, so a
-     * no-argument target is a bare token and only an application carries {@code arguments} -- the one
-     * spelling §5.10 requires, however many phases produce it.
+     * no-argument target is a bare token and an application its quoted canonical text -- the one spelling §5.10
+     * requires, however many phases produce it.
      */
     static DataValue heldReference(TypeRef target) {
         return new DataValue(List.of(), Optional.of(ALIAS), new RecordValue(List.of(
@@ -254,7 +246,7 @@ final class WireForm {
         if (!body.parents().isEmpty()) {
             // Held text's one chain slot, the parents as written (TypeChain.parents). Through refValue like every
             // other reference: a closed parent is a bare token and only a parent still applied to a parameter
-            // carries `arguments`, which is what lets substitution close it.
+            // carries arguments, which is what lets substitution close it.
             binding.add(new RecordValue.Field(CHAIN, plain(new RecordValue(List.of(new RecordValue.Field(PARENTS,
                     plain(new ArrayValue(body.parents().stream().map(parent -> plain(refValue(parent)))
                             .toList()))))))));
@@ -305,76 +297,64 @@ final class WireForm {
     }
 
     /**
-     * A resolved type reference in the held spelling: a bare name, or {@code type_ref}'s record form.
+     * A reference in the held spelling: a bare name, unquoted, or an application as its canonical text, quoted
+     * ({@link TypeRef#text}), {@code <} being reserved in data (SPEC-FEEDBACK.md #12).
      *
-     * <p><b>The {@code arguments().isEmpty()} branch is load-bearing, not an optimisation.</b> A held body is
-     * read by later phases as wire form, and {@code type_argument} is told from {@code type_ref} by which
-     * shape a slot carries -- so stating a no-argument reference in the record form would make the two
-     * indistinguishable to a walk that reads neither against a vocabulary, and would give one type two entry
-     * names, since a name derives from what is written. That is why {@link TemplateMaterialiser}'s
-     * substitution writes a bound reference through this rather than spelling one of its own: the open form
-     * needs one spelling however many phases produce it.
+     * <p><b>One spelling is the requirement, not the tidiness.</b> An entry name derives from what is written, so a
+     * second spelling of one reference would give one type two entry names. That is why {@link TemplateMaterialiser}'s
+     * substitution writes a bound reference through this rather than spelling one of its own.
      */
     static CoreValue refValue(TypeRef ref) {
-        if (ref.arguments().isEmpty()) {
-            return new TokenValue(ref.name(), TokenForm.UNQUOTED);
-        }
-        List<DataValue> arguments = new ArrayList<>();
-        for (TypeArgument argument : ref.arguments()) {
-            arguments.add(plain(new RecordValue(List.of(switch (argument) {
-                case TypeArgument.Ref reference ->
-                        new RecordValue.Field(NAME, plain(refValue(reference.ref())));
-                case TypeArgument.Value literal ->
-                        new RecordValue.Field(VALUE, plain(new TokenValue(literal.value().text(),
-                                tokenForm(literal.value().form()))));
-            }))));
-        }
-        return new RecordValue(List.of(nameField(NAME, ref.name()),
-                new RecordValue.Field(ARGUMENTS, plain(new ArrayValue(arguments)))));
+        return ref.arguments().isEmpty() ? new TokenValue(ref.name(), TokenForm.UNQUOTED)
+                : new TokenValue(ref.text(), TokenForm.SINGLE_LINE_QUOTED);
     }
-
 
     // ── Reading: the wire form back as the reference it spells ─────────────────────────────────
 
     /**
-     * {@code type_ref}'s record form is the one shape carrying both members; a bare name is a token, and a
-     * {@code type_argument} carries {@code name} or {@code value} but never {@code arguments}. Package-visible
-     * so {@link HeldBody} recognises an application by the same test that closes one -- a held body is written
-     * by one phase and read by two, and a second opinion about what an application looks like is what makes
-     * one of them wrong.
+     * The application {@code value} spells, or empty where it spells none: a quoted token whose text is a reference
+     * carrying an argument list. A bare name is an unquoted token, and every other quoted token is a literal.
+     * Package-visible so {@link HeldBody} and {@code ParameterTypes} recognise an application by the same test that
+     * closes one -- a held body is written by one phase and read by several, and a second opinion about what an
+     * application looks like is what makes one of them wrong.
+     *
+     * <p>The cost of the quoted spelling: a held body's text literal that is itself a well-formed application is read
+     * as one. A held body is a constructor application as written, and a text slot holding {@code "box<T>"} beside a
+     * parameter {@code T} is the one shape that meets it.
      */
-    static boolean isApplication(RecordValue record) {
-        return field(record, NAME).isPresent() && field(record, ARGUMENTS).isPresent();
+    static Optional<TypeRef> applicationIn(CoreValue value) {
+        if (value instanceof TokenValue token && token.form() != TokenForm.UNQUOTED
+                && ReferenceGrammar.isApplication(token.text())) {
+            return Optional.of(ReferenceGrammar.parse(token.text()));
+        }
+        return Optional.empty();
     }
 
-    /** {@code { name: head  arguments: [ ... ] }} back as the reference it spells. */
-    static TypeRef typeRefOf(RecordValue record) {
-        CoreValue name = field(record, NAME).orElseThrow();
-        String head = name instanceof TokenValue token ? token.text()
-                : typeRefOf((RecordValue) name).name();
-        List<TypeArgument> arguments = new ArrayList<>();
-        if (field(record, ARGUMENTS).orElseThrow() instanceof ArrayValue array) {
-            for (DataValue element : array.elements()) {
-                arguments.add(argumentOf((RecordValue) element.coreValue()));
+    /** The names an application writes: its head and every reference among its arguments, at any depth. */
+    static List<String> namesIn(TypeRef application) {
+        List<String> names = new ArrayList<>();
+        names.add(application.name());
+        for (TypeArgument argument : application.arguments()) {
+            if (argument instanceof TypeArgument.Ref ref) {
+                names.addAll(namesIn(ref.ref()));
             }
         }
-        return new TypeRef(head, arguments);
+        return names;
     }
 
-    /** One argument record: {@code value} carries a literal, {@code name} a reference, simple or compound. */
-    private static TypeArgument argumentOf(RecordValue argument) {
-        Optional<CoreValue> literal = field(argument, VALUE);
-        if (literal.isPresent()) {
-            TokenValue token = (TokenValue) literal.get();
-            return new TypeArgument.Value(new Token(token.text(), switch (token.form()) {
-                case UNQUOTED -> Token.Form.UNQUOTED;
-                case SINGLE_LINE_QUOTED -> Token.Form.SINGLE_LINE_QUOTED;
-                case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
-            }));
+    /** {@code application} with each argument that is a bare name in {@code renames} renamed, at any depth. */
+    static TypeRef renamedArguments(TypeRef application, Map<String, String> renames) {
+        List<TypeArgument> arguments = new ArrayList<>(application.arguments().size());
+        for (TypeArgument argument : application.arguments()) {
+            arguments.add(switch (argument) {
+                case TypeArgument.Ref ref when ref.ref().arguments().isEmpty()
+                        && renames.containsKey(ref.ref().name()) ->
+                        new TypeArgument.Ref(TypeRef.of(renames.get(ref.ref().name())));
+                case TypeArgument.Ref ref -> new TypeArgument.Ref(renamedArguments(ref.ref(), renames));
+                case TypeArgument.Value value -> value;
+            });
         }
-        CoreValue name = field(argument, NAME).orElseThrow();
-        return new TypeArgument.Ref(name instanceof TokenValue token ? TypeRef.of(token.text())
-                : typeRefOf((RecordValue) name));
+        return new TypeRef(application.name(), arguments, application.annotations());
     }
 
     /**
@@ -390,11 +370,11 @@ final class WireForm {
         }
         List<TypeRef> written = new ArrayList<>();
         for (DataValue parent : parents.elements()) {
-            switch (parent.coreValue()) {
-                case TokenValue token -> written.add(TypeRef.of(token.text()));
-                case RecordValue application when isApplication(application) -> written.add(typeRefOf(application));
-                default -> {
-                }
+            Optional<TypeRef> application = applicationIn(parent.coreValue());
+            if (application.isPresent()) {
+                written.add(application.get());
+            } else if (parent.coreValue() instanceof TokenValue token && token.form() == TokenForm.UNQUOTED) {
+                written.add(TypeRef.of(token.text()));
             }
         }
         return List.copyOf(written);
@@ -415,9 +395,8 @@ final class WireForm {
      * vocabulary has to record which kind of thing each slot was bound to, because a bare token in a value
      * slot is a literal and nothing else; here the body is uninterpreted until this substitution finishes, so
      * §8.1's shadowing rule decides it -- a token that resolves into {@code parameters} is a parameter, and
-     * anything else is what it looks like. The one place the channel still shows is inside a {@code type_ref}
-     * record, whose {@code name} member takes a reference: a parameter there bound to a literal moves to the
-     * {@code value} member, since an argument list distinguishes the two by which member holds it.
+     * anything else is what it looks like. Inside an application ({@link #applicationIn}) an argument naming a
+     * parameter is rewritten the same way, and the application written again as its canonical text.
      *
      * <p><b>An argument may itself be open, and that is a supported use rather than an accident.</b>
      * {@code DefinitionResolver} substitutes an operand's held body with the arguments an enclosing
@@ -432,6 +411,8 @@ final class WireForm {
             case TokenValue token when token.form() == TokenForm.UNQUOTED
                     && parameters.contains(token.text()) ->
                     argumentValue(argumentFor(token.text(), head, bindings));
+            case TokenValue token when applicationIn(token).isPresent() ->
+                    refValue(substituted(applicationIn(token).get(), head, parameters, bindings));
             case ArrayValue array -> new ArrayValue(array.elements().stream()
                     .map(element -> rewritten(element, substitute(element.coreValue(), head, parameters,
                             bindings))).toList());
@@ -455,21 +436,30 @@ final class WireForm {
         return new DataValue(original.annotations(), original.typeRef(), rewritten);
     }
 
-    /**
-     * One field of a held record, with {@code type_ref}'s own {@code name}/{@code value} split honoured: a
-     * {@code name} member bound to a value argument is that argument's literal on the {@code value} member,
-     * because §8.1 tells a reference argument from a literal one by which member carries it.
-     */
+    /** One field of a held record, its value substituted. */
     private static RecordValue.Field substituteField(RecordValue.Field field, String head,
             List<String> parameters, Map<String, TypeArgument> bindings) {
-        CoreValue held = field.value().coreValue();
-        if (NAME.equals(field.name()) && held instanceof TokenValue token
-                && token.form() == TokenForm.UNQUOTED && parameters.contains(token.text())
-                && argumentFor(token.text(), head, bindings) instanceof TypeArgument.Value literal) {
-            return new RecordValue.Field(VALUE, rewritten(field.value(), argumentValue(literal)));
-        }
         return new RecordValue.Field(field.name(),
-                rewritten(field.value(), substitute(held, head, parameters, bindings)));
+                rewritten(field.value(), substitute(field.value().coreValue(), head, parameters, bindings)));
+    }
+
+    /**
+     * An application with each argument naming a parameter replaced by the argument bound for it, at any depth. The
+     * head is never a parameter: {@code T<text>} applies one, which is no form §12.1 has.
+     */
+    static TypeRef substituted(TypeRef application, String head, List<String> parameters,
+                               Map<String, TypeArgument> bindings) {
+        List<TypeArgument> arguments = new ArrayList<>(application.arguments().size());
+        for (TypeArgument argument : application.arguments()) {
+            arguments.add(switch (argument) {
+                case TypeArgument.Ref ref when ref.ref().arguments().isEmpty()
+                        && parameters.contains(ref.ref().name()) -> argumentFor(ref.ref().name(), head, bindings);
+                case TypeArgument.Ref ref when !ref.ref().arguments().isEmpty() ->
+                        new TypeArgument.Ref(substituted(ref.ref(), head, parameters, bindings));
+                default -> argument;
+            });
+        }
+        return new TypeRef(application.name(), arguments, application.annotations());
     }
 
     private static TypeArgument argumentFor(String parameter, String head, Map<String, TypeArgument> bindings) {
@@ -488,22 +478,20 @@ final class WireForm {
     /**
      * One argument in the held spelling, standing where the parameter it binds stood.
      *
-     * <p>A <b>literal</b> is its own token. A <b>reference</b> goes through {@link #refValue},
-     * which spells a no-argument one positionally (§5.6, where a reference and a literal look alike) and one
-     * carrying arguments in {@code type_ref}'s own record form. Writing the head name alone would be the
-     * shorter code and is wrong: {@code box<inner<T>>} would put {@code inner} where {@code inner<T>} belongs
-     * and drop the argument list with no diagnostic, because a token has nowhere to keep it.
+     * <p>A <b>literal</b> is its own token. A <b>reference</b> goes through {@link #refValue}, which spells a
+     * no-argument one as a bare token and one carrying arguments as its quoted text. Writing the head name alone
+     * would be the shorter code and is wrong: {@code box<inner<T>>} would put {@code inner} where {@code inner<T>}
+     * belongs and drop the argument list with no diagnostic.
      *
      * <p><b>Reusing the desugarer's producer is the requirement, not the convenience.</b> Two spellings of
      * one form are two entries for one type, an entry name deriving from what is written -- so the phase that
-     * substitutes and the phase that lifts have to agree down to whether a no-argument reference is a token
-     * or a record. Sharing the function is what makes that true by construction.
+     * substitutes and the phase that lifts have to agree down to how a reference's text is spelled. Sharing the
+     * function is what makes that true by construction.
      *
-     * <p>Every slot a parameter can occupy takes either spelling: a field's {@code type}, an {@code
-     * element_type}, a {@code variants}/{@code elements} entry, and {@code type_argument}'s own {@code name}
-     * member are all typed {@code type_ref}. The one position that would not is a {@code type_ref}'s
-     * <em>head</em> -- {@code type_ref.name} is a {@code type_name} -- and a parameter cannot stand there:
-     * {@code T<text>} applies a parameter, which is no form §12.1 has.
+     * <p>Every slot a parameter can occupy as a type takes either spelling: a field's {@code type}, an {@code
+     * element_type}, a {@code variants}/{@code elements} entry, an application's argument. The one position that
+     * would not is an application's <em>head</em>, and a parameter cannot stand there: {@code T<text>} applies a
+     * parameter, which is no form §12.1 has.
      */
     private static CoreValue argumentValue(TypeArgument argument) {
         return switch (argument) {

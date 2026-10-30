@@ -45,11 +45,11 @@ entry.
 **The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
 whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare
 name. Its counterpart at the body is a held body present ⟹ open entry, and together the two make the closed-entry
-rule checkable structurally, with no vocabulary needed to read a `type_ref`. One direction only: a partial
-application (`<B> pair<uuid, B>`) is a template that holds nothing, keeping the `type_ref` with arguments it
+rule checkable structurally, with no vocabulary needed to read a reference. One direction only: a partial
+application (`<B> pair<uuid, B>`) is a template that holds nothing, keeping the reference with arguments it
 already resolves to.
 
-The alternative — inline sugar riding as a structural `type_ref` rather than as an injected entry, with the
+The alternative — inline sugar riding as a structural reference rather than as an injected entry, with the
 compiler building readers from those refs — is **deliberately not implemented**. Four arguments stand for it
 and none holds:
 
@@ -64,7 +64,7 @@ and none holds:
   reports the path taken (`/holder/xs`), never the leaf it resolves to.
 
 Two arguments run the other way. A second representation of a nested form forces every consumer to walk two
-representations, which is precisely what a structural `type_ref` would impose on every container. And the
+representations, which is precisely what a structural reference would impose on every container. And the
 deduplication would not disappear, only relocate: `[text]` in five records must not
 compile five readers, so the compiler would need a memo keyed on ref structure, which is the naming below
 rebuilt and called a cache.
@@ -111,7 +111,7 @@ rebuilt and called a cache.
   differ between two runs of the same application. `SchemaDesugarerTest` pins two derived names to exact
   strings, because a change to them is a change to the resolved form of every schema.
 - **The variadic pair, `choice` and `tuple`, differ in what one position *is*.** A variant is a bare
-  `type_ref`; an element is a `tuple_element` record carrying a type **and** its own `voidable`, so each
+  `type_kind` reference; an element is a `tuple_element` record carrying a type **and** its own `voidable`, so each
   tuple position needs a record built for it. `voidable` is written only for a marked position — the member
   is defaulted (`voidable?: boolean ~ false`), so an unmarked one is spelled by omitting it,
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the

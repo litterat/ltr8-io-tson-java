@@ -213,7 +213,7 @@ the dispatcher sends each subtype tag to that subtype's class, checked against t
 
 **A record with no subtypes binds to a union only as a labelled choice** (`BindGroupUnionBuilder`): one REQUIRED
 group of one-field options over every field, each member of the sealed interface a one-component record whose wire
-name is the field it labels — the shape of the kernel's `type_argument`, `{ ( name: type_ref | value: value ) }`.
+name is the field it labels, such as `{ ( cents: int64 | text: text ) }`.
 The ordinary loop reads it, the group rule admits one member, and the builder constructs the member whose field
 arrived. A near-miss is a `BindMismatchException` naming it, not a guess.
 

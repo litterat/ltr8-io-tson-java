@@ -82,7 +82,7 @@ spec-required case:
   `readAs(text, "schema")`), with nothing verified.
   `ParameterTypes` already derives the type to check against.
 - [ ] **An application is not yet unified with an imported library's entry for it** ([TSON-SCHEMA] §8.1, §8.2). A
-  library declaring `int_box => box<int32>` writes `@application:{ name: box  arguments: [{ name: int32 }] }` on that
+  library declaring `int_box => box<int32>` writes `@application:"box<int32>"` on that
   key, and a schema importing it that writes `box<int32>` still closes the application to an entry of its own rather
   than resolving to `int_box`. The lookup runs application to entry, so it needs an index over imported keys keyed by
   `DerivedName.canonicalApplication`; `TemplateMaterialiser.ownedBy` is that index for local declarations and
@@ -107,6 +107,11 @@ spec-required case:
   `validateSchema` rather than arriving as a `NOT_IMPLEMENTED` diagnostic. The name is to be recorded with the field's
   slot type and judged as a value body's names are (`ValuesByName.judge`), or the default refused if a reference
   admits none.
+- [ ] **A data read resolves an application only to an entry its closure records** ([TSON-SCHEMA] §4.2, §8.2;
+  `SPEC-FEEDBACK.md #12`). A kind-typed slot in data holding `"box<text>"` is judged through the entry `@application`
+  names (`ReferenceBody.Index.applications`); an expansion nothing declares carries no `@application` and is named by
+  its content, so `KindParser` reports `NOT_IMPLEMENTED` for it. Have the resolver record every application it closes,
+  expansions included, beside the entries (not in resolved output), and index them at link.
 - [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
   component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
@@ -124,13 +129,11 @@ spec-required case:
   (a Revision 39 proposal), make it `namespace => map ^ { key_type: identifier_kind … }` with `key_type`
   required, `field_map` a template applied to its record's `name_type`, and add a vector that `kind<map>` holds a
   namespace type.
-- [ ] **A parameter in a record template has no channel of its own** ([TSON-SCHEMA] §5.10). An open record's
-  parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
-  type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
-  channel: `record_field` `( type: type_kind | type_param: param_name )` and `( value: value | value_param: param_name
-  )`, `type_argument` a `param` member, so `type_ref.name` always names an entry. Sequenced with folding the
-  name-only `type_ref` into the kernel's `reference` atom, a Revision 39 direction, which needs exactly that, and
-  with what `@application` means on a declared entry that is no record.
+- [ ] **A parameter in a record field's `value` has no channel of its own** ([TSON-SCHEMA] §5.10). It is an unquoted
+  token in `record_field.value`, told from a literal by §5.10's shadowing rule, in resolved output as in source; at a
+  type position or among an application's arguments a parameter is its name, as the reference grammar reads one
+  (`SPEC-FEEDBACK.md #12`). Decide with typed facets, which retype `value`, whether `value` gains a channel (`( value:
+  value | value_param: param_name )`), and with it what `@application` means on a declared entry that is no record.
 
 ## Checked annotations
 
