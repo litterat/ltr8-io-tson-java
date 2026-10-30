@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
@@ -239,7 +239,7 @@ class OpenEntryResolvedFormTest {
                 !schema {
                   port   => !integer_type { min: 0  max: 65535 }
                   age    => !int32 ^ { min: 0  max: 150 }
-                  alias  => port
+                  renamed => port
                   colour => !enum [RED GREEN BLUE]
                   point  => { x: int32  y: int32 }
                   named  => point & { label: text }
@@ -295,7 +295,7 @@ class OpenEntryResolvedFormTest {
                     open++;
                 }
                 closed++;
-                if (!TypeChain.supertypesOf(definition).contains("top") && !(definition instanceof Reference)
+                if (!TypeChain.supertypesOf(definition).contains("top") && !(definition instanceof Alias)
                         && !OpenEntry.isOpen(definition)
                         && !perSchema.get(id).containsKey(headOf(definition))) {
                     neededTheGoverningMeta++;
@@ -326,10 +326,10 @@ class OpenEntryResolvedFormTest {
             // template is a type, the family base, and falls to the record rules below.
             return EntryKind.TEMPLATE;
         }
-        if (definition instanceof Reference) {
-            // §4.1 gives an alias REFERENCE, a type_kind and not a base kind -- and the kernel's `reference`
+        if (definition instanceof Alias) {
+            // §4.1 gives an alias the kind ALIAS, a type_kind and not a base kind -- and the kernel's `alias`
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
-            return EntryKind.REFERENCE;
+            return EntryKind.ALIAS;
         }
         if (TypeChain.supertypesOf(definition).contains("top")) {
             // A constructor: its kind states what its *instances* will be, not what its own body is --
@@ -354,7 +354,7 @@ class OpenEntryResolvedFormTest {
             case Atom atom -> atom.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Product product -> product.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Sum sum -> sum.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
-            case Reference reference -> "reference";
+            case Alias alias -> "alias";
             case TemplateBody held -> "template";
             case io.ltr8.tson.schema.meta.ValueEntry value -> value.type();
         };

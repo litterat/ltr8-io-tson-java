@@ -244,7 +244,7 @@ class ChoiceDisjointnessTest {
         TypeRef colour = atom("colour", new EnumBody(List.of("red", "green")));
         TypeRef value = atom("value", new ValueType());
         TypeRef nothing = atom("void", new VoidType());
-        namespace.put("text_alias", new io.ltr8.tson.schema.meta.Reference(TypeRef.of("text")));
+        namespace.put("text_alias", new io.ltr8.tson.schema.meta.Alias(TypeRef.of("text")));
         assertFalse(disjoint(mapKeyedBy("by_point", point), i));
         assertTrue(disjoint(mapKeyedBy("by_text", TypeRef.of("text")), i));
         assertTrue(disjoint(mapKeyedBy("by_alias", TypeRef.of("text_alias")), i));
@@ -295,20 +295,20 @@ class ChoiceDisjointnessTest {
 
     // ---------------------------------------------------------------- references
 
-    /** §8.3 makes an alias and its target one type, so a variant classifies through its reference chain. */
+    /** §8.3 makes an alias and its target one type, so a variant classifies through its alias chain. */
     @Test
     void anAliasVariantClassifiesAsItsTarget() {
         atom("integer", IntegerType.UNCONSTRAINED);
-        namespace.put("my_int", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("integer")));
+        namespace.put("my_int", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("integer")));
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertTrue(disjoint(TypeRef.of("my_int"), t));
         assertFalse(disjoint(TypeRef.of("my_int"), TypeRef.of("integer")));
     }
 
     @Test
-    void aReferenceCycleHasNoClassSoItsChoiceIsNotDisjoint() {
-        namespace.put("a", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("b")));
-        namespace.put("b", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("a")));
+    void anAliasCycleHasNoClassSoItsChoiceIsNotDisjoint() {
+        namespace.put("a", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("b")));
+        namespace.put("b", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("a")));
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertFalse(disjoint(TypeRef.of("a"), t));
     }

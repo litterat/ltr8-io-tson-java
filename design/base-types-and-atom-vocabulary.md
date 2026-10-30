@@ -172,7 +172,7 @@ does narrow, such as a media type that must parse, is a type of its own.
   the type's own `IdentifierProfile` (a profile failure is a parse failure), then `text_type`'s facets through
   `TextParser`. So a naming convention is a `pattern`, a closed vocabulary of names is `members`, and an identifier is
   string-class (§5.4). The kernel's `void` is `!void_type {}`, so the linker's refusal of a `void` variant and the
-  inhabitance check ask the body (`ReferenceChain.resolvesToVoid`), not the name.
+  inhabitance check ask the body (`AliasChain.resolvesToVoid`), not the name.
 - **`identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `ASCII`, `NONE`), `start_add`,
   `continue_add`, `medial` and `exclude` code-point sets, with `text_type`'s `normalization` defaulting to `NFC`.
   `IdentifierType.profile()` builds the `IdentifierProfile` on each call, and `IdentifierParser` holds the one it

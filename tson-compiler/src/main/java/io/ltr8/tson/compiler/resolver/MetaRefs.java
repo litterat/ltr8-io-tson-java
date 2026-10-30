@@ -5,7 +5,7 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -90,7 +90,7 @@ final class MetaRefs {
             // An alias's target maps like any other reference, arguments and all -- which is what lets a
             // closed alias follow its target onto the entry materialisation minted for it, and a partial
             // application keep the arguments it binds.
-            case Reference reference -> new Reference(map.apply(reference.target()));
+            case Alias alias -> new Alias(map.apply(alias.target()));
             // A held body maps nothing: its references are tokens that have not been resolved against
             // anything yet, and rewriting one would be rewriting a name whose meaning is not settled until
             // substitution supplies the arguments.

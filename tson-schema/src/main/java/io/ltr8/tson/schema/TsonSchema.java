@@ -25,7 +25,7 @@ import java.util.Optional;
  * SchemaMap.declarations}' own ordering guarantee.
  *
  * <p><b>An entry is its value</b> ([TSON-SCHEMA] §8.1): a name maps to the body it resolves to -- a {@code
- * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@code ValueEntry} -- and a
+ * RecordBody}, an atom family's instance, an {@code Alias}, a {@code TemplateBody}, a {@code ValueEntry} -- and a
  * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
  * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
  *

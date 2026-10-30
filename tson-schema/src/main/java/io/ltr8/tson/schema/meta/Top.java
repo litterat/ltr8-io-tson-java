@@ -8,8 +8,8 @@ package io.ltr8.tson.schema.meta;
  * the kernel's own composition chain as real Java subtyping: {@code type => top & {}} becomes
  * {@link Type}, and {@code atom => type & {}}, {@code product => type & { ... }} and
  * {@code sum => type & {}} become {@link Atom}/{@link Product}/{@link Sum} each {@code extends Type};
- * {@code reference => top & { target: type_name } } (which composes with {@code top} directly, not
- * through {@code type}) becomes {@link Reference} implementing this interface directly. Lets a consumer
+ * {@code alias => top & { target: type_ref } } (which composes with {@code top} directly, not
+ * through {@code type}) becomes {@link Alias} implementing this interface directly. Lets a consumer
  * test kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product} rather than
  * switching on {@link EntryKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same
  * sealed hierarchy directly for {@code !record}/{@code !array}/etc. type-refs -- {@code
@@ -27,5 +27,5 @@ package io.ltr8.tson.schema.meta;
  * never a type, and is how a schema puts vocabulary of its own in a schema map. Every branch is sealed, so an
  * entry's kind is decidable by inspection and every switch over them is exhaustive.
  */
-public sealed interface Top permits Type, Reference, TemplateBody, ValueEntry {
+public sealed interface Top permits Type, Alias, TemplateBody, ValueEntry {
 }

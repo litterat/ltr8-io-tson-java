@@ -12,7 +12,7 @@ import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.RecordEnd;
@@ -66,7 +66,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
 
     /**
      * Every written name that means the base -- its own, and any alias whose chain ends at it (§7.2's "after
-     * reference flattening of both"). §8.1 admits a redundant tag at any typed position; a sealed base is
+     * alias flattening of both"). §8.1 admits a redundant tag at any typed position; a sealed base is
      * where that stops, and the refusal has to reach every spelling of it.
      */
     private final Set<String> selfNames;
@@ -126,7 +126,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
 
     private static Selector selectorOf(String name, RecordField field, Namespace<Top> entries,
                                        TsonLinkedSchema linked) {
-        String terminal = ReferenceChain.terminal(field.type().name(), entries::get);
+        String terminal = AliasChain.terminal(field.type().name(), entries::get);
         Top target = entries.get(terminal);
         AtomType<?> parser = AtomParsers.forType(target, linked.enumForm(terminal)).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.type().name()

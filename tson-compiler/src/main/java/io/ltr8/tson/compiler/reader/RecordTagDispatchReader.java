@@ -38,7 +38,7 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
     /**
      * Every written name that means the base -- its own, and any alias whose chain ends at it. Naming it is
      * refused with its own rule, the remedy differing (§8.1), and an alias names it exactly as much (§7.2's
-     * "after reference flattening of both").
+     * "after alias flattening of both").
      */
     private final Set<String> selfNames;
 

@@ -357,7 +357,7 @@ class FieldNameTypeTest {
     }
 
     /**
-     * Two name types are one when their reference chains end at one entry, not when they are spelled alike: an
+     * Two name types are one when their alias chains end at one entry, not when they are spelled alike: an
      * alias of {@code json_name} composes with it, and so does the kernel's {@code identifier} with the default
      * {@code field_name}, an alias of it.
      */

@@ -23,7 +23,7 @@ derived — and the static check that runs before any of it.
   substitution descends into arguments.
 - An application nothing declares is its expansion: the use site names the closed synthetic, named for its binding
   record (`mintedRecord` for a record, `closeHeldTemplate` for every other form). The exception is an expansion that
-  reaches its own application (`tied`), which keeps an instantiation entry: the record itself, or a `Reference` to
+  reaches its own application (`tied`), which keeps an instantiation entry: the record itself, or an `Alias` to
   the synthetic.
 - Every instantiation — a declared one, a self-reaching one — records its application in the map `SchemaResolver`
   shares with the materialiser, which writes it on the entry's key as `@application`; §8.2's identity and the
@@ -71,7 +71,7 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   declared entry's identity is its name, and its key records the canonical application, so an imported schema's
   declared applications unify with a later schema's use sites (`ownedBy`).
 - **A declaration naming the application *is* that entry** (§8.2). `text_box => box<text>` resolves to the closed
-  record under `text_box`, its key recording the application — not a `Reference` to an entry beside it.
+  record under `text_box`, its key recording the application — not an `Alias` to an entry beside it.
   `DefinitionResolver` reaches `closeApplicationInto`, which builds the body under the declared name, calls
   `MintedNames.claim` for none of it and publishes nothing, so the synthetic is never created rather than created and
   collapsed. It records `ownedBy` instead, which serves twice: as the knot-tie for recursion inside the closure, and
@@ -194,7 +194,7 @@ resolves, before the batch pass runs. They are handled differently.
     (`integer_type` carries a `!record { ... }`). So `body instanceof Atom` separates the pair, where neither the
     kind nor the chain does alone: `integer_type` is ATOM-kinded exactly like its instances.
 - **A held template is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes it not a type, so
-  `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than REFERENCE — a template whose
+  `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than ALIAS — a template whose
   closure is a reference. It is not a base kind (§4.1). A record template is a type, the family base, and takes a
   record's kind: PRODUCT, or the base kind its chain reaches.
   - **A closed entry's kind is its substituted value's**, §4.1's "construction transfers kind" asked of the

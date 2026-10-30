@@ -25,7 +25,7 @@ import java.util.Objects;
  *
  * <p><b>{@code annotations} carries the wire annotations written on the reference itself</b>, which is a
  * type-ref's own channel rather than the enclosing field's: [TSON-SCHEMA] §8.3 attaches {@code
- * @alias:name} to the <em>type value</em> when a use site is flattened past a {@code REFERENCE} entry, so
+ * @alias:name} to the <em>type value</em> when a use site is flattened past an {@code ALIAS} entry, so
  * {@code type: @alias:field_name token} records both where the reference now points and what the author
  * wrote. Without somewhere on this record to keep it, a read discards it and a write cannot produce it.
  * Excluded from {@link #equals} for the same reason {@code RecordField} excludes its own: an alias is

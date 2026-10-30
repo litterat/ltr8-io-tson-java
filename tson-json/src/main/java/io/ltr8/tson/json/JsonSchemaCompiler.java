@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -27,7 +27,7 @@ import java.util.Set;
  * <p><b>The compile is where the position is decided.</b> [TSON-JSON] §4.1 requires that where two readings
  * could apply to one JSON form, a stated rule select one <em>before</em> the value's content is touched.
  * Deciding per value would be a per-document cost and a per-document opportunity to differ; deciding once per
- * entry makes the wire decision a reference hop, which is what §8.3 asks for in so many words.
+ * entry makes the wire decision an alias hop, which is what §8.3 asks for in so many words.
  *
  * <p><b>What it consumes is a value model.</b> {@link TsonLinkedSchema} is a {@code tson-schema} record, and
  * the resolution, linking and registration that produce it are encoding-neutral and stay in {@code
@@ -117,11 +117,11 @@ public final class JsonSchemaCompiler {
         private JsonTypeReader<?> build(String name, Top definition) {
             ValueReaderContext context = new ValueReaderContext(linked, readers);
             Top body = definition;
-            if (body instanceof Reference reference) {
-                // [TSON-SCHEMA] §8.3: a processor MAY collapse a reference chain when it compiles for
+            if (body instanceof Alias alias) {
+                // [TSON-SCHEMA] §8.3: a processor MAY collapse an alias chain when it compiles for
                 // reading, and this is that moment -- the reader is its target's, reached once here rather
                 // than walked on every value.
-                return resolve(reference.target().name());
+                return resolve(alias.target().name());
             }
             // A namespace type's value is the map it describes. Its keys are read under its key family, and by
             // their spelling alone where the host supplies the family (NamespaceBody#read): a record's field

@@ -34,7 +34,7 @@ import java.util.TreeSet;
  * reading its body reaches. An omitted field is not reached. Everything else is a consequence:
  *
  * <ul>
- *   <li>An alias ({@code !reference { target: X }}) is ready when its target is: an edge alias → {@code X}, beside
+ *   <li>An alias ({@code !alias { target: X }}) is ready when its target is: an edge alias → {@code X}, beside
  *       what reading its own declaration reaches.</li>
  *   <li><b>A reference orders nothing.</b> A token at a slot typed by a kind ({@code type_kind},
  *       {@code identifier_kind}, any {@code !kind_type} instance), a {@code !ref_type} instance or {@code type_ref}
@@ -204,7 +204,7 @@ final class WaitGraph {
             return;
         }
         read.read(declaration, head.get(), "head", "");
-        if (head.get().equals("reference")) {
+        if (head.get().equals("alias")) {
             targetName(declaration).ifPresentOrElse(
                     target -> read.waitOn(target, "alias target", "target"),
                     () -> problems.add(name + ": an alias with no target name"));
@@ -455,7 +455,7 @@ final class WaitGraph {
             if (declaration == null) {
                 return null;
             }
-            if (!"reference".equals(declaration.typeRef().orElse(""))) {
+            if (!"alias".equals(declaration.typeRef().orElse(""))) {
                 return current;
             }
             current = targetName(declaration).orElse(null);

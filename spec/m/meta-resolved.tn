@@ -245,25 +245,25 @@
 
   ordering => @annotation !enum { members: [NONE PARTIAL TOTAL] }
 
-  bounded => @annotation !reference { target: boolean }
+  bounded => @annotation !alias { target: boolean }
 
-  exact => @annotation !reference { target: boolean }
+  exact => @annotation !alias { target: boolean }
 
-  numeric => @annotation !reference { target: void }
+  numeric => @annotation !alias { target: void }
 
-  disjoint => @annotation !reference { target: void }
+  disjoint => @annotation !alias { target: void }
 
-  deprecated => @annotation !reference { target: void }
+  deprecated => @annotation !alias { target: void }
 
-  title => @annotation !reference { target: text }
+  title => @annotation !alias { target: text }
 
-  comment => @annotation !reference { target: text }
+  comment => @annotation !alias { target: text }
 
   examples => @annotation !array { element_type: text }
 
-  read_only => @annotation !reference { target: void }
+  read_only => @annotation !alias { target: void }
 
-  write_only => @annotation !reference { target: void }
+  write_only => @annotation !alias { target: void }
 
   @synthetic array_value_xxhash => !array { element_type: value }
 

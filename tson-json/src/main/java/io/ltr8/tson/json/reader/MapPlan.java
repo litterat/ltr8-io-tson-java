@@ -69,7 +69,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
 
     /** {@code K}'s identifier profile when it is an identifier family, else {@code null}. */
     private static IdentifierProfile keyProfile(TsonSchema schema, String keyTypeName) {
-        return ReferenceChain.terminal(schema, keyTypeName)
+        return AliasChain.terminal(schema, keyTypeName)
                 .map(terminal -> terminal.definition() instanceof IdentifierType identifier
                         ? identifier.profile() : null)
                 .orElse(null);
@@ -95,7 +95,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
      * than by being listed: neither has a content grammar for a key token to face.
      */
     private static Optional<AtomType<?>> scalarKeyParser(TsonLinkedSchema linked, String keyTypeName) {
-        ReferenceChain.Resolved terminal = ReferenceChain.terminal(linked.schema(), keyTypeName).orElseThrow(() ->
+        AliasChain.Resolved terminal = AliasChain.terminal(linked.schema(), keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
         return terminal.definition() instanceof Atom atom
                 ? AtomParsers.forType(atom, linked.enumForm(terminal.name()))

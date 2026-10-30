@@ -121,7 +121,7 @@ class OpenOperandCompositionTest {
         // A `name => head<args>` declaration *is* the instantiation entry (§8.2), so
         // the entry every use site reaches is the declaration itself -- or, where an earlier declaration
         // already named the same application, the one it aliases.
-        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
 

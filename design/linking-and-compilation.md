@@ -23,7 +23,7 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   occupies: it is a value, and nothing is typed by it.
 - A kernel slot typed `type_kind` (`record_field.type`, the element and container type slots, `choice.variants`) is
   judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor named as a type is refused there. An
-  alias's target (`Reference`), which may name a constructor, is judged by resolution and arity alone
+  alias's target (`Alias`), which may name a constructor, is judged by resolution and arity alone
   (`constructors == null`). `design/references.md` has the account of every slot.
 - A value by name (`TsonSchema.valuesByName`) resolves its first segment in the schema's merged namespace, alias
   hops followed; its referent's declared type must IS-A the slot's, compared by canonical identity.
@@ -116,7 +116,7 @@ are worth their place here, each catching what would otherwise link, compile, an
   names by `ValuesByName`, so `validateBody` asks nothing of it.
 - **A `type_kind` slot is judged by membership** of `type_kind` (`KindMembers.isMember`), where `type` is in reach:
   a constructor named as a field's type is refused as applied-not-typed (§4.1).
-- **A choice's variants are distinct at the end of each §8.3 reference chain** (`ReferenceChain.terminal`), since an
+- **A choice's variants are distinct at the end of each §8.3 alias chain** (`AliasChain.terminal`), since an
   alias and its target are one type: `(text | my_text)` with `my_text => text` is caught, the only spelling an author
   cannot see. No variant may resolve to `void` (`checkVariantsAreNotVoid`).
 

@@ -15,7 +15,7 @@ import java.util.Objects;
  *
  * <p><b>It holds in both directions</b>: an entry whose value is one of these declares type parameters, and
  * every entry that declares them has one. §5.10's partial application is no exception --
- * {@code <B> pair<uuid, B>} holds the {@code !reference { target: pair<uuid, B> }} §8.1 says it denotes.
+ * {@code <B> pair<uuid, B>} holds the {@code !alias { target: pair<uuid, B> }} §8.1 says it denotes.
  *
  * <p><b>Why the body is text, and not a value of the constructor's own vocabulary.</b> A parameter stands
  * wherever a token stands: {@code element_type: T} in a type slot, {@code min_items: N} in a value slot,

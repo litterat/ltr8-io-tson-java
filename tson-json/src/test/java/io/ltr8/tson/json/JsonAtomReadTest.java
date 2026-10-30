@@ -51,7 +51,7 @@ class JsonAtomReadTest {
               flag       => boolean
               nothing    => void
               small      => !integer ^ { min: 0  max: 10 }
-              alias      => count
+              renamed    => count
               point      => { x: int32  y: int32 }
               lookup     => { text => int32 }
             }
@@ -320,10 +320,10 @@ class JsonAtomReadTest {
         assertEquals("", refusal.path().orElseThrow(), "the data pointer: this value is the document root");
     }
 
-    /** [TSON-SCHEMA] §8.3: a reference collapses where the schema is compiled for reading. */
+    /** [TSON-SCHEMA] §8.3: an alias collapses where the schema is compiled for reading. */
     @Test
     void anAliasReadsAsItsTarget() {
-        assertEquals(42, read("alias", "42").accepted());
+        assertEquals(42, read("renamed", "42").accepted());
     }
 
     /**

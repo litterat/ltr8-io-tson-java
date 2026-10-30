@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -80,14 +80,14 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * An entry's body with every {@code REFERENCE} hop followed. How many hops an alias costs is this
+     * An entry's body with every {@code ALIAS} hop followed. How many hops an alias costs is this
      * resolver's own bookkeeping (§8.3 flattens uses, not entries), so a fixture asserting on the body a name
      * denotes should not also be asserting on the length of the chain to it.
      */
     private static Top bodyOf(TsonCompiledSchema compiled, String name) {
         Top body = compiled.schema().entries().get(name);
-        while (body instanceof Reference reference) {
-            body = compiled.schema().entries().get(reference.target().name());
+        while (body instanceof Alias alias) {
+            body = compiled.schema().entries().get(alias.target().name());
         }
         return body;
     }

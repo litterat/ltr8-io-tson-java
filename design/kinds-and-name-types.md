@@ -72,7 +72,7 @@ in the merged map after `computeSubtypes` and before the name-type checks.
   records beside the schema's, and `kind<namespace>` holds a schema's own namespace type `api` beside `schema` and
   `field_map`.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: `kind<data>`, `kind<top>`,
-  `kind<template>`, `kind<reference>` and a type that is no constructor (`kind<stock_id>`, `kind<api>`) are refused,
+  `kind<template>`, `kind<alias>` and a type that is no constructor (`kind<stock_id>`, `kind<api>`) are refused,
   against the declaration that wrote the application (`reportedAgainst`).
 - **Recomputed everywhere, trusted nowhere.** Members are computed over each linking schema's closure, so the
   kernel's `identifier_kind` lists a user schema's own `text_identifier` at that schema's link, and an author's
@@ -135,7 +135,7 @@ atom, string-class like any other (`design/choice-disjointness.md`).
 no kernel is in scope, the identifier grammar the default stands for applies.
 
 - **Supertypes decide.** A record with supertypes takes their one type, refuses two that disagree, and refuses a
-  stated type that is not theirs; two are one when their reference chains end at one entry (`sameNameType`), so an
+  stated type that is not theirs; two are one when their alias chains end at one entry (`sameNameType`), so an
   alias is its target and `field_name` is `identifier`. A refinement keeps its source's. The rule is composition's
   (`resolveComposition`): a declaration never writes a chain (§8.1), so an explicit `!record { … }` has none to take a
   type from, which is why the kernel's `name_type` has no `~` default. It is also how a brace form states one: a

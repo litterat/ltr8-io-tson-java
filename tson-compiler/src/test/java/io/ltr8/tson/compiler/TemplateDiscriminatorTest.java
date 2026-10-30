@@ -55,7 +55,7 @@ class TemplateDiscriminatorTest {
      * already named the same application.
      */
     private static String target(TsonCompiledSchema compiled, String alias) {
-        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
 

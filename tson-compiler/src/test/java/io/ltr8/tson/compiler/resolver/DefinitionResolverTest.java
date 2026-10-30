@@ -80,7 +80,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * a shape that happens to work only because a bespoke writer papered over it.
  *
  * <p>What this confirms works with zero extra code: {@code Top}'s sealed-interface variants
- * each get their own {@code !record}/{@code !reference}/{@code !value_type}/{@code !enum}/{@code
+ * each get their own {@code !record}/{@code !alias}/{@code !value_type}/{@code !enum}/{@code
  * !choice}/{@code !array}/{@code !map}/{@code !tuple} type-ref purely from {@code
  * DataClassUnion} auto-detection plus a {@code @Typename} on each variant -- exactly the "body:
  * top" polymorphism the kernel itself describes. {@code BigInteger} fields, {@code
@@ -228,7 +228,7 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
         Map<String, Top> irrelevantStructureNamespace =
-                Map.of("unrelated", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("token")));
+                Map.of("unrelated", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("token")));
         Map<String, Top> entries = new LinkedHashMap<>();
         DefinitionResolver resolverWithIrrelevantNamespace =
                 new DefinitionResolver(NEVER_CALLED, irrelevantStructureNamespace::get, entries::get);
@@ -322,7 +322,7 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void resolvesAtomProductSumAndReferenceByComposingWithTop() throws IOException, DataBindException {
+    void resolvesAtomProductSumAndAliasByComposingWithTop() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
@@ -333,20 +333,20 @@ class DefinitionResolverTest {
         resolved.put("product", product);
         Top sum = resolver.resolve(schemaMap.declarations().get("sum"));
         resolved.put("sum", sum);
-        Top reference = resolver.resolve(schemaMap.declarations().get("reference"));
-        resolved.put("reference", reference);
+        Top alias = resolver.resolve(schemaMap.declarations().get("alias"));
+        resolved.put("alias", alias);
 
         // §4.1: atom/product/sum are each kind PRODUCT -- their own transitive chain is just
         // [type, top], which contains none of the three literal base-kind names, so the structural
-        // default applies even to the base kinds' own entries. They compose with `type`; reference with top.
+        // default applies even to the base kinds' own entries. They compose with `type`; alias with top.
         assertEquals(EntryKind.PRODUCT, EntryKind.of(atom, n -> true));
         assertEquals(EntryKind.PRODUCT, EntryKind.of(product, n -> true));
         assertEquals(EntryKind.PRODUCT, EntryKind.of(sum, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(reference, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(alias, n -> true));
         assertEquals(List.of("top", "type"), TypeChain.supertypesOf(atom));
         assertEquals(List.of("top", "type"), TypeChain.supertypesOf(product));
         assertEquals(List.of("top", "type"), TypeChain.supertypesOf(sum));
-        assertEquals(List.of("top"), TypeChain.supertypesOf(reference));
+        assertEquals(List.of("top"), TypeChain.supertypesOf(alias));
 
         // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
         assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
@@ -363,11 +363,11 @@ class DefinitionResolverTest {
                 + "product_size_type optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
                 + "\"ABSTRACT\" discriminators: [] parameters: [] }", write(product));
 
-        // reference: one brand-new field.
+        // alias: one brand-new field.
         assertEquals("{ chain: { parents: [] supertypes: [ \"top\" ] subtypes: [] } fields: { target => { "
                 + "type: type_ref optional: false "
                 + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
-                        write(reference));
+                        write(alias));
     }
 
     // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
@@ -403,11 +403,11 @@ class DefinitionResolverTest {
     }
 
     // ── Bare type references (§8.3): type_name, field_name, param_name, and
-    //    the annotation markers -- all resolve to a REFERENCE-kind entry
+    //    the annotation markers -- all resolve to an ALIAS-kind entry
     //    regardless of what the referenced name itself resolves to.
 
     @Test
-    void resolvesBareTypeReferencesToAReferenceKindEntry() throws IOException, DataBindException {
+    void resolvesBareTypeReferencesToAnAliasKindEntry() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
 
         Top typeName = resolver.resolve(schemaMap.declarations().get("type_name"));
@@ -416,13 +416,13 @@ class DefinitionResolverTest {
         Top annotation = resolver.resolve(schemaMap.declarations().get("annotation"));
         Top doc = resolver.resolve(schemaMap.declarations().get("doc"));
 
-        // type_name/field_name/param_name => identifier; each is its own fresh REFERENCE entry, not
+        // type_name/field_name/param_name => identifier; each is its own fresh ALIAS entry, not
         // three views of the same one -- source/target both name "identifier" for all three.
-        assertEquals(EntryKind.REFERENCE, EntryKind.of(typeName, n -> true));
-        assertEquals(EntryKind.REFERENCE, EntryKind.of(fieldName, n -> true));
-        assertEquals(EntryKind.REFERENCE, EntryKind.of(paramName, n -> true));
-        assertEquals(EntryKind.REFERENCE, EntryKind.of(annotation, n -> true));
-        assertEquals(EntryKind.REFERENCE, EntryKind.of(doc, n -> true));
+        assertEquals(EntryKind.ALIAS, EntryKind.of(typeName, n -> true));
+        assertEquals(EntryKind.ALIAS, EntryKind.of(fieldName, n -> true));
+        assertEquals(EntryKind.ALIAS, EntryKind.of(paramName, n -> true));
+        assertEquals(EntryKind.ALIAS, EntryKind.of(annotation, n -> true));
+        assertEquals(EntryKind.ALIAS, EntryKind.of(doc, n -> true));
 
         assertEquals("{ target: identifier }", write(typeName));
         assertEquals(write(typeName), write(fieldName));
@@ -602,8 +602,8 @@ class DefinitionResolverTest {
         judging.resolve(schemaMap.declarations().get("both"));
         assertFalse(lookedUp.contains("words") || lookedUp.contains("slug"), lookedUp::toString);
 
-        resolved.put("words", new io.ltr8.tson.schema.meta.Reference(TypeRef.of("identifier")));
-        resolved.put("slug", new io.ltr8.tson.schema.meta.Reference(TypeRef.of("text")));
+        resolved.put("words", new io.ltr8.tson.schema.meta.Alias(TypeRef.of("identifier")));
+        resolved.put("slug", new io.ltr8.tson.schema.meta.Alias(TypeRef.of("text")));
         List<String> refused = new java.util.ArrayList<>();
         judging.judgeDeferred((name, error) -> refused.add(name + ": " + error.getMessage()));
         assertTrue(lookedUp.contains("words") && lookedUp.contains("slug"), lookedUp::toString);

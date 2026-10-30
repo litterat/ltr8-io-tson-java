@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ValueEntry;
@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -117,7 +117,7 @@ final class TypeInhabitance {
             // inhabited exactly when linking found a member.
             case KindBody kind -> !kind.memberNames().isEmpty();
             case RefBody ignored -> true; // a name; what it reaches is the linker's judgement
-            case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
+            case Alias alias -> refInhabited(alias.target(), namespace, inhabited);
             case TemplateBody ignored -> true; // open, answered above
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
@@ -198,7 +198,7 @@ final class TypeInhabitance {
         if (field.voidable()) {
             return true;
         }
-        return !ReferenceChain.resolvesToVoid(field.type().name(), namespace)
+        return !AliasChain.resolvesToVoid(field.type().name(), namespace)
                 && refInhabited(field.type(), namespace, inhabited);
     }
 
@@ -295,8 +295,8 @@ final class TypeInhabitance {
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
                     .map(element -> element.elementType().name()).findFirst().orElse(null);
-            case Reference reference -> refInhabited(reference.target(), namespace, inhabited)
-                    ? null : reference.target().name();
+            case Alias alias -> refInhabited(alias.target(), namespace, inhabited)
+                    ? null : alias.target().name();
             // A choice fails on every variant at once, so no single link continues the chain; the rest name none.
             case Sum ignored -> null;
             case Atom ignored -> null;

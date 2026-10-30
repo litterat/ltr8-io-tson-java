@@ -6,7 +6,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
 
@@ -59,11 +59,11 @@ class ParameterKindTest {
         return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
-    /** An entry's body with every {@code REFERENCE} hop followed. */
+    /** An entry's body with every {@code ALIAS} hop followed. */
     private static Top bodyOf(TsonCompiledSchema compiled, String name) {
         Top body = compiled.schema().entries().get(name);
-        while (body instanceof Reference reference) {
-            body = compiled.schema().entries().get(reference.target().name());
+        while (body instanceof Alias alias) {
+            body = compiled.schema().entries().get(alias.target().name());
         }
         return body;
     }
@@ -164,7 +164,7 @@ class ParameterKindTest {
      * template it is declared on -- classifies, and its argument stays a reference.
      *
      * <p>[TSON-SCHEMA] §5.10 makes such a parameter a resolver error instead. Reading it as forced is what
-     * leaves {@code loop => <T> loop<T>} to be judged on what is actually wrong with it: a reference
+     * leaves {@code loop => <T> loop<T>} to be judged on what is actually wrong with it: an alias
      * template's body <em>is</em> the application, so there is no second slot a concrete use could go in, and
      * the useful verdict is that it applies itself forever.
      */
@@ -182,11 +182,11 @@ class ParameterKindTest {
         assertEquals("text", assertInstanceOf(TypeArgument.Ref.class, argument).ref().name());
     }
 
-    /** And the self-applying reference template is judged on the loop, not on its parameter's kind. */
+    /** And the self-applying alias template is judged on the loop, not on its parameter's kind. */
     @Test
-    void aSelfApplyingReferenceTemplateStillReportsTheLoop() {
+    void aSelfApplyingAliasTemplateStillReportsTheLoop() {
         assertTrue(rejected("  loop => <T> loop<T>\n  holder => { p: loop<text> }")
-                .contains("reference template whose own body applies it again"));
+                .contains("alias template whose own body applies it again"));
     }
 
     /**

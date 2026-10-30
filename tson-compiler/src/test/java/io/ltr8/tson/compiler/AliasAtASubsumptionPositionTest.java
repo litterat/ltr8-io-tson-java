@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §7.2 compares a written type annotation against a position's type "after reference flattening
+ * [TSON-SCHEMA] §7.2 compares a written type annotation against a position's type "after alias flattening
  * of <b>both</b>". So an alias and its target are one type at either end of that comparison: {@code !b_of} at
  * a {@code base} position names the position's own type, and {@code !s_of} names a subtype, whichever of the
  * two names the schema happens to have flattened.
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * flattening on the subtype side, a subtype family over instantiations is unwritable: the family exists in
  * the index and nothing can name a member of it.
  *
- * <p><b>The alias is admitted, not rewritten to its target.</b> A reference entry compiles to its target's
+ * <p><b>The alias is admitted, not rewritten to its target.</b> An alias entry compiles to its target's
  * reader named for the entry doing the referring, so dispatching on the written name runs the same reader and
  * reports under the name the author typed.
  */

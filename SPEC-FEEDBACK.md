@@ -74,11 +74,11 @@ edge from `x` to `box<text>`, so `x` would not be admissible where `box<text>` i
 its value parameters' types in the structure namespace, a record template reads them in the schema's own namespace,
 and "a template whose body applies another template takes that template's form". An alias is a template whose body
 applies another template — `rb => <N: int8> box<N>` against `box => <N> { w?: integer ~ N }` — so by the third
-sentence it takes `box`'s form and reads `int8` in the schema's namespace. But an alias's resolved entry is a
-`reference`, a meta constructor, which by the first sentence makes it a structure-namespace template. The section
+sentence it takes `box`'s form and reads `int8` in the schema's namespace. But an alias's resolved entry is an
+`alias`, a kernel constructor (#10), which by the first sentence makes it a structure-namespace template. The section
 does not say which sentence wins for an alias.
 
-**What is running.** The resolved entry decides: `rb`'s held head is `reference`, not `record` and not an open
+**What is running.** The resolved entry decides: `rb`'s held head is `alias`, not `record` and not an open
 template, so `ParameterTypes.readsInStructure` answers true and the written type is checked in the structure
 namespace. The schema above is refused at `rb`: "parameter 'N' is declared 'N: int8', and this template applies a
 constructor of the governing meta, so its value parameters are the meta's types and a written type names one there --
@@ -88,8 +88,8 @@ decides where value types are read") states the rule as built.
 
 **Resolution to decide.** The third sentence is the one an author relies on — an alias of a record template is used
 exactly like the record template — so the proposal is that §5.10 says an alias takes the form of the template its
-target applies, following aliases through to the first non-alias head, and that `reference` is never itself a form.
-The implementation then follows the target through `reference.target` in `readsInStructure`. The alternative, that
+target applies, following aliases through to the first non-alias head, and that `alias` is never itself a form.
+The implementation then follows the target through `alias.target` in `readsInStructure`. The alternative, that
 the resolved entry's constructor is the form in every case, is what runs and should then be stated in §5.10 with the
 alias named, since the third sentence reads against it.
 
@@ -209,7 +209,7 @@ The rule is 1; the rest are its consequences.
    as its `value_type`, and a value of a family base (§5.2) reaches each subtype, whose selector pins §5.2 confines to
    an atom or an enum.
 4. **A cycle is refused.** Entries waiting on each other through rule 1 are a resolver error naming the entries on the
-   cycle. A loop of references is not a cycle under this rule; §8.3 refuses a reference chain with no terminal. The
+   cycle. A loop of aliases is not a cycle under this rule; §8.3 refuses an alias chain with no terminal. The
    pre-loaded entries (§3.4) are ready before any declaration is read, and are exactly the kernel's one cycle, the one
    holding `record`, whose declaration is a `!record`. Every other kernel entry is read by these rules, and the
    kernel's resolved form must come out of them unchanged.
@@ -491,7 +491,7 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 
 **Resolution, a proposal.** Sections amended:
 
-- §4.1: the kinds are `atom`, `product` and `sum` under `type`, beside `reference` and `template` under `top`;
+- §4.1: the kinds are `atom`, `product` and `sum` under `type`, beside `alias` (#10) and `template` under `top`;
   `namespace` is a constructor under `product` whose instances are namespace types, and the paragraph making a
   namespace type the one constructor whose instances are not types goes. An entry is a type exactly when its value
   is built by a constructor IS-A `type`, and any other entry is a value, its tag naming its type. `schema`'s
@@ -511,3 +511,32 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 **Open.** `namespace => map ^ { key_type: identifier_kind … }`, with `key_type` required, once a field's value can
 depend on its host (dependent fields): `field_map` then becomes a template applied to its record's `name_type`, and
 `kind<map>` holds every namespace type. §5.7 is unchanged by it.
+
+## 10. [TSON-SCHEMA] §4.1, §7.2, §8, §11.5, §12.1 — the alias body is `alias`; a reference is a name in a slot
+
+**Problem.** "Reference" names two things. §4.1's entry kind and §8.3's body, `!reference { target: T }`, are an
+alias: §8.3 is headed "References" and says a reference is a hop, §7.2 compares "after reference flattening", and
+§11.5 bounds the "reference chain". §4.2 and §5.12 use the same word for a name held in a slot: `ref<T>`, a type
+reference, a qualified name. The kernel's `reference` holds the word an atom of names would take, and every rule that
+says "reference" leaves the reader to work out which of the two it means.
+
+**What is running.**
+
+- **The kernel declares `alias => top & { target: type_ref }`.** An alias body is `!alias { target: T }`, written
+  explicitly or derived from `name => T`, and its kind is ALIAS. The kernel's and meta.tn's resolved forms state
+  `!alias` for `type_name`, `field_name`, `param_name`, `annotation`, `doc` and the annotation markers.
+- **§8.3's walk is the alias chain.** Policy's limit is `max_alias_chain`, default 64, and diagnostics that walk it say
+  "resolves through its alias chain to".
+- **Nothing else moves.** `kind<alias>` is refused at the declaration as `kind<reference>` was, `alias` being a
+  constructor beside `type`. `alias` is now a kernel name, reserved in every closure that imports the kernel (#7),
+  and `reference` is no longer one. That has a cost: `alias` is a likelier name for an author's own entry than
+  `reference` was, and `alias => port` in a schema importing core now collides with the import.
+
+**Resolution, a proposal.** §4.1's fourth entry kind is **Alias**: "an entry whose value is a pointer to another
+entry: `!alias { target: T }`". §8.1's record paragraph and table name `alias` and ALIAS. §8.3 is headed "Aliases":
+"an alias is a hop, not a rewrite", "aliases are not supertypes", "instantiation entries are not aliases". Every
+"reference chain" becomes "alias chain": §4.3, §5.2, §5.4, §5.7, §5.10, §5.12, §6, §7.2, §8.1 to §8.3, and §11.5's
+row. §7.2's phrase becomes "after alias flattening of both", §5.10's "reference template" (`id => <T> T`, a partial
+application) becomes "alias template", and §12.1's `instance` comment names the kernel's `alias`.
+"Reference" keeps one meaning: a name held in a slot, as in §4.2's `ref<T>`, §5.12's qualified name and §8.1's
+`type_ref`.

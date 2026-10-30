@@ -73,7 +73,7 @@ usable and its members pin them distinctly, and every member is declared.
 
 - **Why the linker and not the resolver.** Every rule needs a namespace the declaration does not have. FINAL
   constrains whoever composes onto it, which may be another schema; the family rules range over `subtypes`, which
-  nothing populates until linking; and a selector's type has to be followed to the end of its reference chain. What is
+  nothing populates until linking; and a selector's type has to be followed to the end of its alias chain. What is
   local (two definition marks on one declaration, a mark carrying a value, a mark on a non-record) the resolver
   already refused while lowering. It runs on the merged map, not the annotated one: the marks are consumed into the
   body, so no annotation is left to consult.

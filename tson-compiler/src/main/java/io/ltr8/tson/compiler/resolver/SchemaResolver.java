@@ -536,7 +536,7 @@ public final class SchemaResolver {
             }
         }
 
-        // No reference is flattened here, at a use site or anywhere else. A reference is a hop, not a
+        // No reference is flattened here, at a use site or anywhere else. An alias is a hop, not a
         // rewrite: resolved output states the chain the author wrote, every use site keeps the name it
         // names, and a processor collapses the chain when it compiles readers -- after linking, where the
         // whole namespace is present and the walk is done once per entry rather than once per output.

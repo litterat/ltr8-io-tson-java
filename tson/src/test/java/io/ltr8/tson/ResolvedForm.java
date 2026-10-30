@@ -281,7 +281,7 @@ final class ResolvedForm {
 
     /**
      * Each entry's <em>value</em> annotations in a §8 resolved-schema document -- those written after {@code =>},
-     * {@code doc => @annotation !reference { ... }} -- as {@code @name} or {@code @name:value}, hashes normalised,
+     * {@code doc => @annotation !alias { ... }} -- as {@code @name} or {@code @name:value}, hashes normalised,
      * read from the document's text parsed as data. An entry's value is its body, whose Java shape has no slot for
      * them, so binding the document drops them as it drops a key's; the resolver keeps them among the entry's
      * facts.

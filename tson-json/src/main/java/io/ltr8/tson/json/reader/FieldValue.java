@@ -9,7 +9,7 @@ import io.ltr8.tson.json.tree.JsonValue;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -39,13 +39,13 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
         TsonSchema schema = linked.schema();
         String name = fieldTypeName;
         Top body = null;
-        for (int hops = 0; hops < MAX_REFERENCE_HOPS; hops++) {
+        for (int hops = 0; hops < MAX_ALIAS_HOPS; hops++) {
             Top definition = schema.entries().get(name);
             if (definition == null) {
                 throw new IllegalStateException("'" + name + "' is not declared -- linking should have refused this");
             }
-            if (definition instanceof Reference reference) {
-                name = reference.target().name();
+            if (definition instanceof Alias alias) {
+                name = alias.target().name();
                 continue;
             }
             body = definition;
@@ -63,8 +63,8 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
         return new FieldValue(parser, form, pinned, node, token.text());
     }
 
-    /** How many reference hops before this gives up; linking has already refused a cycle, so this is a guard. */
-    private static final int MAX_REFERENCE_HOPS = 64;
+    /** How many alias hops before this gives up; linking has already refused a cycle, so this is a guard. */
+    private static final int MAX_ALIAS_HOPS = 64;
 
     /**
      * The JSON spelling of a schema-stated value -- §5's table run backwards.

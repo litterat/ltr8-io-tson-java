@@ -117,7 +117,7 @@ rebuilt and called a cache.
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the
   compiled reader of the schema declaring the constructor, where an undeclared member is `UNRECOGNIZED_FIELD` under
   §7.2's closure. §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question
-  about what names *resolve to*, at the end of each variant's reference chain, which has no answer until the whole
+  about what names *resolve to*, at the end of each variant's alias chain, which has no answer until the whole
   namespace exists, imports merged. `TsonSchemaLinker.checkVariantsAreDistinct` asks it
   (`design/choice-disjointness.md`).
 - **Both declaration-level tiers desugar in place.** At declaration position the form *is* the construction

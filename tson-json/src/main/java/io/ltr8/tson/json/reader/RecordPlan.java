@@ -53,7 +53,7 @@ final class RecordPlan {
 
     /**
      * Every written name that means this entry: its own, and any alias whose chain ends at it. §7.2 compares
-     * "after reference flattening of both", so a tag spelling an alias names this type and reads here.
+     * "after alias flattening of both", so a tag spelling an alias names this type and reads here.
      */
     private final Set<String> selfNames;
 

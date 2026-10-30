@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 /**
  * Verifies the {@link Top}/{@link Atom}/{@link Product}/{@link Sum} hierarchy actually replicates
  * the kernel's own composition chain (`atom => top & {}`, `product => top & { ... }`, `sum => top &
- * {}`, `reference => top & { target: type_name }`, Part 2 §4.1) as real Java subtyping.
+ * {}`, `alias => top & { target: type_ref }`, Part 2 §4.1) as real Java subtyping.
  *
  * <p>There's no need to also assert e.g. {@code !(unit instanceof Product)} -- {@code Product}'s
  * own {@code permits} list doesn't name {@link ValueType} (a {@code final} record), so the compiler
@@ -74,11 +74,11 @@ class TopKindHierarchyTest {
     }
 
     @Test
-    void referenceIsTopDirectlyNotThroughAnyBaseKind() {
-        // reference => top & { target: type_ref } -- composes with top directly, not through
-        // atom/product/sum, so Reference implements Top but is sealed out of all three base kinds
-        // (Reference isn't in Atom's/Product's/Sum's own permits lists).
-        Reference reference = new Reference(TypeRef.of("token"));
-        assertInstanceOf(Top.class, reference);
+    void aliasIsTopDirectlyNotThroughAnyBaseKind() {
+        // alias => top & { target: type_ref } -- composes with top directly, not through
+        // atom/product/sum, so Alias implements Top but is sealed out of all three base kinds
+        // (Alias isn't in Atom's/Product's/Sum's own permits lists).
+        Alias alias = new Alias(TypeRef.of("token"));
+        assertInstanceOf(Top.class, alias);
     }
 }

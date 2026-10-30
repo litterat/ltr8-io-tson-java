@@ -15,7 +15,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -58,14 +58,14 @@ import java.util.function.Supplier;
  * #closeApplicationInto}).
  *
  * <p><b>An alias closes by a third path and mints nothing.</b> §5.10's partial application,
- * {@code uuid_pair => <B> pair<uuid, B>}, holds {@code !reference { target: pair<uuid, B> }} like any other
+ * {@code uuid_pair => <B> pair<uuid, B>}, holds {@code !alias { target: pair<uuid, B> }} like any other
  * open entry, but it <em>is</em> the application it names with some arguments still open -- so closing it
  * composes the two argument lists and hands back what that denotes, minting no entry of its own (§5.10: "no
  * intermediate entry per alias hop"). See {@link #closeHeldAlias}.
  *
  * <p><b>So the three cases are told apart by the constructor head, not by the kernel shape.</b> Every open
  * entry has a {@link HeldBody} -- a record template's tree written from the open record, a sugar form's lift,
- * an alias, and an error placeholder alike. {@code reference} closes to a name, everything else to a
+ * an alias, and an error placeholder alike. {@code alias} closes to a name, everything else to a
  * synthetic.
  *
  * <p><b>Knot-tying, and the one instantiation entry.</b> The memo entry is registered <em>before</em> the body
@@ -92,9 +92,9 @@ final class TemplateMaterialiser {
     private static final String RECORD = "record";
 
     /** The constructor a held alias carries -- §5.10's partial application, which mints no entry. */
-    private static final String REFERENCE = "reference";
+    private static final String ALIAS = "alias";
 
-    /** {@code reference}'s own member, the one an alias closes through. */
+    /** {@code alias}'s own member, the one an alias closes through. */
     private static final String TARGET = "target";
 
     /** The entries produced, keyed by their derived internal name, in creation order. */
@@ -400,11 +400,11 @@ final class TemplateMaterialiser {
         }
         HeldBody open = HeldBody.of(template);
         String constructor = open.application().typeRef().orElseThrow();
-        if (REFERENCE.equals(constructor)) {
+        if (ALIAS.equals(constructor)) {
             return null; // §5.10: an alias hop mints no entry, so there is none for a declaration to own
         }
         // §8.2 keys an instantiation on the *canonical* application -- "arguments compared after following
-        // reference chains" -- so an argument naming a pure rename is replaced by the entry at the end of it
+        // alias chains" -- so an argument naming a pure rename is replaced by the entry at the end of it
         // before anything is derived from the list. `close` does this for a minted entry; without it here,
         // `by_alias => box<user_id>` and `by_target => box<uuid>` would record two applications for one type,
         // and the name, the ownership key and the recorded application would each disagree with the minted path.
@@ -459,7 +459,7 @@ final class TemplateMaterialiser {
      *
      * <p><b>Because a reference is a pure rename, and an application of one denotes the same type.</b>
      * {@code user_id => uuid} makes {@code user_id} and {@code uuid} interchangeable at every position (§7.2
-     * compares "after reference flattening of both"), so {@code box<user_id>} and {@code box<uuid>} are one
+     * compares "after alias flattening of both"), so {@code box<user_id>} and {@code box<uuid>} are one
      * type and must be one entry. Without this they were two, which left the model saying the arguments were
      * the same type while the applications were not -- interchangeable at a scalar position and refused one
      * layer of application up.
@@ -482,7 +482,7 @@ final class TemplateMaterialiser {
         if (!ref.arguments().isEmpty()) {
             return ref; // an application, already closed above to the entry it denotes
         }
-        String terminal = ReferenceChain.terminal(ref.name(), namespace::definition);
+        String terminal = AliasChain.terminal(ref.name(), namespace::definition);
         return terminal.equals(ref.name()) ? ref : new TypeRef(terminal, ref.arguments(), ref.annotations());
     }
 
@@ -521,9 +521,9 @@ final class TemplateMaterialiser {
             return expansion;
         }
         if (aliasClosing.contains(name)) {
-            throw new SchemaValidationException("'" + head + "<...>' is a reference template whose own "
+            throw new SchemaValidationException("'" + head + "<...>' is an alias template whose own "
                     + "body applies it again, so composing it never reaches a type with a body (§5.10). The "
-                    + "chain begins " + chain() + ". A reference template must eventually name a declared "
+                    + "chain begins " + chain() + ". An alias template must eventually name a declared "
                     + "type; recursion belongs in a record, tuple or choice body, where a field can carry it");
         }
         if (materialised.containsKey(name) || !closing.add(name)) {
@@ -561,7 +561,7 @@ final class TemplateMaterialiser {
             if (OpenEntry.isOpen(template)) {
                 HeldBody open = HeldBody.of(template);
                 String constructor = open.application().typeRef().orElseThrow();
-                if (REFERENCE.equals(constructor)) {
+                if (ALIAS.equals(constructor)) {
                     aliasClosing.add(name);
                     return closeHeldAlias(head, template, open, bind(parameters, arguments));
                 }
@@ -592,8 +592,8 @@ final class TemplateMaterialiser {
                 }
                 // The expansion names this application, so it is named by the application: a reference to
                 // the synthetic, which the compiler collapses, so it costs nothing at read time.
-                Top alias = new Reference(TypeRef.of(formName));
-                note(name, REFERENCE);
+                Top alias = new Alias(TypeRef.of(formName));
+                note(name, ALIAS);
                 alias = instantiation(name, alias, new TypeRef(head, arguments));
                 materialised.put(name, alias);
                 publish.accept(name, alias);
@@ -705,7 +705,7 @@ final class TemplateMaterialiser {
      * (§8.2), so {@code [text]} written directly and {@code [T]} closed to {@code text} are one entry. An
      * application nothing declares is that expansion, and the use site names the synthetic. The one exception
      * is an expansion that names its own application -- {@code nested => <T> ( T | [nested<T>] )} -- whose
-     * content cannot be written without a name: {@link #instantiate} then keeps a reference entry under the
+     * content cannot be written without a name: {@link #instantiate} then keeps an alias entry under the
      * application-derived name, which the knot was tied on.
      */
     private String closeHeldTemplate(String head, Top template, HeldBody open,
@@ -753,7 +753,7 @@ final class TemplateMaterialiser {
         CoreValue target = closed instanceof RecordValue record ? WireForm.field(record, TARGET).orElse(null) : null;
         if (!(target instanceof TokenValue token)) {
             throw new IllegalStateException("'" + head + "<...>' is an alias whose target did not close to a "
-                    + "name: " + target + " -- SchemaDesugarer writes `!reference { target: <type_ref> }` and "
+                    + "name: " + target + " -- SchemaDesugarer writes `!alias { target: <type_ref> }` and "
                     + "closeApplications reduces an application there to the entry it denotes");
         }
         return token.text();
@@ -1017,13 +1017,13 @@ final class TemplateMaterialiser {
     }
 
     private void checkBound(String head, TemplateParam parameter, String argument, String bound) {
-        String terminal = ReferenceChain.terminal(argument, this::lookup);
+        String terminal = AliasChain.terminal(argument, this::lookup);
         Top target = lookup(terminal);
         if (target == null) {
             return; // an unresolved argument -- the linker's verdict
         }
         // By name, so a core type and the kernel original it copies are one bound, as they are at the declaration.
-        String boundTerminal = ReferenceChain.terminal(bound, this::lookup);
+        String boundTerminal = AliasChain.terminal(bound, this::lookup);
         List<String> chain = TypeChain.supertypesOf(target);
         boolean admitted = terminal.equals(boundTerminal) || chain.contains(boundTerminal) || chain.contains(bound);
         if (!admitted) {
@@ -1056,7 +1056,7 @@ final class TemplateMaterialiser {
             return;
         }
         Function<String, Top> resolve = structural ? metaTypes : this::lookup;
-        String terminal = ReferenceChain.terminal(type, resolve::apply);
+        String terminal = AliasChain.terminal(type, resolve::apply);
         Top definition = resolve.apply(terminal);
         // An enum's argument is matched in its name type's form, which an import may hold.
         Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition,

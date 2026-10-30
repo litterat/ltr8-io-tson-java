@@ -23,7 +23,7 @@ substitution rewrites and the declaration-time checks inspect. This note also ow
   returns exactly the tokens substitution would rewrite.
 - A declared field name that is no identifier (`"@id"`, `"first name"`) is written quoted (`WireForm.declaredName`),
   or the text does not parse back; quoting never hides a parameter, whose name is an identifier.
-- Closing dispatches on the held tree's constructor head: `reference` closes to a name, `record` to a record,
+- Closing dispatches on the held tree's constructor head: `alias` closes to a name, `record` to a record,
   anything else to a synthetic construction.
 - Every parameter is substituted, inside nested applications included, before any application in the body closes.
 - A parameter is a TYPE parameter exactly when its recorded type is `type_kind` (§5.10); a slot typed `type_kind` or
@@ -70,8 +70,8 @@ its base), and an application nothing declares is its expansion.
 - **Every other open entry is held text.** `set` resolves to
   `!template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }`. That covers
   an open instance (`<T, N> !array { … }`), an open sugar form (`<T> [T]`, `<T> ( T | error )`), and §5.10's partial
-  application, `uuid_pair => <B> pair<uuid, B>`, held as the `!reference { target: pair<uuid, B> }` §8.1 says it
-  denotes — spellable because `reference.target` is a `type_ref`. Its kind is `TEMPLATE` whatever its head
+  application, `uuid_pair => <B> pair<uuid, B>`, held as the `!alias { target: pair<uuid, B> }` §8.1 says it
+  denotes — spellable because `alias.target` is a `type_ref`. Its kind is `TEMPLATE` whatever its head
   (`design/template-materialisation.md`).
   - **Why text, not a value of the constructor's vocabulary.** A parameter stands wherever a token stands —
     `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a collection — so a
@@ -95,7 +95,7 @@ its base), and an application nothing declares is its expansion.
 The tree is parsed once per closing and dropped with it. The head decides what the result *is*; everything before
 that is shared — substitute (`WireForm.substitute`), then close the applications the substituted body holds.
 
-- **Anything but `record` or `reference`** (`closeHeldTemplate`, via `closeHeld`): the substituted wire is bound
+- **Anything but `record` or `alias`** (`closeHeldTemplate`, via `closeHeld`): the substituted wire is bound
   through **the constructor's own compiled reader**, the one a written `!array { … }` binds through, so the result is
   an ordinary `ArrayBody`/`MapBody`/`ChoiceBody`/… named for its binding record (`DerivedName.ofBinding`). A failure
   there is §8.2's deferred value-level check, with no code of its own, for whatever the call-site check (below) could
@@ -104,7 +104,7 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
   (`asMember`: no `discriminators`, its pins being in place) with its chain completed from the parents as written
   (`Ancestry.chainOf`). Applications in the chain's `parents` are left as written
   (`closeApplicationsOutsideSupertypes`): an operand denotes no entry (§8.2).
-- **`reference`** (`closeHeldAlias`): an alias composes rather than mints. Applying it binds the arguments into the
+- **`alias`** (`closeHeldAlias`): an alias composes rather than mints. Applying it binds the arguments into the
   target's argument list and closes what results, so `uuid_pair<int32>` *is* the entry `pair<uuid, int32>` denotes,
   and the alias's `target` must close to a bare name or it is an `IllegalStateException`. §5.10 mints no intermediate
   entry per alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's
@@ -113,7 +113,7 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
     `uuid_pair`'s one parameter rather than `pair`'s two.
   - **A self-applying alias is a cycle, not a knot.** The knot-tying memo answers a recursive application with the
     entry under construction, and this path constructs none, so `loop => <T> loop<T>` would hand a field a name
-    nothing defines. `aliasClosing` tracks reference-template applications in flight and reports the cycle (`reference
+    nothing defines. `aliasClosing` tracks alias-template applications in flight and reports the cycle (`alias
     template whose own body applies it again`) at the declaration that applied it. Unapplied, the declaration
     compiles: a template nobody applies receives no verdict (§5.10), and `TypeInhabitance` treats every open entry as
     inhabited.
@@ -188,7 +188,7 @@ Beyond those:
   in the closure that declared it, so `min_items: N` makes `N` the kernel's `non_negative_integer` and `kind<T>`'s
   `T` the kernel's `type_name`. A record template reads in the schema's whole namespace. A template whose head is
   another open template takes that template's form; a deferred use takes its callee's. An alias's head is
-  `reference`, a constructor, so a written value type on an alias must name an imported type too. A written type
+  `alias`, a constructor, so a written value type on an alias must name an imported type too. A written type
   must also IS-A the derived one: `<N: int8> !array { … max_items: N }` is refused, core's `int8` not being a
   `non_negative_integer` (`TemplateParamTypeTest`). A type parameter's bound is the schema's in every form.
 - **A written type narrows, read by the derived kind** (`<T: text, N: int8>`, from
@@ -198,7 +198,7 @@ Beyond those:
   `<T: text_type>` names a constructor (IS-A `top`), which no type argument can IS-A, and is refused as "a
   constructor, not a type".
 - **The call-site check** (`TemplateMaterialiser.checkArguments`, through `byParameterKind`): a type argument must IS-A
-  the bound, following reference chains; a value argument must parse as the parameter's type, or as the type an
+  the bound, following alias chains; a value argument must parse as the parameter's type, or as the type an
   earlier parameter's argument names. An application as an argument, or an unresolved name, falls to the substituted
   body.
   - **An application closed during resolution is checked twice.** A declaration naming one (`held => boxed<int32>`), a

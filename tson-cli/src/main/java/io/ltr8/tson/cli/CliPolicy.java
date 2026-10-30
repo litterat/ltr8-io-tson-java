@@ -92,7 +92,7 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                             @Field("max_values") int maxValues,
                             @Field("max_import_closure") int maxImportClosure,
                             @Field("max_schema_entries") int maxSchemaEntries,
-                            @Field("max_reference_chain") int maxReferenceChain,
+                            @Field("max_alias_chain") int maxAliasChain,
                             @Field("max_supertype_chain") int maxSupertypeChain,
                             @Field("max_materialisation_depth") int maxMaterialisationDepth,
                             @Field("max_wait_depth") int maxWaitDepth) {
@@ -102,7 +102,7 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                     limits.maxNumericLiteralLength(), limits.maxBinarySize(), limits.maxDocumentSize(),
                     limits.maxElements(), limits.maxEntries(), limits.maxFields(), limits.maxAnnotations(),
                     limits.maxValues(), limits.maxImportClosure(),
-                    limits.maxSchemaEntries(), limits.maxReferenceChain(), limits.maxSupertypeChain(),
+                    limits.maxSchemaEntries(), limits.maxAliasChain(), limits.maxSupertypeChain(),
                     limits.maxMaterialisationDepth(), limits.maxWaitDepth());
         }
     }

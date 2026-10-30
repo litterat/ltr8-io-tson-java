@@ -50,7 +50,7 @@ class TypeChainTest {
         assertEquals(EntryKind.ATOM, EntryKind.of(constructor, n -> true));
         assertEquals(EntryKind.PRODUCT, EntryKind.of(RecordBody.of(RecordBody.fieldMap()), n -> true));
         assertEquals(EntryKind.ATOM, EntryKind.of(IntegerType.UNCONSTRAINED, n -> true));
-        assertEquals(EntryKind.REFERENCE, EntryKind.of(new Reference(TypeRef.of("text")), n -> true));
+        assertEquals(EntryKind.ALIAS, EntryKind.of(new Alias(TypeRef.of("text")), n -> true));
     }
 
     @Test

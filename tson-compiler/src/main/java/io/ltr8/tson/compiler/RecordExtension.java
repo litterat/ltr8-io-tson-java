@@ -12,7 +12,7 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -21,7 +21,7 @@ import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
@@ -45,7 +45,7 @@ import java.util.function.Predicate;
  * <p><b>Why here and not at resolution.</b> Every rule below needs a namespace the declaration does not have.
  * FINAL constrains whoever composes onto it, which may be another schema; the family rules range over {@code
  * subtypes}, which nothing populates until linking; and a discriminator field's type has to be followed to the
- * end of its reference chain. What <em>is</em> local -- two definition marks on one declaration, a mark
+ * end of its alias chain. What <em>is</em> local -- two definition marks on one declaration, a mark
  * carrying a value, a mark on a non-record -- the resolver already refused while lowering.
  *
  * <p><b>A selector implies {@code abstract}, and states the dispatch by itself.</b> A field written
@@ -181,7 +181,7 @@ final class RecordExtension {
     private static void checkNothingComposesOntoFinal(String name, Top def,
             Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts, List<Violation> violations) {
         for (String supertype : TypeChain.supertypesOf(def)) {
-            Top target = merged.get(ReferenceChain.terminal(supertype, merged));
+            Top target = merged.get(AliasChain.terminal(supertype, merged));
             if (target instanceof RecordBody parent
                     && parent.extension() == RecordExtensionType.FINAL) {
                 violations.add(new Violation(name, "'" + name + "' names '" + supertype + "' as a supertype, "
@@ -334,7 +334,7 @@ final class RecordExtension {
         }
     }
 
-    /** The parser for a field's type at the end of its reference chain, empty where nothing reads a token. */
+    /** The parser for a field's type at the end of its alias chain, empty where nothing reads a token. */
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, Top> merged, Map<String,
             TsonSchema.EntryFacts> facts) {
         return parserFor(field, merged, facts, Map.of());
@@ -347,9 +347,9 @@ final class RecordExtension {
         if (!field.type().arguments().isEmpty()) {
             return Optional.empty();
         }
-        String terminal = ReferenceChain.terminal(field.type().name(), merged);
+        String terminal = AliasChain.terminal(field.type().name(), merged);
         Top target = merged.get(terminal);
-        if (target == null || OpenEntry.isOpen(target) || target instanceof Reference) {
+        if (target == null || OpenEntry.isOpen(target) || target instanceof Alias) {
             return Optional.empty();
         }
         return AtomParsers.forType(target, enumForms.getOrDefault(terminal, Normalization.NONE));

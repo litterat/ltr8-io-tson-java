@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -96,7 +96,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * admits repetition is not one.
      */
     static boolean elementsAreNames(ArrayBody body, ValueReaderContext context) {
-        return body.uniqueItems() && ReferenceChain.terminalDefinition(body.elementType().name(),
+        return body.uniqueItems() && AliasChain.terminalDefinition(body.elementType().name(),
                         context.schema().entries()::get)
                 .map(element -> element instanceof IdentifierType)
                 .orElse(false);

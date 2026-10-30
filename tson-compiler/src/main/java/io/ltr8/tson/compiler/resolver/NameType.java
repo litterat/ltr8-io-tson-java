@@ -108,7 +108,7 @@ public final class NameType {
         Optional<String> head = constructor.or(() -> Optional.of(TsonSchema.constructorOf(entry)));
         Set<String> seen = new HashSet<>();
         while (head.isPresent() && seen.add(head.get())) {
-            Top found = constructors.apply(ReferenceChain.terminal(head.get(), constructors));
+            Top found = constructors.apply(AliasChain.terminal(head.get(), constructors));
             if (found instanceof TemplateBody held) {
                 head = HeldBody.of(held).application().typeRef();
                 continue;
@@ -123,7 +123,7 @@ public final class NameType {
             return Optional.empty();
         }
         return Optional.ofNullable(record.fields().get(NAME_TYPE))
-                .map(field -> constructors.apply(ReferenceChain.terminal(field.type().name(), constructors)))
+                .map(field -> constructors.apply(AliasChain.terminal(field.type().name(), constructors)))
                 .filter(KindBody.class::isInstance)
                 .map(KindBody.class::cast);
     }
@@ -151,7 +151,7 @@ public final class NameType {
      */
     public static boolean isIdentifier(Resolved type, Function<String, Top> structure) {
         return type.definition() != null
-                && type.definition() == structure.apply(ReferenceChain.terminal(EnumBody.IDENTIFIER, structure));
+                && type.definition() == structure.apply(AliasChain.terminal(EnumBody.IDENTIFIER, structure));
     }
 
     /**
@@ -188,11 +188,11 @@ public final class NameType {
                                              Function<String, Top> local,
                                              Function<String, Top> structure) {
         if (pinned(constructor, body, fallingBackTo(local, structure)) && structure.apply(body.nameType()) != null) {
-            return Optional.of(new Resolved(structure.apply(ReferenceChain.terminal(body.nameType(), structure)),
+            return Optional.of(new Resolved(structure.apply(AliasChain.terminal(body.nameType(), structure)),
                     structure));
         }
         if (local.apply(body.nameType()) != null) {
-            return Optional.of(new Resolved(local.apply(ReferenceChain.terminal(body.nameType(), local)),
+            return Optional.of(new Resolved(local.apply(AliasChain.terminal(body.nameType(), local)),
                     fallingBackTo(local, structure)));
         }
         return Optional.empty();
@@ -210,7 +210,7 @@ public final class NameType {
         for (Function<String, Top> namespace : List.of(first, second)) {
             if (namespace.apply(name) != null) {
                 Function<String, Top> other = namespace == first ? second : first;
-                return Optional.of(new Resolved(namespace.apply(ReferenceChain.terminal(name, namespace)),
+                return Optional.of(new Resolved(namespace.apply(AliasChain.terminal(name, namespace)),
                         fallingBackTo(namespace, other)));
             }
         }

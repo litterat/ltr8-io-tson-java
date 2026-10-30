@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-SCHEMA] §7.2: "at a position whose declared type is {@code T}, a value annotated {@code !S} is valid
- * if and only if, after reference flattening of both (§8.3), {@code S} is {@code T} or {@code T} appears in
+ * if and only if, after alias flattening of both (§8.3), {@code S} is {@code T} or {@code T} appears in
  * {@code S}'s transitive {@code supertypes}".
  *
  * <p>The rule was enforced only where {@code T} was a record with a non-empty {@code subtypes()} -- the one
@@ -108,7 +108,7 @@ class SubsumptionAtTypedPositionsTest {
     }
 
     /**
-     * §7.2 compares "after reference flattening of <b>both</b>", and §8.3 makes an alias and its target one
+     * §7.2 compares "after alias flattening of <b>both</b>", and §8.3 makes an alias and its target one
      * type -- so an alias names the position's own type. The reader running at such a position belongs to
      * the target, so this is the case a name-only comparison gets wrong.
      */

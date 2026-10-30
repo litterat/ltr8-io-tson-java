@@ -73,7 +73,7 @@ final class WireForm {
     /** The constructor an open record's held tree applies. */
     static final String RECORD = "record";
 
-    static final String REFERENCE = "reference";
+    static final String ALIAS = "alias";
 
     static final String TARGET = "target";
 
@@ -207,8 +207,8 @@ final class WireForm {
     // ── Writing: a resolved value as the wire form it was written in ───────────────────────────
 
     /**
-     * The held body of an <b>open alias</b> -- {@code <B> !reference { target: pair<uuid, B> }}, the form
-     * [TSON-SCHEMA] §8.1 says a partial application denotes. Spellable because {@code reference.target} is a
+     * The held body of an <b>open alias</b> -- {@code <B> !alias { target: pair<uuid, B> }}, the form
+     * [TSON-SCHEMA] §8.1 says a partial application denotes. Spellable because {@code alias.target} is a
      * {@code type_ref}, so an alias that still binds arguments states them in its own body (§8.1).
      *
      * <p>The target goes through {@link #refValue} like every other reference this package writes, so a
@@ -216,7 +216,7 @@ final class WireForm {
      * spelling §5.10 requires, however many phases produce it.
      */
     static DataValue heldReference(TypeRef target) {
-        return new DataValue(List.of(), Optional.of(REFERENCE), new RecordValue(List.of(
+        return new DataValue(List.of(), Optional.of(ALIAS), new RecordValue(List.of(
                 new RecordValue.Field(TARGET, plain(refValue(target))))));
     }
 

@@ -24,11 +24,11 @@ account, qualified type names and one reference atom over `kind_type`, `ref_type
   refused at the declaration (`api` is no constructor; its values are named by `ref<api>`), and every type position
   refuses a value entry (`validateTypeRef`, `ValuesByName.judgeApplication`, `judgeMember`).
 - `type_ref` is the application form. It stands where an application may (`type_chain.parents`,
-  `type_argument.name`, the `application` annotation, held text) and at `reference.target`, which may name a
+  `type_argument.name`, the `application` annotation, held text) and at `alias.target`, which may name a
   constructor. A `type_ref` slot is judged by resolution and arity alone.
 - Three positions may name a constructor, and keep an IS-A `top` check in Java: `kind_type.of`, a `!C` head (a
   constructor builds a type, any other type a value entry) and a composition operand (constructor or record).
-  `reference.target` admits either, an alias being applied as its target is (§3.3.1). No kind covers "a constructor":
+  `alias.target` admits either, an alias being applied as its target is (§3.3.1). No kind covers "a constructor":
   the series has no classifier of constructors.
 - `top` is a member of `type_kind`, `kind<product>` and `kind<record>`: a fresh abstract record IS-A nothing is a type
   by the rule on `kind_type`. `EntryKind.isConstructor` answers a different question, applicability, and counts `top`
@@ -121,7 +121,7 @@ namespace type is no exception: `api => !namespace { … }` is an instance of `n
 | `enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
 | `type_chain.parents`, `type_argument.name`, `application` | application | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head | resolver, `checkArity` |
 | `type_chain.supertypes`, `subtypes`, `kind_type.members` | index | — | — | link |
-| `reference.target` | reference | namespace | any entry, type or constructor; `type_ref`, by resolution | `validateTypeRef` |
+| `alias.target` | reference | namespace | any entry, type or constructor; `type_ref`, by resolution | `validateTypeRef` |
 | `template_param.type`, `bound` | reference | namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
 | `template.template` | parameters and applications as parsed | `parameters`, then namespace | §5.10's shadowing rule | `HeldBody` |
 | `record_field.type`, `tuple_element.element_type`, `array.element_type`, `map.key_type`, `map.value_type`, `namespace.value_type`, `choice.variants` | reference | namespace | `type_kind`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |

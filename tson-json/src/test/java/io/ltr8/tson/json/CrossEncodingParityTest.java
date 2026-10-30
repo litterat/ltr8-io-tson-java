@@ -458,7 +458,7 @@ class CrossEncodingParityTest {
      * The same family over a <b>template</b>: {@code outcome<text>} is abstract and {@code won<text>} is its
      * one member. Every entry in it is minted, and §8.2 makes a minted name non-normative -- so the alias is
      * the only name either document has for the member, and both encodings have to flatten it (§7.2's "after
-     * reference flattening of both"). TSON text did not, and the two stacks disagreed about every value in
+     * alias flattening of both"). TSON text did not, and the two stacks disagreed about every value in
      * such a family.
      */
     @Test

@@ -31,7 +31,7 @@ class JsonSchemaBindingTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               person => { name: text  tries?: int32 ~ 0 }
-              alias  => person
+              renamed => person
             }
             """;
 
@@ -174,7 +174,7 @@ class JsonSchemaBindingTest {
     @Test
     void anAliasIsAUsableRootType() {
         assertEquals(List.of(), json().validate("""
-                {"name": "Ada"}""", ID, "alias"));
+                {"name": "Ada"}""", ID, "renamed"));
     }
 
     /** The schemaless door is unchanged: `read` consults nothing and `null` is a value there. */

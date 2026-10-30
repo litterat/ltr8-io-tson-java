@@ -54,7 +54,7 @@ class PolicySchemaTest {
         expected.put("max_values", 16_777_216L);
         expected.put("max_import_closure", 64L);
         expected.put("max_schema_entries", 65_536L);
-        expected.put("max_reference_chain", 64L);
+        expected.put("max_alias_chain", 64L);
         expected.put("max_supertype_chain", 64L);
         expected.put("max_materialisation_depth", 64L);
         expected.put("max_wait_depth", 64L);

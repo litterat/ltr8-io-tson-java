@@ -11,8 +11,8 @@
 
   Conventions:
   - Every entry is its value: a name maps to the body it resolves
-    to, `!record { ... }`, `!integer_type { ... }`, `!reference
-    { ... }`, `!template { ... }`. Output is source with sugar
+    to, `!record { ... }`, `!integer_type { ... }`, `!alias { ... }`,
+    `!template { ... }`. Output is source with sugar
     expanded, bodies flattened and chains computed, and an entry
     written as a constructor application resolves to itself.
   - Fields at their default values are omitted (`optional: false`,
@@ -28,7 +28,7 @@
     canonicalise both lists before comparing. Set-typed fields are
     compared as written, in source declaration order (Part 2
     Sections 7.5, 8). An empty chain is omitted.
-  - A `!reference` and a `!template` compose `top` and carry no
+  - An `!alias` and a `!template` compose `top` and carry no
     chain.
   - A record's `fields` are flattened: a composition's fields are
     its operands' and its own, merged, so every record composing
@@ -41,8 +41,8 @@
     verbatim, and these fixtures, which exist to be compared, leave
     entry docs out and substitute this conventions note for the
     document-level one.
-  - Reference-kind names at type positions are stated as written: a
-    reference is a hop, not a rewrite, so a use site naming an alias
+  - Alias-kind names at type positions are stated as written: an
+    alias is a hop, not a rewrite, so a use site naming an alias
     names the alias. A processor collapses the chain when it compiles
     readers, after linking, not in resolved output.
   - A slot that names a type (`record_field.type`,
@@ -52,7 +52,7 @@
     judged a member of the kind when the schema links. `type_ref` is
     the application form and stands only where one may:
     `type_chain.parents`, `type_argument.name`, the `application`
-    annotation, held text, and `reference.target`, which may name a
+    annotation, held text, and `alias.target`, which may name a
     constructor (Part 2 Section 8.1).
   - The container constructors carry no parameters: their type
     slots are plain required `type_kind`-typed fields, filled by the
@@ -79,7 +79,7 @@
     `parameters` and, as text in `template`, the constructor
     application as written — a container as
     `!array`/`!map`/`!tuple`/`!choice`, an atom constructor as
-    `!integer_type`, an alias as `!reference` — unread until
+    `!integer_type`, an alias as `!alias` — unread until
     materialisation substitutes the parameters away. An entry that
     closes a template application carries the derived `@application`
     at its schema-map key, the application it is the instantiation
@@ -103,7 +103,7 @@
 !schema {
   top => !record {
     chain: {
-      subtypes: [array atom choice declared_type enum enum_type identifier_type integer_type iri_type kind_type map namespace product record ref_type reference regex_type set_type sum template text_type tuple type value_type void_type]
+      subtypes: [alias array atom choice declared_type enum enum_type identifier_type integer_type iri_type kind_type map namespace product record ref_type regex_type set_type sum template text_type tuple type value_type void_type]
     }
     fields: {}
     extension: ABSTRACT
@@ -156,7 +156,7 @@
     ordered        => !record_field { type: boolean  optional: true  role: DEFAULT  value: false }
   } }
 
-  reference => !record { chain: { supertypes: [top] }  fields: {
+  alias => !record { chain: { supertypes: [top] }  fields: {
     target => !record_field { type: type_ref }
   } }
 
@@ -283,11 +283,11 @@
 
   regex => !regex_type {}
 
-  type_name => !reference { target: identifier }
+  type_name => !alias { target: identifier }
 
-  field_name => !reference { target: identifier }
+  field_name => !alias { target: identifier }
 
-  param_name => !reference { target: identifier }
+  param_name => !alias { target: identifier }
 
   type_ref => !record { fields: {
     name      => !record_field { type: type_name }
@@ -310,13 +310,13 @@
 
   record_extension_type => !enum { members: [ABSTRACT FINAL OPEN] }
 
-  annotation => !reference { target: void }
+  annotation => !alias { target: void }
 
-  doc => @annotation !reference { target: text }
+  doc => @annotation !alias { target: text }
 
-  synthetic => @annotation !reference { target: void }
+  synthetic => @annotation !alias { target: void }
 
-  application => @annotation !reference { target: type_ref }
+  application => @annotation !alias { target: type_ref }
 
   record_field => !record { fields: {
     type     => !record_field { type: type_kind }

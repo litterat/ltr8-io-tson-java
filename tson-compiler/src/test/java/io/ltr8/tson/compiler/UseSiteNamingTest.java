@@ -16,9 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A diagnostic names the type <b>the author wrote at that position</b>, not the entry at the end of the
- * reference chain it resolves to.
+ * alias chain it resolves to.
  *
- * <p>[TSON-SCHEMA] §8.3 flattens a type position past a {@code REFERENCE} entry and records the name the
+ * <p>[TSON-SCHEMA] §8.3 flattens a type position past an {@code ALIAS} entry and records the name the
  * author wrote as {@code @alias} on the type-ref, so {@code c: pct} over {@code pct => small} arrives at the
  * reader as {@code small} -- one shared reader, correctly named {@code small} for a position that names it
  * directly, and wrong for one that does not. A minted application ({@code e: b<10>}) is its expansion, an
