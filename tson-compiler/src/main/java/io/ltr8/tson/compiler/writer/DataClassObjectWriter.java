@@ -17,6 +17,7 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.base.WriteException;
@@ -25,6 +26,7 @@ import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -177,14 +179,15 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof TypeRef reference) {
-                // A reference is its text, with the annotations written on it ahead: one unquoted token where it
-                // reads back as written, quoted where it carries arguments, `<` being reserved in data.
+                // A reference is data grammar, written unquoted with the annotations written on it ahead: a name
+                // one token, an application its name and argument list. A name that is no qualified name reads
+                // back only quoted.
                 writeAnnotations(reference.annotations(), writer);
                 if (typeRef != null) {
                     writer.typeRef(typeRef);
                 }
-                if (bare(reference)) {
-                    writer.unquotedToken(reference.name());
+                if (qualified(reference)) {
+                    writer.reference(reference);
                 } else {
                     writer.quotedString(reference.text());
                 }
@@ -259,16 +262,15 @@ public final class DataClassObjectWriter {
     }
 
     /**
-     * Whether {@code reference} writes as its bare name: no arguments, and a name every {@code .}-separated segment
-     * of which is an identifier, so the token reads back as written. An application is written quoted, as its
-     * canonical text (SPEC-FEEDBACK.md #12).
+     * Whether {@code reference} reads back unquoted as written: its name a qualified name, every {@code .}-separated
+     * segment an identifier, and the name of each reference among its arguments the same ([TSON-DATA] §7.4).
      */
-    private static boolean bare(TypeRef reference) {
-        if (!reference.arguments().isEmpty()) {
+    private static boolean qualified(TypeRef reference) {
+        if (!ReferenceGrammar.isQualifiedName(reference.name())) {
             return false;
         }
-        for (String segment : reference.name().split("\\.", -1)) {
-            if (segment.isEmpty() || IdentifierGrammar.validate(segment).isPresent()) {
+        for (TypeArgument argument : reference.arguments()) {
+            if (argument instanceof TypeArgument.Ref nested && !qualified(nested.ref())) {
                 return false;
             }
         }

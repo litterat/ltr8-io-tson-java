@@ -173,8 +173,9 @@ Where schemas come from is one value, `SchemaAccess` — the source plus the `Fe
 
 ## Reading into a tree
 
-`TsonValue` is a sealed interface over seven pure immutable node types — `TsonRecord`, `TsonMap`,
-`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonVoid`, `TsonMissing` (no `Node` suffix, deliberately). **Every
+`TsonValue` is a sealed interface over eight pure immutable node types — `TsonRecord`, `TsonMap`,
+`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonReference`, `TsonVoid`, `TsonMissing` (no `Node` suffix,
+deliberately). **Every
 accessor is total — nothing throws.**
 
 | Call                                                     | Answers                                                         |
@@ -193,6 +194,15 @@ returns that same node, so the first failure stays the informative one.
 **`TsonMissing` (nothing there) is not `TsonVoid` (the document wrote `_`).** There is one no-value
 node because there is one no-value spelling: `TsonVoid` carries `_` and a collecting-mode read failure.
 The token `null` is not absence — §4 resolves it to the string `null`, so it arrives as a `TsonAtom`.
+
+**A reference with arguments is data, written unquoted** (`t: set<text>`, `@application:response<order 201>`;
+[TSON-DATA] §7.4). A schemaless read keeps one as a `TsonReference` — `segments()`, `arguments()` (each read by the
+ordinary rule: `201` a number, `text` a string, a nested application another `TsonReference`), `text()` for the
+canonical spelling — and resolves nothing, so it has no referent. Under a schema, a value at a kind-typed position
+(`kind<T>`, `type_kind`) arrives in tree mode as an atom holding a `schema.meta.TypeRef` (`as(TypeRef.class)`), never
+a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names in the schema it was
+read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text, a type
+mismatch.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever
 cast (`isInstance`), so a test asserting *which host type a reader produced* must use `as(Class)`.

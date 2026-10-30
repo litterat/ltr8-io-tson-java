@@ -252,14 +252,14 @@ class NamespaceEntryTest {
     }
 
     /**
-     * A kind slot of a value body holds a type's name, one token: an application there, written quoted, is refused,
-     * nothing lifting or minting in a value body, and the alias spelling named.
+     * A kind slot of a value body holds a type's name, one token: an application there is refused with the alias
+     * spelling named, nothing lifting or minting in a value body.
      */
     @Test
     void anApplicationInANamespaceValueIsRefused() {
-        refused(schema("quoted", """
+        refused(schema("applied", """
                 box   => <T> { v: T }
-                other => !api { m => { response: "box<order>" } }"""),
+                other => !api { m => { response: box<order> } }"""),
                 "a position typed by a kind holds the name of a type", "declare an alias");
     }
 

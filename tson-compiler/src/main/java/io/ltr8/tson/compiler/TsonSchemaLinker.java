@@ -95,6 +95,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -701,7 +702,19 @@ public final class TsonSchemaLinker {
                 enumForms.put(name, form);
             }
         }
-        merged = computeKinds(merged, facts, merged::get, applications);
+        // A reference read under this schema names an entry of the final namespace, assembled below.
+        AtomicReference<Map<String, Top>> closure = new AtomicReference<>(Map.of());
+        merged = computeKinds(merged, facts, merged::get, applications, new java.util.AbstractMap<>() {
+            @Override
+            public Top get(Object name) {
+                return closure.get().get(name);
+            }
+
+            @Override
+            public Set<Map.Entry<String, Top>> entrySet() {
+                return closure.get().entrySet();
+            }
+        });
         merged = computeDisjointness(merged);
         // Before the name checks: a member that is not a value of its enum's name type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
@@ -757,6 +770,7 @@ public final class TsonSchemaLinker {
 
         AnnotatedMap<String, Top> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
+        closure.set(annotated);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.imports(),
                 annotated, schema.bootstrap(), schema.valuesByName(), facts), origins, enumForms, nameTypes);
@@ -1060,8 +1074,9 @@ public final class TsonSchemaLinker {
      * KindMembers}' construction walk. Every reference in the closure is recomputed, an imported one included: the
      * index is computed over the <em>governing</em> schema's closure, so one reference holds different members in two
      * schemas importing different sets, and whatever a body arrived carrying is discarded rather than trusted. A
-     * reference over a constructor also carries the applications the closure records ({@code @application}), each
-     * with the entry it denotes, so a data value written as an application is judged through that entry. The
+     * reference over a constructor also carries the applications the closure closed, each with the entry it denotes
+     * -- its {@code @application}s and every application the resolver closed ({@code EntryFacts.closes}) -- so a
+     * data value written as an application is judged through that entry. The
      * index is never written: resolved output states {@code of} alone.
      *
      * <p>Before the name-type checks, {@code checkNames} and validation, and after {@link #computeSubtypes}, which
@@ -1072,9 +1087,12 @@ public final class TsonSchemaLinker {
      * @param structure where a constructor is looked up first: the schema's one namespace, as {@code merged} is
      */
     private static Map<String, Top> computeKinds(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                                 Function<String, Top> structure, Map<String, TypeRef> applications) {
+                                                 Function<String, Top> structure, Map<String, TypeRef> applications,
+                                                 Map<String, Top> entries) {
         Map<TypeRef, String> denoted = new LinkedHashMap<>();
         applications.forEach((name, application) -> denoted.putIfAbsent(application, name));
+        // Every application the resolver closed to an entry of the closure, an expansion's among them.
+        facts.forEach((name, known) -> known.closes().forEach(application -> denoted.putIfAbsent(application, name)));
         Map<String, Top> result = null;
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             if (entry.getValue() instanceof ReferenceBody reference) {
@@ -1084,7 +1102,13 @@ public final class TsonSchemaLinker {
                 if (result == null) {
                     result = new LinkedHashMap<>(merged);
                 }
-                result.put(entry.getKey(), reference.linked(namesTypes, members, namesTypes ? denoted : Map.of()));
+                // A message lists the members as an author can write them: a minted one by its application.
+                List<String> shown = members.stream().map(name -> EntryDisplayName.authored(name, merged.get(name),
+                        facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), applications.containsKey(name)
+                                ? Optional.of(applications.get(name)) : Optional.empty()))
+                        .flatMap(Optional::stream).distinct().toList();
+                result.put(entry.getKey(), reference.linked(namesTypes, members, namesTypes ? denoted : Map.of(),
+                        entries, shown));
             }
         }
         return result == null ? merged : result;

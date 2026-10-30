@@ -9,6 +9,7 @@ import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
@@ -32,6 +33,7 @@ import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
+import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -343,6 +345,84 @@ public final class TsonDataStream implements TsonEventSource {
      * "found '!!'" is true and useless; naming the directive says which rule was broken. The rule is the
      * <em>position's</em>, not the document kind's, so this holds whoever is reading.
      */
+    // ── A reference ([TSON-DATA] §7.4) ────────────────────────────────────────────────────────────
+
+    /**
+     * Whether the token just consumed, {@code head}, opens a reference's argument list: the next token is a {@code <}
+     * adjacent to it. A {@code <} with whitespace before it opens nothing and is refused, as is one after a quoted
+     * token, which is never a reference (§7.5).
+     */
+    private boolean opensArguments(Token head) {
+        Token next = peekToken();
+        if (next.type() != TokenType.LESS_THAN) {
+            return false;
+        }
+        if (!head.adjacentTo(next)) {
+            throw parseError("'<' opens a reference's argument list only adjacent to the name it applies (§7.5): "
+                    + "write '" + head.text() + "<...>' with no whitespace before '<'");
+        }
+        if (head.type() != TokenType.UNQUOTED) {
+            throw parseError("a quoted token is never a reference, so '<' cannot apply it: write the qualified "
+                    + "name unquoted");
+        }
+        return true;
+    }
+
+    /**
+     * The reference {@code head} heads, its argument list next at the cursor: {@code "<" ws type-args ws ">"}, each
+     * argument a qualified name (a reference, itself possibly applied) or any other token (a value), separated as an
+     * array's elements are. Assembled whole, so the stream delivers one value.
+     */
+    private io.ltr8.tson.schema.meta.TypeRef referenceArguments(Token head) {
+        requireQualifiedName(head);
+        advance(); // '<'
+        List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new ArrayList<>();
+        if (check(TokenType.GREATER_THAN)) {
+            throw parseError("an argument list holds at least one argument, and '" + head.text() + "<>' holds none");
+        }
+        arguments.add(referenceArgument());
+        while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
+            arguments.add(referenceArgument());
+        }
+        expect(TokenType.GREATER_THAN, "a reference's closing '>'");
+        return new io.ltr8.tson.schema.meta.TypeRef(head.text(), arguments);
+    }
+
+    private io.ltr8.tson.schema.meta.TypeArgument referenceArgument() {
+        Token t = peekToken();
+        switch (t.type()) {
+            case UNQUOTED -> {
+                advance();
+                boolean applied = opensArguments(t);
+                if (ReferenceGrammar.isQualifiedName(t.text())) {
+                    return new io.ltr8.tson.schema.meta.TypeArgument.Ref(applied ? referenceArguments(t)
+                            : io.ltr8.tson.schema.meta.TypeRef.of(t.text()));
+                }
+                if (applied) {
+                    requireQualifiedName(t);
+                }
+                return new io.ltr8.tson.schema.meta.TypeArgument.Value(
+                        new io.ltr8.tson.schema.meta.Token(t.text(), io.ltr8.tson.schema.meta.Token.Form.UNQUOTED));
+            }
+            case SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
+                advance();
+                opensArguments(t);
+                return new io.ltr8.tson.schema.meta.TypeArgument.Value(new io.ltr8.tson.schema.meta.Token(t.text(),
+                        t.type() == TokenType.SINGLE_LINE_STRING ? io.ltr8.tson.schema.meta.Token.Form.SINGLE_LINE_QUOTED
+                                : io.ltr8.tson.schema.meta.Token.Form.MULTI_LINE_QUOTED));
+            }
+            default -> throw mismatch("a reference's argument: a qualified name, an application or a token "
+                    + "(no structure stands in an argument list in data)");
+        }
+    }
+
+    private void requireQualifiedName(Token head) {
+        if (!ReferenceGrammar.isQualifiedName(head.text())) {
+            throw new ParseException("'" + head.text() + "' is no qualified name, so it takes no argument list -- "
+                    + "each segment between the dots is an identifier (§7.7)", head.start());
+        }
+    }
+
     private ParseException notAValue(Token t) {
         if (t.type() == TokenType.DIRECTIVE) {
             return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here: a directive "
@@ -900,7 +980,11 @@ public final class TsonDataStream implements TsonEventSource {
                 }
                 case UNQUOTED, SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
                     advance();
-                    ready.add(new TokenEvent(t.text(), formOf(t.type()), t.start()));
+                    if (opensArguments(t)) {
+                        ready.add(new ReferenceEvent(referenceArguments(t), t.start()));
+                    } else {
+                        ready.add(new TokenEvent(t.text(), formOf(t.type()), t.start()));
+                    }
                 }
                 default -> throw notAValue(t);
             }
@@ -935,6 +1019,13 @@ public final class TsonDataStream implements TsonEventSource {
                     ready.add(new RecordStart(lbrace.start()));
                     ready.add(new FieldName(Nfc.of(t1.text()), t1.start()));
                     pushFrame(new RecordFrame());
+                    pushFrame(new DataValueFrame());
+                    return;
+                }
+                if (t2.type() == TokenType.LESS_THAN && t1.adjacentTo(t2)) {
+                    // A reference as the first key: the entry's own frame reads it, and the arrow after it.
+                    ready.add(new MapStart(lbrace.start()));
+                    pushFrame(new MapFrame(MapFrame.Mode.AWAITING_ARROW));
                     pushFrame(new DataValueFrame());
                     return;
                 }

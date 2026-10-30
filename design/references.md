@@ -3,7 +3,8 @@
 Design notes for every position in a schema that holds a name: which are references, what a reference's store and
 judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape,
 one reference atom with a constructor an ordinary record type, is SPEC-FEEDBACK.md #11's; an application is a value
-of that atom, a reference carrying an argument list, SPEC-FEEDBACK.md #12's. What extends this account, a channel of
+of that atom, a reference carrying an argument list and written as data grammar ([TSON-DATA] §7.4), SPEC-FEEDBACK.md
+#12's. What extends this account, a channel of
 its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel entry.
 
 **Invariants**
@@ -22,8 +23,10 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   (`Ref<T>`). So `kind<bar>` over a record type names values of `bar`, `ref<record>` is `kind<record>`, and
   `kind<api>` names `myapi`. These notes call a reference over a constructor a *kind*, whichever spelling wrote it.
 - The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members,
-  applications)`, the last the entry each `@application` the closure records denotes), and `ValuesByName` re-derives
-  it from `of` over the final namespace whatever the read guessed; `TsonSchema.SlotType`'s `KIND` and `REFERENCE`
+  applications, entries, shown)`: the entry each application the closure closed denotes, an `@application` or an
+  expansion's `EntryFacts.closes`; the final namespace's entries, which a reference read here names; and the members
+  as a message names them, a minted one by its application), and `ValuesByName` re-derives it from `of` over the
+  final namespace whatever the read guessed; `TsonSchema.SlotType`'s `KIND` and `REFERENCE`
   roles are only how the read read the name. The index is never written: a resolved form states
   `!reference { of: … }` alone, a written `members:` is refused as an unknown field, and equality and `toString`
   exclude it (`ReferenceBody.memberNames()` is the processor's own).
@@ -32,23 +35,29 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   type. `kind<alias>` admits nothing, no entry past its hops being an alias, and a required field typed by it is
   refused by §5.10.1's productivity check (`TypeInhabitance`). A reference is not a bound: `template_param.bound`
   still refuses a constructor (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
-- **A reference may carry an argument list** (SPEC-FEEDBACK.md #12), and that is what an application is in a slot:
-  `reference = segment *("." segment) [ws "<" ws arguments ws ">"]`, arguments separated by whitespace or a comma,
-  each a number or a quoted token (a value) or a reference (`io.ltr8.tson.atom.ReferenceGrammar`). The canonical text
-  (`TypeRef.text()`) has no whitespace and one space between arguments, `map<text integer>`, and in data a reference
-  with arguments is one quoted token, `"result<T>"`, `<` being reserved there; one without stays an unquoted token.
-  Identity is the parsed form, never the text, so `result< T >` is `result<T>`. The grammar classifies an argument,
+- **A reference may carry an argument list** (SPEC-FEEDBACK.md #12), and that is what an application is in a slot.
+  It is data grammar ([TSON-DATA] §7.4): `reference = qualified-name "<" ws type-args ws ">"`, the `<` adjacent to the
+  name (§7.5), arguments separated by whitespace or a comma, each a reference (a qualified name, with or without
+  arguments) or any other token, a number or a quoted token, which is a value. **A quoted token is never a
+  reference**: a reference is written unquoted wherever it stands, `!alias { target: result<T> }`,
+  `@application:response<order 201>`, `parents: [result<T>]`, and a reference without arguments is one token. The
+  stream assembles one into a single `ReferenceEvent` and the AST into a `ReferenceValue`, each holding the parsed
+  `TypeRef` (`design/lexer-and-data-parsing.md`); JSON, which has no unquoted form, holds the same text in a string,
+  read by `io.ltr8.tson.atom.ReferenceGrammar`. The canonical text (`TypeRef.text()`) has no whitespace and one space
+  between arguments, no comma, `map<text integer>`. Identity is the parsed form, never the text, so `result< T >` is
+  `result<T>`. A qualified head parses (`geo.address<T>`); resolving a qualified name at a type position is this
+  library's gap (`NOT_IMPLEMENTED`, `SchemaDesugarer.unqualified`, `KindParser`). The grammar classifies an argument,
   a reference first; the head's parameters judge whether it binds a type or a value (§5.10), so `TypeArgument`
   compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
 - A reference carries arguments only where an application is still open: a record template's `chain.parents` and
-  field types, held text (`!alias { target: "pair<uuid B>" }` inside `template.template`), and the `application`
+  field types, held text (`!alias { target: pair<uuid B> }` inside `template.template`), and the `application`
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
   resolution and arity, and its arguments by the head's parameters: only an argument at a type parameter is judged
   as a type's name (`TsonSchemaLinker.typeArguments`).
 - A slot that names the type of a value is typed `type_kind` (`record_field.type`, `tuple_element.element_type`,
   `array.element_type`, `map.key_type` and `value_type`, `namespace.value_type`, `choice.variants`,
   `template_param.type` and `bound`, `alias.target`, `type_chain.parents`, and the `application` annotation). Its
-  value is one bare name, or, where an application is still open, a quoted reference with arguments. In a schema
+  value is one bare name, or, where an application is still open, a reference with arguments. In a schema
   document (a construction's or a value
   entry's payload, or a resolved form read as data) the reader reads its grammar alone and the name is judged a
   member where that schema links, or at ingest ([TSON-SCHEMA] §4.2, §8.1); in a data document the reader judges
@@ -80,16 +89,21 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   `type_kind` slot is a type parameter (`ParameterTypes.typePosition`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the
-  slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A quoted token with a `<` is an
-  application, parsed by `ReferenceGrammar`; a malformed one (`"box<text"`) is refused with the grammar's reason
-  (`ATOM_FORM_INVALID`). In a kernel body it is a value: resolved output holds one where an application is open, and
+  slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A `ReferenceEvent` is an application,
+  its `TypeRef` taken as the stream parsed it; a malformed one (`box<text`) is a parse error, and a quoted token,
+  `"box<text>"`, is text, a `TYPE_MISMATCH` at a reference-typed position. In a kernel body an application is a
+  value: resolved output holds one where an application is open, and
   a sugar lift writes one into the slot it fills, which the closer mints an entry for afterwards. In a value body
   (`TsonReadContext.readsValueBody`, a value entry's payload) nothing lifts or mints, so it is refused and the alias
   spelling named: `order_box => box<order>`, then the bare name. In a data document the kind's reader (`KindParser`)
-  judges an application through the entry the closure records for it (`@application`, `ReferenceBody.entryOf`); one
-  the closure records no entry for is a gap (`NOT_IMPLEMENTED`), an expansion nothing declares being named by
-  content, which a data read does not compute. The name itself is recorded by the kind's `AtomTypeReader`, in a
-  schema document only, and name hygiene judges each name an application writes.
+  judges an application through the entry it denotes, resolved bottom-up by structural identity
+  (`ReferenceBody.entryOf`): each argument that is itself an application first, then the application over those
+  entries, against every application the closure closed, `@application`s and the `EntryFacts.closes` the resolver
+  records (`TemplateMaterialiser.closedApplications`, generated heads skipped). A schema loads only when every
+  application in it closes, so data never creates one: an application nothing in the closure closed is refused
+  (`ATOM_CONSTRAINT_VIOLATION`, "names no type this schema closes"), as a name no member is. The name itself is
+  recorded by the kind's `AtomTypeReader`, in a schema document only, and name hygiene judges each name an
+  application writes.
 - A recorded name carries its slot's declared type from the reader that read it (`TsonSchema.SlotType`: the role and
   the reference's `of`), so the linker never walks the path back through the meta's declarations, and a slot only a
   tagged subtype declares is judged however deep the value sits.
@@ -111,8 +125,14 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   namespace; the referent's type IS-A `of`, and the value reached is delivered into the host's `Ref<T>`
   (`Ref.deliver`), a `TypeRef` host taking the name alone. A field step reads the record value the read bound,
   through its binding's descriptor, so a value reached through a field is delivered as one reached by key.
-- One host shape for every reference: a `TypeRef`, whatever the slot. Only the judgement differs by slot, and it is
-  the slot's, never the host's.
+- One host shape for every reference: a `TypeRef`, whatever the slot, in a tree read as in a bound one (a `String`
+  host receives its canonical text). Only the judgement differs by slot, and it is the slot's, never the host's.
+- **A reference read in data finds what it names.** `TypeRef.referent()` is the value of the entry it denotes in the
+  closure it was read under: `KindParser` attaches `ReferenceBody.closure()`, which resolves through `entryOf` over
+  the index's `entries`, and every nested argument carries the same closure, so each level's referent resolves. The
+  closure is a component excluded from `equals`, `hashCode` and `toString`. A reference read in a schema document,
+  built by hand, or at a slot naming values (`RefParser`) carries `Closure.NONE` and names nothing. A schemaless read
+  has no closure at all and keeps an application as a `TsonReference` (`design/tree-model.md`), with no referent.
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter
 positions), `design/meta-layer-namespaces.md` (value entries' slots), `design/record-dispatch.md` (the positional form).

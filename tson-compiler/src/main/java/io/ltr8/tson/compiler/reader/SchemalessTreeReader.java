@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -116,6 +117,10 @@ public final class SchemalessTreeReader {
             case TokenEvent token -> {
                 ctx.next();
                 yield leaf(ctx, token, typeRef, atom, annotations);
+            }
+            case ReferenceEvent reference -> {
+                ctx.next();
+                yield reference(reference.reference(), typeRef, annotations);
             }
             default -> throw new IllegalStateException("unexpected event where a value was expected: " + e);
         };
@@ -242,6 +247,28 @@ public final class SchemalessTreeReader {
         return new TsonAtom(value, typeRef, annotations);
     }
 
+    /**
+     * A reference with arguments, kept as the structured value it is ([TSON-DATA] §4): its segments, and each
+     * argument read by the schemaless rule a token is read by, a nested application a reference of its own. Nothing
+     * resolves.
+     */
+    private static TsonReference reference(io.ltr8.tson.schema.meta.TypeRef reference, Optional<String> typeRef,
+                                           List<TsonAnnotation> annotations) {
+        List<TsonValue> arguments = new ArrayList<>(reference.arguments().size());
+        for (io.ltr8.tson.schema.meta.TypeArgument argument : reference.arguments()) {
+            arguments.add(switch (argument) {
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref nested when !nested.ref().arguments().isEmpty() ->
+                        reference(nested.ref(), Optional.empty(), List.of());
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref name ->
+                        TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(name.ref().name(), TokenForm.UNQUOTED)));
+                case io.ltr8.tson.schema.meta.TypeArgument.Value value ->
+                        TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(value.value().text(),
+                                TokenForm.valueOf(value.value().form().name()))));
+            });
+        }
+        return new TsonReference(reference.segments(), arguments, typeRef, annotations);
+    }
+
     /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form. */
     private static String keySegment(TsonValue key) {
         return key instanceof TsonAtom atom ? String.valueOf(atom.value()) : "?";
@@ -290,6 +317,8 @@ public final class SchemalessTreeReader {
     private static Object keyIdentity(TsonValue key) {
         return switch (key) {
             case TsonAtom atom -> ValueIdentity.of(atom.value());
+            case TsonReference reference -> List.of(KeyKind.REFERENCE, reference.segments(),
+                    reference.arguments().stream().map(SchemalessTreeReader::keyIdentity).toList());
             case TsonArray array -> array.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonTuple tuple -> tuple.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonRecord record -> {
@@ -309,5 +338,5 @@ public final class SchemalessTreeReader {
     }
 
     /** Identity stand-ins for the payload-free node kinds -- see {@link #keyIdentity}. */
-    private enum KeyKind { VOID, MISSING }
+    private enum KeyKind { VOID, MISSING, REFERENCE }
 }

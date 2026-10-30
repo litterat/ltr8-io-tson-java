@@ -49,6 +49,7 @@ class TsonDataStreamTest {
             case AnnotationEnd a -> "AnnotationEnd";
             case TypeRef t -> "TypeRef(" + t.name() + ")";
             case TokenEvent t -> "Token(" + t.text() + "," + t.form() + ")";
+            case ReferenceEvent r -> "Reference(" + r.reference().text() + ")";
             case VoidEvent a -> "Absent";
             case EmptyBraceEvent e2 -> "EmptyBrace";
         };
@@ -65,6 +66,40 @@ class TsonDataStreamTest {
     void quotedTokenRoot() {
         assertEquals(List.of("DocumentStart(|)", "Token(has spaces,SINGLE_LINE_QUOTED)", "DocumentEnd"),
                 shape("\"has spaces\""));
+    }
+
+    // ── A reference ([TSON-DATA] §7.4) ──────────────────────────────────
+
+    /** A qualified name with an adjacent argument list is one value, nested to any depth; whitespace inside is free. */
+    @Test
+    void aReferenceIsOneValue() {
+        assertEquals(List.of("DocumentStart(|)", "Reference(map<text list<int32>>)", "DocumentEnd"),
+                shape("map< text,  list<int32> >"));
+        assertEquals(List.of("DocumentStart(|)", "Reference(geo.address<T 201 \"a b\">)", "DocumentEnd"),
+                shape("geo.address<T 201 \"a b\">"));
+        assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(t)", "Reference(box<text>)",
+                "FieldName(n)", "Token(1,UNQUOTED)", "RecordEnd", "DocumentEnd"), shape("{ t: box<text>  n: 1 }"));
+    }
+
+    /** A reference stands where a core value does, a map key included. */
+    @Test
+    void aReferenceMayBeAMapKey() {
+        assertEquals(List.of("DocumentStart(|)", "MapStart", "Reference(box<text>)", "MapArrow", "Token(1,UNQUOTED)",
+                "MapEnd", "DocumentEnd"), shape("{ box<text> => 1 }"));
+    }
+
+    /** {@code <} opens an argument list only adjacent to an unquoted qualified name. */
+    @Test
+    void aDetachedOrQuotedHeadIsRefused() {
+        for (String source : List.of("box <text>", "\"box\"<text>", "box<>", "box<text", "1x<text>", "box<[a]>",
+                "box<_>")) {
+            TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
+            assertThrows(ParseException.class, () -> {
+                while (!(stream.next() instanceof DocumentEnd)) {
+                    // drain
+                }
+            }, source);
+        }
     }
 
     @Test

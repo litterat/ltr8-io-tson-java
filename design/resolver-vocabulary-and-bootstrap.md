@@ -47,9 +47,10 @@ once.
 
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
 the `plain`/`nameField` builders every producer goes through; `refValue`, which writes a reference as a bare token
-or, carrying arguments, as one quoted token of its canonical text (SPEC-FEEDBACK.md #12), and its inverse
-`applicationIn`; `substituted`, which rewrites a parameter named among an application's arguments and writes the
-application again as its text; the held-record writer `heldRecord`, which spells `fields` as a map
+or, carrying arguments, as a `ReferenceValue`, the data grammar's reference ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12),
+and its inverse `applicationIn`, an `instanceof ReferenceValue`; `substituted`, which walks an application's argument
+tree, rewrites a parameter named among its arguments at any depth, and writes the application again as a
+`ReferenceValue`; the held-record writer `heldRecord`, which spells `fields` as a map
 from each field's declared name to its `record_field` (`fieldMap`/`fieldEntry`); and §5.10 `substitute` over a
 held body. Every walk over a held body descends into a map's keys and values as it does into a record or an
 array, `fields` being one.
@@ -60,10 +61,10 @@ array, `fields` being one.
   declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterTypes`
   walking one for parameter kinds). `applicationIn`'s own contract is that a held body is written by one
   phase and read by several, so a second opinion about what an application looks like is what makes one of
-  them wrong. The writer, the reader and `ParameterTypes` all go through it; a walker parsing quoted tokens
-  on its own is the copy that drifts silently, since nothing fails, only a parameter kind quietly not
-  inferred. The cost of the quoted spelling: a held body's text literal that is itself a well-formed
-  application is read as one.
+  them wrong. The writer, the reader and `ParameterTypes` all go through it; a walker recognising
+  applications on its own is the copy that drifts silently, since nothing fails, only a parameter kind quietly
+  not inferred. A quoted token is never an application, so a held body's text literal (`pattern: "box<T>"`) is
+  text whatever it spells.
 - **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
   gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
   `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
@@ -188,10 +189,14 @@ annotation is: there is no author to resolve against, and the value is fixed.
   application. Marking too much would be as wrong as marking too
   little, so `SyntheticEntryMarkerTest` asserts both halves.
 - **`@application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
-  closes a template application, the application it is the instantiation of, `@application:"box<int32>"`, a
-  `type_kind` reference carrying arguments. It is about the entry, not about a type — a record template's member, a
-  value entry (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Alias` a
-  non-record template's application closes to — which is why it is no field of `type_chain`. The materialiser records
+  closes a template application, the application it is the instantiation of, `@application:box<int32>`, a
+  `type_kind` reference carrying arguments, written unquoted and stated as written: nested arguments unreduced
+  (`@application:pair<box<text> int32>`), a bare-name argument past its alias hops, an argument at a value parameter
+  a value token (`TemplateMaterialiser.asWritten`). An expansion carries none; what a data read and a message need
+  of it is `TsonSchema.EntryFacts.closes`, held in memory and never written. It is about the entry, not about a
+  type — a record template's member, a value entry (`order_api => orders<order>` over `orders => <T> !interface {
+  get => { response: T } }`), the `Alias` a non-record template's application closes to — which is why it is no
+  field of `type_chain`. The materialiser records
   each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
   it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`;
   `TsonSchema.applicationOf` is the one accessor. **Unlike `@synthetic` it is read as stated on ingest**, not

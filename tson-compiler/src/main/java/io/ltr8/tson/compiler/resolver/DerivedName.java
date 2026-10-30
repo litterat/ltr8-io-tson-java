@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.Token;
@@ -71,8 +72,8 @@ final class DerivedName {
     /** The readable half of a derived name: every scalar the binding record holds, in order, under {@code _}. */
     private static void appendReadable(StringBuilder out, CoreValue value) {
         switch (value) {
-            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
-                    appendReadable(out, WireForm.applicationIn(token).get());
+            case ReferenceValue applied ->
+                    appendReadable(out, applied.reference());
             case TokenValue token -> out.append('_')
                     .append(InternalName.part(
                             NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
@@ -119,8 +120,8 @@ final class DerivedName {
     private static void appendValue(StringBuilder out, CoreValue value) {
         switch (value) {
             // An application in a slot is its parsed form, so two spellings of one are one binding (§8.2).
-            case TokenValue token when WireForm.applicationIn(token).isPresent() -> {
-                TypeRef application = WireForm.applicationIn(token).get();
+            case ReferenceValue applied -> {
+                TypeRef application = applied.reference();
                 out.append('p');
                 appendRef(out, application);
             }

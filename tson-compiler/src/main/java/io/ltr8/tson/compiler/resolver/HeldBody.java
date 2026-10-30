@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -139,7 +140,7 @@ public final class HeldBody {
      * declared parameter the body never references is an author error.
      *
      * <p>What it returns is exactly the set of names substitution would rewrite -- unquoted tokens, and the names
-     * an application's text writes, any other quoted token being a literal and never a name -- or the check and the
+     * an application writes, a quoted token being a literal and never a name -- or the check and the
      * rewrite disagree about what a parameter reference is.
      */
     public Set<String> names() {
@@ -174,8 +175,8 @@ public final class HeldBody {
      */
     private static void collectApplications(CoreValue value, List<TypeRef> into) {
         switch (value) {
-            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
-                    into.add(WireForm.applicationIn(token).get());
+            case ReferenceValue applied ->
+                    into.add(applied.reference());
             case RecordValue record -> record.fields()
                     .forEach(field -> collectApplications(field.value().coreValue(), into));
             case ArrayValue array -> array.elements()
@@ -192,8 +193,8 @@ public final class HeldBody {
     private static void collect(CoreValue value, Set<String> into) {
         switch (value) {
             case TokenValue token when token.form() == TokenForm.UNQUOTED -> into.add(token.text());
-            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
-                    collect(WireForm.applicationIn(token).get(), into);
+            case ReferenceValue applied ->
+                    collect(applied.reference(), into);
             case ArrayValue array -> array.elements()
                     .forEach(element -> collect(element.coreValue(), into));
             case RecordValue record -> record.fields()

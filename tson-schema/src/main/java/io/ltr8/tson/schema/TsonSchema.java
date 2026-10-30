@@ -96,46 +96,61 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * which is what lets a tightened constructor bind as the one it tightens, and the chain cannot tell it from a
      * composition adding nothing. All of it is provenance, and none of it is written ([TSON-SCHEMA] §8.1).
      * {@code synthetic} is the key's {@code @synthetic} mark as {@link #factsOf} reads it: a form no author
-     * named, which a message names by its spelling or not at all.
+     * named, which a message names by its spelling or not at all. {@code closes} is every application the resolver
+     * closed to this entry, as it met them, an expansion's among them, which carries no {@code @application}: what
+     * lets a data read resolve an application by structural identity to the entry the schema closed it to
+     * ([TSON-SCHEMA] §8.2, SPEC-FEEDBACK.md #12).
      */
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
-                             Optional<String> constructor, Optional<String> refines, boolean synthetic) {
+                             Optional<String> constructor, Optional<String> refines, boolean synthetic,
+                             List<TypeRef> closes) {
 
-        /** An entry with none of the five. */
+        /** An entry with none of the six. */
         public static final EntryFacts NONE = new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty(),
-                Optional.empty(), false);
+                Optional.empty(), false, List.of());
 
         public EntryFacts {
             position = position == null ? Optional.empty() : position;
             annotations = annotations == null ? Annotations.empty() : annotations;
             constructor = constructor == null ? Optional.empty() : constructor;
             refines = refines == null ? Optional.empty() : refines;
+            closes = closes == null ? List.of() : List.copyOf(closes);
+        }
+
+        /** The same facts with {@code closes} in place of these. */
+        public EntryFacts(Optional<SourcePosition> position, Annotations annotations, Optional<String> constructor,
+                          Optional<String> refines, boolean synthetic) {
+            this(position, annotations, constructor, refines, synthetic, List.of());
         }
 
         /** Whether this holds nothing at all -- the facts a schema need not record. */
         public boolean isEmpty() {
             return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && refines.isEmpty()
-                    && !synthetic;
+                    && !synthetic && closes.isEmpty();
+        }
+
+        public EntryFacts withCloses(List<TypeRef> closes) {
+            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
         }
 
         public EntryFacts withPosition(Optional<SourcePosition> position) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
         }
 
         public EntryFacts withAnnotations(Annotations annotations) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
         }
 
         public EntryFacts withConstructor(Optional<String> constructor) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
         }
 
         public EntryFacts withRefines(Optional<String> refines) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
         }
 
         public EntryFacts withSynthetic(boolean synthetic) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic);
+            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
         }
 
         /** An entry declared at {@code position}. */

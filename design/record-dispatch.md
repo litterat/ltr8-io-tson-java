@@ -109,7 +109,7 @@ constructor's binding record, a value entry's payload — reaches its declaring 
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
 bare value as that field — `record_field`'s `type` is `type_kind`, an atom whose value is a type's name
-(`KindSlotReader`, which also admits the quoted application a sugar lift writes there before the closer mints its
+(`KindSlotReader`, which also admits the application a sugar lift writes there before the closer mints its
 entry) — and where the field is a product or a sum, an unquoted token
 (`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field (`record_field`'s
 own positional field being an atom, `fields: { p => x }` fills its `type`, as the sugar `p: x` does). Whether the token is

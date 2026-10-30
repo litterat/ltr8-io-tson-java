@@ -4,6 +4,7 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Unbound;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,14 +36,19 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
     /**
      * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are
      * types, and the members where it does -- the names of the closure the slot admits, sorted -- with the entry each
-     * application the closure records denotes ({@code @application}), so a value written as an application is
-     * judged through the entry it names.
+     * application the closure closed denotes, an expansion's included, so a value written as an application is
+     * judged through the entry it names, and the closure's entries, which a reference read here names ({@link
+     * #closure}). {@code shown} is the members as a message names them: a minted entry by the application that
+     * closed to it, as written, and one with no spelling left out.
      */
-    public record Index(boolean namesTypes, List<String> members, Map<TypeRef, String> applications) {
+    public record Index(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
+                        Map<String, Top> entries, List<String> shown) {
 
         public Index {
             members = List.copyOf(members);
+            shown = List.copyOf(shown);
             applications = Map.copyOf(applications);
+            Objects.requireNonNull(entries, "entries");
         }
     }
 
@@ -63,10 +69,14 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
         return new ReferenceBody(chain, of, index);
     }
 
-    /** This reference with its derived index: {@code namesTypes}, the members sorted, and the closure's applications. */
-    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<TypeRef, String> applications) {
+    /**
+     * This reference with its derived index: {@code namesTypes}, the members sorted, the closure's applications, and
+     * its entries.
+     */
+    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
+                                Map<String, Top> entries, List<String> shown) {
         return new ReferenceBody(chain, of, Optional.of(new Index(namesTypes, members.stream().sorted().toList(),
-                applications)));
+                applications, entries, shown.stream().sorted().toList())));
     }
 
     /**
@@ -82,9 +92,52 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
         return index.map(Index::members).orElse(List.of());
     }
 
-    /** The entry the closure records {@code application} as denoting, or empty where it records none. */
-    public Optional<String> entryOf(TypeRef application) {
-        return index.map(found -> found.applications().get(application));
+    /** The members as a message names them -- a minted one by its application ({@link Index#shown}). */
+    public List<String> shownMembers() {
+        return index.map(Index::shown).orElse(List.of());
+    }
+
+    /**
+     * The entry {@code reference} denotes in the closure this reference was linked over: a name is its own entry, and
+     * an application resolves bottom-up by structural identity ([TSON-SCHEMA] §8.2) -- each argument that is itself an
+     * application first, to the entry the closure closed it to, then the application over those entries, against
+     * the applications the closure closed. Empty where nothing in the closure closed it.
+     */
+    public Optional<String> entryOf(TypeRef reference) {
+        if (index.isEmpty()) {
+            return Optional.empty();
+        }
+        if (reference.arguments().isEmpty()) {
+            return Optional.of(reference.name());
+        }
+        Map<TypeRef, String> applications = index.get().applications();
+        String direct = applications.get(reference);
+        if (direct != null) {
+            return Optional.of(direct);
+        }
+        List<TypeArgument> closed = new ArrayList<>(reference.arguments().size());
+        for (TypeArgument argument : reference.arguments()) {
+            if (argument instanceof TypeArgument.Ref nested && !nested.ref().arguments().isEmpty()) {
+                Optional<String> inner = entryOf(nested.ref());
+                if (inner.isEmpty()) {
+                    return Optional.empty();
+                }
+                closed.add(new TypeArgument.Ref(TypeRef.of(inner.get())));
+            } else {
+                closed.add(argument);
+            }
+        }
+        return Optional.ofNullable(applications.get(new TypeRef(reference.name(), closed)));
+    }
+
+    /**
+     * The closure a reference read against this one finds its referent in ({@link TypeRef#referent}): the value of
+     * the entry it denotes ({@link #entryOf}), over the entries the linker indexed. {@link TypeRef.Closure#NONE}
+     * where this reference is not linked.
+     */
+    public TypeRef.Closure closure() {
+        return index.<TypeRef.Closure>map(found -> reference -> entryOf(reference)
+                .map(found.entries()::get).map(Object.class::cast)).orElse(TypeRef.Closure.NONE);
     }
 
     /**

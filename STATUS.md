@@ -35,6 +35,13 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       with it: computed at link, never listed or written, and judged by membership in both encodings. Over any other
       type its values are qualified names of values. The kernel types `enum_type.name_type` and `record.name_type` by
       its `identifier_kind`, and judges a name type by membership (Part 2 §4.2)
+- [x] An application is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12) — a reference with arguments is
+      data grammar ([TSON-DATA] §7.4), written unquoted (`t: set<text>`, `@application:response<order 201>`, an open
+      alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonReference`, and at a kind-typed position
+      it reads to a `TypeRef` that resolves level by level, by structural identity, to the entry the schema closed
+      it to, its `referent()` that entry's value. An application the schema never closes is refused; a quoted token
+      is never a reference. In JSON the same text is a string. A qualified head (`geo.address<T>`) parses and is
+      not yet resolved at a type position
 - [x] A constructor is an ordinary record type ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — `uuid_type`'s value is
       a record, so `type_kind` and `kind<record>` hold it and a field typed `uuid_type` holds a declaration body as
       data, in TSON tree and bind mode and in JSON

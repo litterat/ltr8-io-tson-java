@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -179,6 +180,21 @@ final class TemplateMaterialiser {
      * reaches from here ({@link #expansionsByApplication}).
      */
     private final Map<String, String> expansionsByApplication = new LinkedHashMap<>();
+
+    /**
+     * Every application this pass closed, as it was met and with its arguments closed, to the entry it closed to --
+     * an expansion's included, which records no {@code @application}. Held beside the entries, never written: it is
+     * what lets a data read resolve an application to the entry by structural identity ({@link
+     * #closedApplications}).
+     */
+    private final Map<TypeRef, String> closedApplications = new LinkedHashMap<>();
+
+    /**
+     * Each instantiation entry's application as it was written, its nested arguments unreduced ({@code foo<bar<text>>}
+     * where {@link #applications} holds {@code foo<bar_text_…>}): what {@code @application} states on the entry's key,
+     * so a reader and a message see the reference the author wrote.
+     */
+    private final Map<String, TypeRef> writtenApplications = new LinkedHashMap<>();
 
     /**
      * The applications whose closing reached themselves -- the knot tied on the application-derived name while
@@ -423,7 +439,9 @@ final class TemplateMaterialiser {
             note(declaredName, constructor);
             Top closed = RECORD.equals(constructor) ? closeHeldRecord(head, template, open, bindings)
                     : closeHeld(head, template, open, bindings).body();
-            return instantiation(declaredName, closed, new TypeRef(head, arguments));
+            closedApplications.putIfAbsent(plain(application), declaredName);
+            closedApplications.putIfAbsent(new TypeRef(head, arguments), declaredName);
+            return instantiation(declaredName, closed, new TypeRef(head, arguments), application);
         } finally {
             heads.remove(heads.size() - 1);
         }
@@ -449,7 +467,12 @@ final class TemplateMaterialiser {
                     ? new TypeArgument.Ref(dereferenced(close(nested.ref())))
                     : argument);
         }
-        String entry = instantiate(ref.name(), arguments);
+        String entry = instantiate(ref.name(), arguments, ref);
+        // A generated head's application is an open synthetic closing its own intermediate form: nobody wrote it.
+        if (entry != null && !generated.contains(ref.name())) {
+            closedApplications.putIfAbsent(plain(ref), entry);
+            closedApplications.putIfAbsent(new TypeRef(ref.name(), arguments), entry);
+        }
         return entry == null ? new TypeRef(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
     }
 
@@ -491,7 +514,7 @@ final class TemplateMaterialiser {
      * when the head names nothing in scope -- that is {@code TsonSchemaLinker}'s verdict to give as an
      * unresolved reference, not this pass's to guess at.
      */
-    private String instantiate(String head, List<TypeArgument> arguments) {
+    private String instantiate(String head, List<TypeArgument> arguments, TypeRef written) {
         Top template = namespace.definition(head);
         if (template == null) {
             return null; // unresolved head -- the linker's verdict, not this pass's
@@ -574,7 +597,7 @@ final class TemplateMaterialiser {
                         return mintedRecord(name, DerivedName.canonicalApplication(head, arguments), closed);
                     }
                     note(name, RECORD);
-                    Top instantiation = instantiation(name, closed, new TypeRef(head, arguments));
+                    Top instantiation = instantiation(name, closed, new TypeRef(head, arguments), written);
                     materialised.put(name, instantiation);
                     publish.accept(name, instantiation);
                     return name;
@@ -594,7 +617,7 @@ final class TemplateMaterialiser {
                 // the synthetic, which the compiler collapses, so it costs nothing at read time.
                 Top alias = new Alias(TypeRef.of(formName));
                 note(name, ALIAS);
-                alias = instantiation(name, alias, new TypeRef(head, arguments));
+                alias = instantiation(name, alias, new TypeRef(head, arguments), written);
                 materialised.put(name, alias);
                 publish.accept(name, alias);
                 return name;
@@ -793,11 +816,57 @@ final class TemplateMaterialiser {
     /**
      * {@code value} as the instantiation of {@code application} (§8.2), whatever kind of entry it is: a record
      * template's member, a namespace entry, the hop to the synthetic a non-record template closes to. Recorded in
-     * {@link #applications}, which {@code SchemaResolver} writes onto the entry's key as {@code @application}.
+     * {@link #applications}, with {@code written}, the application as written, which {@code SchemaResolver} writes
+     * onto the entry's key as {@code @application}.
      */
-    private Top instantiation(String name, Top value, TypeRef application) {
+    private Top instantiation(String name, Top value, TypeRef application, TypeRef written) {
         applications.put(name, application);
+        writtenApplications.put(name, asWritten(written));
         return value;
+    }
+
+    /**
+     * {@code reference} as {@code @application} states it: as written, a nested application unreduced and itself
+     * stated this way, each argument a value where its parameter binds one, and a bare name followed through its
+     * alias chain, since §8.2 compares arguments after alias flattening.
+     */
+    private TypeRef asWritten(TypeRef reference) {
+        if (reference.arguments().isEmpty()) {
+            return plain(dereferenced(reference));
+        }
+        Top template = namespace.definition(reference.name());
+        List<String> parameters = template == null ? List.of() : OpenEntry.parameterNames(template);
+        Map<String, ParameterTypes.Kind> kinds = parameters.isEmpty() ? null
+                : Optional.ofNullable(parameterKinds.get(reference.name())).orElseGet(() -> kindsOnDemand
+                        .computeIfAbsent(reference.name(), ignored -> ParameterTypes.inferOne(template, metaTypes)));
+        List<TypeArgument> arguments = new ArrayList<>(reference.arguments().size());
+        for (int i = 0; i < reference.arguments().size(); i++) {
+            TypeArgument argument = reference.arguments().get(i);
+            boolean value = kinds != null && parameters.size() == reference.arguments().size()
+                    && kinds.get(parameters.get(i)) == ParameterTypes.Kind.VALUE;
+            arguments.add(switch (argument) {
+                case TypeArgument.Ref ref when value && ref.ref().arguments().isEmpty() ->
+                        new TypeArgument.Value(new Token(ref.ref().name(), Token.Form.UNQUOTED));
+                case TypeArgument.Ref ref -> new TypeArgument.Ref(asWritten(ref.ref()));
+                case TypeArgument.Value literal -> literal;
+            });
+        }
+        return new TypeRef(reference.name(), arguments);
+    }
+
+    /** {@code reference} with nothing but its name and arguments: no annotations, no closure. */
+    private static TypeRef plain(TypeRef reference) {
+        return new TypeRef(reference.name(), reference.arguments());
+    }
+
+    /** Every application this pass closed, to the entry it closed to -- see {@link #closedApplications}. */
+    Map<TypeRef, String> closedApplications() {
+        return new LinkedHashMap<>(closedApplications);
+    }
+
+    /** The application {@code name}'s entry closes, as written, where it is an instantiation entry. */
+    Optional<TypeRef> writtenApplication(String name) {
+        return Optional.ofNullable(writtenApplications.get(name));
     }
 
     /** A held body substituted, its inner applications closed, and read back through its constructor. */
@@ -914,8 +983,8 @@ final class TemplateMaterialiser {
      */
     private CoreValue closeApplications(CoreValue value) {
         return switch (value) {
-            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
-                    new TokenValue(close(WireForm.applicationIn(token).get()).name(), TokenForm.UNQUOTED);
+            case ReferenceValue applied ->
+                    new TokenValue(close(applied.reference()).name(), TokenForm.UNQUOTED);
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> new RecordValue.Field(field.name(),
                             WireForm.rewritten(field.value(), closeApplications(field.value().coreValue()))))

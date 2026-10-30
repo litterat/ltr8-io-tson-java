@@ -467,12 +467,14 @@ everything, are fail-fast by design.
 ### Exported sub-packages
 
 - `io.ltr8.tson.compiler.ast` — the parse-preserving AST: `Document`, `DataValue`, `CoreValue` and its
-  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `VoidValue`, `EmptyBrace`), `Annotation`,
+  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `ReferenceValue`, `VoidValue`, `EmptyBrace`),
+  `Annotation`,
   `TokenForm`.
 - `io.ltr8.tson.compiler.ast.schema` — `SchemaDocument` and the schema-grammar nodes.
 - `io.ltr8.tson.compiler.stream` — the Tier 2 event vocabulary: `TsonEvent` (sealed) with
   `DocumentStart`/`End`, `RecordStart`/`End`, `MapStart`/`MapArrow`/`MapEnd`, `ArrayStart`/`End`,
-  `FieldName`, `TokenEvent`, `VoidEvent`, `EmptyBraceEvent`, `TypeRef`,
+  `FieldName`, `TokenEvent`, `ReferenceEvent` (a reference with arguments, assembled whole), `VoidEvent`,
+  `EmptyBraceEvent`, `TypeRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`:
   the schema pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`,
@@ -489,9 +491,10 @@ A true leaf — depends on **nothing**, not even `ltr8-annotation`.
 
 ```java
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonVoid, TsonMissing {
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonReference, TsonVoid, TsonMissing {
 
-    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isVoid() / isMissing();
+    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isReference() / isVoid()
+            / isMissing();
     default boolean isContainer();
     default Optional<String> missingPath();          // the pointer up to the step that FAILED
 
@@ -517,6 +520,13 @@ public sealed interface TsonValue
 
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue { public static TsonAtom of(Object value[, String typeRef]); }
+
+// A reference with arguments read with no schema (map<text list<int32>>): no referent, nothing resolved.
+public record TsonReference(List<String> segments, List<TsonValue> arguments, Optional<String> typeRef,
+        List<TsonAnnotation> annotations) implements TsonValue {
+    public String name();                            // segments joined by "."
+    public String text();                            // canonical: one space between arguments
+}
 
 public record TsonDocument(Optional<String> id, List<String> imports, TsonValue root) {}
 ```
@@ -588,7 +598,8 @@ value model — pure records, sealed interfaces and enums, §8's `Top` and its b
 a `Type` carries its own chain (`Type.chain()`, a `TypeChain` of `parents`, `supertypes` and
 `subtypes`, with accessors for each on `Type`, and `TypeChain.supertypesOf(top)` and its siblings for any
 value); the application an entry is the instantiation of is the derived
-`@application` on its key (`TsonSchema.applicationOf`); and what is not part of the value — where it was declared, its
+`@application` on its key (`TsonSchema.applicationOf`), stated as written, nested arguments unreduced
+(`@application:pair<box<text> int32>`); and what is not part of the value — where it was declared, its
 value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
 host values the atoms read to
 are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`,
@@ -600,7 +611,9 @@ member of no kind — whose value is a `Namespace` for a namespace type, the con
 context binds one (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its
 references. A slot
 typed by a reference (`ReferenceBody`, spelled `kind<T>` or `ref<T>` alike) holds what its `T` decides: over a
-constructor (`request: kind<record>`) it binds a `TypeRef` holding a type's name; over any other type
+constructor (`request: kind<record>`) it binds a `TypeRef` holding a type's name or an application the schema
+closes (`set<text>`, written unquoted), whose `referent()` is the value of the entry it names — a tree read
+delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type
 (`method: ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and then
 a key of its namespace value, or a field of a record value) and, once the schema has linked, the value it names
 (`method().get()`), or a `TypeRef` for the name alone. The resolver records each with its slot as it reads the value,

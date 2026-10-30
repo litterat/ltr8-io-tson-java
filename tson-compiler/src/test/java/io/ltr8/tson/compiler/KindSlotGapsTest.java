@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * slot's declared type.
  *
  * <ol>
- *   <li>An application at a kind-typed slot of a value body, written quoted, is refused, the alias spelling named:
- *       nothing lifts or mints in a value body, so an application there would have no entry to be the name of.
+ *   <li>An application at a kind-typed slot of a value body is refused with the alias spelling named: nothing lifts
+ *       or mints in a value body, so an application there would have no entry to be the name of.
  *   <li>A slot that only the subtype the value's tag selected declares, below a record family base, is judged by
  *       its declared type ({@code SubtypeBehindFieldTest} has the same one record field further down).
  *   <li>A slot's pointer writes the key for a map key that carries annotations.
@@ -120,9 +120,9 @@ class KindSlotGapsTest {
      */
     @Test
     void anApplicationAtAKindSlotIsRefusedNamingTheAlias() {
-        for (String application : List.of("\"box<order>\"", "\"box<no_such>\"", "\"no_box<order>\"",
-                "\"box<order order>\"", "\"box< other >\"")) {
-            refused(schema("quoted-" + application.hashCode(),
+        for (String application : List.of("box<order>", "box<no_such>", "no_box<order>", "box<order order>",
+                "box< other >")) {
+            refused(schema("applied-" + application.hashCode(),
                             "op => !gap_operations { o => { request: " + application + " } }"),
                     "a position typed by a kind holds the name of a type", "declare an alias");
         }
@@ -134,7 +134,7 @@ class KindSlotGapsTest {
         refused(schema("nested", """
                 op => !gap_operations { o => {
                   request: order
-                  replies: [ { status: 200  body: "box<no_such>" } ]
+                  replies: [ { status: 200  body: box<no_such> } ]
                 } }"""),
                 "a position typed by a kind holds the name of a type");
     }

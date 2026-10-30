@@ -212,7 +212,8 @@ class ValueThroughFieldTest {
         assertEquals("loose.x.endpoints.e", route.endpoint().name());
         // A tree delivered where the host's class is no tree: the schema holds it, and only a bound read refuses it.
         Object delivered = ((io.ltr8.tson.schema.meta.Ref<?>) route.endpoint()).get();
-        assertEquals("order", ((io.ltr8.tson.tree.TsonValue) delivered).get("response").asString().orElseThrow());
+        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("order"), ((io.ltr8.tson.tree.TsonValue) delivered)
+                .get("response").as(io.ltr8.tson.schema.meta.TypeRef.class).orElseThrow());
 
         List<Diagnostic> problems = new java.util.ArrayList<>();
         tson.bindRegistry().get("https://example.test/shop.tn", problems::add);

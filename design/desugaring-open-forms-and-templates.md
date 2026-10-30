@@ -47,7 +47,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     out to be. Deciding it here instead would make `[text; N]` bind the *literal* `"N"`.
   - **A scalar type slot may hold an application**, not just a name — which is what makes `[tree<T>; 1..]`
     and `[[T]]` lift at all. The table keeps both renderings of such a slot: the wire field a closed
-    construction would write (the quoted reference, `element_type: "tree<p0>"`, which is what
+    construction would write (the reference, `element_type: tree<p0>`, which is what
     `DerivedName.ofBinding` hashes) and the reference *as written*, which is what an open binding holds. Only
     `element_type`/`key_type`/`value_type` are reached this way, a named slot being the one an open binding
     can address; `tuple` and `choice` put their positions inside a collection, so they keep only the first
@@ -58,11 +58,11 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
       `choiceBinding` requiring a bare name per variant would leave `( box<text> | int32 )` unlifted *whole*, to
       reach `DefinitionResolver` as a `ChoiceRef` it has no case for — and, inside a template, to reach
       `refValue`, whose two inputs are `SimpleRef` and `GenericRef`.
-    - **A closed construction writes the quoted reference and lets materialisation close it.** Its body goes
+    - **A closed construction writes the reference and lets materialisation close it.** Its body goes
       through the constructor's own reader, so the application has to survive a wire hop, and the resulting
       entry names something that is not an entry yet — for exactly the window an ordinary forward reference
       lives in, since `close()` walks every closed entry's references after the driving loop. It rests on a
-      kind slot reading a quoted application in a kernel body (`KindSlotReader`, `design/references.md`).
+      kind slot reading an application in a kernel body (`KindSlotReader`, `design/references.md`).
     - **A *value* argument makes the trip intact.** The reference grammar keeps a value argument as its token
       (`TypeArgument.Value`) — §5.10 calls a type argument's literal a bare token rather than the value it
       denotes — so nothing decodes it. The spelling is therefore what reaches identity,
@@ -84,7 +84,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 ## Parameterised aliases
 
 - **A parameterised alias is normalised here as well** (§5.10's partial application). `uuid_pair => <B>
-  pair<text, B>` leaves this phase as `<B> !alias { target: "pair<text B>" }` — §8.1's own reading of what
+  pair<text, B>` leaves this phase as `<B> !alias { target: pair<text B> }` — §8.1's own reading of what
   an alias body is, spellable because the kernel's `alias.target` is a reference, which may carry arguments.
   With it no open form is anything but a constructor application: §12.1's
   `[type-params] "!" type-name ws core-value` covers every template and one walk closes them all.

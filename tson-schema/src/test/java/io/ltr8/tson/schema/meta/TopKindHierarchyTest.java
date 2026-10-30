@@ -65,7 +65,8 @@ class TopKindHierarchyTest {
      */
     @Test
     void aReferenceIsItsOf() {
-        ReferenceBody linked = new ReferenceBody("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of());
+        ReferenceBody linked = new ReferenceBody("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
+                Map.of(), List.of("stock_id", "customer_id"));
 
         assertEquals(new ReferenceBody("uuid_type"), linked);
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());

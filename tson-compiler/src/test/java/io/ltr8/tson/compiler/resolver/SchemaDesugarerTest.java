@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
@@ -557,7 +558,7 @@ class SchemaDesugarerTest {
                 payload.fields().getFirst().value().coreValue());
 
         // `box` itself is `!record { ... }` by the time it leaves this phase (§5.2), so the field applying
-        // the lifted form is a quoted reference inside the held binding record rather than a `GenericRef`
+        // the lifted form is a reference inside the held binding record rather than a `GenericRef`
         // in the AST.
         Instance boxTemplate =
                 assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
@@ -742,9 +743,10 @@ class SchemaDesugarerTest {
                 .value().coreValue();
     }
 
-    /** An application in a slot: the reference's canonical text, quoted, {@code "head<arg>"}. */
+    /** An application in a slot: the data grammar's reference, {@code head<arg>}. */
     private static CoreValue applicationValue(String head, String argument) {
-        return new TokenValue(head + "<" + argument + ">", TokenForm.SINGLE_LINE_QUOTED);
+        return new ReferenceValue(new io.ltr8.tson.schema.meta.TypeRef(head,
+                List.of(new io.ltr8.tson.schema.meta.TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(argument)))));
     }
 
     private static DataValue plain(CoreValue value) {

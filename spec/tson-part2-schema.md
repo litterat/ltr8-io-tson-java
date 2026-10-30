@@ -2123,11 +2123,11 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/38/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/38/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/38/tson-guide |
-| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/39/m/meta-kernel.tn?sha256=e2ba34f50fba5b24dab2fedf43404ff7e4e408c1ba6cb55c5d8ae343ef04d66d |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/39/m/meta.tn?sha256=8e1d33139126fc5d2ca036c3ce28cbba2db5fd0c1593c8125b40c56b5c14b94b |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/39/m/core.tn?sha256=10d4828a18f5590b9ddd2732f678cf73abaee944ff485fa17f6cf7ef1600e5eb |
-| net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/39/m/net.tn?sha256=c705b8929ca6cc81906a0cbf7c336023df57aaa9a45810f28f9cad74ecc70d70 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/39/m/policy.tn?sha256=d73e41084e5609a63b310348589d4335ce3d1958cea947d1103a01ffe4ea7be6 |
+| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/39/m/meta-kernel.tn?sha256=d38992ca748190ffa6b2289de14e8370f8194924403e9c2eb943356aa0e96775 |
+| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/39/m/meta.tn?sha256=ba355b343c65cacabc85c5aec497c46f2d6630971ffbf5933354d733bbc1cf93 |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/39/m/core.tn?sha256=8ee6e4f57bcb9ed3051547a22032ff0f15f08a6fc8b4a42e30be3c149092aa71 |
+| net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/39/m/net.tn?sha256=a10b5517f75198da9da2972cf485cf975256889a08e347b85f118a01e291ac4a |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/39/m/policy.tn?sha256=78869c7d13ad7223cc53d2949e6d04358ed055f4906d408aa183beb105b1c110 |
 
 ### 13.3 Informative References
 

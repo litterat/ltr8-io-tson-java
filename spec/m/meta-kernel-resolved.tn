@@ -50,9 +50,9 @@
     variants, a parameter's `type` and `bound`) is typed `type_kind`,
     the kind of the types, and holds a bare name: a type's name,
     judged a member of the kind when the schema links. An
-    application is a reference with an argument list, written quoted
-    in its canonical text, `"result<T>"`: no whitespace, and one
-    space between arguments. A closed one lifts to an entry and is
+    application is a reference with an argument list, written
+    unquoted in its canonical text, `result<T>`: no whitespace, and
+    one space between arguments. A closed one lifts to an entry and is
     named bare, so one stands only where an application is still
     open: a record template's `parents` and field types, held text,
     and the `application` annotation.

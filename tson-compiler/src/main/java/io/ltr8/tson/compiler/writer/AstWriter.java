@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 
@@ -64,6 +65,7 @@ public final class AstWriter {
 					emitter.quotedString(token.text());
 				}
 			}
+			case ReferenceValue reference -> emitter.reference(reference.reference());
 			case RecordValue record -> {
 				emitter.beginRecord();
 				for (RecordValue.Field field : record.fields()) {

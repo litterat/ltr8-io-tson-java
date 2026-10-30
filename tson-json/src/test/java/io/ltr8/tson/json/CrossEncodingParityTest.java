@@ -564,28 +564,25 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A kind may hold an applied type, written quoted, judged through the entry the closure records it as: {@code
-     * unique => set<text>} is a type, and no type built with {@code uuid_type} (SPEC-FEEDBACK.md #12).
+     * A kind may hold an applied type, judged through the entry the closure closed it to: {@code unique =>
+     * set<text>} is a type, and no type built with {@code uuid_type} (SPEC-FEEDBACK.md #12). TSON writes the
+     * reference unquoted, as data grammar; JSON, having no unquoted form, writes the same text as a string.
      */
     @Test
     void anApplicationAtAKindIsJudgedThroughItsEntryByBoth() {
-        bothAccept("typed", "{ t: \"set< text >\" }", """
+        bothAccept("typed", "{ t: set< text > }", """
                 {"t": "set<text>"}""");
-        sameVerdict("ided", "{ id: \"set<text>\" }", """
+        sameVerdict("ided", "{ id: set<text> }", """
                 {"id": "set<text>"}""");
     }
 
-    /** A malformed reference is refused by the grammar, and an application nothing records is the same gap, in both. */
+    /** An application nothing in the closure closed names no type the schema closes, and is refused by both. */
     @Test
-    void aMalformedOrUnrecordedApplicationAtAKindIsTheSameVerdictInBoth() {
-        sameVerdict("typed", "{ t: \"set<text\" }", """
-                {"t": "set<text"}""");
-        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID),
-                tson("typed", "{ t: \"set<text\" }").stream().map(Verdict::code).toList());
-        sameVerdict("typed", "{ t: \"set<int32>\" }", """
+    void anUnclosedApplicationAtAKindIsRefusedByBoth() {
+        sameVerdict("typed", "{ t: set<int32> }", """
                 {"t": "set<int32>"}""");
-        assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED),
-                tson("typed", "{ t: \"set<int32>\" }").stream().map(Verdict::code).toList());
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
+                tson("typed", "{ t: set<int32> }").stream().map(Verdict::code).toList());
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

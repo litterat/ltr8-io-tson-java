@@ -15,6 +15,7 @@ import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
+import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TypeRef;
@@ -58,6 +59,7 @@ final class DataValueEvents {
 
     private static void emitCoreValue(CoreValue core, List<TsonEvent> events) {
         switch (core) {
+            case ReferenceValue reference -> events.add(new ReferenceEvent(reference.reference(), PLACEHOLDER));
             case RecordValue rv -> {
                 events.add(new RecordStart(PLACEHOLDER));
                 for (RecordValue.Field field : rv.fields()) {

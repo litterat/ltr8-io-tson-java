@@ -130,6 +130,9 @@ public final class EventSkip {
             case TokenEvent ignored -> {
                 // leaf, already consumed
             }
+            case ReferenceEvent ignored -> {
+                // one value, already consumed
+            }
             case VoidEvent ignored -> {
                 // leaf, already consumed
             }

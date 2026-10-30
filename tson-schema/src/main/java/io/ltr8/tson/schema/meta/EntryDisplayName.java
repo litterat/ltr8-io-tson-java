@@ -30,12 +30,14 @@ import java.util.stream.Collectors;
  * <p>The rendering is the sugar the author would have written, not a description of it: {@code
  * [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)}, and {@code
  * paged&lt;order&gt;} for an application that keeps an entry of its own, and a synthetic record as the body a
- * record is written with, <code>{ v: text }</code>. <b>A synthetic form with no sugar spelling has no authored
- * name</b> ({@link #authored}, read off the key's {@code @synthetic}, {@link TsonSchema.EntryFacts#synthetic}):
- * an application nothing declares is its expansion (§5.10), so {@code b<10>} over {@code b => <N> !integer_type {
- * min: N  max: 100 }} is an atom instance no author named, and a message about it is the family's own, located by
- * its position. An entry with no position and no mark is a declaration, and keeps its name. {@link #of} falls back
- * to the entry name for a caller that must name something.
+ * record is written with, <code>{ v: text }</code>. <b>An application nothing declares is its expansion</b>
+ * (§5.10), minted under a name no author wrote and named by the application that closed to it, as written ({@link
+ * TsonSchema.EntryFacts#closes}): {@code b<10>} over {@code b => <N> !integer_type { min: N  max: 100 }} is shown as
+ * {@code b<10>}, and {@code bx<int32>} as itself rather than its body. A synthetic form with no sugar spelling and
+ * no application has no authored name ({@link #authored}, read off the key's {@code @synthetic}, {@link
+ * TsonSchema.EntryFacts#synthetic}), and a message leaves it unnamed, located by its position. An entry with no
+ * position and no mark is a declaration, and keeps its name. {@link #of} falls back to the entry name for a caller
+ * that must name something.
  */
 public final class EntryDisplayName {
 
@@ -92,6 +94,11 @@ public final class EntryDisplayName {
                                              Optional<TypeRef> application, Lookup lookup) {
         if (facts.position().isPresent()) {
             return Optional.of(name);
+        }
+        if (application.isEmpty() && facts.synthetic() && !facts.closes().isEmpty()) {
+            // An application nothing declares is its expansion, minted under a name no author wrote: it is named by
+            // the application that closed to it, as written.
+            return Optional.of(facts.closes().getFirst().text());
         }
         return applied(application).or(() -> Optional.ofNullable(switch (value) {
             // `[T]` is an ordered array that admits repeats; a set is the same body with neither, and has no sugar.

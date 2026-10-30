@@ -482,6 +482,7 @@ public final class SchemaResolver {
         // application had an entry to be named for; at this point every application is closed, so it
         // re-derives to the name the other channel gives the same form. See SyntheticMerge.
         Map<String, String> merged = SyntheticMerge.renames(declarations, generated, materialiser);
+        Map<String, String> mergedNames = new LinkedHashMap<>(merged);
         if (!merged.isEmpty()) {
             SyntheticMerge.rewrite(resolvedLocals, merged);
             SyntheticMerge.rewrite(instantiations, merged);
@@ -573,13 +574,28 @@ public final class SchemaResolver {
         // record template's member, a namespace entry, the hop a non-record template's application closes to --
         // carries `@application` on its key, which is where resolved output states an instantiation's identity
         // and where ingest reads it back as stated.
+        // The application is stated as written, its nested arguments unreduced: a reader and a message see the
+        // reference the author wrote, and each level resolves structurally to the entry it closed to.
         for (String name : List.copyOf(localOnly.keySet())) {
-            io.ltr8.tson.schema.meta.TypeRef application = applications.get(name);
+            io.ltr8.tson.schema.meta.TypeRef application = materialiser.writtenApplication(name)
+                    .map(asWritten -> SyntheticMerge.renamedReference(asWritten, mergedNames))
+                    .orElse(applications.get(name));
             if (application != null) {
                 localOnly.put(name, localOnly.get(name),
                         TsonSchema.withApplication(localOnly.getAnnotations(name), application));
             }
         }
+        // Every application closed to an entry of this schema, an expansion's included, kept with the entry's facts
+        // for a data read to resolve an application by structural identity (TsonSchema.EntryFacts.closes).
+        Map<String, List<io.ltr8.tson.schema.meta.TypeRef>> closes = new LinkedHashMap<>();
+        materialiser.closedApplications().forEach((application, entry) -> closes
+                .computeIfAbsent(mergedNames.getOrDefault(entry, entry), ignored -> new ArrayList<>())
+                .add(SyntheticMerge.renamedReference(application, mergedNames)));
+        closes.forEach((name, closed) -> {
+            if (localOnly.containsKey(name)) {
+                facts.put(name, facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).withCloses(closed));
+            }
+        });
         Map<String, List<TsonSchema.ValueByName>> valuesByName = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> localFacts = new LinkedHashMap<>();
         localOnly.forEach((name, definition) -> {

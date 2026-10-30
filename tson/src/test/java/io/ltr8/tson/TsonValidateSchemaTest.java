@@ -217,15 +217,29 @@ class TsonValidateSchemaTest {
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
         assertStaysWithTheApplier("box<3>",
                 "'box<...>' substitutes into a body that is not valid data for 'record', the constructor's "
-                        + "own constraint vocabulary -- 'type_kind': '3': U+0033 at index 0 cannot start an "
-                        + "identifier -- an identifier never begins with a digit or a sign");
+                        + "own constraint vocabulary -- 'type_kind': '3' is no reference -- '3' is no name: '3': "
+                        + "U+0033 at index 0 cannot start an identifier -- an identifier never begins with a digit or "
+                        + "a sign");
     }
 
     /** The same rule for a name that is a name: {@code some_typo} is the applier's typo, not the template's. */
     @Test
     void anUnresolvedArgumentStaysWithTheApplier() {
         assertStaysWithTheApplier("box<some_typo>",
-                "'{ v: some_typo }' field 'v' has an unresolved reference 'some_typo'");
+                "'box<some_typo>' field 'v' has an unresolved reference 'some_typo'");
+    }
+
+    /**
+     * A refusal of an application nothing declares names the application as written, never the entry minted for it:
+     * {@code kind<nope>}'s expansion is a reference over a name nothing declares.
+     */
+    @Test
+    void anUnresolvedReferenceApplicationIsNamedAsWritten() {
+        List<Diagnostic> problems = check("{\n  r => { f: kind<nope> }\n}");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("'kind<nope>'"), problems.getFirst().message());
+        assertFalse(problems.getFirst().message().contains("reference_nope"), problems.getFirst().message());
     }
 
     private static void assertStaysWithTheApplier(String application, String message) {

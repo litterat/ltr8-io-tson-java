@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,10 +29,11 @@ class ReferenceGrammarTest {
     void aNameIsAReferenceWithNoArguments() {
         assertEquals(TypeRef.of("order"), ReferenceGrammar.parse("order"));
         assertEquals(TypeRef.of("orders.place_order"), ReferenceGrammar.parse("orders.place_order"));
-        assertFalse(ReferenceGrammar.isApplication("order"));
+        assertTrue(ReferenceGrammar.parse("order").arguments().isEmpty());
+        assertEquals(List.of("geo", "address"), ReferenceGrammar.parse("geo.address<T>").segments());
     }
 
-    /** A number or a quoted token is a value; every other token is a reference, nested ones included. */
+    /** A qualified name is a reference, nested ones included; any other token, a number or a quoted one, a value. */
     @Test
     void anArgumentIsAReferenceOrAToken() {
         assertEquals(new TypeRef("response", List.of(ref("order"), value("201", Token.Form.UNQUOTED))),
@@ -41,14 +41,15 @@ class ReferenceGrammarTest {
         assertEquals(new TypeRef("box", List.of(new TypeArgument.Ref(new TypeRef("pair",
                         List.of(ref("text"), value("a b", Token.Form.SINGLE_LINE_QUOTED)))))),
                 ReferenceGrammar.parse("box<pair<text \"a b\">>"));
-        assertTrue(ReferenceGrammar.isApplication("maxint<10>"));
+        assertEquals(new TypeRef("p", List.of(value("-1", Token.Form.UNQUOTED), value("1box", Token.Form.UNQUOTED))),
+                ReferenceGrammar.parse("p<-1 1box>"));
     }
 
     /** Identity is the parsed form: whitespace and a comma between arguments are free, and the text is one. */
     @Test
     void twoSpellingsAreOneReferenceWithOneCanonicalText() {
         TypeRef canonical = ReferenceGrammar.parse("map<text integer>");
-        for (String spelling : List.of("map< text integer >", "map<text, integer>", "map <text\tinteger>")) {
+        for (String spelling : List.of("map< text integer >", "map<text, integer>", "map<text\tinteger,>")) {
             assertEquals(canonical, ReferenceGrammar.parse(spelling), spelling);
             assertEquals("map<text integer>", ReferenceGrammar.parse(spelling).text(), spelling);
         }
@@ -65,9 +66,8 @@ class ReferenceGrammarTest {
     @Test
     void aMalformedReferenceIsRefusedWithTheGrammarsReason() {
         for (String text : List.of("box<text", "box<>", "box<text>>", "box<<text>", ".box", "box..x", "box<text>x",
-                "", "1box", "box<\"open>")) {
+                "", "1box", "box<\"open>", "box <text>", "box<1x<y>>")) {
             assertThrows(AtomParseException.class, () -> ReferenceGrammar.parse(text), text);
-            assertFalse(ReferenceGrammar.isApplication(text), text);
         }
     }
 

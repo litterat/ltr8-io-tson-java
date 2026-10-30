@@ -10,8 +10,9 @@ history lives in git.
   spelling, and an untagged root is a syntax error.
 - It `extends TsonDataParser` in the same package and calls its package-private methods rather than re-implementing
   Part 1's grammar.
-- `type-name = identifier`: every declared name, type parameter, referenced name and `!` head is matched against
-  `IdentifierProfile`; field names are the one naming position the parser leaves alone.
+- `type-name = identifier`: every declared name, type parameter and `!` head is matched against
+  `IdentifierProfile`; a type reference's head is a `qualified-name`, each segment so matched, with an argument
+  list's `<` adjacent to it (§12.3). Field names are the one naming position the parser leaves alone.
 - `SchemaMap.declarations` is a `LinkedHashMap` and a duplicate name overwrites — the grammar layer doesn't dedupe.
 - No production of the schema grammar takes the full `data-value`: `instance` takes a `core-value`, `atom-refinement` a
   braced `record-def`.
@@ -61,6 +62,13 @@ materialization, no validation (those are the resolver's/linker's jobs).
     offending token, per declaration like every other schema syntax error.
   - An unquoted non-numeric type-argument always parses as a type reference, never a value literal — a
     deliberate grammar-layer deferral, classified at a later semantic layer.
+- **A type reference's head is a `qualified-name`** (`parseTypeRefHead`, `requireQualifiedName`): `geo.address` and
+  `geo.address<T>` parse, each `.`-separated segment an identifier. Resolving one, the walk into a `!schema` map, is
+  this library's gap, refused by `SchemaDesugarer.unqualified` as `UnsupportedOperationException` (`NOT_IMPLEMENTED`).
+  **The `<` is adjacent to the head** (§12.3), as the data grammar's is ([TSON-DATA] §7.5): `box <text>` is a parse
+  error naming the rule; inside the list whitespace and commas are free. The schema grammar keeps a parser of its own
+  for references rather than the data stream's, because its `type-arg` admits sugar (`box<[text]>`,
+  `box<(text | int32)>`), which a data argument never holds.
 - **A parameter may write a type after its name** (`type-param = param-name [ws ":" ws type-ref]`), on every
   type-def form alike. `parseTypeParamsOpt` still returns the names the type-def records; a written type goes to
   the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution
@@ -76,11 +84,12 @@ materialization, no validation (those are the resolver's/linker's jobs).
     to constrain it and a collection payload is as ordinary as a scalar one: `<T> !choice { variants:
     [T error] }` parses and resolves, which is §5.10's "collection-valued slots are parameterizable". The
     kernel declares no `template_argument` or `instance_template` for a quotation to need.
-  - **What it cannot spell is an application**, and neither can a closed instance: `!array { element_type:
-    box<text> }` is not a `core-value`, in either form. That line falls where the grammars already divide --
-    a *type* position is schema grammar and takes `box<text>` directly, while `!C value` takes data, so an
-    application inside one is written as its quoted reference (`element_type: "box<text>"`), which is what the
-    sugar expands to anyway.
+  - **An application is data too**: `!array { element_type: box<text> }` is a `core-value`, the reference
+    production being [TSON-DATA] §7.4's (SPEC-FEEDBACK.md #12), and it is what the sugar `[box<text>]` expands
+    to. What a payload cannot spell is sugar: `[text]` in a payload is a data array, never the array type, so a
+    sugar argument there is named by the entry that declares it. That line falls where the
+    grammars divide — a *type* position is schema grammar and takes the sugar forms, while `!C value` takes
+    data.
   - A parameterized **atom refinement** is no form at all: §12.1 gives `atom-refinement` no parameter
     list, a refinement of an atom instance having no parameter to take, and the parser says so where the
     `^` is read.

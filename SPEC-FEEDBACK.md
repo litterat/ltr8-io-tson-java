@@ -599,80 +599,94 @@ atom & { … }`) and a record type's values are records.
 remaining difference would have to be in what the slot does with the name. A type's name is one segment and a value's
 a qualified name; one grammar for both waits on qualified names at type positions.
 
-## 12. [TSON-SCHEMA] §4.2, §5.10, §8.1, §8.2, §12.1 — an application is a reference value
+## 12. [TSON-SCHEMA] §4.2, §5.10, §8.1, §8.2 — an application is a reference value
 
 **Problem.** A type is named in two value forms. A bare name is a value of the `reference` atom (#11); an application
 still open in resolved output, an alias's target, a record template's parents, the `application` annotation, is the
 §8.1 record `type_ref { name  arguments?: [type_argument] }`, with `type_argument { ( name: type_ref | value: value ) }`.
 The record exists only so a value argument has somewhere to sit, and that somewhere is the kernel's last `value`-typed
 slot outside facets and defaults. It also says nothing the token does not: §12.1 already reads an argument by its
-token, a number or quoted token as a value and anything else as a reference, and leaves the head's parameters to
-judge which it binds.
+token and leaves the head's parameters to judge which it binds.
 
 **What is running.**
 
-- **One grammar, one value.** A reference is segments joined by `.`, optionally followed by `<` arguments `>`; an
-  argument is a reference or a token (a number or a quoted token), positional against the head's parameters, and
-  separated as §12.1's `type-args` are. The `reference` atom's values are this grammar, read by one parser
-  (`ReferenceGrammar`) into the same parsed form the schema grammar's type positions produce; those keep their own
-  parser, since a type position also admits the sugar forms a reference never holds.
-- **`type_ref` and `type_argument` are gone.** `alias.target`, `type_chain.parents` and the `application` annotation
-  are typed `type_kind`. The kernel holds 74 entries (67 declarations).
-- **Canonical text, quoted in data.** No whitespace, one space between arguments: `result<T>`, `map<text integer>`,
-  `maxint<10>`. `<` is reserved in data ([TSON-DATA] §7.1), so a reference carrying arguments is written as one quoted
-  token wherever it stands in data: `@application:"response<order 201>"`, `chain: { parents: ["result<T>"] }`, an
-  open alias's held text `!alias { target: "pair<uuid B>" }`, and a value document's `t: "set<text>"`. A reference
-  without arguments stays one unquoted token. A quoted token that does not parse as a reference with arguments is
-  text, and one that opens an argument list it never closes is refused with the grammar's reason. Part 1 is
-  unchanged.
-- **Identity is the parsed form.** Whitespace inside an argument list is free: `"box< text >"` at an element type and
+- **One value.** The `reference` atom's values are the reference #13 makes data grammar: a qualified name with an
+  optional argument list, `geo.address<T>`, each argument a reference or a token. `type_ref` and `type_argument` are
+  gone; `alias.target`, `type_chain.parents` and the `application` annotation are typed `type_kind`. The kernel
+  holds 74 entries (67 declarations).
+- **Written unquoted, canonically.** Resolved output and held text write an open application as source does, one
+  space between arguments and no comma: `!alias { target: pair<uuid B> }`, `chain: { parents: [result<T>] }`.
+- **The value is an object, in every mode.** A reference read at a reference-typed position, in a tree read and a
+  bound one alike, is one object: its qualified name's segments, its arguments (each a nested reference or a value
+  token), its canonical text, and its referent, the value of the entry it names in the closure it was read under,
+  each nested argument resolving to its own. A schemaless read keeps an application as a structured value with no
+  referent (#13).
+- **Identity is the parsed form.** Whitespace inside an argument list is free: `box< text, >` at an element type and
   `box<text>` at a type position close to one entry. An argument's channel is no part of the reference: `names<red>`
   is one application whether `red` was read as a reference or filed as a value at its parameter.
 - **Arguments are typed where they land.** A type argument is judged against the parameter's `bound`; a value
   argument is a token of the parameter's type, substituted into the body, which is read as the constructor's
   instance (`maxint<10>` closes to `!integer_type { max: 10 }`). The linker judges as type names only the arguments
   at the head's type parameters.
-- **A closed application still lifts and is named bare** (§5.3); arguments survive only where an application is open.
-- **In a held body** an application is the quoted token, and substitution rewrites a parameter named among its
-  arguments. The cost: a quoted text literal in a held body that is itself a well-formed application is read as one.
-- **In a value body** an application at a kind-typed slot is refused, as the braced record was, and the alias
-  spelling named: nothing lifts or mints there.
-- **In a data document** a kind-typed slot may name an applied type, `t: "set<text>"`, judged through the entry it
-  denotes: the one the closure records it as (`names => set<text>`, an instantiation entry). An application the
-  closure records no entry for is this library's gap (`NOT_IMPLEMENTED`): an expansion nothing declares is named
-  by its content, which a data read does not compute.
+- **Nested applications close innermost first** (§5.3), and a closed one is named bare where it stands. The
+  instantiation entry's `@application` states the application as written, its nested arguments unreduced, each bare
+  name argument past its alias chain and a value argument a token: `@application:pair<box<text> int32>`, where the
+  inner `box<text>` closed to `inner` and `inner` states `@application:box<text>`. An application nothing declares
+  is its expansion and still states no `@application`.
+- **In a value body** an application at a kind-typed slot is refused and the alias spelling named: nothing lifts or
+  mints there.
+- **In a data document** a kind-typed slot may name an applied type, `t: set<text>`, resolved bottom-up, level by
+  level, by structural identity against every application the closure closed, an expansion's among them (the
+  resolver keeps them beside the entries; resolved output does not carry them). A schema loads only when every
+  application in it closes, so data never creates one: an application nothing in the closure closed names no type
+  the schema closes and is refused, as a name no member is.
+- **A message names a minted entry by its application**, as written: `'b<10>': '5' is less than the minimum 10`, and
+  a kind's refusal lists `kind<uuid_type>` where it would have listed the entry minted for it.
 - `value_type` stays: meta.tn's facets and `record_field.value` still use `value`.
 
 **Resolution, a proposal.**
 
-- §4.2: the `reference` atom's values are the reference grammar above, with its canonical text; a value carrying
-  arguments is an application and stands where one is still open.
+- §4.2: the `reference` atom's values are #13's reference, compared as their parsed form; a value carrying
+  arguments is an application, stands where one is still open, and in data names the entry the schema closed it to.
 - §8.1: `type_ref` and `type_argument` go from the kernel table; `alias.target`, `type_chain.parents` and
-  `application` are typed `type_kind`; resolved output writes an open application as its quoted canonical text.
+  `application` are typed `type_kind`; `@application` states the application as written, nested arguments
+  unreduced.
 - §8.2: identity compares a reference's parsed form, its head, and its arguments as references or tokens, never the
-  text or the channel a processor filed an argument in.
-- §5.10 and §12.1: an argument is a reference or a token by the grammar, and typed by the head's parameter; a
-  parameter standing in an argument is its name, in held text as in a record template.
-- §4.2: a kind-typed slot in data may hold an application, quoted, resolving to the entry it denotes by structural
-  identity.
+  text or the channel a processor filed an argument in; a nested argument is compared as the entry it closed to.
+- §5.10: an argument is a reference or a token by the grammar, and typed by the head's parameter; a parameter
+  standing in an argument is its name, in held text as in a record template.
 
-**Open.** How a data read finds the entry an application nothing declares denotes: by expanding it against the
-closure, which needs the resolver at read time, or by the resolver recording every application it closes beside the
-entries, which resolved output does not carry.
+**Open.** Whether an expansion, an application nothing declares, should state its `@application` too, so that every
+entry an application closed to names the reference that closed it in resolved output; today the resolver keeps that
+in memory only. An expansion is keyed on its content, so two applications closing to one record (`box<int32>` and
+`crate<int32>`) would give one entry two applications.
 
 ## 13. [TSON-DATA] §4, §7.2.5, §7.4, §7.5, §7.7; [TSON-SCHEMA] §8.1, §12.1, §12.3 — a reference in data is grammar
 
-**Problem.** #12 writes a reference that carries arguments as one quoted token wherever it stands in data
-(`target: "result<T>"`), because `<` and `>` are reserved there (§7.2.5). A quoted token is then text or a reference
-by its shape, so a held body's text literal that parses as an application is read as one. The production a data value
+**Problem.** A reference that carries arguments (#12) has no spelling in data: `<` and `>` are reserved there
+(§7.2.5), so `target: result<T>` is a parse error, and the one spelling left, a quoted token (`"result<T>"`), makes a
+quoted token text or a reference by its shape, so a held body's text literal that parses as an application would be
+read as one. The production a data value
 needs already exists: [TSON-SCHEMA] §12.1's `type-ref` has `type-name "<" type-args ">"`. Under one level a `!T { … }`
 body is data read against `T` — a value entry, a constructor body, a resolved form, the schema document itself — so
 whatever can stand in one is data grammar. The line between the two grammars is values against sugar: [TSON-DATA] is
 every value, a reference with its arguments included, and [TSON-SCHEMA]'s grammar is the sugar at type positions that
 desugars into values (`{ a: text }`, `[T]`, `{K => V}`, `(A | B)`, `^`, `&`, `-`, `~`, `=`, `?`).
 
-**What is running.** Nothing yet; #12's quoted spelling runs. This entry is the grammar proposed to replace it, for
-agreement before it is built.
+**What is running.** The grammar below, in both encodings.
+
+- The stream assembles a reference into one event, delivered as one value; a quoted token is never a reference, so a
+  held body's `pattern: "box<T>"` is text and a quoted application at a reference-typed position is a type mismatch.
+  `<` with whitespace before it, after a quoted token, or after a token that is no qualified name is a parse error,
+  as is an unclosed list.
+- A schemaless read keeps an application as a structured value: the qualified name's segments and the arguments,
+  each read as a schemaless read reads a token, a nested application another such value, with its text recreated
+  and no referent, there being no closure to resolve in. A Class 1 processor no longer refuses one.
+- A qualified head parses at every position, data and schema; resolving one at a type position is this
+  implementation's gap until qualified names at type positions land (`NOT_IMPLEMENTED`).
+- The schema grammar keeps its own production, whose `type-arg` admits sugar, and produces the same tree; it applies
+  the adjacency rule and admits a qualified head.
+- JSON carries a reference as a string holding the same text, read by the same production.
 
 **Resolution, a proposal.** Grammar only.
 
@@ -711,8 +725,8 @@ qualified-name = unquoted-token
 - **No sugar in data.** `[T]`, `{K => V}` and `(A | B)` are [TSON-SCHEMA]'s, and `[` and `{` are structure in data, so
   a data argument is a reference or a token. An applied sugar form is named by the entry that declares it.
 
-[TSON-DATA] §7.5: one row, `<` (reference arguments) MUST be adjacent to the preceding unquoted token; whitespace inside the
-argument list is free. `>>` is two tokens.
+[TSON-DATA] §7.5: one row, `<` (reference arguments) MUST be adjacent to the preceding unquoted token; whitespace
+inside the argument list is free. `>>` is two tokens.
 
 [TSON-DATA] §4: a schemaless read keeps a reference with arguments as a structured value, its head and arguments,
 resolving nothing; a Class 1 processor no longer refuses one.
@@ -722,12 +736,13 @@ resolving nothing; a Class 1 processor no longer refuses one.
 in `supertype-ref` and in `map-key`. §12.3 gains the adjacency row for `<`.
 
 [TSON-SCHEMA] §8.1: an open application in resolved output is written as it is in source, unquoted:
-`!alias { target: result<T> }`, `@application: response<order 201>`, `parents: [result<T>]`. Identity is the parsed
+`!alias { target: result<T> }`, `@application:response<order 201>`, `parents: [result<T>]`. Identity is the parsed
 tree (§8.2), so whitespace inside the list is free; canonical output has one space between arguments and no comma.
 
 [TSON-JSON]: a JSON string holding the same text, read by the same production; JSON has no unquoted form.
 
 **Open.**
 - Resolving a qualified head (`geo.address<T>` walking `geo`'s `!schema` map) lands with qualified names at type
-  positions and qualified tags (one-level step 6c); the grammar admits it here.
+  positions and qualified tags (one-level step 6c); the grammar admits it here, and the value object keeps its
+  segments.
 - Whether a value argument may be any token, or only those §12.1's `value-literal` admits.

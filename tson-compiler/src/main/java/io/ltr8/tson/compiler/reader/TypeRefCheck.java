@@ -132,6 +132,7 @@ final class TypeRefCheck {
             case ArrayStart ignored -> "an array";
             case EmptyBraceEvent ignored -> "{}";
             case VoidEvent ignored -> "the void sentinel '_'";
+            case ReferenceEvent reference -> "the reference " + reference.reference().text();
             default -> String.valueOf(core);
         };
     }

@@ -539,7 +539,7 @@ final class DefinitionResolver {
 
     /**
      * A container sugar form that reached resolution. {@link SchemaDesugarer} lifts every one -- closed or open, at
-     * any depth, an element that is itself an application included (written as its quoted reference and
+     * any depth, an element that is itself an application included (written as its reference and
      * rewritten to its entry at materialisation) -- to an entry before this resolver runs, so no schema an author
      * writes can produce one here: it is a caller resolving raw AST without that phase, an invariant of the pipeline
      * rather than a gap in it.
@@ -1947,7 +1947,7 @@ final class DefinitionResolver {
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArg arg : application.args()) {
             // An argument that is itself an application needs no special case: substitution writes a bound
-            // reference as its canonical text when it carries arguments, so `box<inner<T>>` keeps `inner<T>`
+            // reference as a reference value when it carries arguments, so `box<inner<T>>` keeps `inner<T>`
             // whole and the absorbing declaration's own materialisation closes it.
             arguments.add(typeArgument(arg));
         }
@@ -2471,8 +2471,12 @@ final class DefinitionResolver {
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeRef ref) {
         return switch (ref) {
-            case SimpleRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
+            case SimpleRef simple -> {
+                SchemaDesugarer.unqualified(simple.name());
+                yield io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
+            }
             case GenericRef generic -> {
+                SchemaDesugarer.unqualified(generic.name());
                 List<TypeArgument> args = new ArrayList<>();
                 for (TypeArg arg : generic.args()) {
                     args.add(typeArgument(arg));
