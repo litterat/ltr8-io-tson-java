@@ -64,11 +64,12 @@ import java.util.Optional;
  * bind-anchored regardless of read mode, and {@link #resolve} takes no mode. Only the final compile of an
  * already-resolved, already-linked schema (a registry's own {@code compile}/{@code get}) picks a mode.
  *
- * <p><b>What that fixes is the mode, not the vocabulary.</b> The resolution core's own binder knows the
- * kernel's names; a governing meta of a consumer's own may declare vocabulary beyond them (a record {@code
- * operation => { ... }} held in a namespace type, {@code api => namespace & { ... }}), and {@link
- * ProcessorConfig#metaNameBinder} adds the classes its values bind to --
- * composed over the library's binder, so the mode and every kernel name stand.
+ * <p><b>One binding serves schemas and data.</b> The core resolves through the same context the object readers bind
+ * with, {@link #dataBindContext()}: the configured context with the kernel's vocabulary composed under its binder and
+ * asked first ({@code SchemaMetaNameBinder.over}), so every kernel name binds to the schema model whatever the
+ * consumer's binder says, and a schema's value entries ({@code create_order => !operation { ... }}) bind to the
+ * consumer's classes as its data does. A value entry no class binds is held as a tree: the schema loads and
+ * validates, and {@link #bindRegistry()} refuses it with {@code BIND_MISMATCH} at the entry.
  *
  * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link SchemaSource#registeredOnly()}
  * is the default source, so a schema governed by or importing anything else has to be registered first, or
@@ -126,17 +127,13 @@ public final class Tson {
         // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
         // bundled meta-kernel/meta/core, and the access's source is consulted only for other URIs. It
         // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
-        // can't resolve the !enum/!integer instances a meta-schema declares), which is why it takes the
-        // bind context rather than a resolver that might be the wrong mode. The *mode* is what is fixed
-        // here; which names that binder knows is metaNameBinder's to extend. Tson builds the per-mode read
-        // registries (DOM and object-binding, the latter bound to dataBindContext) over this one core.
-        DataBindContext schemaContext = config.metaNameBinder() == null
-                ? SchemaMetaNameBinder.defaultContext()
-                : SchemaMetaNameBinder.contextExtendedWith(config.metaNameBinder());
+        // can't resolve the !enum/!integer instances a meta-schema declares). One context serves the core
+        // and the object readers: the configured one, the kernel's names composed under its binder.
+        DataBindContext context = SchemaMetaNameBinder.over(config.dataBindContext());
         SchemaSource source = config.schemaAccess().source();
         TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
-                schemaContext, source, config.processorPolicy().identifierPolicy());
-        return new Tson(core, config.dataBindContext(), config.processorPolicy());
+                context, source, config.processorPolicy().identifierPolicy());
+        return new Tson(core, context, config.processorPolicy());
     }
 
     /**

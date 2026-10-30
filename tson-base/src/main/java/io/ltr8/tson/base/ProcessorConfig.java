@@ -1,7 +1,6 @@
 package io.ltr8.tson.base;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.policy.*;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -25,12 +24,11 @@ import java.util.Objects;
  *   <li>{@link #withDataBindContext} -- which <b>Java classes</b> the schema's types bind to.</li>
  * </ul>
  *
- * <p>{@link #withMetaNameBinder} is a fourth setting but not a fourth question: it is one seam into a
- * context the consumer never holds. {@code withDataBindContext} binds the <em>data</em> a schema describes
- * ({@code order} -> {@code Order}); this adds names to the binding of a governing meta's own
- * <em>vocabulary</em> ({@code operation} -> {@code Operation}), which the library otherwise builds itself.
- * One name means different things on the two sides, so one namespace holding both would collide the first
- * time a schema type and a meta-layer constructor shared a name.
+ * <p><b>One binding serves schemas and data.</b> The context binds a data document's values ({@code order} ->
+ * {@code Order}) and a schema's value entries ({@code create_order => !operation { ... }}, {@code operation} ->
+ * {@code Operation}) alike: within one closure a name means one thing, so one binder is coherent. The kernel's own
+ * vocabulary ({@code record}, {@code integer_type}, ...) always binds to {@code io.ltr8.tson.schema.meta}, composed
+ * under the context's binder by {@code Tson.of}, so a consumer's binder cannot rebind it.
  *
  * <p><b>It lives here, and construction does not.</b> A configuration is a value: it names what a
  * deployment chose and knows nothing about how a processor is assembled from it. Building one names the
@@ -46,18 +44,16 @@ public final class ProcessorConfig {
 
     private final DataBindContext dataBindContext;
     private final SchemaAccess schemaAccess;
-    private final DataNameBinder metaNameBinder;
     private final ProcessorPolicy policy;
 
-    ProcessorConfig(DataBindContext dataBindContext, SchemaAccess schemaAccess, ProcessorPolicy policy, DataNameBinder metaNameBinder) {
+    ProcessorConfig(DataBindContext dataBindContext, SchemaAccess schemaAccess, ProcessorPolicy policy) {
         this.dataBindContext = dataBindContext;
         this.schemaAccess = schemaAccess;
         this.policy = policy;
-        this.metaNameBinder = metaNameBinder;
     }
 
     public static ProcessorConfig defaults() {
-        return new ProcessorConfig( AtomContext.defaultContext(), SchemaAccess.registeredOnly(), ProcessorPolicy.defaults(), null);
+        return new ProcessorConfig( AtomContext.defaultContext(), SchemaAccess.registeredOnly(), ProcessorPolicy.defaults());
     }
 
     public SchemaAccess schemaAccess() {
@@ -66,10 +62,6 @@ public final class ProcessorConfig {
 
     public DataBindContext dataBindContext() {
         return dataBindContext;
-    }
-
-    public DataNameBinder metaNameBinder() {
-        return metaNameBinder;
     }
 
     public ProcessorPolicy processorPolicy() {
@@ -98,7 +90,7 @@ public final class ProcessorConfig {
      * nothing, the loader applies the other and reads no documents.
      */
     public ProcessorConfig withSchemaAccess(SchemaAccess schemaAccess) {
-        return new ProcessorConfig(this.dataBindContext, Objects.requireNonNull(schemaAccess, "schemaAccess"), this.policy, this.metaNameBinder);
+        return new ProcessorConfig(this.dataBindContext, Objects.requireNonNull(schemaAccess, "schemaAccess"), this.policy);
     }
 
     /**
@@ -110,7 +102,7 @@ public final class ProcessorConfig {
      *
      * <pre>{@code
      * DataBindContext.builder()
-     *         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class)).orElse(kernelVocabulary))
+     *         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class)))
      *         .registerAtoms(AtomContext.hostTypes())
      *         .build()
      * }</pre>
@@ -120,30 +112,14 @@ public final class ProcessorConfig {
      * {@code build()}. What stays concurrent is the descriptor cache, where two threads resolving one class
      * both do the work and one answer wins -- duplicated work on a race, never duplicated state.
      *
-     * <p>Unrelated to (and never overriding) the object-binding-mode context construction always uses
-     * internally to resolve the standard library itself -- see {@code Tson}'s own Javadoc for why that one's
-     * mode is fixed, and {@link #metaNameBinder} for the one thing about it a consumer may extend.
+     * <p><b>The same binding resolves schemas.</b> A schema's value entries bind through it, and a value entry
+     * whose type it binds no class for is held as a tree, which loads and validates but is refused by a schema
+     * obtained to bind. {@code Tson.of} composes the kernel's own vocabulary under this context's binder, asked
+     * first, so {@code record}, {@code enum} and the rest bind to the schema model whatever this binder says.
      */
     public ProcessorConfig withDataBindContext(DataBindContext dataBindContext) {
-        return new ProcessorConfig(Objects.requireNonNull(dataBindContext, "dataBindContext"), this.schemaAccess, this.policy, this.metaNameBinder);
-    }
-
-    /**
-     * The names a consumer's own <b>meta layer</b> adds -- consulted when resolving a schema whose governing
-     * meta declares vocabulary of its own, so that each value of {@code api => !operations { search => { ... } }}
-     * can bind to that consumer's own class for {@code operation}, found by name. Defaults to unset: the kernel's
-     * own vocabulary alone, which is every schema governed by the bundled meta.tn.
-     *
-     * <p><b>Composed over the library's own binder, never replacing it</b> ({@code SchemaMetaNameBinder.contextExtendedWith}): {@code record}/{@code enum}/{@code integer_type} and the
-     * rest resolve first, and this binder answers only for a name the kernel does not declare. So it adds
-     * names and gives up nothing -- in particular not the object-binding mode the standard library must be
-     * compiled in (see {@code Tson}), which construction fixes and this does not touch.
-     *
-     * <p>Distinct from {@link #dataBindContext}, which binds the <em>data</em> a schema describes; this
-     * binds the <em>schema vocabulary</em> a meta describes. A consumer with both supplies both.
-     */
-    public ProcessorConfig withMetaNameBinder(DataNameBinder metaNameBinder) {
-        return new ProcessorConfig(this.dataBindContext, this.schemaAccess, this.policy, Objects.requireNonNull(metaNameBinder, "metaNameBinder"));
+        return new ProcessorConfig(Objects.requireNonNull(dataBindContext, "dataBindContext"), this.schemaAccess,
+                this.policy);
     }
 
     /**
@@ -167,7 +143,7 @@ public final class ProcessorConfig {
      * the instance that holds it.
      */
     public ProcessorConfig withProcessorPolicy(ProcessorPolicy policy) {
-        return new ProcessorConfig(this.dataBindContext, this.schemaAccess, Objects.requireNonNull(policy, "policy"), this.metaNameBinder);
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess, Objects.requireNonNull(policy, "policy"));
     }
 
     /**
@@ -200,7 +176,8 @@ public final class ProcessorConfig {
      * says so.
      */
     public ProcessorConfig withIdentifierPolicy(IdentifierPolicy identifierPolicy) {
-        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,  policy.withIdentifierPolicy(Objects.requireNonNull(identifierPolicy, "identifierPolicy")), this.metaNameBinder);
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,
+                policy.withIdentifierPolicy(Objects.requireNonNull(identifierPolicy, "identifierPolicy")));
     }
 
     /**
@@ -242,7 +219,8 @@ public final class ProcessorConfig {
      * says so.
      */
     public ProcessorConfig withTokenPolicy(ScriptPolicy tokenPolicy) {
-        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,  policy.withTokenPolicy(Objects.requireNonNull(tokenPolicy, "tokenPolicy")), this.metaNameBinder);
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,
+                policy.withTokenPolicy(Objects.requireNonNull(tokenPolicy, "tokenPolicy")));
     }
 
     /**
@@ -263,7 +241,8 @@ public final class ProcessorConfig {
      * shows.
      */
     public ProcessorConfig withLimits(LimitsPolicy limits) {
-        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,  policy.withLimits(Objects.requireNonNull(limits, "limits")), this.metaNameBinder);
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,
+                policy.withLimits(Objects.requireNonNull(limits, "limits")));
     }
 
 }

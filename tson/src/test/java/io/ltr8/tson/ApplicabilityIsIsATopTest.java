@@ -141,20 +141,21 @@ class ApplicabilityIsIsATopTest {
     }
 
     /**
-     * A component of a type — record-bodied, empty chain — is refused where it is written. Without the check
-     * it fails anyway, on {@code Top} being sealed, but as a {@code ClassCastException} surfaced as {@code
-     * NOT_IMPLEMENTED}: a non-verdict code, and a message about JVM module loaders, for an author's mistake.
+     * A component of a type -- a record type IS-A no constructor -- is an ordinary type, and {@code !C { ... }} with
+     * {@code C} one of them is a value of it ([TSON-SCHEMA] §4.1), read against it: a body that is no value of it is
+     * refused as such, and one that is resolves to a value entry.
      */
     @Test
-    void aComponentOfATypeIsRefusedWhereItIsWritten() {
-        for (String component : List.of("record_field { name: x  type: text }", "type_ref { name: text }",
-                "field_group { members: [[g]] }", "integer_size { bits: 32  signed: true }")) {
+    void aComponentOfATypeBuildsAValueOfIt() {
+        for (String component : List.of("record_field { name: x  type: text }", "type_ref { label: text }",
+                "field_group { members: g }", "integer_size { bits: 32  sign: true }")) {
             List<Diagnostic> problems = problems("  bad => !" + component);
 
             assertEquals(1, problems.size(), problems::toString);
             assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
-            assertTrue(problems.getFirst().message().contains("not IS-A 'top'"), problems::toString);
+            assertTrue(problems.getFirst().message().contains("the body is no value of the type"), problems::toString);
         }
+        assertEquals(List.of(), problems("  good => !integer_size { bits: 32  signed: true }"));
     }
 
     /**
@@ -168,7 +169,7 @@ class ApplicabilityIsIsATopTest {
 
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("'!product' names an abstract entry"), problems::toString);
-        assertTrue(problems.getFirst().message().contains("(record | array | set_type | map | tuple)"),
+        assertTrue(problems.getFirst().message().contains("(namespace | record | array | set_type | map | tuple)"),
                 problems::toString);
         assertFalse(problems.getFirst().message().contains("constraint vocabulary"),
                 "one sentence, not the applicability clause beside the abstract one: " + problems);
@@ -180,7 +181,7 @@ class ApplicabilityIsIsATopTest {
         String message = problems("  bad => !top {}").getFirst().message();
 
         assertTrue(message.contains("record"), message);
-        for (String abstractKind : List.of("type", "atom", "product", "sum", "namespace", "template")) {
+        for (String abstractKind : List.of("type", "atom", "product", "sum", "template")) {
             assertFalse(message.matches("(?s).*[(| ]" + abstractKind + "[ |)].*"),
                     () -> abstractKind + " is no answer: " + message);
         }

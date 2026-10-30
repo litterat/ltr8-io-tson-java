@@ -56,7 +56,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
     private final DataClassMap descriptor;
 
     /**
-     * The namespace constructor a value read here is an instance of, where the map is a namespace type's: what a
+     * The namespace type a value read here is a value of, where the map is a namespace type's: what a
      * position whose host holds a {@link Namespace} wraps the map in ({@link BindTargets}). {@code null} for a
      * map that is no namespace.
      */

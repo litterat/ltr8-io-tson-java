@@ -47,7 +47,7 @@ Related: `design/constructor-application.md` (what `!C { … }` may apply and ho
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
 `design/template-materialisation.md` and `design/held-template-bodies.md` (§5.10 closing, applied-parent edges),
 `design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, reference hops, `@synthetic`, the
-meta-kernel bootstrap), `design/meta-layer-namespaces.md` (namespace-type payloads),
+meta-kernel bootstrap), `design/meta-layer-namespaces.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
 
 ## The two resolvers
@@ -152,13 +152,16 @@ base is no member of it, so `RecordExtension`'s pin checks and both encodings' m
 A resolved entry's `subtypes` is empty, minted or declared: linking computes it one phase later, which keeps two
 schemas closing one application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`).
 
-## Namespace-type payloads
+## Value entries
 
-`myapi => !api { … }`, with `api` IS-A the kernel's `namespace`, resolves to a `Namespace` value of kind `NAMESPACE`,
-`api` recorded as the constructor (`design/meta-layer-namespaces.md` has the read: `NamespaceInstanceReader`,
-`SchemaResolver.payloadNames`, `isValueBody`). The resolver's part: a payload that is no such map is refused
-against the entry as no value of the namespace type, with the read's path (`bindAtomInstance`), and
-`!namespace { … }` itself is refused as abstract (`refuseAbstractHead`).
+`name => !T { … }` with `T` no constructor (not IS-A `top`, `EntryKind.isConstructor`) is a value entry:
+`resolveInstance` hands it to `resolveValueEntry`, which reads the payload against `T` as a data value is read and
+returns a `ValueEntry(T, value)` of kind `VALUE`, `T` recorded as the entry's constructor fact for the tag
+(`design/meta-layer-namespaces.md` has the read, the binding and the tree fallback). The resolver's part: a head that
+is itself a value is refused (a value has no instances), a braced payload at an atom type is refused with the `^` it
+is missing, and a payload that is no value of `T` is refused against the entry with the read's path. A namespace type
+is the other side of the line: `api => !namespace { … }` applies the constructor `namespace` and builds a type, a
+`NamespaceBody`.
 
 ## Fields
 
@@ -186,7 +189,7 @@ cell for cell without the matrix existing in code. No rule compares a restated t
 §5.8), one path for refinement and composition. Concatenation, because [TSON-DATA] §3.1 makes an annotation name
 repeatable — "the inherited `@doc`" names nothing when two were written. Restatement first, because
 `Annotations.get`/`value` take the first occurrence, so the nearer declaration wins at every lookup. No annotation
-the meta layer declares changes how a value reads, so the ordering is pinned over resolved output
+the kernel or meta.tn declares changes how a value reads, so the ordering is pinned over resolved output
 (`RestatedFieldAnnotationsTest`).
 
 ## Field groups
@@ -264,7 +267,7 @@ the report, located at the value it could not read (`TsonCli.exitCodeFor` lifts 
 One Java type per kernel record or enum; `Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as
 Java subtyping, and an entry's kind is `EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record
 carries `TypeChain chain` as its first component, mirroring the constructor's flattened shape (`type`'s field first);
-`Reference`, `TemplateBody` and `Namespace` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), the
+`Reference`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), the
 kernel's labelled choice, because a record of two `Optional`s would not say that exactly one is present.
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the
 model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtures are listed in

@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -106,6 +106,7 @@ final class TypeInhabitance {
             case MapBody map -> isEmptyAllowed(map.minItems())
                     || (refInhabited(map.keyType(), namespace, inhabited)
                             && refInhabited(map.valueType(), namespace, inhabited));
+            case io.ltr8.tson.schema.meta.NamespaceBody ignored -> true; // the empty map is a value of it
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .allMatch(element -> positionInhabited(element, namespace, inhabited));
             // A sum needs one good variant, where a product needs all its parts -- the one place the walk
@@ -120,7 +121,7 @@ final class TypeInhabitance {
             case TemplateBody ignored -> true; // open, answered above
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
-            case Namespace<?> ignored -> true; // a value, which nothing is typed by
+            case ValueEntry ignored -> true; // a value, which nothing is typed by
         };
     }
 
@@ -290,6 +291,7 @@ final class TypeInhabitance {
                     ? null : array.elementType().name();
             case MapBody map -> refInhabited(map.valueType(), namespace, inhabited)
                     ? null : map.valueType().name();
+            case io.ltr8.tson.schema.meta.NamespaceBody ignored -> null;
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
                     .map(element -> element.elementType().name()).findFirst().orElse(null);
@@ -299,7 +301,7 @@ final class TypeInhabitance {
             case Sum ignored -> null;
             case Atom ignored -> null;
             case TemplateBody ignored -> null;
-            case Namespace<?> ignored -> null;
+            case ValueEntry ignored -> null;
         };
     }
 }

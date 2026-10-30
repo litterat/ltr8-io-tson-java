@@ -6,12 +6,14 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.schema.meta.DeclaredType;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * meta.tn's {@code declared_type} constructor, whose instance is core's {@code declared}: the open sum over the
+ * The kernel's {@code declared_type} constructor, whose instance is its {@code declared}: the open sum over the
  * governing closure, where the value names its own type by its tag and is read in full against it ([TSON-SCHEMA]
  * §7.8).
  *
@@ -22,7 +24,11 @@ import java.util.Set;
  * <p><b>Fixed at compile time.</b> A {@code declared} entry belongs to exactly one schema, so "the governing
  * closure" is that schema's -- its own declarations and its imports -- known when this is built and resolved
  * through the same {@link TsonTypeReaderResolver} every other dispatch uses. The selected type's reader builds
- * the value, so every mode hands back what it built.
+ * the value, so every mode hands back what it built; in bind mode a value of a namespace type is delivered as the
+ * {@code Namespace} it is ({@link NamespaceInstanceReader}), as at every position whose tag names its type.
+ *
+ * <p>The kernel's {@code schema} map holds its entries at {@code declared}: each entry's value names its type by its
+ * tag, a constructor for a type entry and an ordinary type for a value entry.
  */
 final class DeclaredReader implements TsonTypeReader<Object> {
 
@@ -31,17 +37,26 @@ final class DeclaredReader implements TsonTypeReader<Object> {
         if (!(definition instanceof DeclaredType)) {
             throw new IllegalArgumentException("'" + name + "' is not declared_type-shaped: " + definition);
         }
+        Set<String> namespaces = new HashSet<>();
+        context.schema().entries().forEach((entry, value) -> {
+            if (value instanceof NamespaceBody) {
+                namespaces.add(entry);
+            }
+        });
         return new DeclaredReader(context.displayName(name, definition), context.schema().entries().keySet(),
-                context.readers());
+                namespaces, context.readers());
     };
 
     private final String displayName;
     private final Set<String> closure;
+    private final Set<String> namespaces;
     private final TsonTypeReaderResolver readers;
 
-    private DeclaredReader(String displayName, Set<String> closure, TsonTypeReaderResolver readers) {
+    private DeclaredReader(String displayName, Set<String> closure, Set<String> namespaces,
+                           TsonTypeReaderResolver readers) {
         this.displayName = displayName;
         this.closure = closure;
+        this.namespaces = Set.copyOf(namespaces);
         this.readers = readers;
     }
 
@@ -63,7 +78,8 @@ final class DeclaredReader implements TsonTypeReader<Object> {
                             + "' resolves a value's own type name there (§2.2.3)",
                     "a type declared by the governing schema", name);
         }
-        return readers.resolve(name).read(ctx);
+        Object read = readers.resolve(name).read(ctx);
+        return namespaces.contains(name) ? NamespaceInstanceReader.instance(name, read) : read;
     }
 
     /** Reports, discards the whole value (framing included -- nothing has consumed it), and yields nothing. */

@@ -90,12 +90,15 @@ final class ResolvedForm {
      * depth of a body -- as the type of a field, inside an argument list -- and normalising it in place would
      * mean rebuilding every body shape here.
      */
-    static String rendered(Top value) {
+    static String rendered(Object value) {
         // An open entry's body is text, and [TSON-SCHEMA] §5.10 compares the *parsed* form: one spelling is
         // required of the application, not of the whitespace around it. Both sides are reduced to their
         // parsed application here, so a held body compares like every other body and needs no side channel.
-        Top compared = value instanceof TemplateBody held ? parsedForComparison(held) : value;
-        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(compared))).replaceAll(HASH_PLACEHOLDER);
+        // A resolved form read as data holds each entry's value, and a value entry's is the value itself.
+        Object entry = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
+        Object compared = entry instanceof TemplateBody held ? parsedForComparison(held) : entry;
+        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(compared instanceof Top top ? canonical(top)
+                : compared)).replaceAll(HASH_PLACEHOLDER);
         return SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty");
     }
 
@@ -326,7 +329,7 @@ final class ResolvedForm {
      * resolved form's header is its source's ([TSON-SCHEMA] §8.1) -- and as a resolved form because this caller says
      * so: its root, tagged {@code !schema}, is read as a value of {@code schema}.
      */
-    static Map<String, Top> readResolved(Tson tson, String resolvedText) {
+    static Map<String, Object> readResolved(Tson tson, String resolvedText) {
         return readResolved(tson, resolvedText, io.ltr8.tson.compiler.TsonDocumentPeek.of(resolvedText).header().imports());
     }
 
@@ -336,9 +339,9 @@ final class ResolvedForm {
      * form is read under the pre-loaded kernel (§3.4).
      */
     @SuppressWarnings("unchecked")
-    static Map<String, Top> readResolved(Tson tson, String resolvedText, List<String> imports) {
+    static Map<String, Object> readResolved(Tson tson, String resolvedText, List<String> imports) {
         List<String> under = imports.isEmpty() ? List.of(TsonBundledSchemas.META_KERNEL_ID) : imports;
-        return (Map<String, Top>) tson.objectReader()
+        return (Map<String, Object>) tson.objectReader()
                 .withImports(under)
                 .readAs(resolvedText, "schema", Object.class);
     }

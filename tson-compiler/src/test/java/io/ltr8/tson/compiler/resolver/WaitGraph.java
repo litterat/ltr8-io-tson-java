@@ -50,17 +50,17 @@ import java.util.TreeSet;
  *
  * <p><b>Self-describing.</b> Every field, element and key type comes from the document's own declarations: a
  * type's form is read off its constructor's declaration ({@code record}, {@code array} and what composes it,
- * {@code map}, {@code tuple}, {@code choice}, anything composing {@code atom}), a record's fields off its flattened
- * {@code fields} map, a namespace's key and value types off the values its {@code key_type} and {@code value_type}
- * fields carry. Nothing compiled is consulted, which is what keeps a measurement of the kernel from assuming it.
+ * {@code map}, {@code namespace}, {@code tuple}, {@code choice}, {@code declared_type}, anything composing {@code
+ * atom}), a record's fields off its flattened {@code fields} map, a namespace type's key and value types off its own
+ * {@code key_type} and {@code value_type}. Nothing compiled is consulted, which is what keeps a measurement of the
+ * kernel from assuming it.
  *
  * <p><b>Where the rule as written is silent</b>, this implements: an entry's value is read against its head tag,
  * not against the enclosing schema's {@code value_type} (the document read waits on that, see
  * {@link #documentWaits()}); a schema-map key's annotations ({@code @synthetic}) belong to the schema map, so
  * they too are waits of the document read and not of the entry they mark; a bare token at a record position is
- * that record's shorthand for its one required field ({@code type_ref}'s {@code name}); a namespace's key and value
- * types are the values its {@code key_type} and {@code value_type} fields hold, read although those slots are
- * typed {@code value}.
+ * that record's shorthand for its one required field ({@code type_ref}'s {@code name}); a namespace type stating no
+ * {@code key_type} has its keys read by their spelling, as {@code text}, the host judging them later.
  */
 final class WaitGraph {
 
@@ -77,7 +77,7 @@ final class WaitGraph {
     record Overapproximation(String entry, String path, String type, List<String> variants) {
     }
 
-    private enum Form { RECORD, ABSTRACT, NAMESPACE, ARRAY, MAP, TUPLE, CHOICE, ATOM, TEMPLATE }
+    private enum Form { RECORD, ABSTRACT, NAMESPACE, ARRAY, MAP, TUPLE, CHOICE, DECLARED, ATOM, TEMPLATE }
 
     private record Shape(String terminal, DataValue declaration, Form form) {
     }
@@ -318,6 +318,8 @@ final class WaitGraph {
                     }
                 }
                 case CHOICE -> dispatch(core, type, tokens(field(shape.declaration(), "variants")), path);
+                // A tagged value is read against its tag (`read`), so what reaches here is untagged, and names no type.
+                case DECLARED -> problems.add(entry + ": an untagged value at the declared " + type + " (" + path + ")");
                 case ABSTRACT -> dispatch(core, type, subtypes(shape.declaration()), path);
                 case ATOM -> {
                     if (!(core instanceof TokenValue) && !(core instanceof VoidValue)) {
@@ -391,7 +393,7 @@ final class WaitGraph {
             case RECORD -> core instanceof RecordValue || core instanceof EmptyBrace;
             case NAMESPACE, MAP -> core instanceof MapValue || core instanceof EmptyBrace;
             case ARRAY, TUPLE -> core instanceof ArrayValue;
-            case CHOICE, ABSTRACT -> true;
+            case CHOICE, ABSTRACT, DECLARED -> true;
             case TEMPLATE -> false;
         };
     }
@@ -416,9 +418,7 @@ final class WaitGraph {
         Set<String> constructorSupertypes = new HashSet<>(supertypes(declarations.get(constructor)));
         Form form;
         if (constructor.equals("record")) {
-            if (supertypes(declaration).contains("namespace")) {
-                form = Form.NAMESPACE;
-            } else if ("ABSTRACT".equals(token(field(declaration, "extension")))) {
+            if ("ABSTRACT".equals(token(field(declaration, "extension")))) {
                 form = Form.ABSTRACT;
             } else {
                 form = Form.RECORD;
@@ -427,6 +427,10 @@ final class WaitGraph {
             form = Form.ARRAY;
         } else if (constructor.equals("map")) {
             form = Form.MAP;
+        } else if (constructor.equals("namespace")) {
+            form = Form.NAMESPACE;
+        } else if (constructor.equals("declared_type")) {
+            form = Form.DECLARED;
         } else if (constructor.equals("tuple")) {
             form = Form.TUPLE;
         } else if (constructor.equals("choice")) {
@@ -459,10 +463,15 @@ final class WaitGraph {
         return null;
     }
 
-    /** A namespace's key or value type: the value its {@code key_type} or {@code value_type} field carries. */
+    /**
+     * A namespace type's key or value type, as its declaration states it; a key type it leaves to the host is read
+     * by spelling, as {@code text}.
+     */
     private Optional<String> namespaceType(Shape shape, String slot, Read read, String path) {
-        DataValue declared = recordFields(shape.declaration()).get(slot);
-        String type = declared == null ? null : token(field(declared, "value"));
+        String type = token(field(shape.declaration(), slot));
+        if (type == null && slot.equals("key_type")) {
+            return Optional.of("text");
+        }
         if (type == null) {
             problems.add(read.entry + ": namespace " + shape.terminal() + " carries no " + slot + " (" + path + ")");
         }

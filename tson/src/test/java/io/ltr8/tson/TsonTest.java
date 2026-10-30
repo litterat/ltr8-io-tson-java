@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import java.math.BigInteger;
+import java.util.Map;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -123,12 +124,60 @@ class TsonTest {
         assertTrue(meta.schema().entries().containsKey("text_type"));
     }
 
+    /**
+     * The configured context is the one schemas and data bind through, with the kernel's vocabulary composed under
+     * its binder and asked first: the consumer's names bind, and a consumer naming a kernel type rebinds nothing.
+     */
     @Test
-    void objectReaderAndWriterAreBoundToTheConfiguredDataBindContext() {
-        DataBindContext context = DataBindContext.builder().build();
+    void theConfiguredContextBindsAndTheKernelsNamesAreFixed() throws Exception {
+        DataBindContext context = DataBindContext.builder()
+                .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(Map.of("point", Point.class, "record", Point.class)))
+                .build();
         Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(context));
 
-        assertSame(context, tson.dataBindContext());
+        assertEquals(Point.class, tson.dataBindContext().nameBinder().resolve("point"));
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, tson.dataBindContext().nameBinder().resolve("record"),
+                "the kernel's name binds to the schema model whatever the consumer's binder says");
+        assertTrue(tson.loader().loadMeta(TsonBundledSchemas.META_ID).schema().entries().containsKey("text_type"),
+                "and the standard library resolves through the same context");
+    }
+
+    /**
+     * Only a name the kernel or meta.tn declares is fixed. {@code token} and {@code entry_kind} mangle to classes of
+     * the schema model ({@code Token}, {@code EntryKind}) and are entries of no bundled schema, so a consumer's schema
+     * declaring them binds them through the consumer's binder like any other name it declares.
+     */
+    @Test
+    void aNameNoLibrarySchemaDeclaresBindsThroughTheConsumer() throws Exception {
+        String schema = """
+                !!id:"https://example.test/tokens.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
+                  token => { text: text }
+                  entry_kind => { label: text }
+                }
+                """;
+        DataBindContext context = DataBindContext.builder()
+                .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(Map.of(
+                        "token", Token.class, "entry_kind", EntryKind.class, "record", Point.class)))
+                .build();
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(io.ltr8.tson.base.source.SchemaAccess.of(uri -> schema))
+                .withDataBindContext(context));
+        io.ltr8.bind.DataNameBinder binder = tson.dataBindContext().nameBinder();
+
+        assertEquals(Token.class, binder.resolve("token"));
+        assertEquals(EntryKind.class, binder.resolve("entry_kind"));
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("record"),
+                "a name the kernel declares still binds to the schema model");
+
+        assertEquals(new Token("a"), tson.objectReader().read("""
+                !!import:"https://example.test/tokens.tn"
+                !token { text: "a" }""", Token.class));
+        assertEquals(new EntryKind("b"), tson.objectReader().read("""
+                !!import:"https://example.test/tokens.tn"
+                !entry_kind { label: "b" }""", EntryKind.class));
     }
 
     @Test
@@ -147,5 +196,13 @@ class TsonTest {
      * constructors, as {@code tson-cli}'s {@code CliDiagnostic} also notes.
      */
     public record Point(int x, int y) {
+    }
+
+    /** A consumer's {@code token}, named as a class of the schema model is. */
+    public record Token(String text) {
+    }
+
+    /** A consumer's {@code entry_kind}, named as a class of the schema model is. */
+    public record EntryKind(String label) {
     }
 }

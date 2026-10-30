@@ -228,51 +228,50 @@ class KindMembersTest {
     }
 
     /**
-     * A namespace constructor is a type, its instances being values: the kernel's {@code type_kind} holds {@code
-     * namespace}, {@code field_map} and {@code schema}, and no constructor IS-A {@code type}, whose instances are
-     * types.
+     * A namespace type is a type built with {@code namespace}: the kernel's {@code type_kind} holds {@code field_map}
+     * and {@code schema}, and no constructor, {@code namespace} among them, whose instances are types.
      */
     @Test
-    void typeKindHoldsTheNamespaceConstructorsAndNoTypeConstructor() {
+    void typeKindHoldsTheNamespaceTypesAndNoConstructor() {
         TsonLinkedSchema kernel = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
                 uri -> {
                     throw new IllegalStateException("unexpected fetch: " + uri);
                 }).resolveLinked(TsonBundledSchemas.META_KERNEL_ID);
         List<String> members = kind(kernel, "type_kind").members().orElseThrow();
 
-        assertTrue(members.containsAll(List.of("field_map", "namespace", "schema")), members::toString);
-        assertFalse(members.contains("set_type") || members.contains("record") || members.contains("reference"),
-                members::toString);
+        assertTrue(members.containsAll(List.of("field_map", "schema", "declared")), members::toString);
+        assertFalse(members.contains("set_type") || members.contains("record") || members.contains("reference")
+                || members.contains("namespace"), members::toString);
     }
 
-    /** {@code kind<namespace>} is a kind: it holds the kernel's namespace constructors and a meta layer's own. */
+    /** {@code kind<namespace>} is a kind: it holds the kernel's namespace types and a schema's own. */
     @Test
-    void aKindOfNamespaceHoldsEveryNamespaceConstructor() {
+    void aKindOfNamespaceHoldsEveryNamespaceType() {
         KindBody namespaces = kind(link("""
                 !!id:"https://example.test/kinds.tn"
                 !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  api        => namespace & { key_type: = identifier  value_type: = text }
+                  api        => !namespace { key_type: identifier  value_type: text }
                   namespaces => !kind_type { of: namespace }
                 }
                 """, ""), "namespaces");
 
-        assertEquals(Optional.of(List.of("api", "field_map", "namespace", "schema")), namespaces.members());
+        assertEquals(Optional.of(List.of("api", "field_map", "schema")), namespaces.members());
     }
 
     /**
-     * A value of a namespace type is a map, not a record, and nothing builds it with {@code map}: it is a member of
-     * {@code type_kind} and {@code kind<namespace>}, and of no kind of {@code record}, {@code product} or {@code map}.
+     * A namespace type is built with {@code namespace}, which IS-A {@code product}: it is a member of {@code
+     * type_kind}, {@code kind<namespace>} and {@code kind<product>}, and of no kind of {@code record} or {@code map}.
      */
     @Test
-    void aNamespaceTypeIsNoRecordAndNoMap() {
+    void aNamespaceTypeIsAProductAndNoRecordOrMap() {
         TsonLinkedSchema linked = link("""
                 !!id:"https://example.test/kinds.tn"
                 !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  api        => namespace & { key_type: = identifier  value_type: = text }
+                  api        => !namespace { key_type: identifier  value_type: text }
                   labels     => !map { key_type: identifier  value_type: text }
                   types      => !kind_type { of: type }
                   namespaces => !kind_type { of: namespace }
@@ -284,7 +283,8 @@ class KindMembersTest {
 
         assertTrue(kind(linked, "types").members().orElseThrow().contains("api"));
         assertTrue(kind(linked, "namespaces").members().orElseThrow().contains("api"));
-        for (String kind : List.of("records", "products", "maps")) {
+        assertTrue(kind(linked, "products").members().orElseThrow().contains("api"));
+        for (String kind : List.of("records", "maps")) {
             List<String> members = kind(linked, kind).members().orElseThrow();
             assertFalse(members.contains("api") || members.contains("field_map") || members.contains("schema"),
                     () -> kind + ": " + members);
@@ -300,7 +300,7 @@ class KindMembersTest {
                 """));
 
         assertTrue(e.getMessage().contains("'reference'")
-                        && e.getMessage().contains("not 'type', 'namespace' or a constructor"), e.getMessage());
+                        && e.getMessage().contains("not 'type' or a constructor below it"), e.getMessage());
     }
 
     @Test
@@ -321,7 +321,8 @@ class KindMembersTest {
                 }
                 """));
 
-        assertTrue(e.getMessage().contains("not 'type', 'namespace' or a constructor"), e.getMessage());
+        assertTrue(e.getMessage().contains("a type and no constructor") && e.getMessage().contains("ref<stock_id>"),
+                e.getMessage());
     }
 
     @Test

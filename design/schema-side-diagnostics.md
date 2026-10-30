@@ -177,10 +177,11 @@ error's verdict doesn't change when this library improves; a gap's does.*
   `TsonCli.notImplemented`.
 - **A bind mismatch is neither an author error nor a gap.** `DefinitionResolver.bindAtomInstance` and
   `bindAnnotationValue` keep it clear of their catch-alls; relabelled `UnsupportedOperationException`, a missing line
-  of wiring would read as *this library cannot do that*. The reachable case is a meta layer's own record the consumer
-  bound no class for (`pings => !notifications { ping => … }` with none for `notification`), reported at the entry;
-  `BindMismatchClassificationTest` pins it beside an annotation typed by an abstract base kind (`@sum:_`), which is
-  the author's error in both §6 positions.
+  of wiring would read as *this library cannot do that*. The reachable case is a value entry of a type the consumer
+  bound no class for (`pings => !notifications { ping => … }` with none for `notification`): the resolver holds it as
+  a tree, so the schema loads and validates, and the bind registry reports it at the entry (`/pings`) where the
+  schema is obtained to bind (`design/compiled-registries.md`). `BindMismatchClassificationTest` pins it beside an
+  annotation typed by an abstract base kind (`@sum:_`), which is the author's error in both §6 positions.
 - **A read that cannot get its schema classifies the same way (`SchemaFailure`).** Both facades reach their schema
   through one call that resolves, links *and* compiles, so every failure arrives at one `catch`:
   `BindMismatchException` (with its `MissingBindingException` subclass) is `BIND_MISMATCH`,
@@ -240,8 +241,8 @@ declares.** `RecordBindReader` refuses four disagreements; `BindTargets` carries
   map binds to either kind. Both encodings check it at every depth (`BindTargets`; `BindMapBuilder.forTarget` in
   `tson-json`), and a map read with no component to declare a class is built as a `LinkedHashMap` when ordered.
 - **A `Namespace` component binds a namespace type's map, and nothing else**: the map is read for the component's
-  `entries` and delivered as an instance of the constructor the position names. A map that is no namespace has no
-  constructor to name; a `Map` component at a namespace type receives the map.
+  `entries` and delivered as a value of the namespace type the position names. A map that is no namespace has no
+  namespace type to name; a `Map` component at a namespace type receives the map.
 - **A type with no class to build is deferred to its first read** — the `MissingBindingException` subclass — since a
   schema legitimately declares types a consumer never binds. It covers a name the binder resolves to no class
   (`ltr8-bind`'s `UnboundNameException`) and a class that cannot be analysed (the kernel's base kinds map to sealed

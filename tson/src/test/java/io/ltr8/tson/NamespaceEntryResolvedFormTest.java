@@ -4,6 +4,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.suite.SuiteBindings;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,7 @@ class NamespaceEntryResolvedFormTest {
               status_name => identifier
               method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
                                replies?: {status_name => kind<record>} }
-              api         => namespace & { key_type: = identifier  value_type: = method }
+              api         => !namespace { key_type: identifier  value_type: method }
             }
             """;
 
@@ -51,7 +52,6 @@ class NamespaceEntryResolvedFormTest {
     private static Tson tson() {
         return Tson.of(ProcessorConfig.defaults()
                 .withDataBindContext(SuiteBindings.context())
-                .withMetaNameBinder(SuiteBindings.names())
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_TEXT)))));
     }
 
@@ -64,9 +64,9 @@ class NamespaceEntryResolvedFormTest {
         assertEquals("!api { get_orders => { response: order_list } place_order => { request: order response: order } }",
                 written.replaceAll("\\s+", " "));
 
-        Map<String, Top> read = ResolvedForm.readResolved(tson, "!schema { myapi => " + written + " }", List.of(META));
+        Map<String, Object> read = ResolvedForm.readResolved(tson, "!schema { myapi => " + written + " }", List.of(META));
         Namespace<?> back = assertInstanceOf(Namespace.class, read.get("myapi"));
-        assertEquals(myapi, back);
+        assertEquals(((ValueEntry) myapi).value(), back);
         assertEquals(List.of("get_orders", "place_order"), List.copyOf(back.entries().keySet()));
         assertEquals(ResolvedForm.rendered(myapi), ResolvedForm.rendered(back));
     }

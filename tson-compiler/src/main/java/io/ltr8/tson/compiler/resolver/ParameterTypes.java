@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -676,17 +677,16 @@ final class ParameterTypes {
 
         /**
          * A name's resolved body, reference chains followed -- the slot type a written value faces. A namespace type
-         * faces it as the map its value is ({@link MapBody#ofNamespace}): {@code record}'s {@code fields} is written
-         * as a map. The walk is over the imported vocabulary, where {@code namespace} is the kernel's.
+         * faces it as the map its value is ({@link NamespaceBody#read}): {@code record}'s {@code fields} is written
+         * as a map.
          */
         private Top resolve(String name) {
             Top definition = meta.apply(name);
             for (int hops = 0; definition instanceof Reference reference && hops < 32; hops++) {
                 definition = meta.apply(reference.target().name());
             }
-            if (MapBody.isNamespace(definition, kernel -> true)) {
-                return MapBody.ofNamespace((RecordBody) definition).<Top>map(MapBody.Namespace::map)
-                        .orElse(definition);
+            if (definition instanceof NamespaceBody namespace) {
+                return namespace.read();
             }
             return definition;
         }

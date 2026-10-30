@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -83,7 +84,8 @@ class TsonSchemaCompilerTest {
         // normally either way.
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("used", RecordBody.of(RecordBody.fieldMap()));
-        entries.put("orphan", new Namespace<>("endpoints", AnnotatedMap.of(Map.of("search", "/search"))));
+        entries.put("orphan", new ValueEntry("endpoints",
+                new Namespace<>("endpoints", AnnotatedMap.of(Map.of("search", "/search")))));
         TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
@@ -94,13 +96,12 @@ class TsonSchemaCompilerTest {
                 .read(TestDocuments.document("{}")));
         assertTrue(used.isEmpty());
 
-        // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.
-        // Fail-fast, so the report raises: the gap is in `diagnostic().code()`, never in the exception type,
-        // which is the same rule the schema pipeline follows (`Diagnostic.Code.NOT_IMPLEMENTED`).
+        // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails, and as the
+        // document's mistake: a value entry is no type, so a data tag naming it names nothing to read against.
         TsonTypeReader<?> orphan = compiled.get("orphan");
         ReadException thrown =
                 assertThrows(ReadException.class, () -> orphan.read(TestDocuments.document("{}")));
-        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, thrown.diagnostic().code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, thrown.diagnostic().code());
         assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());
     }
 

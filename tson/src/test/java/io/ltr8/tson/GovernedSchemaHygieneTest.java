@@ -44,7 +44,7 @@ class GovernedSchemaHygieneTest {
             !schema {
               method_name => identifier
               iface       => { methods: {method_name => text} }
-              ifaces      => namespace & { key_type: = identifier  value_type: = iface }
+              ifaces      => !namespace { key_type: identifier  value_type: iface }
               routes      => @annotation {method_name => text}
             }""";
 
@@ -72,7 +72,8 @@ class GovernedSchemaHygieneTest {
         SchemaSource source = SchemaSource.ofMap(Map.of(META_ID, META, DATA_ID, DATA_SCHEMA));
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withIdentifierPolicy(identifiers)
-                .withMetaNameBinder(DataNameBinder.ofMap(Map.of("iface", Iface.class))));
+                .withDataBindContext(io.ltr8.bind.DataBindContext.builder()
+                        .nameBinder(DataNameBinder.ofMap(Map.of("iface", Iface.class))).build()));
     }
 
     private static List<Diagnostic.Code> codes(List<Diagnostic> problems) {

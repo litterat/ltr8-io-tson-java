@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.consumer.SbOp;
 import io.ltr8.tson.compiler.consumer.SbResource;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -40,9 +41,9 @@ class SubtypeBehindFieldTest {
                 !schema {
                   sb_endpoint  => abstract {}
                   sb_op        => sb_endpoint & { request?: type_kind }
-                  sb_ops       => namespace & { key_type: = identifier  value_type: = sb_endpoint }
+                  sb_ops       => !namespace { key_type: identifier  value_type: sb_endpoint }
                   sb_resource  => { endpoints: {identifier => sb_endpoint} }
-                  sb_resources => namespace & { key_type: = identifier  value_type: = sb_resource }
+                  sb_resources => !namespace { key_type: identifier  value_type: sb_resource }
                 }
                 """);
     }
@@ -107,8 +108,8 @@ class SubtypeBehindFieldTest {
     @Test
     void aSoundNameBehindARecordFieldResolves() {
         assertEquals(List.of(), problems("field-sound", behindAField("order")));
-        Namespace<?> resources = assertInstanceOf(Namespace.class, registry()
-                .resolveLinked("https://example.test/sb-field-sound.tn").schema().entries().get("r"));
+        Namespace<?> resources = assertInstanceOf(Namespace.class, ((ValueEntry) registry()
+                .resolveLinked("https://example.test/sb-field-sound.tn").schema().entries().get("r")).value());
         SbResource resource = assertInstanceOf(SbResource.class, resources.get("o"));
         assertEquals("order", assertInstanceOf(SbOp.class, resource.endpoints().get("get")).request().name());
     }

@@ -38,14 +38,9 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **Which schemas describe schemas, once value entries are ordinary types** (step 5e, SPEC-FEEDBACK.md #8).
-  `TsonLinkedSchema.governsSchemas` reads a kind-typed position by its name's grammar alone under the kernel and a
-  schema importing it directly, and by membership under every other; the rule stands in for the `!!meta` that named
-  the kernel, and a read under several imports takes none of it from an import that has it. Decide it with the
-  binder split, and give the corpus a vector for each side.
 - [ ] **Rename the meta-layer vocabulary the header no longer has.** `TsonCompiledMetaRegistry`,
-  `TsonCompiledMetaSchema`, `TsonCompiledSchemaLoader.loadMeta`, `ProcessorConfig.metaNameBinder` and
-  `SchemaMetaNameBinder` name a "meta" no directive states: each is the compiled vocabulary of an imported schema, or
+  `TsonCompiledMetaSchema`, `TsonCompiledSchemaLoader.loadMeta` and `SchemaMetaNameBinder` name a "meta" no
+  directive states: each is the compiled vocabulary of an imported schema, or
   the bind context for `schema.meta`'s classes. A rename across some 130 files, done as one IDE refactor.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
@@ -59,8 +54,8 @@ spec-required case:
   recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`
   must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
   family checks (no member minted at a use site) over the ingested map and its closure, the §5.11 group
-  declaration rules over every `field_group`, and every kind-typed slot's name against its kind, which a reader under
-  a schema that describes schemas checks for grammar alone ([TSON-SCHEMA] §4.2, `KindParser.namesOnly`). A resolved
+  declaration rules over every `field_group`, and every kind-typed slot's name against its kind, which a resolved
+  form's read checks for grammar alone ([TSON-SCHEMA] §4.2, `TsonReadContext.readsSchemaNames`). A resolved
   form is read today only where a caller says it is one (`TsonDataParser.parseResolvedForm`, a reader's
   `readAs(text, "schema")`), with nothing verified.
   `ParameterTypes` already derives the type to check against.
@@ -79,9 +74,10 @@ spec-required case:
   schema's own, the field's pinned value in the record type, so the walk should take it from the declared
   `RecordField` and continue; no test covers the case yet.
 - [ ] **A data document's value at a reference-typed position is not read** ([TSON-SCHEMA] §4.2, §5.12). Any schema
-  may declare `ref<T>` (SPEC-FEEDBACK.md #7), and a data document it governs reaches `AtomParsers.forType` with
-  `governsSchemas` false, which reports `NOT_IMPLEMENTED`: a reference is judged by what its name reaches when a
-  schema links, and a data document is never linked. The name is to resolve in the governing schema's namespace and
+  may declare `ref<T>` (SPEC-FEEDBACK.md #7), and a data document's read reaches `AtomTypeReader`, which reports
+  `NOT_IMPLEMENTED` there (and `tson-json`'s `AtomReader` compiles the position to an `ErrorReader`): a reference is
+  judged by what its name reaches when a schema links, and a data document is never linked. The name is to resolve in
+  the governing schema's namespace and
   be judged as a value body's names are (`ValuesByName`), against the schema's value entries.
 - [ ] **A value a schema writes at a reference-typed field is not judged** ([TSON-SCHEMA] §4.2, §5.12). In any
   schema, `rpick => { m: ref<order> = os.o1 }` (or `~`) reaches `AtomParsers.forType`'s token-level reading from the
@@ -94,6 +90,23 @@ spec-required case:
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
   component there is a bind mismatch. Nothing in the JSON stack binds `schema.meta` today, so nothing fails yet; a
   JSON reading of resolved output, a record's `fields` among it, would.
+- [ ] **A JSON read naming a value entry reports a gap, not the document's mistake.** A TSON read whose tag names a
+  value entry (`!orders { … }`) is a `TYPE_MISMATCH` (`ValueEntryReader`): a value is no type. `tson-json`'s
+  `JsonSchemaCompiler` dispatches a `ValueEntry` to the factory of its type's name, finds none, and compiles an
+  `ErrorReader`, so the same document in JSON reports `NOT_IMPLEMENTED`. Give the JSON stack the same refusal and a
+  `CrossEncodingParityTest` case.
+- [ ] **`namespace` is `map`'s sibling, not its refinement** ([TSON-SCHEMA] §4.1, §5.7; `SPEC-FEEDBACK.md #9`).
+  Its form is a map's, but `namespace => product & { key_type?: … }` leaves `kind<map>` without the namespace types:
+  §5.7 refuses `map ^ { … }` making the required `key_type` optional, and it is optional only because `field_map`'s
+  key family is its record's `name_type`, a value depending on its host. Once dependent fields exist
+  (a Revision 39 proposal), make it `namespace => map ^ { key_type: identifier_kind … }` with `key_type`
+  required, `field_map` a template applied to its record's `name_type`, and add a vector that `kind<map>` holds a
+  namespace type.
+- [ ] **Applying a schema's own constructor needs a host class.** With `step => top & { … }` declared in an imported
+  schema, `s => !step { … }` is a `BIND_MISMATCH` unless the consumer binds `step` to a class, so a schema applying a
+  constructor no class backs does not load for validation, where a value entry no class binds is held as a tree.
+  Hold the instance as a tree for validation and refuse it from a schema loaded to bind, as value entries are; lands
+  with wait order everywhere (one-level step 5f), which admits a same-document constructor too.
 - [ ] **A parameter in a record template has no channel of its own** ([TSON-SCHEMA] §5.10). An open record's
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
@@ -332,9 +345,9 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 ## Miscellaneous
 
 - [ ] **No test pins [TSON-SCHEMA] §5.9 rule 8.** A subtracted construction whose head is a constructor
-  (`my_record => record - { groups }`) resolves with an empty chain and `!my_record { … }` is refused
-  as not IS-A `top`, which is the rule; nothing in the suite or the corpus exercises it, and the refusal's hint
-  ("Did you mean atom refinement") misleads there. Add a vector and drop the hint for a subtracted head.
+  (`my_record => record - { groups }`) resolves with an empty chain, so it is no constructor, and `!my_record {
+  … }` is read as a value of it, a value entry, rather than building a type; nothing in the suite or the corpus
+  exercises it. Add a vector stating the outcome §5.9 rule 8 gives.
 - [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
   kind's members, and the list holds `kind_type_type_c430c650`, the entry minted for the application `kind<type>`
   itself: a `kind_type` instance IS-A `type`, so the construction walk admits it. A minted name is no spelling an

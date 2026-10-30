@@ -66,8 +66,8 @@ public final class ProcessorConfig {                 // io.ltr8.tson.base
     public static ProcessorConfig defaults();
 
     public ProcessorConfig withSchemaAccess(SchemaAccess access);      // where a schema may come from
-    public ProcessorConfig withDataBindContext(DataBindContext ctx);   // which classes the types bind to
-    public ProcessorConfig withMetaNameBinder(DataNameBinder binder);  // a consumer's own meta vocabulary
+    public ProcessorConfig withDataBindContext(DataBindContext ctx);   // which classes the types bind to,
+                                                                       // data and value entries alike
 
     public ProcessorConfig withProcessorPolicy(ProcessorPolicy policy);   // the whole value
     public ProcessorConfig withIdentifierPolicy(IdentifierPolicy policy); // every name, and its scopes
@@ -76,7 +76,6 @@ public final class ProcessorConfig {                 // io.ltr8.tson.base
 
     public SchemaAccess schemaAccess();
     public DataBindContext dataBindContext();
-    public DataNameBinder metaNameBinder();
     public ProcessorPolicy processorPolicy();
 }
 ```
@@ -473,7 +472,9 @@ everything, are fail-fast by design.
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`:
   the schema pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`,
-  `contextExtendedWith(binder)`, `extendedWith(binder)`: the meta vocabulary's names), and
+  `contextExtendedWith(binder)`, `extendedWith(binder)`, `over(context)`: the names meta-kernel.tn and meta.tn
+  declare bound to the schema model, every other name to the consumer's — `over` is what `Tson.of` builds its one
+  context with), and
   `SourcePositionStringBridge`.
 
 ---
@@ -543,7 +544,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public boolean isKernel(String entryName);      // the meta-kernel's own entry, judged by origin
     public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
     public boolean isConstructor(String name, Top value); // IS-A the kernel's top
-    public boolean governsSchemas();                 // the kernel, or a schema importing it directly (meta.tn)
+    public Optional<NamespaceBody> namespace(String entryName); // the namespace type it is, if it is one
 }
 
 public final class TsonSchemaRegistry implements TsonSchemaLoader {
@@ -586,15 +587,19 @@ value); the application an entry is the instantiation of is the derived
 `@application` on its key (`TsonSchema.applicationOf`); and what is not part of the value — where it was declared, its
 value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
 host values the atoms read to
-are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down. A meta-schema's own
-vocabulary is a record it declares and a namespace type holding it (`operations => namespace & { key_type: =
-identifier  value_type: = operation }`); an entry built with one, `api => !operations { search => { … } }`, is a
-**`Namespace`** — a value, never a type — whose map holds each value bound to the consumer's own class, a plain
-record found by the `metaNameBinder` (by name, or by `@Typename`). The class declares none of its references. A slot
+are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`,
+`Reference`, `TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a
+map of them, a namespace type (`operations => !namespace { key_type: identifier  value_type: operation }`, a
+`NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search =>
+{ … } }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a
+member of no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind
+context binds one (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its
+references. A slot
 typed by a kind (`request: kind<record>`) binds a `TypeRef` holding a type's name; a slot typed by a reference
-(`method: ref<method>`) binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and
-then a key of its namespace) and, once the schema has linked, the value it names (`method().get()`), or a `TypeRef`
-for the name alone. The resolver records each with its slot as it reads the value, and the linker judges it there.
+(`method: ref<method>`) binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and then
+a key of its namespace value, or a field of a record value) and, once the schema has linked, the value it names
+(`method().get()`), or a `TypeRef` for the name alone. The resolver records each with its slot as it reads the value,
+and the linker judges it there.
 
 ---
 

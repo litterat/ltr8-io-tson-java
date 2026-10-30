@@ -115,8 +115,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.imports(), linked.schema().imports());
-        assertEquals(77, raw.entries().size());
-        assertEquals(77, linked.schema().entries().size());
+        assertEquals(79, raw.entries().size());
+        assertEquals(79, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
@@ -146,7 +146,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(77, registered.schema().entries().size());
+        assertEquals(79, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

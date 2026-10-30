@@ -18,14 +18,14 @@ import java.util.Optional;
 
 /**
  * A resolved schema (Part 2 §8): a value of the kernel's {@code schema}, the namespace type
- * <code>{type_name =&gt; top}</code> ({@link #entries}, a {@link Namespace} typed {@value #SCHEMA}), plus the
+ * <code>{type_name =&gt; declared}</code> ({@link #entries}, a {@link Namespace} typed {@value #SCHEMA}), plus the
  * directives its own document header carried ({@code !!id}, {@code !!import}*, §2.2)
  * -- the "produced schema" this module exists for, as opposed to {@code tson-compiler}'s grammar-only {@code
  * SchemaDocument}/{@code SchemaMap}. {@code entries}' insertion order is preserved, matching {@code
  * SchemaMap.declarations}' own ordering guarantee.
  *
  * <p><b>An entry is its value</b> ([TSON-SCHEMA] §8.1): a name maps to the body it resolves to -- a {@code
- * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@link Namespace} -- and a
+ * RecordBody}, an atom family's instance, a {@code Reference}, a {@code TemplateBody}, a {@code ValueEntry} -- and a
  * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
  * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
  *
@@ -73,8 +73,8 @@ import java.util.Optional;
  * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
  * buying any safety a universal property like linked-ness actually needs.
  *
- * <p><b>{@link #valuesByName()}</b> -- for each entry whose value is an instance of a namespace type
- * ({@link Namespace}), the references that value holds by name ([TSON-SCHEMA] §5.12), each with the
+ * <p><b>{@link #valuesByName()}</b> -- for each value entry ({@code ValueEntry}), the references that value holds
+ * by name ([TSON-SCHEMA] §5.12), each with the
  * slot it fills and that slot's declared type, as the resolver's read collected them: the reader at a kind-, reference-
  * or {@code type_ref}-typed slot records the name it read there whatever the host class holds, so the list depends on
  * nothing the host declares. The linker resolves each and judges it against the slot's declared type. A fact the
@@ -333,11 +333,11 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * The constructor {@code value}'s class is named for, by its {@link Typename} -- exact where one constructor
      * has that shape, and only one of them where several share it ({@code enum_type}, {@code enum} and a meta
      * layer's own tightening of either are one class), which is why an entry's own facts are asked first. A
-     * namespace value names its own: the constructor it is an instance of.
+     * value entry names its own: the type it is a value of.
      */
     public static String constructorOf(Top value) {
-        if (value instanceof Namespace<?> namespace) {
-            return namespace.type();
+        if (value instanceof io.ltr8.tson.schema.meta.ValueEntry entry) {
+            return entry.type();
         }
         Typename typename = value.getClass().getAnnotation(Typename.class);
         if (typename == null) {

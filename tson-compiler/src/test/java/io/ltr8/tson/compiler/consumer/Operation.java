@@ -5,7 +5,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
  * A consumer's own meta-layer record: an HTTP operation, which describes an endpoint rather than the shape of a
- * data value, held as a value of a namespace type ({@code operations => namespace & { ... value_type: = operation }}).
+ * data value, held as a value of a namespace type ({@code operations => !namespace { ... value_type: operation }}).
  *
  * <p><b>The name binder is what binds it to the schema-side {@code operation} record</b>: this package is on the
  * {@code DataNameBinder}'s search path, so {@code operation} resolves here (see {@code

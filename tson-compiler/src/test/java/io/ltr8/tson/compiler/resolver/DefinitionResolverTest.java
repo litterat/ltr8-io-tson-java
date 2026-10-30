@@ -145,8 +145,8 @@ class DefinitionResolverTest {
     private static DefinitionResolver definitionResolverFor(TsonCompiledMetaSchema metaParser,
             DefinitionGetter definitionGetter, Map<String, TsonSchema.EntryFacts> facts) {
         return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type)
-                        .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
-                                IdentifierPolicy.none())), null,
+                        .read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)),
+                                IdentifierPolicy.none(), (slot, slotType, reference, cell) -> { }, false)), null,
                 metaParser.schema().entries()::get, definitionGetter, null, SchemaPositions.none(), facts,
                 n -> true, metaParser.compiledSchema()::isKernel, n -> false);
     }
@@ -1076,14 +1076,15 @@ class DefinitionResolverTest {
         // complex => !complex_type {} -- ComplexType, same record-only/no-compiler treatment as the
         // other atom families above.
         //
-        // declared => !declared_type {} -- its constructor (declared_type => sum & {}) composes with
+        // declared => !declared_type {} -- the kernel's; its constructor (declared_type => sum & {}) composes with
         // `sum`, not `atom`; resolves fine since bindAtomInstance binds against Top, not the narrower Atom.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         Top complex = instanceResolver.resolve(schemaMap.declarations().get("complex"));
-        Top declared = instanceResolver.resolve(schemaMap.declarations().get("declared"));
+        Top declared = instanceResolver.resolve(new TsonSchemaParser("!schema { declared => !declared_type {} }")
+                .parseSchemaDocument().body().declarations().get("declared"));
 
         assertEquals(ComplexType.UNCONSTRAINED, complex);
         assertEquals(EntryKind.SUM, EntryKind.of(declared, n -> true));

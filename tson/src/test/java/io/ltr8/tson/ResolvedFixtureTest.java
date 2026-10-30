@@ -43,7 +43,7 @@ class ResolvedFixtureTest {
 
     // ── The comparison ───────────────────────────────────────────────────
 
-    private record Comparison(String label, Map<String, Top> fixture,
+    private record Comparison(String label, Map<String, Object> fixture,
                                Map<String, Top> ours, String text) {
 
     }
@@ -53,8 +53,8 @@ class ResolvedFixtureTest {
                 Files.readString(specDirectory().resolve(fixtureFile)));
     }
 
-    private static Map<String, Top> fixtureEntries(String file) throws Exception {
-        Map<String, Top> bound =
+    private static Map<String, Object> fixtureEntries(String file) throws Exception {
+        Map<String, Object> bound =
                 ResolvedForm.readResolved(tson(), Files.readString(specDirectory().resolve(file)));
         assertNotNull(bound, file + " did not read back at all");
         return bound;

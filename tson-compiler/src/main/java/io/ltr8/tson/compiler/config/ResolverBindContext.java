@@ -35,4 +35,26 @@ public final class ResolverBindContext {
                 .registerAtom(SourcePosition.class, new SourcePositionStringBridge())
                 .registerAtom(Ref.class, new RefNameBridge());
     }
+
+    /**
+     * {@link #registerDefaults}, adding each registration only where {@code builder} does not already hold it -- for
+     * a builder derived from a consumer's context, which already registers the atom vocabulary it binds.
+     */
+    public static DataBindContext.Builder registerAbsent(DataBindContext.Builder builder) {
+        for (Class<?> atom : AtomContext.hostTypes()) {
+            if (!builder.registersAtom(atom)) {
+                builder.registerAtom(atom);
+            }
+        }
+        if (!builder.registersAtom(Token.class)) {
+            builder.registerAtom(Token.class);
+        }
+        if (!builder.registersAtom(SourcePosition.class)) {
+            builder.registerAtom(SourcePosition.class, new SourcePositionStringBridge());
+        }
+        if (!builder.registersAtom(Ref.class)) {
+            builder.registerAtom(Ref.class, new RefNameBridge());
+        }
+        return builder;
+    }
 }

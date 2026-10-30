@@ -67,6 +67,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       entries, merges every `!!import`'s namespace into one per schema
       ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #7), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
+- [x] Value entries ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #9) — an entry whose tag names an ordinary type
+      (`create_order => !operation { … }`, `orders => !api { … }` over a namespace type `api => !namespace { … }`)
+      is a value of it, no type and in no kind, named by `ref<T>` and walked by key and field; bound through the
+      one bind context, or held as a tree where no class binds its type, so the schema loads and validates
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see the README's [Schema pipeline](README.md#schema-pipeline))

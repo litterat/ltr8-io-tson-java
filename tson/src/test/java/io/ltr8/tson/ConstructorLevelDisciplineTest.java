@@ -91,7 +91,7 @@ class ConstructorLevelDisciplineTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  steps => namespace & { key_type: = identifier  value_type: = text }
+                  steps => !namespace { key_type: identifier  value_type: text }
                 }
                 """;
         String importer = """
@@ -116,7 +116,7 @@ class ConstructorLevelDisciplineTest {
     @Test
     void applyingASameDocumentConstructorIsNotYetImplemented() {
         List<Diagnostic> problems = problems(META, CORE, """
-                  steps => namespace & { key_type: = identifier  value_type: = text }
+                  steps => !namespace { key_type: identifier  value_type: text }
                   plan  => !steps { first => "a" }
                 """);
 

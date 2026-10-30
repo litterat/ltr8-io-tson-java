@@ -119,11 +119,16 @@ than replace them. **A name outside the map is an error naming the map**, not a 
 whatever was consulted last: `orElse` composes the caller's binder over the kernel's, and the caller's is
 the one that authors the failure, because a name neither knows is a missing line of *their* configuration.
 
-`withDataBindContext` binds the **data** a schema describes. `withMetaNameBinder` is a separate namespace
-and binds the **schema vocabulary** a governing *meta* describes — a consumer's own meta-schema declaring an
-`operation` record and a namespace type of it, applied as `api => !operations { search => { … } }`, needs its
-`operation` class there. It composes over the library's binder rather than replacing it, so the kernel's
-names still resolve first.
+`withDataBindContext` is **the one bind context**, for the data a schema describes and for a schema's own
+**value entries** alike: a schema declaring an `operation` record and a namespace type of it (`operations =>
+!namespace { key_type: identifier  value_type: operation }`), and a schema importing it that holds a value,
+`api => !operations { search => { … } }`, binds `operation` to the class this context names, exactly as a data
+document's `!operation { … }` would. `Tson.of` composes the library's own binder with yours: the names the kernel
+and meta.tn declare (`record`, `enum`, …) always bind to the schema model and yours cannot shadow them, and every
+other name is yours;
+`tson.dataBindContext()` returns that composed context. A value entry whose type your context binds no class for is
+held as a `TsonValue`: the schema still resolves, validates and reads in tree mode, and `bindRegistry()` refuses it
+with `BIND_MISMATCH` at the entry (`MissingBindingException` where no receiver is given).
 
 A **profile** is fixed when the context is built (`DataBindContext.Builder.profile`), never afterwards, so
 one `Tson` is one profile — a server speaking two schema versions builds one instance per version.
@@ -137,7 +142,7 @@ new DataNameBinder.DefaultDataNameBinder(Set.of("com.example.api"), Map.of())
 ```
 
 The second argument is aliases, applied *before* the mangling, for the names that do not follow the
-convention. This is what `metaNameBinder(…)` usually receives.
+convention. This is what `DataBindContext.Builder.nameBinder(…)` usually receives.
 
 **Components bind by exact name — there is no `snake_case` ↔ `camelCase` conversion.** A `request_stream`
 field needs a `request_stream` component, or `@Field("request_stream")` on whatever the component is really

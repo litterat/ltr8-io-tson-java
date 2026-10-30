@@ -6,6 +6,7 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.ValueEntry;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,15 +23,13 @@ import java.util.function.Function;
  *
  * <p><b>Membership is one walk</b> over resolved entries, never over spellings. From an entry, alias hops first
  * ([TSON-SCHEMA] §8.3) reach the type the entry is; that type is no member if it is a type constructor, a
- * reference, or a template over another constructor (a {@code template} body, which is no type). A constructor
- * IS-A {@code top}, and is excluded because its instances are types; a namespace constructor -- the kernel's
- * {@code namespace}, or one IS-A it -- is a type, because its instances are values, maps. It is a member of {@code
- * type_kind} and of the kind of each namespace constructor it is or IS-A, so {@code kind<namespace>} holds every
- * one, and of no other kind: its body's {@code !record} tag is not followed, a value of it being a map and not a
- * record, and nothing builds it with {@code map}. For every other type the constructor its value applies -- the
- * tag resolved output writes, {@code !identifier_type}, {@code !enum} -- is followed, through a constructor
- * template's held body to the constructor it applies, until a constructor is reached, and the entry is a member
- * when that constructor is {@code of} or has {@code of} among its supertypes. A record template is built with
+ * reference, a template over another constructor (a {@code template} body, which is no type), or a value entry,
+ * which is no type at all. A constructor IS-A {@code top}, and is excluded because its instances are types. For
+ * every other type the constructor its value applies -- the tag resolved output writes, {@code !identifier_type},
+ * {@code !enum}, {@code !namespace} -- is followed, through a constructor template's held body to the constructor
+ * it applies, until a constructor is reached, and the entry is a member when that constructor is {@code of} or has
+ * {@code of} among its supertypes. A value entry's tag names an ordinary type, which no walk reaches a constructor
+ * through, so it is a member of no kind. A record template is built with
  * {@code record}: it is a type, the family base its members are IS-A (§5.10), so a kind of {@code record} holds
  * it. So does the kernel's {@code top}: a fresh abstract record built with {@code record} and IS-A nothing, it is
  * a type and not a constructor by the rule, and a member of every kind whose {@code of} is {@code record} or above
@@ -55,7 +54,6 @@ public final class KindMembers {
 
     private static final String TOP = "top";
     private static final String TYPE = "type";
-    private static final String NAMESPACE = "namespace";
 
     private KindMembers() {
     }
@@ -87,7 +85,7 @@ public final class KindMembers {
                                    Function<String, Optional<String>> constructorOf, Function<String, Top> structure) {
         String terminal = ReferenceChain.terminal(name, local);
         Top type = local.apply(terminal);
-        return type != null && isMember(terminal, type, constructorOf.apply(terminal)
+        return type != null && isMember(type, constructorOf.apply(terminal)
                 .orElseGet(() -> TsonSchema.constructorOf(type)), of, local, structure);
     }
 
@@ -97,26 +95,12 @@ public final class KindMembers {
      */
     public static boolean isMember(Top type, String head, String of, Function<String, Top> local,
                                    Function<String, Top> structure) {
-        return isMember(null, type, head, of, local, structure);
-    }
-
-    /** {@link #isMember(Top, String, String, Function, Function)} for the entry {@code name}, where it is known. */
-    private static boolean isMember(String name, Top type, String head, String of, Function<String, Top> local,
-                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
-        if (type == null || type instanceof TemplateBody || type instanceof Reference) {
+        if (type == null || type instanceof TemplateBody || type instanceof Reference || type instanceof ValueEntry
+                || isConstructor(type)) {
             return false;
         }
         String constructorOf = ReferenceChain.terminal(of, constructors);
-        if (isConstructor(type)) {
-            List<String> supertypes = TypeChain.supertypesOf(type);
-            if (!NAMESPACE.equals(name) && !supertypes.contains(NAMESPACE)) {
-                return false;
-            }
-            // A value of it is a map and not a record, and it is not built with `map`: its `!record` tag is not
-            // followed. It is a type, and the namespace constructor it is or IS-A.
-            return constructorOf.equals(TYPE) || constructorOf.equals(name) || supertypes.contains(constructorOf);
-        }
         Set<String> walked = new HashSet<>();
         String current = head;
         while (walked.add(current)) {
@@ -140,10 +124,10 @@ public final class KindMembers {
 
     /**
      * Why {@code kind}'s {@code of} cannot be a kind's, or empty where it can: it names a constructor in {@code
-     * structure}, followed through its alias hops, that is {@code type} or IS-A it, or is the kernel's {@code
-     * namespace} or IS-A it. A name {@code structure} does not declare is refused; so is a type that is no
-     * constructor, and a constructor above {@code type} or beside it, {@code template} and {@code reference}
-     * included, which no value has a type built with.
+     * structure}, followed through its alias hops, that is {@code type} or IS-A it. A name {@code structure} does not
+     * declare is refused; so is a type that is no constructor ({@code kind<api>}, whose values are named by {@code
+     * ref<api>}), and a constructor above {@code type} or beside it, {@code template} and {@code reference} included,
+     * which no value has a type built with.
      */
     public static Optional<String> ofRefusal(KindBody kind, Function<String, Top> structure) {
         String of = kind.of();
@@ -153,13 +137,17 @@ public final class KindMembers {
                     + "kind names a constructor");
         }
         List<String> supertypes = TypeChain.supertypesOf(constructor.get().definition());
-        if (constructor.get().name().equals(TYPE) || supertypes.contains(TYPE)
-                || constructor.get().name().equals(NAMESPACE) || supertypes.contains(NAMESPACE)) {
+        if (constructor.get().name().equals(TYPE) || supertypes.contains(TYPE)) {
             return Optional.empty();
         }
-        return Optional.of("its 'of' names '" + of + "', which is not 'type', 'namespace' or a constructor below "
-                + "either, so no value has a type built with it and the kind could have no members -- name 'type', "
-                + "a base kind, 'namespace', or a constructor that IS-A one");
+        if (!supertypes.contains(TOP)) {
+            return Optional.of("its 'of' names '" + of + "', which is a type and no constructor, so no type is built "
+                    + "with it and the kind could have no members -- a kind names the types a constructor builds; "
+                    + "the values of the type '" + of + "' are named by a reference, ref<" + of + ">");
+        }
+        return Optional.of("its 'of' names '" + of + "', which is not 'type' or a constructor below it, so no "
+                + "value has a type built with it and the kind could have no members -- name 'type', a base kind, "
+                + "or a constructor that IS-A one");
     }
 
     private static boolean reaches(Found constructor, String of) {

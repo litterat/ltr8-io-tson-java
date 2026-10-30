@@ -148,7 +148,7 @@ class OpenEntryResolvedFormTest {
                 """;
         assertEquals(List.of(), ResolvedForm.validateResolved(tson, resolved), "the open entry is valid data");
 
-        Map<String, Top> read = ResolvedForm.readResolved(tson, resolved);
+        Map<String, Object> read = ResolvedForm.readResolved(tson, resolved);
 
         TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e"));
         assertEquals("!enum { members: [a b M] }", e.template(),
@@ -260,7 +260,7 @@ class OpenEntryResolvedFormTest {
                 !schema {
                   listed      => <T> atom & { members: [T] }
                   listed_text => listed<text>
-                  payloads     => <T> namespace & { key_type: = identifier  value_type: = T }
+                  payloads     => <T> !namespace { key_type: identifier  value_type: T }
                   iri_payloads => payloads<iri>
                 }
                 """);
@@ -338,7 +338,6 @@ class OpenEntryResolvedFormTest {
                 switch (supertype) {
                     case "atom" -> { return EntryKind.ATOM; }
                     case "sum" -> { return EntryKind.SUM; }
-                    case "namespace" -> { return EntryKind.NAMESPACE; }
                     default -> { }
                 }
             }
@@ -357,7 +356,7 @@ class OpenEntryResolvedFormTest {
             case Sum sum -> sum.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Reference reference -> "reference";
             case TemplateBody held -> "template";
-            case io.ltr8.tson.schema.meta.Namespace<?> namespace -> namespace.type();
+            case io.ltr8.tson.schema.meta.ValueEntry value -> value.type();
         };
     }
 }

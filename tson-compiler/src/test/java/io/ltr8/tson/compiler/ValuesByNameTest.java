@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.consumer.Pairing;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.suite.SuiteBindings;
@@ -51,16 +52,16 @@ class ValuesByNameTest {
                   status_name => identifier
                   method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
                                    replies?: {status_name => kind<record>} }
-                  interface   => namespace & { key_type: = method_name  value_type: = method }
+                  interface   => !namespace { key_type: method_name  value_type: method }
                   http_verb   => !enum [GET POST]
                   binding     => { method: ref<method>  verb: http_verb  route: text }
-                  bindings    => namespace & { key_type: = identifier  value_type: = binding }
+                  bindings    => !namespace { key_type: identifier  value_type: binding }
                   filed_in_references => { request: kind<record>  method?: ref<method> }
                   filed_nowhere       => { request: kind<record> }
-                  refs        => namespace & { key_type: = identifier  value_type: = filed_in_references }
-                  nowheres    => namespace & { key_type: = identifier  value_type: = filed_nowhere }
+                  refs        => !namespace { key_type: identifier  value_type: filed_in_references }
+                  nowheres    => !namespace { key_type: identifier  value_type: filed_nowhere }
                   pairing     => { primary: method }
-                  pairings    => namespace & { key_type: = identifier  value_type: = pairing }
+                  pairings    => !namespace { key_type: identifier  value_type: pairing }
                 }
                 """);
         DOCUMENTS.put("https://example.test/orders.tn", orders("https://example.test/orders.tn", ""));
@@ -137,7 +138,7 @@ class ValuesByNameTest {
     @Test
     void anInterfaceHoldsItsRequestByName() {
         TsonLinkedSchema linked = registry().resolveLinked("https://example.test/orders.tn");
-        Namespace<?> orders = assertInstanceOf(Namespace.class, linked.schema().entries().get("orders"));
+        Namespace<?> orders = assertInstanceOf(Namespace.class, valueOf(linked.schema().entries().get("orders")));
         assertEquals(new Method(TypeRef.of("place_order_request"), TypeRef.of("order"), null, null),
                 orders.get("place_order"));
     }
@@ -148,8 +149,8 @@ class ValuesByNameTest {
         String id = api("binds", """
                 routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }""");
         assertEquals(List.of(), problems(id));
-        Binding binding = assertInstanceOf(Binding.class, ((Namespace<?>) registry().resolveLinked(id).schema().entries()
-                .get("routes")).get("post_orders"));
+        Binding binding = assertInstanceOf(Binding.class,
+                ((Namespace<?>) valueOf(registry().resolveLinked(id).schema().entries().get("routes"))).get("post_orders"));
         assertEquals("orders.place_order", binding.method().name());
         assertEquals("POST", binding.verb());
         assertEquals("/orders", binding.route());
@@ -240,8 +241,8 @@ class ValuesByNameTest {
                 routes => !bindings { b => { method: p.x.primary  verb: POST  route: "/" } }""");
         assertEquals(List.of(), problems(id));
         Map<String, Top> entries = registry().resolveLinked(id).schema().entries().entries();
-        Binding b = assertInstanceOf(Binding.class, ((Namespace<?>) entries.get("routes")).get("b"));
-        Pairing x = assertInstanceOf(Pairing.class, ((Namespace<?>) entries.get("p")).get("x"));
+        Binding b = assertInstanceOf(Binding.class, ((Namespace<?>) valueOf(entries.get("routes"))).get("b"));
+        Pairing x = assertInstanceOf(Pairing.class, ((Namespace<?>) valueOf(entries.get("p"))).get("x"));
         assertTrue(b.method().isResolved(), "delivered at link");
         assertSame(x.primary(), b.method().get());
     }
@@ -299,7 +300,7 @@ class ValuesByNameTest {
         List<Diagnostic> problems = problems(api("data-as-type", """
                 api => !interface { m => { response: orders } }"""));
         assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("'orders' is a value of the namespace type 'interface'"),
+        assertTrue(problems.getFirst().message().contains("'orders' is a value of the type 'interface'"),
                 problems.getFirst().message());
     }
 
@@ -366,9 +367,9 @@ class ValuesByNameTest {
         String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body);
         assertTrue(written.replaceAll("\\s+", " ").contains("method: orders.place_order"), written);
 
-        Object read = registry.loadMeta(META_SERVICE).compiledSchema().find("top").orElseThrow()
-                .read(TestDocuments.document(written));
-        assertEquals(body, read);
+        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META_SERVICE).compiledSchema().find("schema").orElseThrow()
+                .read(TestDocuments.document("!schema { routes => " + written + " }"));
+        assertEquals(((ValueEntry) body).value(), read.get("routes"));
     }
 
     // ── The class declares nothing; the slot judges ─────────────────────────────────────────────────
@@ -398,7 +399,7 @@ class ValuesByNameTest {
                 routes => !bindings { b => { method: orders.place_order  verb: POST  route: "/orders" } }""");
 
         Binding b = assertInstanceOf(Binding.class,
-                ((Namespace<?>) registry().resolveLinked(id).schema().entries().get("routes")).get("b"));
+                ((Namespace<?>) valueOf(registry().resolveLinked(id).schema().entries().get("routes"))).get("b"));
 
         assertEquals("orders.place_order", b.method().name());
         assertTrue(b.method().isResolved(), "delivered at link");
@@ -415,5 +416,10 @@ class ValuesByNameTest {
                 a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'uuid_type'");
         assertEquals(List.of(), problems(api("nowhere-right", """
                 a => !nowheres { x => { request: order } }""")));
+    }
+
+    /** A value entry's value. */
+    private static Object valueOf(Object entry) {
+        return ((ValueEntry) entry).value();
     }
 }

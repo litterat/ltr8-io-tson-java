@@ -24,10 +24,11 @@ keeps the rest of the document. Current form only; history lives in git.
   segment of which is no identifier is written as the record too, so it never comes back as text.
 - `DataClassObjectWriter` writes a `Namespace` as the map it holds: each key keeps its annotations and is bare where
   it is an identifier, quoted otherwise; a value is tagged only where its class carries `@Typename`, which is what
-  selects a subtype of the value type on the way back in. Where the position admits more than one constructor
-  (`top`, a union) the map carries its `type` as the tag, `!api { key => value … }`, written through `Top`'s
-  descriptor since no class carries it; at a slot whose host types it as a `Namespace` the slot's type already names
-  the constructor, and the map is written untagged (`fields: { name => … }`).
+  selects a subtype of the value type on the way back in. A value entry (`ValueEntry`) is written as its `type` for
+  the tag, `!api { key => value … }`, then its value: a `Namespace`'s map, a bound object through its descriptor, a
+  tree through the tree writer. A bare `Namespace` where the position admits more than one type carries its `type` as
+  the tag; at a slot whose host types it as a `Namespace` the slot's type already names it, and the map is written
+  untagged (`fields: { name => … }`).
 - `TsonDocumentPeek` performs no second header scan and rewinds nothing; a continuing reader whose lexical
   policy (token policy, limits) disagrees with the peek's is refused.
 - A peek is total: a malformed header yields nothing rather than throwing, never a schema the document does

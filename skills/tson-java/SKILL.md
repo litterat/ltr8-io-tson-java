@@ -156,7 +156,8 @@ said and `readAs(source, type)` what a root type-ref would have. A **self-descri
 throws `SchemaValidationException` ("a schema is already registered under …"). Pick one.
 
 `ProcessorConfig` (a value in `tson-base`, handed to `Tson.of`) carries: `withSchemaAccess(…)`,
-`withDataBindContext(…)`, `withMetaNameBinder(…)`, and `withProcessorPolicy(…)` (or its
+`withDataBindContext(…)` — one context for data and for a schema's value entries alike — and
+`withProcessorPolicy(…)` (or its
 `withIdentifierPolicy(…)` / `withTokenPolicy(…)` / `withLimits(…)` components). Every setter returns a
 new value, so a configuration may be derived from without the holder losing what they stated.
 

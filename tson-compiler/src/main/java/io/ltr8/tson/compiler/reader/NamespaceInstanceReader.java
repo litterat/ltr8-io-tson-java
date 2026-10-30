@@ -6,13 +6,13 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.meta.Namespace;
 
 /**
- * An instance of a namespace constructor: the map the constructor's own reader reads, delivered as the {@link
- * Namespace} it is an instance of, which carries the constructor's name beside the map. Four positions deliver
- * one: a value standing as an entry, {@code myapi => !api { ... }} (the meta's constructor reader); a value read back
- * from resolved output at a {@code top}-typed position, selected by its tag ({@code RecordTagDispatchReader}); a
- * position typed by a namespace type whose host component is a {@code Namespace}, a record's {@code fields} ({@link
- * BindTargets}); and a root read asked for a {@code Namespace} ({@code TsonObjectReader}). Anywhere else a namespace
- * type reads as the map itself, so a host declaring {@code Map<String, Method> methods} receives a map.
+ * A value of a namespace type: the map the namespace type's own reader reads, delivered as the {@link Namespace} it
+ * is, which carries the namespace type's name beside the map. Four positions deliver one: a value entry's payload,
+ * {@code myapi => !api { ... }} (the resolver's read); a value at a {@code declared} position, selected by its tag,
+ * which is where resolved output's entries stand ({@code DeclaredReader}); a position typed by a namespace type whose
+ * host component is a {@code Namespace}, a record's {@code fields} ({@link BindTargets}); and a root read asked for a
+ * {@code Namespace} ({@code TsonObjectReader}). Anywhere else a namespace type reads as the map itself, so a host
+ * declaring {@code Map<String, Method> methods} receives a map.
  *
  * <p>Bind mode only wraps: a bound namespace type reads into an {@link AnnotatedMap}, which keeps each key's
  * annotations and the order written ({@code MapBindReader}). Anything else the wrapped reader produces -- a tree
@@ -24,8 +24,8 @@ public final class NamespaceInstanceReader implements TsonTypeReader<Object> {
     private final TsonTypeReader<?> map;
 
     /**
-     * @param constructor the namespace constructor a value read here is an instance of
-     * @param map         the constructor's own reader, reading the map
+     * @param constructor the namespace type a value read here is a value of
+     * @param map         the namespace type's own reader, reading the map
      */
     public NamespaceInstanceReader(String constructor, TsonTypeReader<?> map) {
         this.constructor = constructor;

@@ -12,8 +12,8 @@ rules are walked. Current form only; history lives in git.
 - A skip is not a pass: CI sets `TSON_REQUIRE_TEST_SUITE`, and the pin is a commit, never a branch.
 - At the schema and link layers the category is the phase's; each diagnostic must be a verdict (`Code.verdict()`).
 - Add vectors in the same session as lexer/parser/resolver work; the corpus moves before `SUITE_PIN`.
-- A record a fixture's namespace types hold is bound to a host class of the runner's own (`SuiteBindings`, one record
-  per meta record in `io.ltr8.tson.suite.data`), the same binding in both runners and in `SidecarSchemasTest`.
+- A record a fixture's value entries hold is bound to a host class of the runner's own (`SuiteBindings`, one record
+  per fixture record in `io.ltr8.tson.suite.data`), the same binding in both runners and in `SidecarSchemasTest`.
 
 Related: `design/name-hygiene-and-minted-names.md`, `design/name-hygiene-read-path.md`, `design/json-unicode-policies.md`.
 
@@ -124,22 +124,22 @@ whole-name (§8.2's SHOULD) and relaxes through `withIdentifierPolicy`, which §
 than ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
 may legitimately be anything.
 
-**A meta layer's own records need host classes, and the runner supplies them.** A value of a meta layer's namespace
-type reads each value of its map into a class the reading application binds ([TSON-SCHEMA] §4.1,
-`design/meta-layer-namespaces.md`), so a vector whose schema applies one — the link layer's values-by-name vectors
-over `fixtures/meta-service.tn`'s `interface` and `bindings` — cannot be judged by a runner that binds nothing. The
-corpus states the records in a fixture meta-schema and stays language-agnostic; the host side is the runner's:
-`SuiteBindings` (`tson-compiler/src/testShared`) carries a plain record per meta record (`Method`, `RpcMethod`,
-`Binding`, `HeaderSet`, `Route`), named for it so the name binder's package convention finds it, composed onto the
-library's own binder (`ProcessorConfig.withMetaNameBinder` at the front door, `SchemaMetaNameBinder.contextExtendedWith`
-where a registry is built directly). `SidecarSchemasTest` resolves the fixtures under the same binding, since a fixture
-applying a namespace type would otherwise fail there for want of a class rather than for anything about the fixture.
-A new fixture record is a new host record beside them; the fixture's `@doc` lists the records its namespace types hold,
-which is the corpus's half of the contract (`RUNNER.md`, "A meta layer's own records").
+**A fixture's own records get host classes, and the runner supplies them.** A schema's value entries bind to the
+classes the reading application's bind context names ([TSON-SCHEMA] §4.1, `design/meta-layer-namespaces.md`); one no
+class binds is held as a tree, which loads and validates but which a schema obtained to bind refuses, so a vector
+over `fixtures/meta-service.tn`'s `interface` and `bindings` — the link layer's values-by-name vectors — is judged
+against bound values. The corpus states the records in its fixture schemas and stays language-agnostic; the host side
+is the runner's: `SuiteBindings` (`tson-compiler/src/testShared`) carries a plain record per fixture record
+(`Method`, `RpcMethod`, `Binding`, `HeaderSet`, `Route`, …), named for it so the name binder's package convention finds
+it, composed onto the library's own binder (`SchemaMetaNameBinder.contextExtendedWith`), and handed to the front door
+as the one context schemas and data bind through (`ProcessorConfig.withDataBindContext(SuiteBindings.context())`).
+`SidecarSchemasTest` resolves the fixtures under the same binding. A new fixture record is a new host record beside
+them; the fixture's `@doc` lists the records its value entries hold, which is the corpus's half of the contract
+(`RUNNER.md`).
 **A `schema/` vector's expected side is read under the subject's first `!!import`** (`ResolvedForm.readResolved`, a
 `withImports(…).readAs(text, "schema")` read; the pre-loaded kernel where the subject imports nothing), and the object
-reader binds through `SuiteBindings` too: a fixture meta imports meta.tn and adds its constructors, and a namespace
-entry in resolved output is typed by that layer alone, so a vector showing a value by name written back as written
+reader binds through `SuiteBindings` too: a fixture imports meta.tn and adds its own types, and a value entry in
+resolved output is typed by that fixture alone, so a vector showing a value by name written back as written
 reads only there. Only the first: `SuiteBindings` binds by name across the corpus, and reading under every import
 would bind a second fixture's same-named record to the first's class.
 

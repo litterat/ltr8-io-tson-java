@@ -11,12 +11,10 @@ public enum EntryKind {
     ATOM, PRODUCT, SUM, REFERENCE,
 
     /**
-     * A namespace type: a constructor IS-A the kernel's {@code namespace}, whose instances are maps from its
-     * {@code key_type} to its {@code value_type} ({@link MapBody#ofNamespace}). It is a type -- its values
-     * are its instances -- and {@code type_kind} holds it, where it holds no other constructor. An entry whose
-     * value is one of those instances, a {@link Namespace}, takes this kind too, and is no type.
+     * A value entry ({@link ValueEntry}): an instance of an ordinary type, {@code orders => !api { ... }}. It is
+     * no type, and no kind holds it.
      */
-    NAMESPACE,
+    VALUE,
 
     /**
      * A held template -- [TSON-SCHEMA] §5.10's open entry over any constructor but {@code record}, whose body is a
@@ -35,8 +33,8 @@ public enum EntryKind {
      * of a constructor is what its instances are.
      *
      * @param kernel whether a chain's name denotes the meta-kernel's own entry of that name -- a kind is judged by
-     *               where a base kind is defined, never by its spelling, so a schema's own {@code namespace => { ... }}
-     *               composed into {@code payload => namespace & { ... }} leaves {@code payload} a PRODUCT
+     *               where a base kind is defined, never by its spelling, so a schema's own {@code atom => { ... }}
+     *               composed into {@code payload => atom & { ... }} leaves {@code payload} a PRODUCT
      */
     public static EntryKind of(Top value, Predicate<String> kernel) {
         return switch (value) {
@@ -46,13 +44,13 @@ public enum EntryKind {
             case Sum ignored -> SUM;
             case Reference ignored -> REFERENCE;
             case TemplateBody ignored -> TEMPLATE;
-            case Namespace<?> ignored -> NAMESPACE;
+            case ValueEntry ignored -> VALUE;
         };
     }
 
     /**
-     * The kind a record's chain reaches: the first of the kernel's {@code atom}, {@code product}, {@code sum} and
-     * {@code namespace} that appears in it as the kernel's own entry ({@code top} never counts),
+     * The kind a record's chain reaches: the first of the kernel's {@code atom}, {@code product} and {@code sum}
+     * that appears in it as the kernel's own entry ({@code top} never counts),
      * and {@link #PRODUCT} where none does, a record being a product. Those entries themselves and not each
      * ancestor's own kind: the {@code atom} entry is itself a record of kind {@code PRODUCT}, so inheriting the
      * nearest ancestor's kind would answer wrongly for {@code atom}'s own subtypes. A chain reaching two is refused
@@ -73,9 +71,6 @@ public enum EntryKind {
                 case "sum" -> {
                     return SUM;
                 }
-                case MapBody.NAMESPACE -> {
-                    return NAMESPACE;
-                }
                 default -> {
                 }
             }
@@ -84,14 +79,14 @@ public enum EntryKind {
     }
 
     /**
-     * Whether {@code value} IS-A the meta-kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind, a
-     * namespace type, {@code reference} or {@code template} -- what a construction may apply, and what a compiled
+     * Whether {@code value} IS-A the meta-kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
+     * {@code reference} or {@code template} -- what a construction may apply, and what a compiled
      * schema builds an instance reader for. Read off the chain, so a
      * template composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would; and
      * judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:
      * it is what every other answer IS-A, and as abstract as the base kinds beneath it, so its own reader is what
      * refuses a direct application of it. That is applicability, not kind membership: by the chain {@code top} is
-     * a type, and a member of {@code type_kind}, and so is a namespace type.
+     * a type, and a member of {@code type_kind}.
      *
      * @param name the entry whose value {@code value} is
      */

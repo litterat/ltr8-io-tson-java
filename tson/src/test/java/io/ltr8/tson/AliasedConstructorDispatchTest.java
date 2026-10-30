@@ -34,16 +34,16 @@ class AliasedConstructorDispatchTest {
     /** The name the class carries itself still works -- the fallback passes are untouched. */
     @Test
     void aBodyNamedForItsOwnClassDispatches() {
-        assertInstanceOf(ArrayBody.class, read("!array { element_type: token }"));
+        assertInstanceOf(ArrayBody.class, read("!array { element_type: text }"));
     }
 
     /** And the one that is only a name in the binder, which is the case that failed. */
     @Test
     void aBodyNamedByAnAliasOfItsClassDispatchesToo() {
-        Top definition = read("!set_type { element_type: token }");
+        Top definition = read("!set_type { element_type: text }");
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, definition);
-        assertEquals("token", body.elementType().name());
+        assertEquals("text", body.elementType().name());
     }
 
     /** A name that is nobody's -- neither a class's own nor an alias -- is still not a member. */

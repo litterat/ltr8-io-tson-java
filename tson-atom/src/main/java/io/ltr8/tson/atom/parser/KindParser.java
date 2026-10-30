@@ -12,11 +12,11 @@ import java.util.Optional;
  * grammar, read as the kernel's {@code type_name} reads it ({@link IdentifierParser#IDENTIFIER}), and then a
  * member of the kind's linked {@code members}. The value is the name, never a value of the type it names.
  *
- * <p><b>Membership is judged where the names resolve.</b> A kind's members are the names of the governing
- * schema's closure, so a name read under that schema is a member or refused here, as an enum refuses a label it
- * does not list. Where the governing schema is a meta layer the document is a schema or describes one, and a name
- * it writes resolves in the described schema's namespace, which the closure does not hold: {@link #namesOnly}
- * reads the grammar alone, and that schema's link, or ingest, judges the name a member ([TSON-SCHEMA] §4.2, §8.1).
+ * <p><b>Membership is judged where the names resolve.</b> A kind's members are the names of the reading
+ * document's closure, so a name a data document writes is a member or refused here, as an enum refuses a label it
+ * does not list. A name in a schema document resolves in that schema, which the closure does not hold: {@link
+ * #namesOnly} reads the grammar alone, and that schema's link, or ingest, judges the name a member ([TSON-SCHEMA]
+ * §4.2, §8.1).
  *
  * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link EnumParser}: the members are the
  * closure's.

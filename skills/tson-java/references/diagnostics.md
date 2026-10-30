@@ -48,17 +48,19 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
   not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in one
-  document both get reported. No construct the bundled schemas declare reaches one; what still can is a
-  document read against an entry built with a schema's own namespace type, which is a value and has no reader;
-  a value at a `ref<T>`-typed position of a data document; and, in a schema, applying a constructor or
-  reading an annotation value against a type declared in the same document (SPEC-FEEDBACK.md #7).
+  document both get reported. No construct the bundled schemas declare reaches one; what still can is
+  a value at a `ref<T>`-typed position of a data document, and, in a schema, applying a constructor or a type, or
+  reading an annotation value against a type, declared in the same document (SPEC-FEEDBACK.md #7). A data tag
+  naming a schema's value entry (`!orders { … }` over `orders => !api { … }`) is no gap: it is `TYPE_MISMATCH`,
+  a value and not a type.
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
   document than a gap is. It normally fails the bind-mode compile as an exception instead; it reaches a
   read as a diagnostic for a schema compiled on demand, and where the bound class refuses a value the schema
   admits — its constructor's own check, or a void value meeting a collection that refuses `null`, such as
   `ConcurrentHashMap`. With no schema the class is the contract, and the same refusal is `TYPE_MISMATCH`.
   A field or position that can hold no value (voidable, or optional with no default) bound to a primitive is
-  refused at compile.
+  refused at compile. A schema value entry whose type the context binds no class for is held as a tree, so it
+  validates; obtained through `bindRegistry()` it is a `BIND_MISMATCH` at the entry (`/entry`).
 - **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth`
   (64 by default). The bytes may be valid and read in full by a processor configured for more, which is why
   the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope)

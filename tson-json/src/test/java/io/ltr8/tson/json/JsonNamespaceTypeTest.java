@@ -32,7 +32,7 @@ class JsonNamespaceTypeTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               header_name => !identifier_type { continue_add: "-" }
-              headers     => namespace & { key_type: = header_name  value_type: = text }
+              headers     => !namespace { key_type: header_name  value_type: text }
             }
             """;
 

@@ -23,8 +23,8 @@ import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Ref;
-import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -158,11 +158,18 @@ public final class DataClassObjectWriter {
                 writer.unquotedToken(reference.name());
                 return;
             }
+            if (value instanceof ValueEntry entry) {
+                // A value entry names its type under its tag, the entry's and no Java class's, `!api { ... }`, and
+                // its value is written as the value of that type it is: a namespace's map, a bound record, or the
+                // tree a value no class binds is held as.
+                writeValueEntry(entry, writer);
+                return;
+            }
             if (value instanceof Namespace<?> namespace) {
-                // A namespace value is an instance of its constructor, written as the map it is. Where the position
-                // admits more than one constructor (a schema entry, typed `top`) the value names its own under the
-                // tag, which is the value's and no Java class's: `!api { get_orders => ... }`. A position its host
-                // types as a Namespace is a named one, `fields: { ... }`, whose type already says which.
+                // A namespace value is the map it is. Where the position admits more than one type (a declared
+                // one) the value names its own under the tag, which is the value's and no Java class's. A
+                // position its host types as a Namespace is a named one, `fields: { ... }`, whose type already
+                // says which.
                 if (dataClass == null || dataClass.typeClass() != Namespace.class) {
                     writer.typeRef(namespace.type());
                 }
@@ -321,11 +328,12 @@ public final class DataClassObjectWriter {
     }
 
     /**
-     * The descriptor {@code value} is written through: its class's, and for a {@link Namespace}, which no class
-     * describes, {@link Top}'s -- the union it is a member of, the value naming its own constructor.
+     * The descriptor {@code value} is written through: its class's, and none for a {@link Namespace} or a {@link
+     * ValueEntry}, which no class describes and which name their own type ({@link #write}).
      */
     private DataClass descriptorOf(Object value) throws DataBindException {
-        return context.getDescriptor(value instanceof Namespace<?> ? Top.class : value.getClass());
+        return value instanceof Namespace<?> || value instanceof ValueEntry ? null
+                : context.getDescriptor(value.getClass());
     }
 
     // ── Records ──────────────────────────────────────────────────────────
@@ -386,6 +394,22 @@ public final class DataClassObjectWriter {
         writer.endMap();
     }
 
+    /** A value entry: its type as the tag, then its value. */
+    private void writeValueEntry(ValueEntry entry, TsonDataEmitter writer) throws Throwable {
+        Object held = entry.value();
+        if (held instanceof Namespace<?> namespace) {
+            writer.typeRef(entry.type());
+            writeNamespace(namespace, writer);
+        } else if (held instanceof TsonValue node) {
+            if (node.typeRef().isEmpty()) {
+                writer.typeRef(entry.type());
+            }
+            treeWriter.write(node, writer);
+        } else {
+            write(held, context.getDescriptor(held.getClass()), writer, entry.type());
+        }
+    }
+
     /**
      * A namespace value's entries, in the order held: each key with its annotations, as its bare name where it is an
      * identifier and quoted otherwise, and each value as its own class writes it, under the tag its {@link Typename}
@@ -437,8 +461,8 @@ public final class DataClassObjectWriter {
      * flexibility doesn't obligate a writer to be equally flexible about its own single output.
      */
     private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer) throws Throwable {
-        if (value instanceof Namespace<?>) {
-            write(value, dataClass, writer, null); // names its own constructor, which no class does
+        if (value instanceof Namespace<?> || value instanceof ValueEntry) {
+            write(value, dataClass, writer, null); // names its own type, which no class does
             return;
         }
         Class<?> memberClass = value.getClass();

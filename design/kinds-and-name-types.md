@@ -9,11 +9,15 @@ is why they are the linker's. Current form only; history lives in git.
 - A kind is an atom whose values are type names. Its `members` are recomputed for **every** kind in the closure,
   imports included, and never trusted from a body; `KindBody`'s equality is `of` and the chain, never the members, so
   an importer re-deriving an import's kind unifies with it.
-- `of` resolves in the schema's one namespace and must be `type` or `namespace`, or IS-A either
-  (`KindMembers.ofRefusal`). A kind is not a bound.
-- A constructor (IS-A `top`) is no member of any kind except as a namespace constructor, whose instances are maps; a
-  namespace constructor is a member of `type_kind` and of the kind of every namespace constructor it is or IS-A, and
-  of no other kind.
+- `of` resolves in the schema's one namespace and must be `type` or a constructor IS-A it
+  (`KindMembers.ofRefusal`); a type that is no constructor is refused with the reference named (`kind<api>`, write
+  `ref<api>`). A kind is not a bound.
+- A constructor (IS-A `top`) is no member of any kind, `namespace` included. A namespace type is built with
+  `namespace`, so it is a member of `type_kind`, `kind<product>` and `kind<namespace>`, and of no `kind<record>` or
+  `kind<map>`. A value entry is a member of no kind: its tag names an ordinary type, which no walk reaches a
+  constructor through.
+- A kind-typed position is judged by membership in every data document, over the reading document's closure; in a
+  schema document it reads its grammar alone and the link (or ingest) judges membership.
 - An empty kind admits no value, and `TypeInhabitance` refuses it.
 - Whether a `name_type` referent may stand in its slot is membership of the slot's kind (`NameType.admits`, reading
   the kind off the constructor's `name_type` field), never a test of the referent's body class.
@@ -52,7 +56,7 @@ and `record.name_type` by the first. `computeKinds` writes `members` (sorted, `K
 in the merged map after `computeSubtypes` and before the name-type checks.
 
 - **Membership is one walk over resolved entries.** `KindMembers`' class Javadoc states the walk: alias hops to the
-  type, constructors, references and `template` bodies excluded, the namespace-constructor exception, then the
+  type, constructors, references, `template` bodies and value entries excluded, then the
   constructor the value applies (its recorded tag, `EntryFacts.constructor`, else its body's `@Typename`) followed
   through a constructor template's held body until `of` or a constructor IS-A it is reached. So a record template is
   a member of `kind<record>` (it is a type, §5.10), `set<text>` of `kind<set_type>` while meta.tn's template `set` is
@@ -65,23 +69,28 @@ in the merged map after `computeSubtypes` and before the name-type checks.
   holding a narrower first one (materialisation's imported entries). A schema cannot declare a `uuid_type` of its own
   to capture a hop: the closure already binds the name, and a second declaration is §2.2.3's collision. The closure
   walked is the merged map, the kernel's and meta.tn's own types included, so `kind<record>` lists the kernel's
-  records beside the schema's, and `kind<api>` holds the namespace type `api` itself.
+  records beside the schema's, and `kind<namespace>` holds a schema's own namespace type `api` beside `schema` and
+  `field_map`.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: `kind<data>`, `kind<top>`,
-  `kind<template>`, `kind<reference>` and a type that is no constructor (`kind<stock_id>`) are refused, against the
-  declaration that wrote the application (`reportedAgainst`).
+  `kind<template>`, `kind<reference>` and a type that is no constructor (`kind<stock_id>`, `kind<api>`) are refused,
+  against the declaration that wrote the application (`reportedAgainst`).
 - **Recomputed everywhere, trusted nowhere.** Members are computed over each linking schema's closure, so the
-  kernel's `identifier_kind` lists a user meta layer's own `text_identifier` at that layer's link, and an author's
+  kernel's `identifier_kind` lists a user schema's own `text_identifier` at that schema's link, and an author's
   hand-written `members` are discarded.
 - **A value at a kind-typed field is a name.** `checkFieldValue` hands a `~`/`=` value at a kind-typed field to
   `checkKindValue`, which resolves it in the schema's namespace and asks the walk. So
-  the kernel's `enum => enum_type ^ { name_type?: = identifier }` is a member at the kernel's link, a meta layer's pin
-  of its own `text_identifier` at that layer's, and a pin of a text family is refused where it is written.
-- **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers`' `KindParser`): a
-  type-name token, or a JSON string, naming a member of the linked index. Under the kernel or a schema importing it
-  directly (`TsonLinkedSchema.governsSchemas`; core.tn, reaching it transitively, governs data) the document is a
-  schema or describes one, its names resolving in the described schema, so the reader checks the
-  grammar alone (`KindParser.namesOnly`) and that schema's link judges membership, which is what lets a resolved form
-  naming a user's own name type read back through meta.tn.
+  the kernel's `enum => enum_type ^ { name_type?: = identifier }` is a member at the kernel's link, a schema's pin
+  of its own `text_identifier` at that schema's, and a pin of a text family is refused where it is written.
+- **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers.forRead`'s
+  `KindParser`): a type-name token, or a JSON string, naming a member of the linked index. That is every data
+  document's reading, whatever it imports: a data document importing only meta.tn that writes `!record_field { type:
+  int32 }` is refused, `int32` being core's. In a **schema document** a name resolves in the schema being resolved,
+  which the reading closure does not hold, so the reader checks the grammar alone (`AtomParsers.inSchemaDocument`,
+  `KindParser.namesOnly`) and `AtomTypeReader` records the name for that schema's link to judge. A schema document is
+  a construction's or a value entry's payload, which the resolver reads (`TsonReadContext.readsSchemaDocument`), or
+  a value of the kernel's `schema` read as data, a resolved form (`readsSchemaNames`, set by the reader
+  `TsonSchemaCompiler` builds for the kernel's `schema` entry), whose names ingest judges. That is what lets a
+  resolved form naming a user's own name type read back.
 
 ## What a name type is (`NameType`)
 

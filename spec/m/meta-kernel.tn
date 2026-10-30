@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=f906da450f8e6f27c3e3e3195a97afbeb9c6c25b7092745cdd16aa05b0de2b07"
+!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=afc2c2135a5aa442d259a40f1327e8a97b6a6bf2b4158b3be2a9d1c5864ca062"
 @doc:"""
   TSON meta-kernel — pre-loaded bootstrap layer (2026 Revision 39 draft).
 
@@ -15,18 +15,21 @@
   """
 !schema {
   @doc:"""
-    The structural root, and what a schema map's entries are: `schema` maps a
-    name to a `top`, an entry being its value. Every constructor transitively
-    IS-A `atom`, `product` or `sum`, except `reference`, `template` and
-    `namespace`, which compose with `top` directly, and the namespace types,
-    which compose with `namespace` (`schema`, `field_map`). `atom`, `product`
-    and `sum` IS-A `type`, which IS-A `top`; `namespace` IS-A `top` alone.
-    Construction transfers kind, not IS-A, so instances and fresh records sit
-    under the kinds with empty chains; a namespace type is declared by
-    composition, which is what places it in the order. `top` and the kinds
-    beneath it are abstract: none has instances of its own, so a direct
-    application of one is refused as any abstract record's is, naming the
-    subtypes that would satisfy it.
+    The structural root: every constructor IS-A `top`. Every constructor
+    transitively IS-A `atom`, `product` or `sum`, except `reference` and
+    `template`, which compose with `top` directly; `atom`, `product` and `sum`
+    IS-A `type`, which IS-A `top`. Construction transfers kind, not IS-A, so
+    instances and fresh records sit under the kinds with empty chains. `top`
+    and the kinds beneath it are abstract: none has instances of its own, so a
+    direct application of one is refused as any abstract record's is, naming
+    the subtypes that would satisfy it.
+
+    A schema map's entries are types or values (`schema`). An entry whose value
+    is built by a constructor IS-A `type` is a type; one whose value is built
+    by `reference` or `template` is an alias or an open entry; and one whose
+    value is an instance of an ordinary type, `orders => !api { ... }` or
+    `create_order => !operation { ... }`, is a value, marked by nothing but its
+    tag.
     """
   top       => abstract {}
 
@@ -51,12 +54,8 @@
     The kind of kinds that describe the shape of a data value: `atom`,
     `product` and `sum` IS-A `type`, and nothing else does. An entry whose
     value is a body whose constructor IS-A `type` is a type; a `reference`
-    or a `template` is not, composing `top`. A `namespace` composes `top`
-    too, and is a type of another kind: a value of it is a map, so `namespace`
-    and the namespace types composing it (`schema`, `field_map`) are the
-    constructors `type_kind` holds. An entry whose value is an instance of a
-    namespace type is a value, never a type: it is how a schema puts
-    vocabulary of its own in a schema map.
+    or a `template` is not, composing `top`, and an entry whose value is an
+    instance of an ordinary type is a value, never a type.
 
     A type carries its IS-A chain. A declaration never writes `chain`, and a
     constructor never declares a field of that name: the resolver computes the
@@ -88,26 +87,27 @@
   sum       => abstract type & {}
 
   @doc:"""
-    The constructor whose instances are maps. A value of a type IS-A
-    `namespace` is written and read as a map from `key_type` to `value_type`,
-    `ordered` as a map's is, and never as a record of these facets: the facets
-    describe the map, and a namespace type pins them by composition,
-    `api => namespace & { key_type: = identifier  value_type: = method }`.
-    Its keys are names, of an identifier family, which is what a qualified
-    name's segment is. A fixed `key_type` is the family every key is read and
-    judged under; a default one is the family that stands where the host of
-    the value states none, the host supplying the family otherwise.
-    That composition is the IS-A edge that admits `!api { ... }` wherever
-    `top` is ([TSON-SCHEMA] §3.3.1), and `api` is a type whose values are its
-    instances, so `type_kind` holds it where it holds no constructor IS-A
-    `type`. A qualified name's segment selects a key of a namespace value and
-    of no other map. The schema map (`schema`) and a record's fields
-    (`field_map`) are the kernel's two.
+    A map keyed by names: the constructor of a namespace type, whose values
+    are maps from `key_type` to `value_type`, `ordered` as a map's are. A
+    namespace type is an instance, as a map type is one of `map`:
+    `api => !namespace { key_type: identifier  value_type: method }`, and an
+    entry holding a value of it, `orders => !api { ... }`, is an ordinary
+    value of the type `api`. Its keys are names, of an identifier family,
+    which is what a qualified name's segment is, and a segment selects a key
+    of a namespace value and of no other map.
+
+    `key_type` is the family every key is read and judged under. Absent, the
+    host of the value supplies it: a record's `fields` are keyed by the
+    record's `name_type`. A value is never void and has no size bounds.
+    The schema map (`schema`) and a record's fields (`field_map`) are the
+    kernel's two.
     """
-  namespace => abstract top & {
-    key_type:   identifier_kind
-    value_type: type_kind
-    ordered?:   boolean ~ false
+  namespace => product & {
+    access_pattern?: product_access_type = NAMED
+    size_type?:      product_size_type = VARIABLE
+    key_type?:       identifier_kind
+    value_type:      type_kind
+    ordered?:        boolean ~ false
   }
 
   @doc:"""
@@ -169,7 +169,7 @@
     `min_items: N` as readily as `element_type: T` — so a body carrying one is
     not typed by any constructor's own record shape until it closes.
 
-    An open entry's value is this, a `top` like every other entry's. What is
+    An open entry's value is this, built by a constructor IS-A `top`. What is
     compared is the parsed form and never the text: an open
     synthetic's identity is derived from its held binding record, so two
     spellings of one form must reduce to one entry, and whitespace is free.
@@ -604,8 +604,8 @@
     application the entry is the instantiation of ([TSON-SCHEMA] §8.2). An
     entry of any kind can be one, so it is a fact about the entry and not
     about a type: the resolver writes it wherever an entry closes an
-    application — a record template's member, a namespace entry closed from a
-    templated instance, the alias a template's application closes to. On
+    application — a record template's member, an instance closed from a
+    templated construction, the alias a template's application closes to. On
     ingest it is read as stated, unlike `synthetic`, which is recomputed: it
     is the one fact the entry's value does not state, and what lets an
     imported schema's instantiations unify with a later schema's. A
@@ -698,10 +698,10 @@
     facts, in declaration order, which is part of the value. A name is written
     once, by its spelling, as the key; two spellings that are one value of the
     record's `name_type` are a resolver error. The key family is the host
-    record's: its `name_type`, which stands at `key_type` by default, and so
-    `field_name` where neither the record nor a supertype states one.
+    record's: its `name_type`, so `field_map` states no `key_type`, and the
+    family is `field_name` where neither the record nor a supertype states one.
     """
-  field_map => namespace & { key_type?: ~ field_name  value_type: = record_field  ordered?: = true }
+  field_map => !namespace { value_type: record_field  ordered: true }
 
   @doc:"""
     A record: named fields, fixed by the type, with the field groups over them.
@@ -875,28 +875,46 @@
   }
 
   @doc:"""
+    Constructor for the open sum over the governing closure: the value names
+    its own type by its tag, among the types of the closure ([TSON-SCHEMA]
+    §2.2.3), and is validated in full against it. A value naming no type is
+    invalid. Where `choice` is the closed sum, enumerating its variants, this
+    is the open one, drawing them from the closure; `disjoint` is absent, as
+    on every non-choice sum.
+    """
+  declared_type => sum & {}
+
+  @doc:"""
+    A value of a type the closure declares, chosen by the value: the tag names
+    the type, the name resolves in the closure exactly as it does anywhere
+    else, and the value is validated in full against it. What a schema map's
+    entries are.
+    """
+  declared => !declared_type {}
+
+  @doc:"""
     The names of the types built with the constructor `of`: an atom whose
     values are type names, as an enum's are the names it lists. An entry of the
     governing schema's closure is a member when, past its alias hops
     ([TSON-SCHEMA] §8.3), the constructor its value applies is `of` or IS-A
     `of`, a constructor template followed to the constructor it applies, and
-    it is not itself a constructor whose instances are types: it is not IS-A
-    `top` unless it is a namespace constructor, whose instances are maps. A
+    it is not itself a constructor: it is not IS-A `top`. A
     record written in braces is built with `record`, and so is a record
     template, which is a type, and so is `top` itself: a fresh abstract record
     IS-A nothing, so it is a member of every kind whose `of` is `record` or
     above it. A template over another constructor is no type and no member; an
     application of one is, as the type it expands to, and so is an alias of a
-    member. A namespace type is a member of `type_kind` and of the namespace
-    kinds (`kind<namespace>`) and of no other: a value of it is a map, so
-    `kind<record>` and `kind<product>` exclude it. Membership is by
-    construction, so a kind holds an abstract type: `kind<record>` holds
-    `pet => abstract { ... }`, and `kind<namespace>` holds `namespace` itself.
+    member. A namespace type is built with `namespace`, so `kind<namespace>`
+    and `type_kind` hold it and `kind<record>` does not. An entry whose value
+    is an instance of an ordinary type is no member of any kind: it is a
+    value, named by a reference (`ref<api>`). Membership is by construction,
+    so a kind holds an abstract type: `kind<record>` holds
+    `pet => abstract { ... }`.
 
     `of` names a constructor of the writer's namespace ([TSON-SCHEMA] §3.3.1),
-    never a type that is no constructor. It is `type` or `namespace`, or a
-    constructor at or below either; any other `of` (`kind<reference>`) is a
-    resolver error at the declaration.
+    never a type that is no constructor. It is `type` or a constructor below
+    it; any other `of` (`kind<reference>`, `kind<api>`) is a resolver error at
+    the declaration.
 
     A value is a type name ([TSON-DATA] §7.7), and conforms when it resolves to
     a member. In a data document it resolves in the namespace of the governing
@@ -954,9 +972,10 @@
 
   @doc:"""
     Resolver output: a schema map, from each name to the value its entry
-    resolves to. Resolved output and source are one grammar — output is source
-    with sugar expanded, bodies flattened and chains computed, and an entry
-    written as a constructor application resolves to itself.
+    resolves to, a type or a value, each naming its type by its tag. Resolved
+    output and source are one grammar — output is source with sugar expanded,
+    bodies flattened and chains computed, and an entry written as a
+    constructor application resolves to itself.
     """
-  schema => namespace & { key_type: = type_name  value_type: = top }
+  schema => !namespace { key_type: type_name  value_type: declared }
 }

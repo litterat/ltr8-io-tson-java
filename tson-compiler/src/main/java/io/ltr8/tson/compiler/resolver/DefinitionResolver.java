@@ -43,6 +43,7 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -590,45 +591,6 @@ final class DefinitionResolver {
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
 
     /**
-     * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A the kernel's {@code top}</b>
-     * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain ({@link EntryKind#isConstructor}, judged in the
-     * imported entries every head resolves in, where {@code top} must be the kernel's own).
-     *
-     * <p><b>A wider and more exact question than whether {@code C} is marked a constructor.</b> §4.1 makes
-     * every base kind IS-A {@code top} and every constructor transitively so, while IS-A stops at
-     * construction -- an instance or a fresh record carries an empty chain. So the predicate
-     * admits every constructor, and beyond them exactly the entries that describe <em>a type</em> rather than
-     * a part of one.
-     *
-     * <p>What it lets in that a constructor mark would not:
-     * <ul>
-     *   <li>{@code reference}, which describes no value and which the language nonetheless needs
-     *   applicable, open and closed alike: {@code <T> !reference { target: T }} and
-     *   {@code !reference { target: int32 }} are one construction and get one answer.</li>
-     *   <li>{@code top}, {@code type} and the four base kinds, which cost nothing: each is abstract
-     *   ([TSON-SCHEMA] §4.1), so its reader refuses a direct application as any abstract record's does,
-     *   naming the subtypes that would satisfy it.</li>
-     * </ul>
-     *
-     * <p>What it keeps out is the set that matters -- {@code record_field}, {@code type_ref}, {@code
-     * type_argument}, {@code tuple_element}, {@code field_group}, {@code integer_size}, {@code
-     * atom_specification}: record-bodied entries with empty chains, every one a component of a type rather than
-     * a type. Without a check they fail anyway, on {@code Top} being sealed,
-     * but as a {@code ClassCastException} reported {@code NOT_IMPLEMENTED} -- a non-verdict, for an author
-     * error.
-     */
-    private void requireApplicable(String name, String target, Top applied) {
-        String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
-        if (EntryKind.isConstructor(terminal, applied, metaKernel)) {
-            return;
-        }
-        throw new SchemaValidationException("'" + name + "': '!" + target + "' is not applicable -- it is "
-                + "not IS-A 'top' (§4.1), so it describes a part of a type rather than a type, and there is "
-                + "nothing for '!" + target + " { ... }' to build. Did you mean atom refinement ('!" + target
-                + " ^ { ... }')?");
-    }
-
-    /**
      * Refuses a construction whose head is abstract -- {@code top}, {@code type}, a base kind ([TSON-SCHEMA] §4.1),
      * or a meta layer's own abstract record: it has no direct instances (§5.2), so {@code !C { ... }} builds
      * nothing. One sentence, naming what would satisfy it: the instantiable entries IS-A the head among the imported
@@ -660,8 +622,8 @@ final class DefinitionResolver {
     /**
      * Refuses {@code template} as a construction head, closed or open: it is resolver vocabulary (§8.1).
      * An open entry's body is derived from a declaration's parameter list, and nothing is ever typed by it, so
-     * a source declaration applying it directly is a resolver error. It passes {@link #requireApplicable} --
-     * it is IS-A {@code top}, since resolved output is typed by it -- which is why it needs a check of its own:
+     * a source declaration applying it directly is a resolver error. It IS-A {@code top}, since resolved output is
+     * typed by it, so it is applied as a constructor would be -- which is why it needs a check of its own:
      * admitted, it would mint an open entry whose held body was hand-written, skipping every check §5.10 makes
      * of a template's declaration. Tested at the end of the head's reference chain (§8.3), so an alias of
      * {@code template} is refused as well.
@@ -679,10 +641,11 @@ final class DefinitionResolver {
      * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
      * with {@code value}.
      *
-     * <p>{@code C} resolves in the schema's one namespace, an imported entry (see {@link #resolveConstructorTarget}),
-     * and faces two questions. It MUST be <b>applicable</b> -- IS-A {@code top} (§4.1), see {@link #requireApplicable}
-     * -- and it MUST be <b>closed</b>: a template ({@code C} declaring type parameters) closes by application, {@code
+     * <p>{@code C} resolves in the schema's one namespace, an imported entry (see {@link #resolveConstructorTarget}).
+     * It MUST be <b>closed</b>: a template ({@code C} declaring type parameters) closes by application, {@code
      * C<...>}, never by construction, so naming one here is a resolver error whether or not it also carries {@code ~}.
+     * Where {@code C} is no constructor -- not IS-A {@code top} (§4.1) -- the entry is a value of the type {@code C}
+     * ({@link #resolveValueEntry}).
      *
      * <p>{@code value} is bound via {@link #bindAtomInstance} directly -- {@code instance.value().typeRef()}
      * already names {@code C} (per {@code Instance}'s own reshape, matching §12.1's {@code instance = "!"
@@ -712,14 +675,15 @@ final class DefinitionResolver {
                     + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
                     + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
-        requireApplicable(name, target, constructor);
+        if (!EntryKind.isConstructor(head.name(), constructor, metaKernel)) {
+            return resolveValueEntry(name, target, head, instance.value());
+        }
         refuseAbstractHead(name, target, constructor);
         refuseWrittenChain(name, target, instance.value());
-        // No check that the head's own body is a record: the two above leave nothing else. A chain reaching
-        // `top` is built only by composition and refinement, both of which build a `RecordBody` -- except where
-        // `parameterised` opens one for an open declaration, and a declaration with parameters is refused as a
-        // template above. Every other body shape (a construction's bound value, an alias's `Reference`) comes
-        // with an empty chain, since IS-A stops at construction (§4.1), so `requireApplicable` refuses it.
+        // No check that the head's own body is a record: a chain reaching `top` is built only by composition and
+        // refinement, both of which build a `RecordBody` -- except where `parameterised` opens one for an open
+        // declaration, and a declaration with parameters is refused as a template above. Every other body shape
+        // comes with an empty chain, since IS-A stops at construction (§4.1), and so is read as a value entry.
         // Parameters empty and IS-A `top` therefore imply a record body.
         Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
         if (body instanceof io.ltr8.tson.schema.meta.Reference) {
@@ -732,6 +696,44 @@ final class DefinitionResolver {
         // The author's own spelling of the head is the tag, not the terminal, so the chain stays walkable.
         constructedBy(name, target);
         return body;
+    }
+
+    /**
+     * {@code name => !T { ... }} where {@code T} is no constructor: a value entry, an instance of the ordinary type
+     * {@code T} ([TSON-SCHEMA] §4.1), its payload read against {@code T} as a data value is and held as the value
+     * ({@link ValueEntry}). It is no type, so nothing is minted or lifted for it, and its tag is {@code T}.
+     *
+     * <p>Refused: a head that is itself a value, since a value has no instances; and a braced payload at an atom
+     * type, which reads as no value of it and is almost always an atom refinement missing its {@code ^}.
+     */
+    private Top resolveValueEntry(String name, String target, ConstructorHead head, DataValue payload) {
+        if (head.definition() instanceof ValueEntry value) {
+            throw new SchemaValidationException("'" + name + "': '!" + target + "' names a value of the type '"
+                    + value.type() + "', and a value has no instances -- '!T { ... }' builds a value of the type T");
+        }
+        if (head.definition() instanceof Atom && payload.coreValue() instanceof RecordValue) {
+            throw new SchemaValidationException("'" + name + "': '!" + target + "' is an atom, and a braced body is "
+                    + "no value of it, so there is nothing for '!" + target + " { ... }' to build. Did you mean atom "
+                    + "refinement ('!" + target + " ^ { ... }')?");
+        }
+        Object value;
+        try {
+            value = definitionMetaReader.readValue(head.name(), readAs(payload, head.name()));
+        } catch (ReadException e) {
+            throw payloadFailure("'" + name + "': the body", "'" + name + "': the body is no value of the type '"
+                    + head.name() + "' -- " + e.diagnostic().path().filter(path -> !path.isEmpty())
+                            .map(path -> "at " + path + ": ").orElse("") + e.getMessage(), e);
+        } catch (BindMismatchException e) {
+            String where = "'" + name + "': " + e.getMessage();
+            throw e instanceof MissingBindingException ? new MissingBindingException(where)
+                    : new BindMismatchException(where);
+        }
+        if (value == null) {
+            throw new SchemaValidationException("'" + name + "': the body is no value of the type '" + head.name()
+                    + "'");
+        }
+        constructedBy(name, target);
+        return new ValueEntry(target, value);
     }
 
     /**
@@ -847,11 +849,19 @@ final class DefinitionResolver {
         ConstructorHead head = resolveConstructorTarget(name, target);
         requireAuthorable(name, target, head);
         Top constructor = head.definition();
+        if (!EntryKind.isConstructor(head.name(), constructor, metaKernel)) {
+            // A template over an ordinary type closes to a value entry, read against the type when it is applied.
+            if (constructor instanceof ValueEntry value) {
+                throw new SchemaValidationException("'" + name + "': '!" + target + "' names a value of the type '"
+                        + value.type() + "', and a value has no instances -- '!T { ... }' builds a value of the "
+                        + "type T");
+            }
+            return HeldBody.held(template.typeParams(), template.value());
+        }
         // `reference` needs no exception here: it IS-A `top`, so the generic rule admits it, which is what
         // makes the open and closed spellings of one construction agree. Nor does its kind need one any
         // more -- every open entry is TEMPLATE whatever constructor its held body applies, so the alias form
         // stopped being the one shape whose kind had to be read off the head.
-        requireApplicable(name, target, constructor);
         refuseAbstractHead(name, target, constructor);
         refuseWrittenChain(name, target, template.value());
         if (!(constructor instanceof RecordBody vocabulary)) {
@@ -1161,12 +1171,7 @@ final class DefinitionResolver {
         try {
             body = definitionMetaReader.read(constructorName, value);
         } catch (ReadException e) {
-            throw MapBody.isNamespace(metaDefinitions.definition(constructorName), metaKernel)
-                    ? payloadFailure("'" + name + "': the body", "'" + name + "': the body is no value of the "
-                            + "namespace type '" + constructorName + "', a map from its key type to its value type -- "
-                            + e.diagnostic().path().filter(path -> !path.isEmpty()).map(path -> "at " + path + ": ")
-                                    .orElse("") + e.getMessage(), e)
-                    : bodyIsNotValidData(name, constructorName, e);
+            throw bodyIsNotValidData(name, constructorName, e);
         } catch (BindMismatchException e) {
             // The constructor is a meta layer's own and the consumer never registered a class for it, or
             // registered one that disagrees. Either way it is their configuration, and it already says so --

@@ -192,7 +192,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
             }
             // A misconfiguration, not a gap -- see RecordBindReader.Factory.descriptorFor.
             throw new MissingBindingException("no bound Java class for '" + tried + "': nothing in this "
-                    + "bind context resolves that schema type name. Map it (ProcessorConfig.bindings) or give "
+                    + "bind context resolves that schema type name. Map it (ProcessorConfig.withDataBindContext) or give "
                     + "the context a DataNameBinder that can find it -- "
                     + (first == null ? "" : first.getMessage()), first);
         }

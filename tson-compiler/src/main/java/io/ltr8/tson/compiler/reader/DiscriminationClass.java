@@ -5,7 +5,8 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -126,13 +127,14 @@ public enum DiscriminationClass {
             case EnumBody members -> ofEnum(members);
             case RecordBody ignored -> Optional.of(BRACE);
             case MapBody m -> hasScalarKey(m, namespace) ? Optional.of(BRACE) : Optional.empty();
+            case NamespaceBody ignored -> Optional.of(BRACE); // its keys are names
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
             case Reference ignored -> Optional.empty();
             case TemplateBody ignored -> Optional.empty();
-            case Namespace<?> ignored -> Optional.empty();
+            case ValueEntry ignored -> Optional.empty();
         };
     }
 
