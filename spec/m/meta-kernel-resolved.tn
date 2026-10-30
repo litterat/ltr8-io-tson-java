@@ -113,8 +113,8 @@
 
   type_chain => !record { fields: {
     parents    => !record_field { type: array_type_kind_xxhash  optional: true }
-    supertypes => !record_field { type: array_type_name_xxhash  optional: true }
-    subtypes   => !record_field { type: array_type_name_xxhash  optional: true }
+    supertypes => !record_field { type: array_type_kind_xxhash  optional: true }
+    subtypes   => !record_field { type: array_type_kind_xxhash  optional: true }
   } }
 
   type => !record {
@@ -414,10 +414,10 @@
 
   reference => !record { chain: { supertypes: [atom top type] }  fields: {
     chain => !record_field { type: type_chain  optional: true }
-    of    => !record_field { type: type_name }
+    of    => !record_field { type: type_kind }
   } }
 
-  kind => !template { parameters: [{ name: T  type: type_name }]  template: "!reference { of: T }" }
+  kind => !template { parameters: [{ name: T  type: type_kind }]  template: "!reference { of: T }" }
 
   identifier_kind => !reference { of: identifier_type }
 
@@ -425,11 +425,9 @@
 
   type_kind => !reference { of: type }
 
-  ref => !template { parameters: [{ name: T  type: type_name }]  template: "!reference { of: T }" }
+  ref => !template { parameters: [{ name: T  type: type_kind }]  template: "!reference { of: T }" }
 
   schema => !namespace { key_type: type_name  value_type: declared }
-
-  @synthetic array_type_name_xxhash => !array { element_type: type_name }
 
   @synthetic array_template_param_xxhash => !array { element_type: template_param }
 

@@ -26,6 +26,7 @@ import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
+import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
@@ -100,6 +101,15 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /** The declaration currently being parsed, or {@code ""} before its name token is reached -- the {@code /name} schema pointer a recovered diagnostic carries. */
     private String declarationInProgress = "";
+
+    /**
+     * The document's one declaration map, which every schema map's members go into, a nested map's under their paths
+     * ({@link #parseMembers}).
+     */
+    private Map<String, SchemaMap.Declaration> declarationSink = new LinkedHashMap<>();
+
+    /** The path a schema map nested as the value of the declaration being parsed gives its members: its name and a dot. */
+    private String declarationPrefix = "";
 
     /** The types the declaration being parsed wrote in its parameter list, by parameter name ({@link #parseTypeParam}). */
     private Map<String, TypeRef> parameterTypes = new LinkedHashMap<>();
@@ -197,16 +207,31 @@ public final class TsonSchemaParser extends TsonDataParser {
     private Optional<SchemaMap> parseSchemaMap() {
         List<Annotation> annotations = parseAnnotationList();
         expectSchemaTag();
+        Map<String, SchemaMap.Declaration> declarations = new LinkedHashMap<>();
+        declarationSink = declarations;
+        parseMembers("");
+        return declarations.isEmpty() ? Optional.empty() : Optional.of(new SchemaMap(annotations, declarations));
+    }
+
+    /**
+     * A schema map's braced members, from its opening {@code '{'} to its closing {@code '}'}, each put into the
+     * document's one declaration map ({@link #declarationSink}) under {@code prefix} plus its own name: the root's
+     * under their names, a nested map's under their paths ({@link SchemaMapDef}). Returns the members' own names in
+     * the order written; one a recovered parse reported is left out.
+     */
+    private List<String> parseMembers(String prefix) {
         expect(TokenType.LBRACE, "a schema map's opening '{'");
         if (check(TokenType.RBRACE)) {
             throw parseError("a schema map requires at least one declaration; '{}' is not permitted here (§2.1)");
         }
         int mapDepth = nesting();
-        Map<String, SchemaMap.Declaration> declarations = new LinkedHashMap<>();
+        List<String> members = new ArrayList<>();
         boolean more = true;
         while (more) {
             try {
-                putDeclaration(declarations, parseDeclaration());
+                SchemaMap.Declaration declaration = parseDeclaration(prefix);
+                putDeclaration(declarationSink, declaration);
+                members.add(declaration.name().substring(prefix.length()));
                 more = consumeSeparatorOrCloseCheck(TokenType.RBRACE);
             } catch (ParseException e) {
                 if (receiver == null) {
@@ -217,7 +242,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             }
         }
         expect(TokenType.RBRACE, "a schema map's closing '}'");
-        return declarations.isEmpty() ? Optional.empty() : Optional.of(new SchemaMap(annotations, declarations));
+        return members;
     }
 
     /**
@@ -284,11 +309,12 @@ public final class TsonSchemaParser extends TsonDataParser {
         declarations.put(declaration.name(), declaration);
     }
 
-    private SchemaMap.Declaration parseDeclaration() {
+    private SchemaMap.Declaration parseDeclaration(String prefix) {
         List<Annotation> nameAnnotations = parseAnnotationList();
         Position namePosition = peek().start();
-        String name = expectTypeName("a declaration name");
+        String name = prefix + expectTypeName("a declaration name");
         declarationInProgress = name;
+        declarationPrefix = name + ".";
         expect(TokenType.MAP_ARROW, "a declaration's '=>'");
         List<Annotation> typeDefAnnotations = parseAnnotationList();
         Optional<DefinitionMark> mark = parseDefinitionMarkOpt();
@@ -436,6 +462,25 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
     }
 
+    /**
+     * {@code "!schema" ws schema-map} as a declaration's value ({@link SchemaMapDef}): a schema map nested as an entry,
+     * its members declarations of this document under their paths. The tag is read as a spelling, as the root's is
+     * ({@link #expectSchemaTag}), so the payload is the schema grammar's and never a data map. A schema map is a value
+     * and takes no parameters.
+     */
+    private TypeDef nestedSchemaMap(List<String> typeParams) {
+        if (!typeParams.isEmpty()) {
+            throw parseError("'!" + DocumentStart.SCHEMA_TAG + " { ... }' is a schema map nested as an entry, a "
+                    + "value, and takes no type parameters");
+        }
+        String prefix = declarationPrefix;
+        String declaration = declarationInProgress;
+        List<String> members = parseMembers(prefix);
+        declarationInProgress = declaration;
+        declarationPrefix = prefix;
+        return new SchemaMapDef(members);
+    }
+
     private TypeDef parseAtomRefinementOrInstance(List<String> typeParams) {
         Token bang = expect(TokenType.BANG, "an atom refinement or constructor application ('!name')");
         Token name = peek();
@@ -446,9 +491,12 @@ public final class TsonSchemaParser extends TsonDataParser {
             throw parseError("'!' must be immediately adjacent to the type name (no whitespace)");
         }
         advance();
-        requireIdentifierName(name);
+        requireQualifiedName(name);
         String target = name.text();
 
+        if (DocumentStart.SCHEMA_TAG.equals(target) && check(TokenType.LBRACE)) {
+            return nestedSchemaMap(typeParams);
+        }
         if (check(TokenType.CARET)) {
             // §12.1 gives `atom-refinement` no parameter list: a refinement of an atom instance has no
             // parameter to take, so the two forms are told apart here rather than by a production of their
@@ -458,7 +506,7 @@ public final class TsonSchemaParser extends TsonDataParser {
                         + "parameters, since a refinement of an atom instance has none to bind");
             }
             advance();
-            // atom-refinement = "!" type-name ws "^" ws record-def (§12.1) -- a braced record of constraint
+            // atom-refinement = "!" qualified-name ws "^" ws record-def (§12.1) -- a braced record of constraint
             // bindings, and nothing wider. The `^` has already committed this production and the grammar
             // does not backtrack, so anything but a brace is this production's own error rather than a
             // fall-through to `instance`, whose payload could not start with `^` either.
@@ -468,7 +516,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             }
             return new AtomRefinement(target, new DataValue(List.of(), Optional.empty(), parseCoreValue()));
         }
-        // instance = [type-params] "!" type-name ws core-value (§12.1) -- see Instance's own Javadoc. The
+        // instance = [type-params] "!" qualified-name ws core-value (§12.1) -- see Instance's own Javadoc. The
         // constructor name goes straight into the wrapping DataValue's own typeRef; there is no room in this
         // production for the payload to carry further annotations or a second, competing type-ref.
         //

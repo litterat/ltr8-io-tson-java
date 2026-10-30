@@ -729,12 +729,13 @@ class TsonDataParserTest {
     // ── Names are identifiers, however the position spells them (§7.1's name profile) ────
 
     /**
-     * {@code type-ref = "!" identifier} and {@code annotation = "@" identifier}: both positions take a name, so
-     * both match the profile in full rather than merely requiring an unquoted token. Token-Start admits
-     * {@code Nd}, {@code -}, {@code +} and {@code .} so a <em>number</em> can be an unquoted token; a name never
-     * begins with one, and never carries a dot at all.
+     * {@code type-ref = "!" qualified-name} and {@code annotation = "@" identifier}: both positions take a name, so
+     * each segment, and the annotation's name whole, matches the profile in full rather than merely requiring an
+     * unquoted token. Token-Start admits {@code Nd}, {@code -}, {@code +} and {@code .} so a <em>number</em> can be an
+     * unquoted token; a name never begins with one, an annotation's never carries a dot, and a tag's segments never
+     * meet one empty.
      */
-    @ValueSource(strings = {"!42x 1", "!-t 1", "!x.y 1", "@42x:1 v", "@x.y:1 v", "@-note 1"})
+    @ValueSource(strings = {"!42x 1", "!-t 1", "!x..y 1", "@42x:1 v", "@x.y:1 v", "@-note 1"})
     @ParameterizedTest
     void aNameOutsideTheIdentifierProfileIsAParseError(String source) {
         assertThrows(ParseException.class, () -> parse(source));

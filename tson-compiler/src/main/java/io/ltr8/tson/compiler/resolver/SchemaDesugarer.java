@@ -463,31 +463,15 @@ final class SchemaDesugarer {
      */
     private TypeRef typeRef(TypeRef ref) {
         return switch (ref) {
-            case SimpleRef simple -> {
-                unqualified(simple.name());
-                yield simple;
-            }
+            case SimpleRef simple -> simple;
             case ArrayRef _, TupleRef _, MapRef _ -> hoistOrKeep(binding(ref), ref);
             case ChoiceRef _ -> hoistOrKeep(binding(ref), ref);
             case GenericRef generic -> {
-                unqualified(generic.name());
                 checkTemplateApplication(generic.name());
                 List<TypeArg> args = mapShared(generic.args(), this::typeArg);
                 yield args == generic.args() ? generic : new GenericRef(generic.name(), args);
             }
         };
-    }
-
-    /**
-     * Refuses a qualified name at a type position as this library's gap: the grammar admits {@code geo.address} and
-     * {@code geo.address<T>} ([TSON-SCHEMA] §12.1), and resolving one, the walk into a {@code !schema} map, lands with
-     * qualified names at type positions.
-     */
-    static void unqualified(String name) {
-        if (name.indexOf('.') >= 0) {
-            throw new UnsupportedOperationException("'" + name + "' names a type by a qualified name, which parses "
-                    + "and is not yet resolved at a type position");
-        }
     }
 
     /** Expands only within a reference's arguments, leaving its own head in place. */

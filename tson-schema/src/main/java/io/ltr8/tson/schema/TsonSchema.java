@@ -29,6 +29,11 @@ import java.util.Optional;
  * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
  * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
  *
+ * <p><b>A schema map nested as an entry keys its members under their paths</b> ({@link SchemaPaths}): {@code
+ * geo.address} is an entry of {@link #entries} beside {@code geo}, whose value, a {@code ValueEntry} of {@value
+ * #SCHEMA}, holds the same members by their own names and is rebuilt from the path entries whenever a schema is built,
+ * so the two never disagree.
+ *
  * <p><b>{@link #facts} holds what a value's Java shape cannot</b>, per entry ({@link EntryFacts}): where it was
  * declared, the annotations written on its value, the constructor its value applies and the entry a refinement
  * names. None of it is a field of any constructor, so binding a value never fills it, and none of it is written.
@@ -224,6 +229,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
             throw new IllegalArgumentException("a schema's entries are a value of '" + SCHEMA + "', not of '"
                     + entries.type() + "'");
         }
+        entries = SchemaPaths.synced(entries);
         Map<String, List<ValueByName>> held = new LinkedHashMap<>();
         valuesByName.forEach((name, values) -> held.put(name, List.copyOf(values)));
         valuesByName = Collections.unmodifiableMap(held);

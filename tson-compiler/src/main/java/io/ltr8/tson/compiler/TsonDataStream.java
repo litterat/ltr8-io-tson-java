@@ -730,6 +730,26 @@ public final class TsonDataStream implements TsonEventSource {
         }
     }
 
+    /**
+     * A tag's name: {@code type-ref = "!" qualified-name} (§7.4), segments joined by {@code .}, each matched as
+     * {@link #requireIdentifier} matches a name. {@code !order} is one segment and {@code !geo.address} two; which
+     * entry a qualified tag names is the reading schema's walk, and a schemaless read keeps it as written.
+     */
+    private void requireTagName(Token name) {
+        String text = name.text();
+        if (text.indexOf('.') < 0) {
+            requireIdentifier(name, "type name");
+            return;
+        }
+        for (String segment : text.split("\\.", -1)) {
+            Optional<String> violation = segment.isEmpty() ? Optional.of("a segment between the dots is empty")
+                    : IdentifierGrammar.validate(segment);
+            if (violation.isPresent()) {
+                throw new ParseException("invalid type name '" + text + "' -- " + violation.get(), name.start());
+            }
+        }
+    }
+
     private static TokenForm formOf(TokenType type) {
         return switch (type) {
             case UNQUOTED -> TokenForm.UNQUOTED;
@@ -832,7 +852,7 @@ public final class TsonDataStream implements TsonEventSource {
         if (!bang.adjacentTo(name)) {
             throw parseError("'!' must be immediately adjacent to the type name (no whitespace)");
         }
-        requireIdentifier(name, "type name");
+        requireTagName(name);
         advance();
 
         Token next = peekToken();

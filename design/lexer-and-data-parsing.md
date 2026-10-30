@@ -197,43 +197,43 @@ Key points:
     is no qualified name (`requireQualifiedName`, each `.`-separated segment a §7.7 identifier). A qualified head
     parses (`geo.address<T>`); what it names is the reader's or the resolver's to judge.
   - **Where it stands**: anywhere a core value does, a map key included, the stream looking one token past a
-    `{`'s first key for an adjacent `<` to frame the map. A `!` tag stays `"!" identifier`, below.
+    `{`'s first key for an adjacent `<` to frame the map. A `!` tag is a qualified name with no arguments, below.
 - **§3.2's three type-expression forms are refused by name, not by the separation rule.** Array brackets,
   type arguments and the `?` suffix "exist only within the [TSON-SCHEMA] type-definition grammar, and their
   appearance after `!` in a data value is a parse error" — so `parseTypeRefName` checks for each and says
   which one was written and what to do instead. Left to the separation rule, `!paged<order>` reads as an
   adjacency problem ("expected whitespace before `'<'`"), whose advice produces a second error one column
-  later and never states the rule that stopped it: a data type-ref is a bare name, and an application is
+  later and never states the rule that stopped it: a data type-ref is a name without arguments, and an application is
   named in the schema (`my_type => paged<order>`) and referenced as `!my_type`. Argument lists are refused
   whether or not a space precedes them, since an adjacency message sends authors to the spaced spelling;
   `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
   unchanged and still catches everything else (`!int32"5"`).
 - **A name position takes an `identifier`, not merely a bare token, and the check sits in the grammar.**
-  `type-ref = "!" identifier` and `annotation = "@" identifier` (§7.4): `TsonDataStream` matches each name's
-  text in full against `IdentifierProfile` once adjacency is settled, which is §7.6's own two-layer shape —
+  `type-ref = "!" qualified-name` and `annotation = "@" identifier` (§7.4): `TsonDataStream` matches an annotation's
+  name, and each `.`-separated segment of a tag's (`requireTagName`, none empty), in full against `IdentifierProfile`
+  once adjacency is settled, which is §7.6's own two-layer shape —
   the lexer produces a token, and a production that is no part of the token-stream grammar then matches its
   decoded text, exactly as a number is matched. It has to be the profile and not the token class, because
   token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
-  because names and values share one lexical class. So `!42x` and `@x.y` are syntax errors rather than a
-  reference to an undeclared type and an annotation carrying a name the format reserves — the dot being
-  reserved as a future identifier separator. **`field-name` does not reach that check** ([TSON-DATA] §2.5,
-  [TSON-SCHEMA] §5.2): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`, narrower than
-  the map key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because what a
-  field name may be is its record's to say. The stream NFC-normalises the name and delivers it; `DefaultTsonReadContext`
-  judges each freshly pulled `FieldName` by the record's name type. A schemaless record's is the identifier, and a
-  failure there is `ATOM_FORM_INVALID`, a resolver error; under a schema a name the type refuses is the record
-  reader's `UNRECOGNIZED_FIELD` (`design/name-hygiene-read-path.md`). So schemaless
-  `{"first name": 1}` parses and is refused, and the diagnostic names the remedy the format already has: a key that
-  is not a name belongs in a map. A name declared in a schema is read by the same production
-  (`expectDeclaredFieldName`) and judged at link by its record's name type, a resolver error.
-  **Normalisation runs before the match**, which is the one thing the profile does not decide here.
-  `IdentifierProfile` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a
-  field name its identity by NFC-normalised comparison — a decomposed spelling is the same name, and a
-  duplicate rather than a malformed one. The lexer already normalises the unquoted spelling, so refusing the
-  form here would make the quoted spelling the stricter of the two, which is the asymmetry the rule removes.
-  **Quoting buys the lexical accidents of the unquoted form** — a name that would otherwise resolve as a number — and
-  never a key that is not a name; a key that is not a name is what a map is for, and the diagnostic says so. A map key
-  keeps all three token forms.
+  because names and values share one lexical class. So `!42x`, `!x..y` and `@x.y` are syntax errors rather than a
+  reference to an undeclared type and an annotation carrying a name the format reserves. A dotted tag,
+  `!geo.address { … }`, names a member of a nested schema map, resolved by the reading schema's walk; a schemaless
+  read keeps it as written, as it keeps any tag (`preservingUnknownTypeRefs`). **`field-name` does not reach that check**
+  ([TSON-DATA] §2.5, [TSON-SCHEMA] §5.2): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`,
+  narrower than the map key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because
+  what a field name may be is its record's to say. The stream NFC-normalises the name and delivers it;
+  `DefaultTsonReadContext` judges each freshly pulled `FieldName` by the record's name type. A schemaless record's is the
+  identifier, and a failure there is `ATOM_FORM_INVALID`, a resolver error; under a schema a name the type refuses is the
+  record reader's `UNRECOGNIZED_FIELD` (`design/name-hygiene-read-path.md`). So schemaless `{"first name": 1}` parses and is
+  refused, and the diagnostic names the remedy the format already has: a key that is not a name belongs in a map. A name
+  declared in a schema is read by the same production (`expectDeclaredFieldName`) and judged at link by its record's name
+  type, a resolver error. **Normalisation runs before the match**, which is the one thing the profile does not decide here.
+  `IdentifierProfile` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a field name its
+  identity by NFC-normalised comparison — a decomposed spelling is the same name, and a duplicate rather than a malformed
+  one. The lexer already normalises the unquoted spelling, so refusing the form here would make the quoted spelling the
+  stricter of the two, which is the asymmetry the rule removes. **Quoting buys the lexical accidents of the unquoted form** —
+  a name that would otherwise resolve as a number — and never a key that is not a name; a key that is not a name is what a
+  map is for, and the diagnostic says so. A map key keeps all three token forms.
 - **A root tagged `!schema` throws `TsonUnsupportedDocumentException`, not `ParseException`** (`tson-base`'s,
   which is what a malformed document raises) — and the throw is `parseDocument`'s, on the stream's `rootTag()`,
   never the stream's own. This is a Class 1 processor; a schema document isn't malformed input, it's a well-formed

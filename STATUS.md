@@ -40,8 +40,14 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonReference`, and at a kind-typed position
       it reads to a `TypeRef` that resolves level by level, by structural identity, to the entry the schema closed
       it to, its `referent()` that entry's value. An application the schema never closes is refused; a quoted token
-      is never a reference. In JSON the same text is a string. A qualified head (`geo.address<T>`) parses and is
-      not yet resolved at a type position
+      is never a reference. In JSON the same text is a string
+- [x] Every `!schema` value declares ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #14) — `geo => !schema { address => { … }
+      }` is a schema map nested as an entry, its members declarations that lift, mint, link and compile as root
+      entries do, each named by its path from the root (`geo.address`); two imports each declaring `geo` collide.
+      Every name resolves from the root, with no lexical scope, and a qualified name stands at every type position,
+      an application's head (`geo.box<text>`) and a reference's `of` (`kind<geo.address>`) included; a value's name
+      walks through nested maps (`geo.home.at`). A data tag is a qualified name (`!geo.address { … }`, `"$type":
+      "geo.address"` in JSON), and resolved output writes a nested map nested
 - [x] A constructor is an ordinary record type ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — `uuid_type`'s value is
       a record, so `type_kind` and `kind<record>` hold it and a field typed `uuid_type` holds a declaration body as
       data, in TSON tree and bind mode and in JSON

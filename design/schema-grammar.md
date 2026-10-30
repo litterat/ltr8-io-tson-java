@@ -10,9 +10,11 @@ history lives in git.
   spelling, and an untagged root is a syntax error.
 - It `extends TsonDataParser` in the same package and calls its package-private methods rather than re-implementing
   Part 1's grammar.
-- `type-name = identifier`: every declared name, type parameter and `!` head is matched against
-  `IdentifierProfile`; a type reference's head is a `qualified-name`, each segment so matched, with an argument
-  list's `<` adjacent to it (§12.3). Field names are the one naming position the parser leaves alone.
+- `type-name = identifier`: every declared name and type parameter is matched against `IdentifierProfile`; a type
+  reference's head and a `!` head are each a `qualified-name`, each segment so matched, with an argument list's `<`
+  adjacent to a reference's head (§12.3). Field names are the one naming position the parser leaves alone.
+- A document has one declaration map. `geo => !schema { … }` is a schema map nested as an entry: its members go into
+  that map under their paths (`geo.address`), and `geo` itself is a `SchemaMapDef` of its members' own names.
 - `SchemaMap.declarations` is a `LinkedHashMap` and a duplicate name overwrites — the grammar layer doesn't dedupe.
 - No production of the schema grammar takes the full `data-value`: `instance` takes a `core-value`, `atom-refinement` a
   braced `record-def`.
@@ -40,9 +42,17 @@ materialization, no validation (those are the resolver's/linker's jobs).
   the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's `schema`
   whatever the document imports, so it is matched as a spelling, never looked up; an untagged root is a syntax
   error saying the document is data.
+- **A schema map nests as an entry** (`nestedSchemaMap`, SPEC-FEEDBACK.md #14). A `!` head spelled `schema` and
+  followed by `{` reads `"!schema" ws schema-map`: the tag is matched as a spelling, as the root's is, so the payload
+  is the schema grammar and never a data map. It declares at least one member and takes no type parameters. Every
+  schema map's members, the root's and each nested one's, go through `parseMembers` into the document's one
+  declaration map, a nested map's under its path (`geo.address`, `geo.inner.deep`): the path is the member's identity
+  and the key every later phase addresses it by. The entry `geo` is a `SchemaMapDef` of its members' own names, in
+  source order. A recovered syntax error in a member is reported against its path.
 - **`type-name = identifier`, and that one rule replaces §12.1's number rule rather than joining it.**
   `expectTypeName` matches every declared name, type parameter and referenced name against
-  `IdentifierProfile`, and `parseAtomRefinementOrInstance` matches the `!` head. §12.1 states separately that
+  `IdentifierProfile`, and `parseAtomRefinementOrInstance` matches each segment of the `!` head
+  (`requireQualifiedName`). §12.1 states separately that
   "numbers are not declarable names"; identifier-Start is `XID_Start`, and every spelling the number grammar
   admits begins with a digit, a sign or a dot — all in token-Start only so a *number* can be an unquoted
   token — so the profile subsumes it and also catches the names that merely *begin* like a number (`42x`,
@@ -57,24 +67,23 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `instance`'s payload is a `core-value` (`Instance` wraps a `DataValue` with `typeRef` pre-set, no separate
   `target`); `construction-def` admits the implicit `&` before its trailing `record-def`; `field-modifier`'s
   value is a bare token or the void sentinel.
-  - **`atom-refinement` is `"!" type-name ws "^" ws record-def`**, so the `^` branch requires a brace:
+  - **`atom-refinement` is `"!" qualified-name ws "^" ws record-def`**, so the `^` branch requires a brace:
     `!integer ^ 5`, `!integer ^ !foo { … }` and `!integer ^ @doc:"d" { … }` are syntax errors, reported at the
     offending token, per declaration like every other schema syntax error.
   - An unquoted non-numeric type-argument always parses as a type reference, never a value literal — a
     deliberate grammar-layer deferral, classified at a later semantic layer.
 - **A type reference's head is a `qualified-name`** (`parseTypeRefHead`, `requireQualifiedName`): `geo.address` and
-  `geo.address<T>` parse, each `.`-separated segment an identifier. Resolving one, the walk into a `!schema` map, is
-  this library's gap, refused by `SchemaDesugarer.unqualified` as `UnsupportedOperationException` (`NOT_IMPLEMENTED`).
-  **The `<` is adjacent to the head** (§12.3), as the data grammar's is ([TSON-DATA] §7.5): `box <text>` is a parse
-  error naming the rule; inside the list whitespace and commas are free. The schema grammar keeps a parser of its own
-  for references rather than the data stream's, because its `type-arg` admits sugar (`box<[text]>`,
-  `box<(text | int32)>`), which a data argument never holds.
+  `geo.address<T>` parse, each `.`-separated segment an identifier, and the parser keeps the dotted text whole; it
+  names the entry keyed by that path (`design/schema-resolution.md`). **The `<` is adjacent to the head** (§12.3), as the
+  data grammar's is ([TSON-DATA] §7.5): `box <text>` is a parse error naming the rule; inside the list whitespace and commas
+  are free. The schema grammar keeps a parser of its own for references rather than the data stream's, because its `type-arg`
+  admits sugar (`box<[text]>`, `box<(text | int32)>`), which a data argument never holds.
 - **A parameter may write a type after its name** (`type-param = param-name [ws ":" ws type-ref]`), on every
   type-def form alike. `parseTypeParamsOpt` still returns the names the type-def records; a written type goes to
   the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution
   derives rather than shaping the type-def, and the declaration survives every desugar rewrite of its type-def.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
-  [type-params] "!" type-name ws core-value`) -- `vector => <T, N> !array { element_type: T  min_items: N }`.
+  [type-params] "!" qualified-name ws core-value`) -- `vector => <T, N> !array { element_type: T  min_items: N }`.
   §12.1 has one production for both, and its own note says so: "`!` opens an `instance`, with or without a
   preceding `<…>`". `Instance` carries
   the parameter list, and `parseTypeDef` reads that list *before* dispatching on `!` -- one token then

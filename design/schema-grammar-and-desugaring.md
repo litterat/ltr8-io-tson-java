@@ -14,6 +14,9 @@ The schema grammar itself is in `design/schema-grammar.md`.
   needs no special case.
 - An injected name derives from the resolved binding record, never the spelling and never the AST's own `toString` or
   `hashCode`; `SchemaDesugarerTest` pins two derived names to exact strings.
+- An injected entry is a root entry, one per form schema-wide, sugar written inside a nested `!schema` map included:
+  `[uuid]` in `geo.tagged` and in a root record is one `array_uuid_…`, and a dotted head contributes `geo_inner_tag`
+  to a name (`InternalName.part`).
 - A form an `!!import` already declares is referenced, not redeclared — and is not marked `@synthetic` by this document.
 - An element, position or map-value `?` binds `state` directly; an unmarked one states nothing; a map key takes no `?`.
 - An invalid sugar form is reported per declaration through `DesugarFailureReporter`, not thrown.

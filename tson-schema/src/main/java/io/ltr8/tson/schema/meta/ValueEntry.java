@@ -9,7 +9,9 @@ import java.util.Objects;
  * is no type, nothing is typed by it, and no kind holds it. A reference names it ({@code ref<api>}), and a qualified
  * name walks into it, by key through a namespace value and by field through a record value. The instance of a
  * constructor whose instances are no types, one composing {@code top} and not {@code type} ({@code s => !step { ...
- * }} over {@code step => top & { ... }}), is held the same way, the schema model having no body for it.
+ * }} over {@code step => top & { ... }}), is held the same way, the schema model having no body for it. A schema map
+ * nested as an entry, {@code geo => !schema { ... }}, is one too, a value of {@code schema} holding its members by
+ * their own names, each of them an entry of the document under its path ({@code io.ltr8.tson.schema.SchemaPaths}).
  *
  * <p>{@link #type} is the type the entry's tag names, which resolved output writes as that tag. {@link #value} is
  * what reading the payload against it produced: a {@link Namespace} for a namespace type, an object of the class the

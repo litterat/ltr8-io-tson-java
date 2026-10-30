@@ -29,7 +29,6 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
@@ -97,19 +96,19 @@ public final class MetaKernelBootstrapResolver {
 
     /**
      * The kernel's named instances and refinements on its one wait cycle, built by hand: {@code value}, the
-     * {@code boolean} and {@code field_role} enums, {@code enum}'s member set, the {@code integer}, {@code text} and
-     * {@code identifier} atoms, {@code type_kind}, {@code field_map}, the namespace type a record's fields are a value
-     * of, and {@code non_negative_integer}, the one refinement.
+     * {@code boolean} and {@code field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text}
+     * atoms, {@code type_kind}, {@code field_map}, the namespace type a record's fields are a value of, and {@code
+     * non_negative_integer}, the one refinement.
      */
     private static final Set<String> PRE_LOADED = Set.of("value", "boolean", "field_role", "enum_set", "integer",
-            "non_negative_integer", "text", "identifier", "type_kind", "field_map");
+            "non_negative_integer", "text", "type_kind", "field_map");
 
     /**
-     * The element types whose lifted arrays are on the cycle: {@code [type_name]}, {@code [field_group]} and {@code
+     * The element types whose lifted arrays are on the cycle: {@code [type_kind]}, {@code [field_group]} and {@code
      * [text; 1..]}, and an array of one of those ({@code [[text; 1..]; 1..]}). A lifted array is named by its
      * content (§8.2), so it is designated by what it holds rather than by its name.
      */
-    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("type_name", "field_group", "text");
+    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("type_kind", "field_group", "text");
 
     private MetaKernelBootstrapResolver() {
     }
@@ -359,10 +358,9 @@ public final class MetaKernelBootstrapResolver {
 
     /**
      * The hand-written construction of a pre-loaded instance (see the class Javadoc). The pre-loaded set applies
-     * its constructors in four shapes, each checked rather than assumed: a bare {@code {}} for {@code value_type},
-     * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; {@code identifier}'s
-     * profile, checked against the constant the lexer and resolver already hold; a bare token array for {@code
-     * enum}; and a record of tokens for {@code reference}, for {@code namespace} and for the {@code
+     * its constructors in three shapes, each checked rather than assumed: a bare {@code {}} for {@code value_type},
+     * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; a bare token array for
+     * {@code enum}; and a record of tokens for {@code reference}, for {@code namespace} and for the {@code
      * array}/{@code set_type} binding records {@link SchemaDesugarer} lifts.
      *
      * <p>Package-private so {@code MetaKernelBootstrapResolverTest} can reach the refusals the real kernel never
@@ -373,10 +371,6 @@ public final class MetaKernelBootstrapResolver {
             case "value_type" -> {
                 requireEmptyBody(instance);
                 yield new ValueType();
-            }
-            case "identifier_type" -> {
-                requireIdentifierProfile(instance);
-                yield IdentifierType.IDENTIFIER;
             }
             case "integer_type" -> {
                 requireEmptyBody(instance);
@@ -408,22 +402,6 @@ public final class MetaKernelBootstrapResolver {
         if (!(instance.value().coreValue() instanceof EmptyBrace)) {
             throw new IllegalStateException(
                     "expected {} for !" + instance.target() + ", found " + instance.value().coreValue());
-        }
-    }
-
-    /**
-     * {@code identifier => !identifier_type { continue_add: "-" }}, checked to be exactly that: the hand-picked
-     * constant is the profile the lexer, parser, resolver and linker already hold, since the kernel's own names
-     * are read by it before the kernel exists. The kernel stating another would be a kernel that describes a
-     * profile this implementation does not run.
-     */
-    private static void requireIdentifierProfile(Instance instance) {
-        if (!(instance.value().coreValue() instanceof RecordValue record) || record.fields().size() != 1
-                || !record.fields().getFirst().name().equals("continue_add")
-                || !(record.fields().getFirst().value().coreValue() instanceof TokenValue token)
-                || !token.text().equals("-")) {
-            throw new IllegalStateException("expected { continue_add: \"-\" } for !identifier_type, found "
-                    + instance.value().coreValue());
         }
     }
 

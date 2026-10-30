@@ -98,16 +98,17 @@ in the merged map after `computeSubtypes` and before the name-type checks; a ref
 - **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers.forRead`'s
   `KindParser`, an `AtomTypeParser<TypeRef>`): a name token, a reference with arguments, or a JSON string holding
   either, read into the `TypeRef` it is and naming a member of the linked index, an application through the entry
-  it denotes (`design/references.md`). The value is the `TypeRef`, carrying the closure its `referent()` resolves
-  in, in a tree read as in a bind; a `String` host receives its canonical text. That is every data
-  document's reading, whatever it imports: a data document importing only meta.tn that writes `!record_field { type:
-  int32 }` is refused, `int32` being core's. In a **schema document** a name resolves in the schema being resolved,
-  which the reading closure does not hold, so the reader checks the grammar alone (`AtomParsers.inSchemaDocument`,
-  `KindParser.namesOnly`) and `AtomTypeReader` records the name for that schema's link to judge. A schema document is
-  a construction's or a value entry's payload, which the resolver reads (`TsonReadContext.readsSchemaDocument`), or
-  a value of the kernel's `schema` read as data, a resolved form (`readsSchemaNames`, set by the reader
-  `TsonSchemaCompiler` builds for the kernel's `schema` entry), whose names ingest judges. That is what lets a
-  resolved form naming a user's own name type read back.
+  it denotes (`design/references.md`). A name without arguments is judged as one name, its path from the root
+  (`geo.address`), each segment read into its normalization form as `type_name` reads an identifier. The value is the
+  `TypeRef`, carrying the closure its `referent()` resolves in, in a tree read as in a bind; a `String` host receives its
+  canonical text. That is every data document's reading, whatever it imports: a data document importing only meta.tn that
+  writes `!record_field { type: int32 }` is refused, `int32` being core's. In a **schema document** a name resolves in the
+  schema being resolved, which the reading closure does not hold, so the reader checks the grammar alone
+  (`AtomParsers.inSchemaDocument`, `KindParser.namesOnly`) and `AtomTypeReader` records the name for that schema's link to
+  judge. A schema document is a construction's or a value entry's payload, which the resolver reads
+  (`TsonReadContext.readsSchemaDocument`), or a value of the kernel's `schema` read as data, a resolved form
+  (`readsSchemaNames`, set by the reader `TsonSchemaCompiler` builds for the kernel's `schema` entry), whose names ingest
+  judges. That is what lets a resolved form naming a user's own name type read back.
 
 ## What a name type is (`NameType`)
 

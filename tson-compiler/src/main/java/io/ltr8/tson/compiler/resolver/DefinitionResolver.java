@@ -20,6 +20,7 @@ import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
+import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
@@ -43,6 +44,7 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -97,6 +99,9 @@ import java.util.function.Predicate;
  *   name-to-class table --
  *   and <b>atom refinement</b> ({@code !I ^ { ... }}, §5.5, {@link #resolveAtomRefinement}), which merges
  *   its bindings with its source on the wire and is checked to narrow ({@link #checkNarrows}).</li>
+ *   <li><b>A schema map nested as an entry</b> ({@code geo => !schema { ... }}) -- a value of {@code schema}
+ *   whose members are declarations of the document under their paths, each resolved on its own; its namespace is
+ *   built from them wherever the schema is ({@code SchemaPaths.synced}).</li>
  * </ul>
  *
  * <p><b>A declaration carrying type parameters (§5.10) is open.</b> A record template is the record it is, with
@@ -534,6 +539,11 @@ final class DefinitionResolver {
             case Instance instance -> instance.typeParams().isEmpty() ? resolveInstance(name, instance)
                     : resolveInstanceTemplate(name, instance);
             case AtomRefinement refinement -> resolveAtomRefinement(name, refinement);
+            // A schema map nested as an entry: a value of `schema` whose members are declarations of this document
+            // under their paths, each resolved as any entry is. Its namespace is built from them wherever the
+            // schema is (`SchemaPaths.synced`), so it holds none here and waits on none.
+            case SchemaMapDef ignored -> new ValueEntry(TsonSchema.SCHEMA,
+                    Namespace.of(TsonSchema.SCHEMA, Map.<String, Top>of()));
         };
     }
 
@@ -2471,12 +2481,8 @@ final class DefinitionResolver {
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeRef ref) {
         return switch (ref) {
-            case SimpleRef simple -> {
-                SchemaDesugarer.unqualified(simple.name());
-                yield io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-            }
+            case SimpleRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
             case GenericRef generic -> {
-                SchemaDesugarer.unqualified(generic.name());
                 List<TypeArgument> args = new ArrayList<>();
                 for (TypeArg arg : generic.args()) {
                     args.add(typeArgument(arg));

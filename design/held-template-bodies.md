@@ -191,8 +191,8 @@ Beyond those:
 - **The template's form decides where value types are read** (`ParameterTypes.readsInStructure`, §5.10). A template
   whose held head is a constructor other than `record` reads its value parameters' types, written ones included,
   among the schema's imported entries: the constructor's compiled reader reads the argument, and its slot types are
-  in the closure that declared it, so `min_items: N` makes `N` the kernel's `non_negative_integer` and `kind<T>`'s
-  `T` the kernel's `type_name`. A record template reads in the schema's whole namespace. A template whose head is
+  in the closure that declared it, so `min_items: N` makes `N` the kernel's `non_negative_integer`. A record template
+  reads in the schema's whole namespace. A template whose head is
   another open template takes that template's form; a deferred use takes its callee's. An alias's head is
   `alias`, a constructor, so a written value type on an alias must name an imported type too. A written type
   must also IS-A the derived one: `<N: int8> !array { … max_items: N }` is refused, core's `int8` not being a

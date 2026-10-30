@@ -18,7 +18,9 @@ import java.util.Optional;
  * <p>{@code declarations} is keyed by declaration name (insertion order preserved, a {@link
  * LinkedHashMap} under the hood) rather than a plain list, so a resolver can look an entry up by
  * name directly -- exactly the shape §3.4.1's Pass 1 needs (an entry per name) and the document's own target
- * type, <code>{type_name =&gt; top}</code> (§9). Two declarations sharing a name are not rejected here: the
+ * type, <code>{type_name =&gt; top}</code> (§9). It holds the document's every declaration at every depth: a member
+ * of a schema map nested as an entry ({@link SchemaMapDef}) is keyed by its path from the root, {@code geo.address},
+ * which is its {@link Declaration#name} too. Two declarations sharing a name are not rejected here: the
  * later one simply overwrites the earlier one's map entry, the same "detection is a resolver-layer
  * concern, not a grammar one" treatment [TSON-DATA] §2.5/§2.6 already give ordinary duplicate
  * record fields and map keys -- real duplicate-name detection belongs to schema resolution

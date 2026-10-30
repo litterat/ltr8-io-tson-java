@@ -51,8 +51,6 @@ class AliasChainTest {
         TypeRef name = fieldType(kernelEntry("template_param"), "name");
         assertEquals("param_name", name.name());
         assertTrue(name.annotations().isEmpty(), "nothing is attached to record where it points");
-
-        assertEquals("type_name", fieldType(kernelEntry("reference"), "of").name());
     }
 
     /** A position naming something that is not an alias is unaffected, as it always was. */

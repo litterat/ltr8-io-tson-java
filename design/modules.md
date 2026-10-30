@@ -53,20 +53,19 @@ module has a real `module-info.java`; module names mirror each module's root exp
   because *what do I get back from `!rational`?* is a question about the type system rather than about §8's model, and
   they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
   `min`/`max`/`multiple_of` are `Rational` values — a pull from above rather than a reason to live above. Plus the schema
-  registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`) and
-  `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
-  `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what stays is storage
-  and the identity algorithm lookups compare by. Depends on `ltr8-annotation`, `tson-base` (`requires
-  transitive`) and `ltr8-regex` — the last so that `text_type`'s member-against-pattern coherence sits on the
-  family with the length checks it shares a rule with, rather than being split across modules by which engine
-  each half needs. The engine is an internal library like any other; the boundary worth keeping is the one
-  that stops a value model depending on the *pipeline*, and `ltr8-regex` is a leaf.
-  **`tson-compiler` depends on `tson-schema`, not the reverse** — the opposite of what the names suggest, deliberately
-  so the compiler's resolver can hold and consult `schema.meta` types directly. `schema.meta` names no `tson-compiler`
-  type; where it needs
-  one structurally it declares a local stand-in (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`;
-  `tson-base`'s `SourcePosition` is an interface `tson-compiler`'s `Position` implements), converted at the
-  one spot that needs it.
+  registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`),
+  `TsonBundledSchemas`, and `SchemaPaths`, which keeps a nested schema map's value in step with its members' path
+  entries wherever a `TsonSchema` is built, the writer and the test side included. **The linker is not here** — it is an
+  engine, not a value model, so `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the
+  pipeline; what stays is storage and the identity algorithm lookups compare by. Depends on `ltr8-annotation`, `tson-base`
+  (`requires transitive`) and `ltr8-regex` — the last so that `text_type`'s member-against-pattern coherence sits on the
+  family with the length checks it shares a rule with, rather than being split across modules by which engine each half
+  needs. The engine is an internal library like any other; the boundary worth keeping is the one that stops a value model
+  depending on the *pipeline*, and `ltr8-regex` is a leaf. **`tson-compiler` depends on `tson-schema`, not the reverse** —
+  the opposite of what the names suggest, deliberately so the compiler's resolver can hold and consult `schema.meta` types
+  directly. `schema.meta` names no `tson-compiler` type; where it needs one structurally it declares a local stand-in
+  (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`; `tson-base`'s `SourcePosition` is an interface `tson-compiler`'s
+  `Position` implements), converted at the one spot that needs it.
 - **`tson-atom`** — the built-in atom vocabulary: which tokens each family accepts and what host value results (§5.2's
   parsing contracts). **A module rather than a package inside an engine, because the vocabulary is not an engine's** —
   [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser exactly as a TSON quoted token's text would be, so

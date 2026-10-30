@@ -302,18 +302,26 @@ public final class TsonSchemaLinker {
                                    Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
                                    Function<String, Top> structure, Set<String> refusedEnums,
                                    IdentifierPolicy identifiers) {
+        // Each schema map is a scope of its own: the root's entries, and each nested map's members, named by their
+        // own last segment, a member's path being its map's name and its own.
+        Map<String, Map<String, String>> scopes = new LinkedHashMap<>();
+        merged.keySet().forEach(name -> scopes.computeIfAbsent(SchemaPaths.parent(name), map -> new LinkedHashMap<>())
+                .put(SchemaPaths.member(name), name));
         if (identifiers.appliesSkeletonDistinctness()) {
-            ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
-                    collision.second(), at(facts, collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
-                    "in the namespace of '" + schema.id() + "': " + collision.describe()));
+            scopes.forEach((map, members) -> ConfusableNames.firstCollision(members.keySet()).ifPresent(collision -> {
+                String second = members.get(collision.second());
+                refuse(receiver, schema, second, at(facts, second), Diagnostic.Code.CONFUSABLE_NAMES,
+                        "in the namespace of '" + schema.id() + "'" + (map.isEmpty() ? "" : ", the schema map '"
+                                + map + "'") + ": " + collision.describe());
+            }));
         }
 
         // The restricted-character and restricted-script rules over the same names, in the same pass. Where the
         // collision check above is a
         // relation and needs the whole set, these are properties of each name on its own -- so they are the
         // rules that reach a name nothing else in the schema resembles.
-        merged.forEach((name, definition) ->
-                perName(receiver, schema, name, at(facts, name), name, "declared name ", identifiers));
+        merged.forEach((name, definition) -> perName(receiver, schema, name, at(facts, name),
+                SchemaPaths.member(name), "declared name ", identifiers));
 
         merged.forEach((name, definition) -> {
             Top body = definition;
@@ -704,7 +712,7 @@ public final class TsonSchemaLinker {
         }
         // A reference read under this schema names an entry of the final namespace, assembled below.
         AtomicReference<Map<String, Top>> closure = new AtomicReference<>(Map.of());
-        merged = computeKinds(merged, facts, merged::get, applications, new java.util.AbstractMap<>() {
+        merged = computeKinds(merged, facts, merged::get, applications, pending, new java.util.AbstractMap<>() {
             @Override
             public Top get(Object name) {
                 return closure.get().get(name);
@@ -1084,11 +1092,15 @@ public final class TsonSchemaLinker {
      * already resolved. A reference that names types and has no members admits no value, and the inhabitance check
      * reports it.
      *
+     * <p>A partial link ({@link #linkReady}) admits each {@code pending} name as a member of every reference that
+     * names types: a declaration not yet ready has no value to judge, and a pin or default naming it is judged when the
+     * whole schema links, as a reference to it is.
+     *
      * @param structure where a constructor is looked up first: the schema's one namespace, as {@code merged} is
      */
     private static Map<String, Top> computeKinds(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
                                                  Function<String, Top> structure, Map<String, TypeRef> applications,
-                                                 Map<String, Top> entries) {
+                                                 Set<String> pending, Map<String, Top> entries) {
         Map<TypeRef, String> denoted = new LinkedHashMap<>();
         applications.forEach((name, application) -> denoted.putIfAbsent(application, name));
         // Every application the resolver closed to an entry of the closure, an expansion's among them.
@@ -1099,6 +1111,7 @@ public final class TsonSchemaLinker {
                 boolean namesTypes = KindMembers.namesTypes(reference.of(), structure);
                 List<String> members = namesTypes ? KindMembers.of(reference, merged,
                         name -> constructorOf(name, merged.get(name), facts), structure) : List.of();
+
                 if (result == null) {
                     result = new LinkedHashMap<>(merged);
                 }
@@ -1107,6 +1120,9 @@ public final class TsonSchemaLinker {
                         facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), applications.containsKey(name)
                                 ? Optional.of(applications.get(name)) : Optional.empty()))
                         .flatMap(Optional::stream).distinct().toList();
+                if (namesTypes && !pending.isEmpty()) {
+                    members = java.util.stream.Stream.concat(members.stream(), pending.stream()).distinct().toList();
+                }
                 result.put(entry.getKey(), reference.linked(namesTypes, members, namesTypes ? denoted : Map.of(),
                         entries, shown));
             }
