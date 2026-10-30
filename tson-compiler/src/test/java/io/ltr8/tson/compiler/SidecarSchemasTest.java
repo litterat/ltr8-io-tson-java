@@ -71,18 +71,13 @@ class SidecarSchemasTest {
         String source = read(schemasRoot.resolve(fileName));
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
 
-        // Same bootstrap sequence ProcessorConfig#build uses -- meta-kernel has to be resolved and
-        // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
-        // register itself. A fresh registry per schema file, deliberately, so one file's own
-        // failure doesn't leave a shared registry in a half-registered state for the next. Bound as the
-        // class2 runner binds, since a fixture's namespace values read only into classes.
-        TsonCompiledMetaRegistry compiledRegistry =
-                new TsonCompiledMetaRegistry(SuiteBindings.context(), id -> fetch(schemasRoot, id));
-        TsonCompiledSchemaLoader loader = compiledRegistry;
-        SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        compiledRegistry.register(resolvedMetaKernel);
+        // The bundled schemas loaded first, as every front door loads them: a schema importing core.tn alone reaches
+        // meta.tn through core's pinned import, which only a registry already holding it serves. A fresh registry per
+        // schema file, deliberately, so one file's own failure doesn't leave a shared registry in a half-registered
+        // state for the next. Bound as the class2 runner binds, since a fixture's namespace values read only into
+        // classes.
+        TsonCompiledSchemaLoader loader = TsonCompiledMetaRegistry.withStandardLibrary(SuiteBindings.context(),
+                id -> fetch(schemasRoot, id));
 
         TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.entries().isEmpty(), fileName + " resolved with no entries");
