@@ -54,7 +54,7 @@ class KindMembershipByDocumentTest {
                 .readAs("""
                         !schema {
                           point => !record { fields: { x => !record_field { type: coordinate } } }
-                          coordinate => !reference { target: integer }
+                          coordinate => !alias { target: integer }
                         }
                         """, "schema");
 

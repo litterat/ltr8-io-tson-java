@@ -53,7 +53,7 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
     /**
      * {@code selfNames} are the written names that mean <em>this</em> type and so read through
      * {@code ownParser} rather than dispatching: the entry's own name, plus any alias that flattens to it.
-     * §7.2 compares "after reference flattening of both", so an alias is not a different type to be
+     * §7.2 compares "after alias flattening of both", so an alias is not a different type to be
      * dispatched to -- resolving it would arrive back here and recurse.
      */
     VariantSchemaReader(String name, Collection<String> selfNames, TsonTypeReader<?> ownParser,

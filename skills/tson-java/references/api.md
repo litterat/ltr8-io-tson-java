@@ -592,7 +592,7 @@ value); the application an entry is the instantiation of is the derived
 value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
 host values the atoms read to
 are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`,
-`Reference`, `TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a
+`Alias`, `TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a
 map of them, a namespace type (`operations => !namespace { key_type: identifier  value_type: operation }`, a
 `NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search =>
 { … } }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a

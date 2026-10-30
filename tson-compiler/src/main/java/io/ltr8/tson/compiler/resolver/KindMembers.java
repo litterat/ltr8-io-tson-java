@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -83,7 +83,7 @@ public final class KindMembers {
      */
     public static boolean isMember(String name, String of, Function<String, Top> local,
                                    Function<String, Optional<String>> constructorOf, Function<String, Top> structure) {
-        String terminal = ReferenceChain.terminal(name, local);
+        String terminal = AliasChain.terminal(name, local);
         Top type = local.apply(terminal);
         return type != null && isMember(type, constructorOf.apply(terminal)
                 .orElseGet(() -> TsonSchema.constructorOf(type)), of, local, structure);
@@ -96,11 +96,11 @@ public final class KindMembers {
     public static boolean isMember(Top type, String head, String of, Function<String, Top> local,
                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
-        if (type == null || type instanceof TemplateBody || type instanceof Reference || type instanceof ValueEntry
+        if (type == null || type instanceof TemplateBody || type instanceof Alias || type instanceof ValueEntry
                 || isConstructor(type)) {
             return false;
         }
-        String constructorOf = ReferenceChain.terminal(of, constructors);
+        String constructorOf = AliasChain.terminal(of, constructors);
         Set<String> walked = new HashSet<>();
         String current = head;
         while (walked.add(current)) {
@@ -156,9 +156,9 @@ public final class KindMembers {
 
     /** The entry at the end of {@code name}'s §8.3 chain in {@code entries}, or empty where the walk reaches none. */
     private static Optional<Found> reached(String name, Function<String, Top> entries) {
-        String terminal = ReferenceChain.terminal(name, entries);
+        String terminal = AliasChain.terminal(name, entries);
         Top definition = entries.apply(terminal);
-        return definition == null || definition instanceof Reference ? Optional.empty()
+        return definition == null || definition instanceof Alias ? Optional.empty()
                 : Optional.of(new Found(terminal, definition));
     }
 

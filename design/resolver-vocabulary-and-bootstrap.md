@@ -1,7 +1,7 @@
-# Resolver vocabulary, reference hops, `@synthetic`, and the meta-kernel bootstrap
+# Resolver vocabulary, alias hops, `@synthetic`, and the meta-kernel bootstrap
 
 The facts the resolver phases share rather than own: the three leaf classes (`WireForm`, `MetaRefs`, `DerivedName`),
-how a reference chain is kept in resolved output and walked, the one derived marker, the compiled vocabulary a
+how an alias chain is kept in resolved output and walked, the one derived marker, the compiled vocabulary a
 resolution reads `!C` bodies and annotation values through, and the special-cased bootstrap that resolves meta-kernel
 itself. Current form only; history lives in git.
 
@@ -15,8 +15,8 @@ itself. Current form only; history lives in git.
 - `MetaRefs` visits by rewriting with the identity function; there is no separate read-only walk to fall behind.
 - `DerivedName`'s two families stay apart, `ofBinding` is called by **both** lift channels, and a derived name is
   asserted by value, never by `startsWith`.
-- Resolved output states the reference chain as written; the chain collapses only where `TsonSchemaCompiler` compiles a
-  `REFERENCE` entry. `ReferenceChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
+- Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
+  `ALIAS` entry. `AliasChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
 - `@synthetic` goes on the **key** of exactly the sugar-form entries (both channels), never on an instantiation entry
   or an entry's value, and the linker re-attaches it (`withNameAnnotations`), imports included.
 - `@application` goes on the **key** of exactly the entries that close an application, whatever their kind, by the
@@ -85,7 +85,7 @@ array, `fields` being one.
 **`MetaRefs`** — the `schema.meta` reference walk, `mapRefs` over a definition and `mapBodyRefs` over a body.
 Three callers use it and only one is closing a template: materialisation rewrites an application onto the entry it
 closed, §8.2's synthetic merge renames onto a merged entry, and §5.10's regularity check uses it as a
-*visitor* by returning each reference unchanged. No pass rewrites a use site onto the end of a reference
+*visitor* by returning each reference unchanged. No pass rewrites a use site onto the end of an alias
 chain — see "References are hops" below. Which body shape carries which references is a fact about the value model, so it is
 stated where the model is walked. Visiting is rewriting with the identity function deliberately: a separate
 read-only walk would be a second list of body shapes to keep in step, and the one that fell behind would
@@ -118,20 +118,20 @@ silently skip a reference rather than fail.
 ## References are hops, not rewrites (`tson-compiler/.../TsonSchemaCompiler.java`)
 
 **There is no use-site flattening pass and no `@alias` marker.** Resolved output states the chain the author
-wrote: a type position naming a `REFERENCE` entry keeps that name, nothing is attached to record where it
+wrote: a type position naming an `ALIAS` entry keeps that name, nothing is attached to record where it
 "really" points, and the chain stays walkable through the entries themselves.
 
 **A processor collapses the chain when it compiles readers** — after linking, once per entry, where the whole
-namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a `REFERENCE` entry's reader
+namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `ALIAS` entry's reader
 *is* its target's reader, resolved recursively, named for the entry doing the referring, so a use site naming
 `pct` over `pct => small` reads and reports as `pct`.
 
 - **The walk is unavoidable, which is why a rewrite is not worth its price.** §8.3 requires the chain stay
-  walkable (`reference.target` is never flattened), and several passes walk one. Rewriting the output as well
+  walkable (`alias.target` is never flattened), and several passes walk one. Rewriting the output as well
   would leave two representations to keep in step, and an `@alias` marker recording where a rewritten site
   pointed is a *lossy* summary of the one it duplicates — it keeps only the source-site name, so in
   `digest_chain => digest_alias => bytes` it records the hop that carries nothing.
-- **`ReferenceChain` is that walk, stated once** (`resolver/ReferenceChain.java`). The linker's choice-variant
+- **`AliasChain` is that walk, stated once** (`resolver/AliasChain.java`). The linker's choice-variant
   distinctness and its §5.2 field-value check, `Subsumption`'s subtype naming and `DiscriminationClass`'s
   classification all use it, because the one decision inside — *stop at a non-reference, at an
   **argument-bearing** target (an application, with no entry until materialisation mints one), or on a cycle*
@@ -139,7 +139,7 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
   they differ only on an undeclared name and a cycle, where the first has an answer its caller wants (a type
   parameter is its own terminal) and the second has none. **`ParameterTypes` keeps its own loop deliberately**:
   it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the template
-  being the answer there. `ReferenceChainWalkTest` pins all four stops.
+  being the answer there. `AliasChainWalkTest` pins all four stops.
 - **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
   terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
   alias names; `FieldValueConformanceTest` pins both directions.
@@ -147,10 +147,10 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
   compiles for reading, and MUST NOT collapse in resolved output. The compiler, `DiscriminationClass`,
   `TypeInhabitance` and the linker each walk a chain. A directive on an alias is applied where the alias compiles
   (`UseSite.named`, applied by the
-  reference entry's own compile).
+  alias entry's own compile).
 - **The bootstrap route needs no special case.** Neither it nor ordinary resolution rewrites a reference, so
   the two cannot diverge on one (`BootstrapReferencesTest`).
-- Pinned by `ReferenceChainTest` — the chain stated as written, a read still reaching the end of it, and a
+- Pinned by `AliasChainTest` — the chain stated as written, a read still reaching the end of it, and a
   diagnostic naming the hop the author wrote — and end to end by `ResolvedFixtureTest` against the spec's own
   `spec/m/*-resolved.tn`.
 
@@ -187,7 +187,7 @@ annotation is: there is no author to resolve against, and the value is fixed.
 - **`@application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
   closes a template application, the application it is the instantiation of, `@application:{ name: box  arguments:
   [{ name: int32 }] }`. It is about the entry, not about a type — a record template's member, a value entry
-  (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Reference` a
+  (`order_api => orders<order>` over `orders => <T> !interface { get => { response: T } }`), the `Alias` a
   non-record template's application closes to — which is why it is no field of `type_chain`. The materialiser records
   each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
   it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`;

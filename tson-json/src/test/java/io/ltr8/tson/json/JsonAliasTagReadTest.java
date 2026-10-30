@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A {@code $type} spelling an <b>alias</b>. [TSON-SCHEMA] §7.2 compares "after reference flattening of
+ * A {@code $type} spelling an <b>alias</b>. [TSON-SCHEMA] §7.2 compares "after alias flattening of
  * <b>both</b>", so an alias and its target are one type at either end -- and §9.4 makes that one rule across
  * the encodings rather than two that happen to agree, so what {@code !s_of} does in TSON text
  * {@code "$type": "s_of"} does here.

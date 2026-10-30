@@ -12,7 +12,7 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.reader.DataClassObjectReader;
 import io.ltr8.tson.compiler.reader.NamespaceInstanceReader;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
@@ -824,7 +824,7 @@ public final class TsonObjectReader {
             return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, compiled.unknownTypeMessage(name),
                     compiled.declaredTypeNames(), name);
         }
-        String terminal = ReferenceChain.terminal(name, compiled.schema().entries()::get);
+        String terminal = AliasChain.terminal(name, compiled.schema().entries()::get);
         String namespace = compiled.linkedSchema().namespace(terminal).isPresent() ? terminal : null;
         return new RootReader(reader, name, compiled.rootDeclaration(name), namespace);
     }

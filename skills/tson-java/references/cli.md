@@ -96,7 +96,7 @@ max annotations:            64
 max values:                 16777216
 max import closure:         64
 max schema entries:         65536
-max reference chain:        64
+max alias chain:            64
 max supertype chain:        64
 max materialisation depth:  64
 max wait depth:             64

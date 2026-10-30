@@ -98,7 +98,7 @@ class TinySchemaImportsCoreTn1Test {
         assertEquals(Set.of("my_int", "my_percentage", "my_record"), resolvedTiny.entries().keySet());
 
         Top myInt = resolvedTiny.entries().get("my_int");
-        assertEquals(EntryKind.REFERENCE, EntryKind.of(myInt, n -> true));
+        assertEquals(EntryKind.ALIAS, EntryKind.of(myInt, n -> true));
         Top myRecord = resolvedTiny.entries().get("my_record");
         assertEquals(EntryKind.PRODUCT, EntryKind.of(myRecord, n -> true));
 

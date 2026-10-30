@@ -49,7 +49,7 @@ facts and refinement, groups, subtraction, and the exception boundary.
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
 `design/template-materialisation.md` and `design/held-template-bodies.md` (§5.10 closing, applied-parent edges),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, reference hops, `@synthetic`, the
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@synthetic`, the
 meta-kernel bootstrap), `design/meta-layer-namespaces.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
 
@@ -92,7 +92,7 @@ goes through, so an entry is made ready the first time anything asks for it, and
   `SchemaValidationException` naming the cycle in wait order: `'a' waits on 'b' waits on 'a': entries waiting on each
   other are never ready -- …`, or `'step' waits on 'step'`. A composition or refinement cycle is this same rule,
   reached through an application too (`design/template-materialisation.md`). An alias loop is §8.3's reference-chain
-  refusal, not a wait (`WaitOrderTest.anAliasLoopIsRefusedAsAReferenceChainNotAWaitCycle`).
+  refusal, not a wait (`WaitOrderTest.anAliasLoopIsRefusedAsAnAliasChainNotAWaitCycle`).
 - **Wait depth is counted here**, order-independently, and a chain past `LimitsPolicy.maxWaitDepth` refuses its head
   with `LIMIT_EXCEEDED` (`design/processor-policy.md`).
 - **Rule 6: a judgement that walks a name waits for everything.** §5.8's one name type over a composition's
@@ -303,7 +303,7 @@ the report, located at the value it could not read (`TsonCli.exitCodeFor` lifts 
 One Java type per kernel record or enum; `Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as
 Java subtyping, and an entry's kind is `EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record
 carries `TypeChain chain` as its first component, mirroring the constructor's flattened shape (`type`'s field first);
-`Reference`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), the
+`Alias`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), the
 kernel's labelled choice, because a record of two `Optional`s would not say that exactly one is present.
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the
 model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtures are listed in

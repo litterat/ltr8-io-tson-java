@@ -133,7 +133,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   named by content (§8.2 — resolver-chosen, fresh, unreachable from source), so a binding map cannot be keyed
   on one: the hash is not knowable when the map is written, and a generator emitting bindings cannot invent
   it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
-  a `REFERENCE` body, in declaration order, then the entry's own name, then — for a constructor tightening
+  an `ALIAS` body, in declaration order, then the entry's own name, then — for a constructor tightening
   another — that constructor's, up its chain — and `RecordBindReader` and `TupleBindReader` try them in that
   order, so `ping => msg_of<"ping", ping_body>` binds under `ping`, and `set_type`, `enum` and a meta
   layer's `kebab_enum => enum_type ^ { name_type?: = kebab }` bind as the constructor they tighten: a tightening
@@ -165,7 +165,7 @@ same `VariantSchemaReader` a record with subtypes dispatches through, wired wher
 applies. Three things it has to get right: it **follows the body, not
 `kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and declared instances have their
 own membership relations §7.2 excludes); it accepts an entry's **aliases as the entry itself**, since §7.2
-compares "after following both reference chains to their terminal entries" and resolving an alias would
+compares "after following both alias chains to their terminal entries" and resolving an alias would
 arrive back at the same reader and recurse; and it is **transparent to `UseSite` renaming and to bind-mode
 container rebinding**, both of which look at the reader it wraps — the first or a diagnostic names the entry
 instead of the author's alias, the second or a bound `Map` field silently loses its rebinding.
@@ -179,7 +179,7 @@ to have a subtype, decided by which construction site the entry reached. The sub
 load-bearing rather than tidy: a materialised entry's name is
 implementation-chosen and non-normative (§8.2), so an alias is the *only* name a document has for a template
 instantiation, and without it a subtype-template family exists in the index with no member anything can
-write. **The alias is admitted rather than reduced to its target** — a reference entry compiles to its
+write. **The alias is admitted rather than reduced to its target** — an alias entry compiles to its
 target's reader named for the referring entry, so dispatching on the written name runs the same reader and
 reports under the name the author typed.
 

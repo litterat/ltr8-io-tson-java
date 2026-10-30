@@ -9,7 +9,7 @@ import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.suite.SuiteBindings;
 import io.ltr8.tson.suite.data.Method;
@@ -290,8 +290,8 @@ class NamespaceEntryTest {
     }
 
     private static List<String> members(TsonLinkedSchema linked, String kind) {
-        String terminal = linked.schema().entries().get(kind) instanceof Reference reference
-                ? reference.target().name() : kind;
+        String terminal = linked.schema().entries().get(kind) instanceof Alias alias
+                ? alias.target().name() : kind;
         return assertInstanceOf(KindBody.class, linked.schema().entries().get(terminal)).members().orElseThrow();
     }
 

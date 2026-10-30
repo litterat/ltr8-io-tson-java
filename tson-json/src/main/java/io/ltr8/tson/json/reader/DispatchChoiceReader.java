@@ -81,7 +81,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         }
         for (TypeRef variant : body.variants()) {
             JsonTypeReader<?> reader = context.readers().resolve(variant.name());
-            ReferenceChain.terminal(context.schema(), variant.name())
+            AliasChain.terminal(context.schema(), variant.name())
                     .ifPresent(resolved -> context.admitting(TypeChain.subtypesOf(resolved.definition()))
                             .forEach(subtype -> table.putIfAbsent(subtype, routeBelow(reader, subtype))));
         }

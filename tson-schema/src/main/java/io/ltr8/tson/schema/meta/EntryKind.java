@@ -8,7 +8,7 @@ import java.util.function.Predicate;
  * written.
  */
 public enum EntryKind {
-    ATOM, PRODUCT, SUM, REFERENCE,
+    ATOM, PRODUCT, SUM, ALIAS,
 
     /**
      * A value entry ({@link ValueEntry}): an instance of an ordinary type, {@code orders => !api { ... }}. It is
@@ -20,7 +20,7 @@ public enum EntryKind {
      * A held template -- [TSON-SCHEMA] §5.10's open entry over any constructor but {@code record}, whose body is a
      * {@link TemplateBody}. It is not a type: it cannot validate data, and naming one where a type is expected is
      * a resolver error. A record template is a type, the family base, and takes a record's kind. Like {@link
-     * #REFERENCE} it is a {@code type_kind} and not a base kind (§4.1), and it says nothing about what an
+     * #ALIAS} it is a {@code type_kind} and not a base kind (§4.1), and it says nothing about what an
      * application of the template will produce -- that is the kind of the entry materialisation mints, derived
      * from the constructor its closed body applies.
      */
@@ -42,7 +42,7 @@ public enum EntryKind {
             case Atom ignored -> ATOM;
             case Product ignored -> PRODUCT;
             case Sum ignored -> SUM;
-            case Reference ignored -> REFERENCE;
+            case Alias ignored -> ALIAS;
             case TemplateBody ignored -> TEMPLATE;
             case ValueEntry ignored -> VALUE;
         };
@@ -80,7 +80,7 @@ public enum EntryKind {
 
     /**
      * Whether {@code value} IS-A the meta-kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
-     * {@code reference} or {@code template} -- what a construction may apply, and what a compiled
+     * {@code alias} or {@code template} -- what a construction may apply, and what a compiled
      * schema builds an instance reader for. Read off the chain, so a
      * template composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would; and
      * judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:

@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.reader.Subsumption;
 
@@ -55,7 +55,7 @@ import java.util.function.Function;
  *
  * <p>A compile dispatches each body's constructor name to a factory through one factory set ({@link
  * #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}), with no scoping: linking already established that every
- * head a schema applies is in its namespace. One non-factory case is checked first: {@link Reference} (a bare {@code
+ * head a schema applies is in its namespace. One non-factory case is checked first: {@link Alias} (a bare {@code
  * name => other_name} entry, §8.3) delegates straight to the target's own reader, resolved recursively rather than
  * built fresh. A compile of a resolution in progress ({@link #compileReady}) compiles the entries ready so far, in
  * which a declaration not yet ready is a {@link PendingTypeReader} rather than a missing name.
@@ -228,8 +228,8 @@ public final class TsonSchemaCompiler {
                 return new OpenTemplateReader(name, OpenEntry.parameterNames(definition), context.locationOf(name));
             }
             Top body = definition;
-            if (body instanceof Reference r) {
-                // A reference is a hop, and this is where the chain is collapsed: after linking, once per
+            if (body instanceof Alias r) {
+                // An alias is a hop, and this is where the chain is collapsed: after linking, once per
                 // entry, at the moment a reader is built. Resolved output states the chain the author wrote,
                 // so the target's reader is named for the entry doing the referring -- which is what a use
                 // site naming `pct` over `pct => small` needs, and what names a self-reaching instantiation by

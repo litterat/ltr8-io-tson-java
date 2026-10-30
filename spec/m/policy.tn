@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/policy.tn?sha256=994e74e48729b70a12b6c5b5214d2b09cd87eecc79db19a35cfa1ad77b92c07d"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=1c918afb33a5447fbcca0be1eb9710dbced11686756206bd6f37be23febb5b1e"
+!!id:"https://tson.io/2026/39/m/policy.tn?sha256=8519df0e456168edc3723236be34412887d060242b113329cd79f9954301ed2c"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=e79ae2bcbc672d158edcc44bf5f526dbff7084e3cfb19ca373c921653388f14e"
 @doc:"""
   TSON processor policy — what a processor admits and spends (2026 Revision 39
   draft).
@@ -76,7 +76,7 @@
     max_values?:                int32 ~ 16777216
     max_import_closure?:        int32 ~ 64
     max_schema_entries?:        int32 ~ 65536
-    max_reference_chain?:       int32 ~ 64
+    max_alias_chain?:           int32 ~ 64
     max_supertype_chain?:       int32 ~ 64
     max_materialisation_depth?: int32 ~ 64
     max_wait_depth?:            int32 ~ 64

@@ -8,8 +8,8 @@ JSON inputs are in `design/cli-config-hashing.md`.
 
 - A JSON document binds out of band: `Json.withSchemas` takes a `TsonSchemaLoader`, and failing to reach the schema is a
   diagnostic and never a verdict.
-- A `$type` is matched after reference flattening at every position that compares a written name against a set, through
-  the one index `ReferenceChain.namesMeaning`.
+- A `$type` is matched after alias flattening at every position that compares a written name against a set, through
+  the one index `AliasChain.namesMeaning`.
 - Selectors lead their object ([TSON-JSON] §3.3, §6.1.5, §6.1.6): every decision is a peek at the leading members
   (`TagMembers.lead`), bounded by the schema, and no reader scans an object.
 - The concrete record reader looks ahead at nothing: its member loop judges every annotation member as it arrives, and
@@ -50,7 +50,7 @@ until that stack adopts the same design (`BACKLOG.md`).
 
 **The `Json` prefix is dropped in `reader` and kept in the root** — `CLAUDE.md`'s rule applied, `reader` being
 unexported. So most of the package shares a bare name with its `tson-compiler` counterpart (`CompiledReaders`,
-`ErrorReader`, `ValueReaderContext`, `ReferenceChain`, `DiscriminationClass`, `BindTargets`, …),
+`ErrorReader`, `ValueReaderContext`, `AliasChain`, `DiscriminationClass`, `BindTargets`, …),
 which shows at a glance which TSON class a JSON class answers to. `tson-json` does not depend on `tson-compiler`
 (`module-info`), so nothing can name both.
 
@@ -83,10 +83,10 @@ member name, `$`-initial or not, is a field name (`$ref` under a record whose `n
 class is `TagMembers`, not the spec's noun, because `Annotation` in this codebase means an `@name` annotation, which
 has no JSON carrier (§4.3); its Javadoc has the reasoning.
 
-**A `$type` is matched after reference flattening, on both sides** ([TSON-SCHEMA] §7.2), at every position here that
+**A `$type` is matched after alias flattening, on both sides** ([TSON-SCHEMA] §7.2), at every position here that
 compares a written name against a set: a plain record's own name and its subtypes, an abstract base's subtypes, a sealed
 base's own name and the deeper names each member admits, and a choice's variants and their subtypes. One index answers
-it — `ReferenceChain.namesMeaning`, built once per compile and held by `ValueReaderContext` (`admitting`) — so the set
+it — `AliasChain.namesMeaning`, built once per compile and held by `ValueReaderContext` (`admitting`) — so the set
 of positions that flatten cannot become whichever ones someone remembered. TSON text's peer is `Subsumption.admitting`.
 It is load-bearing for a template instantiation, whose entry name is minted and non-normative ([TSON-SCHEMA] §8.2): an
 alias is the only name a document has for one.

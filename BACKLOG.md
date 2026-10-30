@@ -229,8 +229,8 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   `Dispatch*Reader` names. Its diagnostics are the drift to close: every divergence the JSON restructure pins in
   `CrossEncodingParityTest` comes out of that test as the TSON side matches.
 
-- [ ] **A JSON diagnostic names the type at the end of a reference chain, not the alias the author wrote.**
-  `JsonSchemaCompiler` collapses a `REFERENCE` entry onto its target's reader ([TSON-SCHEMA] §8.3 permits
+- [ ] **A JSON diagnostic names the type at the end of an alias chain, not the alias the author wrote.**
+  `JsonSchemaCompiler` collapses an `ALIAS` entry onto its target's reader ([TSON-SCHEMA] §8.3 permits
   exactly that when compiling for reading), and the target's reader carries the target's name — so a refusal at
   `day => date` says `date`. The schema *location* is already right, because the entry point seeds the root
   declaration (`JsonCompiledSchema.rootDeclaration`), but the name in the message is not. `tson-compiler` solves
@@ -275,9 +275,9 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     (`base.diagnostics`), and so is what an omitted field yields (`RecordField.omitted`); the other two decisions
     are two copies, and so is the field-group judgement (each reader's `GroupPlan` and its pass over chosen options).
   - **The dispatch tables built at compile** — a sealed family's pin table keyed by `ValueIdentity`, the deeper
-    names, the alias index (`ReferenceChain.namesMeaning` beside `Subsumption.admitting`), and
+    names, the alias index (`AliasChain.namesMeaning` beside `Subsumption.admitting`), and
     `DiscriminationClass`. The lookahead that reads them stays with each encoding.
-  - **The same-named pairs** — `ValueIdentity`, `ReferenceChain`, `DeferredTypeReader`, `ErrorReader`,
+  - **The same-named pairs** — `ValueIdentity`, `AliasChain`, `DeferredTypeReader`, `ErrorReader`,
     `CompiledReaders`, and the compile loop itself (resolve, cycle, gap reader, the bind-exception order), which is
     one algorithm over two reader types.
   What stays per encoding is the event loop — TSON's positional records, `_` and annotations have no
@@ -438,7 +438,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   length** after escape processing, **numeric literal length** (annotated tokens included), **decoded binary size**
   per `!bytes` value, **document size**, **elements** per array or set, **entries** per map, **fields** per record,
   **annotations** on one value, and **total values**. Schema side: **import closure**, **entries** in one schema map,
-  **reference chain**, **supertype chain**, and **materialisation depth** — which `TemplateMaterialiser` enforces as
+  **alias chain**, **supertype chain**, and **materialisation depth** — which `TemplateMaterialiser` enforces as
   the bare constant `MAX_CLOSING_DEPTH` at the default, and which moves to reading `maxMaterialisationDepth`. (Wait
   depth, the sixth §11.5 limit, is counted, by `WaitOrder`, with its `--max-wait-depth` flag.) What
   still needs deciding per limit is *where it is counted*: the ones that bound shape are per-container state the

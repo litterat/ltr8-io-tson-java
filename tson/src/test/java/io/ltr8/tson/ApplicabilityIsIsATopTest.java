@@ -6,7 +6,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 
 import java.util.List;
 import java.util.Map;
@@ -25,9 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * part of one.
  *
  * <p><b>Asking whether {@code C} is a constructor was both too narrow and inconsistent.</b> Too narrow:
- * {@code reference} is deliberately unmarked in the kernel (it describes no value) and the language needs it
+ * {@code alias} is deliberately unmarked in the kernel (it describes no value) and the language needs it
  * applicable, so it took a by-name exception in the template path and none in the closed one — leaving
- * {@code <T> !reference { target: T }} legal and {@code !reference { target: int32 }} refused, one
+ * {@code <T> !alias { target: T }} legal and {@code !alias { target: int32 }} refused, one
  * construction with two answers. Inconsistent, because nothing about the marker said which.
  *
  * <p>The marker keeps its other jobs — §4.2's level discipline reads it, and §8.1 records it. What it no
@@ -50,24 +50,23 @@ class ApplicabilityIsIsATopTest {
     }
 
     /**
-     * The asymmetry this replaced. Both spellings apply {@code reference}; before, only the open one
-     * resolved, because {@code resolveTemplateInstance} carried {@code REFERENCE.equals(target)} and
-     * {@code resolveInstance} did not.
+     * Both spellings apply {@code alias}: a closed application and an open one resolve by the same
+     * applicability rule, {@code alias} being IS-A {@code top}.
      */
     @Test
-    void referenceAppliesClosedAndOpenAlike() {
-        assertEquals(List.of(), problems("  r => !reference { target: int32 }"));
+    void aliasAppliesClosedAndOpenAlike() {
+        assertEquals(List.of(), problems("  r => !alias { target: int32 }"));
         assertEquals(List.of(), problems("""
-                  r => <T> !reference { target: T }
+                  r => <T> !alias { target: T }
                   c => r<int32>
                 """));
     }
 
     /**
      * <b>The closed spelling denotes the same entry the bare alias does.</b> Admitting it is only half the
-     * job: {@code !reference { target: X }} is the explicit form of {@code name => X} (§8.3), so it must
-     * resolve to {@code kind: REFERENCE} with {@code X} as source and body — not to the head's own kind with
-     * {@code reference} as source, which is what a construction of any other head yields.
+     * job: {@code !alias { target: X }} is the explicit form of {@code name => X} (§8.3), so it must
+     * resolve to {@code kind: ALIAS} with {@code X} as source and body — not to the head's own kind with
+     * {@code alias} as source, which is what a construction of any other head yields.
      *
      * <p>The distinction was unreachable while the closed form was refused, which is why it is asserted here
      * against all three spellings at once rather than left to the one that already worked.
@@ -80,8 +79,8 @@ class ApplicabilityIsIsATopTest {
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
                   bare    => int32
-                  closed  => !reference { target: int32 }
-                  open    => <T> !reference { target: T }
+                  closed  => !alias { target: int32 }
+                  open    => <T> !alias { target: T }
                   applied => open<int32>
                 }
                 """;
@@ -90,23 +89,23 @@ class ApplicabilityIsIsATopTest {
 
         for (String name : List.of("bare", "closed", "applied")) {
             Top definition = entries.get(name);
-            assertEquals(EntryKind.REFERENCE, EntryKind.of(definition, n -> true), name);
-            assertEquals("int32", ((Reference) definition).target().name(), name);
+            assertEquals(EntryKind.ALIAS, EntryKind.of(definition, n -> true), name);
+            assertEquals("int32", ((Alias) definition).target().name(), name);
         }
         // The open one is a template until it closes, and its kind says so: a template is not a type
-        // (§5.10), so it is TEMPLATE rather than the REFERENCE its closure produces. `applied` above is
-        // where the REFERENCE appears -- the entry closing it mints.
+        // (§5.10), so it is TEMPLATE rather than the ALIAS its closure produces. `applied` above is
+        // where the ALIAS appears -- the entry closing it mints.
         assertEquals(EntryKind.TEMPLATE, EntryKind.of(entries.get("open"), n -> true));
     }
 
     /**
-     * <b>A reference is a hop, not a rewrite (§8.3), so applicability follows the chain.</b> An alias to a
+     * <b>An alias is a hop, not a rewrite (§8.3), so applicability follows the chain.</b> An alias to a
      * constructor is applicable, because the entry at the end of the chain is — and so is an alias to that
      * alias. Everything the head is asked (is it a template, is it applicable, what kind does construction
      * transfer, whose vocabulary reads the payload) is a question about the terminal entry.
      *
      * <p>Asking the alias instead would answer every one of them from an empty supertype chain and a {@code
-     * REFERENCE} kind, which is what a hop looks like rather than what it points at.
+     * ALIAS} kind, which is what a hop looks like rather than what it points at.
      */
     @Test
     void applicationFollowsAnAliasToItsTarget() {
@@ -134,7 +133,7 @@ class ApplicabilityIsIsATopTest {
         }
     }
 
-    /** Every ordinary constructor is IS-A top, so nothing that worked before stops working. */
+    /** Every ordinary constructor is IS-A top, so each applies. */
     @Test
     void anOrdinaryConstructorStillApplies() {
         assertEquals(List.of(), problems("  tags => !array { element_type: text }"));

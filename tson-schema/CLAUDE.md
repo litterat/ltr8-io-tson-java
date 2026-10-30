@@ -7,7 +7,7 @@ registry and identity, `design/meta-layer-namespaces.md` for `NamespaceBody`, `N
 
 - Names no `tson-compiler` type — the engine depends on this module, not the reverse. Where a compiler type is needed
   structurally, declare a local stand-in (`schema.meta.Token`, `SourcePosition`).
-- `Top` is sealed all the way down: `Type`, `Reference`, `TemplateBody`, `ValueEntry`. An entry whose tag names an
+- `Top` is sealed all the way down: `Type`, `Alias`, `TemplateBody`, `ValueEntry`. An entry whose tag names an
   ordinary type is a `ValueEntry` wrapping the value (a `Namespace`, a bound object, or a tree); `Namespace` is the
   value of a namespace type and no `Top`.
 - An atom body's components mirror its constructor's *resolved*, flattened shape — one component per schema field name.

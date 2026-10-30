@@ -70,7 +70,7 @@ class MetaKernelBootstrapResolverTest {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         // A sample spanning every construct DefinitionResolver already handles on its own.
-        for (String name : List.of("top", "atom", "product", "sum", "reference", "integer_size",
+        for (String name : List.of("top", "atom", "product", "sum", "alias", "integer_size",
                 "integer_type", "record", "array", "map", "tuple", "choice", "schema")) {
             assertTrue(schema.entries().containsKey(name), name + " should resolve via DefinitionResolver alone");
         }
@@ -173,7 +173,7 @@ class MetaKernelBootstrapResolverTest {
      * Rule 4 of {@code SPEC-FEEDBACK.md #4}: the pre-loaded set is exactly the kernel's one wait cycle. The bootstrap
      * builds by hand the instances and refinements on it, so they are measured here from {@code
      * meta-kernel-resolved.tn}'s own declarations ({@link WaitGraph}) rather than trusted: a kernel edit that moves
-     * the cycle fails this test, not a read. An entry on the cycle written {@code !record} or {@code !reference} is
+     * the cycle fails this test, not a read. An entry on the cycle written {@code !record} or {@code !alias} is
      * resolved from its grammar, and reads nothing.
      */
     @Test
@@ -183,7 +183,7 @@ class MetaKernelBootstrapResolverTest {
                 .filter(component -> component.contains("record")).findFirst().orElseThrow();
         Set<String> read = new TreeSet<>();
         for (String entry : cycle) {
-            if (!Set.of("record", "reference").contains(graph.head(entry))) {
+            if (!Set.of("record", "alias").contains(graph.head(entry))) {
                 read.add(entry);
             }
         }

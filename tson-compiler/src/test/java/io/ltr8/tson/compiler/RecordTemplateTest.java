@@ -626,7 +626,7 @@ class RecordTemplateTest {
     }
 
     /**
-     * §5.10 is explicit that a reference template composes during substitution with "no intermediate entry
+     * §5.10 is explicit that an alias template composes during substitution with "no intermediate entry
      * per alias hop", so a chain of them lands on the one entry the innermost application denotes.
      */
     @Test
@@ -644,9 +644,9 @@ class RecordTemplateTest {
         assertEquals(instantiationsOf(compiled, "pair").get(0), fieldType(compiled, "holder", "p"));
     }
 
-    /** The degenerate reference template: its body <em>is</em> the parameter, so applying it is the argument. */
+    /** The degenerate alias template: its body <em>is</em> the parameter, so applying it is the argument. */
     @Test
-    void aReferenceTemplateWhoseBodyIsTheParameterClosesToTheArgument() {
+    void anAliasTemplateWhoseBodyIsTheParameterClosesToTheArgument() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: T }
                   ident  => <T> T
@@ -687,17 +687,17 @@ class RecordTemplateTest {
     }
 
     /**
-     * A reference template that applies itself never reaches a body, and -- unlike a recursive record --
+     * An alias template that applies itself never reaches a body, and -- unlike a recursive record --
      * mints no entry a knot could be tied on. Diagnosed as the author's error rather than handing a field
      * the name of an entry nothing defines.
      */
     @Test
-    void aSelfApplyingReferenceTemplateIsASchemaError() {
+    void aSelfApplyingAliasTemplateIsASchemaError() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
                   loop   => <T> loop<T>
                   holder => { p: loop<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("reference template whose own body applies it again"),
+        assertTrue(thrown.getMessage().contains("alias template whose own body applies it again"),
                 thrown.getMessage());
     }
 

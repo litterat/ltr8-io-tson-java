@@ -163,7 +163,7 @@ class TsonSchemaLinkerTest {
      *
      * <p><b>The argument is a real entry, and it has to be.</b> An instantiation's key records the
      * application it closes, closed; a partial application states the arguments it binds in its own {@code
-     * reference.target} (§8.1's alias paragraph). Neither puts a parameter here.
+     * alias.target} (§8.1's alias paragraph). Neither puts a parameter here.
      */
     @Test
     void anArgumentBearingApplicationIsCarriedThroughWithoutMaterialising() {
@@ -217,7 +217,7 @@ class TsonSchemaLinkerTest {
     void rejectsTwoVariantsThatFlattenToOneType() {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
-        entries.put("nickname", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("token")));
+        entries.put("nickname", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("token")));
         entries.put("contact", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("nickname")))));
 
@@ -232,7 +232,7 @@ class TsonSchemaLinkerTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
         entries.put("other", emptyRecord());
-        entries.put("nickname", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("token")));
+        entries.put("nickname", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("token")));
         entries.put("contact", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("nickname"), TypeRef.of("other")))));
 
@@ -245,10 +245,10 @@ class TsonSchemaLinkerTest {
      * verdict arriving at all.
      */
     @Test
-    void aReferenceCycleAmongVariantsIsUninhabited() {
+    void anAliasCycleAmongVariantsIsUninhabited() {
         Map<String, Top> entries = new LinkedHashMap<>();
-        entries.put("a", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("b")));
-        entries.put("b", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("a")));
+        entries.put("a", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("b")));
+        entries.put("b", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("a")));
         entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("a"), TypeRef.of("b")))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -371,7 +371,7 @@ class TsonSchemaLinkerTest {
     void rejectsAVoidVariantReachedThroughAnAlias() {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("void", voidEntry());
-        entries.put("nothing", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("void")));
+        entries.put("nothing", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("void")));
         entries.put("label", TextType.UNCONSTRAINED);
         entries.put("maybe_label", choiceEntry(
                 new ChoiceBody(List.of(TypeRef.of("label"), TypeRef.of("nothing")))));

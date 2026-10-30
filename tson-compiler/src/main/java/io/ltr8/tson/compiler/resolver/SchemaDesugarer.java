@@ -121,7 +121,7 @@ final class SchemaDesugarer {
     private static final String CHOICE = "choice";
 
     /** §5.10's desugar target for a partial application {@code <B> pair<text, B>} -- an alias body. */
-    private static final String REFERENCE = "reference";
+    private static final String ALIAS = "alias";
 
     /** The vocabulary fields the desugar table binds -- fixed by the table, not looked up in a governing meta. */
     private static final String ELEMENT_TYPE = "element_type";
@@ -132,7 +132,7 @@ final class SchemaDesugarer {
     private static final String ELEMENTS = "elements";
     private static final String VARIANTS = "variants";
 
-    /** {@code reference}'s own member, the slot an alias body binds. */
+    /** {@code alias}'s own member, the slot an alias body binds. */
     private static final String TARGET = "target";
 
 
@@ -366,7 +366,7 @@ final class SchemaDesugarer {
                 // **A declaration's own body never lifts** (§5.3): the form *is* the construction, so it
                 // becomes the instance directly rather than a reference to an injected one. That is what
                 // keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body, and
-                // `contact => (email | phone)` a SUM entry with a real ChoiceBody, instead of REFERENCEs to
+                // `contact => (email | phone)` a SUM entry with a real ChoiceBody, instead of aliases to
                 // ones. Every sugar form takes this path -- the bracket forms reach it through
                 // `type-ref` like the rest, since there is no separate declaration-level tier.
                 Optional<Binding> binding = binding(reference.ref());
@@ -380,10 +380,10 @@ final class SchemaDesugarer {
                 }
                 if (!reference.typeParams().isEmpty()) {
                     // §5.10's partial application, and the last open form that was not a constructor
-                    // application: `uuid_pair => <B> pair<text, B>` denotes `!reference { target:
+                    // application: `uuid_pair => <B> pair<text, B>` denotes `!alias { target:
                     // pair<text, B> }`, so it is written that way here and closes by the same walk as
-                    // every other template. Spellable only because `reference.target` is a `type_ref`.
-                    yield instance(new Binding(REFERENCE, List.of(
+                    // every other template. Spellable only because `alias.target` is a `type_ref`.
+                    yield instance(new Binding(ALIAS, List.of(
                             new RecordValue.Field(TARGET, WireForm.plain(refValue(reference.ref()))))),
                             reference.typeParams());
                 }
@@ -708,7 +708,7 @@ final class SchemaDesugarer {
      *
      * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
      * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
-     * after reference flattening, which this phase has no answer to.
+     * after alias flattening, which this phase has no answer to.
      */
     private static Optional<Binding> choiceBinding(List<TypeRef> variants) {
         List<DataValue> members = new ArrayList<>();

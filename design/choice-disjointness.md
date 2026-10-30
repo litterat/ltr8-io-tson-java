@@ -9,16 +9,16 @@ and why the same table is what untagged reading dispatches on. Current form only
   twice, `false` otherwise, never absent.
 - An `integer` and a `decimal` are one class (`number`); records and maps are one class (`brace`).
 - Two kinds straddle classes and have none ([TSON-SCHEMA] §5.4): an approximate atom whose `allow_nan` or
-  `allow_infinity` is true, and a map whose key type, at the end of its reference chain, is not an atom other than
+  `allow_infinity` is true, and a map whose key type, at the end of its alias chain, is not an atom other than
   `value` and `void` (enums included). A classed type's every value lands in its class in every encoding.
-- A variant classifies through its §8.3 reference chain; no class at all makes the choice `false`.
+- A variant classifies through its §8.3 alias chain; no class at all makes the choice `false`.
 - An enum's class is its members' shared class, read off each member's spelling; every enum is over an identifier
   family, so no fact beyond the body is needed. A closed set of text values is `text_type`'s `members` facet and is
   string-class as every text atom is, whatever its members spell.
 - A kind (`kind_type`) is an atom whose values are type names, string-class as an identifier family is. It is no sum
   and carries no `disjoint`; a choice may list one as a variant like any other atom.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
-  §8.3 reference chain.
+  §8.3 alias chain.
 - `ChoiceReader.untaggedRecovery` and the derivation both go through `DiscriminationClass.of`: one fact, not two.
 - Any change to the class table is a compatibility decision: it decides which schemas load and which documents read
   untagged.
@@ -46,7 +46,7 @@ identifier family whatever its members spell, a kind, `uuid`, `date`, `bytes`, �
 takes its members' shared token class instead, so `[true false]` is boolean-class) — plus `brace` (records **and**
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
-§8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
+§8.3 alias chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
 `rational`/`complex` (whose typed forms straddle classes), `value`, `void`, a mixed-class enum, a declared instance (its
 membership is a closure, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
 conservative side. §5.4 adds two kinds to that list by the same straddling, judged across encodings: an approximate
@@ -59,7 +59,7 @@ so a choice's untagged values are one set whichever encoding reads it, and no en
 
 A `void` variant never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`) —
 `(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`), per §5.4's "a
-variant MUST NOT resolve to `void`", judged after following the variant's reference chain (§8.3) as §5.4
+variant MUST NOT resolve to `void`", judged after following the variant's alias chain (§8.3) as §5.4
 requires, so an alias of `void` is caught too.
 
 **`disjoint` ⇔ the tag is droppable — one fact, not two.** `ChoiceReader.untaggedRecovery` builds its

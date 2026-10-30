@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Every member's entry name is minted, which is what makes the alias half load-bearing.</b> §8.2 makes
  * a materialised name non-normative, so {@code ok_of => ok<text>} is the only name a document has for that
- * member -- and §7.2's "after reference flattening of both" is what lets a tag spell it.
+ * member -- and §7.2's "after alias flattening of both" is what lets a tag spell it.
  */
 class AbstractTemplateFamilyTest {
 
@@ -88,7 +88,7 @@ class AbstractTemplateFamilyTest {
      */
     private static String target(TsonCompiledSchemaRegistry registry, String alias) {
         return registry.get(ID).schema().entries().get(alias)
-                instanceof io.ltr8.tson.schema.meta.Reference ref ? ref.target().name() : alias;
+                instanceof io.ltr8.tson.schema.meta.Alias ref ? ref.target().name() : alias;
     }
 
     private static RecordBody bodyOf(TsonCompiledSchemaRegistry registry, String alias) {

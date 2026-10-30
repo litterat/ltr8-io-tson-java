@@ -1,7 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.Collection;
@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Where a type name ends up. [TSON-SCHEMA] §8.3 makes a reference a hop rather than a rewrite, so resolved
+ * Where a type name ends up. [TSON-SCHEMA] §8.3 makes an alias a hop rather than a rewrite, so resolved
  * output states the chain the author wrote and a reader that wants the *shape* has to walk it.
  *
  * <p>One place, because three readers were walking it independently -- a field's stated value, a map's key
@@ -22,12 +22,12 @@ import java.util.Set;
  * <p>Named for {@code tson-compiler}'s class of the same name, which does the same job over the same model:
  * the two stacks are peers, and a reader who knows one should recognise the other without being told.
  */
-final class ReferenceChain {
+final class AliasChain {
 
     /** Linking has already refused a cycle, so this bounds a fault rather than a document. */
     private static final int MAX_HOPS = 64;
 
-    private ReferenceChain() {
+    private AliasChain() {
     }
 
     /**
@@ -41,7 +41,7 @@ final class ReferenceChain {
 
     /**
      * The inverse of {@link #terminal}: for each entry, every <em>written</em> name that means it -- the
-     * aliases whose chain ends there. [TSON-SCHEMA] §7.2 compares "after reference flattening of
+     * aliases whose chain ends there. [TSON-SCHEMA] §7.2 compares "after alias flattening of
      * <b>both</b>", so a reader matching a written {@code $type} against a set of entry names has to hold
      * the aliases too, or it refuses a name that denotes exactly what it admits.
      *
@@ -65,7 +65,7 @@ final class ReferenceChain {
      * against. A materialised entry's own name is implementation-chosen (§8.2), so for a template
      * instantiation an alias is the only name an author has to write.
      *
-     * <p><b>The alias is kept rather than reduced to its target.</b> A reference entry compiles to its
+     * <p><b>The alias is kept rather than reduced to its target.</b> An alias entry compiles to its
      * target's reader, so dispatching on the written name runs the same reader and reports under the name
      * the author typed.
      */
@@ -90,10 +90,10 @@ final class ReferenceChain {
             if (definition == null) {
                 return Optional.empty();
             }
-            if (!(definition instanceof Reference reference)) {
+            if (!(definition instanceof Alias alias)) {
                 return Optional.of(new Resolved(at, definition));
             }
-            at = reference.target().name();
+            at = alias.target().name();
         }
         return Optional.empty();
     }

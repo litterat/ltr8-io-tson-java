@@ -22,7 +22,7 @@ import java.util.Set;
  * payload -- ill-defined, since an empty array determines nothing and two instantiations accept one document.
  * None of that reaches a marked template: every member is a closed entry with its arguments already fixed, so
  * the existential is eliminated by dispatch. {@link OpenTemplateReader} keeps every template that has no such
- * dispatch -- a container, a constructor application, a reference template.
+ * dispatch -- a container, a constructor application, an alias template.
  *
  * <p><b>The template itself is the base, and nothing is minted for it.</b> So the name a diagnostic prints,
  * the name a binding map is keyed on, and the entry {@code subtypes} hangs off are all the one the author

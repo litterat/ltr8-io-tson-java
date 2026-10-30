@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
@@ -17,38 +17,38 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link ReferenceChain}'s three stopping rules, which four passes used to decide for themselves.
+ * {@link AliasChain}'s three stopping rules, which four passes used to decide for themselves.
  *
  * <p>The walk exists because resolved output states the chain the author wrote: nothing rewrites a use site
  * past a reference, so anything that wants the type at the end walks there. What that walk stops at is one
  * decision, and these are the cases that make it one -- an argument-bearing target especially, since it looks
  * like a hop and is an application.
  */
-class ReferenceChainWalkTest {
+class AliasChainWalkTest {
 
     private static final Map<String, Top> ENTRIES = entries();
 
     private static Map<String, Top> entries() {
         Map<String, Top> map = new LinkedHashMap<>();
         map.put("text", TextType.UNCONSTRAINED);
-        map.put("hop", reference(TypeRef.of("text")));
-        map.put("alias", reference(TypeRef.of("hop")));
-        map.put("applied", reference(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
-        map.put("loop_a", reference(TypeRef.of("loop_b")));
-        map.put("loop_b", reference(TypeRef.of("loop_a")));
+        map.put("hop", alias(TypeRef.of("text")));
+        map.put("alias", alias(TypeRef.of("hop")));
+        map.put("applied", alias(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
+        map.put("loop_a", alias(TypeRef.of("loop_b")));
+        map.put("loop_b", alias(TypeRef.of("loop_a")));
         return map;
     }
 
-    private static Top reference(TypeRef target) {
-        return new Reference(target);
+    private static Top alias(TypeRef target) {
+        return new Alias(target);
     }
 
     /** The ordinary case, and the one that has to be transitive: two hops reach the type at the end. */
     @Test
     void aChainWalksToTheTypeAtItsEnd() {
-        assertEquals("text", ReferenceChain.terminal("alias", ENTRIES));
-        assertEquals("text", ReferenceChain.terminal("hop", ENTRIES));
-        assertEquals("text", ReferenceChain.terminal("text", ENTRIES), "a name that starts no chain is its own end");
+        assertEquals("text", AliasChain.terminal("alias", ENTRIES));
+        assertEquals("text", AliasChain.terminal("hop", ENTRIES));
+        assertEquals("text", AliasChain.terminal("text", ENTRIES), "a name that starts no chain is its own end");
     }
 
     /**
@@ -58,8 +58,8 @@ class ReferenceChainWalkTest {
      */
     @Test
     void anArgumentBearingTargetStopsTheWalk() {
-        assertEquals("applied", ReferenceChain.terminal("applied", ENTRIES));
-        assertTrue(ReferenceChain.terminalDefinition("applied", ENTRIES).isPresent(),
+        assertEquals("applied", AliasChain.terminal("applied", ENTRIES));
+        assertTrue(AliasChain.terminalDefinition("applied", ENTRIES).isPresent(),
                 "it stopped on an entry, so there is one to hand back");
     }
 
@@ -69,8 +69,8 @@ class ReferenceChainWalkTest {
      */
     @Test
     void anUndeclaredNameIsItsOwnTerminal() {
-        assertEquals("nowhere", ReferenceChain.terminal("nowhere", ENTRIES));
-        assertFalse(ReferenceChain.terminalDefinition("nowhere", ENTRIES).isPresent());
+        assertEquals("nowhere", AliasChain.terminal("nowhere", ENTRIES));
+        assertFalse(AliasChain.terminalDefinition("nowhere", ENTRIES).isPresent());
     }
 
     /**
@@ -80,14 +80,14 @@ class ReferenceChainWalkTest {
      */
     @Test
     void aCycleStopsAndYieldsNoType() {
-        assertEquals("loop_a", ReferenceChain.terminal("loop_a", ENTRIES));
-        assertEquals("loop_b", ReferenceChain.terminal("loop_b", ENTRIES));
-        assertFalse(ReferenceChain.terminalDefinition("loop_a", ENTRIES).isPresent());
+        assertEquals("loop_a", AliasChain.terminal("loop_a", ENTRIES));
+        assertEquals("loop_b", AliasChain.terminal("loop_b", ENTRIES));
+        assertFalse(AliasChain.terminalDefinition("loop_a", ENTRIES).isPresent());
     }
 
     /** The two entry points agree wherever the walk reaches a type. */
     @Test
     void theTwoEntryPointsAgree() {
-        assertEquals(ENTRIES.get("text"), ReferenceChain.terminalDefinition("alias", ENTRIES).orElseThrow());
+        assertEquals(ENTRIES.get("text"), AliasChain.terminalDefinition("alias", ENTRIES).orElseThrow());
     }
 }

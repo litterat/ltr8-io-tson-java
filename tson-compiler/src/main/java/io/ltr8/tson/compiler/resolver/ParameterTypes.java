@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
@@ -676,14 +676,14 @@ final class ParameterTypes {
         }
 
         /**
-         * A name's resolved body, reference chains followed -- the slot type a written value faces. A namespace type
+         * A name's resolved body, alias chains followed -- the slot type a written value faces. A namespace type
          * faces it as the map its value is ({@link NamespaceBody#read}): {@code record}'s {@code fields} is written
          * as a map.
          */
         private Top resolve(String name) {
             Top definition = meta.apply(name);
-            for (int hops = 0; definition instanceof Reference reference && hops < 32; hops++) {
-                definition = meta.apply(reference.target().name());
+            for (int hops = 0; definition instanceof Alias alias && hops < 32; hops++) {
+                definition = meta.apply(alias.target().name());
             }
             if (definition instanceof NamespaceBody namespace) {
                 return namespace.read();

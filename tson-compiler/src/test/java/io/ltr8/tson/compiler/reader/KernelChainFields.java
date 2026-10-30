@@ -7,7 +7,7 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -51,7 +51,7 @@ final class KernelChainFields {
             case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)
                     .forEach(e -> copy(e, kernel, entries));
             case ChoiceBody choice -> choice.variants().forEach(v -> copy(v, kernel, entries));
-            case Reference reference -> copy(reference.target(), kernel, entries);
+            case Alias alias -> copy(alias.target(), kernel, entries);
             default -> {
             }
         }

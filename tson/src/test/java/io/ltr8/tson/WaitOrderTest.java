@@ -128,9 +128,9 @@ class WaitOrderTest {
                 """));
     }
 
-    /** An alias loop is no wait cycle either: §8.3 refuses a reference chain with no terminal. */
+    /** An alias loop is no wait cycle either: §8.3 refuses an alias chain with no terminal. */
     @Test
-    void anAliasLoopIsRefusedAsAReferenceChainNotAWaitCycle() {
+    void anAliasLoopIsRefusedAsAnAliasChainNotAWaitCycle() {
         List<Diagnostic> problems = validateSchema("""
                   a => b
                   b => a

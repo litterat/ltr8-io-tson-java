@@ -53,7 +53,7 @@ class TemplateIsAFamilyBaseTest {
      * already named the same application.
      */
     private static String target(TsonLinkedSchema schema, String alias) {
-        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
+        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
 

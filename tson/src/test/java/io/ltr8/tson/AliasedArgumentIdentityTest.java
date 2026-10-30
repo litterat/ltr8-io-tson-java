@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  * difference has to show:
  *
  * <ul>
- *   <li>{@code user_id => uuid} is a <b>reference</b> -- a pure rename. §7.2 compares "after reference
+ *   <li>{@code user_id => uuid} is a <b>reference</b> -- a pure rename. §7.2 compares "after alias
  *       flattening of both", so a {@code user_id} is interchangeable with a {@code uuid} at every position.
  *       {@code box<user_id>} therefore <em>is</em> {@code box<uuid>}, and the resolver dereferences the
  *       argument so that both applications canonicalise the same way.
@@ -62,7 +62,7 @@ class AliasedArgumentIdentityTest {
 
     /**
      * <b>The canonical application a declaration records</b>, which is what §8.2 keys identity on -- the
-     * arguments with every reference chain followed to its terminal entry.
+     * arguments with every alias chain followed to its terminal entry.
      *
      * <p>Each of these declarations is now its own entry (§8.2), so "one entry" is no
      * longer the question a rename test can ask: two declarations naming one application are two entries with

@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.resolver.KindMembers;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.KindBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -95,7 +95,7 @@ class KindMembersTest {
                 }
                 """);
         RecordBody order = assertInstanceOf(RecordBody.class, linked.schema().entries().get("order"));
-        KindBody inline = kind(linked, ReferenceChain.terminal(order.fields().get("id").type().name(),
+        KindBody inline = kind(linked, AliasChain.terminal(order.fields().get("id").type().name(),
                 linked.schema().entries()::get));
 
         assertEquals(new KindBody("uuid_type"), inline);
@@ -240,7 +240,7 @@ class KindMembersTest {
         List<String> members = kind(kernel, "type_kind").members().orElseThrow();
 
         assertTrue(members.containsAll(List.of("field_map", "schema", "declared")), members::toString);
-        assertFalse(members.contains("set_type") || members.contains("record") || members.contains("reference")
+        assertFalse(members.contains("set_type") || members.contains("record") || members.contains("alias")
                 || members.contains("namespace"), members::toString);
     }
 
@@ -295,11 +295,11 @@ class KindMembersTest {
     void aKindOfAConstructorBesideTypeIsRefusedAtTheDeclaration() {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
-                  order => { id: kind<reference> }
+                  order => { id: kind<alias> }
                 }
                 """));
 
-        assertTrue(e.getMessage().contains("'reference'")
+        assertTrue(e.getMessage().contains("'alias'")
                         && e.getMessage().contains("not 'type' or a constructor below it"), e.getMessage());
     }
 

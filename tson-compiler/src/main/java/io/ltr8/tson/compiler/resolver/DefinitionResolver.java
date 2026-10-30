@@ -66,7 +66,7 @@ import java.util.function.Predicate;
 
 /**
  * Resolves one declaration from a {@link SchemaMap} (the grammar-layer AST) into the value its entry maps to
- * ([TSON-SCHEMA] §4.1, §8.1) -- a type body carrying its own IS-A chain, a {@code Reference},
+ * ([TSON-SCHEMA] §4.1, §8.1) -- a type body carrying its own IS-A chain, an {@code Alias},
  * a held {@code TemplateBody} or a constructor's instance -- and records the entry's facts that no value holds
  * ({@link TsonSchema.EntryFacts}). Per-declaration work only: ordering, imports, materialisation and everything else
  * that needs the whole schema is {@link SchemaResolver}'s. {@link #resolveTypeDef} dispatches on the shape of
@@ -87,7 +87,7 @@ import java.util.function.Predicate;
  *   inherited group ({@link #restatesInheritedGroup}: same member labels in the same order, state tightening
  *   OPTIONAL&#8594;REQUIRED only). A closed source heads the result's chain. The source takes an application
  *   on composition's terms.</li>
- *   <li><b>A reference</b> ({@code name => other_name}, §8.3) -- a {@code REFERENCE}-kind entry whatever the
+ *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- an {@code ALIAS}-kind entry whatever the
  *   name resolves to, carried unverified; the linker validates it. <b>A template application</b>
  *   ({@code bx => box<text>}, {@link #resolveTemplateApplication}) is the same declaration carrying
  *   arguments -- a reference or a value each, nested applications included -- and a closed one closes
@@ -198,10 +198,10 @@ final class DefinitionResolver {
 
     /**
      * The kernel's alias constructor -- §5.10's partial application, {@code <B> pair<uuid, B>}, whose held
-     * body is a {@code !reference { target: ... }} and whose entry is {@link EntryKind#REFERENCE} rather than
+     * body is a {@code !alias { target: ... }} and whose entry is {@link EntryKind#ALIAS} rather than
      * the constructor's own kind.
      */
-    private static final String REFERENCE = "reference";
+    private static final String ALIAS = "alias";
 
     /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
     private static final String TEMPLATE = "template";
@@ -588,7 +588,7 @@ final class DefinitionResolver {
         List<String> instantiable = TypeChain.subtypesOf(head).stream()
                 .filter(subtype -> !TEMPLATE.equals(subtype) && isInstantiable(metaDefinitions.definition(subtype)))
                 .toList();
-        String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
+        String terminal = AliasChain.terminal(target, metaDefinitions::definition);
         throw new SchemaValidationException("'" + name + "': '!" + target + "' names an abstract entry, which has no "
                 + "direct instances (§5.2), so there is nothing for '!" + target + " { ... }' to build -- "
                 + (instantiable.isEmpty()
@@ -609,7 +609,7 @@ final class DefinitionResolver {
      * a source declaration applying it directly is a resolver error. It IS-A {@code top}, since resolved output is
      * typed by it, so it is applied as a constructor would be -- which is why it needs a check of its own:
      * admitted, it would mint an open entry whose held body was hand-written, skipping every check §5.10 makes
-     * of a template's declaration. Tested at the end of the head's reference chain (§8.3), so an alias of
+     * of a template's declaration. Tested at the end of the head's alias chain (§8.3), so an alias of
      * {@code template} is refused as well.
      */
     private static void requireAuthorable(String name, String target, ConstructorHead head) {
@@ -637,7 +637,7 @@ final class DefinitionResolver {
      * uniformly by the compiled {@code Record*Reader} itself (see {@code RecordAbstractReader}'s own
      * Javadoc), not by a separate normalization step here. Construction transfers only {@code C}'s {@code
      * kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on the result -- except for an
-     * alias, where the result is the entry {@code name => X} denotes, since {@code !reference { target: X }}
+     * alias, where the result is the entry {@code name => X} denotes, since {@code !alias { target: X }}
      * is that alias written out (§8.3).
      *
      * <p>Binds against {@link Top}, not the narrower {@code Atom} -- some constructors (e.g. {@code
@@ -670,9 +670,9 @@ final class DefinitionResolver {
         // comes with an empty chain, since IS-A stops at construction (§4.1), and so is read as a value entry.
         // Parameters empty and IS-A `top` therefore imply a record body.
         Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
-        if (body instanceof io.ltr8.tson.schema.meta.Reference) {
-            // `!reference { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
-            // denotes the same entry: `kind: REFERENCE` (§4.1 -- a type_kind, not one the supertype chain
+        if (body instanceof io.ltr8.tson.schema.meta.Alias) {
+            // `!alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
+            // denotes the same entry: `kind: ALIAS` (§4.1 -- a type_kind, not one the supertype chain
             // could give). Dispatched on the *body* rather than on the head's name because this path has
             // already read it; `resolveInstanceTemplate` holds its body unread and so has only the name.
             return body;
@@ -809,7 +809,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * Whether two records' name types are one type: the same entry at the end of each one's reference chain, not
+     * Whether two records' name types are one type: the same entry at the end of each one's alias chain, not
      * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code field_name} is
      * {@code identifier}. Both resolve in the schema's one namespace, the absent default being the kernel's {@code
      * field_name}, and two that resolve to nothing are compared as written, the linker refusing each on its own.
@@ -824,7 +824,7 @@ final class DefinitionResolver {
     private String nameTypeIdentity(Optional<String> nameType) {
         String written = nameType.orElse(RecordBody.FIELD_NAME);
         DefinitionGetter in = metaDefinitions.definition(written) != null ? metaDefinitions : namespaceDefinitions;
-        return in.definition(written) == null ? null : ReferenceChain.terminal(written, in::definition);
+        return in.definition(written) == null ? null : AliasChain.terminal(written, in::definition);
     }
 
     /**
@@ -864,7 +864,7 @@ final class DefinitionResolver {
             }
             return HeldBody.held(template.typeParams(), template.value());
         }
-        // `reference` needs no exception here: it IS-A `top`, so the generic rule admits it, which is what
+        // `alias` needs no exception here: it IS-A `top`, so the generic rule admits it, which is what
         // makes the open and closed spellings of one construction agree. Nor does its kind need one any
         // more -- every open entry is TEMPLATE whatever constructor its held body applies, so the alias form
         // stopped being the one shape whose kind had to be read off the head.
@@ -1114,14 +1114,14 @@ final class DefinitionResolver {
 
     /**
      * The constructor a {@code !C ...} head names, and the name to read its payload against -- <b>after
-     * following {@code C}'s reference chain</b> ([TSON-SCHEMA] §8.3).
+     * following {@code C}'s alias chain</b> ([TSON-SCHEMA] §8.3).
      *
-     * <p>A reference is a hop, not a rewrite: resolved output states the chain the author wrote, and a
+     * <p>An alias is a hop, not a rewrite: resolved output states the chain the author wrote, and a
      * processor collapses it when it needs the type. So {@code alias_array => array} makes
      * {@code !alias_array { ... }} an application of {@code array}, and everything this resolver then asks of
      * the head -- is it a template, is it applicable, what kind does construction transfer, whose vocabulary
      * reads the payload -- is a question about the entry at the end. Asking the alias instead answered every
-     * one of them from an empty supertype chain and a {@code REFERENCE} kind, which is what a hop looks like
+     * one of them from an empty supertype chain and an {@code ALIAS} kind, which is what a hop looks like
      * rather than what it points at.
      *
      * <p>The author's own spelling survives where it is visible: {@link #resolveInstance} records {@code C} as
@@ -1132,7 +1132,7 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': '!" + target + "' names no entry of this "
                     + "schema's namespace -- its own entries and every entry its !!imports bring in (§3.3.1)");
         }
-        String terminal = ReferenceChain.terminal(target, metaDefinitions::definition);
+        String terminal = AliasChain.terminal(target, metaDefinitions::definition);
         Top atEnd = metaDefinitions.definition(terminal);
         if (atEnd == null) {
             // The walk stopped at a name no import declares -- a broken hop, which is the alias's own problem and
@@ -1287,7 +1287,7 @@ final class DefinitionResolver {
      *
      * <p><b>A closed one is the entry it denotes</b> (§8.2): {@code bx => box<text>}
      * resolves to the closed record itself, the canonical application among its facts, rather than to a {@code
-     * REFERENCE} at a content-derived entry. §8.2 makes a declared entry's identity its
+     * ALIAS} at a content-derived entry. §8.2 makes a declared entry's identity its
      * name, and a declaration that <em>constructs</em> a type already keeps it (§5.3's lift leaves {@code
      * text_list => [text]} as the entry), so one that <em>denotes</em> a type obeys the same rule.
      *
@@ -1319,8 +1319,8 @@ final class DefinitionResolver {
     }
 
     /**
-     * An alias entry: closed, with a {@code Reference} body naming its target, or -- §5.10's partial
-     * application -- <b>open</b>, with that same {@code !reference { target: ... }} held as its body.
+     * An alias entry: closed, with an {@code Alias} body naming its target, or -- §5.10's partial
+     * application -- <b>open</b>, with that same {@code !alias { target: ... }} held as its body.
      *
      * <p>An open entry's body is held whatever shape it takes, with no exception for the alias form: that is
      * what lets materialisation dispatch on the constructor head, and what makes "declares parameters" and
@@ -1332,7 +1332,7 @@ final class DefinitionResolver {
      * ({@code day => date}), and the second takes partial application.
      */
     private static Top openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
-        return parameters.isEmpty() ? new io.ltr8.tson.schema.meta.Reference(target)
+        return parameters.isEmpty() ? new io.ltr8.tson.schema.meta.Alias(target)
                 : HeldBody.held(parameters, WireForm.heldReference(target));
     }
 
@@ -1459,13 +1459,13 @@ final class DefinitionResolver {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName
                         + "' names no type this schema declares or imports");
             }
-            // §4.3 judges an operand at the end of its reference chain (§8.3), never at the name written: a
+            // §4.3 judges an operand at the end of its alias chain (§8.3), never at the name written: a
             // reference is the same type under another name (§5.7's table), so an alias of a record has that
             // record's fields to contribute. The walk stops at an argument-bearing target, which is the entry
             // that application denotes -- so the test below sees that entry's own body, and an alias is
             // judged for the terminal's reason rather than by whichever body the written name happened to
             // have.
-            String supertypeTerminal = ReferenceChain.terminal(supertypeName,
+            String supertypeTerminal = AliasChain.terminal(supertypeName,
                     namespaceDefinitions::definition);
             boolean supertypeHops = !supertypeTerminal.equals(supertypeName);
             Top terminalSupertype = supertypeHops
@@ -1479,7 +1479,7 @@ final class DefinitionResolver {
             refuseUnappliedTemplate(name, supertypeName, terminalSupertype, "supertype", "&");
             if (!(terminalSupertype instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
-                        + (supertypeHops ? " resolves through its reference chain to '" + supertypeTerminal
+                        + (supertypeHops ? " resolves through its alias chain to '" + supertypeTerminal
                                 + "', which" : "")
                         + " has no fields to contribute -- its body is a binding record, not a "
                         + "vocabulary, so there is nothing for '&' to compose with (§4.3, "
@@ -1727,12 +1727,12 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName
                     + "' names no type this schema declares or imports");
         }
-        // §5.7 states the walk explicitly -- "the source of `^`, after following its reference chain (§8.3)"
+        // §5.7 states the walk explicitly -- "the source of `^`, after following its alias chain (§8.3)"
         // -- and §4.3 states it for both operator families. What is *finished* is a body with no vocabulary
         // to tighten: a top-level constructor application (§5.6), a choice, or an alias resolving to either.
         // What the walk adds is the case that is not finished: an alias of a record, which has that record's
         // vocabulary to tighten -- a record template's instantiation included (§4.3).
-        String sourceTerminal = ReferenceChain.terminal(sourceName, namespaceDefinitions::definition);
+        String sourceTerminal = AliasChain.terminal(sourceName, namespaceDefinitions::definition);
         boolean sourceHops = !sourceTerminal.equals(sourceName);
         Top terminalSource = sourceHops
                 ? namespaceDefinitions.definition(sourceTerminal) : sourceDef;
@@ -1745,7 +1745,7 @@ final class DefinitionResolver {
         refuseUnappliedTemplate(name, sourceName, terminalSource, "refinement source", "^");
         if (!(terminalSource instanceof RecordBody sourceBody)) {
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
-                    + (sourceHops ? " resolves through its reference chain to '" + sourceTerminal
+                    + (sourceHops ? " resolves through its alias chain to '" + sourceTerminal
                             + "', which" : "")
                     + " has no vocabulary to tighten -- its body is a binding record, so it is "
                     + "finished and '^' on it is a resolver error (§4.3, §5.7). Refine the "

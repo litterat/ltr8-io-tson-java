@@ -14,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * <b>An operand is judged at the end of its reference chain, not at the name the author wrote</b>
+ * <b>An operand is judged at the end of its alias chain, not at the name the author wrote</b>
  * ([TSON-SCHEMA] §4.3): "the source of a refinement and every operand of a composition or subtraction MUST,
- * after following its reference chain (§8.3), be a definition whose body is a {@code !record}".
+ * after following its alias chain (§8.3), be a definition whose body is a {@code !record}".
  *
  * <p>Both halves of that rule matter, and only the second was applied. A reference is the same type under
  * another name (§5.7's table), so an alias of a record has a field set to merge or tighten and MUST be
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>Subtraction shares the composition operand path</b>, so it is governed by the same walk; §5.9 then
  * leaves the chain empty as it does for any subtraction.
  */
-class OperandFollowsReferenceChainTest {
+class OperandFollowsAliasChainTest {
 
     private static String schema(String id, String declarations) {
         return """

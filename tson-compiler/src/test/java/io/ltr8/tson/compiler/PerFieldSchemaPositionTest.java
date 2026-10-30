@@ -114,7 +114,7 @@ class PerFieldSchemaPositionTest {
      * exists so the rebuild cannot forget.
      */
     @Test
-    void aFieldRewrittenByReferenceFlatteningKeepsItsPosition() {
+    void aFieldRewrittenByAliasFlatteningKeepsItsPosition() {
         List<Diagnostic> found = read("""
                   small => !integer ^ { max: 100 }
                   pct   => small

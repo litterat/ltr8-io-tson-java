@@ -21,7 +21,7 @@ import java.util.Set;
  * nothing asks whether a record is final and no reader carries a check for it.
  *
  * <p><b>Both dispatchers compare a written tag against flattened names</b> ({@link Subsumption#admitting}),
- * §7.2 comparing "after reference flattening of both". It is not a nicety here: a family whose base is a
+ * §7.2 comparing "after alias flattening of both". It is not a nicety here: a family whose base is a
  * template has minted entries for every member, and §8.2 makes a minted name non-normative -- so an alias is
  * the only name a document has for {@code ok<text>}, and a dispatcher matching raw subtype names would refuse
  * every value in such a family.

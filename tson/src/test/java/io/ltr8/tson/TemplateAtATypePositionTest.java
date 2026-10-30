@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * eliminated by dispatch, never by inference.
  *
  * <p>So the test is the parent's existence, which {@code template.extension} states: present for a record
- * body, absent for a container, a constructor application and a reference template alike.
+ * body, absent for a container, a constructor application and an alias template alike.
  *
  * <p><b>What this test covers is whether the schema loads</b>, which is the half the parent's existence
  * decides. Reading such a position is {@code TemplateIsAFamilyBaseTest}'s: a value there dispatches to a
@@ -96,7 +96,7 @@ class TemplateAtATypePositionTest {
 
     /** A reference is indirection, not a type of its own, so there is nothing for a parent to hold. */
     @Test
-    void aReferenceTemplateIsStillRefused() {
+    void anAliasTemplateIsStillRefused() {
         assertTrue(refusal("t6", """
                   pair      => <A, B> { first: A  second: B }
                   uuid_pair => <B> pair<uuid, B>

@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.VoidType;
 
@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * Following a chain of {@code REFERENCE} entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
+ * Following a chain of {@code ALIAS} entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
  * stated once.
  *
  * <p><b>Why this is a shared class rather than a loop each caller writes.</b> Resolved output states the
@@ -23,7 +23,7 @@ import java.util.function.Function;
  *
  * <p><b>The walk stops at three things</b>, and the second is the one worth knowing:
  * <ul>
- *   <li>an entry whose body is not a {@link Reference} -- the type at the end;
+ *   <li>an entry whose body is not an {@link Alias} -- the type at the end;
  *   <li>an <b>argument-bearing</b> target, which is an application rather than a hop to another entry:
  *       there is no entry at the end of one until materialisation mints it;
  *   <li>a name the namespace does not declare, and a cycle. {@link #terminal} answers both with the name it
@@ -37,13 +37,13 @@ import java.util.function.Function;
  * the constructor's own vocabulary, where the template is the answer. It keeps its own loop, and the
  * difference is the reason to say so here rather than let a future reader assume the four were five.
  */
-public final class ReferenceChain {
+public final class AliasChain {
 
-    private ReferenceChain() {
+    private AliasChain() {
     }
 
     /**
-     * The name at the end of {@code name}'s reference chain -- {@code name} itself when it starts one, and
+     * The name at the end of {@code name}'s alias chain -- {@code name} itself when it starts one, and
      * the name the walk stopped at when it cannot reach a type (see this class's own note).
      */
     public static String terminal(String name, Map<String, ? extends Top> entries) {
@@ -89,8 +89,8 @@ public final class ReferenceChain {
             if (definition == null) {
                 return new Stop(current, false);
             }
-            if (definition instanceof Reference reference && reference.target().arguments().isEmpty()) {
-                current = reference.target().name();
+            if (definition instanceof Alias alias && alias.target().arguments().isEmpty()) {
+                current = alias.target().name();
                 continue;
             }
             return new Stop(current, true);

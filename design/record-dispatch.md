@@ -62,7 +62,7 @@ than §7.2 in any case: a sibling's tag is admissible under §7.2 and still wron
 said which member this is.
 
 **Both compare a written tag against a name and every alias whose chain ends at it**
-(`Subsumption.admitting`), §7.2 comparing "after following both reference chains to their terminal entries":
+(`Subsumption.admitting`), §7.2 comparing "after following both alias chains to their terminal entries":
 the base's own set, which decides the `tagNamesTheBase` refusal, and each
 member's, which decides selection. Skipping it is not a lost nicety but a family nothing can name — a family
 whose base is a **template** has a minted entry for the base and for every member, and §8.2 makes a minted

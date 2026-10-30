@@ -85,11 +85,11 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 ## Parameterised aliases
 
 - **A parameterised alias is normalised here as well** (§5.10's partial application). `uuid_pair => <B>
-  pair<text, B>` leaves this phase as `<B> !reference { target: pair<text, B> }` — §8.1's own reading of what
-  an alias body is, spellable because the kernel's `reference.target` is a `type_ref` rather than a bare name.
+  pair<text, B>` leaves this phase as `<B> !alias { target: pair<text, B> }` — §8.1's own reading of what
+  an alias body is, spellable because the kernel's `alias.target` is a `type_ref` rather than a bare name.
   With it no open form is anything but a constructor application: §12.1's
   `[type-params] "!" type-name ws core-value` covers every template and one walk closes them all.
-  - Only a *parameterised* one. A closed alias (`text_box => box<text>`) resolves to a `REFERENCE` entry
+  - Only a *parameterised* one. A closed alias (`text_box => box<text>`) resolves to an `ALIAS` entry
     directly, the way a closed record resolves to a `RecordBody`: nothing about it is deferred, so there is
     nothing to hold.
 

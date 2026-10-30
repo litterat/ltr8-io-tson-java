@@ -14,7 +14,7 @@ import java.util.Set;
  * What a written parent contributes to an IS-A chain ([TSON-SCHEMA] §5.8): the one rule a closed declaration's
  * chain is built by at its declaration and a record template's application's when materialisation closes it.
  *
- * <p><b>A closed parent</b> contributes itself, the end of its reference chain (§8.3: the terminal is the same
+ * <p><b>A closed parent</b> contributes itself, the end of its alias chain (§8.3: the terminal is the same
  * type under another name, so IS-A reaches it) and that entry's own chain. <b>An application</b> denotes no entry
  * at the position that writes it -- its fields are absorbed by value -- so it contributes its template's
  * ancestors, and nothing for the template, which §5.10 makes no type. The edge to the entry a closed application
@@ -30,11 +30,11 @@ final class Ancestry {
     private Ancestry() {
     }
 
-    /** A closed parent's contribution: itself, the end of its reference chain, and that entry's chain. */
+    /** A closed parent's contribution: itself, the end of its alias chain, and that entry's chain. */
     static List<String> ofParent(String parent, DefinitionGetter namespace) {
         List<String> names = new ArrayList<>();
         names.add(parent);
-        String terminal = ReferenceChain.terminal(parent, namespace::definition);
+        String terminal = AliasChain.terminal(parent, namespace::definition);
         if (!terminal.equals(parent)) {
             names.add(terminal);
         }

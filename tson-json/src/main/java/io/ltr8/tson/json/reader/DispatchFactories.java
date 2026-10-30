@@ -30,7 +30,7 @@ import java.util.Set;
  * </ul>
  *
  * <p>Both dispatchers compare a written tag against flattened names ([TSON-SCHEMA] §7.2 compares "after
- * reference flattening of both"). A family whose base is a template has minted entries for every member, and
+ * alias flattening of both"). A family whose base is a template has minted entries for every member, and
  * §8.2 makes a minted name non-normative -- so an alias is the only name a document has for one.
  */
 final class DispatchFactories {

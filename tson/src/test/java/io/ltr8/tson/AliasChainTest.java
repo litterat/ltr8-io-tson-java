@@ -7,7 +7,7 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,11 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §8.3: a reference is a hop, not a rewrite.
+ * [TSON-SCHEMA] §8.3: an alias is a hop, not a rewrite.
  *
- * <p>Resolved output states the chain as the author wrote it. A type position naming a {@code REFERENCE}
+ * <p>Resolved output states the chain as the author wrote it. A type position naming an {@code ALIAS}
  * entry keeps that name, no annotation records where it "really" points, and the chain stays walkable end to
- * end — which it had to anyway, since {@code reference.target} was never flattened and the entries never
+ * end — which it had to anyway, since {@code alias.target} was never flattened and the entries never
  * left the namespace.
  *
  * <p><b>A processor collapses the chain when it compiles readers</b> — after linking, once per entry, where
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * states both halves: a processor MAY collapse after linking, when it compiles for reading, and MUST NOT
  * collapse in resolved output.
  */
-class ReferenceChainTest {
+class AliasChainTest {
 
     private static Tson tson() {
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
@@ -47,7 +47,7 @@ class ReferenceChainTest {
 
     /** The kernel's own case: {@code template_param.name} is declared {@code param_name} and stays it. */
     @Test
-    void aKernelReferenceAtAFieldTypeNamesWhatWasWritten() {
+    void aKernelAliasAtAFieldTypeNamesWhatWasWritten() {
         TypeRef name = fieldType(kernelEntry("template_param"), "name");
         assertEquals("param_name", name.name());
         assertTrue(name.annotations().isEmpty(), "nothing is attached to record where it points");
@@ -55,9 +55,9 @@ class ReferenceChainTest {
         assertEquals("type_name", fieldType(kernelEntry("type_ref"), "name").name());
     }
 
-    /** A position naming something that is not a reference is unaffected, as it always was. */
+    /** A position naming something that is not an alias is unaffected, as it always was. */
     @Test
-    void aNonReferenceIsUnaffected() {
+    void aNonAliasIsUnaffected() {
         assertEquals("type_kind", fieldType(kernelEntry("record_field"), "type").name());
     }
 
@@ -90,7 +90,7 @@ class ReferenceChainTest {
     @Test
     void aChainIsStatedAsWritten() {
         assertEquals("b", fieldType(resolve(CHAIN, "holder"), "f").name());
-        assertEquals(TypeRef.of("a"), assertInstanceOf(Reference.class,
+        assertEquals(TypeRef.of("a"), assertInstanceOf(Alias.class,
                 resolve(CHAIN, "b")).target());
         assertInstanceOf(io.ltr8.tson.schema.meta.TextType.class, resolve(CHAIN, "a"));
     }
@@ -107,7 +107,7 @@ class ReferenceChainTest {
 
     /**
      * The behavioural half, and the reason none of the above costs anything: a read still reaches the end of
-     * the chain, because the reader for a {@code REFERENCE} entry <em>is</em> its target's reader. The
+     * the chain, because the reader for an {@code ALIAS} entry <em>is</em> its target's reader. The
      * constraint at the end of the chain applies at a position two hops in front of it.
      */
     @Test

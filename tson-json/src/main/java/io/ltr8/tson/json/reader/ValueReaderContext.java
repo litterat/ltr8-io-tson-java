@@ -20,10 +20,10 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
 
     /**
      * The alias index derived rather than supplied. A compile passes its own, built once: deriving it per
-     * factory walks every reference chain again for every entry.
+     * factory walks every alias chain again for every entry.
      */
     public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers) {
-        this(linked, readers, ReferenceChain.namesMeaning(linked.schema()));
+        this(linked, readers, AliasChain.namesMeaning(linked.schema()));
     }
 
     public TsonSchema schema() {
@@ -32,7 +32,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
 
     /** Each of {@code names} with every alias that means it -- what a written {@code $type} is matched against. */
     public Set<String> admitting(Collection<String> names) {
-        return ReferenceChain.admitting(names, namesMeaning);
+        return AliasChain.admitting(names, namesMeaning);
     }
 
     /**

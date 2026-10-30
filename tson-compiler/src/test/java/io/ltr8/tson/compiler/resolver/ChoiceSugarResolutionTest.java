@@ -59,7 +59,7 @@ class ChoiceSugarResolutionTest {
 
     /**
      * At declaration position the sugar <em>is</em> the construction, so the entry itself carries the
-     * {@code ChoiceBody} -- not a REFERENCE to an injected one. It resolves as the ordinary construction of
+     * {@code ChoiceBody} -- not an alias to an injected one. It resolves as the ordinary construction of
      * {@code choice} it desugars to: its tag is the constructor, SUM kind comes from that
      * constructor, and {@code supertypes} stays empty because §5.5 transfers the target's kind and nothing
      * else -- which is also all §8.1's own Choice row claims.

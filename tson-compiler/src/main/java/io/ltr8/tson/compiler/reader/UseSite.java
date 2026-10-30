@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
  * reads with {@code small}'s reader, that being the type at the end of the chain. A message from it against
  * {@code c} would otherwise read {@code 'small': '500' is greater than the maximum 100}, naming a declaration
  * the author did write but did not write <em>here</em>, and for a chain ending in an imported type
- * ({@code my_int => int32}) naming a file they never opened. So the {@code REFERENCE} entry's own compile
+ * ({@code my_int => int32}) naming a file they never opened. So the {@code ALIAS} entry's own compile
  * names the target's reader for the entry doing the referring ({@code TsonSchemaCompiler}), and a use site
  * naming {@code pct} gets a reader called {@code pct}.
  *
@@ -46,7 +46,7 @@ public final class UseSite {
      * {@code reader} named {@code displayName}, or {@code reader} itself where there is no name to give or
      * nothing to give it to.
      *
-     * <p><b>A {@code REFERENCE} entry is the caller.</b> Its reader is its target's, so without this a
+     * <p><b>An {@code ALIAS} entry is the caller.</b> Its reader is its target's, so without this a
      * message at a {@code pct}-typed position would name {@code small}. The same applies to an instantiation
      * entry an expansion that names its own application keeps: the synthetic is named for its content, and
      * the entry referring to it records the application, which {@code EntryDisplayName} renders.

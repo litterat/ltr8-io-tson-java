@@ -5,13 +5,13 @@ import java.util.List;
 /**
  * The meta-kernel's {@code type => abstract top & { chain?: type_chain }} (Part 2 §4.1): the
  * kind of the kinds that describe the shape of a data value. {@link Atom}, {@link Product} and {@link Sum} each
- * {@code extends Type}, as {@code atom}, {@code product} and {@code sum} compose with {@code type}; {@link Reference}
+ * {@code extends Type}, as {@code atom}, {@code product} and {@code sum} compose with {@code type}; {@link Alias}
  * and {@link Namespace} do not, as their kernel entries compose with {@code top} directly. So a body describes a
  * type exactly when it is an {@code instanceof Type}, and every type body carries its chain ({@link TypeChain}).
  *
  * <p><b>Every question about what an entry IS-A asks this</b>, so a record template -- the ABSTRACT family base
  * its members are IS-A, and IS-A its own parents -- is answered the same way a closed type is. {@link Namespace},
- * {@link Reference} and {@link TemplateBody} carry no chain: a value, a hop and an abbreviation have no IS-A.
+ * {@link Alias} and {@link TemplateBody} carry no chain: a value, a hop and an abbreviation have no IS-A.
  *
  * <p>Every body record carries {@code chain} as its first component, mirroring the constructor's flattened
  * shape, where {@code type}'s field comes first.

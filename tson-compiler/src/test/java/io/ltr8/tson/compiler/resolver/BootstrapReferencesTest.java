@@ -4,7 +4,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 
 import org.junit.jupiter.api.Test;
 
@@ -46,9 +46,9 @@ class BootstrapReferencesTest {
         assertEquals("type_name", field(kernel.entries().get("type_ref"), "name").type().name());
     }
 
-    /** And a position naming something that is not a reference is unaffected here as well. */
+    /** And a position naming something that is not an alias is unaffected here as well. */
     @Test
-    void aNonReferenceIsUnaffectedOnTheBootstrapRoute() {
+    void aNonAliasIsUnaffectedOnTheBootstrapRoute() {
         Top recordField = MetaKernelBootstrapResolver.getMetaKernelSchema()
                 .entries().get("record_field");
 
@@ -58,10 +58,10 @@ class BootstrapReferencesTest {
 
     /** The chain stays walkable through the entries, which is what a reader collapses it by. */
     @Test
-    void aReferenceEntryKeepsItsHopOnTheBootstrapRoute() {
+    void anAliasEntryKeepsItsHopOnTheBootstrapRoute() {
         Top typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("type_name");
 
         assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("identifier"),
-                assertInstanceOf(Reference.class, typeName).target());
+                assertInstanceOf(Alias.class, typeName).target());
     }
 }

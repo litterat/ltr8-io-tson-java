@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * text, which is what {@code AbstractTemplateFamilyTest} pins; the two never collide.
  *
  * <p><b>Absent means "no type".</b> Only a record body has fields for a parent to carry, an {@code extension}
- * field to state and members something can select, so a container, a constructor application and a reference
+ * field to state and members something can select, so a container, a constructor application and an alias
  * template carry nothing -- and absence is the fact that a type position naming them stays an error.
  */
 class TemplateParentExtensionTest {
@@ -100,7 +100,7 @@ class TemplateParentExtensionTest {
 
     /** §5.10's partial application: a reference is indirection, so it has nothing to be abstract over. */
     @Test
-    void aReferenceTemplateHasNoParent() {
+    void anAliasTemplateHasNoParent() {
         assertEquals(Optional.empty(), parentOf("p6",
                 "  pair => <A, B> { first: A  second: B }\n  uuid_pair => <B> pair<uuid, B>\n", "uuid_pair"));
     }

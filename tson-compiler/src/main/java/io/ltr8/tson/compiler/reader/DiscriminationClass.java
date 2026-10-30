@@ -7,7 +7,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.BytesType;
@@ -37,7 +37,7 @@ import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.IriType;
 import io.ltr8.tson.schema.meta.UriType;
@@ -66,7 +66,7 @@ import java.util.function.Function;
  * §5.4), so a choice's untagged values are one set whichever encoding reads them. Two kinds straddle classes
  * and get none: an approximate atom whose {@code allow_nan} or {@code allow_infinity} is true (a NaN is a
  * number token in TSON text and a string in JSON; narrowing both to false restores {@link #NUMBER}), and a map
- * whose key type, at the end of its reference chain, is not a type a single scalar token denotes -- an atom
+ * whose key type, at the end of its alias chain, is not a type a single scalar token denotes -- an atom
  * other than {@code value} and {@code void}, enums included -- since such a key has no single-token spelling
  * and JSON writes the map in pairs form, as an array.
  */
@@ -84,7 +84,7 @@ public enum DiscriminationClass {
      * form §4's single pass cannot recover ({@code rational}/{@code complex}, whose typed forms straddle
      * classes; {@code value} and {@code void}; a mixed-class enum; an {@code unknown}), one of [TSON-SCHEMA]
      * §5.4's two straddling kinds (an approximate atom admitting NaN or an infinity, a map whose key type is not
-     * a single-token scalar), a nested choice or extern, or a name the namespace does not resolve. A reference
+     * a single-token scalar), a nested choice or extern, or a name the namespace does not resolve. An alias
      * chain is followed to its terminal entry first (§8.3 makes an alias and its target one type); a cycle,
      * having no terminal, has no class. An empty result makes
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
@@ -93,7 +93,7 @@ public enum DiscriminationClass {
     public static Optional<DiscriminationClass> of(String name, Function<String, ? extends Top> namespace) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
-        return ReferenceChain.terminalDefinition(name, namespace).flatMap(def -> classify(def, namespace));
+        return AliasChain.terminalDefinition(name, namespace).flatMap(def -> classify(def, namespace));
     }
 
     private static Optional<DiscriminationClass> classify(Top def, Function<String, ? extends Top> namespace) {
@@ -132,19 +132,19 @@ public enum DiscriminationClass {
             case TupleBody ignored -> Optional.of(BRACKET);
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
-            case Reference ignored -> Optional.empty();
+            case Alias ignored -> Optional.empty();
             case TemplateBody ignored -> Optional.empty();
             case ValueEntry ignored -> Optional.empty();
         };
     }
 
     /**
-     * [TSON-SCHEMA] §5.4's key test: whether the map's key type, at the end of its reference chain, is a type a
+     * [TSON-SCHEMA] §5.4's key test: whether the map's key type, at the end of its alias chain, is a type a
      * single scalar token denotes by its content -- an atom-family instance or an enum, {@code value} and
      * {@code void} excepted.
      */
     private static boolean hasScalarKey(MapBody map, Function<String, ? extends Top> namespace) {
-        return ReferenceChain.terminalDefinition(map.keyType().name(), namespace)
+        return AliasChain.terminalDefinition(map.keyType().name(), namespace)
                 .filter(key -> key instanceof Atom && !(key instanceof ValueType) && !(key instanceof VoidType))
                 .isPresent();
     }

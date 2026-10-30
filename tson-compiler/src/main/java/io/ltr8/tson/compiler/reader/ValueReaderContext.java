@@ -2,13 +2,13 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 
@@ -33,7 +33,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
 
     /**
      * The index derived rather than supplied -- for a caller with no compilation around it. A compile passes
-     * its own, built once: {@link Subsumption#namesMeaning} walks every entry's reference chain, so deriving
+     * its own, built once: {@link Subsumption#namesMeaning} walks every entry's alias chain, so deriving
      * it per factory would be the schema's size squared for an answer that does not change.
      */
     public ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers) {
@@ -107,7 +107,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
-     * Which entries name each target through a {@code REFERENCE} body, in declaration order.
+     * Which entries name each target through an {@code ALIAS} body, in declaration order.
      *
      * <p>The inverse of the alias hop, and the index {@link #bindingNamesFor} answers from. Built once per
      * compilation for the reason {@code namesMeaning} is: it is a property of the schema, not of the entry
@@ -116,8 +116,8 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     public static Map<String, List<String>> referrers(Namespace<? extends Top> entries) {
         Map<String, List<String>> byTarget = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (definition instanceof Reference reference) {
-                byTarget.computeIfAbsent(reference.target().name(), target -> new ArrayList<>()).add(name);
+            if (definition instanceof Alias alias) {
+                byTarget.computeIfAbsent(alias.target().name(), target -> new ArrayList<>()).add(name);
             }
         });
         Map<String, List<String>> fixed = new LinkedHashMap<>();
@@ -172,7 +172,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     /**
      * The constructor entry {@code name} tightens, or {@code null}: a constructor (IS-A the kernel's {@code top})
      * declared by §5.7's refinement, whose one written parent -- recorded where the declaration resolved, since
-     * its chain cannot tell {@code ^} from a composition adding nothing -- is, at the end of its reference
+     * its chain cannot tell {@code ^} from a composition adding nothing -- is, at the end of its alias
      * chain, a constructor too. A refinement restates fields and adds none, so its instances have its source's
      * shape.
      */
@@ -184,7 +184,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
         if (refined == null) {
             return null;
         }
-        String source = ReferenceChain.terminal(refined, schema().entries()::get);
+        String source = AliasChain.terminal(refined, schema().entries()::get);
         boolean constructor = schema().entries().get(source) instanceof RecordBody body
                 && linked.isConstructor(source, body);
         return constructor ? source : null;

@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -77,8 +77,8 @@ class ApplicationInContainerPositionTest {
      */
     private static Top formBehind(TsonCompiledSchema compiled, String record, String field) {
         Top entry = compiled.schema().entries().get(fieldType(compiled, record, field));
-        return entry instanceof Reference reference
-                ? compiled.schema().entries().get(reference.target().name()) : entry;
+        return entry instanceof Alias alias
+                ? compiled.schema().entries().get(alias.target().name()) : entry;
     }
 
     /**
@@ -252,7 +252,7 @@ class ApplicationInContainerPositionTest {
                   use    => { n: nested<text> }""");
 
         String instantiation = fieldType(compiled, "use", "n");
-        Reference hop = assertInstanceOf(Reference.class, compiled.schema().entries().get(instantiation));
+        Alias hop = assertInstanceOf(Alias.class, compiled.schema().entries().get(instantiation));
         assertEquals("nested", compiled.schema().applicationOf(instantiation).orElseThrow().name());
         assertEquals(Optional.of("choice"), compiled.schema().constructorOf(hop.target().name()));
     }
@@ -448,7 +448,7 @@ class ApplicationInContainerPositionTest {
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "holder", "p"));
         Top inner = compiled.schema().entries().get(outer.elementType().name());
-        ArrayBody vector = assertInstanceOf(ArrayBody.class, inner instanceof Reference r
+        ArrayBody vector = assertInstanceOf(ArrayBody.class, inner instanceof Alias r
                 ? compiled.schema().entries().get(r.target().name()) : inner);
 
         assertEquals(Optional.of(BigInteger.valueOf(3)), vector.minItems());

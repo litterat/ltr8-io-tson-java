@@ -63,8 +63,8 @@ import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.compiler.resolver.AliasChain;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
@@ -388,7 +388,7 @@ public final class TsonSchemaLinker {
             if (field.value().isEmpty()) {
                 continue;
             }
-            Optional<IdentifierType> family = ReferenceChain.terminalDefinition(field.type().name(), merged)
+            Optional<IdentifierType> family = AliasChain.terminalDefinition(field.type().name(), merged)
                     .filter(IdentifierType.class::isInstance)
                     .map(IdentifierType.class::cast);
             if (family.isPresent()) {
@@ -996,7 +996,7 @@ public final class TsonSchemaLinker {
      *
      * <p><b>Every type is credited, and nothing else</b> ({@link Type}): a family base -- a record template, the
      * ABSTRACT base its members are IS-A -- among them. Both sides are asked of the chain,
-     * so a record template IS-A its own parents as any record is. A reference is a hop, and a held template an
+     * so a record template IS-A its own parents as any record is. An alias is a hop, and a held template an
      * abbreviation, neither a type of its own.
      */
     private static Map<String, Top> computeSubtypes(Map<String, Top> merged, Set<String> localNames) {
@@ -1224,7 +1224,7 @@ public final class TsonSchemaLinker {
             // The target in full: an alias naming an application states its arguments there, and a closed one
             // names the entry materialisation minted for it.
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
-            case Reference ref -> validateTypeRef(ref.target(), namespace, ownParameters, null,
+            case Alias ref -> validateTypeRef(ref.target(), namespace, ownParameters, null,
                     entryName, "");
             case MapBody m -> {
                 validateTypeRef(m.keyType(), namespace, ownParameters, constructors, entryName,
@@ -1342,7 +1342,7 @@ public final class TsonSchemaLinker {
             // or a namespace type, never a constructor of types -- the names of the types built with a
             // constructor are a kind, and `kind<record>` is that spelling.
             case RefBody ref -> {
-                Top of = namespace.get(ReferenceChain.terminal(ref.of(), namespace));
+                Top of = namespace.get(AliasChain.terminal(ref.of(), namespace));
                 if (of == null) {
                     throw new UnresolvedReference(entryName, " of", ref.of());
                 }
@@ -1372,7 +1372,7 @@ public final class TsonSchemaLinker {
     /**
      * §5.4: "The resolver validates that each variant resolves to a distinct type."
      *
-     * <p><b>Judged at the end of each variant's reference chain, which is the whole point of the rule.</b>
+     * <p><b>Judged at the end of each variant's alias chain, which is the whole point of the rule.</b>
      * §8.3 makes an alias and its
      * target one type, so {@code (text | my_text)} with {@code my_text => text} is the same duplicate {@code
      * (text | text)} is -- spelled so that an author cannot see it. Comparing the written names would catch
@@ -1394,7 +1394,7 @@ public final class TsonSchemaLinker {
                                                   Map<String, Top> namespace) {
         Map<TypeRef, String> seen = new LinkedHashMap<>();
         for (TypeRef variant : choice.variants()) {
-            TypeRef flattened = new TypeRef(ReferenceChain.terminal(variant.name(), namespace), variant.arguments());
+            TypeRef flattened = new TypeRef(AliasChain.terminal(variant.name(), namespace), variant.arguments());
             String first = seen.putIfAbsent(flattened, variant.name());
             if (first == null) {
                 continue;
@@ -1417,7 +1417,7 @@ public final class TsonSchemaLinker {
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
                                                  Map<String, Top> namespace) {
         for (TypeRef variant : choice.variants()) {
-            if (ReferenceChain.resolvesToVoid(variant.name(), namespace)) {
+            if (AliasChain.resolvesToVoid(variant.name(), namespace)) {
                 throw new SchemaValidationException("'" + entryName + "' has a variant"
                         + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
                         + " resolving to 'void' -- optionality is not choice (§5.4): a value's absence is the "
@@ -1498,7 +1498,7 @@ public final class TsonSchemaLinker {
             }
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
-            case Reference reference -> collectNames(reference.target(), into);
+            case Alias alias -> collectNames(alias.target(), into);
             case TemplateBody ignored -> { } // open, answered above
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
@@ -1540,7 +1540,7 @@ public final class TsonSchemaLinker {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
             case Sum sum -> sum.coherenceCheck();
-            case Reference ignored -> List.of();
+            case Alias ignored -> List.of();
             case TemplateBody ignored -> List.of();
             case ValueEntry ignored -> List.of();
         };
@@ -1584,14 +1584,14 @@ public final class TsonSchemaLinker {
         // The chain end is what has to be checked, not the hop: a field typed by an alias
         // (`a => text`, `f: a = hello`) states a value of whatever the alias names. Resolved output states
         // the chain rather than rewriting the use site past it, so the walk happens here.
-        String terminal = ReferenceChain.terminal(field.type().name(), namespace);
+        String terminal = AliasChain.terminal(field.type().name(), namespace);
         Top target = namespace.get(terminal);
         // An unresolved reference is already reported by validateTypeRef; a target that is still open (or an
         // application of one) has no single body to check against until materialisation closes it. A body
-        // still a Reference means the walk stopped on a cycle or an argument-bearing target, neither of
+        // still an Alias means the walk stopped on a cycle or an argument-bearing target, neither of
         // which has one either.
         if (target == null || OpenEntry.isOpen(target) || !field.type().arguments().isEmpty()
-                || target instanceof Reference) {
+                || target instanceof Alias) {
             return;
         }
         Token value = field.value().get();
@@ -1729,7 +1729,7 @@ public final class TsonSchemaLinker {
         if (constructors != null && ref.arguments().isEmpty() && !ownParameters.contains(ref.name())
                 && (namespace.containsKey(TYPE) || namespace.containsKey(TYPE))
                 && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, namespace::get)) {
-            Top found = namespace.get(ReferenceChain.terminal(ref.name(), namespace));
+            Top found = namespace.get(AliasChain.terminal(ref.name(), namespace));
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is "
                     + (found != null && TypeChain.supertypesOf(found).contains("top")
                             ? "a constructor: a constructor is applied, with '!' or by a sugar form, and is never "

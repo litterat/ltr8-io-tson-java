@@ -40,9 +40,9 @@ enum DiscriminationClass {
 
     BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
 
-    /** The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none. */
+    /** The class {@code name} resolves to, following its alias chain, or empty for a type §5.4 gives none. */
     static Optional<DiscriminationClass> of(TsonLinkedSchema linked, String name) {
-        return ReferenceChain.terminal(linked.schema(), name)
+        return AliasChain.terminal(linked.schema(), name)
                 .flatMap(resolved -> classify(linked.schema(), resolved.definition()));
     }
 

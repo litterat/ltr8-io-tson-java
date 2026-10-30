@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -31,8 +31,8 @@ import java.util.Set;
  * <p><b>The guard follows the body, not the declared kind</b>, and only {@code Atom} and {@code Product}
  * bodies take it. §7.2 excludes the others by name: a choice discriminates "by variant membership (§5.4)"
  * and a {@code declared} position by the governing closure (§7.8), each its own relation with its own
- * dispatcher, and subsumption would refuse the very variant tags those positions exist to take. A
- * {@code Reference} body takes no guard either, and needs none: a reference entry compiles to its target's
+ * dispatcher, and subsumption would refuse the very variant tags those positions exist to take. An
+ * {@code Alias} body takes no guard either, and needs none: an alias entry compiles to its target's
  * reader, which carries the guard, and the alias is among the names that reader admits.
  */
 public final class Subsumption {
@@ -100,7 +100,7 @@ public final class Subsumption {
     public static Map<String, Set<String>> namesMeaning(Namespace<? extends Top> entries) {
         Map<String, Set<String>> index = new LinkedHashMap<>();
         entries.forEach((written, definition) -> {
-            String terminal = ReferenceChain.terminal(written, entries::get);
+            String terminal = AliasChain.terminal(written, entries::get);
             if (!terminal.equals(written)) {
                 index.computeIfAbsent(terminal, ignored -> new LinkedHashSet<>()).add(written);
             }
@@ -109,8 +109,8 @@ public final class Subsumption {
     }
 
     /**
-     * Each of {@code names} with every {@code REFERENCE} entry whose chain ends at it. §7.2 compares "after
-     * following both reference chains to their terminal entries", and an alias and its target are one type
+     * Each of {@code names} with every {@code ALIAS} entry whose chain ends at it. §7.2 compares "after
+     * following both alias chains to their terminal entries", and an alias and its target are one type
      * -- so {@code !created} at a {@code created}-typed position names the position's own type even though
      * the reader running there belongs to the instantiation {@code created} aliases, and
      * {@code !ok_of_text} at a {@code result<text>} position names a subtype even though the entry it
@@ -122,7 +122,7 @@ public final class Subsumption {
      * no other name to write: a materialised entry's own name is implementation-chosen (§8.2), so an alias is
      * how a template instantiation is named at all.
      *
-     * <p><b>The alias is kept rather than reduced to its target.</b> A reference entry compiles to its
+     * <p><b>The alias is kept rather than reduced to its target.</b> An alias entry compiles to its
      * target's reader named for the entry doing the referring ({@code UseSite.named}), so dispatching on the
      * written name runs the same reader and reports under the name the author typed.
      */

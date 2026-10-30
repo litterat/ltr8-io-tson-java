@@ -9,7 +9,7 @@ import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.KindMembers;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
@@ -109,7 +109,7 @@ final class ValuesByName {
     private record Typed(Space space, String name) {
 
         String terminal() {
-            return ReferenceChain.terminal(name, space.entries()::get);
+            return AliasChain.terminal(name, space.entries()::get);
         }
 
         Top definition() {
@@ -200,7 +200,7 @@ final class ValuesByName {
                             : "entry of this schema or its imports -- the first segment names the entry a value is "
                                     + "reached through, and a member is reached through its entry"));
         }
-        String terminal = ReferenceChain.terminal(head, merged);
+        String terminal = AliasChain.terminal(head, merged);
         Top referent = merged.get(terminal);
         if (referent == null) {
             throw new SchemaValidationException(where + " names '" + name + "', and the alias '" + head
@@ -317,7 +317,7 @@ final class ValuesByName {
         if (referent instanceof ValueEntry value) {
             throw new SchemaValidationException(wants + entry + " is " + aValueNoType(value));
         }
-        String terminal = ReferenceChain.terminal(name, merged);
+        String terminal = AliasChain.terminal(name, merged);
         throw new SchemaValidationException(wants + entry + " is an entry whose body is built by '"
                 + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("nothing") + "', which is no '"
                 + slot.of() + "'");
@@ -330,7 +330,7 @@ final class ValuesByName {
      */
     private void judgeApplication(String where, TypeRef reference) {
         String name = reference.name();
-        String terminal = ReferenceChain.terminal(name, merged);
+        String terminal = AliasChain.terminal(name, merged);
         Top referent = merged.get(terminal);
         if (referent == null) {
             throw new SchemaValidationException(where + " names '" + name + "', which is no type declared in this "

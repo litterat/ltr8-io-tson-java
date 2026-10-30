@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 
 import java.util.List;
 
@@ -59,7 +59,7 @@ class ValueParamFixedFieldTest {
     /** The field of the entry {@code created} resolves to, following its alias hop to the instantiation. */
     private static RecordField statusOf(TsonLinkedSchema linked, String entry) {
         var definition = linked.schema().entries().get(entry);
-        if (definition instanceof Reference alias) {
+        if (definition instanceof Alias alias) {
             definition = linked.schema().entries().get(alias.target().name());
         }
         return ((RecordBody) definition).fields().entrySet().stream()
