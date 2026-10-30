@@ -203,25 +203,19 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Links the part of meta-kernel's bootstrap that is ready, {@code pending} naming the kernel's declarations not
-     * yet read: the one partial link. {@code MetaKernelBootstrapResolver} reads each instance outside the pre-loaded
-     * set through readers compiled from the entries ready so far ({@code TsonSchemaCompiler.compileBootstrap}), and
-     * those need a linked schema while some of the names its entries hold have no entry yet.
+     * Links the part of a schema whose resolution is in progress that is ready, {@code pending} naming its
+     * declarations not yet ready: the partial link of [TSON-SCHEMA] §3.4.1's wait order ({@code SPEC-FEEDBACK.md #4}).
+     * A resolution reads a value against an entry of its own document through readers compiled from the entries
+     * ready so far ({@code TsonSchemaCompiler.compileReady}), and those need a linked schema while some of the names
+     * its entries hold have no entry yet. {@code ready}'s imports are merged through {@code loader}, which may be
+     * {@code null} for a schema that imports nothing (the kernel's bootstrap).
      *
-     * <p>A reference to a name in {@code pending} is therefore not a refusal; every other verdict stands as {@link
-     * #linkBootstrap(TsonSchema)} gives it, so a name the kernel does not declare is still refused. An entry's walk
-     * stops at its first pending reference, so what follows it in that entry is judged when the whole kernel is
-     * linked, which every bootstrap ends with. Nothing else may leave a name unresolved: an ordinary link refuses an
-     * undeclared name whatever called it.
-     *
-     * @throws IllegalArgumentException if {@code bootstrap.bootstrap()} is {@code false}
+     * <p>A reference to a name in {@code pending} is therefore not a refusal, and nothing here is a verdict: each
+     * entry is judged when the whole schema links, which every resolution ends with, so what this link finds wrong
+     * is dropped rather than reported against a read it would only confuse.
      */
-    public static TsonLinkedSchema linkBootstrap(TsonSchema bootstrap, Set<String> pending) {
-        if (!bootstrap.bootstrap()) {
-            throw new IllegalArgumentException("'" + bootstrap.id() + "' was not produced by the meta-kernel "
-                    + "bootstrap -- only its partial kernel links with references pending");
-        }
-        return linkWith(bootstrap, null, null, IdentifierPolicy.defaults(), null, Set.copyOf(pending));
+    public static TsonLinkedSchema linkReady(TsonSchema ready, TsonSchemaLoader loader, Set<String> pending) {
+        return linkWith(ready, loader, diagnostic -> { }, IdentifierPolicy.none(), null, Set.copyOf(pending));
     }
 
     /**
@@ -736,7 +730,7 @@ public final class TsonSchemaLinker {
                         merged, constructors);
             } catch (UnresolvedReference e) {
                 if (pending.contains(e.name())) {
-                    continue; // a bootstrap's kernel entry not yet read: judged when the whole kernel links
+                    continue; // a declaration not yet ready: judged when the whole schema links
                 }
                 String author = heldDeclarationNaming(e.name(), entry.getKey(), merged, facts);
                 if (author == null) { // the applier's own text, or a name no held body wrote: blame the entry

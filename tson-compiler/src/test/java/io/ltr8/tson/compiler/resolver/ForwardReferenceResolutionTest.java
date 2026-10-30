@@ -17,7 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Forward-reference resolution (§3.4.1): a declaration may compose/refine one declared later in the same
  * schema (resolution now follows dependencies, not source order). Recursion through <i>field</i> references
  * — which carry a bare name, verified later by the linker — resolves fine; a circular <i>composition</i>
- * chain, which genuinely needs the target resolved to resolve the dependant, is rejected.
+ * chain, each operand waiting on the other being ready ([TSON-SCHEMA] §3.4.1's wait order), is rejected, naming
+ * the cycle in wait order.
  */
 class ForwardReferenceResolutionTest {
 
@@ -67,7 +68,7 @@ class ForwardReferenceResolutionTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolve("  a => b & { }\n  b => a & { }"));
 
-        assertTrue(thrown.getMessage().contains("circular"), thrown::getMessage);
+        assertTrue(thrown.getMessage().startsWith("'a' waits on 'b' waits on 'a'"), thrown::getMessage);
     }
 
     @Test
@@ -77,6 +78,6 @@ class ForwardReferenceResolutionTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolve("  a => b & { p: text }\n  b => a & { q: text }"));
 
-        assertTrue(thrown.getMessage().contains("circular"), thrown::getMessage);
+        assertTrue(thrown.getMessage().startsWith("'a' waits on 'b' waits on 'a'"), thrown::getMessage);
     }
 }

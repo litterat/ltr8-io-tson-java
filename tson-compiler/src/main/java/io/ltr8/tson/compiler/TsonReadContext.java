@@ -284,6 +284,14 @@ public interface TsonReadContext {
     interface HeldByName {
         void held(List<String> slot, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.TypeRef reference,
                   io.ltr8.tson.schema.meta.Ref<?> cell);
+
+        /**
+         * The read reached {@code declaration}: a reader began reading a part of the value against the entry it
+         * locates ({@link #inRecord}, {@link #underDeclaration}). What a resolution counts as a wait of the entry it
+         * is making ready ([TSON-SCHEMA] §3.4.1: a read waits on each type a part of the value is read against).
+         */
+        default void reached(SchemaLocation declaration) {
+        }
     }
 
     /**

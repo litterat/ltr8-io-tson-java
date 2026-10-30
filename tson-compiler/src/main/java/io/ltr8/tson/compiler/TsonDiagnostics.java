@@ -170,10 +170,11 @@ public final class TsonDiagnostics {
     }
 
     /**
-     * A [TSON-DATA] §8.2 name-hygiene <b>refusal</b> at one declaration -- {@link #ofSchemaError}'s shape
-     * with a policy code in place of {@code SCHEMA_ERROR}. The schema is not wrong: it is refused by this
-     * processor, under a policy reading data the Unicode Consortium declines to freeze, and §8.2 says such
-     * a refusal MUST NOT be reported in any of §8.1's four categories.
+     * A <b>refusal</b> at one declaration -- {@link #ofSchemaError}'s shape with a policy code in place of {@code
+     * SCHEMA_ERROR}: a [TSON-DATA] §8.2 name-hygiene rule, or a [TSON-SCHEMA] §11.5 limit ({@link
+     * Diagnostic.Code#LIMIT_EXCEEDED}, a chain of waits past the wait depth). The schema is not wrong: it is refused
+     * by this processor, under a policy reading data the Unicode Consortium declines to freeze or under limits the
+     * deployment chose, and such a refusal is reported in none of §8.1's four categories.
      *
      * <p>The peer of what a read reports for the same rule, so one schema and one document that break the
      * same rule come back under the same code. {@code code} is {@link Diagnostic.Code#CONFUSABLE_NAMES} for names that
@@ -182,9 +183,10 @@ public final class TsonDiagnostics {
      * because the rule is what it knows and the code is what a consumer routes on. One code per rule, so the
      * code alone tells an author which fix applies.
      *
-     * <p><b>It is still a verdict on the schema</b>, and a consumer treats it as one: the document must
-     * change, or the deployment must relax the policy in code. What it is not is a claim that the format
-     * says the schema is malformed, which is why it does not ride {@code SCHEMA_ERROR}.
+     * <p><b>A name refusal is still a verdict on the schema</b>, and a consumer treats it as one: the document must
+     * change, or the deployment must relax the policy in code; a limit refusal is no verdict at all ({@link
+     * Diagnostic.Code#verdict()}), the next processor perhaps loading the schema in full. Neither claims the format
+     * says the schema is malformed, which is why neither rides {@code SCHEMA_ERROR}.
      */
     public static Diagnostic ofSchemaRefusal(String schemaId, String declaration, Diagnostic.Code code, String message,
                                              Optional<SourcePosition> position) {

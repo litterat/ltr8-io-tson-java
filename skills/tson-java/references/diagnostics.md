@@ -49,8 +49,9 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
   not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in one
   document both get reported. No construct the bundled schemas declare reaches one; what still can is
-  a value at a `ref<T>`-typed position of a data document, and, in a schema, applying a constructor or a type, or
-  reading an annotation value against a type, declared in the same document (SPEC-FEEDBACK.md #7). A data tag
+  a value at a `ref<T>`-typed position of a data document, and, in a schema, an instance of a constructor of types
+  the schema declares itself (`c => product & { … }`, `x => !c { … }`). A constructor, a type or an annotation type
+  declared in the same document is otherwise read in wait order, whichever is written first. A data tag
   naming a schema's value entry (`!orders { … }` over `orders => !api { … }`) is no gap: it is `TYPE_MISMATCH`,
   a value and not a type.
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
@@ -61,11 +62,11 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
   A field or position that can hold no value (voidable, or optional with no default) bound to a primitive is
   refused at compile. A schema value entry whose type the context binds no class for is held as a tree, so it
   validates; obtained through `bindRegistry()` it is a `BIND_MISMATCH` at the entry (`/entry`).
-- **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth`
-  (64 by default). The bytes may be valid and read in full by a processor configured for more, which is why
-  the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope)
-  rather than copied into the diagnostic. It and the three refusal codes below are the non-verdicts where
-  the reader holds the fix.
+- **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth` (64 by
+  default), or a schema's entries waited on a chain longer than `LimitsPolicy.maxWaitDepth` (64 by default, reported at
+  the entry heading the chain). The bytes may be valid and read in full by a processor configured for more, which is why
+  the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope) rather than
+  copied into the diagnostic. It and the three refusal codes below are the non-verdicts where the reader holds the fix.
 - **The five `SCHEMA_*` fetch codes** are everyone else: no configured `SchemaSource` would supply
   the schema the document names. Nothing is wrong with the document, and nothing may be wrong with the
   schema either — it was never obtained, so it was never read. **`SCHEMA_ERROR` vs the five** is the

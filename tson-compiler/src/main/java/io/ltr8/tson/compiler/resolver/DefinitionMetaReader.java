@@ -13,8 +13,9 @@ import io.ltr8.tson.schema.meta.Top;
  * {@link DefinitionResolver} has no dependency on {@code reader} at all; a caller
  * with a real compiled reader (e.g. {@link SchemaResolver}) supplies one of these wrapping it
  * (typically a one-line lambda, {@code (type, value) -> (Top) metaParser.get(type).read(value)}).
- * {@link MetaKernelBootstrapResolver} supplies one over readers compiled from the kernel entries ready so far,
- * which makes an entry a read reaches ready before reading again.
+ * A head declared by the document being resolved is read through readers compiled from its entries ready so far
+ * ({@link WaitOrder#read}), which makes an entry a read reaches ready before reading again -- in the kernel's
+ * bootstrap, every head.
  */
 @FunctionalInterface
 interface DefinitionMetaReader {

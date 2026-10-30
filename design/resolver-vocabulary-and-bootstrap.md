@@ -22,16 +22,18 @@ itself. Current form only; history lives in git.
 - `@application` goes on the **key** of exactly the entries that close an application, whatever their kind, by the
   same path; `@synthetic` is recomputed on ingest, `@application` read as stated, and an author writing it is refused.
 - The bootstrap hand-builds exactly the pre-loaded set — the instances and the one refinement on the kernel's one
-  wait cycle (`SPEC-FEEDBACK.md #4`, rule 4) — and reads every other instance through `DefinitionResolver`'s ordinary
-  path, on demand, against readers compiled from the entries ready so far. The order is the waits', never source
-  order. `MetaKernelBootstrapResolverTest` holds the set to the measured cycle and the output to the kernel's ordinary
-  resolution; it attaches no `@synthetic`.
-- A `!C { … }` body or an annotation value is read through the compiled form of the schema that declared `C` or the
-  annotation's type (`SchemaResolver.Vocabulary`, by the origin the import merge recorded), never through one compiled
-  per closure. A name no import declares has no reader; the kernel alone reads through itself.
-- Only the bootstrap links with references pending or compiles with entries pending
-  (`TsonSchemaLinker.linkBootstrap(TsonSchema, Set)`, `TsonSchemaCompiler.compileBootstrap`); both refuse a schema
-  that is not the bootstrap's, and an ordinary link refuses an undeclared name as it always has.
+  wait cycle (`SPEC-FEEDBACK.md #4`, rule 4) — and makes every other entry ready by `WaitOrder`, the one algorithm
+  every schema's resolution runs. The order is the waits', never source order. `MetaKernelBootstrapResolverTest`
+  holds the set to the measured cycle and the output to the kernel's ordinary resolution in any declaration order;
+  it attaches no `@synthetic`.
+- A `!C { … }` body or an annotation value against an imported entry is read through the compiled form of the schema
+  that declared it (`SchemaResolver.Vocabulary`, by the origin the import merge recorded), never through one compiled
+  per closure; against an entry of the same document, through readers compiled from that document's entries ready so
+  far (`WaitOrder.read`). The kernel's ordinary resolution alone reads every head through its pre-loaded stand-in.
+- Only a resolution in progress links with references pending or compiles with entries pending
+  (`TsonSchemaLinker.linkReady`, `TsonSchemaCompiler.compileReady`, through `TsonCompiledSchemaLoader.compileReady`).
+  The partial link reports nothing, each entry being judged when the whole schema links; a finished schema's link
+  refuses an undeclared name.
 
 Related: `design/schema-resolution.md` (definition resolution), `design/template-materialisation.md` and
 `design/held-template-bodies.md` (the callers of `WireForm` and `DerivedName`), `design/constructor-application.md`,
@@ -218,15 +220,17 @@ closure, which is inside the importer's, so it reads everything its body can nam
 each declaring schema is compiled once and cached by identity (`design/compiled-registries.md`), and a schema applying
 only the kernel's and meta.tn's constructors reaches exactly those two.
 
-- **Heads and annotations resolve among the imported entries** (`DefinitionResolver`'s `metaDefinitions`), since
-  only those have compiled readers; type uses resolve in the whole namespace (`namespaceDefinitions`). A head or an
-  annotation type declared in the document itself is in the namespace and has no reader yet, and is refused as a gap
-  before the vocabulary is asked (`DefinitionResolver.notYetReadable`, `design/schema-resolution.md`).
+- **A local head or annotation type is read through the entries ready so far.** `Vocabulary` tells a local name
+  from an import by the recorded origins, and reads a local one through `WaitOrder.read`: readers compiled by
+  `loader.compileReady(readySoFar(…), pending, tree)` from this document's ready entries over the same imports, each
+  declaration not yet ready a `PendingTypeReader`. A read reaching one throws `NotReady`, the order makes that entry
+  ready, and the read restarts; each declaration the read reaches is a wait of the entry being made ready
+  (`TsonReadContext.HeldByName.reached`), which is what wait depth counts (`design/processor-policy.md`).
 - **A payload is a value body exactly when its head is no constructor**: a value entry's payload is read against
   the type, under the loader's identifier policy, and lifts nothing; a construction's binding record is read under
   no policy (`SchemaResolver`'s `DefinitionMetaReader`, `design/meta-layer-namespaces.md`). The value is bound where
-  the context binds its type, and otherwise read through the declaring schema's tree-mode compilation
-  (`treeVocabularyOf`) and held as a tree.
+  the context binds its type, and otherwise read in tree mode (the declaring schema's `treeVocabularyOf`, or a
+  tree-mode compile of the entries ready so far) and held as a tree.
 - **The kernel reads through itself.** Its resolution is handed the pre-loaded stand-in, which answers for every
   name, the one cycle being closed by pre-loading (§3.4).
 
@@ -234,9 +238,9 @@ only the kernel's and meta.tn's constructors reaches exactly those two.
 
 Meta-kernel is special: its header is its `!!id` alone and its root `!schema`, so it imports nothing and applies only
 its own constructors (§3.4's one cycle, closed by pre-loading, not resolution). It is never resolved from a document,
-and its names reach any other schema only by import. Ordinary resolution can't bootstrap it — reading a constructor
-application needs that constructor's compiled reader, and every constructor meta-kernel applies is declared within
-meta-kernel.
+and its names reach any other schema only by import. Ordinary resolution can't bootstrap it: an instance waits on its
+constructor being ready, and the instances on the kernel's one wait cycle wait on each other, so they are built by
+hand (§3.4), and only the wait order over what that leaves is the algorithm every schema runs.
 
 `MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved kernel under
 `SPEC-FEEDBACK.md #4`'s order: reading a value against a type waits on the type being ready, and on each type a part
@@ -260,31 +264,29 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies.
 - **Every other instance is read through the ordinary path.** `DefinitionResolver.resolveInstance` binds through a
-  `DefinitionMetaReader` that reads against readers compiled from the entries ready now:
-  `TsonSchemaLinker.linkBootstrap(ready, pending)` then `TsonSchemaCompiler.compileBootstrap(linked, context,
+  `DefinitionMetaReader` that reads through `WaitOrder.read`, against readers compiled from the entries ready now:
+  `TsonSchemaLinker.linkReady(ready, null, pending)` then `TsonSchemaCompiler.compileReady(linked, factories,
   pending)`, `pending` naming the kernel's declarations not yet ready. A pending name compiles to a
-  `PendingTypeReader`. A read that reaches one throws `PendingTypeReader.NotReady`; the bootstrap makes that entry
-  ready (on demand, through the same getter), drops the compile, and reads again. A held value reached through one
+  `PendingTypeReader`. A read that reaches one throws `PendingTypeReader.NotReady`; the order makes that entry
+  ready, drops the compile, and reads again. A held value reached through one
   binds as written — what base type resolution gives the token, carried to its component by the field's bridge — and
   is judged when the whole kernel links. That is how `iri` is read against `iri_type`, whose `spec` pin is typed by
   `iri` itself: rule 3 says the pin orders nothing, and binding it as written is what makes that true here.
-- **The order is computed.** The bootstrap is the `DefinitionGetter` every lookup goes through, making an entry ready
-  the first time anything asks for it, as `SchemaResolver`'s getter does; its `resolving` stack refuses an entry that
-  waits on itself, naming the chain (an `IllegalStateException`: only a kernel edit can put a cycle outside the
-  pre-loaded set). The driving loop's order changes how many compiles run, never the output: the first compile holds
-  every resolved declaration and the pre-loaded set, and an instance whose read reaches one not yet ready
-  (`scheme_name` reaching `identifier_base` and `normalization`) forces another.
+- **The order is computed.** The bootstrap is `WaitOrder`'s `Readiness` (`handBuilt` for the pre-loaded set,
+  `DefinitionResolver` for the rest), and the order is the `DefinitionGetter` every lookup goes through, making an
+  entry ready the first time anything asks for it. An entry waiting on itself is the `SchemaValidationException`
+  every schema gets, naming the cycle; the bootstrap rethrows every failure, since only a kernel edit can put a cycle
+  outside the pre-loaded set. The kernel is resolved under the default wait depth. The driving loop's order changes
+  how many compiles run, never the output (`theBootstrapIsTheSameInAnyOrder`): an instance whose read reaches an
+  entry not yet ready (`scheme_name` reaching `identifier_base` and `normalization`) forces another compile.
 - **Parameter types are derived after every entry is ready**, through `ParameterTypes.inferAll` as `SchemaResolver`
   derives a schema's, so `kind` and `ref` carry `T: type_name` as their ordinary resolution does.
-- **The partial link and the bootstrap compile are contained.** Both refuse a schema whose `bootstrap()` is false.
-  The partial link passes over a reference to a pending name and nothing else; an entry's walk stops at its first
-  pending reference, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed
-  by (`TsonCompiledMetaRegistry.loadMeta` links and compiles the output into the stand-in). An ordinary link or compile
-  has no pending set, and refuses an undeclared name as before.
+- **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
+  first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by
+  (`TsonCompiledMetaRegistry.loadMeta` links and compiles the output into the stand-in).
 - **Every name the kernel holds is the kernel's own**, so `DefinitionResolver` judges kinds and constructors with a
-  predicate that admits every name (`name -> true`), and the entries a head resolves in are the ones being built, a
-  head declared beside its instance read in wait order; ordinary resolution judges by the origin of each name in the
-  merged namespace instead, and refuses a head declared in the same document as a gap.
+  predicate that admits every name (`name -> true`); ordinary resolution judges by the origin of each name in the
+  merged namespace instead. In both, a head declared beside its instance is made ready in wait order.
 - **Desugaring needs no equivalent trick.** The container constructors are parameterless (§4.2), so the desugar table
   is fixed by the sugar forms and nothing is looked up in another schema. Meta-kernel's eight sugar forms are
   ordinary declarations by the time the linker sees them.

@@ -49,6 +49,22 @@ spec-required case:
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the five bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
+- [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1;
+  `SPEC-FEEDBACK.md #4`, the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
+  `schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
+  entry whose tag names a constructor or a type the same form declares (`counts => !counted { … }` beside `counted
+  => !record { … }`) has no reader, and a `class2/schema/valid` vector cannot state such a schema's output. Read it
+  as a schema is resolved instead: the form's own entries made ready by `WaitOrder` over what its imports hold, each
+  value read through readers compiled from the entries ready so far, so the fixture's readers come from the fixture.
+  `parseResolvedForm`'s grammar-only kind reading stays. Then add `schema/valid` vectors for a same-document
+  constructor and value entry, and check that every `-resolved.tn` re-resolves to itself.
+- [ ] **An instance of a constructor of types no reader factory backs is a gap.** A schema may declare a
+  constructor composing `product` or `atom` (`c => product & { … }`), and the instance `x => !c { … }` would be a
+  type, but a type's body is one of the schema model's (`schema.meta`), so `SchemaResolver` refuses it as
+  `NOT_IMPLEMENTED` ("builds types, and this library models the body of a type built only by the kernel's and
+  meta.tn's constructors"); a constructor composing `top` alone is held as a value. This is what keeps rule 2's
+  example pair (`decimal_type => atom & { min?: number }` beside `number => !decimal_type {}`) kernel-only. What a
+  generic body for such an instance is, and how data is read against it, is open.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
   so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest verifies rather than
   recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`
@@ -102,11 +118,6 @@ spec-required case:
   (a Revision 39 proposal), make it `namespace => map ^ { key_type: identifier_kind … }` with `key_type`
   required, `field_map` a template applied to its record's `name_type`, and add a vector that `kind<map>` holds a
   namespace type.
-- [ ] **Applying a schema's own constructor needs a host class.** With `step => top & { … }` declared in an imported
-  schema, `s => !step { … }` is a `BIND_MISMATCH` unless the consumer binds `step` to a class, so a schema applying a
-  constructor no class backs does not load for validation, where a value entry no class binds is held as a tree.
-  Hold the instance as a tree for validation and refuse it from a schema loaded to bind, as value entries are; lands
-  with wait order everywhere (one-level step 5f), which admits a same-document constructor too.
 - [ ] **A parameter in a record template has no channel of its own** ([TSON-SCHEMA] §5.10). An open record's
   parameter is a `type_ref` whose `name` is the parameter, or an unquoted token in `record_field.value`, told from a
   type or a literal by §5.10's shadowing rule, in resolved output as in source. Give the slots that can hold one a
@@ -419,15 +430,17 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   [TSON-DATA] §8.1 gives to the layer that detects them -- the resolver, following the reference.
 
 - [ ] **Counting the rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** The whole table is
-  stated: `spec/m/policy.tn`'s `limits` declares all sixteen, optional with the spec's defaults, and `LimitsPolicy`
-  and `CliPolicy.CliLimits` carry each one, so every limit is configured and reported. Only nesting depth is counted.
+  stated: `spec/m/policy.tn`'s `limits` declares all seventeen, optional with the spec's defaults, and `LimitsPolicy`
+  and `CliPolicy.CliLimits` carry each one, so every limit is configured and reported. Nesting depth and wait depth
+  are counted.
   What is left, per limit, is the counter, a `LIMIT_EXCEEDED` refusal naming the limit and the configured threshold,
   and a `--max-…` flag beside `--max-depth` in `PolicyOptions`. Document side: **token length**, **decoded text
   length** after escape processing, **numeric literal length** (annotated tokens included), **decoded binary size**
   per `!bytes` value, **document size**, **elements** per array or set, **entries** per map, **fields** per record,
   **annotations** on one value, and **total values**. Schema side: **import closure**, **entries** in one schema map,
   **reference chain**, **supertype chain**, and **materialisation depth** — which `TemplateMaterialiser` enforces as
-  the bare constant `MAX_CLOSING_DEPTH` at the default, and which moves to reading `maxMaterialisationDepth`. What
+  the bare constant `MAX_CLOSING_DEPTH` at the default, and which moves to reading `maxMaterialisationDepth`. (Wait
+  depth, the sixth §11.5 limit, is counted, by `WaitOrder`, with its `--max-wait-depth` flag.) What
   still needs deciding per limit is *where it is counted*: the ones that bound shape are per-container state the
   stream does not keep, where depth was a counter it already had, and the aggregate (total values) needs its own
   counter since §9.1 is explicit that the total is not bounded by the parts.

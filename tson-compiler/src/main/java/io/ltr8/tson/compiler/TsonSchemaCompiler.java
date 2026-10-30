@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.reader.*;
@@ -58,8 +57,8 @@ import java.util.function.Function;
  * #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}), with no scoping: linking already established that every
  * head a schema applies is in its namespace. One non-factory case is checked first: {@link Reference} (a bare {@code
  * name => other_name} entry, §8.3) delegates straight to the target's own reader, resolved recursively rather than
- * built fresh. A <b>bootstrap</b> compile ({@link #compileBootstrap}) is a compile of the meta-kernel
- * entries ready so far, in which a kernel entry not yet read is a {@link PendingTypeReader} rather than a missing name.
+ * built fresh. A compile of a resolution in progress ({@link #compileReady}) compiles the entries ready so far, in
+ * which a declaration not yet ready is a {@link PendingTypeReader} rather than a missing name.
  *
  * <p><b>A held value is decoded after the walk, not during it.</b> A record field's default or pin is held as
  * written while the readers are built and decoded through the field's reader once every entry has one ({@link
@@ -86,27 +85,21 @@ public final class TsonSchemaCompiler {
     }
 
     /**
-     * <b>Bootstrap compile</b>: compiles the part of meta-kernel's bootstrap that is ready, in object-binding mode
-     * over {@code context}, with {@code pending} naming the kernel's declarations not yet read. A pending name
-     * compiles to a {@link PendingTypeReader}, which stops a read that reaches it so the bootstrap can make that entry
-     * ready first, and binds a held value typed by it as written. {@code linkedSchema} comes from {@code
-     * TsonSchemaLinker.linkBootstrap(TsonSchema, Set)}; nothing but {@code MetaKernelBootstrapResolver} compiles a
-     * schema with names left pending.
-     *
-     * @throws IllegalArgumentException if {@code linkedSchema} is not the bootstrap's
+     * Compiles the part of a schema whose resolution is in progress that is ready, {@code pending} naming its
+     * declarations not yet ready: [TSON-SCHEMA] §3.4.1's wait order ({@code SPEC-FEEDBACK.md #4}). A pending name
+     * compiles to a {@link PendingTypeReader}, which stops a read of a schema document's value that reaches it, so the
+     * resolution can make that entry ready first, and binds a held value typed by it as written. {@code
+     * linkedSchema} comes from {@code TsonSchemaLinker.linkReady}; nothing but a resolution reading its own
+     * document's entries compiles a schema with names left pending.
      */
-    public static TsonCompiledSchema compileBootstrap(TsonLinkedSchema linkedSchema, DataBindContext context,
-                                                      Set<String> pending) {
-        if (!linkedSchema.schema().bootstrap()) {
-            throw new IllegalArgumentException("'" + linkedSchema.schema().id() + "' was not produced by the "
-                    + "meta-kernel bootstrap -- only its partial kernel compiles with entries pending");
-        }
-        return compileWith(linkedSchema, ValueReaderFactoryRegistry.bind(context)::resolve, Set.copyOf(pending));
+    public static TsonCompiledSchema compileReady(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
+                                                  Set<String> pending) {
+        return compileWith(linkedSchema, factories::resolve, Set.copyOf(pending));
     }
 
     /**
-     * The shared eager walk (see the "Eager, not lazy" note) -- {@code factoryFor} is the only thing that
-     * differs between a compile and a bootstrap compile's.
+     * The shared eager walk (see the "Eager, not lazy" note) over {@code factoryFor}'s factories, {@code pending}
+     * naming the declarations of a resolution in progress not yet ready (empty for every finished schema).
      */
     private static TsonCompiledSchema compileWith(
             TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {
@@ -166,7 +159,7 @@ public final class TsonSchemaCompiler {
          */
         private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
-        /** The entries a bootstrap compile reads as {@link PendingTypeReader}s; empty for every other compile. */
+        /** The entries a compile of a resolution in progress reads as {@link PendingTypeReader}s; else empty. */
         private final Set<String> pending;
 
         Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {
@@ -184,7 +177,7 @@ public final class TsonSchemaCompiler {
                 return done;
             }
             if (pending.contains(name)) {
-                return new PendingTypeReader(name); // a bootstrap's kernel entry not yet read
+                return new PendingTypeReader(name); // a declaration of a resolution in progress, not yet ready
             }
             if (!building.add(name)) {
                 return new DeferredTypeReader<>(name, finished);

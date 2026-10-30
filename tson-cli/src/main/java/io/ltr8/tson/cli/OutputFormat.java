@@ -248,7 +248,8 @@ enum OutputFormat {
                 Map.entry("max_schema_entries", (long) limits.maxSchemaEntries()),
                 Map.entry("max_reference_chain", (long) limits.maxReferenceChain()),
                 Map.entry("max_supertype_chain", (long) limits.maxSupertypeChain()),
-                Map.entry("max_materialisation_depth", (long) limits.maxMaterialisationDepth()));
+                Map.entry("max_materialisation_depth", (long) limits.maxMaterialisationDepth()),
+                Map.entry("max_wait_depth", (long) limits.maxWaitDepth()));
     }
 
     /**

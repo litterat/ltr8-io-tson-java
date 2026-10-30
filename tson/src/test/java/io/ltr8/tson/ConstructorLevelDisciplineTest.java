@@ -20,8 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * one too, by construction: nothing can derive from a constructor and fail to be one.
  *
  * <p>Any schema may declare one (SPEC-FEEDBACK.md #7): the base kinds are the meta-kernel's, and every closure
- * reaching meta.tn holds them. A schema importing the one that declares a constructor applies it; applying one
- * declared in the same document waits on wait-order resolution and is refused as not yet implemented.
+ * reaching meta.tn holds them. A schema importing the one that declares a constructor applies it, and so does the
+ * document declaring it, in wait order ([TSON-SCHEMA] §3.4.1): the instance waits on the constructor being ready.
  */
 class ConstructorLevelDisciplineTest {
 
@@ -110,20 +110,19 @@ class ConstructorLevelDisciplineTest {
     }
 
     /**
-     * Applying a constructor declared in the same document reads the instance against a declaration not yet ready,
-     * which needs wait-order resolution: a gap this library reports as {@code NOT_IMPLEMENTED}, never a verdict.
+     * The document declaring a constructor applies it: the instance waits on the constructor being ready, whichever is
+     * written first.
      */
     @Test
-    void applyingASameDocumentConstructorIsNotYetImplemented() {
-        List<Diagnostic> problems = problems(META, CORE, """
-                  steps => !namespace { key_type: identifier  value_type: text }
-                  plan  => !steps { first => "a" }
-                """);
-
-        assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("'!steps' applies a constructor declared in this same "
-                + "schema, which is not yet supported"), problems::toString);
+    void theDeclaringDocumentAppliesItsOwnConstructorInEitherOrder() {
+        assertEquals(List.of(), problems(META, CORE, """
+                  my_array => array ^ { ordered?: = false }
+                  tags     => !my_array { element_type: text }
+                """));
+        assertEquals(List.of(), problems(META, CORE, """
+                  tags     => !my_array { element_type: text }
+                  my_array => array ^ { ordered?: = false }
+                """));
     }
 
     /** An ordinary type over an ordinary type is untouched — the overwhelmingly common case. */

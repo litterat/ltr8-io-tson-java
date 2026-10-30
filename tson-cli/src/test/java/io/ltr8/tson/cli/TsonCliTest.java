@@ -452,6 +452,36 @@ class TsonCliTest {
         assertTrue(err.contains("--max-depth must be at least 1"), err);
     }
 
+    /**
+     * [TSON-SCHEMA] §11.5's wait depth is counted as a schema resolves, and {@code --max-wait-depth} sets it: a chain
+     * of three waits loads at the default and is refused under a limit of two, a rejection by this processor and not
+     * a verdict; a limit below one is a usage error.
+     */
+    @Test
+    void aSchemaPastTheWaitDepthIsRefused(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "chain.tn", """
+                !!id:"https://example.test/chain.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
+                  w0 => w1 & { a: text }
+                  w1 => w2 & { b: text }
+                  w2 => w3 & { c: text }
+                  w3 => { d: text }
+                }
+                """);
+
+        captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"compile", schema.toString()})));
+        String json = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
+                "compile", "--output", "json", "--max-wait-depth", "2", schema.toString()})));
+        assertTrue(json.contains("\"outcome\":\"REJECTED\""), json);
+        assertTrue(json.contains("\"code\":\"LIMIT_EXCEEDED\""), json);
+        assertTrue(json.contains("\"max_wait_depth\":2"), json);
+
+        String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {
+                "policy", "--max-wait-depth", "0"})));
+        assertTrue(err.contains("--max-wait-depth must be at least 1"), err);
+    }
+
     /** A flag whose combination configures nothing is a usage error, not a silent no-op. */
     @Test
     void aRelaxationThatWouldConfigureNothingIsAUsageError() throws IOException {

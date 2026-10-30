@@ -8,20 +8,20 @@ import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
 /**
- * The reader a bootstrap compile ({@code TsonSchemaCompiler.compileBootstrap}) gives a meta-kernel entry not yet
- * read, under {@code SPEC-FEEDBACK.md #4}'s order: reading a value against a type waits on that type being ready, and
- * a held value orders nothing.
+ * The reader a compile of a resolution in progress ({@code TsonSchemaCompiler.compileReady}) gives a declaration not
+ * yet ready, under [TSON-SCHEMA] §3.4.1's wait order ({@code SPEC-FEEDBACK.md #4}): reading a value against a type
+ * waits on that type being ready, and a held value orders nothing.
  *
  * <ul>
  *   <li><b>A read of a schema document's value</b> ({@link TsonReadContext#readsSchemaDocument()}) that reaches it is
- *       a wait: it throws {@link NotReady} naming {@link #entry}, and {@code MetaKernelBootstrapResolver} makes that
- *       entry ready and reads the value again against a compile that holds it.</li>
+ *       a wait: it throws {@link NotReady} naming {@link #entry}, and the resolution makes that entry ready and reads
+ *       the value again against a compile that holds it.</li>
  *   <li><b>Any other read is a held value's</b>, a field's default or pin decoded once every reader exists, and binds
  *       as written: what base type resolution gives the token ([TSON-DATA] §4), which the field's own bridge then
- *       carries to its component. The value is judged against its type when the whole kernel links.</li>
+ *       carries to its component. The value is judged against its type when the whole schema links.</li>
  * </ul>
  *
- * <p>Nothing else compiles one: an ordinary compile has no pending entries, and refuses a name with no entry.
+ * <p>Nothing else compiles one: a finished schema's compile has no pending entries, and refuses a name with no entry.
  */
 public record PendingTypeReader(String entry) implements TsonTypeReader<Object> {
 
@@ -38,7 +38,7 @@ public record PendingTypeReader(String entry) implements TsonTypeReader<Object> 
     }
 
     /**
-     * A read reached {@link #entry()}, which is not ready yet. A signal to the bootstrap that compiled the reader,
+     * A read reached {@link #entry()}, which is not ready yet. A signal to the resolution that compiled the reader,
      * which catches it; no stack trace, since it is control flow rather than a failure.
      */
     public static final class NotReady extends RuntimeException {

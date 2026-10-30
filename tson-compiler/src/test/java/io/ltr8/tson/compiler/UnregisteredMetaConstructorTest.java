@@ -3,26 +3,25 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.tree.TsonRecord;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A meta-schema declaring a constructor this library has no Java class for. The schema is <b>correct</b> --
- * the constructor is declared, and a governed schema applies it exactly as written -- so the diagnostic must
- * say what is actually missing.
- *
- * <p>It used to say the opposite. {@code TsonCompiledMetaSchema} paired each constructor with a
- * {@code ValueReaderFactory} and <em>dropped</em> the constructor when there was none, so a governing
- * meta-schema compiled and registered looking healthy while missing a constructor it declares, and the
- * complaint landed against a different document: the first governed schema to apply it was told
- * "'operation' is not a constructor 'meta-http.tn' declares", which is untrue and unactionable.
+ * A schema declaring a constructor this library has no Java class for. The schema is <b>correct</b> -- the
+ * constructor is declared, and a schema importing it applies it exactly as written -- and so is the importer: an
+ * instance of a constructor whose instances are no types ({@code operation} composes {@code top}, not {@code type})
+ * is held as the value it is, as a tree where no class binds it, so both schemas load and validate without host
+ * classes. A schema obtained to bind refuses it ({@code SameDocumentConstructorTest} in the front door).
  */
 class UnregisteredMetaConstructorTest {
 
@@ -59,7 +58,7 @@ class UnregisteredMetaConstructorTest {
         return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
     }
 
-    /** The meta-schema itself is fine, and stays usable -- only applying the constructor can fail. */
+    /** The declaring schema itself is fine, and stays usable. */
     @Test
     void theMetaSchemaStillLoadsAndStillDeclaresTheConstructor() {
         assertTrue(core().resolveLinked("https://example.test/meta-unreg.tn").schema().entries()
@@ -68,14 +67,14 @@ class UnregisteredMetaConstructorTest {
                 .containsKey("operation"));
     }
 
-    /** And applying it names the gap, rather than denying that the meta-schema declares it. */
+    /** And applying it holds the instance as a tree, rather than refusing the schema for a missing class. */
     @Test
-    void applyingItNamesTheMissingClassRatherThanDenyingTheConstructor() {
-        RuntimeException thrown = assertThrows(RuntimeException.class,
-                () -> core().resolveLinked("https://example.test/api-unreg.tn"));
+    void applyingItHoldsTheInstanceAsATree() {
+        Top search = core().resolveLinked("https://example.test/api-unreg.tn").schema().entries().get("search");
 
-        assertTrue(thrown.getMessage().contains("no bound Java class for 'operation'"), thrown.getMessage());
-        assertFalse(thrown.getMessage().contains("is not a constructor"),
-                "the meta-schema does declare it: " + thrown.getMessage());
+        ValueEntry entry = assertInstanceOf(ValueEntry.class, search);
+        assertEquals("operation", entry.type());
+        TsonRecord tree = assertInstanceOf(TsonRecord.class, entry.value());
+        assertEquals("/search", tree.get("path").asString().orElseThrow());
     }
 }

@@ -9,6 +9,7 @@ import io.ltr8.tson.schema.meta.Top;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A schema compiled in object-binding mode as <b>vocabulary</b>: what a schema importing it reads its construction
@@ -38,13 +39,22 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * schema compiles and only reading a value against that entry fails.
      */
     static TsonCompiledMetaSchema compile(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver) {
-        return new TsonCompiledMetaSchema(TsonSchemaCompiler.compile(linked, name -> {
+        return compileReady(linked, resolver, Set.of());
+    }
+
+    /**
+     * {@link #compile} of a schema whose resolution is in progress, {@code pending} naming its declarations not yet
+     * ready ({@link TsonSchemaCompiler#compileReady}).
+     */
+    static TsonCompiledMetaSchema compileReady(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
+                                               Set<String> pending) {
+        return new TsonCompiledMetaSchema(TsonSchemaCompiler.compileReady(linked, name -> {
             try {
                 return resolver.resolve(name);
             } catch (RuntimeException noFactory) {
                 return unbuildable(linked.originOf(name), name, noFactory);
             }
-        }));
+        }, pending));
     }
 
     /**

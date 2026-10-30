@@ -39,9 +39,9 @@ the document, the rest name who must act otherwise — this library (`70`), an a
 the type (`78`), the reference or the schema files given (`69`), or nobody, by rerunning (`75`).
 `TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by who must act first — `70` > `78` > `69` > `1` >
 `75`, a rerun last because every other fix ends in one.
-A refusal — a §8.2 name-hygiene rule or a §9.1 limit (`LIMIT_EXCEEDED`) — is a rejection and a `1` like an
+A refusal — a §8.2 name-hygiene rule or a §9.1 or §11.5 limit (`LIMIT_EXCEEDED`) — is a rejection and a `1` like an
 invalidity, though not a finding about validity: another deployment may accept the same document, and the runner
-can act — a relaxed policy, `--max-depth`, a renamed field or a smaller document.
+can act — a relaxed policy, `--max-depth` or `--max-wait-depth`, a renamed field or a smaller document.
 `validate` collects every problem in a file in one pass.
 
 ```bash
@@ -99,13 +99,14 @@ max schema entries:         65536
 max reference chain:        64
 max supertype chain:        64
 max materialisation depth:  64
+max wait depth:             64
 ```
 
 **Read it before you generate and the refusal never happens** — that is the useful direction, and the reason
 the command exists. A generator that learns the policy from a rejection has already spent a round trip.
 
 Three commands take the policy options — `validate`, `compile`, `policy` — which cover §8.2's name hygiene and
-§9.1's resource limits:
+the resource limits of §9.1 and §11.5:
 
 ```
 --identifier-policy <level>    level for identifiers (default: highly-restrictive)
@@ -115,6 +116,8 @@ Three commands take the policy options — `validate`, `compile`, `policy` — w
 --token-policy <level>         level for values (default: unrestricted, which scans nothing)
 --token-scripts <A+B>          the same for values (repeatable)
 --max-depth <n>                how deeply a document may nest before this refuses to read it (default: 64)
+--max-wait-depth <n>           the longest chain of waits resolving a schema may run, each entry waiting on the
+                               next being ready (default: 64)
 ```
 
 `<level>` is one of UTS #39 §5.2's six — `ascii-only`, `single-script`, `highly-restrictive`,

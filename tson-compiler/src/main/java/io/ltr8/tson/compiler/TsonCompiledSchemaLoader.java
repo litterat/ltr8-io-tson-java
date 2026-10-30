@@ -1,9 +1,13 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.TsonSchema;
+
+import java.util.Set;
 
 /**
  * On-demand resolution of a schema from its own URI -- a document's {@code !!import} target -- so a resolver reaching
@@ -67,6 +71,21 @@ public interface TsonCompiledSchemaLoader {
      * @throws IllegalStateException if no schema is registered under {@code identity}
      */
     TsonCompiledSchema treeVocabularyOf(String identity);
+
+    /**
+     * The readers of a schema whose resolution is in progress, compiled from its entries ready so far ({@code
+     * ready}, its imports merged from this loader's registry), {@code pending} naming its declarations not yet
+     * ready: what a value read against an entry of the document being resolved is read through ([TSON-SCHEMA]
+     * §3.4.1's wait order). In object-binding mode under this loader's bind context where {@code tree} is false, and
+     * in tree mode, holding each value as a {@code TsonValue}, where it is true. Neither registered nor cached.
+     */
+    TsonCompiledSchema compileReady(TsonSchema ready, Set<String> pending, boolean tree);
+
+    /**
+     * The limits the schemas this loader resolves are resolved under: [TSON-SCHEMA] §11.5's, the wait depth among
+     * them, which a resolution counts as it makes its entries ready.
+     */
+    LimitsPolicy limits();
 
     /**
      * [TSON-DATA] §8.2's identifier policy the schemas this loader resolves are judged under. The resolver reads

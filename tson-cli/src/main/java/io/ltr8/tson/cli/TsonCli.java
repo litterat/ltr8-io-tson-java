@@ -86,6 +86,8 @@ public final class TsonCli {
               --max-depth <n>               how deeply a document may nest before this refuses to read it
                                             (default: 64). A refusal is not a verdict: the document may be
                                             read in full by a processor configured for more.
+              --max-wait-depth <n>          the longest chain of waits resolving a schema may run, each
+                                            entry waiting on the next being ready (default: 64)
 
             <level> is a UTS #39 §5.2 restriction level: ascii-only, single-script, highly-restrictive,
             moderately-restrictive, minimally-restrictive, unrestricted. The spelling `tson policy` prints

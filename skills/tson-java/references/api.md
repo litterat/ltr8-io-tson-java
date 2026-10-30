@@ -185,16 +185,20 @@ public record ProcessorPolicy(IdentifierPolicy identifierPolicy,    // io.ltr8.t
     public ProcessorPolicy withLimits(LimitsPolicy limits);
 }
 
-public record LimitsPolicy(int maxDepth) {                           // io.ltr8.tson.base.policy
+public record LimitsPolicy(int maxDepth, /* … §9.1's other ten, then §11.5's … */
+                           int maxMaterialisationDepth, int maxWaitDepth) {   // io.ltr8.tson.base.policy
     public static final int DEFAULT_MAX_DEPTH = 64;
+    public static final int DEFAULT_MAX_WAIT_DEPTH = 64;
     public static LimitsPolicy defaults();
     public LimitsPolicy withMaxDepth(int depth);
+    public LimitsPolicy withMaxWaitDepth(int depth);   // and a with… per component
 }
 ```
 
-`LimitsPolicy` is §9.1's bounds; nesting depth is the one enforced, by the event stream, and a document past it is reported
-as `LIMIT_EXCEEDED` — not a verdict, the document perhaps being valid and readable by a processor configured
-for more.
+`LimitsPolicy` is §9.1's and §11.5's bounds, seventeen components; two are enforced. Nesting depth is counted by the
+event stream, and a document past it is reported as `LIMIT_EXCEEDED` — not a verdict, the document perhaps being
+valid and readable by a processor configured for more. Wait depth is counted as a schema resolves, and a schema past
+it is refused with `LIMIT_EXCEEDED` (a `SchemaRefusalException` on a fail-fast resolve).
 
 **What a report is read against, stated once.** [TSON-DATA] §8.2's rules read Unicode data the Consortium
 does not freeze, at a level this deployment chose, so the same document can be refused here and accepted
@@ -772,7 +776,9 @@ hardening. **Nesting depth is enforced**: `LimitsPolicy.maxDepth`, 64 by default
 stream as a container opens, so a document a few thousand containers deep is refused before it can overflow
 the stack. Configure it on `ProcessorConfig.withLimits`, on either reader's `withLimits`, or with
 `tson validate --max-depth`. The refusal is `LIMIT_EXCEEDED` (a `LimitExceededException` on a fail-fast
-read) and is **not a verdict**. Token length and document size are not bounded yet; a deployment reading
+read) and is **not a verdict**. [TSON-SCHEMA] §11.5's **wait depth** is enforced too: `LimitsPolicy.maxWaitDepth`,
+64 by default, `tson validate --max-wait-depth`, the longest chain of entries in one schema each waiting on the
+next being ready. Token length and document size are not bounded yet; a deployment reading
 untrusted documents caps bytes before handing them to a reader. `LimitsPolicy`'s Javadoc and `BACKLOG.md`
 carry what is left.
 

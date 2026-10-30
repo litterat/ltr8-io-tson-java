@@ -2,6 +2,9 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -19,6 +22,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.reader.PendingTypeReader;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -44,7 +48,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.SequencedSet;
 import java.util.Set;
 
 /**
@@ -68,24 +71,25 @@ import java.util.Set;
  *       nothing, so it is ready as soon as the entries it composes are.</li>
  *   <li><b>Every other instance and atom refinement is read through the ordinary path</b>, {@link
  *       DefinitionResolver}'s, whose {@link DefinitionMetaReader} reads through readers compiled from the entries
- *       ready so far ({@link TsonSchemaLinker#linkBootstrap(TsonSchema, Set)}, {@link
- *       TsonSchemaCompiler#compileBootstrap}). An entry not yet ready compiles to a {@link PendingTypeReader}: a
- *       read that reaches one stops ({@link PendingTypeReader.NotReady}), the entry it names is made ready on
- *       demand, the ready entries are compiled again, and the read starts over. A held value reached through one
- *       is bound as written, since it orders nothing -- which is how {@code iri} is read against {@code iri_type},
- *       whose {@code spec} pin is typed by {@code iri} itself.</li>
+ *       ready so far ({@link TsonSchemaLinker#linkReady}, {@link TsonSchemaCompiler#compileReady}). An entry not
+ *       yet ready compiles to a {@link PendingTypeReader}: a read that reaches one stops ({@link
+ *       PendingTypeReader.NotReady}), the entry it names is made ready on demand, the ready entries are compiled
+ *       again, and the read starts over. A held value reached through one is bound as written, since it orders
+ *       nothing -- which is how {@code iri} is read against {@code iri_type}, whose {@code spec} pin is typed by
+ *       {@code iri} itself.</li>
  * </ul>
  *
- * <p>The order is computed, never the order entries are written in: an entry is made ready the first time
- * anything asks for it, and the {@link Bootstrap#resolving} stack refuses an entry that waits on itself, naming the
- * chain -- a wait cycle outside the pre-loaded set, which only a kernel edit can introduce. Everything closes here:
+ * <p>That is {@link WaitOrder}, the algorithm every schema's resolution runs; the bootstrap differs only in what is
+ * ready before it starts. The order is computed, never the order entries are written in: an entry is made ready the
+ * first time anything asks for it, and an entry that waits on itself is refused, naming the cycle -- a wait cycle
+ * outside the pre-loaded set, which only a kernel edit can introduce. Everything closes here:
  * every entry is ready before {@link #getMetaKernelSchema()} returns, and its output is the kernel's resolved form,
  * entry for entry what the kernel's ordinary resolution against it produces.
  *
- * <p>The output is resolved and not linked: a caller links it through {@link TsonSchemaLinker#linkBootstrap(
- * TsonSchema)} -- never {@code TsonSchemaRegistry#register}, which refuses a bootstrap schema -- and compiles it.
- * {@link SchemaDesugarer} runs first, as for every schema: the desugar table is fixed by the sugar forms (§5.3), so
- * it consults no governing meta. The class is locked down to one public method taking no arguments: it bootstraps
+ * <p>The output is resolved and not linked: a caller links it through {@link TsonSchemaLinker#linkBootstrap} --
+ * never {@code TsonSchemaRegistry#register}, which refuses a bootstrap schema -- and compiles it. {@link
+ * SchemaDesugarer} runs first, as for every schema: the desugar table is fixed by the sugar forms (§5.3), so it
+ * consults no governing meta. The class is locked down to one public method taking no arguments: it bootstraps
  * the bundled meta-kernel ({@link TsonBundledSchemas#META_KERNEL_ID}), fetched from the classpath so the bootstrap
  * works from a built jar, and nothing else.
  */
@@ -118,9 +122,18 @@ public final class MetaKernelBootstrapResolver {
      */
     public static TsonSchema getMetaKernelSchema() {
         TsonSchemaParser parser = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID));
-        SchemaDocument document = SchemaDesugarer.desugar(parser.parseSchemaDocument(), Set.of());
+        return resolve(parser.parseSchemaDocument(), parser.schemaPositions());
+    }
+
+    /**
+     * {@link #getMetaKernelSchema()} over {@code parsed}, the kernel's parsed source: package-private so {@code
+     * MetaKernelBootstrapResolverTest} can hand it the kernel's declarations in another order, and see the order
+     * they are written in consulted for nothing.
+     */
+    static TsonSchema resolve(SchemaDocument parsed, SchemaPositions positions) {
+        SchemaDocument document = SchemaDesugarer.desugar(parsed, Set.of());
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
-        Map<String, Top> entries = new Bootstrap(document, parser.schemaPositions(), facts).resolve();
+        Map<String, Top> entries = new Bootstrap(document, positions, facts).resolve();
         return new TsonSchema(id(document), document.imports(), AnnotatedMap.of(entries), true,
                 Map.of(), facts);
     }
@@ -147,18 +160,13 @@ public final class MetaKernelBootstrapResolver {
                 "meta-kernel.tn has no !!id -- this should never happen for the real, bundled fixture"));
     }
 
-    /** Whether {@code declaration} is read: a closed instance or an atom refinement, as opposed to resolved. */
-    private static boolean isRead(SchemaMap.Declaration declaration) {
-        return declaration.typeDef() instanceof Instance instance ? instance.typeParams().isEmpty()
-                : declaration.typeDef() instanceof AtomRefinement;
-    }
 
     /**
      * Whether {@code declaration} is one of the pre-loaded set's, {@code lifted} collecting the lifted arrays already
      * found to be: a lifted array's element is declared before it, its lift being depth first.
      */
     private static boolean isPreLoaded(SchemaMap.Declaration declaration, Set<String> lifted) {
-        if (!isRead(declaration)) {
+        if (!WaitOrder.reads(declaration)) {
             return false;
         }
         if (PRE_LOADED.contains(declaration.name())) {
@@ -175,11 +183,11 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * One bootstrap: the kernel's declarations, made ready on demand. The {@link DefinitionGetter} every {@link
-     * DefinitionResolver} lookup goes through, as {@link SchemaResolver}'s on-demand getter is, so an entry resolves
-     * the first time anything asks for it.
+     * One bootstrap: the kernel's declarations, made ready in wait order ({@link WaitOrder}), the one algorithm
+     * every schema's resolution runs, over what the kernel has ready before it starts -- its pre-loaded set, built by
+     * hand here ({@link Readiness#resolve}).
      */
-    private static final class Bootstrap implements DefinitionGetter {
+    private static final class Bootstrap implements WaitOrder.Readiness {
 
         private final String id;
         private final SchemaDocument document;
@@ -188,15 +196,9 @@ public final class MetaKernelBootstrapResolver {
         private final SchemaPositions positions;
         private final Map<String, Top> entries = new LinkedHashMap<>();
         private final Map<String, TsonSchema.EntryFacts> facts;
-
-        /** The entries being made ready, innermost last -- an entry arriving twice waits on itself. */
-        private final SequencedSet<String> resolving = new LinkedHashSet<>();
-
+        private final WaitOrder order;
         private final DefinitionResolver resolver;
         private final DataBindContext context = SchemaMetaNameBinder.defaultContext();
-
-        /** The readers of the entries ready when it was compiled; {@code null} until a read first needs one. */
-        private TsonCompiledSchema compiled;
 
         Bootstrap(SchemaDocument document, SchemaPositions positions, Map<String, TsonSchema.EntryFacts> facts) {
             this.id = id(document);
@@ -209,25 +211,24 @@ public final class MetaKernelBootstrapResolver {
                     preLoaded.add(declaration.name());
                 }
             }
+            // The kernel is the library's own, so it is resolved under the default limits whatever a caller set.
+            this.order = new WaitOrder(CanonicalIdentity.canonicalize(id), entries, declarations,
+                    LimitsPolicy.defaults().maxWaitDepth(), this::compile);
+            order.readyWith(this);
             // The kernel is read over itself: the entries a construction's head resolves in are the ones being built,
             // every name it holds is the kernel's own, and a head declared beside its instance is read in wait order.
-            this.resolver = new DefinitionResolver(this::read, null, this, this, null, positions, facts,
-                    name -> true, name -> true, name -> false);
+            this.resolver = new DefinitionResolver(this::read, null, order, order, null, positions, facts,
+                    name -> true, name -> true);
         }
 
         /** Every entry, ready, in the order the kernel declares them. */
         Map<String, Top> resolve() {
-            // What no read produces first -- the pre-loaded set (rule 4: ready before any declaration is read) and the
-            // declarations resolved from their grammar -- so the first compile already holds every head a read
-            // applies. The reads then follow their own waits, whichever declaration the loop reaches first.
-            for (SchemaMap.Declaration declaration : declarations.values()) {
-                if (!isRead(declaration) || preLoaded.contains(declaration.name())) {
-                    definition(declaration.name());
-                }
-            }
-            for (String name : declarations.keySet()) {
-                definition(name);
-            }
+            // The pre-loaded set first, with the declarations resolved from their grammar: rule 4 has it ready before
+            // any declaration is read.
+            order.readyAll(preLoaded::contains);
+            resolver.judgeDeferred((name, error) -> {
+                throw error;
+            });
             stampParameters();
             Map<String, Top> ordered = new LinkedHashMap<>();
             declarations.keySet().forEach(name -> ordered.put(name, entries.get(name)));
@@ -235,29 +236,15 @@ public final class MetaKernelBootstrapResolver {
         }
 
         @Override
-        public Top definition(String name) {
-            Top ready = entries.get(name);
-            if (ready != null) {
-                return ready;
-            }
-            SchemaMap.Declaration declaration = declarations.get(name);
-            if (declaration == null) {
-                return null; // not the kernel's: a reference the linker judges
-            }
-            if (!resolving.add(name)) {
-                throw new IllegalStateException("meta-kernel: '" + name + "' waits on itself ("
-                        + String.join(" -> ", resolving) + " -> " + name + "), a wait cycle outside the pre-loaded "
-                        + "set -- the kernel's one cycle is the set this bootstrap builds by hand (rule 4)");
-            }
-            try {
-                Optional<io.ltr8.tson.base.SourcePosition> position = positions.of(declaration);
-                Top resolved = preLoaded.contains(name) ? handBuilt(declaration, position)
-                        : resolver.resolve(declaration, position);
-                entries.put(name, resolved);
-                return resolved;
-            } finally {
-                resolving.remove(name);
-            }
+        public Top resolve(String name, SchemaMap.Declaration declaration) {
+            Optional<io.ltr8.tson.base.SourcePosition> position = positions.of(declaration);
+            return preLoaded.contains(name) ? handBuilt(declaration, position) : resolver.resolve(declaration, position);
+        }
+
+        /** The kernel is the library's own: a declaration that fails is a broken kernel, never a stand-in. */
+        @Override
+        public Top failed(String name, SchemaMap.Declaration declaration, RuntimeException error) {
+            throw error;
         }
 
         /** A pre-loaded entry, with the facts ordinary resolution would record for it. */
@@ -265,7 +252,7 @@ public final class MetaKernelBootstrapResolver {
                               Optional<io.ltr8.tson.base.SourcePosition> position) {
             String name = declaration.name();
             if (declaration.typeDef() instanceof AtomRefinement refinement) {
-                Top source = definition(refinement.target());
+                Top source = order.definition(refinement.target());
                 facts.put(name, facts.getOrDefault(refinement.target(), TsonSchema.EntryFacts.NONE)
                         .withPosition(position));
                 return refinedBody(name, refinement, source).withSupertypes(List.of(refinement.target()));
@@ -277,38 +264,31 @@ public final class MetaKernelBootstrapResolver {
 
         /**
          * The {@link DefinitionMetaReader}: {@code value} read against constructor {@code type}'s reader, compiled
-         * from the entries ready now. A read that reaches an entry not yet ready makes it ready and starts over
-         * against a compile that holds it.
+         * from the entries ready now; a read that reaches an entry not yet ready makes it ready and starts over.
          */
         private Top read(String type, DataValue value) {
-            while (true) {
-                TsonCompiledSchema readers = readersFor(type);
-                try {
-                    return (Top) readers.get(type).read(TsonReadContext.schemaDocument(
-                            new ListEventSource(DataValueEvents.of(value)), IdentifierPolicy.none(),
-                            (slot, slotType, reference, cell) -> { }, false));
-                } catch (PendingTypeReader.NotReady wait) {
-                    if (entries.containsKey(wait.entry()) && readers.schema().entries().containsKey(wait.entry())) {
-                        throw new IllegalStateException("meta-kernel: '" + wait.entry() + "' is ready and "
-                                + "compiled, and its reader still reports it pending", wait);
-                    }
-                    definition(wait.entry());
-                    compiled = null;
-                }
-            }
+            return order.read(type, readers -> (Top) readers.get(type).read(TsonReadContext.schemaDocument(
+                    new ListEventSource(DataValueEvents.of(value)), IdentifierPolicy.none(),
+                    new TsonReadContext.HeldByName() {
+
+                        @Override
+                        public void held(List<String> slot, TsonSchema.SlotType slotType,
+                                         TypeRef reference, io.ltr8.tson.schema.meta.Ref<?> cell) {
+                        }
+
+                        @Override
+                        public void reached(SchemaLocation declaration) {
+                            order.reached(declaration);
+                        }
+                    }, false)));
         }
 
-        /** The readers of every entry ready now, compiled again only where {@code type} has none yet. */
-        private TsonCompiledSchema readersFor(String type) {
-            if (compiled == null || !compiled.schema().entries().containsKey(type)) {
-                Set<String> pending = new LinkedHashSet<>(declarations.keySet());
-                pending.removeAll(entries.keySet());
-                TsonSchema ready = new TsonSchema(id, document.imports(),
-                        AnnotatedMap.of(new LinkedHashMap<>(entries)), true, Map.of(), new LinkedHashMap<>(facts));
-                compiled = TsonSchemaCompiler.compileBootstrap(TsonSchemaLinker.linkBootstrap(ready, pending),
-                        context, pending);
-            }
-            return compiled;
+        /** The readers of the kernel entries ready now, in object-binding mode under the schema model's binder. */
+        private TsonCompiledSchema compile(Set<String> pending, boolean tree) {
+            TsonSchema ready = new TsonSchema(id, document.imports(), AnnotatedMap.of(new LinkedHashMap<>(entries)),
+                    true, Map.of(), new LinkedHashMap<>(facts));
+            return TsonSchemaCompiler.compileReady(TsonSchemaLinker.linkReady(ready, null, pending),
+                    ValueReaderFactoryRegistry.bind(context), pending);
         }
 
         /**

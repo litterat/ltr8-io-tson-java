@@ -533,6 +533,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public TsonReadContext inRecord(SchemaLocation declaration) {
+        reached(declaration);
         // The pointer survives, the anchor does not: this record declares the field the pointer now ends
         // with, so it is what a reader following the pointer needs opened. Only an outermost record, with no
         // pointer to extend, contributes its own name as the path's root.
@@ -545,9 +546,17 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public TsonReadContext underDeclaration(SchemaLocation declaration) {
+        reached(declaration);
         return schemaRoot != null
                 ? this
                 : anchoredOn(declaration.pointer(), declaration.schemaId(), declaration.position());
+    }
+
+    /** A schema document's read tells its sink each declaration a reader reads against ({@link HeldByName#reached}). */
+    private void reached(SchemaLocation declaration) {
+        if (cursor.heldByName != null) {
+            cursor.heldByName.reached(declaration);
+        }
     }
 
     private TsonReadContext anchoredOn(String root, String id, Optional<SourcePosition> position) {

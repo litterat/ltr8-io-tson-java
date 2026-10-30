@@ -5,6 +5,9 @@ import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.ast.schema.SchemaMap;
+import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
@@ -25,11 +28,17 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Random;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.UnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -206,15 +215,38 @@ class MetaKernelBootstrapResolverTest {
         }
     }
 
-    /** The partial link and the bootstrap compile are the bootstrap's alone: an ordinary schema leaves nothing pending. */
+    /**
+     * The order the kernel writes its declarations in is consulted for nothing ([TSON-SCHEMA] §3.4.1's fifth rule):
+     * reversed or shuffled, the bootstrap produces the same entries, constructors and facts.
+     */
     @Test
-    void onlyTheBootstrapLinksOrCompilesWithEntriesPending() {
-        TsonSchema ordinary = new TsonSchema("https://example.com/s.tn", List.of(),
-                Map.of());
+    void theBootstrapIsTheSameInAnyOrder() {
+        Map<String, String> written = bootstrapped(order -> order);
 
-        assertThrows(IllegalArgumentException.class, () -> TsonSchemaLinker.linkBootstrap(ordinary, Set.of("x")));
-        assertThrows(IllegalArgumentException.class, () -> io.ltr8.tson.compiler.TsonSchemaCompiler.compileBootstrap(
-                new io.ltr8.tson.schema.TsonLinkedSchema(ordinary), SchemaMetaNameBinder.defaultContext(), Set.of("x")));
+        assertEquals(written, bootstrapped(order -> {
+            Collections.reverse(order);
+            return order;
+        }), "reversed");
+        for (long seed : new long[] {1, 39, 2026}) {
+            assertEquals(written, bootstrapped(order -> {
+                Collections.shuffle(order, new Random(seed));
+                return order;
+            }), "shuffled with seed " + seed);
+        }
+    }
+
+    /** The bootstrap over the kernel's declarations in the order {@code reorder} gives, each entry with its facts. */
+    private static Map<String, String> bootstrapped(UnaryOperator<List<String>> reorder) {
+        TsonSchemaParser parser = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID));
+        SchemaDocument document = parser.parseSchemaDocument();
+        Map<String, SchemaMap.Declaration> permuted = new LinkedHashMap<>();
+        reorder.apply(new ArrayList<>(document.body().declarations().keySet()))
+                .forEach(name -> permuted.put(name, document.body().declarations().get(name)));
+        TsonSchema schema = MetaKernelBootstrapResolver.resolve(new SchemaDocument(document.id(), document.imports(),
+                new SchemaMap(document.body().annotations(), permuted)), parser.schemaPositions());
+        Map<String, String> outcome = new TreeMap<>();
+        schema.entries().forEach((name, value) -> outcome.put(name, value + " | facts " + schema.factsOf(name)));
+        return outcome;
     }
 
     // ── instanceBody's own refusals -- neither reachable through the real fixture ──

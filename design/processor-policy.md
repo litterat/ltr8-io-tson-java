@@ -1,8 +1,8 @@
 # `ProcessorPolicy` and `LimitsPolicy`
 
 The configuration a report is read against — the two §8.2 Unicode policies, the UCD version and the §9.1 and §11.5
-limits — how it is threaded and configured, why it is not a diagnostic component, and where the nesting bound is
-counted. Current form only; history lives in git.
+limits — how it is threaded and configured, why it is not a diagnostic component, and where the nesting bound and
+the wait depth are counted. Current form only; history lives in git.
 
 **Invariants**
 
@@ -14,11 +14,15 @@ counted. Current form only; history lives in git.
   than a version.
 - It is read off the reader that judged, not rebuilt from a configuration object.
 - `LimitsPolicy` and `spec/m/policy.tn`'s `limits` carry the whole §9.1 and §11.5 table with the spec's defaults,
-  every field optional on the wire, and `PolicySchemaTest` holds the two to one order and one set of defaults. Only
-  nesting depth is counted so far, in `TsonDataStream.advance` (and `JsonStream`) — the token stream, not the
-  readers — so the refusal lands before any reader descends and reaches schema documents too.
+  every field optional on the wire, and `PolicySchemaTest` holds the two to one order and one set of defaults. Two
+  are counted: nesting depth in `TsonDataStream.advance` (and `JsonStream`) — the token stream, not the readers — so
+  the refusal lands before any reader descends and reaches schema documents too; and wait depth in `WaitOrder`, as a
+  schema's resolution makes its entries ready, the same in any declaration order.
+- The bundled schemas resolve under the default limits whatever a deployment configures
+  (`TsonCompiledMetaRegistry`), as they link under the default identifier policy.
 - `LIMIT_EXCEEDED` is not a verdict and has its own classifier (`Diagnostic.ofLimitExceeded`), caught ahead of
-  `ofBaseSyntaxError`; the CLI still exits 1.
+  `ofBaseSyntaxError`; the CLI still exits 1. A schema-side limit is a `SchemaRefusalException(LIMIT_EXCEEDED)`,
+  reported through `TsonDiagnostics.ofSchemaRefusal` beside §8.2's name refusals.
 - Its wire shape is the spec's: `spec/m/policy.tn` (a bundled companion artifact, `TsonBundledSchemas.POLICY_ID`)
   declares `policy` and its parts, and the CLI's `diagnostics.tn` imports it rather than restating it.
   `PolicySchemaTest` holds `restriction_level` to `RestrictionLevel` and `limits` to `LimitsPolicy`. No document
@@ -110,15 +114,16 @@ inside `ProcessorPolicy`, not inside either of them** — they answer different 
 that changed one has said nothing about the other. The three arguments above transfer whole: a bound is constant for a run, a
 sender needs it before it writes, and a number a caller can act on beats a refusal after the fact.
 
-**The whole table is stated; only nesting depth is counted.** §9.1 states its limits as one table with a default each —
-eleven on the document side, its foreign-schemas row withdrawn with the scope push (`SPEC-FEEDBACK.md` #6) — and
-[TSON-SCHEMA] §11.5 adds five on the schema side under the same policy and the same reporting surfaces. `LimitsPolicy`
-has a component per limit, in the table's order, each defaulting to the spec's value and refused below 1, and
-`policy.tn`'s `limits` and `CliPolicy.CliLimits` carry the same sixteen, so `tson policy` and every envelope state each
-threshold. Depth is the one counted, at §9.1's default of 64, the tightest in common use, so a document that fits
-travels. The other fifteen are configured and reported but not counted, so nothing past one of them is refused for it;
-`BACKLOG.md` carries where each is counted. One of the schema-side five `TemplateMaterialiser.MAX_CLOSING_DEPTH`
-enforces as a bare constant at the default, not yet reading `maxMaterialisationDepth`.
+**The whole table is stated; nesting depth and wait depth are counted.** §9.1 states its limits as one table with a
+default each — eleven on the document side, its foreign-schemas row withdrawn with the scope push (`SPEC-FEEDBACK.md`
+#6) — and [TSON-SCHEMA] §11.5 adds six on the schema side under the same policy and the same reporting surfaces.
+`LimitsPolicy` has a component per limit, in the table's order, each defaulting to the spec's value and refused below 1,
+and `policy.tn`'s `limits` and `CliPolicy.CliLimits` carry the same seventeen, so `tson policy` and every envelope state
+each threshold. Nesting depth is counted at §9.1's default of 64, the tightest in common use, so a document that fits
+travels; wait depth at §11.5's default of 64 (below). The other fifteen are configured and reported but not counted, so
+nothing past one of them is refused for it; `BACKLOG.md` carries where each is counted. One of the schema-side six
+`TemplateMaterialiser.MAX_CLOSING_DEPTH` enforces as a bare constant at the default, not yet reading
+`maxMaterialisationDepth`.
 
 **It is a component of `ProcessorPolicy`** — `Tson.limitsPolicy()` is `processorPolicy().limits()` in one call. A
 deployment states one policy, and the CLI envelope nests `limits` under `policy`. What the grouping keeps is the
@@ -147,3 +152,16 @@ a verdict every processor repeats and this one is a statement about the reader's
 catch it ahead of the `RuntimeException` that reaches the other. It is still a **rejection by this processor**
 (`Code.isRefusal()`), as a §8.2 name refusal is: the CLI's envelope says `REJECTED` and it exits 1, the runner
 holding the fix (`--max-depth`, or a smaller document).
+
+**Wait depth is counted by the wait order** (`WaitOrder`, `LimitsPolicy.maxWaitDepth`, `--max-wait-depth`). An
+entry's depth is none where it waits on nothing of its own document and one more than the deepest entry it waits on
+otherwise; an import is ready before resolution starts, so a chain is counted within one document's resolution. The
+waits are recorded both from the lookups made while an entry is being made ready and from each declaration a read
+of its value reaches (`TsonReadContext.HeldByName.reached`, called from `DefaultTsonReadContext.inRecord` and
+`underDeclaration`), so an entry made ready before the read that needs it still counts: the depth is the same in any
+declaration order. A chain past the limit refuses its head with `SchemaRefusalException(LIMIT_EXCEEDED)`, reported
+per declaration through `TsonDiagnostics.ofSchemaRefusal` and rethrown by a fail-fast resolve. It is also refused as
+soon as the stack of entries being made ready exceeds the limit, so making entries ready never recurses deeper than
+the limit allows. The kernel's bootstrap and the bundled schemas resolve under the default whatever is
+configured: the library's own schemas are not the deployment's to refuse. `WaitOrderTest` pins the count; no corpus
+vector states it, `RUNNER.md` having no way to state a processor limit.

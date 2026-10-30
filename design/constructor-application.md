@@ -10,10 +10,14 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
 - A construction head resolves in the schema's one namespace, among the entries its closure imports
   (SPEC-FEEDBACK.md #7), through its reference chain first (`resolveConstructorTarget`): every question is asked of
   the entry at the end, while the entry's facts record the name the author wrote as its constructor.
-- A head declared in the same document is a gap, refused as `NOT_IMPLEMENTED` (`DefinitionResolver.notYetReadable`):
-  its instance waits on it being ready, which only the kernel's bootstrap orders. The body is read through the
-  compiled form of the schema that declared the head (`design/resolver-vocabulary-and-bootstrap.md`).
-- `!C { … }` builds a type exactly when `C` IS-A `top` (§4.1) — there is no constructor marker — and
+- A head declared in the same document is made ready before its instance is read, in wait order (`WaitOrder`,
+  `design/schema-resolution.md`), whichever is written first; the body is read through readers compiled from the
+  entries ready so far. An imported head's body is read through the compiled form of the schema that declared it
+  (`design/resolver-vocabulary-and-bootstrap.md`).
+- An instance of a kernel or meta.tn constructor is the schema model's body. An instance of any other constructor
+  is held as a `ValueEntry` where the head composes `top` and not `type` (its instances are no types), and refused
+  as `NOT_IMPLEMENTED` where it composes `type` (`SchemaResolver.constructed`).
+- `!C { … }` applies a constructor exactly when `C` IS-A `top` (§4.1) — there is no constructor marker — and
   `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so every constructor head has a reader.
   With `C` any other type the entry is a value of `C` (`resolveValueEntry`, `design/meta-layer-namespaces.md`), never
   a refusal for want of applicability.
@@ -51,7 +55,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   Asking the alias would answer all four from an empty supertype chain and a `REFERENCE` kind, which is what
   a hop looks like rather than what it points at. The author's spelling survives where it is visible: the tag resolved output
   writes (`EntryFacts.constructor`) is the name they wrote, so the chain stays walkable from resolved output.
-- **`!C { … }` builds a type exactly when `C` IS-A `top` (§4.1)** (`EntryKind.isConstructor`), asked of that terminal
+- **`!C { … }` applies a constructor exactly when `C` IS-A `top` (§4.1)** (`EntryKind.isConstructor`), asked of that
   entry. §4.1 makes every base kind IS-A `top` and every constructor transitively so, while IS-A stops at
   construction — an instance or a fresh record carries an empty chain — so the predicate admits every constructor and
   nothing else. Over the bundled schemas that is every vocabulary constructor plus `top`, `type`, the three base kinds,
@@ -92,6 +96,16 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an entry with an empty
   chain, which is why an instance is not itself a constructor. `ApplicabilityIsIsATopTest` and
   `ConstructorLevelDisciplineTest` pin both halves; §3.3.1 and §4.2 are the spec side.
+- **What an instance of a schema's own constructor holds** (`SchemaResolver.constructed`). The kernel's and
+  meta.tn's constructors bind to the schema model, so their instances are `Top` bodies. Any other constructor's
+  instance builds no body this library models. Where its head composes `top` and not the kernel's `type`
+  (`s => !step { … }` over `step => top & { … }`), the instance is no type, so it is held as the value it is, the
+  way a value entry's payload is: `ValueEntry(step, object)` where the bind context binds `step` to a class,
+  `ValueEntry(step, tree)` where none does, so the schema loads and validates without host classes, and a schema
+  obtained to bind refuses the tree-held entry with `BIND_MISMATCH` (`design/meta-layer-namespaces.md`). Where the
+  head composes `type` (`c => product & { … }`), the instance would be a type, whose body must be one of the schema
+  model's, and it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an
+  instance is open work.
 - **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
   substituted as a token and read by the position it lands in, so a slot typed `type_kind` takes a type where
   an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where

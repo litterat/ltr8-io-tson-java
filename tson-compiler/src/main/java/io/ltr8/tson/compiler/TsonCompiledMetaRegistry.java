@@ -5,6 +5,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
@@ -21,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -122,6 +124,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private IdentifierPolicy identifierPolicy = IdentifierPolicy.defaults();
 
     /**
+     * [TSON-SCHEMA] §11.5's limits a schema resolved here is resolved under -- the wait depth is the one a resolution
+     * counts ({@code SchemaResolver}) -- the spec's defaults unless {@link #withStandardLibrary} was given others.
+     */
+    private LimitsPolicy limits = LimitsPolicy.defaults();
+
+    /**
      * The identities this thread is part-way through resolving, outermost first -- [TSON-DATA] §2.2.3's
      * import-cycle guard ({@link #loadMeta} reaches every link through {@link #resolveLinked}).
      *
@@ -207,8 +215,16 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     /** The same, with {@link #identifierPolicy} chosen rather than defaulted. */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
                                                                IdentifierPolicy identifierPolicy) {
+        return withStandardLibrary(context, source, identifierPolicy, LimitsPolicy.defaults());
+    }
+
+    /** The same, with {@link #limits} chosen rather than defaulted as well. */
+    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
+                                                               IdentifierPolicy identifierPolicy,
+                                                               LimitsPolicy limits) {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
-        registry.identifierPolicy = identifierPolicy;
+        registry.identifierPolicy = Objects.requireNonNull(identifierPolicy, "identifierPolicy");
+        registry.limits = Objects.requireNonNull(limits, "limits");
         registry.loadStandardLibrary();
         return registry;
     }
@@ -217,6 +233,19 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     @Override
     public IdentifierPolicy identifierPolicy() {
         return identifierPolicy;
+    }
+
+    /** The limits this registry resolves schemas under -- see {@link #limits}. */
+    @Override
+    public LimitsPolicy limits() {
+        return limits;
+    }
+
+    @Override
+    public TsonCompiledSchema compileReady(TsonSchema ready, Set<String> pending, boolean tree) {
+        TsonLinkedSchema linked = TsonSchemaLinker.linkReady(ready, schemaRegistry, pending);
+        return tree ? TsonSchemaCompiler.compileReady(linked, ValueReaderFactoryRegistry.tree(), pending)
+                : TsonCompiledMetaSchema.compileReady(linked, resolver, pending);
     }
 
     /**
@@ -245,7 +274,10 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         recordAndVerify(sourceText, id, CanonicalIdentity.canonicalize(id));
         TsonSchemaParser parser = new TsonSchemaParser(sourceText);
         SchemaDocument document = parser.parseSchemaDocument();
-        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.schemaPositions());
+        // The library's own schemas are resolved under the default limits, as they are linked under the default
+        // identifier policy: a deployment's configuration should not be able to break the standard library.
+        TsonSchema resolved = new SchemaResolver(this, LimitsPolicy.defaults())
+                .resolveSchema(document, parser.schemaPositions());
         schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry, IdentifierPolicy.defaults(), context));
     }
 

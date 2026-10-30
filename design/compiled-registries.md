@@ -38,13 +38,17 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   value through, where it declared `C` or the annotation's type (`design/resolver-vocabulary-and-bootstrap.md`).
   `treeVocabularyOf(identity)` is the same schema compiled in tree mode, cached per identity beside it: what a value
   entry's payload is read through where the bind context binds no class for its type, so the entry holds a
-  `TsonValue` and the schema still loads and validates (`design/meta-layer-namespaces.md`).
+  `TsonValue` and the schema still loads and validates (`design/meta-layer-namespaces.md`). `compileReady(ready,
+  pending, tree)` compiles a resolution in progress, its document's entries ready so far, in either mode, neither
+  registered nor cached: what a value read against an entry of the same document is read through (`WaitOrder`).
   Any schema compiles to one (`TsonCompiledMetaSchema.compile`), **on first use and cached per identity**, never
   per closure: a schema applying only the kernel's and meta.tn's constructors reaches exactly those two compiled
   schemas, and core.tn, net.tn and policy.tn are compiled here only if something applies a constructor or an
   annotation type they declare. `withStandardLibrary(context, source)` builds a core with the five bundled schemas
-  resolved and registered (meta-kernel, meta, core, net, policy). The meta-kernel is always read from
-  `TsonBundledSchemas`, whatever the `SchemaSource`: it is the revision the library was built for.
+  resolved and registered (meta-kernel, meta, core, net, policy); an overload takes the identifier policy and the
+  `LimitsPolicy` user schemas resolve under (`limits()`, whose wait depth `SchemaResolver` counts), and the bundled
+  schemas resolve under the defaults whatever is configured, so a deployment cannot break them. The meta-kernel is
+  always read from `TsonBundledSchemas`, whatever the `SchemaSource`: it is the revision the library was built for.
 - **`TsonCompiledSchemaRegistry`** is a **per-mode registry of compiled user schemas** over a core, built
   via `TsonCompiledSchemaRegistry.tree(core)` / `bind(core, context)`. **The read mode is which registry
   you hold**, not a compile parameter. `get(uri)` resolves through the core (`resolveLinked`) and compiles
@@ -63,12 +67,12 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   value of the same type bind to the same class. A user schema importing core.tn gets core.tn's entries merged into
   its own linked form (by `link`) and compiled inline in the read registry's mode.
 - **A schema obtained to bind holds no tree.** The bind registry's `get(uri)`, `get(uri, receiver)`, `get(imports,
-  receiver)` and `compile(linked)` refuse a value entry of the compiled closure that the core held as a tree
-  (`refuseUnbound`): `MissingBindingException`, a `BIND_MISMATCH` naming the entry, or one `BIND_MISMATCH` per entry
-  through the receiver, `schemaPointer` `/entry`. That is the narrowest point a consumer first obtains a schema for
-  binding, and a consumer binding under it expects every value of its closure as the class its context names; the
-  tree registry, `Tson.resolve` and `validateSchema` refuse nothing, so a schema loads and validates without host
-  classes.
+  receiver)` and `compile(linked)` refuse a value entry of the compiled closure that the core held as a tree, an
+  instance of a constructor of no types included (`refuseUnbound`): `MissingBindingException`, a `BIND_MISMATCH` naming
+  the entry, or one `BIND_MISMATCH` per entry through the receiver, `schemaPointer` `/entry`. That is the narrowest
+  point a consumer first obtains a schema for binding, and a consumer binding under it expects every value of its
+  closure as the class its context names; the tree registry, `Tson.resolve` and `validateSchema` refuse nothing, so a
+  schema loads and validates without host classes.
 - **An import cycle is caught by what is *in flight*, not by a cache lookup** (§2.2.3). A schema is
   registered only once it has linked, so while `a.tn` is resolving it is in no registry at all and `b.tn`
   importing it back re-enters `resolveLinked` for the same identity and fetches it again — unguarded, that

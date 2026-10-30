@@ -497,18 +497,17 @@ class RecordTemplateTest {
 
     /**
      * A composition operand that is an application is absorbed by value, never closed, and absorbing it
-     * resolves the head through {@code SchemaResolver}'s namespace getter -- which is also the memo the
-     * circular-composition guard rides on. A cycle reached *through* an application must still be caught there
-     * rather than recursing.
+     * resolves the head through the resolution's wait order -- which is also where an entry waiting on itself is
+     * refused. A cycle reached *through* an application must still be caught there rather than recursing.
      */
     @Test
-    void aCycleThroughAnApplicationIsStillCaughtAsACircularComposition() {
+    void aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           a => b<text> & { x: text }
                           b => <T> a & { y: T }"""));
 
-        assertTrue(thrown.getMessage().contains("circular composition/refinement chain"), thrown.getMessage());
+        assertTrue(thrown.getMessage().startsWith("'a' waits on 'b' waits on 'a'"), thrown.getMessage());
     }
 
     // ── Author errors, reported at the application site ──────────────────
