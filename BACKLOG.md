@@ -66,8 +66,10 @@ spec-required case:
   `holder => { r: kind<record> }` with `held => !holder { r: order }` in one schema is refused: "'kind' is a
   template taking 1 type argument … a data type-ref carries no arguments". The reader compiled from the entries
   ready so far (`SchemaResolver.readySoFar`) reaches the field's application before its minted entry is ready.
-  Naming the application (`records => kind<record>`, `holder => { r: records }`) reads. Make the field's application
-  wait in the order, as a named one does, and add a `link/valid` vector writing it inline.
+  Naming the application (`records => kind<record>`, `holder => { r: records }`) reads. A record template applied
+  inline (`{ b: box<text> }`) fails the same way, reported as "no schema in this closure declares a subtype of
+  'box', and it is abstract". Make the field's application wait in the order, as a named one does, and add a
+  `link/valid` vector writing it inline.
 - [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1;
   `SPEC-FEEDBACK.md #4`, the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
   `schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
@@ -77,13 +79,17 @@ spec-required case:
   value read through readers compiled from the entries ready so far, so the fixture's readers come from the fixture.
   `parseResolvedForm`'s grammar-only kind reading stays. Then add `schema/valid` vectors for a same-document
   constructor and value entry, and check that every `-resolved.tn` re-resolves to itself.
-- [ ] **An instance of a constructor of types no reader factory backs is a gap.** A schema may declare a
-  constructor composing `product` or `atom` (`c => product & { … }`), and the instance `x => !c { … }` would be a
-  type, but a type's body is one of the schema model's (`schema.meta`), so `SchemaResolver` refuses it as
-  `NOT_IMPLEMENTED` ("builds types, and this library models the body of a type built only by the kernel's and
-  meta.tn's constructors"); a constructor composing `top` alone is held as a value. This is what keeps rule 2's
-  example pair (`decimal_type => atom & { min?: number }` beside `number => !decimal_type {}`) kernel-only. What a
-  generic body for such an instance is, and how data is read against it, is open.
+- [ ] **An instance of a constructor composing `record` is refused** ([TSON-SCHEMA] §4.1, §5.7). `c => record & {
+  extra: text }` is a constructor whose instances are record types carrying one facet more, and `x => !c { fields: {
+  id => { type: text } }  extra: "hello" }` should follow record composition: `x` is a record type read by the record
+  reader (`!x { id: abc }` validates, in tree and bind mode) and its body holds `extra`. Today `x` is refused as
+  `NOT_IMPLEMENTED` at `/x`, in either declaration order and with `extra?: text` left unwritten: no class binds `c`, so
+  `vocabulary.instance` throws `MissingBindingException` and `SchemaResolver.constructed` sends it to `unmodelledType`.
+  A refinement adding no field already binds to its source's body (`my_array => array ^ { ordered?: = false }`,
+  `ConstructorLevelDisciplineTest`). Decide where an added facet lives in the schema model and in the resolved form,
+  then read the instance as its source's body with the facet held. An instance of a constructor composing `atom`,
+  `product` or `sum` directly stays refused: it is a type of a new form, which a processor backs with readers and
+  writers of its own.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
   so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest verifies rather than
   recomputes what an author may have written into a derived fact: a recorded `template_param.type` or `bound`

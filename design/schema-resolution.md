@@ -290,14 +290,17 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
 (`SchemaResolver.unresolved`) that keeps the failed declaration's type parameters.
 
 - **One schema construct reaches `NOT_IMPLEMENTED`: an instance of a user constructor of types**
-  (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `type` (`c => product & { … }`) builds
-  types, and a type's body is one of the schema model's, built only by the kernel's and meta.tn's constructors. An
-  instance of a constructor composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a
-  tree where no class binds the head — as a value entry's payload is (`design/meta-layer-namespaces.md`). The other
-  `UnsupportedOperationException` sites are the catch-alls around the compiled reader (an exception none of the
-  classified ones), a failed re-serialisation of an atom refinement's source, a closed application with no
-  `ApplicationCloser` (a resolver built standalone), and the bootstrap's closed switch over `meta-kernel.tn`'s own
-  declarations.
+  (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `type` builds types, and a type's body is
+  one of the schema model's, built only by the kernel's and meta.tn's constructors. Composing `atom`, `product` or
+  `sum` directly (`c => product & { … }`) makes a new form, which a processor backs with readers and writers of its
+  own; this library backs none beyond the bundled ones, so the refusal is a capability verdict, and stays one.
+  Composing an existing constructor (`c => record & { extra: text }`) makes no new form, and is refused the same way
+  today only because no body in the schema model holds the added facet (`BACKLOG.md`). An instance of a constructor
+  composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a tree where no class binds
+  the head — as a value entry's payload is (`design/meta-layer-namespaces.md`). The other `UnsupportedOperationException`
+  sites are the catch-alls around the compiled reader (an exception none of the classified ones), a failed
+  re-serialisation of an atom refinement's source, a closed application with no `ApplicationCloser` (a resolver built
+  standalone), and the bootstrap's closed switch over `meta-kernel.tn`'s own declarations.
 - **A body the constructor's vocabulary rejects** arrives as a `ReadException` and is restated as a schema error
   (`bodyIsNotValidData`, `payloadFailure`). The read `Diagnostic` is dropped: it was produced against a
   `DataValueEvents` replay whose positions are placeholders and whose path points into a synthetic body. The real

@@ -176,8 +176,12 @@ schema is handed out. Link remains the one place a pin is judged, and a bad pin 
 What is not running: a resolved form is still read under its source's imports rather than by this algorithm over its
 own entries (§8.1, "Resolved forms" in the proposal), so a fixture holding an instance of a constructor it declares
 does not read back. And rule 2's example pair, a constructor whose facet is typed by its own instance (`decimal_type`
-beside `number`), is expressible only in the kernel: an instance of a constructor of types the kernel and meta.tn do
-not declare has no body this library models, and is refused as `NOT_IMPLEMENTED`.
+beside `number`), runs only as meta.tn declares it. `decimal_type` composes a base kind directly, and a constructor
+that does makes a new form, which a processor backs with readers and writers of its own: an extension point, not
+schema vocabulary. This library backs the forms the kernel and meta.tn declare and no other, so it refuses an
+instance of any other such constructor as `NOT_IMPLEMENTED`. Refining an existing constructor with a field of its
+own (`c => record & { extra: text }`) is no new form and should follow record composition; it is refused the same
+way today.
 
 **Resolution, a proposal.** Terms:
 

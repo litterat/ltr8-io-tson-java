@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
@@ -123,6 +124,25 @@ class ConstructorLevelDisciplineTest {
                   tags     => !my_array { element_type: text }
                   my_array => array ^ { ordered?: = false }
                 """));
+    }
+
+    /**
+     * A constructor composing a base kind directly makes a new form, which a processor backs with readers and writers
+     * of its own. Declaring one is sound; this library backs no form beyond the bundled ones, so an instance of one is
+     * a capability gap, {@code NOT_IMPLEMENTED} at the instance, and never a verdict on the schema.
+     */
+    @Test
+    void anInstanceOfANewFormIsAGap() {
+        for (String kind : List.of("atom", "product", "sum")) {
+            List<Diagnostic> problems = problems(META, CORE, """
+                      c => %s & { extra: text }
+                      x => !c { extra: "hello" }
+                    """.formatted(kind));
+
+            assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), problems.stream().map(Diagnostic::code).toList(),
+                    kind);
+            assertEquals(Optional.of("/x"), problems.getFirst().schemaPointer(), kind);
+        }
     }
 
     /** An ordinary type over an ordinary type is untouched — the overwhelmingly common case. */
