@@ -86,6 +86,10 @@ member name, `$`-initial or not, is a field name (`$ref` under a record whose `n
 class is `TagMembers`, not the spec's noun, because `Annotation` in this codebase means an `@name` annotation, which
 has no JSON carrier (§4.3); its Javadoc has the reasoning.
 
+**A `$type` holds the text a TSON tag writes after `!`**, a qualified name: `"$type": "geo.address"` names the member of
+the schema map nested as `geo`, a lookup of that path entry like any other name, so the JSON stack needs no walk of its
+own and a name reaching no member is refused with the code text gives it (`JsonQualifiedTagTest`).
+
 **A `$type` is matched after alias flattening, on both sides** ([TSON-SCHEMA] §7.2), at every position here that
 compares a written name against a set: a plain record's own name and its subtypes, an abstract base's subtypes, a sealed
 base's own name and the deeper names each member admits, and a choice's variants and their subtypes. One index answers

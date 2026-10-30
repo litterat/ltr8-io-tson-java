@@ -108,6 +108,9 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
 - **A local entry equal to the closure's is the same entry.** §8.2 names a minted instantiation by its resolved form
   alone, so an application this schema closed and one an import closed agree by construction; any other local reuse
   of a closure name is refused and the local entry dropped, keeping the import's, which is already-linked material.
+- **A nested schema map is closed.** `geo => !schema { … }` is an entry like any other, its members entries under
+  their paths: two imports each declaring `geo` collide on `geo` whatever members they declare, and nothing merges
+  two maps of one name. No grammar declares a dotted name, so an importer cannot add to an imported map.
 
 ## Reference validation (`validateEntry`, `validateBody`, `validateTypeRef`)
 
@@ -182,7 +185,9 @@ it overwrites nothing either. `get(uri)` canonicalizes; `getByCanonicalIdentity`
 registering it. `linkReady(ready, loader, pending)` is the one partial link: a resolution in progress links its
 document's entries ready so far to compile readers for the next read (`WaitOrder`), a reference to a pending
 declaration is passed over there and nowhere else, and it reports nothing, each entry being judged when the whole
-schema links; `design/resolver-vocabulary-and-bootstrap.md` has the mode.
+schema links. In a partial link every pending name is a member of each reference naming types (`computeKinds`), so a
+pin naming a declaration not yet ready (enum's `name_type: = identifier` mid-bootstrap) is judged then too;
+`design/resolver-vocabulary-and-bootstrap.md` has the mode.
 
 ## Namespace types (§4.1)
 
@@ -219,8 +224,9 @@ descriptor, is `design/meta-layer-namespaces.md`'s; what is the linker's is belo
   a [TSON-DATA] §7.7 identifier, none empty and no arguments, so `orders.1x`, `.orders` and `orders.` are refused
   before anything is looked up. An application in a value body is refused where it is read, the alias spelling
   named (`design/references.md`).
-- **One namespace for the slot's type and the name.** The first segment resolves in `merged`, alias hops followed
-  (§8.3), and only there, so `method: place_order` is unresolved even though `orders` holds that key. Found first,
+- **One namespace for the slot's type and the name.** The first segment resolves in `merged`, a segment naming a
+  member of a nested `!schema` map collapses onto that member's path entry, alias hops are followed (§8.3), and only
+  there, so `method: place_order` is unresolved even though `orders` holds that key. Found first,
   judged after: nothing is a choice among candidates. A type entry admits no further segment, an open entry is no
   referent, a list has no named members, and a map that is no namespace is not entered whatever its key type.
 - **The judgement is §7.2's IS-A, by canonical identity.** An entry's declared type is the constructor that built its
@@ -229,8 +235,8 @@ descriptor, is `design/meta-layer-namespaces.md`'s; what is the linker's is belo
   constructor is in its declaring schema's closure, which this one contains, so each is named in the one namespace
   (`ValuesByName.Space`), and two types are one when their terminal entries share origin and name.
 - **Each refusal is its own `SCHEMA_ERROR` naming the step**, against the entry holding the name, at the slot's RFC
-  6901 pointer. A qualified name at a kind-typed slot is refused where it reaches into a value. A field step needs the
-  bind context its values were bound under (`TsonCompiledMetaRegistry.link` passes it); an overload without one throws
-  `IllegalStateException` if a walk reaches a field. Two steps are gaps (`NOT_IMPLEMENTED`): a qualified name at a
-  kind-typed slot reaching a type through a namespace of types, and a FIXED field with no component.
+  6901 pointer. A qualified name at a kind-typed slot is refused where it reaches into a value or goes on past a
+  type. A field step needs the bind context its values were bound under (`TsonCompiledMetaRegistry.link` passes it);
+  an overload without one throws `IllegalStateException` if a walk reaches a field. One step is a gap
+  (`NOT_IMPLEMENTED`): a FIXED field with no component.
 - **Local entries only**: an imported body's names were judged in its own namespace when its schema linked.

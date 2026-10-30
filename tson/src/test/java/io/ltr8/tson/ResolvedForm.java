@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.compiler.TsonDataParser;
@@ -100,6 +101,11 @@ final class ResolvedForm {
         // required of the application, not of the whitespace around it. Both sides are reduced to their
         // parsed application here, so a held body compares like every other body and needs no side channel.
         // A resolved form read as data holds each entry's value, and a value entry's is the value itself.
+        if (SchemaPaths.isNestedMap(value)) {
+            // A nested map's members are entries under their paths, each compared on its own; the map is its names.
+            Object members = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
+            return "!schema " + ((io.ltr8.tson.schema.meta.Namespace<?>) members).keySet();
+        }
         Object entry = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
         Object compared = entry instanceof TemplateBody held ? parsedForComparison(held) : entry;
         String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(compared instanceof Top top ? canonical(top)
@@ -183,10 +189,10 @@ final class ResolvedForm {
      * argument list is free.
      */
     static Map<String, String> markedApplications(String resolvedText) {
-        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseResolvedForm().root().coreValue();
         Map<String, String> marked = new TreeMap<>();
-        for (MapValue.MapEntry entry : map.entries()) {
-            String name = ((TokenValue) entry.key().coreValue()).text();
+        for (Map.Entry<String, MapValue.MapEntry> keyed : entries(resolvedText).entrySet()) {
+            String name = keyed.getKey();
+            MapValue.MapEntry entry = keyed.getValue();
             entry.key().annotations().stream()
                     .filter(annotation -> annotation.name().equals("application"))
                     .forEach(annotation -> marked.put(withoutHash(name),
@@ -230,10 +236,10 @@ final class ResolvedForm {
      * tell one from the prose inside a {@code @doc}.
      */
     static Map<String, List<String>> fixtureKeyAnnotations(String resolvedText) {
-        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseResolvedForm().root().coreValue();
         Map<String, List<String>> keys = new TreeMap<>();
-        for (MapValue.MapEntry entry : map.entries()) {
-            String name = ((TokenValue) entry.key().coreValue()).text();
+        for (Map.Entry<String, MapValue.MapEntry> keyed : entries(resolvedText).entrySet()) {
+            String name = keyed.getKey();
+            MapValue.MapEntry entry = keyed.getValue();
             keys.put(withoutHash(name), entry.key().annotations().stream()
                     .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
                     .map(annotation -> "@" + annotation.name() + annotation.value()
@@ -269,10 +275,10 @@ final class ResolvedForm {
      * facts.
      */
     static Map<String, List<String>> fixtureValueAnnotations(String resolvedText) {
-        MapValue map = (MapValue) new TsonDataParser(resolvedText).parseResolvedForm().root().coreValue();
         Map<String, List<String>> values = new TreeMap<>();
-        for (MapValue.MapEntry entry : map.entries()) {
-            String name = ((TokenValue) entry.key().coreValue()).text();
+        for (Map.Entry<String, MapValue.MapEntry> keyed : entries(resolvedText).entrySet()) {
+            String name = keyed.getKey();
+            MapValue.MapEntry entry = keyed.getValue();
             List<String> written = entry.value().annotations().stream()
                     .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
                     .map(annotation -> "@" + annotation.name() + annotation.value()
@@ -307,6 +313,28 @@ final class ResolvedForm {
     }
 
     /**
+     * Every entry a §8 resolved-schema document's text states, keyed by its path from the root: a schema map nested as
+     * an entry, {@code geo => !schema { address => ... }}, contributes itself and each member under its path,
+     * {@code geo.address}, as the resolver's own entries are keyed.
+     */
+    static Map<String, MapValue.MapEntry> entries(String resolvedText) {
+        Map<String, MapValue.MapEntry> entries = new LinkedHashMap<>();
+        addEntries(entries, "", (MapValue) new TsonDataParser(resolvedText).parseResolvedForm().root().coreValue());
+        return entries;
+    }
+
+    private static void addEntries(Map<String, MapValue.MapEntry> entries, String prefix, MapValue map) {
+        for (MapValue.MapEntry entry : map.entries()) {
+            String path = prefix + ((TokenValue) entry.key().coreValue()).text();
+            entries.put(path, entry);
+            if (entry.value().typeRef().filter("schema"::equals).isPresent()
+                    && entry.value().coreValue() instanceof MapValue nested) {
+                addEntries(entries, path + ".", nested);
+            }
+        }
+    }
+
+    /**
      * A §8 resolved-schema document, bound back into the value model, read under its own header's imports -- a
      * resolved form's header is its source's ([TSON-SCHEMA] §8.1) -- and as a resolved form because this caller says
      * so: its root, tagged {@code !schema}, is read as a value of {@code schema}.
@@ -318,14 +346,15 @@ final class ResolvedForm {
     /**
      * {@link #readResolved(Tson, String)} under {@code imports}, the source's own -- what a sidecar's resolved text,
      * which carries no header of its own, is read under. A source importing nothing is the kernel's, whose resolved
-     * form is read under the pre-loaded kernel (§3.4).
+     * form is read under the pre-loaded kernel (§3.4). A nested map's members are keyed under their paths as well, as
+     * a schema keys them ({@link SchemaPaths#withPaths}).
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> readResolved(Tson tson, String resolvedText, List<String> imports) {
         List<String> under = imports.isEmpty() ? List.of(TsonBundledSchemas.META_KERNEL_ID) : imports;
-        return (Map<String, Object>) tson.objectReader()
+        return SchemaPaths.withPaths((Map<String, Object>) tson.objectReader()
                 .withImports(under)
-                .readAs(resolvedText, "schema", Object.class);
+                .readAs(resolvedText, "schema", Object.class));
     }
 
     /**

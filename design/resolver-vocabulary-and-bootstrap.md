@@ -78,7 +78,7 @@ array, `fields` being one.
   put a parameter inside a map — in a key, or inside the array its value names. Each of the three walks fails
   differently if it
   skips one: `substitute` leaves the parameter name standing where the argument belongs; `ParameterTypes`
-  never observes the parameter, so its kind is never inferred and a `type_name` argument stays on the
+  never observes the parameter, so its kind is never inferred and a type argument stays on the
   reference channel and fails as an unresolved reference; and `DerivedName`'s canonical rendering — the half
   §8.2 keys identity on — renders the whole map as the unknown-value mark, so two bindings differing only
   inside one hash alike while the readable half masks it, which is the `startsWith` hazard inverted and why
@@ -258,16 +258,16 @@ constructor, positions included (the bootstrap resolves with the parser's positi
 
 - **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the kernel's
   one wait cycle, the one holding `record`: `value`, `boolean`, `field_role`, `enum_set`, `integer`,
-  `non_negative_integer`, `text`, `identifier`, `type_kind`, `field_map` (`PRE_LOADED`), and the arrays lifted over
-  `type_name`, `field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted array is named by its
-  content, so it is designated by what it holds). `instanceBody` covers the four shapes those apply — a bare `{}` (each
-  target's unconstrained constant), `identifier`'s profile (checked against the constant the lexer already holds), a
-  bare token array (`enum`), and a record of tokens (`reference`, `namespace` for `field_map`, the `array`/`set_type`
-  binding records the desugar phase lifts, with their `min_items`/`max_items`) — and refuses any other target;
+  `non_negative_integer`, `text`, `type_kind`, `field_map` (`PRE_LOADED`), and the arrays lifted over `type_kind`,
+  `field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted array is named by its content, so it
+  is designated by what it holds). `instanceBody` covers the shapes those apply — a bare `{}` (each target's
+  unconstrained constant), a bare token array (`enum`), and a record of tokens (`reference`, `namespace` for
+  `field_map`, the `array`/`set_type` binding records the desugar phase lifts, with their `min_items`/`max_items`) —
+  and refuses any other target;
   `refinedBody` merges the integer family's `min` and `max`. `MetaKernelBootstrapResolverTest` measures the cycle with
   `WaitGraph` from `meta-kernel-resolved.tn` and asserts the hand-built names equal it, so a kernel edit that moves the
-  cycle fails there. `KernelWaitGraphTest` prints the measurement: one cycle, 29 of the kernel's 74 entries (67
-  declarations and 7 desugared arrays), longest wait chain 4.
+  cycle fails there. `KernelWaitGraphTest` prints the measurement: one cycle, 25 of the kernel's 73 entries (67
+  declarations and 6 desugared arrays), longest wait chain 4.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies.
@@ -288,7 +288,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   how many compiles run, never the output (`theBootstrapIsTheSameInAnyOrder`): an instance whose read reaches an
   entry not yet ready (`scheme_name` reaching `identifier_base` and `normalization`) forces another compile.
 - **Parameter types are derived after every entry is ready**, through `ParameterTypes.inferAll` as `SchemaResolver`
-  derives a schema's, so `kind` and `ref` carry `T: type_name` as their ordinary resolution does.
+  derives a schema's, so `kind` and `ref` carry `T: type_kind`, a type parameter, as their ordinary resolution does.
 - **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
   first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by
   (`TsonCompiledMetaRegistry.loadMeta` links and compiles the output into the stand-in).

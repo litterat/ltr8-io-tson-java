@@ -9,7 +9,7 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
 
 **Invariants**
 
-- A name held in a slot is a value of the kernel's one atom of names, `reference => atom & { of: type_name }`
+- A name held in a slot is a value of the kernel's one atom of names, `reference => atom & { of: type_kind }`
   (`ReferenceBody`). It admits a name exactly when the type of the named
   entry's value, its tag, past its alias hops, IS-A `of`: `order => { … }` holds a value of `record`, `int32 =>
   !integer ^ { … }` one of `integer_type`, `orders => !api { … }` one of `api`. `kind => <T> !reference { of: T }`
@@ -17,11 +17,16 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   `identifier_kind`, `atom_kind` and `type_kind` are `!reference { of: … }`. A field's type position, `kind<record>`
   and `ref<method>` differ only in `of`.
 - **What `of` names decides what the slot holds, never the spelling** (`KindMembers.namesTypes`). Over a constructor,
-  `top` or IS-A it, the values admitted are types: the slot holds a type's name, one segment, judged a member over the
-  governing closure (`KindMembers`) and delivered to a host as a `TypeRef`. Over any other type the values admitted
-  are values: the slot holds a value's qualified name, judged at link (`ValuesByName`) and delivered as the referent
-  (`Ref<T>`). So `kind<bar>` over a record type names values of `bar`, `ref<record>` is `kind<record>`, and
-  `kind<api>` names `myapi`. These notes call a reference over a constructor a *kind*, whichever spelling wrote it.
+  `top` or IS-A it, the values admitted are types: the slot holds a type's name, its path from the root (`order`,
+  `geo.address`), judged a member over the governing closure (`KindMembers`) and delivered to a host as a `TypeRef`. Over any
+  other type the values admitted are values: the slot holds a value's qualified name, judged at link (`ValuesByName`) and
+  delivered as the referent (`Ref<T>`). So `kind<bar>` over a record type names values of `bar`, `ref<record>` is
+  `kind<record>`, and `kind<api>` names `myapi`. These notes call a reference over a constructor a *kind*, whichever spelling
+  wrote it.
+- **Every name resolves from the root** (SPEC-FEEDBACK.md #14). A name's first segment names an entry of the root
+  namespace, the root's entries and the import closure, and each further segment selects in what it reached: a member
+  of a nested `!schema` map, a key of a namespace value, a field of a record value. Inside `geo`, a sibling is
+  `geo.address`, and a bare `address` is the root's or unresolved. There is no lexical scope, so no shadowing rule.
 - The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members,
   applications, entries, shown)`: the entry each application the closure closed denotes, an `@application` or an
   expansion's `EntryFacts.closes`; the final namespace's entries, which a reference read here names; and the members
@@ -45,10 +50,9 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   `TypeRef` (`design/lexer-and-data-parsing.md`); JSON, which has no unquoted form, holds the same text in a string,
   read by `io.ltr8.tson.atom.ReferenceGrammar`. The canonical text (`TypeRef.text()`) has no whitespace and one space
   between arguments, no comma, `map<text integer>`. Identity is the parsed form, never the text, so `result< T >` is
-  `result<T>`. A qualified head parses (`geo.address<T>`); resolving a qualified name at a type position is this
-  library's gap (`NOT_IMPLEMENTED`, `SchemaDesugarer.unqualified`, `KindParser`). The grammar classifies an argument,
-  a reference first; the head's parameters judge whether it binds a type or a value (§5.10), so `TypeArgument`
-  compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
+  `result<T>`. A qualified head (`geo.box<T>`) names a member of a nested schema map as a bare head names a root
+  entry. The grammar classifies an argument, a reference first; the head's parameters judge whether it binds a type or a
+  value (§5.10), so `TypeArgument` compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
 - A reference carries arguments only where an application is still open: a record template's `chain.parents` and
   field types, held text (`!alias { target: pair<uuid B> }` inside `template.template`), and the `application`
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
@@ -56,8 +60,10 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   as a type's name (`TsonSchemaLinker.typeArguments`).
 - A slot that names the type of a value is typed `type_kind` (`record_field.type`, `tuple_element.element_type`,
   `array.element_type`, `map.key_type` and `value_type`, `namespace.value_type`, `choice.variants`,
-  `template_param.type` and `bound`, `alias.target`, `type_chain.parents`, and the `application` annotation). Its
-  value is one bare name, or, where an application is still open, a reference with arguments. In a schema
+  `template_param.type` and `bound`, `alias.target`, `type_chain.parents`, and the `application` annotation), and so
+  are `reference.of` and the `type_chain.supertypes` and `subtypes` indexes. Its value is a type's name, its path
+  from the root, or, where an application is still open, a reference with arguments. `type_name`, one identifier, is
+  the schema map's key type and types no reference. In a schema
   document (a construction's or a value
   entry's payload, or a resolved form read as data) the reader reads its grammar alone and the name is judged a
   member where that schema links, or at ingest ([TSON-SCHEMA] §4.2, §8.1); in a data document the reader judges
@@ -119,10 +125,11 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   no constructor reads its grammar in a schema document (`AtomParsers.inSchemaDocument`), and in a data document
   `AtomTypeReader` reports it as a gap (`NOT_IMPLEMENTED`), a data document never being linked.
 - A recorded name at a kind-typed slot of a value body is judged a member by `ValuesByName.judgeMember`; a qualified
-  name there is refused where it reaches a value, and is a gap where it would reach a type through a namespace of
-  types. A recorded name at a slot over a type that is no constructor resolves its first segment in the schema map
-  and each further one as a key of a namespace value or a field of a record value, never into a map that is no
-  namespace; the referent's type IS-A `of`, and the value reached is delivered into the host's `Ref<T>`
+  name there is refused where it reaches a value, and where it goes on past a type, which admits no further segment.
+  `ValuesByName.judge` resolves a name's first segment in the root namespace, collapses each segment that selects a
+  member of a nested `!schema` map onto that member's path entry, and reads each further one, at a slot over a type
+  that is no constructor, as a key of a namespace value or a field of a record value (`geo.home.at`), never into a
+  map that is no namespace; the referent's type IS-A `of`, and the value reached is delivered into the host's `Ref<T>`
   (`Ref.deliver`), a `TypeRef` host taking the name alone. A field step reads the record value the read bound,
   through its binding's descriptor, so a value reached through a field is delivered as one reached by key.
 - One host shape for every reference: a `TypeRef`, whatever the slot, in a tree read as in a bound one (a `String`
@@ -168,7 +175,9 @@ A name stands in a schema in one of five forms. Two are not references.
 **Stores**, positional: the writer's namespace, its own entries and its import closure (every type a declaration
 names, every `!C` and `!I ^` head, `reference.of`, a tag in a schema map, an annotation, the first segment of a
 qualified name; SPEC-FEEDBACK.md #7); and the enclosing collection (`discriminators` and group members in `fields`, a
-parameter in held text, the later segments of a qualified name).
+parameter in held text, the later segments of a qualified name, each selecting in the nested `!schema` map, namespace
+value or record value reached). Neither store is lexical: a name written inside a nested map resolves from the root
+as one written anywhere else (SPEC-FEEDBACK.md #14).
 
 **Judgement.** One predicate covers every reference row: *the referent's value is a value of `T`*. For a constructor
 `T` the referent is a type built with `T` (`KindMembers`), a constructor whose declaration is a record being built
@@ -186,7 +195,7 @@ namespace type is no exception: `api => !namespace { … }` is an instance of `n
 | schema-map key, `field_map` key, `template_param.name` | key | — | spelling under the key type; `fields` by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
 | `enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
 | `type_chain.parents`, `application` | reference, `type_kind`, with arguments where open | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
-| `type_chain.supertypes`, `subtypes` | index | — | — | link |
+| `type_chain.supertypes`, `subtypes` | index, `type_kind` | — | — | link |
 | `alias.target` | reference, `type_kind` | namespace | any entry, type or constructor, by resolution; arguments only in an open alias's held text | `validateTypeRef` |
 | `template_param.type`, `bound` | reference | namespace | `type_kind`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
 | `template.template` | parameters and applications as parsed | `parameters`, then namespace | §5.10's shadowing rule | `HeldBody` |
@@ -194,9 +203,10 @@ namespace type is no exception: `api => !namespace { … }` is an instance of `n
 | `record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference | namespace | member of the slot's kind | `checkKindValue` |
 | `record.discriminators`, `field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `record.name_type`, `enum_type.name_type` | reference | namespace | `identifier_kind` | `NameType.admits` |
-| `reference.of` | reference | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |
-| a slot typed by a reference over a type that is no constructor | reference by key, a path | schema map, then namespace values and record fields | the referent's type IS-A `of` | `ValuesByName.judge` |
+| `reference.of` | reference, `type_kind` | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |
+| a slot typed by a reference over a type that is no constructor | reference by key, a path | root namespace, then nested `!schema` members, namespace values and record fields | the referent's type IS-A `of` | `ValuesByName.judge` |
 | a schema-map value (`schema.value_type: declared`) | tag | namespace | a constructor builds a type; any other type a value of it | `DefinitionResolver` |
+| `geo => !schema { … }` | tag, a spelling | — | none: the payload is schema grammar, its members declarations keyed by path | `TsonSchemaParser`, `SchemaPaths` |
 | `myapi => !api { … }` | tag | namespace | a type that is no constructor; the payload a value of `api`, here a map of its keys and values | `DefinitionResolver` |
 | `!I ^ { … }` head | reference | namespace | an atom instance, never the family's constructor | resolver |
 | `A & B` operand, `A - { … }` source | reference | namespace | a constructor or a record type | resolver |
@@ -215,6 +225,10 @@ type, its keys the key rows above under `api`'s family, its values judged by `me
 name's further segment enters (`myapi.get_orders` at a `ref<method>` slot). In Java it is a `ValueEntry` holding a
 `Namespace`, and its kind is `VALUE`; a value of a record type, `create_order => !operation { … }`, is one too, and a
 further segment selects its fields.
+
+A value of `schema` is the one namespace value that declares: `geo => !schema { address => { … } }` is a schema map
+nested as an entry, and its members are entries of the document under their paths, so `geo.address` is a type, a
+member of `type_kind`, and `kind<geo.address>` is a reference over it (`design/schema-resolution.md`).
 
 An annotation use `@name: v` is a reference by key into the annotating schema's namespace (§3.3.3). In a data
 document a tag resolves in its schema's namespace (or the family's `subtypes` index, or the closure a `declared` position

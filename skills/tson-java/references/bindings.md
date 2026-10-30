@@ -141,8 +141,10 @@ a consumer usually wants is already there — mangle the schema's `snake_case` n
 new DataNameBinder.DefaultDataNameBinder(Set.of("com.example.api"), Map.of())
 ```
 
-The second argument is aliases, applied *before* the mangling, for the names that do not follow the
-convention. This is what `DataBindContext.Builder.nameBinder(…)` usually receives.
+A qualified name's earlier segments are a sub-package each: `geo.route`, a member of the schema map nested as
+`geo => !schema { … }`, binds `com.example.api.geo.Route`. The second argument is aliases, applied *before* the
+mangling, for the names that do not follow the convention. This is what `DataBindContext.Builder.nameBinder(…)` usually
+receives.
 
 **Components bind by exact name — there is no `snake_case` ↔ `camelCase` conversion.** A `request_stream`
 field needs a `request_stream` component, or `@Field("request_stream")` on whatever the component is really

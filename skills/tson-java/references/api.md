@@ -611,7 +611,8 @@ member of no kind — whose value is a `Namespace` for a namespace type, the con
 context binds one (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its
 references. A slot
 typed by a reference (`ReferenceBody`, spelled `kind<T>` or `ref<T>` alike) holds what its `T` decides: over a
-constructor (`request: kind<record>`) it binds a `TypeRef` holding a type's name or an application the schema
+constructor (`request: kind<record>`) it binds a `TypeRef` holding a type's name (its path from the root,
+`geo.address` for a member of a nested `!schema` map) or an application the schema
 closes (`set<text>`, written unquoted), whose `referent()` is the value of the entry it names — a tree read
 delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type
 (`method: ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and then

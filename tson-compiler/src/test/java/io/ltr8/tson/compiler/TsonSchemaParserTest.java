@@ -20,6 +20,7 @@ import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
+import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
@@ -117,6 +118,77 @@ class TsonSchemaParserTest {
     @Test
     void anotherRootTagIsAParseError() {
         assertThrows(ParseException.class, () -> parse("!record { a => text }"));
+    }
+
+    // ── A schema map nested as an entry ──────────────────────────────────
+
+    /**
+     * A member of a nested {@code !schema} map is a declaration of the document, keyed by its path from the root; the
+     * entry itself records its members' own names in source order, and a deeper map nests the same way.
+     */
+    @Test
+    void aNestedSchemaMapsMembersAreDeclarationsUnderTheirPaths() {
+        TsonSchemaParser parser = new TsonSchemaParser("""
+                !schema {
+                  geo => !schema {
+                    address => { street: text }
+                    inner   => !schema { deep => { x: geo.address } }
+                  }
+                  place => { at: geo.inner.deep }
+                }""");
+        SchemaDocument doc = parser.parseSchemaDocument();
+        Map<String, SchemaMap.Declaration> declarations = doc.body().declarations();
+        assertEquals(List.of("geo.address", "geo.inner.deep", "geo.inner", "geo", "place"),
+                List.copyOf(declarations.keySet()));
+        assertEquals(new SchemaMapDef(List.of("address", "inner")), declarations.get("geo").typeDef());
+        assertEquals(new SchemaMapDef(List.of("deep")), declarations.get("geo.inner").typeDef());
+        assertEquals("geo.inner.deep", declarations.get("geo.inner.deep").name());
+        assertNotNull(parser.declarationPositions().get(declarations.get("geo.address")));
+        RecordDef place = (RecordDef) ((StructuralTypeDef) declarations.get("place").typeDef()).body();
+        assertEquals(new SimpleRef("geo.inner.deep"),
+                ((FieldDef) place.entries().getFirst()).type().orElseThrow().typeRef());
+    }
+
+    /** The rules of the root's map hold for every schema map: at least one declaration, and no parameters. */
+    @Test
+    void aNestedSchemaMapIsAMapOfDeclarations() {
+        ParseException empty = assertThrows(ParseException.class, () -> parse("!schema { geo => !schema {} }"));
+        assertTrue(empty.getMessage().contains("at least one declaration"), empty.getMessage());
+        ParseException open = assertThrows(ParseException.class,
+                () -> parse("!schema { geo => <T> !schema { a => T } }"));
+        assertTrue(open.getMessage().contains("takes no type parameters"), open.getMessage());
+    }
+
+    /** A {@code !} head is a qualified name, at an instance and an atom refinement alike. */
+    @Test
+    void aBangHeadIsAQualifiedName() {
+        SchemaDocument doc = parse("""
+                !schema {
+                  geo  => !schema { small => !int32 ^ { min: 0 }  route => { verb: text } }
+                  home => !geo.route { verb: GET }
+                  tiny => !geo.small ^ { max: 9 }
+                }""");
+        assertEquals("geo.route", assertInstanceOf(Instance.class, doc.body().declarations().get("home").typeDef())
+                .target());
+        assertEquals("geo.small", assertInstanceOf(AtomRefinement.class,
+                doc.body().declarations().get("tiny").typeDef()).target());
+        assertThrows(ParseException.class, () -> parse("!schema { home => !geo..route { verb: GET } }"));
+    }
+
+    /** A recovered parse resynchronises inside a nested map, at its own depth, and reports the member by its path. */
+    @Test
+    void aRecoveredParseReportsANestedMemberByItsPath() {
+        List<Diagnostic> problems = new ArrayList<>();
+        Optional<SchemaDocument> doc = new TsonSchemaParser("""
+                !schema {
+                  geo => !schema {
+                    broken => { a text }
+                    fine   => { b: text }
+                  }
+                }""").parseSchemaDocument((DiagnosticsReceiver) problems::add);
+        assertTrue(doc.isEmpty());
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Optional.of("/geo.broken"), problems.getFirst().schemaPointer());
     }
 
     @Test

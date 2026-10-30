@@ -10,6 +10,12 @@ facts and refinement, groups, subtraction, and the exception boundary.
   `!!import`s (SPEC-FEEDBACK.md #7). An annotation on a declaration resolves there (§3.3.3); a
   name that misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its
   type. Only the meta-kernel bootstrap, resolving `meta-kernel.tn` itself, skips the check.
+- **Every name resolves from the root** (SPEC-FEEDBACK.md #14). A name written inside a nested `!schema` map resolves
+  as one written at the root does: a sibling is `geo.address`, never a bare `address`. There is no lexical scope.
+- **A nested map's members are entries under their paths; the nested map's value is derived, never maintained by
+  hand.** `TsonSchema.entries` holds `geo.address` as it holds `order`, and `geo`'s `ValueEntry` of `schema` is
+  rebuilt from the path entries by `SchemaPaths.synced` in `TsonSchema`'s compact constructor. A phase that edits a
+  member edits its path entry.
 - Every declaration is made ready in wait order (`WaitOrder`, §3.4.1), never source order: a read against an entry
   of the same document — `!C { … }` with `C` local, a value of a local type, an annotation whose type is local —
   makes that entry ready first, in either order. Entries waiting on each other are a `SchemaValidationException`
@@ -30,10 +36,10 @@ facts and refinement, groups, subtraction, and the exception boundary.
   instantiates is the derived `@application` on its key (`TsonSchema.applicationOf`). What no value holds — where
   the entry was declared, the annotations on its value, its constructor, the entry a `^` names — is
   `TsonSchema.EntryFacts`, never a field of any constructor.
-- `supertypes` is bare names, sorted, complete to a fixed point through applied parents
-  (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type that is no
-  template keeps none (`closeChains`). A declaration never writes `chain`, and a constructor never declares a field
-  of that name (`refuseWrittenChain`, `refuseDeclaredChain`).
+- `supertypes` is names without arguments, each a path from the root, sorted, complete to a fixed point through applied
+  parents (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type that is no
+  template keeps none (`closeChains`). A declaration never writes `chain`, and a constructor never declares a field of that
+  name (`refuseWrittenChain`, `refuseDeclaredChain`).
 - `subtypes` is linking's throughout: no resolved entry, minted or declared, carries any.
 - A kind and a constructor are judged by where `top` and the base kinds are defined, never by their spelling: the
   resolver's `kernel` predicates, `EntryKind.of(value, kernel)` and `TsonLinkedSchema.isKernel`.
@@ -197,6 +203,22 @@ is itself a value is refused (a value has no instances), a braced payload at an 
 is missing, and a payload that is no value of `T` is refused against the entry with the read's path. A namespace type
 is the other side of the line: `api => !namespace { … }` applies the constructor `namespace` and builds a type, a
 `NamespaceBody`.
+
+## Nested schema maps
+
+`geo => !schema { address => { … } }` declares: every value of `schema` does, as the root does. `TsonSchemaParser`
+puts each member into the document's one declaration map under its path (`geo.address`, `geo.inner.deep`), and the
+entry `geo` itself is a `SchemaMapDef` holding its members' own names. So every phase reads a member as a root entry:
+the desugar phase lifts its sugar, the wait order readies it, and a reference to `geo.address` anywhere is a lookup
+of that key. `DefinitionResolver` resolves the `SchemaMapDef` to `ValueEntry("schema", Namespace("schema", {}))`,
+waiting on nothing, and `SchemaPaths.synced` fills it from the path entries wherever a `TsonSchema` is built,
+innermost map first, the members' key annotations kept. A schema built from a resolved form read back holds the
+nested map alone, and `synced` keys its members under their paths (`SchemaPaths.withPaths` does the same for a
+resolved form read as a plain map).
+
+A member's identity is its path: two maps may each declare `address`, and a diagnostic, a kind's member list, a
+chain and an `@application` name it `geo.address`. A value of any other namespace type, `!api { … }`, stays a value
+entry (above).
 
 ## Fields
 

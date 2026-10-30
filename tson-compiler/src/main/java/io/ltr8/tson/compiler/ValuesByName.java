@@ -11,6 +11,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -28,6 +29,7 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -189,19 +191,34 @@ final class ValuesByName {
     }
 
     private void judge(String where, TypeRef reference, TsonSchema.SlotType slot, Optional<Ref<?>> cell) {
-        List<String> segments = segments(where, reference);
+        List<String> written = segments(where, reference);
         String name = reference.name();
-        String head = segments.getFirst();
+        String head = written.getFirst();
         // What the slot's `of` names decides which names it holds, judged here over the final namespace whatever
         // the read guessed: a constructor's values are types, and any other type's values are values.
         boolean namesTypes = KindMembers.namesTypes(slot.of(), merged::get);
         if (!merged.containsKey(head)) {
             throw new SchemaValidationException(where + " names '" + name + "', and '" + head + "' is no "
-                    + (namesTypes && segments.size() == 1
+                    + (namesTypes && written.size() == 1
                             ? "type declared in this schema or its imports"
                             : "entry of this schema or its imports -- the first segment names the entry a value is "
                                     + "reached through, and a member is reached through its entry"));
         }
+        // A schema map nested as an entry is entered by its members' names: each is an entry under its path, so the
+        // walk goes on from the member a segment names, and a further segment selects in that member's value.
+        int entered = 1;
+        while (entered < written.size() && SchemaPaths.isNestedMap(merged.get(head))) {
+            String member = head + '.' + written.get(entered);
+            if (!merged.containsKey(member)) {
+                throw new SchemaValidationException(where + " names '" + name + "', and the schema map '" + head
+                        + "' declares no '" + written.get(entered) + "'");
+            }
+            head = member;
+            entered++;
+        }
+        List<String> segments = new ArrayList<>(written.size() - entered + 1);
+        segments.add(head);
+        segments.addAll(written.subList(entered, written.size()));
         String terminal = AliasChain.terminal(head, merged);
         Top referent = merged.get(terminal);
         if (referent == null) {
@@ -293,10 +310,9 @@ final class ValuesByName {
     }
 
     /**
-     * A slot whose {@code of} is a constructor holds a type's name, one segment, and the name is a member or refused
-     * ({@link KindMembers}): the referent's value is of the slot's {@code of}. A value entry is refused as a value,
-     * however many segments name it. A type reached through a namespace of types is not yet a spelling this library
-     * reads.
+     * A slot whose {@code of} is a constructor holds a type's name, its path from the root, and the name is a member
+     * or refused ({@link KindMembers}): the referent's value is of the slot's {@code of}. A value entry is refused as a
+     * value, however many segments name it, and a type admits no further segment.
      */
     private void judgeMember(String where, String name, List<String> segments, TsonSchema.SlotType slot,
                              Top referent, String entry) {
@@ -307,9 +323,8 @@ final class ValuesByName {
                     + aValueNoType(value) + " -- and what a further segment selects in a value is a value too");
         }
         if (segments.size() > 1) {
-            throw new UnsupportedOperationException(where + " names '" + name + "' at a position typed by the kind '"
-                    + slot.name() + "', which holds a type's name -- this library does not yet read a type through "
-                    + "a namespace of types, so the name is one segment");
+            throw new SchemaValidationException(wants + "'" + name + "' goes on past " + entry + ", a type, which "
+                    + "admits no further segment");
         }
         if (KindMembers.isMember(name, slot.of(), merged::get,
                 named -> TsonSchemaLinker.constructorOf(named, merged.get(named), facts),

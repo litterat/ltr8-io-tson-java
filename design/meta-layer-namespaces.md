@@ -12,6 +12,11 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   `name => !T { … }` with `T` a constructor builds a type; with `T` any other type of the closure -- a record type, a
   namespace type -- the entry is a value of `T` (`ValueEntry(type, value)`, `EntryKind.VALUE`), read against `T` as a
   data value is and marked by nothing but its tag. A record component, `!record_field { … }`, is a value entry too.
+- **A value of `schema` declares instead** (SPEC-FEEDBACK.md #14). `geo => !schema { … }` is a schema map nested as an
+  entry: the parser reads its payload as schema grammar, never as a value body, and its members are declarations of
+  the document under their paths. It is held as a `ValueEntry` of `schema` whose `Namespace` is derived from those
+  path entries (`SchemaPaths.synced`, `design/schema-resolution.md`). Every other namespace type's value stays a value
+  entry.
 - `Top` is sealed all the way down (`permits Type, Reference, TemplateBody, ValueEntry`). A switch over a body's kind
   is exhaustive with an explicit `ValueEntry` arm and no `default`: `EntryKind.of`, `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
@@ -43,7 +48,8 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   the kind's or reference's reader (`AtomTypeReader`) reads the name's grammar and records it with its path and the
   slot's declared type (`TsonSchema.valuesByName`, `TsonSchema.SlotType`); the linker judges it by that type, whatever
   the host component is.
-- A value by name is entered through a value entry only. Its first segment resolves in the schema's one namespace; a
+- A value by name is entered through a value entry only. Its first segment resolves in the schema's one namespace,
+  each segment naming a member of a nested `!schema` map collapsing onto that member's path entry (`geo.home`); a
   further segment selects a key of a value of a named product, a namespace value's key or a record value's field
   (bound or tree-held), the record being a namespace whose keys its type fixes; a map that is no namespace, `{text =>
   method}`, is not entered whatever its key type.
@@ -124,7 +130,8 @@ an atom refinement missing its `^`), then reads the payload against `T` (`Schema
 as the entry's constructor fact, so resolved output writes the tag. A payload that is no value of `T` is refused
 against the entry with the read's path.
 
-A value entry's payload is a **value body** (`TsonReadContext.readsValueBody`): nothing in it lifts or mints, so a
+A value entry's payload is a **value body** (`TsonReadContext.readsValueBody`; a nested `!schema` map's is none, its
+members being declarations): nothing in it lifts or mints, so a
 kind-typed slot holds one bare name and an application (`request: box<order>`) is refused with the alias spelling
 named (`order_box => box<order>`, then `request: order_box`). A template over an ordinary type closes to a value entry
 (`fetch => <T> !operations { … }`, `get_order => fetch<order>`).

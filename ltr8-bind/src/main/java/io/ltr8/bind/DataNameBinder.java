@@ -72,7 +72,8 @@ public interface DataNameBinder {
     /**
      * Mangles {@code schemaTypeName} (after applying {@code aliases}) from snake_case to
      * PascalCase and tries {@code Class.forName} against each of {@code packages} in turn,
-     * first match wins.
+     * first match wins. A qualified name's earlier segments are sub-packages: {@code geo.route}
+     * is {@code <package>.geo.Route}.
      */
     class DefaultDataNameBinder implements DataNameBinder {
         private final Set<String> packages;
@@ -103,7 +104,16 @@ public interface DataNameBinder {
                             + "(none configured on this DataNameBinder)" : tried.toString()));
         }
 
-        private static String mangle(String snakeCase) {
+        /**
+         * {@code snake_case} to {@code PascalCase}; a qualified name's segments before the last, {@code geo} in {@code
+         * geo.route}, are a sub-package each, as written, so {@code geo.route} is {@code geo.Route}.
+         */
+        private static String mangle(String qualified) {
+            int dot = qualified.lastIndexOf('.');
+            return dot < 0 ? pascal(qualified) : qualified.substring(0, dot + 1) + pascal(qualified.substring(dot + 1));
+        }
+
+        private static String pascal(String snakeCase) {
             StringBuilder result = new StringBuilder(snakeCase.length());
             boolean capitalizeNext = true;
             for (char c : snakeCase.toCharArray()) {

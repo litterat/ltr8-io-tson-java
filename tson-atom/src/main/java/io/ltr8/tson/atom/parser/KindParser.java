@@ -6,6 +6,8 @@ import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,8 +24,8 @@ import java.util.Optional;
  * <p><b>An application is judged through the entry it denotes</b>, resolved bottom-up, level by level, against the
  * applications the closure closed ({@link ReferenceBody#entryOf}). A schema loads only when every application in it
  * closes, so data never creates one: an application nothing in the closure closed names no type and is refused, as a
- * name no member is. A qualified name, {@code geo.address}, parses, and is resolved with qualified names at type
- * positions, not yet here: that is this library's gap ({@link UnsupportedOperationException}).
+ * name no member is. A type's name is its path from the root, {@code order} or {@code geo.address} for a member of a
+ * schema map nested as an entry, and is judged as one name.
  *
  * <p><b>Membership is judged where the names resolve.</b> A kind's members are the names of the reading
  * document's closure, so a name a data document writes is a member or refused here, as an enum refuses a label it
@@ -49,16 +51,16 @@ public record KindParser(ReferenceBody kind, boolean judgesMembers) implements A
     @Override
     public TypeRef read(String text) {
         TypeRef reference = ReferenceGrammar.parse(text);
-        if (reference.arguments().isEmpty() && reference.segments().size() == 1) {
-            // A name is read as the kernel's type_name reads it, into its normalization form.
-            reference = TypeRef.of(IdentifierParser.IDENTIFIER.read(reference.name()));
+        if (reference.arguments().isEmpty()) {
+            // A name is read as the kernel's type_name reads each segment, into its normalization form.
+            List<String> segments = new ArrayList<>(reference.segments().size());
+            for (String segment : reference.segments()) {
+                segments.add(IdentifierParser.IDENTIFIER.read(segment));
+            }
+            reference = TypeRef.of(String.join(".", segments));
         }
         if (!judgesMembers) {
             return reference;
-        }
-        if (reference.segments().size() > 1) {
-            throw new UnsupportedOperationException("'" + reference.text() + "' names a type by a qualified name, "
-                    + "which is resolved with qualified names at type positions and not yet here");
         }
         TypeRef read = reference;
         String entry = kind.entryOf(read).orElseThrow(() -> new AtomValidationException("'" + read.text()

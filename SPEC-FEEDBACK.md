@@ -161,17 +161,17 @@ refusal and not a verdict, whichever order the chain is reached in; the bundled 
 whatever a deployment sets.
 
 The kernel measured from `meta-kernel-resolved.tn`'s own declarations, no compiled reader consulted, has one wait
-cycle, holding `record` and 28 more of the 74 entries (`boolean`, `integer`, `text`, `identifier`,
-`non_negative_integer`, the enum and set machinery, `field_group`, `namespace` and `field_map`, and the synthetics
-they name), every other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`:
-annotating itself with `@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap
-builds by hand exactly the instances and the one refinement on that cycle (a test holds the set to the measurement),
-and makes every other entry ready by the algorithm above. A pin reached through an entry not yet ready binds as
-written (rule 3), which is what lets `iri` be read against `iri_type`, whose `spec` pin is typed by `iri`. The output
-equals the kernel's ordinary resolution against it, entry for entry. Compilation follows rule 3: a record's reader
-holds its pins and defaults as written while it is built and decodes them through their types once every reader of
-the schema exists, before the schema is handed out. Link remains the one place a pin is judged, and a bad pin or
-default still fails the load (rule 6).
+cycle, holding `record` and 24 more of the 73 entries (`boolean`, `integer`, `text`, `non_negative_integer`, the enum
+and set machinery, `field_group`, `namespace` and `field_map`, `type_kind`, and the synthetics they name), every
+other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with
+`@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap builds by hand exactly the
+instances and the one refinement on that cycle (a test holds the set to the measurement), and makes every other entry
+ready by the algorithm above. A pin reached through an entry not yet ready binds as written (rule 3), which is what
+lets `iri` be read against `iri_type`, whose `spec` pin is typed by `iri`. The output equals the kernel's ordinary
+resolution against it, entry for entry. Compilation follows rule 3: a record's reader holds its pins and defaults as
+written while it is built and decodes them through their types once every reader of the schema exists, before the
+schema is handed out. Link remains the one place a pin is judged, and a bad pin or default still fails the load
+(rule 6).
 
 What is not running: a resolved form is still read under its source's imports rather than by this algorithm over its
 own entries (§8.1, "Resolved forms" in the proposal), so a fixture holding an instance of a constructor it declares
@@ -463,10 +463,10 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   entry is a value of `T`, read against `T` as a data value is, and marked by nothing but its tag. A value entry is a
   member of no reference over a constructor (`type_kind` excludes it unmarked), nothing is typed by it, and a
   reference over `T` names it where its type IS-A `T`: `ref<api>`, and `kind<api>` with it (#11), name `orders =>
-  !api { … }`. A value entry's payload lifts and mints nothing; its names at kind- and reference-typed slots are
-  judged at link, and a qualified name walks into it by key and by field. A template over an ordinary type closes to
-  a value entry (`fetch => <T> !operations { … }`, `get_order => fetch<order>`). A type declared in the same
-  document is applied in wait order (#4).
+  !api { … }`. A value entry's payload lifts and mints nothing (a value of `schema` is no value entry: it declares,
+  #14); its names at kind- and reference-typed slots are judged at link, and a qualified name walks into it by key
+  and by field. A template over an ordinary type closes to a value entry (`fetch => <T> !operations { … }`,
+  `get_order => fetch<order>`). A type declared in the same document is applied in wait order (#4).
 - **The schema map's values are `declared`.** The kernel now declares `declared_type` and `declared` (moved from
   meta.tn and core.tn), and `schema`'s `value_type` is `declared`: every entry's value names its type by its tag — a
   constructor for a type, an ordinary type for a value. `top` is the root of the constructors only. `declared` is
@@ -479,7 +479,7 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   under the kernel and any schema importing it directly: a data document importing meta.tn that writes
   `!record_field { type: int32 }` is refused, `int32` being no member of `type_kind` in meta.tn's closure.
 - **The kernel's wait cycle** (#4) gains `namespace`, `field_map` being its instance, and loses `field_name`,
-  `field_map`'s keys being read by their spelling: 30 of the 79 entries, longest chain 4. The bootstrap builds
+  `field_map`'s keys being read by their spelling: 25 of the 73 entries, longest chain 4. The bootstrap builds
   `field_map` by hand with the rest of the pre-loaded set.
 - **Hosts.** One bind context serves schemas and data; the names the kernel and meta.tn declare always bind to
   the schema model, and every other name binds through the consumer's binder. A value entry whose type no class binds is
@@ -553,11 +553,11 @@ atom & { … }`) and a record type's values are records.
 
 **What is running.**
 
-- **One atom.** The kernel declares `reference => atom & { of: type_name }`, with `kind => <T> !reference { of: T }`
-  and `ref => <T> !reference { of: T }` its two spellings; `identifier_kind`, `atom_kind` and `type_kind` are
-  `!reference { of: … }`. `kind_type` and `ref_type` are gone, and with #12's removal of `type_ref` and
-  `type_argument` the kernel holds 74 entries (67 declarations). `kind<order>` and `ref<order>` expand to one content
-  and mint one entry.
+- **One atom.** The kernel declares `reference => atom & { of: type_kind }` (`of` a qualified name, #14), with
+  `kind => <T> !reference { of: T }` and `ref => <T> !reference { of: T }` its two spellings; `identifier_kind`,
+  `atom_kind` and `type_kind` are `!reference { of: … }`. `kind_type` and `ref_type` are gone, and with #12's removal
+  of `type_ref` and `type_argument` the kernel holds 73 entries (67 declarations). `kind<order>` and `ref<order>`
+  expand to one content and mint one entry.
 - **The slot's meaning comes from `of`, never from the spelling.** Where `of` is a constructor, `top` or IS-A it, the
   values it admits are types: the slot holds a type's name, judged a member over the governing closure and delivered
   to a host as a `TypeRef`. Where `of` is any other type, the values it admits are values: the slot holds a value's
@@ -584,7 +584,7 @@ atom & { … }`) and a record type's values are records.
 
 **Resolution, a proposal.**
 
-- §4.2: one atom, `reference => atom & { of: type_name }`, admitting a name exactly when the type of the named entry's
+- §4.2: one atom, `reference => atom & { of: type_kind }`, admitting a name exactly when the type of the named entry's
   value, past its alias hops, IS-A `of`; `kind<T>` and `ref<T>` its spellings; `of` any type or constructor of the
   writer's namespace, never a value or an open entry. A slot over a constructor holds a type's name and takes part in
   structural identity; any other holds a value's name. `kind_type`, `ref_type` and both refusals go.
@@ -596,8 +596,8 @@ atom & { … }`) and a record type's values are records.
   longer a derived index written in resolved output.
 
 **Open.** One spelling or two: `kind<X>` and `ref<X>` are one application and cannot differ by spelling, so a
-remaining difference would have to be in what the slot does with the name. A type's name is one segment and a value's
-a qualified name; one grammar for both waits on qualified names at type positions.
+remaining difference would have to be in what the slot does with the name. The grammar is no longer one: a type's
+name and a value's are both qualified names (#14).
 
 ## 12. [TSON-SCHEMA] §4.2, §5.10, §8.1, §8.2 — an application is a reference value
 
@@ -613,7 +613,7 @@ token and leaves the head's parameters to judge which it binds.
 - **One value.** The `reference` atom's values are the reference #13 makes data grammar: a qualified name with an
   optional argument list, `geo.address<T>`, each argument a reference or a token. `type_ref` and `type_argument` are
   gone; `alias.target`, `type_chain.parents` and the `application` annotation are typed `type_kind`. The kernel
-  holds 74 entries (67 declarations).
+  holds 73 entries (67 declarations).
 - **Written unquoted, canonically.** Resolved output and held text write an open application as source does, one
   space between arguments and no comma: `!alias { target: pair<uuid B> }`, `chain: { parents: [result<T>] }`.
 - **The value is an object, in every mode.** A reference read at a reference-typed position, in a tree read and a
@@ -682,8 +682,7 @@ desugars into values (`{ a: text }`, `[T]`, `{K => V}`, `(A | B)`, `^`, `&`, `-`
 - A schemaless read keeps an application as a structured value: the qualified name's segments and the arguments,
   each read as a schemaless read reads a token, a nested application another such value, with its text recreated
   and no referent, there being no closure to resolve in. A Class 1 processor no longer refuses one.
-- A qualified head parses at every position, data and schema; resolving one at a type position is this
-  implementation's gap until qualified names at type positions land (`NOT_IMPLEMENTED`).
+- A qualified head parses at every position, data and schema, and resolves from the root as any name does (#14).
 - The schema grammar keeps its own production, whose `type-arg` admits sugar, and produces the same tree; it applies
   the adjacency rule and admits a qualified head.
 - JSON carries a reference as a string holding the same text, read by the same production.
@@ -720,8 +719,8 @@ qualified-name = unquoted-token
   `reference` atom rolls the tree up into one value; a qualified name without arguments is one token, rolled up the
   same way. An atom says what a value is, not how many tokens spell it. At any other typed position a reference with
   arguments is a type mismatch.
-- **Where it stands.** Anywhere a core value does, a map key included. A `!` tag stays `"!" identifier`, with no
-  arguments.
+- **Where it stands.** Anywhere a core value does, a map key included. A `!` tag is `"!" qualified-name` (#14), with
+  no arguments.
 - **No sugar in data.** `[T]`, `{K => V}` and `(A | B)` are [TSON-SCHEMA]'s, and `[` and `{` are structure in data, so
   a data argument is a reference or a token. An applied sugar form is named by the entry that declares it.
 
@@ -741,8 +740,77 @@ tree (§8.2), so whitespace inside the list is free; canonical output has one sp
 
 [TSON-JSON]: a JSON string holding the same text, read by the same production; JSON has no unquoted form.
 
+**Open.** Whether a value argument may be any token, or only those §12.1's `value-literal` admits.
+
+## 14. [TSON-DATA] §4, §7.4; [TSON-SCHEMA] §2.2.3, §4.1, §5.12, §12.1 — every `!schema` value declares, from the root
+
+**Problem.** One namespace per schema (#7) reserves every name of an import closure, and the answer one level gives,
+a library grouping its declarations under one entry of its own (`meta => !schema { … }`, `geo => !schema { … }`),
+has no reading: §4.1 makes a value of a namespace type a value entry, "nothing in it lifting or minting", so `geo =>
+!schema { address => { … } }` is read as data and refused (`declared` takes a value naming its own type). Nor could a
+member be named: `type-name = identifier` (§12.1) and [TSON-DATA] §7.4's `type-ref = "!" identifier` admit one segment,
+and the kernel types `reference.of` and `type_chain.supertypes`/`subtypes` by `type_name`, one identifier.
+
+**What is running.**
+
+- **Every value of `schema` declares.** `geo => !schema { … }` is a schema map nested as an entry: its tag is read as
+  a spelling, as the root's is, its payload is the schema grammar, and its members are declarations that lift, mint,
+  link and compile exactly as root entries do — types, constructors, values, aliases, templates. It declares at least
+  one member and takes no parameters. A value of any other namespace type (`!api { … }`) stays a value map. The
+  document root is the outermost `!schema`.
+- **A member's identity is its path from the root.** `geo.address` is an entry of the document: diagnostics, a kind's
+  member list, a chain's `supertypes` and `subtypes`, and `@application` name it so, and two maps may each declare
+  `address` without colliding. The map's own entry, `geo`, is a value of `schema` keyed by its members' own names;
+  resolved output writes it nested, its members in resolved form, and a resolved form read back keys each member
+  under its path.
+- **Closed maps.** A `!schema` value is declared in one document, as any entry is: two imports each declaring `geo`
+  collide on `geo` under §2.2.3, whatever members they declare, and nothing merges two maps of one name. No grammar
+  declares a dotted name, so an importer cannot add to an imported map.
+- **No lexical scope: every name resolves from the root.** A name's first segment resolves in the document's root
+  namespace, its root entries and its import closure; each further segment selects a member of the `!schema` map
+  reached so far. Inside `geo`, a sibling is written `geo.address`, and a bare `address` names the root's `address` or
+  fails to resolve. There is no relative lookup, so there is no shadowing rule.
+- **A qualified name stands at every type position:** a field's type, an element, key or value type, a choice
+  variant, a supertype and an `&` operand, a refinement or subtraction source, a `!` head, a template bound, a
+  reference's `of` (`kind<geo.address>`), an alias target, and an application's head (`geo.box<text>`). A slot over a
+  constructor reads a qualified name in data as it does in a schema (#11's open item): `t: geo.location` at a
+  `kind<record>` slot is a member.
+- **The value walk passes through nested maps.** A value's qualified name enters a `!schema` map by member name, then
+  a namespace value by key and a record value by field: `geo.home` names the value entry `home` of `geo`, and
+  `geo.home.at` its field.
+- **Synthetics mint at the root**, one entry per form across the document (§8.2), sugar written inside a nested map
+  included: `[uuid]` in `geo.tagged` and in a root record is one `array_uuid_…`. A minted name is an identifier; a
+  dotted head contributes its text with the dots dropped (`array_geo_inner_tag_…`).
+- **Qualified tags (Part 1).** A tag is `"!" qualified-name` with no arguments: `!geo.address { … }` in data resolves by
+  the walk, and one naming no member is `UNKNOWN_TYPE`. A schemaless read keeps a dotted tag as written, as it keeps
+  any tag. [TSON-JSON]'s `$type` takes the same text (edited in place).
+- **Name hygiene is per map.** Each schema map is a §8.2 scope of its own, and the per-name rules judge each member's
+  own name.
+- **The kernel.** `reference.of`, `type_chain.supertypes` and `type_chain.subtypes` are typed `type_kind`; `type_name`
+  stays the schema map's key type, one identifier. `kind`'s and `ref`'s parameter is then a type parameter, the
+  kernel holds 73 entries (the `[type_name]` synthetic is gone), and its measured wait cycle gains `[type_kind]` and
+  loses `identifier` (#4).
+- **Hosts.** The default name binder binds a dotted type name to the class of its last segment in one sub-package per
+  earlier segment: `geo.route` to `geo.Route`. A processor's choice, not the spec's.
+
+**Resolution, a proposal.**
+
+- §4.1: "nothing in it lifting or minting" holds for a value of a namespace type other than `schema`. Added: "The rules
+  for a schema document's root map apply to every value of `schema`: its members are declarations, which lift and
+  mint, may be types, constructors or values, and are named by their path from the root."
+- §2.2.3, §10: an entry's identity is `!!id` plus its path; a nested map is an entry, and its name collides as any
+  entry's does.
+- §3.3.2, §5.12: every name resolves from the root. The first segment names an entry of the root namespace; a further
+  segment selects a member of a `!schema` map, a key of a namespace value or a field of a record value.
+- §4.2, §8.1: `reference.of`, `type_chain.supertypes` and `type_chain.subtypes` are typed `type_kind`; a type's name
+  is its path from the root.
+- §12.1: `schema-map-entry`'s value admits `"!schema" ws schema-map`; a declared key stays `type-name = identifier`,
+  and every reference position reads `qualified-name` (#13's grammar).
+- [TSON-DATA] §7.4: `type-ref = "!" qualified-name`. §4: a schemaless read keeps a dotted tag as written.
+
 **Open.**
-- Resolving a qualified head (`geo.address<T>` walking `geo`'s `!schema` map) lands with qualified names at type
-  positions and qualified tags (one-level step 6c); the grammar admits it here, and the value object keeps its
-  segments.
-- Whether a value argument may be any token, or only those §12.1's `value-literal` admits.
+
+- **Lexical scope.** A bare name inside a map resolving in that map first, then outward, needs a way to say "from the
+  root" once relative lookup exists, and with it a shadowing rule, silent or diagnosed.
+- **Synthetics homed by the innermost map**, identity by path, two maps minting one form being two entries. It waits
+  on lexical scope: a name minted inside `geo` must resolve where it is written.

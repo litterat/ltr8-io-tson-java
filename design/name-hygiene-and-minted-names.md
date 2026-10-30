@@ -10,6 +10,8 @@ history lives in git.
 - What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`); `IdentifierGrammar.hygiene`
   returns a verdict rather than throwing.
 - A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
+- Each schema map is a scope of its own, the root and each nested `!schema` map, grouped by `SchemaPaths.parent`; the
+  per-name rules judge a member's own name, its path's last segment, never the dotted path.
 - A value entry's payload and an annotation value are judged at the payload read (`SchemaResolver`, under the
   loader's identifier policy), not in the walk, which cannot see into them; every constructor payload is read under
   no policy.
@@ -29,16 +31,15 @@ Related: `design/linking-and-compilation.md`, `design/schema-resolution.md`, `de
 alike, a character outside the identifier profile, and a script combination the restriction level does not
 admit. The scopes are §11.4's — the
 merged namespace, which is where §2.2.3's own disjointness rule is exact equality and a confusable pair passes
-it by construction; each entry's record field names, its groups' member labels arriving flattened among them;
-and its enum members, where the enum declares itself a vocabulary — plus **a template's parameters, which
-§11.4 declines to list** (`<T, Т>` otherwise
-declares two parameters that render identically, and a body referencing `T` binds one of them with nothing in
-the source to say which). §11.4 and §5.10 both say why they are left out — one author writes the list whole on
-one line — and this stays stricter deliberately: mechanisms 2 and 3 reach every identifier position anyway
-(§8.2), so only the look-alike rule is a divergence, and a walk with an exemption is the shape that grows the
-holes one walk exists to close. A **choice's variants are deliberately not checked**: a variant
-is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
-there could never fire.
+it by construction, split into one scope per schema map (the root's entries, and each nested `!schema` map's members
+by their own names, a refusal naming the map); each entry's record field names, its groups' member labels arriving flattened
+among them; and its enum members, where the enum declares itself a vocabulary — plus **a template's parameters, which §11.4
+declines to list** (`<T, Т>` otherwise declares two parameters that render identically, and a body referencing `T` binds one
+of them with nothing in the source to say which). §11.4 and §5.10 both say why they are left out — one author writes the list
+whole on one line — and this stays stricter deliberately: mechanisms 2 and 3 reach every identifier position anyway (§8.2),
+so only the look-alike rule is a divergence, and a walk with an exemption is the shape that grows the holes one walk exists
+to close. A **choice's variants are deliberately not checked**: a variant is a reference to a declared name, so a confusable
+pair is already two confusable namespace entries and a check there could never fire.
 
 **A field's default or fixed value is a name when its type is an identifier family** (`checkFieldValues`), and
 meets the two per-name rules in the same pass, under that family's own profile. It is not a scope — one value
@@ -91,7 +92,8 @@ requirements meet there, and the second is why meeting the first is not enough:
 
 So the rule is ASCII, in three cases. What is ASCII and admitted by §7.7 is spliced verbatim — the ordinary
 case, a type name or a verb or a bound. What is ASCII but not admitted keeps its admitted characters and
-gains a hash, so `"/x"` reads `x_h00000f2f` and `1.0` reads `1_0_h0000bdb3`. Anything else is the hash alone.
+gains a hash, so `"/x"` reads `x_h00000f2f` and `1.0` reads `1_0_h0000bdb3`; a dotted head, `geo.inner.tag`, is
+this case too (`array_geo_inner_tag_h…`), a minted name being one identifier. Anything else is the hash alone.
 **Hashed rather than dropped**, because replacing it would collapse two different values onto one readable
 half, where a hash keeps them visibly distinct and keeps the name inspectable — a reader holding the schema
 can hash the same text and match it. Nothing identity depends on is at stake either way: that is the

@@ -25,6 +25,8 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.SchemaPaths;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -427,12 +429,17 @@ public final class DataClassObjectWriter {
      * A namespace value's entries, in the order held: each key with its annotations, as its bare name where it is an
      * identifier and quoted otherwise, and each value as its own class writes it, under the tag its {@link Typename}
      * names where it carries one -- a value of a subtype of the namespace's value type is selected by it on the way
-     * back in.
+     * back in. A schema map keys a nested map's members under their paths as well ({@link SchemaPaths}), and writes
+     * them inside the nested map alone.
      */
     private void writeNamespace(Namespace<?> namespace, TsonDataEmitter writer) throws Throwable {
+        boolean schemaMap = TsonSchema.SCHEMA.equals(namespace.type());
         writer.beginMap();
         for (Map.Entry<? extends io.ltr8.annotation.Annotated<String>, ?> entry
                 : namespace.entries().annotatedEntrySet()) {
+            if (schemaMap && SchemaPaths.isPath(entry.getKey().value())) {
+                continue; // a nested map's member, written inside its map
+            }
             writer.beforeMapEntry();
             writeAnnotations(entry.getKey().annotations(), writer);
             String key = entry.getKey().value();

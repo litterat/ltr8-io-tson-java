@@ -9,7 +9,10 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -19,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -32,7 +36,10 @@ class ResolutionOrderTest {
 
     private static final String LOCAL_ID = "https://example.test/order.tn";
 
-    /** Schemas whose entries wait on each other through reads: a constructor and its instances, values, annotations. */
+    /**
+     * Schemas whose entries wait on each other through reads: a constructor and its instances, values, annotations,
+     * and the same reaching members of schema maps nested as entries, whose paths the order permutes with the rest.
+     */
     private static final List<String> SAME_DOCUMENT = List.of("""
             !!id:"https://example.test/order.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
@@ -53,6 +60,24 @@ class ResolutionOrderTest {
               step    => top & { takes: type_kind }
               s       => !step { takes: derived }
             }
+            """, """
+            !!id:"https://example.test/nested.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
+              geo => !schema {
+                counted => array ^ { ordered?: = false }
+                counts  => !geo.counted { element_type: int32  min_items: 1 }
+                point   => { x: int32  y: int32 }
+                origin  => !geo.point { x: 0  y: 0 }
+                inner   => !schema {
+                  label => !text ^ { max_length: 8 }
+                  tag   => !geo.inner.label ^ { max_length: 4 }
+                }
+              }
+              line  => { from: geo.point  to: geo.point  counts?: geo.counts  tags?: [geo.inner.tag] }
+              start => !line { from: { x: 1  y: 2 }  to: { x: 3  y: 4 } }
+            }
             """);
 
     private static Tson tson() {
@@ -60,11 +85,15 @@ class ResolutionOrderTest {
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of()))));
     }
 
-    /** Everything a resolution says of each entry, keyed and sorted by name so declaration order drops out. */
+    /**
+     * Everything a resolution says of each entry, keyed and sorted by name so declaration order drops out. A nested
+     * map's members are entries under their paths, compared there, so the map itself is its sorted member names.
+     */
     private static Map<String, String> outcome(TsonSchema schema) {
         Map<String, String> outcome = new TreeMap<>();
-        schema.entries().forEach((name, value) -> outcome.put(name, value + " | key "
-                + schema.entries().getAnnotations(name) + " | facts " + schema.factsOf(name)));
+        schema.entries().forEach((name, value) -> outcome.put(name, (SchemaPaths.isNestedMap(value)
+                ? "!schema " + new TreeSet<>(((Namespace<?>) ((ValueEntry) value).value()).keySet()) : value)
+                + " | key " + schema.entries().getAnnotations(name) + " | facts " + schema.factsOf(name)));
         return outcome;
     }
 

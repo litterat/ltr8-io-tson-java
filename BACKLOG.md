@@ -50,6 +50,11 @@ spec-required case:
   `@application` is now the application as written, nested arguments unreduced (`pair<box<text> int32>`), and reaches
   the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
   an aliased application declared in an import and applied in the importer, and reduce on ingest if it misses.
+- [ ] **A kind-typed field's default naming a later entry throws `IllegalStateException`.** A record field written
+  `k: kind<record> = later`, with `later` declared after a value read reaches the field, escapes as an internal
+  invariant break whose message calls `kind` "a template … not a type until it is applied". The default is a held
+  value (SPEC-FEEDBACK.md #4 rule 3) and should be judged once every entry is ready. Reproduce, add the failing test,
+  and route the judgement through the held-value settle.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to

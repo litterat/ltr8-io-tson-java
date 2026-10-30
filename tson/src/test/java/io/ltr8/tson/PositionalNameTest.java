@@ -58,7 +58,10 @@ class PositionalNameTest {
         assertFalse(read("!holder { p: some_type }").isEmpty(), "a name that is no member is refused");
     }
 
-    /** A kind-typed slot holds a type's name, one segment: a dotted token is refused by the grammar, never read by name. */
+    /**
+     * A kind-typed slot holds a type's name, its path from the root: a dotted token naming no member is refused, never
+     * read as the positional field's record by name.
+     */
     @Test
     void aDottedTokenIsReadAsThePositionalField() {
         List<Diagnostic> reported = read("!holder { q: orders.methods.place_order }");

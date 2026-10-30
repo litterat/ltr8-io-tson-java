@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=d38992ca748190ffa6b2289de14e8370f8194924403e9c2eb943356aa0e96775"
+!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=027f89e2242ac5a19b3b9eb3142755c012e3be5c39b3be2d2eef5debc648c77a"
 @doc:"""
   TSON meta-kernel — pre-loaded bootstrap layer (2026 Revision 39 draft).
 
@@ -40,14 +40,14 @@
     a closed instantiation keeps none. It is the only list that ever holds an
     application. `supertypes` is the closed chain: every entry this one IS-A,
     complete to a fixed point through applied parents ([TSON-SCHEMA] §5.8),
-    each a bare name, sorted, and empty for a fresh record, an instance and a
-    subtracted record alike. `subtypes` is the inverse, over the entries of
-    this map only ([TSON-SCHEMA] §3.3.4).
+    each a name without arguments, sorted, and empty for a fresh record, an
+    instance and a subtracted record alike. `subtypes` is the inverse, over
+    the entries of this map only ([TSON-SCHEMA] §3.3.4).
     """
   type_chain => {
     parents?:    [type_kind]
-    supertypes?: [type_name]
-    subtypes?:   [type_name]
+    supertypes?: [type_kind]
+    subtypes?:   [type_kind]
   }
 
   @doc:"""
@@ -859,6 +859,10 @@
     key or a record value's field, the record being a namespace whose keys its
     type fixes. A map that is no namespace is not entered.
 
+    A type's name is its entry's path from the document's root: `order`, or
+    `geo.address` for a member of a schema map nested as `geo => !schema { ... }`,
+    and every name resolves from the root.
+
     A value is the name, never a value of the type it names. In a data
     document it resolves in the namespace of the governing schema and is
     judged there. In a schema document its grammar is read where it is
@@ -881,7 +885,7 @@
     `application` annotation.
     """
   reference => atom & {
-    of: type_name
+    of: type_kind
   }
 
   @doc:"""
@@ -910,7 +914,10 @@
     resolves to, a type or a value, each naming its type by its tag. Resolved
     output and source are one grammar — output is source with sugar expanded,
     bodies flattened and chains computed, and an entry written as a
-    constructor application resolves to itself.
+    constructor application resolves to itself. A value of `schema` nested as
+    an entry, `geo => !schema { ... }`, declares as the root does: its members
+    are entries of the document, each named by its path from the root,
+    `geo.address`.
     """
   schema => !namespace { key_type: type_name  value_type: declared }
 }

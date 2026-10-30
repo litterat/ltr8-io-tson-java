@@ -32,7 +32,8 @@ keeps the rest of the document. Current form only; history lives in git.
   the tag, `!api { key => value … }`, then its value: a `Namespace`'s map, a bound object through its descriptor, a
   tree through the tree writer. A bare `Namespace` where the position admits more than one type carries its `type` as
   the tag; at a slot whose host types it as a `Namespace` the slot's type already names it, and the map is written
-  untagged (`fields: { name => … }`).
+  untagged (`fields: { name => … }`). A `Namespace` of `schema` skips its path keys (`SchemaPaths.isPath`): a nested
+  map's members are written inside it, nested, in resolved form, never again under `geo.address` at the root.
 - `TsonDocumentPeek` performs no second header scan and rewinds nothing; a continuing reader whose lexical
   policy (token policy, limits) disagrees with the peek's is refused.
 - A peek is total: a malformed header yields nothing rather than throwing, never a schema the document does

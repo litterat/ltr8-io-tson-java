@@ -57,8 +57,8 @@ including records, record groups, enums and some in-built types. The `2026/39` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=0bcb2f3ad90ce1c6c15e0361076b33fba4fd3d7f2184cbd4ad17a308009f7c6d"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=8ee6e4f57bcb9ed3051547a22032ff0f15f08a6fc8b4a42e30be3c149092aa71"
+!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=75b5eb0d41b26b1c6eef6af71e404a1dfb9db7ce1d33a9514df9b06051d9f2ed"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=53ded46a759a3906f536adec3fd90444734944f04e34533ede786f12a3189e1b"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 !schema {
   role => !enum [admin member guest]
@@ -586,6 +586,12 @@ Vocabulary of your own — a schema declaring record types or namespace types
 (`orders => !api { … }`) — is a schema like any other, reached by `!!import` through the configured `SchemaAccess`.
 Those values bind through the same `ProcessorConfig.withDataBindContext` as data does; where no class binds a value's
 type it is held as a tree, so the schema still loads and validates, and only a schema obtained to bind refuses it.
+
+A schema may group declarations under an entry of its own, `geo => !schema { address => { … } }`. Each member is a
+declaration of the document named by its path from the root, `geo.address`, at any type position, as a data tag
+(`!geo.address { … }`, `"$type": "geo.address"` in JSON) and in resolved output, which writes the map nested. Every
+name resolves from the root, so inside `geo` a sibling is written `geo.address`. The default name binder looks for a
+member's class in a sub-package, `geo.Address`.
 
 ## Command-line interface
 

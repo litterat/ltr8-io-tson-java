@@ -131,11 +131,12 @@ over `fixtures/meta-service.tn`'s `interface` and `bindings` — the link layer'
 against bound values. The corpus states the records in its fixture schemas and stays language-agnostic; the host side
 is the runner's: `SuiteBindings` (`tson-compiler/src/testShared`) carries a plain record per fixture record
 (`Method`, `RpcMethod`, `Binding`, `HeaderSet`, `Route`, …), named for it so the name binder's package convention finds
-it, composed onto the library's own binder (`SchemaMetaNameBinder.contextExtendedWith`), and handed to the front door
-as the one context schemas and data bind through (`ProcessorConfig.withDataBindContext(SuiteBindings.context())`).
-`SidecarSchemasTest` resolves the fixtures under the same binding. A new fixture record is a new host record beside
-them; the fixture's `@doc` lists the records its value entries hold, which is the corpus's half of the contract
-(`RUNNER.md`).
+it, a member of a nested schema map in one sub-package per earlier segment (`geo.route` binds
+`io.ltr8.tson.suite.data.geo.Route`), composed onto the library's own binder (`SchemaMetaNameBinder.contextExtendedWith`),
+and handed to the front door as the one context schemas and data bind through
+(`ProcessorConfig.withDataBindContext(SuiteBindings.context())`). `SidecarSchemasTest` resolves the fixtures under the same
+binding. A new fixture record is a new host record beside them; the fixture's `@doc` lists the records its value entries
+hold, which is the corpus's half of the contract (`RUNNER.md`).
 **A `schema/` vector's expected side is read under the subject's first `!!import`** (`ResolvedForm.readResolved`, a
 `withImports(…).readAs(text, "schema")` read; the pre-loaded kernel where the subject imports nothing), and the object
 reader binds through `SuiteBindings` too: a fixture imports meta.tn and adds its own types, and a value entry in
@@ -173,7 +174,9 @@ for a verdict.
 expectation format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a
 valid vector's subject is a schema document and its expected side is that document's resolved output in §8's
 own form, read back through `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question
-of `spec/m/*-resolved.tn`) and compared entry for entry, `@synthetic` key markers included. `link/` states
+of `spec/m/*-resolved.tn`) and compared entry for entry, `@synthetic` key markers included. A nested schema map is
+walked into: `ResolvedForm.entries` keys each member under its path, `readResolved` adds the path keys a schema holds
+(`SchemaPaths.withPaths`), and the nested map's own entry compares as its member names. `link/` states
 individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived disjointness, §8.2's
 `subtypes` index, a kind's derived `members` (compared as a set, minted names normalised). `validate/` is a data
 document against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901
