@@ -45,8 +45,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
-import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.RefBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.HostType;
 import io.ltr8.tson.schema.meta.HostnameType;
 import io.ltr8.tson.schema.meta.MediaTypeType;
@@ -1055,15 +1054,17 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Derives every kind's {@code members} ([TSON-SCHEMA] §4.2) over the fully-merged namespace, by {@link
-     * KindMembers}' construction walk. Every kind in the closure is recomputed, an imported one included: members
-     * are computed over the <em>governing</em> schema's closure, so one kind holds different members in two
-     * schemas importing different sets, and whatever a body arrived carrying -- an import's own closure, or an
-     * author's hand -- is discarded rather than trusted.
+     * Derives every reference's index ([TSON-SCHEMA] §4.2) over the fully-merged namespace: whether its {@code of}
+     * names a constructor ({@link KindMembers#namesTypes}), and for one that does, the names it admits, by {@link
+     * KindMembers}' construction walk. Every reference in the closure is recomputed, an imported one included: the
+     * index is computed over the <em>governing</em> schema's closure, so one reference holds different members in two
+     * schemas importing different sets, and whatever a body arrived carrying is discarded rather than trusted. The
+     * index is never written: resolved output states {@code of} alone.
      *
      * <p>Before the name-type checks, {@code checkNames} and validation, and after {@link #computeSubtypes}, which
      * no member depends on: the walk reads each entry's constructor and the constructors' {@code supertypes}, both
-     * already resolved. A kind with no members admits no value, and the inhabitance check reports it.
+     * already resolved. A reference that names types and has no members admits no value, and the inhabitance check
+     * reports it.
      *
      * @param structure where a constructor is looked up first: the schema's one namespace, as {@code merged} is
      */
@@ -1071,13 +1072,14 @@ public final class TsonSchemaLinker {
                                                  Function<String, Top> structure) {
         Map<String, Top> result = null;
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
-            if (entry.getValue() instanceof KindBody kind) {
-                List<String> members = KindMembers.of(kind, merged,
-                        name -> constructorOf(name, merged.get(name), facts), structure);
+            if (entry.getValue() instanceof ReferenceBody reference) {
+                boolean namesTypes = KindMembers.namesTypes(reference.of(), structure);
+                List<String> members = namesTypes ? KindMembers.of(reference, merged,
+                        name -> constructorOf(name, merged.get(name), facts), structure) : List.of();
                 if (result == null) {
                     result = new LinkedHashMap<>(merged);
                 }
-                result.put(entry.getKey(), kind.linked(members));
+                result.put(entry.getKey(), reference.linked(namesTypes, members));
             }
         }
         return result == null ? merged : result;
@@ -1269,12 +1271,15 @@ public final class TsonSchemaLinker {
                 checkVariantsAreDistinct(entryName, c, namespace);
                 checkVariantsAreNotVoid(entryName, c, namespace);
             }
-            // `of` resolves in the schema's one namespace and must name `type` or a constructor below it
-            // ([TSON-SCHEMA] §4.2). The members are the linker's own computation, not references an author wrote, so
-            // there is nothing else here to validate.
-            case KindBody kind -> {
-                KindMembers.ofRefusal(kind, namespace::get).ifPresent(refusal -> {
-                    throw new SchemaValidationException("'" + entryName + "' is a kind, but " + refusal);
+            // `of` resolves in the schema's one namespace and names any type or constructor ([TSON-SCHEMA] §4.2,
+            // §5.12): what it admits is the names whose entries' values are of it, which is the slot's judgement
+            // wherever a name is written. The index is the linker's own computation, so nothing else is validated.
+            case ReferenceBody reference -> {
+                if (namespace.get(AliasChain.terminal(reference.of(), namespace)) == null) {
+                    throw new UnresolvedReference(entryName, " of", reference.of());
+                }
+                KindMembers.ofRefusal(reference, namespace::get).ifPresent(refusal -> {
+                    throw new SchemaValidationException("'" + entryName + "' is a reference, but " + refusal);
                 });
             }
             case TemplateBody ignored -> { } // open, answered above
@@ -1338,35 +1343,12 @@ public final class TsonSchemaLinker {
             }
             case DeclaredType ignored -> {
             }
-            // A reference names values of one type: `of` resolves in the writer's own namespace, and names a type
-            // or a namespace type, never a constructor of types -- the names of the types built with a
-            // constructor are a kind, and `kind<record>` is that spelling.
-            case RefBody ref -> {
-                Top of = namespace.get(AliasChain.terminal(ref.of(), namespace));
-                if (of == null) {
-                    throw new UnresolvedReference(entryName, " of", ref.of());
-                }
-                if (TypeChain.supertypesOf(of).contains(TYPE) || of == namespace.get(TYPE)) {
-                    throw referenceToAConstructor(entryName, ref);
-                }
-                if (OpenEntry.isOpen(of)) {
-                    throw new SchemaValidationException("'" + entryName + "' is a reference whose 'of' names '"
-                            + ref.of() + "', an open entry: a template denotes no type until it is applied (§5.10)");
-                }
-            }
             // A value entry was read against its type, so the read judged its shape; every reference it holds is at a
             // slot typed by a kind or a reference, recorded by the read and judged by its slot (ValuesByName), so
             // nothing is asked of the host class a value binds to.
             case ValueEntry ignored -> {
             }
         }
-    }
-
-    /** {@code ref<C>} with {@code C} a constructor: the names of the types built with one are a kind. */
-    private static SchemaValidationException referenceToAConstructor(String entryName, RefBody ref) {
-        return new SchemaValidationException("'" + entryName + "' is a reference whose 'of' names '" + ref.of()
-                + "', a constructor -- a reference (ref<T>) names a value of the type T, and the names of the types "
-                + "built with a constructor are a kind: write kind<" + ref.of() + ">");
     }
 
     /**
@@ -1595,8 +1577,8 @@ public final class TsonSchemaLinker {
             return;
         }
         Token value = field.value().get();
-        if (target instanceof KindBody kind) {
-            checkKindValue(entryName, fieldName, field, value, kind, namespace, constructors);
+        if (target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of(), namespace::get)) {
+            checkKindValue(entryName, fieldName, field, value, reference, namespace, constructors);
             return;
         }
         Optional<AtomType<?>> parser = AtomParsers.forType(target,
@@ -1626,16 +1608,15 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * A {@code ~}/{@code =} value at a kind-typed field: a type name, judged a member of the kind by the walk over
-     * the entry it resolves to ([TSON-SCHEMA] §4.2) -- {@code enum => enum_type ^ { name_type?: = identifier }}
-     * pins a name, and the pin is judged here, after resolution, in the schema's one namespace, which holds the
-     * constructor pinning it and everything that constructor's schema reaches. A name resolving to nothing, or to an
-     * entry not
-     * built with the kind's constructor, is refused with the field's own two halves named, as any other value of
-     * the wrong type is.
+     * A {@code ~}/{@code =} value at a field typed by a reference that names types: a type name, judged a member by
+     * the walk over the entry it resolves to ([TSON-SCHEMA] §4.2) -- {@code enum => enum_type ^ { name_type?: =
+     * identifier }} pins a name, and the pin is judged here, after resolution, in the schema's one namespace, which
+     * holds the constructor pinning it and everything that constructor's schema reaches. A name resolving to
+     * nothing, or to an entry whose value is not of the reference's {@code of}, is refused with the field's own two
+     * halves named, as any other value of the wrong type is.
      */
     private static void checkKindValue(String entryName, String fieldName, RecordField field, Token value,
-                                       KindBody kind, Map<String, Top> namespace,
+                                       ReferenceBody kind, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors) {
         if (KindMembers.isMember(value.text(), kind.of(), namespace::get, constructors, namespace::get)) {
             return;
@@ -1645,8 +1626,8 @@ public final class TsonSchemaLinker {
                 + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " " + asWritten(value)
                 + " is not a value of that type -- " + (namespace.get(value.text()) == null
                         ? "it names nothing in scope"
-                        : "'" + value.text() + "' is not a member of the kind, the names of the types built "
-                                + "with '" + kind.of() + "'")
+                        : "'" + value.text() + "' is not a member of the kind, the names of the entries whose "
+                                + "values are of '" + kind.of() + "'")
                 + ". §5.2 makes a field's fixed or default value a value of the field's own declared type");
     }
 
@@ -1705,9 +1686,9 @@ public final class TsonSchemaLinker {
      * text wrote it, and only the subject differs between the two statements of it.
      *
      * <p>A slot typed {@code type_kind} holds the name of a type a value can have: resolved, then judged a member of
-     * the kind ({@link KindMembers}) where {@code constructors} is given, so a constructor named as a type is
-     * refused, and a value entry with its own diagnostic. A {@code type_ref} slot passes {@code null} and is
-     * judged by resolution alone.
+     * the kind ({@link KindMembers}) where {@code constructors} is given, and a value entry refused with its own
+     * diagnostic. A constructor is a member: its value is a record, whose instances are declarations. A {@code
+     * type_ref} slot passes {@code null} and is judged by resolution alone.
      */
     private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace,
                                          List<String> ownParameters, Function<String, Optional<String>> constructors,
@@ -1729,13 +1710,8 @@ public final class TsonSchemaLinker {
         if (constructors != null && ref.arguments().isEmpty() && !ownParameters.contains(ref.name())
                 && (namespace.containsKey(TYPE) || namespace.containsKey(TYPE))
                 && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, namespace::get)) {
-            Top found = namespace.get(AliasChain.terminal(ref.name(), namespace));
-            throw new SchemaValidationException(context + " names '" + ref.name() + "', which is "
-                    + (found != null && TypeChain.supertypesOf(found).contains("top")
-                            ? "a constructor: a constructor is applied, with '!' or by a sugar form, and is never "
-                                    + "itself the type of a value (§4.1)"
-                            : "no type a value can have -- a slot typed 'type_kind' holds the name of a type built "
-                                    + "with 'type'"));
+            throw new SchemaValidationException(context + " names '" + ref.name() + "', which is no type a value "
+                    + "can have -- a slot typed 'type_kind' holds the name of an entry whose value is of 'type'");
         }
         for (TypeArgument arg : ref.arguments()) {
             if (arg instanceof TypeArgument.Ref nested) {

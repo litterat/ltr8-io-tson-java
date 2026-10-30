@@ -3,18 +3,19 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.schema.meta.RefBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import java.util.Optional;
 
 /**
- * Parses a reference -- an instance of the meta-kernel's {@code ref_type}, the atom whose values are qualified names
- * naming a value. A value is a qualified name: segments between dots, each a [TSON-DATA] §7.7 identifier read as the
- * kernel's {@code type_name} reads it, none empty. What the name reaches is judged where it resolves, when the schema
- * links, never here, so this parser reads schema documents alone: a data document is never linked.
+ * Parses a reference that names values -- an instance of the meta-kernel's {@code reference} whose {@code of} is no
+ * constructor, spelled {@code ref<method>} or {@code kind<method>} alike. A value is a qualified name: segments
+ * between dots, each a [TSON-DATA] §7.7 identifier read as the kernel's {@code type_name} reads it, none empty. What
+ * the name reaches is judged where it resolves, when the schema links, never here, so this parser reads schema
+ * documents alone: a data document is never linked.
  *
  * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link KindParser}.
  */
-public record RefParser(RefBody reference) implements AtomTypeParser<String> {
+public record RefParser(ReferenceBody reference) implements AtomTypeParser<String> {
 
     @Override
     public String read(String text) {

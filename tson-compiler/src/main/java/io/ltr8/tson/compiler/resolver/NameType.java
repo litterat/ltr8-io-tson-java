@@ -7,7 +7,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -91,7 +91,7 @@ public final class NameType {
         if (type.definition() == null) {
             return false;
         }
-        String of = slotKind(entry, constructor, local, structure).map(KindBody::of).orElse(IDENTIFIER_TYPE);
+        String of = slotKind(entry, constructor, local, structure).map(ReferenceBody::of).orElse(IDENTIFIER_TYPE);
         return KindMembers.isMember(type.definition(), TsonSchema.constructorOf(type.definition()), of,
                 type.lookup(), structure);
     }
@@ -102,7 +102,7 @@ public final class NameType {
      * -- read in {@code structure} first, then {@code local}; the linker hands both the schema's one namespace.
      * Empty where no such constructor or kind is in reach.
      */
-    private static Optional<KindBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
+    private static Optional<ReferenceBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
                                                Function<String, Top> structure) {
         Function<String, Top> constructors = fallingBackTo(structure, local);
         Optional<String> head = constructor.or(() -> Optional.of(TsonSchema.constructorOf(entry)));
@@ -118,14 +118,14 @@ public final class NameType {
         return Optional.empty();
     }
 
-    private static Optional<KindBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
+    private static Optional<ReferenceBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
         if (!(constructor instanceof RecordBody record)) {
             return Optional.empty();
         }
         return Optional.ofNullable(record.fields().get(NAME_TYPE))
                 .map(field -> constructors.apply(AliasChain.terminal(field.type().name(), constructors)))
-                .filter(KindBody.class::isInstance)
-                .map(KindBody.class::cast);
+                .filter(ReferenceBody.class::isInstance)
+                .map(ReferenceBody.class::cast);
     }
 
     /**

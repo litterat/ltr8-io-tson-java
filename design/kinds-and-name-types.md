@@ -6,19 +6,26 @@ is why they are the linker's. Current form only; history lives in git.
 
 **Invariants**
 
-- A kind is an atom whose values are type names. Its `members` are recomputed for **every** kind in the closure,
-  imports included, and never trusted from a body; `KindBody`'s equality is `of` and the chain, never the members, so
-  an importer re-deriving an import's kind unifies with it.
-- `of` resolves in the schema's one namespace and must be `type` or a constructor IS-A it
-  (`KindMembers.ofRefusal`); a type that is no constructor is refused with the reference named (`kind<api>`, write
-  `ref<api>`). A kind is not a bound.
-- A constructor (IS-A `top`) is no member of any kind, `namespace` included. A namespace type is built with
-  `namespace`, so it is a member of `type_kind`, `kind<product>` and `kind<namespace>`, and of no `kind<record>` or
-  `kind<map>`. A value entry is a member of no kind: its tag names an ordinary type, which no walk reaches a
-  constructor through.
+- A kind is the kernel's `reference` atom (`ReferenceBody`; SPEC-FEEDBACK.md #11) over a constructor, `top` or IS-A
+  it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling:
+  `kind<record>` and `ref<record>` are one entry, and `kind<api>`, over a type that is no constructor, names values
+  (`ValuesByName`, `design/references.md`).
+- Every reference's derived `index` (`Index(namesTypes, members)`, the members sorted) is recomputed for **every**
+  reference in the closure, imports included, and never trusted from a body. It is `@Unbound` and never written: a
+  resolved form states `!reference { of: … }` alone, and a written `members:` is refused as an unknown field.
+  `ReferenceBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
+  unifies with it.
+- `of` resolves in the schema's one namespace and names any type or constructor; refused are a name resolving to
+  nothing, an open entry and a value entry (`KindMembers.ofRefusal`). A kind is not a bound.
+- A constructor is a member where the walk says so, as any type is: one whose declaration is a record (`uuid_type =>
+  atom & { … }`) holds a value of `record`, so `type_kind`, `kind<record>` and `kind<product>` hold it, `namespace`
+  and `reference` among them. A namespace type is built with `namespace`, so it is a member of `type_kind`,
+  `kind<product>` and `kind<namespace>`, and of no `kind<record>` or `kind<map>`. A value entry is a member of no
+  kind: its tag names an ordinary type, which no walk reaches a constructor through.
 - A kind-typed position is judged by membership in every data document, over the reading document's closure; in a
   schema document it reads its grammar alone and the link (or ingest) judges membership.
-- An empty kind admits no value, and `TypeInhabitance` refuses it.
+- An empty kind admits no value, and `TypeInhabitance` refuses a required field typed by it: `kind<alias>` is one,
+  no entry past its hops being an alias.
 - Whether a `name_type` referent may stand in its slot is membership of the slot's kind (`NameType.admits`, reading
   the kind off the constructor's `name_type` field), never a test of the referent's body class.
 - A `name_type`, pinned by the constructor (traced through a template's held body) or written by the author,
@@ -35,34 +42,35 @@ Related: `design/linking-and-compilation.md` (the link order), `design/reference
 `design/name-hygiene-and-minted-names.md` (the per-name rules a name type's profile feeds),
 `design/meta-layer-namespaces.md`.
 
-**What a kind is not.** Eight shapes were tried before `kind_type`, and each fell for one reason, so none is worth
-re-proposing: a refined `schema` type carrying the checks (§5.7 gives entry-membership only and tightens no field to
-a choice of subtypes); per-slot checked annotations (`@fields_of`, `@typed_by`), which put the referent predicate on
-every slot; naming roles (`type_name`, `method_name` as instances of one constructor, "a role-keyed map declares,
-any other slot references"), which fused token family, store and referent and broke at `field_name`, whose family is
-the record's; a namespace kind with a role lattice, the same fusion plus an alias rule letting a family widen a role
-against §5.7; `name_type` with `target` and `relation` facets, where `relation` was two stores wearing one enum; the
-predicate as facets on the name atom; `kind<T>` with `of` resolving in the writer's namespace, which sent `of` to two
-namespaces depending on who wrote it; and the kind as a sum over its members' values, which admitted an identifier
-token where a family's name was wanted. A kind is an atom whose values are names, `of` resolves in the schema's one
-namespace (SPEC-FEEDBACK.md #7), and the members are computed.
+**What a kind is not.** Eight shapes were tried before the atom of names, and each fell for one reason, so none is
+worth re-proposing: a refined `schema` type carrying the checks (§5.7 gives entry-membership only and tightens no
+field to a choice of subtypes); per-slot checked annotations (`@fields_of`, `@typed_by`), which put the referent
+predicate on every slot; naming roles (`type_name`, `method_name` as instances of one constructor, "a role-keyed map
+declares, any other slot references"), which fused token family, store and referent and broke at `field_name`, whose
+family is the record's; a namespace kind with a role lattice, the same fusion plus an alias rule letting a family
+widen a role against §5.7; `name_type` with `target` and `relation` facets, where `relation` was two stores wearing
+one enum; the predicate as facets on the name atom; `kind<T>` with `of` resolving in the writer's namespace, which
+sent `of` to two namespaces depending on who wrote it; and the kind as a sum over its members' values, which admitted
+an identifier token where a family's name was wanted. A kind is an atom whose values are names, `of` resolves in the
+schema's one namespace (SPEC-FEEDBACK.md #7), and the members are computed.
 
 ## The types built with a constructor (`KindMembers`, §4.2)
 
-A `kind_type` instance (`!kind_type { of: uuid_type }`, or `kind<uuid_type>` through the kernel's template) is an atom
-whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's
-is a listed one. The kernel declares `identifier_kind`, `atom_kind` and `type_kind`, and types `enum_type.name_type`
-and `record.name_type` by the first. `computeKinds` writes `members` (sorted, `KindBody.linked`) onto every kind body
-in the merged map after `computeSubtypes` and before the name-type checks.
+A kind (`!reference { of: uuid_type }`, or `kind<uuid_type>` through the kernel's template) is an atom whose values
+are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a listed
+one. The kernel declares `identifier_kind`, `atom_kind` and `type_kind`, and types `enum_type.name_type` and
+`record.name_type` by the first. `computeKinds` derives every reference's index (`ReferenceBody.linked`) onto its body
+in the merged map after `computeSubtypes` and before the name-type checks; a reference that names values gets
+`namesTypes` false and no members.
 
 - **Membership is one walk over resolved entries.** `KindMembers`' class Javadoc states the walk: alias hops to the
-  type, constructors, references, `template` bodies and value entries excluded, then the
-  constructor the value applies (its recorded tag, `EntryFacts.constructor`, else its body's `@Typename`) followed
-  through a constructor template's held body until `of` or a constructor IS-A it is reached. So a record template is
-  a member of `kind<record>` (it is a type, §5.10), `set<text>` of `kind<set_type>` while meta.tn's template `set` is
-  not, and `top` of `type_kind`, `kind<product>` and `kind<record>`: membership is not `EntryKind.isConstructor`, which
-  answers applicability.
-- **A kind is a member of itself where the walk says so.** `type_kind` is built with `kind_type`, which IS-A `type`,
+  type, an alias stopping at an application, `template` bodies and value entries excluded, then the constructor the
+  value applies (its recorded tag, `EntryFacts.constructor`, else its body's `@Typename`) followed through a
+  constructor template's held body until `of` or a constructor IS-A it is reached. So a record template is a member
+  of `kind<record>` (it is a type, §5.10), `set<text>` of `kind<set_type>` while meta.tn's template `set` is not,
+  `top` of `type_kind`, `kind<product>` and `kind<record>`, and so is a constructor whose declaration is a record:
+  membership is not `EntryKind.isConstructor`, which answers applicability.
+- **A kind is a member of itself where the walk says so.** `type_kind` is built with `reference`, which IS-A `type`,
   so it lists itself. Nothing loops: the walk reads construction chains and never a kind's members.
 - **A constructor is read in the schema's one namespace.** `KindMembers` and `NameType` take a `structure` lookup
   beside the entry's own, read first; the linker passes the merged namespace for both, and the second serves a caller
@@ -71,12 +79,13 @@ in the merged map after `computeSubtypes` and before the name-type checks.
   walked is the merged map, the kernel's and meta.tn's own types included, so `kind<record>` lists the kernel's
   records beside the schema's, and `kind<namespace>` holds a schema's own namespace type `api` beside `schema` and
   `field_map`.
-- **`of` is checked in `validateBody`**, through its alias hops in the one namespace: `kind<data>`, `kind<top>`,
-  `kind<template>`, `kind<alias>` and a type that is no constructor (`kind<stock_id>`, `kind<api>`) are refused,
-  against the declaration that wrote the application (`reportedAgainst`).
+- **`of` is checked in `validateBody`**, through its alias hops in the one namespace: a name resolving to nothing is
+  an unresolved reference, and an open entry or a value entry is refused (`KindMembers.ofRefusal`), against the
+  declaration that wrote the application (`reportedAgainst`). Anything else is admitted: `kind<top>` holds every
+  type, `kind<alias>` holds nothing, and `kind<stock_id>` or `kind<api>` names values of that type.
 - **Recomputed everywhere, trusted nowhere.** Members are computed over each linking schema's closure, so the
-  kernel's `identifier_kind` lists a user schema's own `text_identifier` at that schema's link, and an author's
-  hand-written `members` are discarded.
+  kernel's `identifier_kind` lists a user schema's own `text_identifier` at that schema's link, and `members` is
+  no field an author can write.
 - **A value at a kind-typed field is a name.** `checkFieldValue` hands a `~`/`=` value at a kind-typed field to
   `checkKindValue`, which resolves it in the schema's namespace and asks the walk. So
   the kernel's `enum => enum_type ^ { name_type?: = identifier }` is a member at the kernel's link, a schema's pin

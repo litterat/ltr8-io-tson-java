@@ -31,7 +31,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IdentifierType;
 import io.ltr8.tson.schema.meta.IntegerType;
-import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateParam;
@@ -362,7 +362,7 @@ public final class MetaKernelBootstrapResolver {
      * its constructors in four shapes, each checked rather than assumed: a bare {@code {}} for {@code value_type},
      * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; {@code identifier}'s
      * profile, checked against the constant the lexer and resolver already hold; a bare token array for {@code
-     * enum}; and a record of tokens for {@code kind_type}, for {@code namespace} and for the {@code
+     * enum}; and a record of tokens for {@code reference}, for {@code namespace} and for the {@code
      * array}/{@code set_type} binding records {@link SchemaDesugarer} lifts.
      *
      * <p>Package-private so {@code MetaKernelBootstrapResolverTest} can reach the refusals the real kernel never
@@ -387,9 +387,9 @@ public final class MetaKernelBootstrapResolver {
                 yield TextType.UNCONSTRAINED;
             }
             case "enum" -> toEnumBody(instance.value());
-            // `!kind_type { of: type }`: `of` is the one authored field, and the members are derived when the kernel
-            // links, as every kind's are.
-            case "kind_type" -> new KindBody(bindingField(instance.value(), "of"));
+            // `!reference { of: type }`: `of` is the one authored field, and the index is derived when the kernel
+            // links, as every reference's is.
+            case "reference" -> new ReferenceBody(bindingField(instance.value(), "of"));
             // `field_map => !namespace { value_type: record_field  ordered: true }`: keys of the host's family.
             case "namespace" -> new NamespaceBody(fieldToken(instance.value(), "key_type").map(TypeRef::of),
                     TypeRef.of(bindingField(instance.value(), "value_type")),

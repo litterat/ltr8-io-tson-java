@@ -3,8 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,9 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
- * A kind in resolved output ([TSON-SCHEMA] §4.2, §8.1): its body writes {@code of} and the derived
- * {@code members} index, and reads back through meta.tn's own {@code kind_type} vocabulary. The whole {@code
- * !kind_type { ... }} spelling is what the Class 2 corpus's schema-layer vector compares.
+ * A reference in resolved output ([TSON-SCHEMA] §4.2, §8.1): its body writes {@code of} alone, the names it admits
+ * being the linker's judgement and never written, and reads back through the kernel's own {@code reference}
+ * vocabulary.
  */
 class KindResolvedFormTest {
 
@@ -26,7 +25,7 @@ class KindResolvedFormTest {
             !schema {
               stock_id    => !uuid_type {}
               customer_id => !uuid_type {}
-              any_id      => !kind_type { of: uuid_type }
+              any_id      => !reference { of: uuid_type }
             }""";
 
     private static Tson tson() {
@@ -34,16 +33,18 @@ class KindResolvedFormTest {
     }
 
     @Test
-    void theResolvedFormWritesTheDerivedIndexesAndReadsBack() {
+    void theResolvedFormWritesOfAloneAndReadsBack() {
         Tson tson = tson();
-        Top linked = tson.resolve(SCHEMA).schema().entries().get("any_id");
+        ReferenceBody linked = assertInstanceOf(ReferenceBody.class,
+                tson.resolve(SCHEMA).schema().entries().get("any_id"));
+        assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
 
         String written = tson.objectWriter().toTson(linked);
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: \"uuid_type\" members: [ \"customer_id\" "
-                + "\"stock_id\" ] }", written);
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: \"uuid_type\" }", written);
 
-        KindBody read = assertInstanceOf(KindBody.class, tson.objectReader().withSchema(TsonBundledSchemas.META_ID)
-                .readAs(written, "kind_type", Object.class));
-        assertEquals(Optional.of(List.of("customer_id", "stock_id")), read.members());
+        ReferenceBody read = assertInstanceOf(ReferenceBody.class,
+                tson.objectReader().withSchema(TsonBundledSchemas.META_ID).readAs(written, "reference", Object.class));
+        assertEquals(Optional.empty(), read.index());
+        assertEquals(linked, read);
     }
 }

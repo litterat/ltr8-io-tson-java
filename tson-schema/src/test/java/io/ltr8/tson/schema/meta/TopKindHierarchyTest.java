@@ -3,10 +3,10 @@ package io.ltr8.tson.schema.meta;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Verifies the {@link Top}/{@link Atom}/{@link Product}/{@link Sum} hierarchy actually replicates
@@ -50,27 +50,27 @@ class TopKindHierarchyTest {
         assertInstanceOf(Top.class, choice);
     }
 
-    /** A kind is an atom whose values are names (Part 2 §4.2), as an enum is: a set of names, not a sum. */
+    /** A reference is an atom whose values are names (Part 2 §4.2), as an enum is: a set of names, not a sum. */
     @Test
-    void aKindIsAnAtom() {
-        KindBody kind = new KindBody("uuid_type");
-        assertInstanceOf(Atom.class, kind);
-        assertInstanceOf(Type.class, kind);
+    void aReferenceIsAnAtom() {
+        ReferenceBody reference = new ReferenceBody("uuid_type");
+        assertInstanceOf(Atom.class, reference);
+        assertInstanceOf(Type.class, reference);
     }
 
     /**
-     * A kind's identity is the constructor it names: its members are derived over a closure, and one kind holds
-     * different ones in two schemas. A refinement may not name another constructor.
+     * A reference's identity is its {@code of}: its index is derived over a closure, and one reference holds
+     * different members in two schemas. A refinement may not name another {@code of}.
      */
     @Test
-    void aKindIsItsConstructor() {
-        KindBody linked = new KindBody("uuid_type").linked(List.of("stock_id", "customer_id"));
+    void aReferenceIsItsOf() {
+        ReferenceBody linked = new ReferenceBody("uuid_type").linked(true, List.of("stock_id", "customer_id"));
 
-        assertEquals(new KindBody("uuid_type"), linked);
+        assertEquals(new ReferenceBody("uuid_type"), linked);
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
-        assertEquals(Optional.of(List.of("customer_id", "stock_id")), linked.members());
-        assertEquals(List.of(), linked.constraintsCheck(new KindBody("uuid_type")));
-        assertEquals(1, linked.constraintsCheck(new KindBody("text_type")).size());
+        assertTrue(linked.namesTypes());
+        assertEquals(List.of(), linked.constraintsCheck(new ReferenceBody("uuid_type")));
+        assertEquals(1, linked.constraintsCheck(new ReferenceBody("text_type")).size());
     }
 
     @Test

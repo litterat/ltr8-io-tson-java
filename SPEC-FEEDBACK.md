@@ -461,9 +461,9 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 - **An entry is a type exactly when its value is built by a constructor IS-A `type`.** `name => !T { … }` with `T` a
   constructor builds a type; with `T` an ordinary type — a record, a namespace type, any type of the closure — the
   entry is a value of `T`, read against `T` as a data value is, and marked by nothing but its tag. A value entry is a
-  member of no kind (`type_kind` excludes it unmarked), nothing is typed by it, and `ref<T>` names it where its type
-  IS-A `T`: `ref<api>` names `orders => !api { … }`. `kind<api>` is refused at the declaration, `api` being no
-  constructor. A value entry's payload lifts and mints nothing; its names at kind- and reference-typed slots are
+  member of no reference over a constructor (`type_kind` excludes it unmarked), nothing is typed by it, and a
+  reference over `T` names it where its type IS-A `T`: `ref<api>`, and `kind<api>` with it (#11), name `orders =>
+  !api { … }`. A value entry's payload lifts and mints nothing; its names at kind- and reference-typed slots are
   judged at link, and a qualified name walks into it by key and by field. A template over an ordinary type closes to
   a value entry (`fetch => <T> !operations { … }`, `get_order => fetch<order>`). A type declared in the same
   document is applied in wait order (#4).
@@ -496,9 +496,8 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   namespace type the one constructor whose instances are not types goes. An entry is a type exactly when its value
   is built by a constructor IS-A `type`, and any other entry is a value, its tag naming its type. `schema`'s
   `value_type` is `declared`, which with `declared_type` is the kernel's.
-- §4.2: `kind_type`'s exclusions are "not a constructor"; a namespace type is a member of `type_kind`, `kind<product>`
-  and `kind<namespace>`; a value entry is a member of no kind; `of` names `type` or a constructor below it.
-  `ref_type`'s `of` names any type, a namespace type included.
+- §4.2: a namespace type is a member of `type_kind`, `kind<product>` and `kind<namespace>`, and a value entry of no
+  reference over a constructor; the rest of §4.2 is #11's.
 - §5.7: "Constructor refinement in a meta-schema is the meta-level exception and MAY replace fixed values (§4.2)"
   is ladder wording; with no meta-schema it is restated for a constructor refinement wherever it is written, or the
   exception goes. The omission order stands: it is what keeps `namespace` from being `map ^ { … }` today.
@@ -527,8 +526,7 @@ says "reference" leaves the reader to work out which of the two it means.
   `!alias` for `type_name`, `field_name`, `param_name`, `annotation`, `doc` and the annotation markers.
 - **§8.3's walk is the alias chain.** Policy's limit is `max_alias_chain`, default 64, and diagnostics that walk it say
   "resolves through its alias chain to".
-- **Nothing else moves.** `kind<alias>` is refused at the declaration as `kind<reference>` was, `alias` being a
-  constructor beside `type`. `alias` is now a kernel name, reserved in every closure that imports the kernel (#7),
+- **Nothing else moves.** `alias` is now a kernel name, reserved in every closure that imports the kernel (#7),
   and `reference` is no longer one. That has a cost: `alias` is a likelier name for an author's own entry than
   `reference` was, and `alias => port` in a schema importing core now collides with the import.
 
@@ -540,3 +538,62 @@ row. §7.2's phrase becomes "after alias flattening of both", §5.10's "referenc
 application) becomes "alias template", and §12.1's `instance` comment names the kernel's `alias`.
 "Reference" keeps one meaning: a name held in a slot, as in §4.2's `ref<T>`, §5.12's qualified name and §8.1's
 `type_ref`.
+
+## 11. [TSON-SCHEMA] §4.1, §4.2, §5.12, §7.4, §8.1 — one reference atom, and a constructor is a record type
+
+**Problem.** Every entry of a schema map is a name and a value, and the value has a type, its tag: `order => { … }`
+holds a value of `record`, `int32 => !integer ^ { … }` a value of `integer_type`, `orders => !api { … }` a value of
+`api`. A field's type position (`type_kind`), a `kind<C>` slot and a `ref<T>` slot all ask one question of a name:
+does the named entry's value, past its alias hops, have a type that IS-A the slot's `T`? §4.2 asks it through two
+atoms, `kind_type` and `ref_type`, and partitions by `T`: `kind<T>` requires a constructor and `ref<T>` refuses one, so
+`kind<api>` and `ref<record>` are each refused pointing at the other spelling. `kind_type` also writes a derived
+`members` index into resolved output. And a kind excludes an entry that is itself a constructor, and a field's type
+position refuses one ("a constructor, not a type"), although a constructor's declaration is a record (`uuid_type =>
+atom & { … }`) and a record type's values are records.
+
+**What is running.**
+
+- **One atom.** The kernel declares `reference => atom & { of: type_name }`, with `kind => <T> !reference { of: T }`
+  and `ref => <T> !reference { of: T }` its two spellings; `identifier_kind`, `atom_kind` and `type_kind` are
+  `!reference { of: … }`. `kind_type` and `ref_type` are gone, and the kernel holds 78 entries (69 declarations).
+  `kind<order>` and `ref<order>` expand to one content and mint one entry.
+- **The slot's meaning comes from `of`, never from the spelling.** Where `of` is a constructor, `top` or IS-A it, the
+  values it admits are types: the slot holds a type's name, judged a member over the governing closure and delivered
+  to a host as a `TypeRef`. Where `of` is any other type, the values it admits are values: the slot holds a value's
+  qualified name, judged at link and delivered as the referent (`Ref<T>`). So `kind<bar>` over a record type names
+  values of `bar`, `ref<record>` names types, and `kind<api>` names `myapi`.
+- **`of` names any type or constructor.** Refused are a name that resolves to nothing, an open entry and a value
+  entry. `kind<top>` holds every type; `kind<alias>` holds nothing, no entry past its hops being an alias, and a
+  required field typed by it is refused by §5.10.1's productivity rule.
+- **`members` is no part of the body.** A resolved form states `of` alone, and an author writing `members` is refused
+  as an unknown field. The admitted set is derived at link and kept by the processor for its own judgements.
+- **Where a name is judged** is unchanged: in a data document a type's name by membership in the reading closure, and
+  a value's qualified name is this library's gap there (`NOT_IMPLEMENTED`); in a schema document the grammar where it
+  is written and the judgement when the schema links.
+- **A qualified name selects a key of a value of a named product**: a namespace value's key, or a record value's field,
+  the record being a namespace whose keys its type fixes. That is §5.12's walk restated, and nothing it admits moves.
+- **A constructor is an ordinary record type.** Nothing in the predicate sets a constructor apart. `uuid_type`'s value
+  is of `record`, so `type_kind`, `kind<record>` and `kind<product>` hold it, and `record`, `top`, `alias` and
+  `template` with it. A field typed `uuid_type` holds a declaration's body as data, `!holder { spec: { version: 4 }
+  }`, read in a TSON tree, bound to the constructor's own model class, and read from JSON; `boxed<uuid_type>` and
+  `[uuid_type]` close as any application does. A declaration read as data is judged by its record shape alone: it is
+  not resolved, so a derived field such as `chain` is admitted as written and no coherence rule runs.
+- **Unchanged:** a template parameter's `bound` still refuses a constructor. A bound is IS-A, not membership, and
+  construction transfers kind and not IS-A, so only another constructor (`set_type` IS-A `array`) could satisfy one.
+
+**Resolution, a proposal.**
+
+- §4.2: one atom, `reference => atom & { of: type_name }`, admitting a name exactly when the type of the named entry's
+  value, past its alias hops, IS-A `of`; `kind<T>` and `ref<T>` its spellings; `of` any type or constructor of the
+  writer's namespace, never a value or an open entry. A slot over a constructor holds a type's name and takes part in
+  structural identity; any other holds a value's name. `kind_type`, `ref_type` and both refusals go.
+- §4.1: a constructor is a type like any other at a name slot and a type position: its declaration is a record, whose
+  instances are declarations. The sentence making a constructor "never itself the type of a value" goes.
+- §5.12: a further segment selects a key of a value of a named product, a namespace value's key or a record value's
+  field, the record being a namespace whose keys its type fixes; a map that is no namespace is not entered.
+- §7.4 and §8.1: "a kind-typed position" reads "a position typed by a reference over a constructor"; `members` is no
+  longer a derived index written in resolved output.
+
+**Open.** One spelling or two: `kind<X>` and `ref<X>` are one application and cannot differ by spelling, so a
+remaining difference would have to be in what the slot does with the name. A type's name is one segment and a value's
+a qualified name; one grammar for both waits on qualified names at type positions.

@@ -22,9 +22,10 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
 - A reference to a value entry (a `ValueEntry`, `myapi => !api { … }`) is refused at every position a type-ref
   occupies: it is a value, and nothing is typed by it.
 - A kernel slot typed `type_kind` (`record_field.type`, the element and container type slots, `choice.variants`) is
-  judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor named as a type is refused there. An
-  alias's target (`Alias`), which may name a constructor, is judged by resolution and arity alone
-  (`constructors == null`). `design/references.md` has the account of every slot.
+  judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor whose declaration is a record is a
+  member, its value being of `record`, and a value entry is refused there. An alias's target (`Alias`), which may name
+  a constructor, is judged by resolution and arity alone (`constructors == null`). `design/references.md` has the
+  account of every slot.
 - A value by name (`TsonSchema.valuesByName`) resolves its first segment in the schema's merged namespace, alias
   hops followed; its referent's declared type must IS-A the slot's, compared by canonical identity.
   Local entries only, after `validateEntry`.
@@ -75,7 +76,8 @@ load-bearing, each step reading what an earlier one wrote:
    the one namespace every later step reads.
 3. **`computeSubtypes`**, the reverse of `supertypes` over every `Type`, a record template included.
 4. **`enumForms`** for each local enum (`EnumLabels.labelForm`).
-5. **`computeKinds`**, every kind's `members` (`design/kinds-and-name-types.md`).
+5. **`computeKinds`**, every reference's derived index, whether `of` names a constructor and, for a kind, its
+   members (`design/kinds-and-name-types.md`).
 6. **`computeDisjointness`**, every choice's `disjoint` (`design/choice-disjointness.md`).
 7. **`checkEnumTypes`**, **`checkFieldNameTypes`**, then **`nameTypes`** for each record not refused.
 8. **`checkNames`**, §8.2 over scopes (`design/name-hygiene-and-minted-names.md`).
@@ -115,16 +117,17 @@ are worth their place here, each catching what would otherwise link, compile, an
   value), naming the type it is a value of. A value entry's payload was judged by the read against its type and its
   names by `ValuesByName`, so `validateBody` asks nothing of it.
 - **A `type_kind` slot is judged by membership** of `type_kind` (`KindMembers.isMember`), where `type` is in reach:
-  a constructor named as a field's type is refused as applied-not-typed (§4.1).
+  an alias stopping at an application, an open entry and a value entry are no type a value can have. A constructor
+  is one, its declaration a record (`spec: uuid_type` holds a declaration body as data; SPEC-FEEDBACK.md #11).
 - **A choice's variants are distinct at the end of each §8.3 alias chain** (`AliasChain.terminal`), since an
   alias and its target are one type: `(text | my_text)` with `my_text => text` is caught, the only spelling an author
   cannot see. No variant may resolve to `void` (`checkVariantsAreNotVoid`).
 
 **A chain's names resolve in the same namespace.** A refinement of a kernel constructor reaches one (`set_type =>
 array ^ {...}` carries `[array, product, top, type]`), and the defining schema's closure is inside the importer's, so
-every name on it is there. A `ref_type` body's `of` must name a type, a namespace type included, never a
-constructor (`kind<record>` is that spelling). A namespace type's stated `key_type` must be a member of
-`identifier_kind`: its keys are names.
+every name on it is there. A `reference` body's `of` names any type or constructor, never a value entry or an open
+entry (`KindMembers.ofRefusal`); what it names decides whether the slot holds a type's name or a value's. A namespace
+type's stated `key_type` must be a member of `identifier_kind`: its keys are names.
 
 **Every body is asked its family's coherence rule** (`checkCoherent`), which catches the bounds an application closed
 onto parameters (`sized<10, 3>`); a declared body was already asked at resolution, and one refused there never reaches
@@ -198,16 +201,17 @@ text }` in any schema), and resolves to a `NamespaceBody`. A value of it is a ma
   it is delivered as a `Namespace` is `design/meta-layer-namespaces.md`'s.
 - **Any schema's vocabulary.** Any schema declares a namespace type or types a field by it, and a schema importing the
   declaring one holds values of it as entries. Such an entry (`myapi => !api { … }`) is a `ValueEntry`: refused at
-  every type position (above), a member of no kind (`kind<api>` is refused at the declaration, `api` being no
-  constructor), named by `ref<api>`, and compiled to a `ValueEntryReader`.
+  every type position (above), a member of no kind, named by `ref<api>` (one entry with `kind<api>`, `api` being no
+  constructor), and compiled to a `ValueEntryReader`.
 
 ## Values by name (`ValuesByName`, §5.12)
 
 A value entry's payload may hold a name, `request: place_order_request` at a slot typed `kind<record>` or
 `method: orders.place_order` at a slot typed `ref<method>`. The read keeps the name as written with its path and the
 slot's declared type (`TsonSchema.SlotType`), and `checkValuesByName` judges each one over local entries after
-`validateEntry`: a kind-typed slot's name as a member (`judgeMember`), a reference-typed slot's by the walk, the value
-it reaches delivered into the host's `Ref` cell. The walk itself, by key and by field through the binding's
+`validateEntry`, by what the slot's `of` names over `merged` (`KindMembers.namesTypes`), whatever the read guessed:
+over a constructor the name as a member (`judgeMember`), over any other type by the walk, the value it reaches
+delivered into the host's `Ref` cell. The walk itself, by key and by field through the binding's
 descriptor, is `design/meta-layer-namespaces.md`'s; what is the linker's is below.
 
 - **The grammar is judged here.** `ValuesByName.segments` splits the name at each `.` and requires each segment to be

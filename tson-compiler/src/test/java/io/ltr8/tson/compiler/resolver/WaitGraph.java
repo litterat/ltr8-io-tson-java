@@ -37,7 +37,7 @@ import java.util.TreeSet;
  *   <li>An alias ({@code !alias { target: X }}) is ready when its target is: an edge alias → {@code X}, beside
  *       what reading its own declaration reaches.</li>
  *   <li><b>A reference orders nothing.</b> A token at a slot typed by a kind ({@code type_kind},
- *       {@code identifier_kind}, any {@code !kind_type} instance), a {@code !ref_type} instance or {@code type_ref}
+ *       {@code identifier_kind}, any {@code !reference} instance) or {@code type_ref}
  *       waits on the slot's own type and what reading that reaches, never on the entry the name names. This falls
  *       out of the walk: a kind is an atom, so reading against one reaches nothing further.</li>
  *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only, and a template's

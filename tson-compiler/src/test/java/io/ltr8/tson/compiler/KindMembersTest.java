@@ -7,14 +7,13 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.AliasChain;
-import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -23,15 +22,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §4.2's {@code kind_type}: the atom whose values are the names of the types built with a
- * constructor, its members computed at link by {@link KindMembers}' construction walk.
+ * [TSON-SCHEMA] §4.2's {@code reference} over a constructor, a kind: the atom whose values are the names of the
+ * entries whose value is of its {@code of}, its members computed at link by {@link KindMembers}' walk.
  *
- * <p>Each walk case the kernel's {@code kind_type} doc names is pinned on its own: a construction is a member, a
- * refinement of a member is one, the constructor itself is not, a type built with another constructor is not, an
- * ABSTRACT record base is a member of {@code kind<record>} with no values of its own, and an instantiation is a member
- * of its constructor's kind where the template it closes is not. A kind's members are computed over the whole closure,
- * so the kernel's and meta.tn's own types join them wherever the schema reaches core. Then {@code of}: resolved in the
- * schema's one namespace, and refused unless it is {@code type} or a constructor below it. Last, the kernel's {@code
+ * <p>Each walk case the kernel's {@code reference} doc names is pinned on its own: a construction is a member, a
+ * refinement of a member is one, a type built with another constructor is not, an ABSTRACT record base is a member of
+ * {@code kind<record>} with no values of its own, an instantiation is a member of its constructor's kind where the
+ * template it closes is not, and a constructor, whose declaration is a record, is a member of {@code kind<record>}
+ * and {@code type_kind}. A kind's members are computed over the whole closure, so the kernel's and meta.tn's own
+ * types join them wherever the schema reaches core. Then {@code of}: any type or constructor of the schema's one
+ * namespace, a type that is no constructor making the reference one that names values. Last, the kernel's {@code
  * name_type} slots, typed {@code identifier_kind}, judged by membership.
  */
 class KindMembersTest {
@@ -63,8 +63,8 @@ class KindMembersTest {
         }).resolveLinked(ID);
     }
 
-    private static KindBody kind(TsonLinkedSchema linked, String name) {
-        return assertInstanceOf(KindBody.class, linked.schema().entries().get(name));
+    private static ReferenceBody kind(TsonLinkedSchema linked, String name) {
+        return assertInstanceOf(ReferenceBody.class, linked.schema().entries().get(name));
     }
 
     private static final String IDS = """
@@ -73,16 +73,16 @@ class KindMembersTest {
               customer_id => !uuid_type {}
               v4_stock_id => !stock_id ^ { version: 4 }
               sku         => text
-              any_id      => !kind_type { of: uuid_type }
+              any_id      => !reference { of: uuid_type }
             }
             """;
 
     @Test
     void aConstructionAndARefinementOfOneAreMembersAndTheConstructorAndAnotherFamilyAreNot() {
-        KindBody ids = kind(link(IDS), "any_id");
+        ReferenceBody ids = kind(link(IDS), "any_id");
 
         // core's own `uuid` is a member too: the closure is the schema's, imports included.
-        assertEquals(Optional.of(List.of("customer_id", "stock_id", "uuid", "v4_stock_id")), ids.members());
+        assertEquals(List.of("customer_id", "stock_id", "uuid", "v4_stock_id"), ids.memberNames());
         assertEquals("uuid_type", ids.of());
     }
 
@@ -95,20 +95,20 @@ class KindMembersTest {
                 }
                 """);
         RecordBody order = assertInstanceOf(RecordBody.class, linked.schema().entries().get("order"));
-        KindBody inline = kind(linked, AliasChain.terminal(order.fields().get("id").type().name(),
+        ReferenceBody inline = kind(linked, AliasChain.terminal(order.fields().get("id").type().name(),
                 linked.schema().entries()::get));
 
-        assertEquals(new KindBody("uuid_type"), inline);
-        assertEquals(Optional.of(List.of("stock_id", "uuid")), inline.members());
+        assertEquals(new ReferenceBody("uuid_type"), inline);
+        assertEquals(List.of("stock_id", "uuid"), inline.memberNames());
     }
 
     @Test
     void aBraceRecordIsBuiltWithRecordAndAnAbstractBaseIsAMember() {
-        KindBody records = kind(link("""
+        ReferenceBody records = kind(link("""
                 {
                   pet     => abstract { name: text }
                   dog     => pet & { breed: text }
-                  records => !kind_type { of: record }
+                  records => !reference { of: record }
                 }
                 """), "records");
 
@@ -125,10 +125,10 @@ class KindMembersTest {
         TsonLinkedSchema linked = link("""
                 {
                   tags  => set<text>
-                  sets  => !kind_type { of: set_type }
+                  sets  => !reference { of: set_type }
                   boxed => <T> { v: T }
                   box_t => boxed<text>
-                  recs  => !kind_type { of: record }
+                  recs  => !reference { of: record }
                 }
                 """);
 
@@ -141,10 +141,10 @@ class KindMembersTest {
 
     @Test
     void aBaseKindTakesEveryConstructionBelowIt() {
-        KindBody atoms = kind(link("""
+        ReferenceBody atoms = kind(link("""
                 {
                   stock_id => !uuid_type {}
-                  atoms    => !kind_type { of: atom }
+                  atoms    => !reference { of: atom }
                 }
                 """), "atoms");
 
@@ -155,15 +155,15 @@ class KindMembersTest {
 
     @Test
     void anAliasOfAMemberIsAMemberThroughItsHop() {
-        KindBody ids = kind(link("""
+        ReferenceBody ids = kind(link("""
                 {
                   stock_id => !uuid_type {}
                   sku_id   => stock_id
-                  ids      => !kind_type { of: uuid_type }
+                  ids      => !reference { of: uuid_type }
                 }
                 """), "ids");
 
-        assertEquals(Optional.of(List.of("sku_id", "stock_id", "uuid")), ids.members());
+        assertEquals(List.of("sku_id", "stock_id", "uuid"), ids.memberNames());
     }
 
     /**
@@ -176,13 +176,13 @@ class KindMembersTest {
         TsonLinkedSchema linked = link("""
                 {
                   shape => (text | int32)
-                  atoms => !kind_type { of: atom }
-                  kinds => !kind_type { of: kind_type }
+                  atoms => !reference { of: atom }
+                  kinds => !reference { of: reference }
                   ids   => kind<uuid_type>
                 }
                 """);
 
-        KindBody atoms = kind(linked, "atoms");
+        ReferenceBody atoms = kind(linked, "atoms");
         assertTrue(atoms.memberNames().containsAll(List.of("atoms", "kinds", "ids")), atoms.memberNames().toString());
         assertTrue(!atoms.memberNames().contains("shape"), atoms.memberNames().toString());
         assertTrue(kind(linked, "kinds").memberNames().containsAll(List.of("atoms", "ids", "kinds", "type_kind")),
@@ -209,55 +209,57 @@ class KindMembersTest {
                 }
                 """);
 
-        assertEquals(Optional.of(List.of("customer_id", "stock_id", "uuid")), kind(linked, "any_id").members());
+        assertEquals(List.of("customer_id", "stock_id", "uuid"), kind(linked, "any_id").memberNames());
         // The import's own kind is recomputed over the importer's closure, not carried in from its own.
-        assertEquals(Optional.of(List.of("customer_id", "stock_id", "uuid")), kind(linked, "some_id").members());
+        assertEquals(List.of("customer_id", "stock_id", "uuid"), kind(linked, "some_id").memberNames());
     }
 
+    /** The admitted names are the linker's judgement and never a field: an author cannot write them. */
     @Test
-    void derivedIndexesWrittenByHandAreDiscardedAndRecomputed() {
-        KindBody ids = kind(link("""
+    void membersAreNoFieldAnAuthorWrites() {
+        SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
                   stock_id => !uuid_type {}
-                  any_id   => !kind_type { of: uuid_type  members: [sku] }
+                  any_id   => !reference { of: uuid_type  members: [sku] }
                   sku      => text
                 }
-                """), "any_id");
+                """));
 
-        assertEquals(Optional.of(List.of("stock_id", "uuid")), ids.members());
+        assertTrue(e.getMessage().contains("unknown field 'members'"), e.getMessage());
     }
 
     /**
      * A namespace type is a type built with {@code namespace}: the kernel's {@code type_kind} holds {@code field_map}
-     * and {@code schema}, and no constructor, {@code namespace} among them, whose instances are types.
+     * and {@code schema}. A constructor is a member too, its value being a record whose instances are declarations:
+     * {@code record}, {@code namespace} and {@code set_type} alike. A held template is not.
      */
     @Test
-    void typeKindHoldsTheNamespaceTypesAndNoConstructor() {
+    void typeKindHoldsTheNamespaceTypesAndTheConstructors() {
         TsonLinkedSchema kernel = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
                 uri -> {
                     throw new IllegalStateException("unexpected fetch: " + uri);
                 }).resolveLinked(TsonBundledSchemas.META_KERNEL_ID);
-        List<String> members = kind(kernel, "type_kind").members().orElseThrow();
+        List<String> members = kind(kernel, "type_kind").memberNames();
 
-        assertTrue(members.containsAll(List.of("field_map", "schema", "declared")), members::toString);
-        assertFalse(members.contains("set_type") || members.contains("record") || members.contains("alias")
-                || members.contains("namespace"), members::toString);
+        assertTrue(members.containsAll(List.of("field_map", "schema", "declared", "set_type", "record", "alias",
+                "namespace", "reference", "top")), members::toString);
+        assertFalse(members.contains("kind") || members.contains("ref"), members::toString);
     }
 
     /** {@code kind<namespace>} is a kind: it holds the kernel's namespace types and a schema's own. */
     @Test
     void aKindOfNamespaceHoldsEveryNamespaceType() {
-        KindBody namespaces = kind(link("""
+        ReferenceBody namespaces = kind(link("""
                 !!id:"https://example.test/kinds.tn"
                 !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   api        => !namespace { key_type: identifier  value_type: text }
-                  namespaces => !kind_type { of: namespace }
+                  namespaces => !reference { of: namespace }
                 }
                 """, ""), "namespaces");
 
-        assertEquals(Optional.of(List.of("api", "field_map", "schema")), namespaces.members());
+        assertEquals(List.of("api", "field_map", "schema"), namespaces.memberNames());
     }
 
     /**
@@ -273,56 +275,68 @@ class KindMembersTest {
                 !schema {
                   api        => !namespace { key_type: identifier  value_type: text }
                   labels     => !map { key_type: identifier  value_type: text }
-                  types      => !kind_type { of: type }
-                  namespaces => !kind_type { of: namespace }
-                  records    => !kind_type { of: record }
-                  products   => !kind_type { of: product }
-                  maps       => !kind_type { of: map }
+                  types      => !reference { of: type }
+                  namespaces => !reference { of: namespace }
+                  records    => !reference { of: record }
+                  products   => !reference { of: product }
+                  maps       => !reference { of: map }
                 }
                 """, "");
 
-        assertTrue(kind(linked, "types").members().orElseThrow().contains("api"));
-        assertTrue(kind(linked, "namespaces").members().orElseThrow().contains("api"));
-        assertTrue(kind(linked, "products").members().orElseThrow().contains("api"));
+        assertTrue(kind(linked, "types").memberNames().contains("api"));
+        assertTrue(kind(linked, "namespaces").memberNames().contains("api"));
+        assertTrue(kind(linked, "products").memberNames().contains("api"));
         for (String kind : List.of("records", "maps")) {
-            List<String> members = kind(linked, kind).members().orElseThrow();
+            List<String> members = kind(linked, kind).memberNames();
             assertFalse(members.contains("api") || members.contains("field_map") || members.contains("schema"),
                     () -> kind + ": " + members);
         }
     }
 
+    /**
+     * {@code of} names any type or constructor, and the predicate decides what it admits: past its alias hops no
+     * entry's value is an alias, so {@code kind<alias>} admits nothing, and a required field typed by it can hold
+     * no value -- the inhabitance check's verdict, not a refusal of the declaration.
+     */
     @Test
-    void aKindOfAConstructorBesideTypeIsRefusedAtTheDeclaration() {
+    void aKindOfAliasAdmitsNothing() {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
                   order => { id: kind<alias> }
                 }
                 """));
 
-        assertTrue(e.getMessage().contains("'alias'")
-                        && e.getMessage().contains("not 'type' or a constructor below it"), e.getMessage());
+        assertTrue(e.getMessage().contains("can never be satisfied"), e.getMessage());
     }
 
+    /** {@code top} is a constructor, so a reference over it names types: every entry whose value IS-A top. */
     @Test
-    void aConstructorAboveTypeIsRefused() {
-        SchemaValidationException e = assertThrows(SchemaValidationException.class,
-                () -> link("{ tops => !kind_type { of: top } }"));
+    void aReferenceOverTopNamesEveryType() {
+        List<String> members = kind(link("""
+                {
+                  order => { id: text }
+                  tops  => !reference { of: top }
+                }
+                """), "tops").memberNames();
 
-        assertTrue(e.getMessage().contains("'top'"), e.getMessage());
+        assertTrue(members.containsAll(List.of("order", "text", "record", "tops")), members::toString);
     }
 
+    /**
+     * A reference whose {@code of} is no constructor names values, whichever template spelled it: {@code
+     * kind<stock_id>} is {@code ref<stock_id>}, and no type's name is one.
+     */
     @Test
-    void ofNamingATypeThatIsNoConstructorIsRefused() {
-        // `stock_id` is this schema's type, and a kind is not a bound: its `of` names a constructor.
-        SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
+    void ofNamingATypeThatIsNoConstructorNamesValues() {
+        ReferenceBody ids = kind(link("""
                 {
                   stock_id => !uuid_type {}
-                  ids      => !kind_type { of: stock_id }
+                  ids      => !reference { of: stock_id }
                 }
-                """));
+                """), "ids");
 
-        assertTrue(e.getMessage().contains("a type and no constructor") && e.getMessage().contains("ref<stock_id>"),
-                e.getMessage());
+        assertFalse(ids.namesTypes());
+        assertEquals(List.of(), ids.memberNames());
     }
 
     @Test
@@ -346,7 +360,7 @@ class KindMembersTest {
                 !!id:"https://example.test/kinds.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  ids => !kind_type { of: uuid_type }
+                  ids => !reference { of: uuid_type }
                 }
                 """, ""));
 
@@ -357,8 +371,8 @@ class KindMembersTest {
     void theResolvedFormWritesTheMembers() {
         Namespace<Top> entries = link(IDS).schema().entries();
 
-        assertEquals(Optional.of(List.of("customer_id", "stock_id", "uuid", "v4_stock_id")),
-                ((KindBody) entries.get("any_id")).members());
+        assertEquals(List.of("customer_id", "stock_id", "uuid", "v4_stock_id"),
+                ((ReferenceBody) entries.get("any_id")).memberNames());
     }
 
     /** A default at a kind-typed field is a type name, judged a member at link (§5.2's field-value rule). */
@@ -394,8 +408,8 @@ class KindMembersTest {
                 uri -> { throw new IllegalStateException("unexpected fetch: " + uri); })
                 .resolveLinked("https://tson.io/2026/39/m/meta.tn");
 
-        assertEquals(Optional.of(List.of("field_name", "identifier", "param_name", "scheme_name", "type_name")),
-                kind(meta, "identifier_kind").members());
+        assertEquals(List.of("field_name", "identifier", "param_name", "scheme_name", "type_name"),
+                kind(meta, "identifier_kind").memberNames());
         assertTrue(kind(meta, "atom_kind").memberNames().containsAll(
                 List.of("boolean", "identifier", "identifier_kind", "atom_kind")),
                 kind(meta, "atom_kind").memberNames().toString());

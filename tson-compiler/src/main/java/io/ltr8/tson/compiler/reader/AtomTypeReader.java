@@ -13,8 +13,7 @@ import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.RefBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.ValueParser;
@@ -54,8 +53,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             .forRead(definition, context.linked().enumForm(name))
             .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(context.authoredName(name, definition), parser,
                     context.locationOf(name), namesProfile(definition),
-                    definition instanceof KindBody kind ? kind.of() : null,
-                    definition instanceof RefBody reference ? reference.of() : null,
+                    definition instanceof ReferenceBody kind && kind.namesTypes() ? kind.of() : null,
+                    definition instanceof ReferenceBody reference && !reference.namesTypes() ? reference.of() : null,
                     AtomParsers.inSchemaDocument(definition).orElse(null)))
             .orElseThrow(() -> new IllegalStateException(
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition));
@@ -126,12 +125,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     private final IdentifierProfile names;
 
     /**
-     * The constructor a kind's values are built with ({@code kind<C>}'s {@code C}), or {@code null} for every other
-     * atom.
+     * The {@code of} of a reference that names types, a constructor ({@code kind<record>}'s {@code record}), or {@code
+     * null} for every other atom.
      */
     private final String kindOf;
 
-    /** The type a reference's values are of ({@code ref<T>}'s {@code T}), or {@code null} for every other atom. */
+    /** The {@code of} of a reference that names values, a type ({@code ref<method>}'s {@code method}), or null. */
     private final String refOf;
 
     /**
@@ -146,13 +145,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     }
 
 
-    /** Whether this reads a kind, whose value is a type's name -- a position a {@code TypeRef} target holds by name. */
+    /** Whether this reads a type's name -- a position a {@code TypeRef} target holds by name. */
     boolean readsAKind() {
         return kindOf != null;
     }
 
-    /** Whether this reads a reference, whose value is a value's qualified name --
-     * held by a {@code Ref} or a {@code TypeRef}. */
+    /** Whether this reads a value's qualified name -- held by a {@code Ref} or a {@code TypeRef}. */
     boolean readsARef() {
         return refOf != null;
     }
