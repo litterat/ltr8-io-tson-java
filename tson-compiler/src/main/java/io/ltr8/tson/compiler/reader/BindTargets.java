@@ -47,7 +47,7 @@ import java.util.Optional;
  *       ({@code ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives
  *       the value when the schema links, a {@code TypeRef} the name alone. A {@code TypeRef} target at a kind-typed
  *       slot ({@code record_field.type} is {@code type_kind}, a meta's {@code request: kind<record>}) reads through
- *       a {@link KindSlotReader}: a type's name, or in a kernel body an application still to close, written quoted.
+ *       a {@link KindSlotReader}: a type's name, or in a kernel body an application still to close, written unquoted.
  *       Any other target there is bound as at an atom and wrapped in a {@link RecordedNameReader}, which records the
  *       name it read. The slot declares the spelling, so a {@code TypeRef} or {@code Ref} target is a mismatch at a
  *       record-typed slot, which holds the record's value inline, and at any other atom, where a token is a literal

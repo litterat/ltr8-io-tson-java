@@ -302,6 +302,43 @@ public final class TsonDataEmitter {
     }
 
     /**
+     * Writes {@code reference} unquoted ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12): its qualified name, and where it
+     * carries arguments an adjacent {@code <}, each argument separated by one space, and {@code >} -- the canonical
+     * text, {@code map<text list<int32>>}. A value argument keeps its token form, a quoted one escaped as {@link
+     * #quotedString} escapes. The caller is responsible for the head and every reference argument being qualified
+     * names, which is what a {@code TypeRef} read from either grammar holds.
+     */
+    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.TypeRef reference) {
+        startCoreValue();
+        emitReference(reference);
+        return this;
+    }
+
+    private void emitReference(io.ltr8.tson.schema.meta.TypeRef reference) {
+        emit(reference.name());
+        if (reference.arguments().isEmpty()) {
+            return;
+        }
+        emit('<');
+        for (int i = 0; i < reference.arguments().size(); i++) {
+            if (i > 0) {
+                emit(' ');
+            }
+            switch (reference.arguments().get(i)) {
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref nested -> emitReference(nested.ref());
+                case io.ltr8.tson.schema.meta.TypeArgument.Value value -> {
+                    if (value.value().form() == io.ltr8.tson.schema.meta.Token.Form.UNQUOTED) {
+                        emit(value.value().text());
+                    } else {
+                        emitQuoted(value.value().text());
+                    }
+                }
+            }
+        }
+        emit('>');
+    }
+
+    /**
      * A C0 control character, the range §7.2.2 requires escaped. <b>A comparison, deliberately, not a
      * {@code Pattern}</b> -- this runs once per character of every string written, and a regex here cost a
      * {@code String}, a {@code Matcher} and the {@code Matcher}'s own internals per character (measured at

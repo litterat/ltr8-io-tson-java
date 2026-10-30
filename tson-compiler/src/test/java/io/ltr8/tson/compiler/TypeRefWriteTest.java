@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * How a reference is written: an argument-free one as its bare name, which [TSON-SCHEMA] §8.1 requires of canonical
  * output and which is the only spelling a value written by name has ([TSON-SCHEMA] §5.12); an application as its
- * canonical text, quoted, {@code <} being reserved in data (SPEC-FEEDBACK.md #12).
+ * canonical text, unquoted, the data grammar's reference (SPEC-FEEDBACK.md #12).
  */
 class TypeRefWriteTest {
 
@@ -29,9 +29,9 @@ class TypeRefWriteTest {
     }
 
     @Test
-    void anApplicationIsItsQuotedText() {
-        assertEquals("\"box<text>\"", written(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
-        assertEquals("\"map<text 3 \\\"a b\\\">\"", written(new TypeRef("map", List.of(
+    void anApplicationIsItsUnquotedText() {
+        assertEquals("box<text>", written(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
+        assertEquals("map<text 3 \"a b\">", written(new TypeRef("map", List.of(
                 new TypeArgument.Ref(TypeRef.of("text")), new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED)),
                 new TypeArgument.Value(new Token("a b", Token.Form.SINGLE_LINE_QUOTED))))));
     }

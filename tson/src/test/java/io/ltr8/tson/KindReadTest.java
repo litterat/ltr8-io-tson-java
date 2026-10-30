@@ -9,6 +9,10 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.UuidType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -16,6 +20,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -37,6 +43,11 @@ class KindReadTest {
               customer_id => !uuid_type {}
               sku         => text
               ledger      => { named: kind<uuid_type>  fallback?: kind<uuid_type> ~ customer_id }
+              box         => <T> { v: T }
+              pair        => <A, B> { a: A  b: B }
+              inner       => box<text>
+              outer       => pair<box<text> int32>
+              typed       => { t: type_kind }
             }""";
 
     private static final SchemaSource SOURCE = uri -> IDS_SCHEMA;
@@ -53,11 +64,64 @@ class KindReadTest {
         return tson().validate("!!import:\"" + IDS + "\"\n" + data);
     }
 
+    /** What a reference-typed position reads to: the reference itself, its name, and a helper to its referent. */
+    private static TypeRef reference(TsonValue node) {
+        return node.as(TypeRef.class).orElseThrow(() -> new AssertionError("not a reference: " + node));
+    }
+
     @Test
     void aMemberNameReadsAsThatName() {
-        assertEquals(Optional.of("stock_id"), read("!ledger { named: stock_id }").get("named").asString());
-        assertEquals(Optional.of("customer_id"),
-                read("!ledger { named: \"customer_id\" }").get("named").asString());
+        TypeRef named = reference(read("!ledger { named: stock_id }").get("named"));
+        assertEquals("stock_id", named.text());
+        assertEquals(List.of("stock_id"), named.segments());
+        assertEquals(TypeRef.of("customer_id"), reference(read("!ledger { named: \"customer_id\" }").get("named")));
+    }
+
+    /** The reference names its referent in the closure it was read under: the entry's value. */
+    @Test
+    void aReferenceFindsTheEntryItNames() {
+        Object referent = reference(read("!ledger { named: stock_id }").get("named")).referent().orElseThrow();
+        assertInstanceOf(UuidType.class, referent);
+    }
+
+    /**
+     * An application resolves level by level, by structural identity, to the entries the schema closed: the
+     * inner {@code box<text>} to {@code inner}, then {@code pair<inner int32>} to {@code outer}. Whitespace is free.
+     */
+    @Test
+    void aNestedApplicationResolvesBottomUpToTheEntryTheSchemaClosed() {
+        TypeRef read = reference(read("!typed { t: pair< box<text>, int32 > }").get("t"));
+        assertEquals("pair<box<text> int32>", read.text());
+        Top outer = tson().bindRegistry().core().resolveLinked(IDS).schema().entries().get("outer");
+        assertEquals(outer, read.referent().orElseThrow());
+        TypeRef inner = ((TypeArgument.Ref) read.arguments().getFirst()).ref();
+        assertEquals("box<text>", inner.text());
+        assertEquals(tson().bindRegistry().core().resolveLinked(IDS).schema().entries().get("inner"),
+                inner.referent().orElseThrow());
+    }
+
+    /**
+     * A refusal lists the kind's members as an author can write them: the entry {@code kind<uuid_type>} closed to is
+     * minted under a name nobody wrote, and the list names it by its application.
+     */
+    @Test
+    void aRefusalNamesAMintedMemberByItsApplication() {
+        List<Diagnostic> problems = problems("!typed { t: nope }");
+        assertEquals(1, problems.size(), problems.toString());
+        String message = problems.getFirst().message();
+        assertTrue(message.contains("kind<uuid_type>"), message);
+        assertFalse(message.contains("reference_uuid_type"), message);
+        assertFalse(problems.getFirst().expected().contains("reference_uuid_type"), problems.getFirst().expected());
+    }
+
+    /** An application nothing in the closure closed names no type the schema closes, and is refused. */
+    @Test
+    void anApplicationNothingClosedIsRefused() {
+        List<Diagnostic> problems = problems("!typed { t: box<int32> }");
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("names no type this schema closes"),
+                problems.getFirst().message());
     }
 
     @Test
@@ -67,7 +131,7 @@ class KindReadTest {
 
     @Test
     void aDefaultAtAKindTypedFieldIsAMemberName() {
-        assertEquals(Optional.of("customer_id"), read("!ledger { named: stock_id }").get("fallback").asString());
+        assertEquals(TypeRef.of("customer_id"), reference(read("!ledger { named: stock_id }").get("fallback")));
     }
 
     @Test

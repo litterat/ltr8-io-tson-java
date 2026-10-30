@@ -10,10 +10,14 @@ is why they are the linker's. Current form only; history lives in git.
   it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling:
   `kind<record>` and `ref<record>` are one entry, and `kind<api>`, over a type that is no constructor, names values
   (`ValuesByName`, `design/references.md`).
-- Every reference's derived `index` (`Index(namesTypes, members, applications)`, the members sorted, and the entry
-  each recorded `@application` denotes) is recomputed for **every** reference in the closure, imports included, and
-  never trusted from a body. It is `@Unbound` and never written: a resolved form states `!reference { of: … }`
-  alone, and a written `members:` is refused as an unknown field.
+- Every reference's derived `index` (`Index(namesTypes, members, applications, entries, shown)`: the members sorted;
+  the entry each application the closure closed denotes, every `@application` and every entry's
+  `TsonSchema.EntryFacts.closes`, expansions included; the final namespace's entries, which a reference read in data
+  names through `ReferenceBody.closure()`; and the members as a message shows them, a minted one by its application
+  through `EntryDisplayName.authored`, one with no spelling left out) is recomputed for **every** reference in the
+  closure, imports included (`TsonSchemaLinker.computeKinds`), and never trusted from a body. It is `@Unbound` and
+  never written: a resolved form states `!reference { of: … }` alone, and a written `members:` is refused as an
+  unknown field.
   `ReferenceBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
   unifies with it.
 - `of` resolves in the schema's one namespace and names any type or constructor; refused are a name resolving to
@@ -92,7 +96,10 @@ in the merged map after `computeSubtypes` and before the name-type checks; a ref
   the kernel's `enum => enum_type ^ { name_type?: = identifier }` is a member at the kernel's link, a schema's pin
   of its own `text_identifier` at that schema's, and a pin of a text family is refused where it is written.
 - **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers.forRead`'s
-  `KindParser`): a type-name token, or a JSON string, naming a member of the linked index. That is every data
+  `KindParser`, an `AtomTypeParser<TypeRef>`): a name token, a reference with arguments, or a JSON string holding
+  either, read into the `TypeRef` it is and naming a member of the linked index, an application through the entry
+  it denotes (`design/references.md`). The value is the `TypeRef`, carrying the closure its `referent()` resolves
+  in, in a tree read as in a bind; a `String` host receives its canonical text. That is every data
   document's reading, whatever it imports: a data document importing only meta.tn that writes `!record_field { type:
   int32 }` is refused, `int32` being core's. In a **schema document** a name resolves in the schema being resolved,
   which the reading closure does not hold, so the reader checks the grammar alone (`AtomParsers.inSchemaDocument`,

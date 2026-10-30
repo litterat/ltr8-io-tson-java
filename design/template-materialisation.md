@@ -26,8 +26,16 @@ derived — and the static check that runs before any of it.
   reaches its own application (`tied`), which keeps an instantiation entry: the record itself, or an `Alias` to
   the synthetic.
 - Every instantiation — a declared one, a self-reaching one — records its application in the map `SchemaResolver`
-  shares with the materialiser, which writes it on the entry's key as `@application`; §8.2's identity and the
-  applied-parent fold key on it.
+  shares with the materialiser, in its reduced form (each argument closed to the entry it names), which §8.2's
+  identity and the applied-parent fold key on. The entry's key carries it as `@application` **as written**
+  (`asWritten`, `writtenApplications`): nested arguments unreduced and each stated the same way,
+  `@application:pair<box<text> int32>`, a bare-name argument followed through its alias chain (§8.2), and an
+  argument at a value parameter a value token. An expansion carries no `@application`.
+- Every application the pass closes, an expansion's included, is recorded against the entry it closed to
+  (`closedApplications`, as met and with its arguments closed; a generated head's own intermediate form skipped), and
+  `SchemaResolver` stores the list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written.
+  It is what a data read resolves an application against (`ReferenceBody.entryOf`, `design/references.md`), and what
+  a message names a minted entry by (`EntryDisplayName`).
 - A composition operand never closes, open or closed: it is absorbed by value and mints nothing. A closed refinement
   source is closed on demand, through the same materialiser instance.
 - Which parents were applications is read off the **held** tree's chain `parents`, not off the closed one, whose
@@ -51,8 +59,9 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   and must be one entry; otherwise the arguments would be interchangeable at a scalar position and the
   applications refused one layer up. A refinement (`!uuid ^ {}`) and a fresh instance (`!uuid_type {}`) are
   ordinary entries and keep their own applications, which is what makes those spellings mean something. **Identity
-  is normalised, provenance is not**: the canonical application is what `@application` records, and the use site
-  still names what the author wrote, since no pass rewrites use sites (§8.3). It rests on nothing that changes how
+  is normalised, provenance is not**: the canonical application is what identity keys on, `@application` states
+  the application as written past its alias hops, and the use site still names what the author wrote, since no
+  pass rewrites use sites (§8.3). It rests on nothing that changes how
   a value reads riding on a reference — a `bytes` alphabet is `bytes_type`'s own selector (§5.5).
   `AliasedArgumentIdentityTest` pins it. `closeApplicationInto` dereferences the same way, so the declared and the
   minted path agree on the name, the ownership key and the recorded application.
@@ -68,7 +77,7 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   selector's type from, and what keeps the synthetic merge's renames reaching the base.
 - **A minted entry's identity is its content** (§8.2): its name derives from its binding record, so two `box<text>`
   anywhere land on one entry, and so do `box<int32>` and `crate<int32>` over two templates with one field list. A
-  declared entry's identity is its name, and its key records the canonical application, so an imported schema's
+  declared entry's identity is its name, and its key records its application, so an imported schema's
   declared applications unify with a later schema's use sites (`ownedBy`).
 - **A declaration naming the application *is* that entry** (§8.2). `text_box => box<text>` resolves to the closed
   record under `text_box`, its key recording the application — not an `Alias` to an entry beside it.
@@ -170,7 +179,7 @@ resolves, before the batch pass runs. They are handled differently.
   (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on
   'a'`) rather than recursing (`RecordTemplateTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).
 - **An argument that is itself an application survives whole.** Substitution writes a bound reference through
-  `WireForm.refValue` — a bare token with no arguments, its quoted canonical text with them — so `box<inner<T>>`
+  `WireForm.refValue` — a bare token with no arguments, a `ReferenceValue` with them — so `box<inner<T>>`
   keeps `inner<T>` for the absorbing declaration's own materialisation to close. Sharing that producer is the
   requirement: two spellings of one form would be two entries for one type, since a name derives from what is
   written.

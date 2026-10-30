@@ -209,9 +209,10 @@ final class ResolvedForm {
         return marked;
     }
 
-    /** A written application, a reference's quoted text, as its canonical text. */
+    /** A written application, the data grammar's reference, as its canonical text. */
     private static String writtenApplication(CoreValue value) {
-        return io.ltr8.tson.atom.ReferenceGrammar.parse(((TokenValue) value).text()).text();
+        return value instanceof io.ltr8.tson.compiler.ast.ReferenceValue reference ? reference.reference().text()
+                : ((TokenValue) value).text();
     }
 
     /** A bound application as its canonical text, on the same terms. */

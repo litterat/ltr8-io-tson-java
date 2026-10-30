@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -11,6 +10,7 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -44,8 +44,8 @@ import java.util.function.Function;
  * writer's output is canonical-explicit and fully quoted, which is a different language from the one a held
  * body is written in: {@code TemplateBody.names()} and {@link #substitute} both key on a token being
  * unquoted, so a quoted body references no parameters at all. What is written here is what an author would
- * have written -- an unquoted token where the writer would quote, a reference as its canonical text, and nothing at
- * all where the constructor's own default says it.
+ * have written -- an unquoted token where the writer would quote, an application as the data grammar's reference,
+ * and nothing at all where the constructor's own default says it.
  *
  * <p><b>One spelling per shape is the requirement, not the tidiness.</b> An entry name derives from what is
  * written ({@code SchemaDesugarer.internalName}), so a second spelling of one reference splits one type
@@ -199,12 +199,12 @@ final class WireForm {
     // ── Writing: a resolved value as the wire form it was written in ───────────────────────────
 
     /**
-     * The held body of an <b>open alias</b> -- {@code <B> !alias { target: "pair<uuid B>" }}, the form
+     * The held body of an <b>open alias</b> -- {@code <B> !alias { target: pair<uuid B> }}, the form
      * [TSON-SCHEMA] §8.1 says a partial application denotes: {@code alias.target} is a reference, and a reference
      * may carry the arguments the alias already binds.
      *
      * <p>The target goes through {@link #refValue} like every other reference this package writes, so a
-     * no-argument target is a bare token and an application its quoted canonical text -- the one spelling §5.10
+     * no-argument target is a bare token and an application a {@link ReferenceValue} -- the one spelling §5.10
      * requires, however many phases produce it.
      */
     static DataValue heldReference(TypeRef target) {
@@ -297,37 +297,27 @@ final class WireForm {
     }
 
     /**
-     * A reference in the held spelling: a bare name, unquoted, or an application as its canonical text, quoted
-     * ({@link TypeRef#text}), {@code <} being reserved in data (SPEC-FEEDBACK.md #12).
+     * A reference in the held spelling: a bare name an unquoted token, and an application a {@link ReferenceValue},
+     * written unquoted as data grammar ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12).
      *
      * <p><b>One spelling is the requirement, not the tidiness.</b> An entry name derives from what is written, so a
      * second spelling of one reference would give one type two entry names. That is why {@link TemplateMaterialiser}'s
      * substitution writes a bound reference through this rather than spelling one of its own.
      */
     static CoreValue refValue(TypeRef ref) {
-        return ref.arguments().isEmpty() ? new TokenValue(ref.name(), TokenForm.UNQUOTED)
-                : new TokenValue(ref.text(), TokenForm.SINGLE_LINE_QUOTED);
+        return ref.arguments().isEmpty() ? new TokenValue(ref.name(), TokenForm.UNQUOTED) : new ReferenceValue(ref);
     }
 
     // ── Reading: the wire form back as the reference it spells ─────────────────────────────────
 
     /**
-     * The application {@code value} spells, or empty where it spells none: a quoted token whose text is a reference
-     * carrying an argument list. A bare name is an unquoted token, and every other quoted token is a literal.
-     * Package-visible so {@link HeldBody} and {@code ParameterTypes} recognise an application by the same test that
-     * closes one -- a held body is written by one phase and read by several, and a second opinion about what an
-     * application looks like is what makes one of them wrong.
-     *
-     * <p>The cost of the quoted spelling: a held body's text literal that is itself a well-formed application is read
-     * as one. A held body is a constructor application as written, and a text slot holding {@code "box<T>"} beside a
-     * parameter {@code T} is the one shape that meets it.
+     * The application {@code value} is, or empty where it is none: a {@link ReferenceValue}, the data grammar's
+     * reference with arguments. A bare name is an unquoted token, and a quoted token is never a reference, so a held
+     * body's text slot holding {@code "box<T>"} is text. Package-visible so {@link HeldBody} and {@code
+     * ParameterTypes} recognise an application by the same test that closes one.
      */
     static Optional<TypeRef> applicationIn(CoreValue value) {
-        if (value instanceof TokenValue token && token.form() != TokenForm.UNQUOTED
-                && ReferenceGrammar.isApplication(token.text())) {
-            return Optional.of(ReferenceGrammar.parse(token.text()));
-        }
-        return Optional.empty();
+        return value instanceof ReferenceValue reference ? Optional.of(reference.reference()) : Optional.empty();
     }
 
     /** The names an application writes: its head and every reference among its arguments, at any depth. */
@@ -396,7 +386,7 @@ final class WireForm {
      * slot is a literal and nothing else; here the body is uninterpreted until this substitution finishes, so
      * §8.1's shadowing rule decides it -- a token that resolves into {@code parameters} is a parameter, and
      * anything else is what it looks like. Inside an application ({@link #applicationIn}) an argument naming a
-     * parameter is rewritten the same way, and the application written again as its canonical text.
+     * parameter is rewritten the same way, and the application written again through {@link #refValue}.
      *
      * <p><b>An argument may itself be open, and that is a supported use rather than an accident.</b>
      * {@code DefinitionResolver} substitutes an operand's held body with the arguments an enclosing
@@ -411,8 +401,8 @@ final class WireForm {
             case TokenValue token when token.form() == TokenForm.UNQUOTED
                     && parameters.contains(token.text()) ->
                     argumentValue(argumentFor(token.text(), head, bindings));
-            case TokenValue token when applicationIn(token).isPresent() ->
-                    refValue(substituted(applicationIn(token).get(), head, parameters, bindings));
+            case ReferenceValue reference ->
+                    refValue(substituted(reference.reference(), head, parameters, bindings));
             case ArrayValue array -> new ArrayValue(array.elements().stream()
                     .map(element -> rewritten(element, substitute(element.coreValue(), head, parameters,
                             bindings))).toList());
@@ -479,13 +469,13 @@ final class WireForm {
      * One argument in the held spelling, standing where the parameter it binds stood.
      *
      * <p>A <b>literal</b> is its own token. A <b>reference</b> goes through {@link #refValue}, which spells a
-     * no-argument one as a bare token and one carrying arguments as its quoted text. Writing the head name alone
+     * no-argument one as a bare token and one carrying arguments as a {@link ReferenceValue}. Writing the head alone
      * would be the shorter code and is wrong: {@code box<inner<T>>} would put {@code inner} where {@code inner<T>}
      * belongs and drop the argument list with no diagnostic.
      *
      * <p><b>Reusing the desugarer's producer is the requirement, not the convenience.</b> Two spellings of
      * one form are two entries for one type, an entry name deriving from what is written -- so the phase that
-     * substitutes and the phase that lifts have to agree down to how a reference's text is spelled. Sharing the
+     * substitutes and the phase that lifts have to agree down to how a reference is spelled. Sharing the
      * function is what makes that true by construction.
      *
      * <p>Every slot a parameter can occupy as a type takes either spelling: a field's {@code type}, an {@code

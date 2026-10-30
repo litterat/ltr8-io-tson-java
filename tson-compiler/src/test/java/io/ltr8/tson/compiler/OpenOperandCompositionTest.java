@@ -234,8 +234,8 @@ class OpenOperandCompositionTest {
 
     /**
      * One template applied to another, at an absorbing position and still open. Substitution writes a bound
-     * reference through {@code WireForm.refValue}, which spells one carrying arguments as its quoted canonical
-     * text rather than as its head name, so {@code inner<T>} survives whole and the absorbing declaration's own
+     * reference through {@code WireForm.refValue}, which spells one carrying arguments as the data grammar's
+     * reference rather than as its head name, so {@code inner<T>} survives whole and the absorbing declaration's own
      * materialisation closes it. Writing the head name alone would drop the argument list with no diagnostic.
      */
     @Test

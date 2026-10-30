@@ -10,6 +10,7 @@ import io.ltr8.tson.tree.TsonAtom;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonMissing;
 import io.ltr8.tson.tree.TsonRecord;
+import io.ltr8.tson.tree.TsonReference;
 import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -46,6 +47,10 @@ public final class TreeValueWriter {
             case TsonArray array -> writeSequence(array.elements(), array.typeRef(), out);
             case TsonTuple tuple -> writeSequence(tuple.elements(), tuple.typeRef(), out);
             case TsonAtom atom -> writeAtom(atom, out);
+            case TsonReference reference -> {
+                reference.typeRef().ifPresent(out::typeRef);
+                out.reference(reference(reference));
+            }
             case TsonVoid voidNode -> {
                 voidNode.typeRef().ifPresent(out::typeRef);
                 out.voidValue();
@@ -54,6 +59,28 @@ public final class TreeValueWriter {
                     "a TsonMissing is a navigation artifact and cannot be written as TSON; navigation failed at \""
                             + missing.path() + "\"");
         }
+    }
+
+    /**
+     * A schemaless reference as the reference it was read from: a string argument that is a qualified name a
+     * reference, any other a quoted token, and every other value its text, unquoted.
+     */
+    private static io.ltr8.tson.schema.meta.TypeRef reference(TsonReference reference) {
+        List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new java.util.ArrayList<>();
+        for (TsonValue argument : reference.arguments()) {
+            arguments.add(switch (argument) {
+                case TsonReference nested -> new io.ltr8.tson.schema.meta.TypeArgument.Ref(reference(nested));
+                case TsonAtom atom when atom.value() instanceof String text
+                        && io.ltr8.tson.atom.ReferenceGrammar.isQualifiedName(text) ->
+                        new io.ltr8.tson.schema.meta.TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(text));
+                case TsonAtom atom when atom.value() instanceof String text ->
+                        new io.ltr8.tson.schema.meta.TypeArgument.Value(new io.ltr8.tson.schema.meta.Token(text,
+                                io.ltr8.tson.schema.meta.Token.Form.SINGLE_LINE_QUOTED));
+                default -> new io.ltr8.tson.schema.meta.TypeArgument.Value(new io.ltr8.tson.schema.meta.Token(
+                        String.valueOf(argument), io.ltr8.tson.schema.meta.Token.Form.UNQUOTED));
+            });
+        }
+        return new io.ltr8.tson.schema.meta.TypeRef(reference.name(), arguments);
     }
 
     /**
@@ -120,6 +147,12 @@ public final class TreeValueWriter {
      */
     private void writeAtom(TsonAtom node, TsonDataEmitter out) throws DataBindException {
         Object value = node.value();
+        if (value instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
+            // A reference a schema-directed read delivered: written as the reference it is, unquoted.
+            node.typeRef().ifPresent(out::typeRef);
+            out.reference(reference);
+            return;
+        }
         VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());
         if (vocab != null) {
             out.typeRef(node.typeRef().orElseGet(() -> vocab.typeRef(value))).quotedString(vocab.write(value));

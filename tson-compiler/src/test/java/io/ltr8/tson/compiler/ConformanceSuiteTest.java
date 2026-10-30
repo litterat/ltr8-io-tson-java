@@ -289,6 +289,38 @@ class ConformanceSuiteTest {
         assertCoreValueMatches((RecordValue) fieldValue(expected, "core").coreValue(), actual.coreValue());
     }
 
+    /** A reference with arguments: its name, and each argument a nested reference or a token, in order. */
+    private static void assertReferenceMatches(RecordValue expected, io.ltr8.tson.schema.meta.TypeRef actual) {
+        assertEquals(fieldText(expected, "name"), actual.name(), "reference name");
+        ArrayValue expArguments = (ArrayValue) fieldCore(expected, "arguments");
+        assertEquals(expArguments.elements().size(), actual.arguments().size(), "reference argument count");
+        for (int i = 0; i < actual.arguments().size(); i++) {
+            RecordValue.Field argument = soleField((RecordValue) expArguments.elements().get(i).coreValue(),
+                    "reference argument");
+            RecordValue payload = (RecordValue) argument.value().coreValue();
+            switch (actual.arguments().get(i)) {
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref ref when !ref.ref().arguments().isEmpty() -> {
+                    assertEquals("reference", argument.name(), "argument[" + i + "] kind");
+                    assertReferenceMatches(payload, ref.ref());
+                }
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref ref -> {
+                    assertEquals("token", argument.name(), "argument[" + i + "] kind");
+                    assertEquals("unquoted", fieldText(payload, "form"), "argument[" + i + "] form");
+                    assertEquals(fieldText(payload, "text"), ref.ref().name(), "argument[" + i + "] text");
+                }
+                case io.ltr8.tson.schema.meta.TypeArgument.Value value -> {
+                    assertEquals("token", argument.name(), "argument[" + i + "] kind");
+                    assertEquals(fieldText(payload, "form"), switch (value.value().form()) {
+                        case UNQUOTED -> "unquoted";
+                        case SINGLE_LINE_QUOTED -> "single-line";
+                        case MULTI_LINE_QUOTED -> "multi-line";
+                    }, "argument[" + i + "] form");
+                    assertEquals(fieldText(payload, "text"), value.value().text(), "argument[" + i + "] text");
+                }
+            }
+        }
+    }
+
     private static void assertCoreValueMatches(RecordValue expected, CoreValue actual) {
         RecordValue.Field member = soleField(expected, "core-value");
         String kind = member.name();
@@ -307,6 +339,8 @@ class ConformanceSuiteTest {
                 assertEquals(expForm, actForm, "token form");
                 assertEquals(fieldText(payload, "text"), tv.text(), "token text");
             }
+            case "reference" -> assertReferenceMatches(payload,
+                    assertInstanceOf(ReferenceValue.class, actual, "core-value kind 'reference'").reference());
             case "absent" -> assertInstanceOf(VoidValue.class, actual, "core-value kind 'absent'");
             case "empty-brace" -> assertInstanceOf(EmptyBrace.class, actual, "core-value kind 'empty-brace'");
             case "record" -> {
@@ -459,6 +493,18 @@ class ConformanceSuiteTest {
         CoreValue payload = member.value().coreValue();
         switch (member.name()) {
             case "absent" -> assertInstanceOf(TsonVoid.class, actual, "reader-value 'absent'");
+            case "reference" -> {
+                TsonReference reference = assertInstanceOf(TsonReference.class, actual, "reader-value 'reference'");
+                ArrayValue expSegments = (ArrayValue) fieldCore((RecordValue) payload, "segments");
+                assertEquals(expSegments.elements().stream().map(e -> ((TokenValue) e.coreValue()).text()).toList(),
+                        reference.segments(), "reference segments");
+                ArrayValue expArguments = (ArrayValue) fieldCore((RecordValue) payload, "arguments");
+                assertEquals(expArguments.elements().size(), reference.arguments().size(), "reference argument count");
+                for (int i = 0; i < reference.arguments().size(); i++) {
+                    assertReaderValueMatches((RecordValue) expArguments.elements().get(i).coreValue(),
+                            reference.arguments().get(i));
+                }
+            }
             case "atom" -> assertAtomMatches((RecordValue) payload,
                     assertInstanceOf(TsonAtom.class, actual, "reader-value 'atom'"));
             case "record" -> {

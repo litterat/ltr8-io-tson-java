@@ -119,12 +119,13 @@ final class AtomReader<T> implements JsonTypeReader<T> {
             T value = parser.read(content);
             // Hygiene judges the name the value is, in its type's normalization form, not the spelling -- each name
             // an application writes, where a kind's value is one.
-            String named = value instanceof String name ? name : content;
+            String named = value instanceof String name ? name
+                    : value instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference.text() : content;
             JsonReadContext reading = ctx;
             return names != null && ReferenceGrammar.anyRefused(named,
                     each -> NameHygiene.refusesValue(reading, each, names)) ? null : value;
         } catch (UnsupportedOperationException gap) {
-            // A value this library cannot judge yet, such as an application its closure records no entry for.
+            // A value this library cannot judge yet, such as a type named by a qualified name (`geo.address<T>`).
             ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge", content);
             return null;
         } catch (AtomTypeException e) {

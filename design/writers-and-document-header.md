@@ -18,10 +18,14 @@ keeps the rest of the document. Current form only; history lives in git.
   will not read back.
 - `TsonDataEmitter.field` writes a name that is no identifier as a quoted string: a relaxed `name_type`
   ([TSON-SCHEMA] §5.2) admits `"@id"`, which written bare would not lex back.
-- `DataClassObjectWriter` writes a reference (`schema.meta.TypeRef`, a `type_kind` value) with no arguments as its
-  bare name, as a value written by name has only that spelling ([TSON-SCHEMA] §5.12), and an application as one
-  quoted token, its canonical text (`"result<T>"`, `<` being reserved in data; SPEC-FEEDBACK.md #12). A name some
-  segment of which is no identifier is written quoted too, never as a bare token that would not lex back.
+- A reference is written unquoted, as data grammar ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12):
+  `TsonDataEmitter.reference(TypeRef)` writes the qualified name and, where it carries arguments, an adjacent `<`,
+  the arguments one space apart and `>`, the canonical text `map<text list<int32>>`, a value argument keeping its
+  token form. `AstWriter` writes a `ReferenceValue` through it, `TreeValueWriter` a `TsonReference`, and
+  `DataClassObjectWriter` a `schema.meta.TypeRef` (a `type_kind` value): a name as its one token, as a value written
+  by name has only that spelling ([TSON-SCHEMA] §5.12), and an application as `!alias { target: result<T> }` or
+  `@application:response<order 201>` writes it. A reference some name in which is no qualified name is written as a
+  quoted string, never as bare text that would not read back.
 - `DataClassObjectWriter` writes a `Namespace` as the map it holds: each key keeps its annotations and is bare where
   it is an identifier, quoted otherwise; a value is tagged only where its class carries `@Typename`, which is what
   selects a subtype of the value type on the way back in. A value entry (`ValueEntry`) is written as its `type` for

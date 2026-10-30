@@ -277,6 +277,7 @@ public class TsonDataParser {
             Position position = e.position();
             CoreValue value = switch (e) {
                 case TokenEvent t -> new TokenValue(t.text(), t.form());
+                case ReferenceEvent r -> new ReferenceValue(r.reference());
                 case VoidEvent ignored -> new VoidValue();
                 case EmptyBraceEvent ignored -> new EmptyBrace();
                 case RecordStart ignored -> record();

@@ -85,32 +85,32 @@ class UseSiteNamingTest {
     }
 
     /**
-     * <b>An application nothing declares is its expansion, which no author named</b> (§5.10). {@code b<10>} is
-     * an atom instance with no spelling of its own, so the message is the atom family's alone, and the position
-     * the diagnostic carries says where -- never the content-derived name of the entry it landed on.
+     * <b>An application nothing declares is its expansion, named by the application as written</b> (§5.10, §8.2):
+     * {@code b<10>} is an atom instance under a content-derived name no author wrote, and the message names the
+     * application that closed to it instead.
      */
     @Test
-    void aMintedApplicationLeavesTheMessageToItsFamily() {
+    void aMintedApplicationIsNamedByItsApplication() {
         List<String> found = messages("  r => { e: b<10> }", "!r { e: 5 }");
 
-        assertEquals(List.of("'5' is less than the minimum 10"), found);
+        assertEquals(List.of("'b<10>': '5' is less than the minimum 10"), found);
     }
 
-    /** A record application nothing declares expands to a record no author named, shown as its body. */
+    /** A record application nothing declares is named by its application too, not by its body. */
     @Test
-    void aMintedRecordIsNamedByItsBody() {
+    void aMintedRecordIsNamedByItsApplication() {
         List<String> found = messages("  bx => <T> { v: T }\n  r => { e: bx<int32> }", "!r { e: { v: 1  nope: 2 } }");
 
         assertEquals(1, found.size(), found::toString);
-        assertTrue(found.getFirst().startsWith("unknown field 'nope' on '{ v: int32 }'"), found.getFirst());
+        assertTrue(found.getFirst().startsWith("unknown field 'nope' on 'bx<int32>'"), found.getFirst());
     }
 
-    /** The same for a set: {@code set<text>} expands to a set no author named, which is not the array {@code [text]}. */
+    /** The same for a set: {@code set<text>} is named as the application, not as the array {@code [text]}. */
     @Test
-    void aMintedSetIsNotNamedAsAnArray() {
+    void aMintedSetIsNamedByItsApplication() {
         List<String> found = messages("  r => { t: set<text> }", "!r { t: [a a] }");
 
-        assertEquals(List.of("elements must be unique, 'a' appears more than once"), found);
+        assertEquals(List.of("'set<text>' requires unique elements, 'a' appears more than once"), found);
     }
 
     /**

@@ -108,7 +108,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * <b>A collection-valued slot holds an application like every other {@code type_kind}-typed slot.</b>
-     * {@code variants} is a {@code [type_kind]}, so a §5.10 application standing in one is spelled as its quoted
+     * {@code variants} is a {@code [type_kind]}, so a §5.10 application standing in one is spelled as its
      * reference and rewritten to the entry it denotes one pass later -- the same route a field
      * type, an {@code element_type} and a map's {@code key_type}/{@code value_type} already took. Refusing the
      * variant in {@code choiceBinding} instead would leave the <em>whole</em> choice unlifted, and an unlifted

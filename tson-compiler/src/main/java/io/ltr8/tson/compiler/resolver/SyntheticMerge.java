@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -103,6 +104,11 @@ final class SyntheticMerge {
         applications.replaceAll((name, application) -> renamed(application, renames));
     }
 
+    /** {@code ref} with every name {@code renames} merged rewritten, its arguments' included. */
+    static TypeRef renamedReference(TypeRef ref, Map<String, String> renames) {
+        return renames.isEmpty() ? ref : renamed(ref, renames);
+    }
+
     private static TypeRef renamed(TypeRef ref, Map<String, String> renames) {
         List<TypeArgument> arguments = ref.arguments().stream()
                 .map(argument -> argument instanceof TypeArgument.Ref nested
@@ -133,13 +139,13 @@ final class SyntheticMerge {
     }
 
     /**
-     * Whether any slot of the binding record holds an application -- a reference with arguments, the quoted token
+     * Whether any slot of the binding record holds an application -- a reference with arguments, the reference value
      * {@code SchemaDesugarer} writes for an application standing in a slot ({@link WireForm#applicationIn}). Nested
      * records, arrays and maps recurse, so {@code [[box<text>]]} and {@code (box<text> | int32)} are found alike.
      */
     private static boolean holdsApplication(CoreValue value) {
         return switch (value) {
-            case TokenValue token -> WireForm.applicationIn(token).isPresent();
+            case ReferenceValue ignored -> true;
             case RecordValue record ->
                     record.fields().stream().anyMatch(f -> holdsApplication(f.value().coreValue()));
             case ArrayValue array ->

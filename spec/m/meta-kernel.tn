@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=e2ba34f50fba5b24dab2fedf43404ff7e4e408c1ba6cb55c5d8ae343ef04d66d"
+!!id:"https://tson.io/2026/39/m/meta-kernel.tn?sha256=d38992ca748190ffa6b2289de14e8370f8194924403e9c2eb943356aa0e96775"
 @doc:"""
   TSON meta-kernel — pre-loaded bootstrap layer (2026 Revision 39 draft).
 
@@ -115,8 +115,8 @@
     an alias of a constructor is applied as its target is ([TSON-SCHEMA]
     §3.3.1), a constructor's value being a record. A partial application
     ([TSON-SCHEMA] §5.10, `uuid_pair => <B> pair<uuid, B>`) is an open entry,
-    and its target is the reference as written, quoted inside the
-    `template.template` text: `!alias { target: "pair<uuid B>" }`.
+    and its target is the reference as written, inside the
+    `template.template` text: `!alias { target: pair<uuid B> }`.
 
     An alias is a hop, not a rewrite: resolved output states the chain as the
     author wrote it, and a use site names whatever entry it names. A processor
@@ -550,7 +550,8 @@
     is the one fact the entry's value does not state, and what lets an
     imported schema's instantiations unify with a later schema's. A
     declaration never writes it, as it never writes `chain`. Its value is the
-    application as a reference, `@application:"box<text>"`.
+    application as the reference written, nested arguments unreduced,
+    `@application:foo<bar<text>>`.
     """
   application => @annotation type_kind
 
@@ -864,19 +865,19 @@
     written, and the name is judged when that schema links: the set of names
     a reference admits is the closure's, derived and never written.
 
-    A value may carry an argument list, `result<T>`: after its segments, `<`,
-    one or more arguments, and `>`. An argument is a reference or a token,
-    positional against the head's parameters, and is typed where it lands: a
-    type argument is judged as the parameter's `bound` says, and a value
-    argument is a token of the parameter's type ([TSON-SCHEMA] §5.10). The
-    canonical text has no whitespace but one space between arguments, and a
-    value carrying arguments is written quoted, `<` being reserved in data:
-    `"map<text integer>"`, `"maxint<10>"`. Identity is the parsed form
-    ([TSON-SCHEMA] §8.2), so whitespace inside an argument list is free. Every
-    application denotes an entry: a closed one lifts to the entry it denotes
-    and is named bare where it stands ([TSON-SCHEMA] §5.3), so a value
-    carries arguments only where an application is still open, in a record
-    template's `parents` and field types, in held text, and in the
+    A value may carry an argument list, `geo.address<T>`: after its qualified
+    name, an adjacent `<`, one or more arguments, and `>`. It is data grammar
+    ([TSON-DATA] §7.4), written unquoted wherever a value stands. An argument
+    is a reference or a token, positional against the head's parameters, and
+    typed where it lands: a type argument is judged as the parameter's `bound`
+    says, and a value argument is a token of the parameter's type
+    ([TSON-SCHEMA] §5.10). The canonical text has no whitespace but one space
+    between arguments: `map<text integer>`, `maxint<10>`. Identity is the
+    parsed form ([TSON-SCHEMA] §8.2), so whitespace inside an argument list is
+    free. Every application denotes an entry: a closed one lifts to the entry
+    it denotes and is named bare where it stands ([TSON-SCHEMA] §5.3), so a
+    value carries arguments only where an application is still open, in a
+    record template's `parents` and field types, in held text, and in the
     `application` annotation.
     """
   reference => atom & {

@@ -11,15 +11,19 @@ import java.util.Optional;
 /**
  * Parses and validates against a reference that names types -- an instance of the meta-kernel's {@code reference}
  * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, spelled {@code kind<record>} or {@code ref<record>} alike.
- * A value is a type name: §7.7's grammar, read as the kernel's {@code type_name} reads it ({@link
- * IdentifierParser#IDENTIFIER}), and then one of the reference's linked members. The value is the name, never a value
- * of the type it names.
+ * A value is a type's name or an application, read by {@link ReferenceGrammar} into the {@link TypeRef} it is, and
+ * then judged a member: the entry it denotes must be one of the reference's linked members. The value is the
+ * reference, never a value of the type it names; a reader rolls a name token or a reference's tree into the one
+ * text this reads.
  *
- * <p><b>An application is a value too</b>, written quoted ({@code "set<text>"}) and read by {@link ReferenceGrammar}
- * (SPEC-FEEDBACK.md #12). It reads to its canonical text and is judged through the entry it denotes: the one the
- * closure records it as (a declaration {@code names => set<text>}, an instantiation entry), which must be a member.
- * An application the closure records no entry for is this library's gap ({@link UnsupportedOperationException}):
- * an expansion nothing declares is named by its content, which a data read does not compute.
+ * <p><b>The value finds what it names.</b> A reference read here carries the closure the members were computed over
+ * ({@link ReferenceBody#closure}), so {@link TypeRef#referent} answers with the entry it denotes.
+ *
+ * <p><b>An application is judged through the entry it denotes</b>, resolved bottom-up, level by level, against the
+ * applications the closure closed ({@link ReferenceBody#entryOf}). A schema loads only when every application in it
+ * closes, so data never creates one: an application nothing in the closure closed names no type and is refused, as a
+ * name no member is. A qualified name, {@code geo.address}, parses, and is resolved with qualified names at type
+ * positions, not yet here: that is this library's gap ({@link UnsupportedOperationException}).
  *
  * <p><b>Membership is judged where the names resolve.</b> A kind's members are the names of the reading
  * document's closure, so a name a data document writes is a member or refused here, as an enum refuses a label it
@@ -30,58 +34,54 @@ import java.util.Optional;
  * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link EnumParser}: the members are the
  * closure's.
  */
-public record KindParser(ReferenceBody kind, boolean judgesMembers) implements AtomTypeParser<String> {
+public record KindParser(ReferenceBody kind, boolean judgesMembers) implements AtomTypeParser<TypeRef> {
 
     /** A kind read under the schema whose closure its members were computed over. */
     public KindParser(ReferenceBody kind) {
         this(kind, true);
     }
 
-    /** {@code kind}, read where a name resolves in the document being read: the type-name grammar alone. */
+    /** {@code kind}, read where a name resolves in the document being read: the grammar alone. */
     public static KindParser namesOnly(ReferenceBody kind) {
         return new KindParser(kind, false);
     }
 
     @Override
-    public String read(String text) {
-        if (text.indexOf('<') >= 0) {
-            return application(ReferenceGrammar.parse(text));
+    public TypeRef read(String text) {
+        TypeRef reference = ReferenceGrammar.parse(text);
+        if (reference.arguments().isEmpty() && reference.segments().size() == 1) {
+            // A name is read as the kernel's type_name reads it, into its normalization form.
+            reference = TypeRef.of(IdentifierParser.IDENTIFIER.read(reference.name()));
         }
-        String name = IdentifierParser.IDENTIFIER.read(text);
-        if (!judgesMembers || kind.memberNames().contains(name)) {
-            return name;
-        }
-        throw notAMember("'" + name + "'");
-    }
-
-    private String application(TypeRef application) {
         if (!judgesMembers) {
-            return application.text();
+            return reference;
         }
-        String entry = kind.entryOf(application).orElseThrow(() -> new UnsupportedOperationException("'"
-                + application.text() + "' is an application this closure records no entry for -- a data read "
-                + "resolves an application to the entry its closure declares for it ('name => "
-                + application.text() + "'), and an expansion nothing declares is not yet found"));
+        if (reference.segments().size() > 1) {
+            throw new UnsupportedOperationException("'" + reference.text() + "' names a type by a qualified name, "
+                    + "which is resolved with qualified names at type positions and not yet here");
+        }
+        TypeRef read = reference;
+        String entry = kind.entryOf(read).orElseThrow(() -> new AtomValidationException("'" + read.text()
+                + "' names no type this schema closes -- an application in data names the entry the schema closed "
+                + "it to, and nothing in this closure applies it; one of " + kind.shownMembers(),
+                "one of (" + String.join(", ", kind.shownMembers()) + ")"));
         if (kind.memberNames().contains(entry)) {
-            return application.text();
+            return reference.withClosure(kind.closure());
         }
-        throw notAMember("'" + application.text() + "', the entry '" + entry + "',");
-    }
-
-    private AtomValidationException notAMember(String what) {
-        return new AtomValidationException(what + " is not a member of this kind -- expected the name of a type "
-                + "whose value IS-A '" + kind.of() + "', one of " + kind.memberNames(),
-                "one of (" + String.join(", ", kind.memberNames()) + ")");
+        // An application is named as written, never by the entry minted for it.
+        throw new AtomValidationException("'" + reference.text() + "' is not a member of this kind -- expected the "
+                + "name of a type whose value IS-A '" + kind.of() + "', one of " + kind.shownMembers(),
+                "one of (" + String.join(", ", kind.shownMembers()) + ")");
     }
 
     @Override
-    public String write(String value) {
-        return value;
+    public String write(TypeRef value) {
+        return value.text();
     }
 
-    /** A kind reads to the name, so a string target is its own value and nothing else is. */
+    /** A kind reads to its reference: a {@code TypeRef} target receives it, and a string target its canonical text. */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return natural(String.class, target);
+        return target == String.class ? converting(TypeRef::text, text -> text) : natural(TypeRef.class, target);
     }
 }

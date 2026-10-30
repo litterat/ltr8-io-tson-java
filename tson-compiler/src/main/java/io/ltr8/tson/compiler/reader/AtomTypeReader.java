@@ -7,6 +7,7 @@ import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
@@ -19,6 +20,7 @@ import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.EventSkip;
+import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.IdentifierType;
@@ -254,7 +256,25 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         ctx = ctx.underDeclaration(schemaLocation);
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
-        if (!(e instanceof TokenEvent token)) {
+        boolean referenceTyped = kindOf != null || refOf != null;
+        String text;
+        TokenForm form;
+        if (e instanceof TokenEvent token) {
+            text = token.text();
+            form = token.form();
+            if (referenceTyped && form != TokenForm.UNQUOTED && text.indexOf('<') >= 0) {
+                // A quoted token is text, never a reference ([TSON-DATA] §7.4): an application is written unquoted.
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a reference, found the quoted token \"" + text
+                        + "\" -- a quoted token is never a reference; write the application unquoted",
+                        "a reference", "the quoted token \"" + text + "\"");
+                ctx.next();
+                return null;
+            }
+        } else if (referenceTyped && e instanceof ReferenceEvent reference) {
+            // A reference's tree rolls up into the one value the reference atom reads.
+            text = reference.reference().text();
+            form = TokenForm.UNQUOTED;
+        } else {
             String expected = name == null ? "a token" : "a token for " + name;
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected " + (name == null ? "a token" : "a token for '"
                     + name + "'") + ", found " + TypeRefCheck.describe(e), expected, TypeRefCheck.describe(e));
@@ -265,21 +285,25 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             // What a reference's name reaches is judged where a schema links, and a data document never links.
             ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, "a value at a reference-typed position ('ref<" + refOf
                     + ">') in a data document is not yet read: what its name reaches is judged when a schema links, "
-                    + "and a data document is not linked", "a position this library can read", token.text());
+                    + "and a data document is not linked", "a position this library can read", text);
             ctx.next();
             return null;
         }
         ctx.next();
-        TokenValue tokenValue = new TokenValue(token.text(), token.form());
+        TokenValue tokenValue = new TokenValue(text, form);
         if (inSchemaDocument != null && ctx.readsSchemaNames()) {
             // A name in a schema document resolves in the schema being resolved: its grammar is read here, and it
             // is recorded for that schema's link to judge.
             try {
                 T value = inSchemaDocument.read(tokenValue.text());
-                ctx.heldByName(io.ltr8.tson.schema.meta.TypeRef.of(token.text()), slotType(), null);
+                ctx.heldByName(value instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference
+                        : io.ltr8.tson.schema.meta.TypeRef.of(text), slotType(), null);
                 return value;
+            } catch (UnsupportedOperationException gap) {
+                ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge", text);
+                return null;
             } catch (AtomTypeException ex) {
-                AtomRefusal refusal = AtomRefusal.of(ex, token.text(), Object.class);
+                AtomRefusal refusal = AtomRefusal.of(ex, text, Object.class);
                 refusal = name == null ? refusal : refusal.named(name);
                 ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
                 return null;
@@ -296,21 +320,28 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             }
             T value = delegate.read(tokenValue.text());
             // Hygiene judges the name the value is, in its type's normalization form, not the spelling -- each name
-            // an application writes, where a kind's value is one.
-            String named = value instanceof String name ? name : token.text();
-            TsonReadContext reading = ctx;
-            return names != null && (kindOf != null ? ReferenceGrammar.anyRefused(named,
-                    each -> reading.refusesName(each, names)) : ctx.refusesName(named, names)) ? null : value;
+            // a reference writes, where the value is one.
+            if (names == null) {
+                return value;
+            }
+            if (value instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
+                for (String each : ReferenceGrammar.names(reference)) {
+                    if (ctx.refusesName(each, names)) {
+                        return null;
+                    }
+                }
+                return value;
+            }
+            return ctx.refusesName(value instanceof String named ? named : text, names) ? null : value;
         } catch (UnsupportedOperationException gap) {
-            // A value this library cannot judge yet, such as an application its closure records no entry for.
-            ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge",
-                    token.text());
+            // A value this library cannot judge yet, such as a type named by a qualified name (`geo.address<T>`).
+            ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge", text);
             return null;
         } catch (AtomTypeException ex) {
             // The entry's own name leads the sentence -- see `name` above -- and AtomRefusal decides the
             // code: §8.1 files a contract rejection apart from a range violation, and this reader is not a
             // second opinion about which is which.
-            AtomRefusal refusal = AtomRefusal.of(ex, token.text(), Object.class);
+            AtomRefusal refusal = AtomRefusal.of(ex, text, Object.class);
             refusal = name == null ? refusal : refusal.named(name);
             ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
             return null;

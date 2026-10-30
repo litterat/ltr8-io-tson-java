@@ -19,8 +19,9 @@ substitution rewrites and the declaration-time checks inspect. This note also ow
 - A held tree is a working value: built per call, never cached or stored on the entry. Callers outside `resolver`
   ask it `names()` and `applications()` only, never for the `DataValue`.
 - Substitution is one rule at every depth (`WireForm.substitute`): an **unquoted** token whose text is one of the
-  entry's parameters is rewritten (§5.10, with §8.1's shadowing rule); a quoted token is a literal. `HeldBody.names()`
-  returns exactly the tokens substitution would rewrite.
+  entry's parameters is rewritten (§5.10, with §8.1's shadowing rule), and so is one among a reference's arguments,
+  however deep; a quoted token is a literal. `HeldBody.names()` returns exactly the tokens substitution would
+  rewrite.
 - A declared field name that is no identifier (`"@id"`, `"first name"`) is written quoted (`WireForm.declaredName`),
   or the text does not parse back; quoting never hides a parameter, whose name is an identifier.
 - Closing dispatches on the held tree's constructor head: `alias` closes to a name, `record` to a record,
@@ -28,10 +29,10 @@ substitution rewrites and the declaration-time checks inspect. This note also ow
 - Every parameter is substituted, inside nested applications included, before any application in the body closes.
 - A parameter is a TYPE parameter exactly when its recorded type is `type_kind` (§5.10); a slot typed `type_kind`
   gives one, an `Atom`-typed slot gives a VALUE parameter, and anything else is refused at the declaration.
-- An application in a held tree is one quoted token, its canonical text (`"result<T>"`, SPEC-FEEDBACK.md #12):
-  `WireForm.refValue` writes it and `WireForm.applicationIn` recognises it, and `HeldBody.names()` includes the names
-  its text writes. The cost: a held body's quoted text literal that is itself a well-formed application is read as
-  one.
+- An application in a held tree is a `ReferenceValue`, the data grammar's reference written unquoted (`result<T>`,
+  [TSON-DATA] §7.4, SPEC-FEEDBACK.md #12): `WireForm.refValue` writes it, `WireForm.applicationIn` recognises it (an
+  `instanceof`, nothing parsed), and `HeldBody.names()` includes the names its arguments write. A quoted token is
+  never a reference, so a held body's text literal `pattern: "box<T>"` stays text.
 - Parameter types are derived twice: before materialisation (feeding the call-site check) and after everything has
   closed (stamping minted open entries). The second pass reports nothing.
 
@@ -74,7 +75,7 @@ its base), and an application nothing declares is its expansion.
 - **Every other open entry is held text.** `set` resolves to
   `!template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }`. That covers
   an open instance (`<T, N> !array { … }`), an open sugar form (`<T> [T]`, `<T> ( T | error )`), and §5.10's partial
-  application, `uuid_pair => <B> pair<uuid, B>`, held as the `!alias { target: "pair<uuid B>" }` §8.1 says it
+  application, `uuid_pair => <B> pair<uuid, B>`, held as the `!alias { target: pair<uuid B> }` §8.1 says it
   denotes — spellable because `alias.target` is a reference, which may carry arguments. Its kind is `TEMPLATE` whatever
   its head (`design/template-materialisation.md`).
   - **Why text, not a value of the constructor's vocabulary.** A parameter stands wherever a token stands —
@@ -143,7 +144,7 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
 - **An application in a held body closes when the body does**, whether or not it names a parameter: the held text is
   not scanned at the declaration. Only the two field-absorbing positions, a composition operand and a refinement
   source, close during resolution (`DefinitionResolver.closedApplication`; `design/template-materialisation.md`).
-- **A closed container position takes one too** (`[box<text>]`): its slot is written as the quoted reference, and
+- **A closed container position takes one too** (`[box<text>]`): its slot is written as the reference, and
   the batch pass closes it like every other ref; `close()` builds `pair<int32>` before `box<pair<int32>>` names it.
 - **The synthetic merge is where the two lift channels meet** (§8.2; `SyntheticMerge`, whose Javadoc carries the
   rationale). A form the desugar phase lifted *closed* with an application in a slot was named from an unreduced
@@ -154,9 +155,9 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
   binding held an application moves.
 - **An argument keeps what it was applied as.** An argument list is the one position where a type and a value are
   equally at home, so a value parameter passed straight through (`array_p0_…<N>` inside `<N> { a: [text; N] }`)
-  stays a value: substitution puts the bound `TypeArgument` itself where the parameter stood and writes the
-  application again as its canonical text (`WireForm.substituted`). What a held body admits beyond that —
-  collection-valued slots, value arguments and their numeric identity — is
+  stays a value: substitution puts the bound `TypeArgument` itself where the parameter stood, walking the reference's
+  argument tree, and writes the application again as a `ReferenceValue` (`WireForm.substituted`). What a held body
+  admits beyond that — collection-valued slots, value arguments and their numeric identity — is
   `design/desugaring-open-forms-and-templates.md`'s.
 
 ## Parameter types (`ParameterTypes`)

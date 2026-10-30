@@ -42,6 +42,14 @@ spec-required case:
   `TsonCompiledMetaSchema`, `TsonCompiledSchemaLoader.loadMeta` and `SchemaMetaNameBinder` name a "meta" no
   directive states: each is the compiled vocabulary of an imported schema, or
   the bind context for `schema.meta`'s classes. A rename across some 130 files, done as one IDE refactor.
+- [ ] **A data reference does not follow alias chains inside its arguments** ([TSON-SCHEMA] §8.2, §8.3). With
+  `user_id => uuid` and the schema closing `box<uuid>`, a data document writing `box<user_id>` at a kind-typed slot is
+  matched only through the bottom-up lookup (`ReferenceBody.entryOf`), not by the identity §8.2 gives it, which
+  follows each argument's chain to its terminal. Follow the chains before the lookup and add a validate vector.
+- [ ] **A nested or aliased application across imports is untested at the IS-A edge fold.** An imported schema's
+  `@application` is now the application as written, nested arguments unreduced (`pair<box<text> int32>`), and reaches
+  the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
+  an aliased application declared in an import and applied in the importer, and reduce on ingest if it misses.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to
@@ -107,11 +115,6 @@ spec-required case:
   `validateSchema` rather than arriving as a `NOT_IMPLEMENTED` diagnostic. The name is to be recorded with the field's
   slot type and judged as a value body's names are (`ValuesByName.judge`), or the default refused if a reference
   admits none.
-- [ ] **A data read resolves an application only to an entry its closure records** ([TSON-SCHEMA] §4.2, §8.2;
-  `SPEC-FEEDBACK.md #12`). A kind-typed slot in data holding `"box<text>"` is judged through the entry `@application`
-  names (`ReferenceBody.Index.applications`); an expansion nothing declares carries no `@application` and is named by
-  its content, so `KindParser` reports `NOT_IMPLEMENTED` for it. Have the resolver record every application it closes,
-  expansions included, beside the entries (not in resolved output), and index them at link.
 - [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
   component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
@@ -368,17 +371,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   (`my_record => record - { groups }`) resolves with an empty chain, so it is no constructor, and `!my_record {
   … }` is read as a value of it, a value entry, rather than building a type; nothing in the suite or the corpus
   exercises it. Add a vector stating the outcome §5.9 rule 8 gives.
-- [ ] **A kind's member list names a minted application.** The refusal of a name at a `kind<type>` slot lists the
-  kind's members, and the list holds `reference_type_…`, the entry minted for the application `kind<type>` itself:
-  a `reference` instance's value is of `reference`, which IS-A `type`, so the walk admits it. A minted name is no
-  spelling an author can write (`InternalName`), so `KindMembers` should pass over `@synthetic` entries, in the
-  message's list and in `expected` alike, or the walk should exclude an application's minted entry from every kind.
-- [ ] **A linker refusal of an atom application names its minted entry.** An unresolved `ref<nope>` or
-  `kind<nope>` is refused as "'reference_nope_…' of has an unresolved reference 'nope'": an application nothing
-  declares is its expansion, which
-  `EntryDisplayName` gives no authored name, so `TsonSchemaLinker.validateEntry`'s subject falls back to the key.
-  Name it by the application the key's facts carry (`ref<record>`), or state the refusal without a subject, since
-  the diagnostic is already located at the declaration that wrote it.
 - [ ] **The §7.2 refusal names a synthetic by its key.** `VariantSchemaReader` builds its `SubsumptionDiagnostics`
   from the entry name and keeps it through `renamed`, so beside `text_list => [text]` and `r => { t: [text] }`,
   `!r { t: !text_list [a] }` reads "'text_list' is not admissible at a 'array_text_4cc4a482' position". The position

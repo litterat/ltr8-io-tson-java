@@ -1,6 +1,5 @@
 package io.ltr8.tson.atom;
 
-import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -9,23 +8,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The reference grammar, read from a token's text into the {@link TypeRef} it spells (SPEC-FEEDBACK.md #12): the
- * value of the kernel's {@code reference} atom, the one parser both encodings read a reference-typed slot with.
+ * [TSON-DATA] §7.4's reference production, read from text into the {@link TypeRef} it spells (SPEC-FEEDBACK.md
+ * #12): what a JSON string at a reference-typed position holds, JSON having no unquoted form, and the text form
+ * {@link TypeRef#text} writes. The TSON text reader builds the same tree from tokens ({@code TsonDataStream}).
  *
  * <pre>
- *   reference = segment *("." segment) [ws "&lt;" ws arguments ws "&gt;"]
- *   segment   = identifier                       ; [TSON-DATA] §7.7
- *   arguments = argument *(separator argument)   ; separator = ws "," ws / ws1, as [TSON-SCHEMA] §12.1's type-args
- *   argument  = number / quoted / reference      ; a number or a quoted token is a value, anything else a reference
+ *   reference = qualified-name ["&lt;" ws type-args ws "&gt;"]   ; "&lt;" adjacent to the name
+ *   type-args = type-arg *(separator type-arg) [ws ","]        ; separator = ws "," ws / ws1
+ *   type-arg  = reference / token                              ; a qualified name is a reference, any other
+ *                                                              ; token (a number, a quoted token) a value
  * </pre>
  *
- * <p><b>The same parsed form as the schema grammar's type positions</b>, which keep their own parser
- * ({@code TsonSchemaParser.parseTypeArg}) because a type position also admits the sugar forms a reference never
- * holds: both classify an argument by its token alone, a number or a quoted token as a value and every other token
- * as a reference, and leave the parameter to judge which it binds (§5.10). Whitespace inside an argument list is
- * free, and {@link TypeRef#text} is the one canonical spelling, so {@code result< T >} and {@code result<T>} parse
- * to one reference. A quoted argument is {@code "} delimited, with {@code \"}, {@code \\}, {@code \n}, {@code \r},
- * {@code \t} and {@code \}{@code uXXXX} escapes.
+ * <p>A quoted argument is {@code "} delimited, with {@code \"}, {@code \\}, {@code \n}, {@code \r}, {@code \t}
+ * and {@code \}{@code uXXXX} escapes, and is never a reference. Whitespace inside an argument list is free, so
+ * {@code result< T >} and {@code result<T>} parse to one reference.
  *
  * <p>The grammar alone: what the head and each argument resolve to is the position's to judge.
  */
@@ -46,18 +42,6 @@ public final class ReferenceGrammar {
             throw cursor.error("'" + cursor.rest() + "' follows the reference");
         }
         return reference;
-    }
-
-    /** Whether {@code text} spells a reference carrying an argument list -- an application, written as one token. */
-    public static boolean isApplication(String text) {
-        if (text.indexOf('<') < 0) {
-            return false;
-        }
-        try {
-            return !parse(text).arguments().isEmpty();
-        } catch (AtomParseException e) {
-            return false;
-        }
     }
 
     /**
@@ -91,6 +75,16 @@ public final class ReferenceGrammar {
         return false;
     }
 
+    /** Whether {@code text} is a qualified name: segments joined by {@code .}, each an identifier (§7.7). */
+    public static boolean isQualifiedName(String text) {
+        for (String segment : text.split("\\.", -1)) {
+            if (segment.isEmpty() || IdentifierGrammar.validate(segment).isPresent()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static final class Cursor {
 
         private final String text;
@@ -117,9 +111,7 @@ public final class ReferenceGrammar {
             }
             segments(head);
             int afterHead = at;
-            skipWhitespace();
             if (atEnd() || text.charAt(at) != '<') {
-                at = afterHead;
                 return TypeRef.of(head);
             }
             at++;
@@ -151,7 +143,13 @@ public final class ReferenceGrammar {
             }
             int start = at;
             String word = word();
-            if (!word.isEmpty() && NumberGrammar.tryParse(word).isPresent()) {
+            if (word.isEmpty()) {
+                throw error("expected an argument, found '" + text.charAt(at) + "'");
+            }
+            if (!isQualifiedName(word)) {
+                if (!atEnd() && text.charAt(at) == '<') {
+                    throw error("'" + word + "' is no qualified name, so it takes no argument list");
+                }
                 return new TypeArgument.Value(new Token(word, Token.Form.UNQUOTED));
             }
             at = start;

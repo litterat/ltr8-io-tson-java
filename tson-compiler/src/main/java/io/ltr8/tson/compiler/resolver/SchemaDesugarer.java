@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.ArrayRef;
@@ -462,15 +463,31 @@ final class SchemaDesugarer {
      */
     private TypeRef typeRef(TypeRef ref) {
         return switch (ref) {
-            case SimpleRef simple -> simple;
+            case SimpleRef simple -> {
+                unqualified(simple.name());
+                yield simple;
+            }
             case ArrayRef _, TupleRef _, MapRef _ -> hoistOrKeep(binding(ref), ref);
             case ChoiceRef _ -> hoistOrKeep(binding(ref), ref);
             case GenericRef generic -> {
+                unqualified(generic.name());
                 checkTemplateApplication(generic.name());
                 List<TypeArg> args = mapShared(generic.args(), this::typeArg);
                 yield args == generic.args() ? generic : new GenericRef(generic.name(), args);
             }
         };
+    }
+
+    /**
+     * Refuses a qualified name at a type position as this library's gap: the grammar admits {@code geo.address} and
+     * {@code geo.address<T>} ([TSON-SCHEMA] §12.1), and resolving one, the walk into a {@code !schema} map, lands with
+     * qualified names at type positions.
+     */
+    static void unqualified(String name) {
+        if (name.indexOf('.') >= 0) {
+            throw new UnsupportedOperationException("'" + name + "' names a type by a qualified name, which parses "
+                    + "and is not yet resolved at a type position");
+        }
     }
 
     /** Expands only within a reference's arguments, leaving its own head in place. */
@@ -546,8 +563,8 @@ final class SchemaDesugarer {
     }
 
     /**
-     * What a type slot holds: a bare token for a plain name, and an application as its canonical text, quoted
-     * ({@link WireForm#refValue}). <b>One spelling per shape, produced in one place</b> -- a slot written two ways
+     * What a type slot holds: a bare token for a plain name, and an application as the data grammar's reference,
+     * unquoted ({@link WireForm#refValue}). <b>One spelling per shape, produced in one place</b> -- a slot written two ways
      * is a slot two phases disagree about, and {@link DerivedName#ofBinding} hashes what is written, so a second
      * spelling of one reference would split one type across two entries.
      *
@@ -675,7 +692,7 @@ final class SchemaDesugarer {
      * for a marked position, for the reason {@link #arrayBinding} omits an unmarked element's.
      *
      * <p>What the two do share is that a position's type is written through {@link #refValue}: an element
-     * holding a §5.10 application is spelled as its quoted text and rewritten one pass later,
+     * holding a §5.10 application is spelled as its reference and rewritten one pass later,
      * exactly as a variant is.
      */
     private static Optional<Binding> tupleBinding(List<Position> positions) {
@@ -700,7 +717,7 @@ final class SchemaDesugarer {
      *
      * <p><b>A variant is written through {@link #refValue}, like every other type slot.</b>
      * A collection-valued slot is no different from a named one in what it holds: {@code variants} is a
-     * {@code [type_kind]}, so an application standing in it is spelled as its quoted text and
+     * {@code [type_kind]}, so an application standing in it is spelled as its reference and
      * rewritten to the entry it denotes one pass later ({@code TemplateMaterialiser.mapBodyRefs}, which maps
      * a choice's variants like any other reference). Refusing the application here instead left the whole
      * choice unlifted, and a form the desugar table did not reduce reaches {@code DefinitionResolver} as a
@@ -892,7 +909,7 @@ final class SchemaDesugarer {
     /**
      * {@code !head { field: value ... }} -- the construction a binding record denotes.
      *
-     * <p><b>A slot holding an application is written as its quoted text</b>, since an
+     * <p><b>A slot holding an application is written as its reference</b>, {@code box<text>}, since an
      * application has no bare-token spelling: the entry it denotes does not exist until materialisation, one
      * phase later. The construction therefore names something that is not yet an entry, and that is fine --
      * materialisation rewrites every closed entry's references afterwards, so {@code [box<text>]} resolves to
@@ -980,8 +997,8 @@ final class SchemaDesugarer {
     /** Whether {@code value}, or anything nested inside it, is the bare token {@code text}. */
     private static boolean namesToken(CoreValue value, String text) {
         return switch (value) {
-            case TokenValue token when WireForm.applicationIn(token).isPresent() ->
-                    WireForm.namesIn(WireForm.applicationIn(token).get()).contains(text);
+            case ReferenceValue applied ->
+                    WireForm.namesIn(applied.reference()).contains(text);
             case TokenValue token -> token.text().equals(text);
             case ArrayValue array -> array.elements().stream()
                     .anyMatch(element -> namesToken(element.coreValue(), text));
@@ -1040,8 +1057,8 @@ final class SchemaDesugarer {
 
     private static CoreValue renameValue(CoreValue value, Map<String, String> substitution) {
         return switch (value) {
-            case TokenValue token when WireForm.applicationIn(token).isPresent() -> WireForm.refValue(
-                    WireForm.renamedArguments(WireForm.applicationIn(token).get(), substitution));
+            case ReferenceValue applied -> WireForm.refValue(
+                    WireForm.renamedArguments(applied.reference(), substitution));
             case TokenValue token -> substitution.containsKey(token.text())
                     ? new TokenValue(substitution.get(token.text()), token.form())
                     : token;

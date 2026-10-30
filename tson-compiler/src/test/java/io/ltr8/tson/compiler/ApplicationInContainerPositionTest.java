@@ -393,7 +393,7 @@ class ApplicationInContainerPositionTest {
 
     /**
      * The closed counterpart, which needs no parameters anywhere: {@code [box<text>]} lifts to a synthetic
-     * whose {@code element_type} is the application itself, written as its quoted reference, and
+     * whose {@code element_type} is the application itself, written as its reference, and
      * materialisation rewrites it to the instantiation entry one pass later.
      *
      * <p><b>The synthetic names something that is not an entry yet, and that is the point.</b> The window is
@@ -490,10 +490,9 @@ class ApplicationInContainerPositionTest {
     /**
      * A binding whose application names no parameter is fully bound already, so it closes where it is written.
      *
-     * <p>Written as sugar rather than as an explicit binding, because §12.1's {@code instance} takes a
-     * {@code core-value} and {@code box<text>} is schema grammar, not data: an application reaches a slot as
-     * its quoted reference, which is what the sugar expands to. The open and closed forms share one
-     * production now, so this is the same rule that has always governed a closed instance's payload.
+     * <p>Written as sugar, which expands to a binding whose slot holds the application as the data grammar's
+     * reference ([TSON-DATA] §7.4). The open and closed forms share one production, so this is the rule that
+     * governs a closed instance's payload.
      */
     @Test
     void aConcreteApplicationInABindingClosesAtTheDeclaration() {

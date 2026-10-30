@@ -125,7 +125,7 @@ as the entry's constructor fact, so resolved output writes the tag. A payload th
 against the entry with the read's path.
 
 A value entry's payload is a **value body** (`TsonReadContext.readsValueBody`): nothing in it lifts or mints, so a
-kind-typed slot holds one bare name and an application (`request: "box<order>"`) is refused with the alias spelling
+kind-typed slot holds one bare name and an application (`request: box<order>`) is refused with the alias spelling
 named (`order_box => box<order>`, then `request: order_box`). A template over an ordinary type closes to a value entry
 (`fetch => <T> !operations { … }`, `get_order => fetch<order>`).
 

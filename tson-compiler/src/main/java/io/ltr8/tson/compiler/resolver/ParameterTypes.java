@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -562,10 +563,11 @@ final class ParameterTypes {
          */
         private void routed(String parameter, RecordValue field) {
             Optional<CoreValue> declared = WireForm.field(field, WireForm.TYPE);
-            TypeRef type = declared.flatMap(WireForm::applicationIn).orElse(switch (declared.orElse(null)) {
+            TypeRef type = switch (declared.orElse(null)) {
+                case ReferenceValue applied -> applied.reference();
                 case TokenValue token when token.form() == TokenForm.UNQUOTED -> TypeRef.of(token.text());
                 case null, default -> null;
-            });
+            };
             if (type == null) {
                 return; // no type to route into: record_field's own reader refuses the field
             }
@@ -580,8 +582,7 @@ final class ParameterTypes {
                         token(token.text(), declared, type, slot);
                 case ArrayValue array -> elements(array, type, slot);
                 case MapValue map when type instanceof MapBody entries -> entries(map, entries, slot);
-                case TokenValue token when typePosition(declared.name())
-                        && WireForm.applicationIn(token).isPresent() -> application(WireForm.applicationIn(token).get());
+                case ReferenceValue applied when typePosition(declared.name()) -> application(applied.reference());
                 case RecordValue record when type instanceof RecordBody nested ->
                         record(record, declared.name(), nested);
                 default -> {

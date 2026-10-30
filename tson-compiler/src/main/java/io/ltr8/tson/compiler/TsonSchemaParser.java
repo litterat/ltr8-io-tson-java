@@ -758,8 +758,14 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /** {@code type-name ["<" type-args ">"]} -- the type-name-based tail shared by every type-ref position and by refinement/construction heads. */
     private TypeRef parseTypeRefHead() {
-        String name = expectTypeName("a type reference");
+        Token head = expect(TokenType.UNQUOTED, "a type reference");
+        requireQualifiedName(head);
+        String name = head.text();
         if (check(TokenType.LESS_THAN)) {
+            if (!head.adjacentTo(peek())) {
+                throw parseError("'<' applies '" + name + "' only adjacent to it (§12.3): write '" + name
+                        + "<...>' with no whitespace before '<'");
+            }
             advance();
             List<TypeArg> args = parseTypeArgs();
             expect(TokenType.GREATER_THAN, "a type argument list's closing '>'");
@@ -1021,6 +1027,21 @@ public final class TsonSchemaParser extends TsonDataParser {
      */
     private Token expectDeclaredFieldName(String construct) {
         return expectFieldNameToken(construct);
+    }
+
+    /**
+     * {@code qualified-name} (§12.1): segments joined by {@code .}, each an identifier -- {@code text}, or {@code
+     * geo.address}, which parses and whose resolution is a later phase's.
+     */
+    private void requireQualifiedName(Token t) {
+        for (String segment : t.text().split("\\.", -1)) {
+            Optional<String> violation = segment.isEmpty() ? Optional.of("a segment between the dots is empty")
+                    : IdentifierGrammar.validate(segment);
+            if (violation.isPresent()) {
+                throw new ParseException("'" + t.text() + "' is not a valid type name -- " + violation.get(),
+                        t.start());
+            }
+        }
     }
 
     private void requireIdentifierName(Token t) {

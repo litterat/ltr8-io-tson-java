@@ -199,12 +199,15 @@ class ValuesByNameTest {
                 "/m/request", "'user_id' (an alias of 'uuid')", "built by 'uuid_type'", "no 'record'");
     }
 
-    /** A kind-typed slot holds a type's name, one segment: a qualified name there fails the kind's own grammar. */
+    /**
+     * A kind-typed slot holds a type's name: a qualified name there parses, and reaches into a value, which is no
+     * type.
+     */
     @Test
     void aMethodIsNoRecord() {
         refused(api("method-as-record", """
                 api => !interface { m => { request: orders.place_order } }"""),
-                "'orders.place_order'", "cannot appear in an identifier");
+                "'orders.place_order'", "a value and not a type");
     }
 
     @Test

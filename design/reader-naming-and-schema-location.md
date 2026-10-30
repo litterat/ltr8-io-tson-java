@@ -37,7 +37,8 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
   carries its own name token's position and a minted entry has none. So `tag_list => [text; 1..2]` keeps
   `tag_list` and the anonymous form inside it renders as `[order; 1..]`, a map as `{text => order}`, a tuple
   as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application it records
-  (`@application` on its key, `TsonSchema.applicationOf`: `paged<order>`). Anything with no sugar spelling falls
+  (`@application` on its key, `TsonSchema.applicationOf`, stated as written: `paged<order>`, `pair<box<text>
+  int32>`). Anything with no sugar spelling falls
   back to the entry name — honest rather than invented.
 - **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). A field
   declared `c: pct` over `pct => small` reads with `small`'s reader, that being the type at the end of the
@@ -50,13 +51,18 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
   reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
   in its name, every other position gets the shared reader back unchanged and allocates nothing
   (`AllocationHarnessTest` is the guard).
-    - **An application nothing declares has no authored name.** It is its expansion (§5.10): the position names
-      the synthetic directly, so `e: b<10>` over `b => <N> !integer_type { min: N  max: 100 }` reads an atom
-      instance no author named. `EntryDisplayName.authored` is empty for a form with no sugar spelling, and the
-      atom reader then leads with no name at all — the family's own sentence (`'5' is less than the minimum
-      10`), located by the diagnostic's position, never the entry's content-derived key. An expansion that
-      names its own application keeps an instantiation entry (an `Alias` to the synthetic, recording the
-      application), and that one is named like any other hop.
+    - **An application nothing declares is named by the application that closed to it.** It is its expansion
+      (§5.10): the position names the synthetic directly, so `e: b<10>` over `b => <N> !integer_type { min: N
+      max: 100 }` reads an atom instance no author named, which carries no `@application`. Its
+      `TsonSchema.EntryFacts.closes` does record the application, so `EntryDisplayName` shows a synthetic with
+      none by `closes().getFirst().text()`: `'b<10>': '5' is less than the minimum 10`, `unknown field 'nope'
+      on 'bx<int32>'`, `'set<text>' requires unique elements`, never the entry's content-derived key. One with
+      neither an application nor a sugar spelling leads with no name at all — the family's own sentence, located
+      by the diagnostic's position. An expansion that names its own application keeps an instantiation entry (an
+      `Alias` to the synthetic, recording the application), and that one is named like any other hop.
+    - **A kind's refusal lists its members the same way** (`ReferenceBody.shownMembers()`, the index's `shown`): a
+      minted member by its application, `kind<uuid_type>`, never `reference_uuid_type_…`, and one with no spelling
+      left out.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.

@@ -137,6 +137,7 @@ class MetaKernelEndToEndTest {
                 .read(TestDocuments.document("{ element_type: text voidable: true }")));
 
         assertEquals(true, result.get("voidable"));
-        assertEquals("text", result.get("element_type"), "a type_kind slot holds a type's name");
+        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("text"), result.get("element_type"),
+                "a type_kind slot holds a type's name, as the reference it is");
     }
 }
