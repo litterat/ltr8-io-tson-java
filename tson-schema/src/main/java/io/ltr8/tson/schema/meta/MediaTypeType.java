@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn's {@code media_type_type} constructor: a media type (RFC 6838) and its parameters (RFC 9110 §8.3.1). Pure
+ * net.tn's {@code net.media_type_type} constructor: a media type (RFC 6838) and its parameters (RFC 9110 §8.3.1). Pure
  * constraint value -- {@code tson-atom}'s {@code MediaTypeParser} holds one and does the reading, through
  * {@code io.ltr8.net.MediaType}.
  *
@@ -20,7 +20,7 @@ import java.util.Optional;
  * {@code +suffix} and the subtype that is the suffix itself. Names compare without ASCII case. {@code spec} is
  * pinned to RFC 6838, flat and a bare {@link String}, as {@link Cidr4Type}'s is.
  */
-@Typename(name = "media_type_type")
+@Typename(name = "net.media_type_type")
 public record MediaTypeType(TypeChain chain,
         String spec, @Field("allow_parameters") boolean allowParameters,
                             Optional<List<String>> types, Optional<List<String>> suffixes) implements Atom {
@@ -47,7 +47,7 @@ public record MediaTypeType(TypeChain chain,
     /** {@code media_type_type.spec}'s pinned value. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc6838";
 
-    /** {@code media_type => !media_type_type {}} -- net.tn's {@code media_type}, without parameters. */
+    /** {@code media_type => !net.media_type_type {}} -- net.tn's {@code media_type}, without parameters. */
     public static final MediaTypeType UNCONSTRAINED =
             new MediaTypeType(SPEC, false, Optional.empty(), Optional.empty());
 

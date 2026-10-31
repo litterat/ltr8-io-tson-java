@@ -23,7 +23,7 @@ import java.util.Optional;
  * encoding writes it in. It is a **selector** facet ([TSON-SCHEMA] §5.7): a refinement may neither set nor
  * change it, since an alphabet narrows nothing and an IS-A carrying no narrowing would claim a subtype at
  * positions no base64 reader could honour. Another alphabet is another **instance** --
- * {@code hexdigest => !bytes_type { encoding: HEX  length: 4 }} -- and refining for length inherits the
+ * {@code hexdigest => !meta.bytes_type { encoding: HEX  length: 4 }} -- and refining for length inherits the
  * alphabet. An encoding whose values are octets ignores the selector entirely and writes them raw.
  *
  * <p><b>Why the type rather than an annotation</b> ([TSON-SCHEMA] §5.5): a container element has no
@@ -34,7 +34,7 @@ import java.util.Optional;
  * <p>Pure constraint values, no parsing or validation behaviour: {@code tson-compiler}'s {@code
  * BytesParser} holds one of these and does the work, reading the alphabet off it.
  */
-@Typename(name = "bytes_type")
+@Typename(name = "meta.bytes_type")
 public record BytesType(TypeChain chain,
         Encoding encoding, Optional<Integer> length,
                          @Field("min_length") Optional<Integer> minLength,
@@ -71,7 +71,7 @@ public record BytesType(TypeChain chain,
         BASE64, BASE64URL, BASE32, HEX
     }
 
-    /** The unconstrained octet sequence -- {@code bytes => !bytes_type {}}, base64 by the selector's default. */
+    /** The unconstrained octet sequence -- {@code bytes => !meta.bytes_type {}}, base64 by the selector's default. */
     public static final BytesType UNCONSTRAINED =
             new BytesType(Encoding.BASE64, Optional.empty(), Optional.empty(), Optional.empty());
 
@@ -94,7 +94,7 @@ public record BytesType(TypeChain chain,
      * refinement would let an author rebuild it by hand.
      *
      * <p>The remedy names itself in the message: a different alphabet is a different type, declared as a
-     * fresh instance of this constructor ({@code hexbytes => !bytes_type { encoding: HEX }}) rather than as a
+     * fresh instance of this constructor ({@code hexbytes => !meta.bytes_type { encoding: HEX }}) rather than as a
      * refinement of one.
      */
     @Override

@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code record_field} record (Part 2 §5.2, §8.1): a field as the four facts a reader
+ * The kernel's {@code record_field} record (Part 2 §5.2, §8.1): a field as the four facts a reader
  * consults. {@code optional} says the key may be omitted, {@code voidable} that a written {@code _} is
  * admitted, {@code role} what the schema's {@code value} is for, and {@code value} is that value. Each
  * reader decision reads its own: a written {@code _} reads {@code voidable}; a written value reads {@code

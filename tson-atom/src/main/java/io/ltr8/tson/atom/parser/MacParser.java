@@ -8,9 +8,9 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.meta.MacType;
 
 /**
- * Parses and validates against meta.tn's {@code mac_type} constructor (§5.5's {@code mac} atom, EUI-48 per
+ * Parses and validates against net.tn's {@code net.mac_type} constructor (§5.5's {@code mac} atom, EUI-48 per
  * RFC 9542). A pure format check (§5.2: "the remaining atoms are pure format checks") -- {@link MacType}
- * carries only its RFC pin, so there are no facets to apply and {@code mac => !mac_type {}} in core.tn is
+ * carries only its RFC pin, so there are no facets to apply and {@code mac => !net.mac_type {}} in core.tn is
  * fully unconstrained.
  *
  * <p><b>Host type is {@link String}</b>, not a byte array. Java has no MAC-address type to map onto, and
@@ -33,7 +33,7 @@ public record MacParser(MacType constraints) implements AtomTypeParser<String> {
     /** §5.5's built-in annotation name -- {@code !mac}. */
     public static final String TYPENAME = "mac";
 
-    /** {@code mac => !mac_type {}} -- the unconstrained MAC address, §5.5's {@code !mac}. */
+    /** {@code mac => !net.mac_type {}} -- the unconstrained MAC address, §5.5's {@code !mac}. */
     public static final MacParser UNCONSTRAINED = new MacParser(MacType.UNCONSTRAINED);
 
     @Override

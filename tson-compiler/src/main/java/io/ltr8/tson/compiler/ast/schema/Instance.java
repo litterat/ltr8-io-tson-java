@@ -11,11 +11,11 @@ import java.util.List;
  * [TSON-DATA] §2.3), which would let it carry its own further annotations and a second, competing
  * type-ref; §12.1 states that no production of the schema grammar takes the full {@code data-value}.
  *
- * <p><b>A parameter list makes it a template, and changes nothing else.</b> {@code <T> !array
+ * <p><b>A parameter list makes it a template, and changes nothing else.</b> {@code <T> !meta.array
  * { element_type: T }} is this same production with {@code typeParams} non-empty, and its payload is
  * unrestricted for the same reason the closed form's is: an open entry's body is held rather than read
  * against its constructor's vocabulary until materialisation has substituted the parameters away, so a
- * collection payload -- {@code <T> !choice { variants: [T error] }} -- is as ordinary here as a scalar one.
+ * collection payload -- {@code <T> !meta.choice { variants: [T error] }} -- is as ordinary here as a scalar one.
  * A parameterized {@link AtomRefinement} is not a form at all (§12.1 gives {@code atom-refinement} no
  * parameter list, a refinement of an atom instance having no parameter to take).
  *

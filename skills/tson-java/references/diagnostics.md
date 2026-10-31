@@ -51,7 +51,7 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
   document both get reported. No construct the bundled schemas declare reaches one; what still can is
   a value's qualified name at a reference-typed position of a data document (`ref<T>` over a type that is no
   constructor), and, in a schema, an instance of a constructor of types
-  the schema declares itself (`c => product & { … }`, `x => !c { … }`). A constructor, a type or an annotation type
+  the schema declares itself (`c => meta.product & { … }`, `x => !c { … }`). A constructor, a type or an annotation type
   declared in the same document is otherwise read in wait order, whichever is written first. A data tag
   naming a schema's value entry (`!orders { … }` over `orders => !api { … }`) is no gap: it is `TYPE_MISMATCH`,
   a value and not a type.

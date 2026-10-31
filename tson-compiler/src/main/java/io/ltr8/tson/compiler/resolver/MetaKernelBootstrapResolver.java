@@ -25,6 +25,7 @@ import io.ltr8.tson.compiler.reader.PendingTypeReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -50,7 +51,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Resolves meta-kernel's own source text into the {@link TsonSchema} that governs its ordinary resolution: the
+ * Resolves the kernel's own source text into the {@link TsonSchema} that governs its ordinary resolution: the
  * kernel is never resolved from a document but pre-loaded by special resolution ([TSON-SCHEMA] §3.4), its header an
  * {@code !!id} alone. Every constructor the kernel applies is declared in the kernel, so no compiled vocabulary
  * exists to read its instances through until this class has produced one.
@@ -89,7 +90,7 @@ import java.util.Set;
  * never {@code TsonSchemaRegistry#register}, which refuses a bootstrap schema -- and compiles it. {@link
  * SchemaDesugarer} runs first, as for every schema: the desugar table is fixed by the sugar forms (§5.3), so it
  * consults no governing meta. The class is locked down to one public method taking no arguments: it bootstraps
- * the bundled meta-kernel ({@link TsonBundledSchemas#META_KERNEL_ID}), fetched from the classpath so the bootstrap
+ * the bundled kernel, meta.tn ({@link TsonBundledSchemas#META_ID}), fetched from the classpath so the bootstrap
  * works from a built jar, and nothing else.
  */
 public final class MetaKernelBootstrapResolver {
@@ -100,27 +101,29 @@ public final class MetaKernelBootstrapResolver {
      * atoms, {@code type_kind}, {@code field_map}, the namespace type a record's fields are a value of, and {@code
      * non_negative_integer}, the one refinement.
      */
-    private static final Set<String> PRE_LOADED = Set.of("value", "boolean", "field_role", "enum_set", "integer",
-            "non_negative_integer", "text", "type_kind", "field_map");
+    private static final Set<String> PRE_LOADED = Set.of("meta.value", "meta.boolean", "meta.field_role",
+            "meta.enum_set", "meta.integer", "meta.non_negative_integer", "meta.text", "meta.type_kind",
+            "meta.field_map");
 
     /**
      * The element types whose lifted arrays are on the cycle: {@code [type_kind]}, {@code [field_group]} and {@code
      * [text; 1..]}, and an array of one of those ({@code [[text; 1..]; 1..]}). A lifted array is named by its
      * content (§8.2), so it is designated by what it holds rather than by its name.
      */
-    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("type_kind", "field_group", "text");
+    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("meta.type_kind", "meta.field_group",
+            "meta.text");
 
     private MetaKernelBootstrapResolver() {
     }
 
     /**
-     * Parses and resolves meta-kernel's own bundled source text (see class Javadoc). The one place in this codebase
+     * Parses and resolves the kernel's own bundled source text (see class Javadoc). The one place in this codebase
      * that constructs a {@link TsonSchema} with {@code bootstrap: true} -- {@link TsonSchema#bootstrap()} says why
-     * that matters: {@code TsonSchemaRegistry.register} gates on it, so meta-kernel's own identity can only be
+     * that matters: {@code TsonSchemaRegistry.register} gates on it, so the kernel's own identity can only be
      * registered by something that came from here.
      */
     public static TsonSchema getMetaKernelSchema() {
-        TsonSchemaParser parser = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID));
+        TsonSchemaParser parser = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID));
         return resolve(parser.parseSchemaDocument(), parser.schemaPositions());
     }
 
@@ -132,7 +135,8 @@ public final class MetaKernelBootstrapResolver {
     static TsonSchema resolve(SchemaDocument parsed, SchemaPositions positions) {
         SchemaDocument document = SchemaDesugarer.desugar(parsed, Set.of());
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
-        Map<String, Top> entries = new Bootstrap(document, positions, facts).resolve();
+        Map<String, Top> entries = new Bootstrap(document, parsed.body().declarations().keySet(), positions, facts)
+                .resolve();
         return new TsonSchema(id(document), document.imports(), AnnotatedMap.of(entries), true,
                 Map.of(), facts);
     }
@@ -142,12 +146,13 @@ public final class MetaKernelBootstrapResolver {
      * {@code MetaKernelBootstrapResolverTest} holds against the measured wait cycle.
      */
     static Set<String> preLoaded() {
-        SchemaDocument document = SchemaDesugarer.desugar(new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument(), Set.of());
+        SchemaDocument parsed = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID))
+                .parseSchemaDocument();
+        SchemaDocument document = SchemaDesugarer.desugar(parsed, Set.of());
         Set<String> names = new LinkedHashSet<>();
         Set<String> lifted = new LinkedHashSet<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
-            if (isPreLoaded(declaration, lifted)) {
+            if (isPreLoaded(declaration, parsed.body().declarations().keySet(), lifted)) {
                 names.add(declaration.name());
             }
         }
@@ -156,22 +161,25 @@ public final class MetaKernelBootstrapResolver {
 
     private static String id(SchemaDocument document) {
         return document.id().orElseThrow(() -> new IllegalStateException(
-                "meta-kernel.tn has no !!id -- this should never happen for the real, bundled fixture"));
+                "meta.tn has no !!id -- this should never happen for the real, bundled fixture"));
     }
 
 
     /**
      * Whether {@code declaration} is one of the pre-loaded set's, {@code lifted} collecting the lifted arrays already
-     * found to be: a lifted array's element is declared before it, its lift being depth first.
+     * found to be: a lifted array's element is declared before it, its lift being depth first. A lifted array is one
+     * the kernel's source does not declare ({@code declared}), so an entry whose own body is a sugar form ({@code
+     * meta.examples => @meta.annotation [meta.text]}) is no lift.
      */
-    private static boolean isPreLoaded(SchemaMap.Declaration declaration, Set<String> lifted) {
+    private static boolean isPreLoaded(SchemaMap.Declaration declaration, Set<String> declared, Set<String> lifted) {
         if (!WaitOrder.reads(declaration)) {
             return false;
         }
         if (PRE_LOADED.contains(declaration.name())) {
             return true;
         }
-        if (declaration.typeDef() instanceof Instance instance && instance.target().equals("array")) {
+        if (!declared.contains(declaration.name()) && declaration.typeDef() instanceof Instance instance
+                && instance.target().equals(KernelNames.of("array"))) {
             String element = bindingField(instance.value(), "element_type");
             if (PRE_LOADED_ELEMENTS.contains(element) || lifted.contains(element)) {
                 lifted.add(declaration.name());
@@ -199,14 +207,15 @@ public final class MetaKernelBootstrapResolver {
         private final DefinitionResolver resolver;
         private final DataBindContext context = SchemaMetaNameBinder.defaultContext();
 
-        Bootstrap(SchemaDocument document, SchemaPositions positions, Map<String, TsonSchema.EntryFacts> facts) {
+        Bootstrap(SchemaDocument document, Set<String> declared, SchemaPositions positions,
+                  Map<String, TsonSchema.EntryFacts> facts) {
             this.id = id(document);
             this.document = document;
             this.positions = positions;
             this.facts = facts;
             for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
                 declarations.put(declaration.name(), declaration);
-                if (isPreLoaded(declaration, preLoaded)) {
+                if (isPreLoaded(declaration, declared, preLoaded)) {
                     preLoaded.add(declaration.name());
                 }
             }
@@ -368,29 +377,29 @@ public final class MetaKernelBootstrapResolver {
      */
     static Top instanceBody(String name, Instance instance) {
         return switch (instance.target()) {
-            case "value_type" -> {
+            case "meta.value_type" -> {
                 requireEmptyBody(instance);
                 yield new ValueType();
             }
-            case "integer_type" -> {
+            case "meta.integer_type" -> {
                 requireEmptyBody(instance);
                 yield IntegerType.UNCONSTRAINED;
             }
-            case "text_type" -> {
+            case "meta.text_type" -> {
                 requireEmptyBody(instance);
                 yield TextType.UNCONSTRAINED;
             }
-            case "enum" -> toEnumBody(instance.value());
-            // `!reference { of: type }`: `of` is the one authored field, and the index is derived when the kernel
+            case "meta.enum" -> toEnumBody(instance.value());
+            // `!meta.reference { of: type }`: `of` is the one authored field, and the index is derived when the kernel
             // links, as every reference's is.
-            case "reference" -> new ReferenceBody(bindingField(instance.value(), "of"));
-            // `field_map => !namespace { value_type: record_field  ordered: true }`: keys of the host's family.
-            case "namespace" -> new NamespaceBody(fieldToken(instance.value(), "key_type").map(TypeRef::of),
+            case "meta.reference" -> new ReferenceBody(bindingField(instance.value(), "of"));
+            // `field_map => !meta.namespace { value_type: record_field  ordered: true }`: keys of the host's family.
+            case "meta.namespace" -> new NamespaceBody(fieldToken(instance.value(), "key_type").map(TypeRef::of),
                     TypeRef.of(bindingField(instance.value(), "value_type")),
                     fieldToken(instance.value(), "ordered").map(Boolean::parseBoolean).orElse(false));
             // array and set differ only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
-            case "array" -> toArrayBody(instance.value(), false);
-            case "set_type" -> toArrayBody(instance.value(), true);
+            case "meta.array" -> toArrayBody(instance.value(), false);
+            case "meta.set_type" -> toArrayBody(instance.value(), true);
             default -> throw new IllegalStateException("'" + name + "' applies '" + instance.target()
                     + "', which no pre-loaded instance applies -- an instance outside the pre-loaded set is read, "
                     + "not built by hand");
@@ -406,7 +415,7 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * {@code !array { element_type: T  min_items?: N  max_items?: M }}, or the same for {@code !set_type}, as the
+     * {@code !meta.array { element_type: T  min_items?: N  max_items?: M }}, or the same for {@code !meta.set_type}, as the
      * body it denotes -- every fact the binding record states, so a hand-built body is the one the ordinary path
      * would read.
      */
@@ -440,7 +449,7 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * {@code !enum [true false]}'s value is a bare array (§5.6's positional form for a
+     * {@code !meta.enum [true false]}'s value is a bare array (§5.6's positional form for a
      * single-field constructor), not {@code { members: [...] } }.
      */
     private static EnumBody toEnumBody(DataValue value) {

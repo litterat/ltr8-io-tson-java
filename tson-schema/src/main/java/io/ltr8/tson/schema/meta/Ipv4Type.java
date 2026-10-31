@@ -6,7 +6,7 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 
 /**
- * meta.tn's {@code ipv4_type} constructor (IPv4 address constraint vocabulary, RFC 3986's {@code
+ * net.tn's {@code net.ipv4_type} constructor (IPv4 address constraint vocabulary, RFC 3986's {@code
  * IPv4address} production): CIDR-text network allow/deny lists. Pure constraint values, no
  * parsing/validation behavior -- {@code tson-compiler}'s {@code Ipv4Parser} does the actual
  * reading/writing, though it does not model {@code within}/{@code excluding} (see its own Javadoc).
@@ -16,7 +16,7 @@ import java.util.List;
  * flat {@link String} rather than a {@link java.net.URI} and why {@code within}/{@code excluding} are
  * bare {@code List<String>} with a defensive compact constructor.
  */
-@Typename(name = "ipv4_type")
+@Typename(name = "net.ipv4_type")
 public record Ipv4Type(TypeChain chain,
         String spec, List<String> within, List<String> excluding) implements Atom {
 
@@ -38,7 +38,7 @@ public record Ipv4Type(TypeChain chain,
         return new Ipv4Type(chain, spec, within, excluding);
     }
 
-    /** {@code ipv4 => !ipv4_type {}} -- the unconstrained IPv4 address, core.tn's own {@code !ipv4}. */
+    /** {@code ipv4 => !net.ipv4_type {}} -- the unconstrained IPv4 address, core.tn's own {@code !ipv4}. */
     public static final Ipv4Type UNCONSTRAINED =
             new Ipv4Type("https://www.rfc-editor.org/rfc/rfc3986", List.of(), List.of());
 
@@ -72,9 +72,9 @@ public record Ipv4Type(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>Every entry of {@code within} and {@code excluding} must be a network. The facets are typed
-     * {@code [value]} in meta.tn -- they list networks, and meta declares no network instance to type them
-     * by, core.tn doing that and core importing meta -- so any token satisfies the vocabulary and a missing
-     * prefix length or a transposed octet reaches here as ordinary text.
+     * {@code [meta.value]} in net.tn -- they list networks, and no facet is typed by a family's own instance
+     * ({@code cidr4}) -- so any token satisfies the vocabulary and a missing prefix length or a transposed octet
+     * reaches here as ordinary text.
      *
      * <p>It is checked here rather than anywhere downstream because it is this family's rule: a malformed
      * entry makes the facet unreadable, which is the same kind of defect as a floor above a ceiling. Every

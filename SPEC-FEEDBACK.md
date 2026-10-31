@@ -160,11 +160,12 @@ within one document's resolution. A chain past the limit (default 64) refuses it
 refusal and not a verdict, whichever order the chain is reached in; the bundled schemas resolve under the default
 whatever a deployment sets.
 
-The kernel measured from `meta-kernel-resolved.tn`'s own declarations, no compiled reader consulted, has one wait
-cycle, holding `record` and 24 more of the 73 entries (`boolean`, `integer`, `text`, `non_negative_integer`, the enum
-and set machinery, `field_group`, `namespace` and `field_map`, `type_kind`, and the synthetics they name), every
-other entry ordered after it, the longest chain 4. The kernel declares `annotation => void`: annotating itself with
-`@annotation` would be a second cycle, and the marker changes no value (§6). The bootstrap builds by hand exactly the
+The kernel (meta.tn, every declaration under `meta`, #15) measured from `meta-resolved.tn`'s own declarations, no
+compiled reader consulted, has one wait cycle, holding `meta.record` and 24 more of its 102 entries (`meta.boolean`,
+`meta.integer`, `meta.text`, `meta.non_negative_integer`, the enum and set machinery, `meta.field_group`,
+`meta.namespace` and `meta.field_map`, `meta.type_kind`, and the synthetics they name), every other entry ordered after
+it, the longest chain 4. The kernel declares `annotation => meta.void`: annotating itself with `@meta.annotation`
+would be a second cycle, and the marker changes no value (§6). The bootstrap builds by hand exactly the
 instances and the one refinement on that cycle (a test holds the set to the measurement), and makes every other entry
 ready by the algorithm above. A pin reached through an entry not yet ready binds as written (rule 3), which is what
 lets `iri` be read against `iri_type`, whose `spec` pin is typed by `iri`. The output equals the kernel's ordinary
@@ -176,9 +177,9 @@ schema is handed out. Link remains the one place a pin is judged, and a bad pin 
 What is not running: a resolved form is still read under its source's imports rather than by this algorithm over its
 own entries (§8.1, "Resolved forms" in the proposal), so a fixture holding an instance of a constructor it declares
 does not read back. And rule 2's example pair, a constructor whose facet is typed by its own instance (`decimal_type`
-beside `number`), runs only as meta.tn declares it. `decimal_type` composes a base kind directly, and a constructor
+beside `number`), runs only as the kernel declares it. `decimal_type` composes a base kind directly, and a constructor
 that does makes a new form, which a processor backs with readers and writers of its own: an extension point, not
-schema vocabulary. This library backs the forms the kernel and meta.tn declare and no other, so it refuses an
+schema vocabulary. This library backs the forms the kernel and net.tn declare and no other, so it refuses an
 instance of any other such constructor as `NOT_IMPLEMENTED`. Refining an existing constructor with a field of its
 own (`c => record & { extra: text }`) is no new form and should follow record composition; it is refused the same
 way today.
@@ -358,15 +359,16 @@ importer applies, unexpressible. Each is a rule about levels, which the dependen
   extension guard; direction of service (§3.3.1); the import-level rule (§2.2.3); the governing-target eligibility
   check; the structure/type-name split (§3.3.1, §3.3.2, §3.3.4's invisibility of structural vocabulary); and §3.3.5's
   sibling allowance. Two same-named entries in one closure are §2.2.3's collision, decided by identity.
-- **core.tn imports meta.tn** and no longer declares `void`, `boolean`, `integer`, `text`, `regex`, `iri`, `kind` or
-  `doc` (the kernel's) or `set` (meta.tn's). Core's `iri` was IS-A its `iri_reference`; the kernel's is not, and core
-  keeps `iri_reference`. The descriptive annotations core put on its copies (`@ordering`, `@bounded`, …) go with them.
+- **core.tn imports meta.tn**, the kernel, and declares no sibling of `void`, `boolean`, `integer`, `text`, `regex`, `iri`,
+  `kind`, `doc` or `set`: it names them at its root by alias (#15). Core's `iri` was IS-A its `iri_reference`; the kernel's
+  is not, and core keeps `iri_reference`. The descriptive annotations core put on its copies (`@ordering`, `@bounded`, …) go
+  with them.
 - **A same-document read waits:** applying a constructor declared in the same document (`!C { … }` with `C` local),
   reading a value of a type declared there, and reading an annotation value against one each wait on that
   declaration being ready, in #4's wait order, whichever is written first. A type used by name waits on nothing.
-- **The cost:** every name in the closure is reserved. A schema importing core reserves every name of meta.tn and
-  the kernel — `identifier`, `field_name`, `record`, `map`, `namespace`, `bounded`, `exact`, `title`, `comment`,
-  `examples` among them — until the kernel moves under one name of its own.
+- **The cost:** every name in the closure is reserved. The kernel's declarations sit under one root entry, `meta`
+  (#15), so a schema importing core reserves `meta` and core's root names, its 21 aliases of kernel entries among
+  them; `record`, `map`, `namespace`, `bounded` and `field_name` are free.
 
 **Resolution, a proposal.** Sections amended:
 
@@ -417,7 +419,7 @@ supplied at ingest (§8.1).
 - **The kernel's header is its `!!id` alone**, its root `!schema`. It imports nothing, is pre-loaded (§3.4) and is never
   resolved from a document, and a document claiming its identity is checked against the bytes the processor ships.
   Its names reach a schema only by import: an import-free `!schema { a => { b: b }  b => {} }` is valid and sees its
-  own names. meta.tn imports the kernel, core.tn and net.tn import meta.tn, and policy.tn imports core.tn.
+  own names. The kernel is meta.tn (#15); core.tn and net.tn import it, and policy.tn imports core.tn.
 - **A resolved form's header is its source's**, and its root `!schema`; nothing in it marks it resolved. Reading one is
   the caller's choice, as §10.1's ingest is: the reader is told the root's type, and reads under the form's own
   imports, the kernel's own form, which imports nothing, under the pre-loaded kernel. Nothing is supplied at ingest.
@@ -474,24 +476,23 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 - **The schema map's values are `declared`.** The kernel now declares `declared_type` and `declared` (moved from
   meta.tn and core.tn), and `schema`'s `value_type` is `declared`: every entry's value names its type by its tag — a
   constructor for a type, an ordinary type for a value. `top` is the root of the constructors only. `declared` is
-  now a kernel name, reserved in every closure that imports the kernel (#7), and the descriptive annotations core put
-  on its copy (`@ordering`, `@bounded`) go with it.
+  a kernel entry, `meta.declared`, which core names at its root by alias (#15), and the descriptive annotations core
+  put on its copy (`@ordering`, `@bounded`) go with it.
 - **A kind-typed position is judged by membership in every data document**, over the reading document's closure. A
   name in a schema document — a construction's or a value entry's payload, or a value of the kernel's `schema` read
   as data, a resolved form — resolves in that schema, which the reading closure does not hold: its grammar is read
   and its membership judged where that schema links, or at ingest. That replaces the stand-in that read grammar alone
   under the kernel and any schema importing it directly: a data document importing meta.tn that writes
-  `!record_field { type: int32 }` is refused, `int32` being no member of `type_kind` in meta.tn's closure.
+  `!meta.record_field { type: int32 }` is refused, `int32` being no member of `meta.type_kind` in meta.tn's closure.
 - **The kernel's wait cycle** (#4) gains `namespace`, `field_map` being its instance, and loses `field_name`,
-  `field_map`'s keys being read by their spelling: 25 of the 73 entries, longest chain 4. The bootstrap builds
+  `field_map`'s keys being read by their spelling: 25 entries, longest chain 4 (#4). The bootstrap builds
   `field_map` by hand with the rest of the pre-loaded set.
-- **Hosts.** One bind context serves schemas and data; the names the kernel and meta.tn declare always bind to
-  the schema model, and every other name binds through the consumer's binder. A value entry whose type no class binds is
-  held as a tree, so a schema loads and validates without host classes; a schema obtained to bind refuses such an
-  entry with `BIND_MISMATCH` at the entry, anywhere in the closure it compiles, since a bound reference can reach a
-  value of any schema there. An instance of a constructor whose instances are no types (one composing `top` and not
-  `type`, `s => !step { … }` over `step => top & { … }`) is held the same way, as the value it is. These are a
-  processor's choices, not the spec's.
+- **Hosts.** One bind context serves schemas and data; the names under the kernel's `meta` and net.tn's `net` always bind to
+  the schema model (#15), and every other name binds through the consumer's binder. A value entry whose type no class binds
+  is held as a tree, so a schema loads and validates without host classes; a schema obtained to bind refuses such an entry
+  with `BIND_MISMATCH` at the entry, anywhere in the closure it compiles, since a bound reference can reach a value of any
+  schema there. An instance of a constructor whose instances are no types (one composing `top` and not `type`, `s => !step {
+  … }` over `step => top & { … }`) is held the same way, as the value it is. These are a processor's choices, not the spec's.
 
 **Resolution, a proposal.** Sections amended:
 
@@ -526,13 +527,13 @@ says "reference" leaves the reader to work out which of the two it means.
 **What is running.**
 
 - **The kernel declares `alias => top & { target: type_kind }`** (#12). An alias body is `!alias { target: T }`, written
-  explicitly or derived from `name => T`, and its kind is ALIAS. The kernel's and meta.tn's resolved forms state
-  `!alias` for `type_name`, `field_name`, `param_name`, `annotation`, `doc` and the annotation markers.
+  explicitly or derived from `name => T`, and its kind is ALIAS. The kernel's resolved form states `!meta.alias` for
+  `meta.type_name`, `meta.field_name`, `meta.param_name`, `meta.annotation`, `meta.doc` and the annotation markers.
 - **§8.3's walk is the alias chain.** Policy's limit is `max_alias_chain`, default 64, and diagnostics that walk it say
   "resolves through its alias chain to".
-- **Nothing else moves.** `alias` is now a kernel name, reserved in every closure that imports the kernel (#7),
-  and `reference` is no longer one. That has a cost: `alias` is a likelier name for an author's own entry than
-  `reference` was, and `alias => port` in a schema importing core now collides with the import.
+- **Nothing else moves.** `alias` is a kernel entry, `meta.alias`, and `reference` likewise `meta.reference`; under
+  `meta` (#15) neither reserves its bare name, so `alias => port` in a schema importing core collides with
+  nothing.
 
 **Resolution, a proposal.** §4.1's fourth entry kind is **Alias**: "an entry whose value is a pointer to another
 entry: `!alias { target: T }`". §8.1's record paragraph and table name `alias` and ALIAS. §8.3 is headed "Aliases":
@@ -560,7 +561,8 @@ atom & { … }`) and a record type's values are records.
 - **One atom.** The kernel declares `reference => atom & { of: type_kind }` (`of` a qualified name, #14), with
   `kind => <T> !reference { of: T }` and `ref => <T> !reference { of: T }` its two spellings; `identifier_kind`,
   `atom_kind` and `type_kind` are `!reference { of: … }`. `kind_type` and `ref_type` are gone, and with #12's removal
-  of `type_ref` and `type_argument` the kernel holds 73 entries (67 declarations). `kind<order>` and `ref<order>`
+  of `type_ref` and `type_argument` the kernel's own declarations are 67 of meta.tn's (#15). `kind<order>` and
+  `ref<order>`
   expand to one content and mint one entry.
 - **The slot's meaning comes from `of`, never from the spelling.** Where `of` is a constructor, `top` or IS-A it, the
   values it admits are types: the slot holds a type's name, judged a member over the governing closure and delivered
@@ -616,8 +618,7 @@ token and leaves the head's parameters to judge which it binds.
 
 - **One value.** The `reference` atom's values are the reference #13 makes data grammar: a qualified name with an
   optional argument list, `geo.address<T>`, each argument a reference or a token. `type_ref` and `type_argument` are
-  gone; `alias.target`, `type_chain.parents` and the `application` annotation are typed `type_kind`. The kernel
-  holds 73 entries (67 declarations).
+  gone; `alias.target`, `type_chain.parents` and the `application` annotation are typed `type_kind`.
 - **Written unquoted, canonically.** Resolved output and held text write an open application as source does, one
   space between arguments and no comma: `!alias { target: pair<uuid B> }`, `chain: { parents: [result<T>] }`.
 - **The value is an object, in every mode.** A reference read at a reference-typed position, in a tree read and a
@@ -784,7 +785,8 @@ and the kernel types `reference.of` and `type_chain.supertypes`/`subtypes` by `t
   `geo.home.at` its field.
 - **Synthetics mint at the root**, one entry per form across the document (§8.2), sugar written inside a nested map
   included: `[uuid]` in `geo.tagged` and in a root record is one `array_uuid_…`. A minted name is an identifier; a
-  dotted head contributes its text with the dots dropped (`array_geo_inner_tag_…`).
+  dotted name contributes its text with each dot written `_` (`array_geo_inner_tag_…`), a kernel path its member's
+  name (`array_text_…` for `[meta.text]`, #15).
 - **Qualified tags (Part 1).** A tag is `"!" qualified-name` with no arguments: `!geo.address { … }` in data resolves by
   the walk, and one naming no member is `UNKNOWN_TYPE`. A schemaless read keeps a dotted tag as written, as it keeps
   any tag. [TSON-JSON]'s `$type` takes the same text (edited in place).
@@ -792,8 +794,8 @@ and the kernel types `reference.of` and `type_chain.supertypes`/`subtypes` by `t
   own name.
 - **The kernel.** `reference.of`, `type_chain.supertypes` and `type_chain.subtypes` are typed `type_kind`; `type_name`
   stays the schema map's key type, one identifier. `kind`'s and `ref`'s parameter is then a type parameter, the
-  kernel holds 73 entries (the `[type_name]` synthetic is gone), and its measured wait cycle gains `[type_kind]` and
-  loses `identifier` (#4).
+  `[type_name]` synthetic is gone, and the kernel's measured wait cycle gains `[type_kind]` and loses `identifier`
+  (#4).
 - **Hosts.** The default name binder binds a dotted type name to the class of its last segment in one sub-package per
   earlier segment: `geo.route` to `geo.Route`. A processor's choice, not the spec's.
 
@@ -818,3 +820,88 @@ and the kernel types `reference.of` and `type_chain.supertypes`/`subtypes` by `t
   root" once relative lookup exists, and with it a shadowing rule, silent or diagnosed.
 - **Synthetics homed by the innermost map**, identity by path, two maps minting one form being two entries. It waits
   on lexical scope: a name minted inside `geo` must resolve where it is written.
+
+## 15. [TSON-DATA] §3.1, §7.4; [TSON-SCHEMA] §2.2.3, §3.4, §5.3, §8.1–§8.3, §13.2 — the kernel's names sit under `meta`
+
+**Problem.** One namespace per schema (#7) reserves every name of an import closure, and core.tn imports the kernel,
+so a schema importing core reserved every kernel and meta.tn name: `record`, `map`, `set`, `template`, `namespace`,
+`alias`, `field_name`, `bounded`, `title`, and every `*_type` constructor. Those are plausible names for an author's
+own entries, and almost none is a name a data schema writes: it writes `text`, `integer` and `uuid`, and a
+constructor rarely. And meta-kernel.tn and meta.tn were two documents only because the ladder put the atom
+constructors a rung below the kernel.
+
+**What is running.**
+
+- **One kernel document, meta.tn, whose root holds one entry, `meta => !schema { … }`.** Every declaration of the
+  former meta-kernel.tn and meta.tn is a member of it: the kinds and constructors, the base instances, the atom
+  constructors core instantiates, `set`, and the annotation types. Its identity is `https://tson.io/2026/39/m/meta.tn`
+  and meta-kernel.tn is retired: its name is the namespace it declares, and it is the one document pre-loaded and
+  bound to the processor's revision (§3.4, #8), header `!!id` alone. A schema importing it reserves one name, `meta`.
+- **Closed maps (#14).** A `!schema` value is declared in one document, so meta.tn's constructors joined the kernel's
+  map rather than extending it from a second document. net.tn's constructors are its own, under `net => !schema {
+  ipv4_type => meta.atom & … }`, its instances (`ipv4`, `hostname`) at its root. A user's constructor composes
+  `meta.atom` at the user's root or under the user's own map, and a schema declaring `meta` beside an import of
+  meta.tn collides on it.
+- **Every name resolves from the root (#14), inside the kernel too.** A kernel entry naming a sibling writes its path:
+  `integer => !meta.integer_type {}`, `record => meta.product & { fields: meta.field_map … }`, `@meta.doc:"…"`. There
+  is no lexical scope; synthetics the kernel's sugar lifts are the root's.
+- **An annotation's name is a qualified name** ([TSON-DATA] §3.1, §7.4: `"@" qualified-name`), resolved from the root
+  as every name is: `@meta.doc`, `@meta.annotation`. A schemaless read keeps it as written, and an empty segment
+  (`@x..y`) is a parse error. A Part 1 edit: without it a schema importing meta.tn alone could annotate nothing.
+- **The elided constructions target the kernel's entries**, whatever a document imports: `{ … }` is `meta.record`,
+  `[T]` `meta.array`, `{K => V}` `meta.map`, `[A, B]` `meta.tuple`, `(A | B)` `meta.choice`, and a partial application
+  `meta.alias`; an enum is applied, `!meta.enum [A B]`, or `!enum [A B]` under core. The root tag stays `!schema`, a
+  spelling of the pre-loaded kernel's `meta.schema` (#8), admitted as that spelling wherever a value of `meta.schema`
+  is read, so a resolved form's root reads as one; a nested map is tagged `!schema` in source, or `!meta.schema`, as
+  resolved output writes it.
+- **core.tn names at its root, by alias, what a data schema writes bare:** the instances `void`, `boolean`, `integer`,
+  `text`, `identifier`, `iri`, `regex`; `kind`, `ref`, `declared`, `set` and `enum`; and the annotation types `doc`,
+  `annotation`, `disjoint`, `deprecated`, `title`, `comment`, `examples`, `read_only`, `write_only` (`text =>
+  meta.text`). Core's own entries name the kernel by path (`@meta.ordering:TOTAL`, `!meta.uuid_type {}`), so its body
+  depends on none of its aliases. An alias is a hop to the same entry (§8.3), never a sibling: `text` and `meta.text`
+  are one type; `!integer ^ { min: 0 }` refines `meta.integer`, whose path its chain states; an application through an
+  alias of a template (`kind<order>`, `set<text>`) applies the template; and an annotation is the entries on its alias
+  chain (`@disjoint` and `@meta.disjoint` are one assertion, though `meta.disjoint` is itself an alias of
+  `meta.void`). A schema importing core reserves `meta` and core's root names, these 21 aliases among them; `record`,
+  `map`, `namespace`, `template`, `bounded` and `field_name` are free.
+- **Resolved output tags by path:** `!meta.record { … }`, `!meta.record_field { … }`, `!meta.alias { … }`,
+  `@meta.synthetic`, `@meta.application`; a use site keeps the name written (`type: text`). The kernel's resolved
+  form is `!schema { meta => !meta.schema { … } }`, its six synthetics at the root. §8.2 compares an application's
+  arguments past their alias chains, so `@meta.application` states core's `text` as `meta.text`
+  (`@meta.application:box<meta.text>`), and the field the application closed is typed `meta.text`. A minted name's
+  readable half spells a kernel path as its member (`array_text_1_…` for `[meta.text; 1..]`) and any other path with
+  `_` (`array_geo_address_…`).
+- **Hosts.** A name under the kernel's `meta` or net.tn's `net` binds to the schema model by its last segment
+  (`meta.record` to `RecordBody`, `net.ipv4_type` to `Ipv4Type`); a consumer's dotted name keeps #14's sub-package
+  rule. A processor's choice, not the spec's.
+- **The bootstrap and the kernel's one wait cycle (#4)** run over the merged document: 102 entries (96 members of
+  `meta` and six synthetics), one cycle of the same 25 entries, now `meta.record`, `meta.text`, `meta.type_kind` …,
+  longest chain 4; the former meta.tn's constructors are ordered after the cycle. `Tson.standard()` loads one fewer
+  document; measured cold it rose from about 355 ms to 375 ms, warm unchanged at about 77 ms.
+- **What is not running:** net.tn's resolved form holds instances of constructors net.tn declares, so it reads back
+  only beside its source, the gap #4 states for any such form.
+
+**Resolution, a proposal.**
+
+- §3.4, §9, §13.2: one kernel document, meta.tn, `!!id` alone, its root `{ meta => !schema { … } }`; meta-kernel.tn
+  goes from the table. §2.2.3: importing it reserves `meta`, and a schema map is declared in one document (#14).
+- §4.1, §5.3, §5.4, §5.10 and every kernel name in the spec's text: written by its path; the desugar targets are
+  `meta.record`, `meta.array`, `meta.map`, `meta.tuple`, `meta.enum`, `meta.choice`, `meta.alias`.
+- §8.1 to §8.3: resolved output tags by path; an alias of a template applies it; a refinement source written as an
+  alias names the instance at the end of its chain; `@meta.synthetic` and `@meta.application`.
+- [TSON-DATA] §3.1, §7.4: `annotation = "@" qualified-name [ ":" data-value ]`.
+- §9, §13.2: core.tn's root aliases are core's to keep, and its doc lists them.
+
+**Open.**
+
+- **Which names core names at its root.** The list is what the corpus's data schemas write bare; `type_kind`,
+  `non_negative_integer`, the classifying markers (`ordering`, `bounded`, `exact`, `numeric`) and every constructor
+  stay qualified, a constructor-declaring schema writing `meta.atom` and `meta.type_kind`.
+- **`@meta.application:box<meta.text>`.** Identity is right to flatten an alias, and the flattened argument is what
+  materialisation substitutes, so an entry an application closed, and a message or a tree's type naming one of its
+  positions, says `meta.text` where the author wrote core's `text`. Whether resolved output should state an
+  argument as written and compare it flattened is a readability question for §8.2.
+- **An annotation inside a value read through an imported type's reader** resolves in the namespace of the schema
+  declaring that type, not the annotating document's (§3.3.3): a value entry's payload annotated `@doc` refuses the
+  annotation where the value's type is declared by a schema importing the kernel alone. This library's gap, made
+  reachable by core naming the annotation types at its root; such a payload writes `@meta.doc`.

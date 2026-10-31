@@ -42,10 +42,9 @@ class SchemaAnnotationScopeTest {
     private static final String META_HTTP_ID = "https://example.test/meta-http.tn";
     private static final String META_HTTP = """
             !!id:"https://example.test/meta-http.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              method => @annotation text
+              method => @meta.annotation meta.text
             }
             """;
 

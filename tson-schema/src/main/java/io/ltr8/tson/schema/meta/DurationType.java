@@ -33,7 +33,7 @@ import java.util.Optional;
  * #isMultiple}'s own {@code toNanos} cannot overflow. A bound built programmatically rather than read is
  * checked against the ceiling by {@link #coherenceCheck}, which is what keeps that true.
  */
-@Typename(name = "duration_type")
+@Typename(name = "meta.duration_type")
 public record DurationType(TypeChain chain,
         Optional<Duration> min,
         @Field("exclusive_min") Optional<Duration> exclusiveMin,
@@ -42,7 +42,7 @@ public record DurationType(TypeChain chain,
         Optional<BigInteger> precision,
         @Field("multiple_of") Optional<Duration> multipleOf) implements Atom {
 
-    /** {@code duration => !duration_type {}} -- the unconstrained duration. */
+    /** {@code duration => !meta.duration_type {}} -- the unconstrained duration. */
     public static final DurationType UNCONSTRAINED = new DurationType(Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 

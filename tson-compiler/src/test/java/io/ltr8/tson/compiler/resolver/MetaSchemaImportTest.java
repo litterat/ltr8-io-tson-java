@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
@@ -24,110 +24,63 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifies {@code SchemaValidator}'s {@code !!import} merging (see its own Javadoc) against the
- * real {@code meta.tn} fixture -- register meta-kernel first, then meta.tn's own declarations
- * (resolved via {@link SchemaResolver#resolveSchema}, mirroring the now-deleted {@code MetaTn1Parser}'s
- * own bootstrap steps -- see {@link #parseMetaTn1}), and confirm meta-kernel's names (e.g. {@code
- * atom}, {@code text_type}) are visible and correctly referenced from meta.tn's own
- * composition-based declarations (e.g. {@code date_type => atom & atom_specification & {...}}).
- *
- * <p><b>meta.tn now registers in full, all 31 declarations</b> (2026-07-24, once {@code
- * SchemaResolver} gained generic {@code Instance} resolution -- Phase B step 4) -- previously 4 of
- * its 31 declarations ({@code bytes_encoding}, {@code ieee_format}, {@code complex_component},
- * {@code ordered}, all {@code !enum [...]}) had to be skipped, and 3 more ({@code binary}, {@code
- * float_type}, {@code complex_type}) that reference one of those four as a field type had to be
- * excluded too (registering them without their dependency present correctly failed validation).
- * With generic {@code Instance} resolution in place, every one of the 31 resolves in a single
- * source-order pass (meta.tn's own declaration order already has each dependency before its use --
- * unlike meta-kernel.tn itself, which needs {@code MetaKernelBootstrapResolver}'s own two-pass ordering for
- * forward references like {@code boolean => !enum [...]} preceding {@code enum}'s own declaration),
- * and the merged, validated registration succeeds outright.
+ * Verifies {@code !!import} merging against a real bundled document importing the kernel: net.tn, resolved via {@link
+ * SchemaResolver#resolveSchema} over a registered kernel, whose own constructors under {@code net} compose the
+ * kernel's {@code meta.atom} and {@code meta.atom_specification} -- names visible only through the merge.
  */
 class MetaSchemaImportTest {
 
     /**
-     * Deliberately still resolves via a bare {@link SchemaResolver#resolveSchema(SchemaDocument)} call
-     * rather than {@link TsonCompiledMetaRegistry#load(String)} -- this test wants meta.tn's own
-     * *raw, unregistered, local-only* result (31 entries, no merged imports) to exercise {@code
-     * TsonSchemaRegistry#register}'s own import-merge itself, one stage later; {@code
-     * TsonCompiledMetaRegistry#load} would register (and materialize/merge) it immediately as
-     * part of the same call, collapsing the two stages this test means to keep separate. {@link
-     * TsonBundledSchemas} is still reused here, just for the raw fetch, so this doesn't duplicate
-     * its own classpath-reading logic -- the same reasoning that replaced the old, now-deleted
-     * {@code MetaTn1Parser} everywhere else that only wants the *fully* resolved-and-registered
-     * result (see {@code TsonSchemaResolverCompiledMetaSchemaTest#loadMetaKernelAndMeta}).
-     *
-     * <p><b>Meta-kernel itself is resolved via ordinary {@code SchemaResolver.resolveSchema}, not
-     * registered as the raw bootstrap output</b> (2026-07-26, {@code TsonSchemaRegistry#register} now
-     * refuses <i>any</i> self-referential schema with {@code bootstrap() == true}, materialized or
-     * not -- see that method's own Javadoc). {@code registry.materializeBootstrap(...)} still runs
-     * once, purely to get a genuinely materialized shape to build {@code
-     * TsonObjectBinding.factoryRegistry(...)} against -- that value is never itself registered anywhere.
-     * The loader built from it then resolves meta-kernel's own document the ordinary way (its
-     * own bootstrap branch supplies the structure namespace, so even {@code boolean => !enum [...]}
-     * resolves correctly despite the forward reference) -- that result carries no {@code bootstrap}
-     * flag, so {@link TsonSchemaRegistry#register} accepts it, both into {@code registry} (permanently,
-     * so meta.tn's own {@code !!import} finds it below) and into {@code compiledRegistry} (so this
-     * loader's own cache has it too). Mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s
-     * own pattern exactly.
+     * The kernel resolved the ordinary way and registered (the registry refuses the raw bootstrap output, {@code
+     * bootstrap() == true}), then net.tn's own document resolved over it -- its raw, unregistered, local-only result,
+     * so {@code TsonSchemaRegistry#register}'s import merge runs one stage later, in the test.
      */
-    private static TsonSchema parseMetaTn1(TsonSchemaRegistry registry) {
+    private static TsonSchema parseNet(TsonSchemaRegistry registry) {
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         TsonCompiledMetaRegistry compiledRegistry = new TsonCompiledMetaRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
-        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
-        SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
-        // Registered with the compiled registry too, which compiles it as the kernel's vocabulary.
-        compiledRegistry.register(metaKernelMaterialized.schema());
+        SchemaDocument kernelDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID))
+                .parseSchemaDocument();
+        TsonSchema kernel = new SchemaResolver(loader).resolveSchema(kernelDocument);
+        TsonLinkedSchema registeredKernel = registry.register(TsonSchemaLinker.link(kernel, registry));
+        compiledRegistry.register(registeredKernel.schema());
 
-        String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
-        SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
-        return new SchemaResolver(loader).resolveSchema(metaDocument);
+        SchemaDocument netDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.NET_ID))
+                .parseSchemaDocument();
+        return new SchemaResolver(loader).resolveSchema(netDocument);
     }
 
     @Test
-    void mergesMetaKernelIntoAllOfMetaTn1sOwnDeclarations() {
+    void mergesTheKernelIntoNetTnsOwnDeclarations() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
-        TsonSchema meta = parseMetaTn1(registry);
-        // Every written declaration, plus the entries the desugar phase hoists: meta.tn's `within`/`excluding`
-        // fields are `[value]`, which becomes an `!array { element_type: value }` declaration -- one entry for
-        // all eight occurrences, since identical forms share a name.
-        assertEquals(39, meta.entries().size(), "expected every meta.tn declaration to resolve");
+        TsonSchema net = parseNet(registry);
+        // `net`, its eight constructors, the eight instances at the root, and the two arrays the desugar phase
+        // lifts at the root: `within`/`excluding` are `[meta.value]` and `types`/`suffixes` `[meta.text]`.
+        assertEquals(19, net.entries().size(), "expected every net.tn declaration to resolve");
 
-        TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(meta, registry));
+        TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(net, registry));
 
-        // Meta-kernel's own imported entries are visible in the merged, validated namespace.
-        assertTrue(registered.schema().entries().containsKey("atom"));
-        assertTrue(registered.schema().entries().containsKey("text_type"));
-        // meta.tn's own composition against an imported supertype resolved and validated correctly.
-        assertTrue(registered.schema().entries().containsKey("date_type"));
-        // The four constructor-application (!enum [...]) declarations previously excluded now
-        // resolve too, bound generically via TsonObjectReader against Atom.class.
-        assertEquals(new EnumBody(List.of("BASE64", "BASE64URL", "BASE32", "HEX")),
-                registered.schema().entries().get("bytes_encoding"));
-        // ...and the three declarations that reference one of those four as a field type now
-        // register successfully as well, since their dependency is present in the same schema.
-        assertTrue(registered.schema().entries().containsKey("bytes_type"));
-        assertTrue(registered.schema().entries().containsKey("float_type"));
-        assertTrue(registered.schema().entries().containsKey("complex_type"));
+        // The kernel's imported entries are visible in the merged, validated namespace.
+        assertTrue(registered.schema().entries().containsKey("meta.atom"));
+        assertTrue(registered.schema().entries().containsKey("meta.atom_specification"));
+        // net.tn's own composition against an imported supertype resolved and validated correctly.
+        assertTrue(registered.schema().entries().containsKey("net.ipv4_type"));
+        assertEquals(Ipv4Type.UNCONSTRAINED, registered.schema().entries().get("ipv4"));
     }
 
     @Test
-    void registeringAConstructorWithoutItsUnresolvedVocabularyFieldCorrectlyFailsValidation() {
+    void registeringAConstructorWithoutItsImportedVocabularyCorrectlyFailsValidation() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
-        TsonSchema meta = parseMetaTn1(registry);
-        Top floatType = meta.entries().get("float_type");
+        TsonSchema net = parseNet(registry);
+        Top cidr4Type = net.entries().get("net.cidr4_type");
 
-        // float_type's `format` is typed by ieee_format, which this schema deliberately leaves out.
-        TsonSchema withFloatOnly =
-                new TsonSchema(meta.id(), meta.imports(), Map.of("float_type", floatType));
+        // net.cidr4_type's facets are typed by the kernel's entries, which this schema, importing nothing, lacks.
+        TsonSchema withConstructorOnly = new TsonSchema(net.id(), List.of(), Map.of("net.cidr4_type", cidr4Type));
 
         assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
-                () -> registry.register(TsonSchemaLinker.link(withFloatOnly, registry)));
+                () -> registry.register(TsonSchemaLinker.link(withConstructorOnly, registry)));
     }
 }

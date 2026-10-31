@@ -11,12 +11,12 @@ is why they are the linker's. Current form only; history lives in git.
   `kind<record>` and `ref<record>` are one entry, and `kind<api>`, over a type that is no constructor, names values
   (`ValuesByName`, `design/references.md`).
 - Every reference's derived `index` (`Index(namesTypes, members, applications, entries, shown)`: the members sorted;
-  the entry each application the closure closed denotes, every `@application` and every entry's
+  the entry each application the closure closed denotes, every `@meta.application` and every entry's
   `TsonSchema.EntryFacts.closes`, expansions included; the final namespace's entries, which a reference read in data
   names through `ReferenceBody.closure()`; and the members as a message shows them, a minted one by its application
   through `EntryDisplayName.authored`, one with no spelling left out) is recomputed for **every** reference in the
   closure, imports included (`TsonSchemaLinker.computeKinds`), and never trusted from a body. It is `@Unbound` and
-  never written: a resolved form states `!reference { of: … }` alone, and a written `members:` is refused as an
+  never written: a resolved form states `!meta.reference { of: … }` alone, and a written `members:` is refused as an
   unknown field.
   `ReferenceBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
   unifies with it.
@@ -61,29 +61,29 @@ schema's one namespace (SPEC-FEEDBACK.md #7), and the members are computed.
 
 ## The types built with a constructor (`KindMembers`, §4.2)
 
-A kind (`!reference { of: uuid_type }`, or `kind<uuid_type>` through the kernel's template) is an atom whose values
-are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a listed
-one. The kernel declares `identifier_kind`, `atom_kind` and `type_kind`, and types `enum_type.name_type` and
+A kind (`!meta.reference { of: meta.uuid_type }`, or `kind<meta.uuid_type>` through the kernel's template) is an atom
+whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a
+listed one. The kernel declares `identifier_kind`, `atom_kind` and `type_kind`, and types `enum_type.name_type` and
 `record.name_type` by the first. `computeKinds` derives every reference's index (`ReferenceBody.linked`) onto its body
 in the merged map after `computeSubtypes` and before the name-type checks; a reference that names values gets
 `namesTypes` false and no members.
 
 - **Membership is one walk over resolved entries.** `KindMembers`' class Javadoc states the walk: alias hops to the
   type, an alias stopping at an application, `template` bodies and value entries excluded, then the constructor the
-  value applies (its recorded tag, `EntryFacts.constructor`, else its body's `@Typename`) followed through a
-  constructor template's held body until `of` or a constructor IS-A it is reached. So a record template is a member
-  of `kind<record>` (it is a type, §5.10), `set<text>` of `kind<set_type>` while meta.tn's template `set` is not,
-  `top` of `type_kind`, `kind<product>` and `kind<record>`, and so is a constructor whose declaration is a record:
+  value applies (its recorded tag, `EntryFacts.constructor`, else its body's `@Typename`) followed through a constructor
+  template's held body until `of` or a constructor IS-A it is reached. So a record template is a member of
+  `kind<record>` (it is a type, §5.10), `set<text>` of `kind<meta.set_type>` while the kernel's template `meta.set` is
+  not, `top` of `type_kind`, `kind<product>` and `kind<record>`, and so is a constructor whose declaration is a record:
   membership is not `EntryKind.isConstructor`, which answers applicability.
 - **A kind is a member of itself where the walk says so.** `type_kind` is built with `reference`, which IS-A `type`,
   so it lists itself. Nothing loops: the walk reads construction chains and never a kind's members.
-- **A constructor is read in the schema's one namespace.** `KindMembers` and `NameType` take a `structure` lookup
-  beside the entry's own, read first; the linker passes the merged namespace for both, and the second serves a caller
-  holding a narrower first one (materialisation's imported entries). A schema cannot declare a `uuid_type` of its own
-  to capture a hop: the closure already binds the name, and a second declaration is §2.2.3's collision. The closure
-  walked is the merged map, the kernel's and meta.tn's own types included, so `kind<record>` lists the kernel's
-  records beside the schema's, and `kind<namespace>` holds a schema's own namespace type `api` beside `schema` and
-  `field_map`.
+- **A constructor is read in the schema's one namespace.** `KindMembers` and `NameType` take a `structure` lookup beside
+  the entry's own, read first; the linker passes the merged namespace for both, and the second serves a caller holding a
+  narrower first one (materialisation's imported entries). A schema's own `uuid_type` captures no hop: the kernel's is
+  `meta.uuid_type`, a path of the closure, and a schema declaring `meta` itself collides under §2.2.3. The closure
+  walked is the merged map, the kernel's own types included, so `kind<meta.record>` lists the kernel's records beside
+  the schema's, and `kind<meta.namespace>` holds a schema's own namespace type `api` beside `meta.schema` and
+  `meta.field_map`.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: a name resolving to nothing is
   an unresolved reference, and an open entry or a value entry is refused (`KindMembers.ofRefusal`), against the
   declaration that wrote the application (`reportedAgainst`). Anything else is admitted: `kind<top>` holds every
@@ -93,22 +93,22 @@ in the merged map after `computeSubtypes` and before the name-type checks; a ref
   no field an author can write.
 - **A value at a kind-typed field is a name.** `checkFieldValue` hands a `~`/`=` value at a kind-typed field to
   `checkKindValue`, which resolves it in the schema's namespace and asks the walk. So
-  the kernel's `enum => enum_type ^ { name_type?: = identifier }` is a member at the kernel's link, a schema's pin
+  the kernel's `enum => meta.enum_type ^ { name_type?: = meta.identifier }` is a member at the kernel's link, a schema's pin
   of its own `text_identifier` at that schema's, and a pin of a text family is refused where it is written.
 - **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers.forRead`'s
   `KindParser`, an `AtomTypeParser<TypeRef>`): a name token, a reference with arguments, or a JSON string holding
-  either, read into the `TypeRef` it is and naming a member of the linked index, an application through the entry
-  it denotes (`design/references.md`). A name without arguments is judged as one name, its path from the root
+  either, read into the `TypeRef` it is and naming a member of the linked index, an application through the entry it
+  denotes (`design/references.md`). A name without arguments is judged as one name, its path from the root
   (`geo.address`), each segment read into its normalization form as `type_name` reads an identifier. The value is the
-  `TypeRef`, carrying the closure its `referent()` resolves in, in a tree read as in a bind; a `String` host receives its
-  canonical text. That is every data document's reading, whatever it imports: a data document importing only meta.tn that
-  writes `!record_field { type: int32 }` is refused, `int32` being core's. In a **schema document** a name resolves in the
-  schema being resolved, which the reading closure does not hold, so the reader checks the grammar alone
-  (`AtomParsers.inSchemaDocument`, `KindParser.namesOnly`) and `AtomTypeReader` records the name for that schema's link to
-  judge. A schema document is a construction's or a value entry's payload, which the resolver reads
+  `TypeRef`, carrying the closure its `referent()` resolves in, in a tree read as in a bind; a `String` host receives
+  its canonical text. That is every data document's reading, whatever it imports: a data document importing only meta.tn
+  that writes `!meta.record_field { type: int32 }` is refused, `int32` being core's. In a **schema document** a name
+  resolves in the schema being resolved, which the reading closure does not hold, so the reader checks the grammar alone
+  (`AtomParsers.inSchemaDocument`, `KindParser.namesOnly`) and `AtomTypeReader` records the name for that schema's link
+  to judge. A schema document is a construction's or a value entry's payload, which the resolver reads
   (`TsonReadContext.readsSchemaDocument`), or a value of the kernel's `schema` read as data, a resolved form
-  (`readsSchemaNames`, set by the reader `TsonSchemaCompiler` builds for the kernel's `schema` entry), whose names ingest
-  judges. That is what lets a resolved form naming a user's own name type read back.
+  (`readsSchemaNames`, set by the reader `TsonSchemaCompiler` builds for the kernel's `schema` entry), whose names
+  ingest judges. That is what lets a resolved form naming a user's own name type read back.
 
 ## What a name type is (`NameType`)
 
@@ -117,7 +117,7 @@ optional `name_type` for its field names. Each body holds the name only, and wha
 parser, which equality, which profile) lives in a namespace the body cannot see.
 
 - **One namespace, whoever wrote the value.** An author-written `name_type` names a vocabulary the schema declares
-  or imports (`!enum_type { name_type: kebab … }`); one the constructor pinned (`!enum [A B]` names the kernel's
+  or imports (`!meta.enum_type { name_type: kebab … }`); one the constructor pinned (`!meta.enum [A B]` names the kernel's
   `identifier`) resolves in the same namespace, and since the closure holds the kernel's `identifier`, no schema
   declares one of its own to displace it. Pinned is found through the constructor the entry's value applies
   (`TsonSchemaLinker.constructorOf`) and through a template's held body to the constructor it applies: `named =>
@@ -155,7 +155,7 @@ no kernel is in scope, the identifier grammar the default stands for applies.
 - **Supertypes decide.** A record with supertypes takes their one type, refuses two that disagree, and refuses a
   stated type that is not theirs; two are one when their alias chains end at one entry (`sameNameType`), so an
   alias is its target and `field_name` is `identifier`. A refinement keeps its source's. The rule is composition's
-  (`resolveComposition`): a declaration never writes a chain (§8.1), so an explicit `!record { … }` has none to take a
+  (`resolveComposition`): a declaration never writes a chain (§8.1), so an explicit `!meta.record { … }` has none to take a
   type from, which is why the kernel's `name_type` has no `~` default. It is also how a brace form states one: a
   fieldless ABSTRACT base carries the type and the records composing it take it.
 - **A schema's own references to a field match its declared spelling exactly**, under a folding type too: a group
@@ -165,7 +165,7 @@ no kernel is in scope, the identifier grammar the default stands for applies.
   with the definition it resolves to (`FieldNames.readBy`), because its readers judge a document's names by it and
   cannot resolve it themselves.
 - **A duplicate field is refused by whichever layer can see it, and only by that one.** One spelling written twice
-  in the explicit `!record { fields: { … } }` form is `field_map`'s duplicate key, `DUPLICATE_MAP_KEY` where the form is
+  in the explicit `!meta.record { fields: { … } }` form is `field_map`'s duplicate key, `DUPLICATE_MAP_KEY` where the form is
   read as data and restated against the declaration where a schema writes it; the brace form's repeat is the
   resolver's. What no map can see, two spellings that are one value of the name type (`name` and `NAME` under a case
   fold), is `FieldNames`'. `field_map` states `key_type?: ~ field_name`, a default: the key family is the host

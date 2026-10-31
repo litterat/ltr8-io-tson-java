@@ -128,12 +128,13 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /**
-     * Whether {@code entryName} denotes the meta-kernel's own entry of that name: declared by meta-kernel.tn, or
+     * Whether {@code entryName} denotes the kernel's own entry of that name: declared by meta.tn, or
      * merged in from it. What a kind and a constructor are judged by ([TSON-SCHEMA] §4.1), so a schema's own
-     * {@code namespace} or {@code top} is an ordinary declaration whatever it is spelled.
+     * {@code namespace} or {@code top} is an ordinary declaration, the kernel's being {@code meta.namespace} and
+     * {@code meta.top}.
      */
     public boolean isKernel(String entryName) {
-        return schema.entries().containsKey(entryName) && TsonBundledSchemas.isMetaKernel(originOf(entryName));
+        return schema.entries().containsKey(entryName) && TsonBundledSchemas.isKernel(originOf(entryName));
     }
 
     /** {@code entryName}'s kind ({@link EntryKind#of}), judged by origin; {@code null} for a name it lacks. */

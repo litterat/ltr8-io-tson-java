@@ -20,7 +20,7 @@ import java.util.Arrays;
 
 /**
  * Represents a Tuple data class -- a heterogeneous, fixed-arity product accessed positionally, the
- * shape the meta-kernel's own {@code tuple} constructor describes ({@code ~product & {
+ * shape the kernel's own {@code tuple} constructor describes ({@code ~product & {
  * access_pattern: INDEX, size_type: FIXED, elements: [...] } }): {@link DataClassRecord}'s
  * heterogeneity (each slot has its own type), but {@link DataClassArray}'s index-based access
  * instead of named fields.

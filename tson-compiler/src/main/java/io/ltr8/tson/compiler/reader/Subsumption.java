@@ -1,5 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.stream.DocumentStart;
+import io.ltr8.tson.schema.TsonSchema;
+
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -99,6 +102,11 @@ public final class Subsumption {
      */
     public static Map<String, Set<String>> namesMeaning(Namespace<? extends Top> entries) {
         Map<String, Set<String>> index = new LinkedHashMap<>();
+        // `!schema` is the spelling of the kernel's `meta.schema` wherever it is written, as a schema document's
+        // root tag is (§3.4): a resolved form's root reads as a value of it.
+        if (entries.containsKey(TsonSchema.SCHEMA)) {
+            index.computeIfAbsent(TsonSchema.SCHEMA, ignored -> new LinkedHashSet<>()).add(DocumentStart.SCHEMA_TAG);
+        }
         entries.forEach((written, definition) -> {
             String terminal = AliasChain.terminal(written, entries::get);
             if (!terminal.equals(written)) {

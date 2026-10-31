@@ -333,8 +333,7 @@ final class ValidateCommand {
 
     /** The bundled standard-library identities, which {@code ProcessorConfig} always serves from its own resources. */
     private static boolean isBundledId(String id) {
-        return id.equals(TsonBundledSchemas.META_KERNEL_ID)
-                || id.equals(TsonBundledSchemas.META_ID)
+        return id.equals(TsonBundledSchemas.META_ID)
                 || id.equals(TsonBundledSchemas.CORE_ID)
                 || id.equals(TsonBundledSchemas.NET_ID)
                 || id.equals(TsonBundledSchemas.POLICY_ID);
@@ -350,7 +349,7 @@ final class ValidateCommand {
                 new IllegalArgumentException("schema " + file + " has no !!id"));
         if (isBundledId(id)) {
             System.err.println("note: " + file + " declares the built-in schema id \"" + id
-                    + "\" -- overriding meta-kernel/meta/core is not supported; ignoring this file");
+                    + "\" -- overriding a bundled schema (meta, core, net, policy) is not supported; ignoring this file");
         } else {
             // Key by canonical identity so a data file's plain !!import resolves against a schema whose
             // !!id carries a ?sha256= pin (the hash is not identity, §2.2.1).

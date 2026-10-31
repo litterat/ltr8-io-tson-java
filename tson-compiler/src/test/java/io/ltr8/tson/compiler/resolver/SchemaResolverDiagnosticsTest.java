@@ -60,7 +60,7 @@ class SchemaResolverDiagnosticsTest {
         TsonCompiledSchemaLoader loader = registry;
 
         SchemaDocument metaKernel = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
+                TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
         registry.register(new SchemaResolver(loader).resolveSchema(metaKernel));
         loader.loadMeta(TsonBundledSchemas.META_ID);
         loader.resolveLinked(TsonBundledSchemas.CORE_ID);
@@ -163,7 +163,7 @@ class SchemaResolverDiagnosticsTest {
         assertEquals(List.of("/bad_max", "/bad_min"),
                 diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
         for (Diagnostic diagnostic : diagnostics) {
-            assertTrue(diagnostic.message().contains("not valid data for 'integer_type'"), diagnostic.message());
+            assertTrue(diagnostic.message().contains("not valid data for 'meta.integer_type'"), diagnostic.message());
             assertTrue(diagnostic.schemaPosition().isPresent(), diagnostic.schemaPointer().orElseThrow());
         }
     }

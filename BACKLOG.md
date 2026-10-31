@@ -33,7 +33,7 @@ distinction, and a misfiled entry is how a wrong classification gets adopted rat
 
 ## Resolution & linking generality
 
-Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
+Every real schema resolved so far (meta.tn, core.tn, net.tn, policy.tn and hand-built test fixtures)
 happens to fit a narrow shape this pipeline already handles — declared in dependency order, with
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
@@ -47,8 +47,8 @@ spec-required case:
   matched only through the bottom-up lookup (`ReferenceBody.entryOf`), not by the identity §8.2 gives it, which
   follows each argument's chain to its terminal. Follow the chains before the lookup and add a validate vector.
 - [ ] **A nested or aliased application across imports is untested at the IS-A edge fold.** An imported schema's
-  `@application` is now the application as written, nested arguments unreduced (`pair<box<text> int32>`), and reaches
-  the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
+  `@meta.application` is the application as written, nested arguments unreduced (`pair<box<text> int32>`), and
+  reaches the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
   an aliased application declared in an import and applied in the importer, and reduce on ingest if it misses.
 - [ ] **A kind-typed field's default naming a later entry throws `IllegalStateException`.** A record field written
   `k: kind<record> = later`, with `later` declared after a value read reaches the field, escapes as an internal
@@ -59,7 +59,7 @@ spec-required case:
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
-  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the five bundled
+  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the four bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **A value entry read against a type declared beside it cannot read a field typed by an inline application.**
@@ -72,13 +72,15 @@ spec-required case:
   `link/valid` vector writing it inline.
 - [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1;
   `SPEC-FEEDBACK.md #4`, the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
-  `schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
+  `meta.schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
   entry whose tag names a constructor or a type the same form declares (`counts => !counted { … }` beside `counted
   => !record { … }`) has no reader, and a `class2/schema/valid` vector cannot state such a schema's output. Read it
   as a schema is resolved instead: the form's own entries made ready by `WaitOrder` over what its imports hold, each
   value read through readers compiled from the entries ready so far, so the fixture's readers come from the fixture.
   `parseResolvedForm`'s grammar-only kind reading stays. Then add `schema/valid` vectors for a same-document
-  constructor and value entry, and check that every `-resolved.tn` re-resolves to itself.
+  constructor and value entry, check that every `-resolved.tn` re-resolves to itself, and drop
+  `ResolvedFixtureTest`'s reading of `net-resolved.tn` beside net.tn, whose `ipv4 => !net.ipv4_type {}` names a
+  constructor the form declares.
 - [ ] **An instance of a constructor composing `record` is refused** ([TSON-SCHEMA] §4.1, §5.7). `c => record & {
   extra: text }` is a constructor whose instances are record types carrying one facet more, and `x => !c { fields: {
   id => { type: text } }  extra: "hello" }` should follow record composition: `x` is a record type read by the record
@@ -101,11 +103,11 @@ spec-required case:
   `readAs(text, "schema")`), with nothing verified.
   `ParameterTypes` already derives the type to check against.
 - [ ] **An application is not yet unified with an imported library's entry for it** ([TSON-SCHEMA] §8.1, §8.2). A
-  library declaring `int_box => box<int32>` writes `@application:"box<int32>"` on that
+  library declaring `int_box => box<int32>` writes `@meta.application:"box<int32>"` on that
   key, and a schema importing it that writes `box<int32>` still closes the application to an entry of its own rather
   than resolving to `int_box`. The lookup runs application to entry, so it needs an index over imported keys keyed by
   `DerivedName.canonicalApplication`; `TemplateMaterialiser.ownedBy` is that index for local declarations and
-  `SchemaResolver` already reads every import's `@application` into the map the applied-parent fold uses, so the
+  `SchemaResolver` already reads every import's `@meta.application` into the map the applied-parent fold uses, so the
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
@@ -147,7 +149,15 @@ spec-required case:
   token in `record_field.value`, told from a literal by §5.10's shadowing rule, in resolved output as in source; at a
   type position or among an application's arguments a parameter is its name, as the reference grammar reads one
   (`SPEC-FEEDBACK.md #12`). Decide with typed facets, which retype `value`, whether `value` gains a channel (`( value:
-  value | value_param: param_name )`), and with it what `@application` means on a declared entry that is no record.
+  value | value_param: param_name )`), and with it what `@meta.application` means on a declared entry that is no record.
+
+- [ ] **An annotation inside a value read through an imported type's reader resolves in the declaring schema's
+  namespace.** [TSON-SCHEMA] §3.3.3 resolves an annotation in the annotating document's namespace, and a value
+  entry's payload (or any value) read through a reader its type's declaring schema compiled looks the annotation up
+  in that schema's closure: `@doc` inside `!api { … }`, where `api` is declared by a schema importing the kernel
+  alone, is refused though the annotating schema imports core, whose `doc` names `meta.doc`. The read needs the
+  annotating document's annotation scope beside the reader's own (`AnnotationTypes`), consulted where the reader's
+  misses. `SPEC-FEEDBACK.md #15`, "Open".
 
 ## Checked annotations
 
@@ -337,12 +347,12 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
-  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`Namespace.getAnnotations`) and survives
+  `@meta.synthetic` — reaches `TsonSchema.entries()` as key annotations (`Namespace.getAnnotations`) and survives
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => top}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the fixtures carry `@synthetic` on the keys the resolver minted and `@ordering`/`@bounded`/`@exact` on core's,
-  and the bound side renders none of them, so the entries would compare equal for the wrong reason;
+  — the fixtures carry `@meta.synthetic` on the keys the resolver minted and `@meta.ordering`/`@meta.bounded`/
+  `@meta.exact` on core's, and the bound side renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
   only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers

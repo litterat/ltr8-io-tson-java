@@ -7,9 +7,9 @@ import io.ltr8.annotation.Typename;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code namespace} constructor's own vocabulary, resolved ([TSON-SCHEMA] §4.1, §8.1): a map type
+ * The kernel's {@code namespace} constructor's own vocabulary, resolved ([TSON-SCHEMA] §4.1, §8.1): a map type
  * keyed by names. A namespace type is an instance, as a map type is one of {@code map} -- the kernel's {@code
- * schema} and {@code field_map}, and a schema's own {@code api => !namespace { key_type: identifier  value_type:
+ * schema} and {@code field_map}, and a schema's own {@code api => !meta.namespace { key_type: identifier  value_type:
  * method }} -- and a value of it is the map its facets describe, delivered as a {@link Namespace} where the position
  * asks for one. {@code access_pattern}/{@code size_type} are fixed ({@code NAMED}/{@code VARIABLE}) and never appear in
  * output.
@@ -26,15 +26,15 @@ import java.util.Optional;
  * @param valueType the type of every value
  * @param ordered   whether key order is part of a value
  */
-@Typename(name = "namespace")
+@Typename(name = "meta.namespace")
 public record NamespaceBody(TypeChain chain, @Field("key_type") Optional<TypeRef> keyType,
                             @Field("value_type") TypeRef valueType, boolean ordered) implements Product {
 
     /** The kernel's constructor whose instances are namespace types. */
-    public static final String NAMESPACE = "namespace";
+    public static final String NAMESPACE = "meta.namespace";
 
     /** What a key of a host-supplied family is read as: a token, its spelling, judged later by the host. */
-    public static final String HOST_KEYS = "text";
+    public static final String HOST_KEYS = "meta.text";
 
     /** The chain normalised: absent and empty are one list. */
     @Record

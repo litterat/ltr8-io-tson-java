@@ -91,16 +91,15 @@ class TsonCompiledSchemaRegistryTest {
     }
 
     @Test
-    void theCoreCompilesOnlyMetaLayerSchemas() {
+    void theCoreCompilesOnlyTheSchemasAResolutionReadsThrough() {
         TsonCompiledMetaRegistry core = core();
 
-        // meta-kernel and meta.tn are meta-layer (their !!meta is meta-kernel) -- compiled and cached here.
-        assertTrue(core.get(TsonBundledSchemas.META_KERNEL_ID).isPresent());
+        // The kernel is the vocabulary every bundled schema's constructions read through -- compiled and cached here.
         assertTrue(core.get(TsonBundledSchemas.META_ID).isPresent());
 
-        // core.tn is not a meta (its !!meta is meta.tn) -- resolved+registered, but never compiled here.
-        assertTrue(core.schemaRegistry().get(TsonBundledSchemas.CORE_ID).isPresent());
-        assertTrue(core.get(TsonBundledSchemas.CORE_ID).isEmpty());
+        // net.tn is read through by no other bundled schema -- resolved+registered, but never compiled here.
+        assertTrue(core.schemaRegistry().get(TsonBundledSchemas.NET_ID).isPresent());
+        assertTrue(core.get(TsonBundledSchemas.NET_ID).isEmpty());
     }
 
     // ── Facade readers over a registry (one compiled-schema cache, not one per reader) ──

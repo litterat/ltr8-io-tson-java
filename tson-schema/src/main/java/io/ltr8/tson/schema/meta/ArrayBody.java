@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code array} constructor's own vocabulary, resolved (Part 2 §4.2, §5.3,
+ * The kernel's {@code array} constructor's own vocabulary, resolved (Part 2 §4.2, §5.3,
  * §8.1) -- {@code access_pattern}/{@code size_type} are fixed ({@code INDEX}/{@code VARIABLE}) and
  * never appear in output. Also backs {@code set_type}, whose refinement resolves to this same shape with
  * different field values: it pins {@code voidable: false}, {@code ordered: false} and {@code unique_items: true}.
@@ -24,7 +24,7 @@ import java.util.Optional;
  * <p>{@code ordered} says whether element order is part of the value; output keeps the order written either way
  * ([TSON-SCHEMA] §7.5).
  */
-@Typename(name = "array")
+@Typename(name = "meta.array")
 public record ArrayBody(TypeChain chain,
         @Field("element_type") TypeRef elementType, boolean voidable, boolean ordered,
                          @Field("unique_items") boolean uniqueItems,

@@ -30,7 +30,7 @@ import java.util.Optional;
  * positional form loses the token in a schema document, so the readers cannot disagree about which tokens are names.
  *
  * <p><b>Names only.</b> The slot holds a reference and nothing else, so a braced value, a quoted token and a framed
- * name ({@code @doc:"x" orders}, {@code !record x}) are refused: a name's type is its referent's, and an annotation
+ * name ({@code @doc:"x" orders}, {@code !meta.record x}) are refused: a name's type is its referent's, and an annotation
  * would have nowhere to go.
  */
 final class ReferenceNameReader implements TsonTypeReader<Object> {

@@ -8,14 +8,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * meta.tn's {@code hostname_type} constructor: a domain name in either label form, judged by IDNA2008. Pure
+ * net.tn's {@code net.hostname_type} constructor: a domain name in either label form, judged by IDNA2008. Pure
  * constraint value -- {@code tson-atom}'s {@code HostnameParser} holds one and does the reading, through
  * {@code io.ltr8.net.HostName}.
  *
  * <p>{@code allow_idn} is the one facet: false admits only names with no internationalized label, in either
  * spelling. {@code spec} is pinned to RFC 5890, flat and a bare {@link String}, as {@link Cidr4Type}'s is.
  */
-@Typename(name = "hostname_type")
+@Typename(name = "net.hostname_type")
 public record HostnameType(TypeChain chain,
         String spec, @Field("allow_idn") boolean allowIdn) implements Atom {
     /** The chain normalised: absent and empty are one list. */
@@ -37,7 +37,7 @@ public record HostnameType(TypeChain chain,
     /** {@code hostname_type.spec}'s pinned value. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc5890";
 
-    /** {@code hostname => !hostname_type {}} -- net.tn's {@code hostname}, internationalized names admitted. */
+    /** {@code hostname => !net.hostname_type {}} -- net.tn's {@code hostname}, internationalized names admitted. */
     public static final HostnameType UNCONSTRAINED = new HostnameType(SPEC, true);
 
     /**

@@ -28,11 +28,10 @@ class NamespaceTypeTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-headers.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              header_name => !identifier_type { continue_add: "-" }
-              headers     => !namespace { key_type: header_name  value_type: text }
+              header_name => !meta.identifier_type { continue_add: "-" }
+              headers     => !meta.namespace { key_type: header_name  value_type: meta.text }
               %s
             }
             """;
@@ -70,7 +69,7 @@ class NamespaceTypeTest {
 
     @Test
     void aValueIsJudgedByTheValueType() {
-        assertEquals(1, read("{ accept => [text] }").size());
+        assertEquals(1, read("{ accept => [meta.text] }").size());
     }
 
     /** The record of facets is never what is read: a field named for one is a key like any other. */
@@ -98,10 +97,10 @@ class NamespaceTypeTest {
     void theLinkedSchemaRecordsTheMapAndTheKind() {
         TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
 
-        assertEquals(Optional.of(new NamespaceBody(Optional.of(TypeRef.of("header_name")), TypeRef.of("text"), false)),
+        assertEquals(Optional.of(new NamespaceBody(Optional.of(TypeRef.of("header_name")), TypeRef.of("meta.text"), false)),
                 meta.namespace("headers"));
         assertEquals(EntryKind.PRODUCT, meta.kindOf("headers"));
-        assertEquals(Optional.of("namespace"), meta.schema().constructorOf("headers"));
+        assertEquals(Optional.of("meta.namespace"), meta.schema().constructorOf("headers"));
         assertEquals(Optional.empty(), meta.namespace("header_name"));
     }
 
@@ -111,7 +110,7 @@ class NamespaceTypeTest {
      */
     @Test
     void aDefaultKeyFamilyIsTheHostsAndIsReadBySpelling() {
-        NamespaceBody fields = tson("").bindRegistry().core().resolveLinked(META).namespace("field_map")
+        NamespaceBody fields = tson("").bindRegistry().core().resolveLinked(META).namespace("meta.field_map")
                 .orElseThrow();
 
         assertEquals(Optional.empty(), fields.keyType());
@@ -128,9 +127,8 @@ class NamespaceTypeTest {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/governed.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  hs => !namespace { key_type: identifier  value_type: text }
+                  hs => !meta.namespace { key_type: meta.identifier  value_type: meta.text }
                 }
                 """);
 
@@ -141,7 +139,7 @@ class NamespaceTypeTest {
     @Test
     void aNamespaceTypeWithoutAValueTypeIsRefused() {
         List<Diagnostic> problems = tson("").validateSchema(META_TEXT.formatted("""
-                  keyed => !namespace { key_type: header_name }
+                  keyed => !meta.namespace { key_type: header_name }
                 """));
 
         assertEquals(1, problems.size(), problems::toString);

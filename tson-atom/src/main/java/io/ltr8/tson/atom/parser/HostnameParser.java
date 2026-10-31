@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.meta.HostnameType;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta.tn's {@code hostname_type} (net.tn's {@code hostname}): a domain name in either
+ * Parses and validates against net.tn's {@code net.hostname_type} (net.tn's {@code hostname}): a domain name in either
  * label form, read to an {@link HostName}, whose rules -- IDNA2008, the ASCII fold, the boundaries -- are
  * {@code io.ltr8.net}'s. A token that is not a host name is outside the family's grammar and so a parse failure;
  * {@code allow_idn} false refusing an internationalized name is a constraint violation, the name being one.
@@ -23,7 +23,7 @@ public record HostnameParser(HostnameType constraints) implements AtomTypeParser
     /** net.tn's annotation name -- {@code !hostname}. */
     public static final String TYPENAME = "hostname";
 
-    /** {@code hostname => !hostname_type {}}. */
+    /** {@code hostname => !net.hostname_type {}}. */
     public static final HostnameParser UNCONSTRAINED = new HostnameParser(HostnameType.UNCONSTRAINED);
 
     @Override

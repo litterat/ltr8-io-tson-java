@@ -40,7 +40,7 @@ import java.util.function.UnaryOperator;
  * <p><b>{@code declared_type} is shared between both modes</b>, registered once via {@link
  * DeclaredReader#FACTORY}: it selects the reader of the type the value names and builds nothing of its own.
  *
- * <p><b>Every {@code ~}-marked constructor meta-kernel.tn/meta.tn declare has an entry</b> -- verified
+ * <p><b>Every {@code ~}-marked constructor meta.tn and net.tn declare has an entry</b> -- verified
  * against both files directly, not assumed -- and every one of them now builds a real reader.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
@@ -97,15 +97,16 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
             new AtomTreeReader(AtomTypeReader.VALUE.create(name, definition, context), name,
                     AnnotationTypes.of(context));
 
-    /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
+    /** The atom constructors meta.tn and net.tn declare, by path, in the order those documents declare them. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
-            // meta-kernel.tn
-            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type", "reference",
-            // meta.tn
-            "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
-            "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
-            "iri_type", "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type",
-            "hostname_type", "host_type", "media_type_type");
+            // meta.tn, under meta
+            "meta.integer_type", "meta.text_type", "meta.identifier_type", "meta.uri_type", "meta.regex_type",
+            "meta.reference", "meta.bytes_type", "meta.float_type", "meta.decimal_type", "meta.rational_type",
+            "meta.date_type", "meta.time_type", "meta.datetime_type", "meta.duration_type", "meta.period_type",
+            "meta.uuid_type", "meta.complex_type", "meta.iri_type", "meta.email_type",
+            // net.tn, under net
+            "net.mac_type", "net.ipv4_type", "net.ipv6_type", "net.cidr4_type", "net.cidr6_type", "net.hostname_type",
+            "net.host_type", "net.media_type_type");
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
@@ -113,17 +114,16 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
             ValueReaderFactory choice) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
-        // meta-kernel.tn
-        factories.put("value_type", valueFactory);
-        factories.put("void_type", voidFactory);
-        factories.put("record", RecordDispatch.over(record));
-        factories.put("array", array);
-        factories.put("set_type", array);
-        factories.put("map", map);
-        factories.put("tuple", tuple);
-        factories.put("enum", leaf.apply(enumFactory));
-        factories.put("choice", choice);
-        factories.put("declared_type", DeclaredReader.FACTORY);
+        factories.put("meta.value_type", valueFactory);
+        factories.put("meta.void_type", voidFactory);
+        factories.put("meta.record", RecordDispatch.over(record));
+        factories.put("meta.array", array);
+        factories.put("meta.set_type", array);
+        factories.put("meta.map", map);
+        factories.put("meta.tuple", tuple);
+        factories.put("meta.enum", leaf.apply(enumFactory));
+        factories.put("meta.choice", choice);
+        factories.put("meta.declared_type", DeclaredReader.FACTORY);
 
         // Every atom constructor routes to one factory, so what varies is the key and not the value:
         // AtomTypeReader.ATOM asks AtomParsers which parser the resolved body wants, and that mapping is

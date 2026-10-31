@@ -64,11 +64,11 @@ class NamespaceSlotTest {
         assertFalse(written.contains("!field_map"), written);
 
         Map<String, Object> read = ResolvedForm.readResolved(tson, """
-                !schema { person => !record { fields: {
+                !schema { person => !meta.record { fields: {
                   name => { type: text }
                   age  => { type: integer  optional: true }
                   nick => { type: text  optional: true }
-                } } }""");
+                } } }""", List.of(TsonBundledSchemas.CORE_ID));
         RecordBody back = assertInstanceOf(RecordBody.class, read.get("person"));
         assertEquals(RecordBody.FIELD_MAP, back.fields().type());
         assertEquals(List.of("name", "age", "nick"), List.copyOf(back.fields().keySet()));
@@ -90,8 +90,8 @@ class NamespaceSlotTest {
     void aRootReadAskedForANamespaceDeliversTheConstructorsInstance() {
         Tson tson = tson();
         Namespace<?> read = tson.objectReader().withSchema(TsonBundledSchemas.META_ID)
-                .readAs("{ person => !record { fields: { name => !record_field { type: text } } } }", "schema",
-                        Namespace.class);
+                .readAs("{ person => !meta.record { fields: { name => !meta.record_field { type: meta.text } } } }",
+                        "meta.schema", Namespace.class);
         assertEquals(TsonSchema.SCHEMA, read.type());
         assertInstanceOf(RecordBody.class, read.get("person"));
     }

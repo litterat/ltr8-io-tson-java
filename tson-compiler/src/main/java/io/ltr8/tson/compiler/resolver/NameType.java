@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.TsonSchema;
@@ -25,7 +26,7 @@ import java.util.stream.Stream;
  * Where an entry's {@code name_type} resolves, and whether what it resolves to may stand there: an enum's, which its
  * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of ([TSON-SCHEMA] §5.2).
  * A value the entry's constructor wrote resolves where that constructor is declared, whose closure is in the schema's
- * -- so {@code !enum [A B]} names the kernel's {@code identifier}, and a record that says nothing the kernel's {@code
+ * -- so {@code !meta.enum [A B]} names the kernel's {@code identifier}, and a record that says nothing the kernel's {@code
  * field_name}, names no schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own
  * namespace first. Shared by the linker's enum and field name checks and by materialisation, which checks a template's
  * value argument of an enum type before linking has run.
@@ -43,7 +44,7 @@ public final class NameType {
     private static final String NAME_TYPE = "name_type";
 
     /** The {@code of} of the kernel's {@code identifier_kind}, for a slot whose own kind is out of reach. */
-    private static final String IDENTIFIER_TYPE = "identifier_type";
+    private static final String IDENTIFIER_TYPE = KernelNames.of("identifier_type");
 
     private NameType() {
     }

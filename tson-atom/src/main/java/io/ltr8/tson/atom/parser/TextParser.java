@@ -9,7 +9,7 @@ import io.ltr8.tson.schema.meta.TextType;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta-kernel's {@code text_type} constructor -- the Unicode code
+ * Parses and validates against the kernel's {@code text_type} constructor -- the Unicode code
  * point sequence type every other text-shaped atom in this package composes with ({@code
  * UriParser} already does; {@code RegexParser} does explicitly, via a {@code TextType} field,
  * rather than duplicating its constraint checks). Holds a {@link TextType} -- the pure constraint
@@ -34,7 +34,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
     /** The §5.5 annotation name this atom is reached by. */
     public static final String TYPENAME = "text";
 
-    /** {@code text => !text_type {}} -- the unconstrained text type. */
+    /** {@code text => !meta.text_type {}} -- the unconstrained text type. */
     public static final TextParser UNCONSTRAINED = new TextParser(TextType.UNCONSTRAINED);
 
     public TextParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,

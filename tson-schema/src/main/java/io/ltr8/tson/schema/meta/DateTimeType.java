@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code datetime_type} constructor (§5.4's {@code datetime} atom, RFC 3339
+ * The kernel's {@code datetime_type} constructor (§5.4's {@code datetime} atom, RFC 3339
  * {@code date-time}). Pure constraint values, no parsing/validation behavior -- {@code
  * tson-atom}'s {@code DateTimeParser} holds one of these and does the actual reading/writing.
  *
@@ -20,10 +20,10 @@ import java.util.Optional;
  * {@code precision: 0} admits whole seconds only. The family carries no timezone facet -- RFC 3339 {@code
  * date-time} already makes the offset mandatory.
  *
- * <p>Also an {@link Atom} variant: {@code datetime => !datetime_type {}} is a
+ * <p>Also an {@link Atom} variant: {@code datetime => !meta.datetime_type {}} is a
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "datetime_type")
+@Typename(name = "meta.datetime_type")
 public record DateTimeType(TypeChain chain,
         Optional<OffsetDateTime> min, @Field("exclusive_min") Optional<OffsetDateTime> exclusiveMin,
                      Optional<OffsetDateTime> max, @Field("exclusive_max") Optional<OffsetDateTime> exclusiveMax,
@@ -65,7 +65,7 @@ public record DateTimeType(TypeChain chain,
         this(min, Optional.empty(), max, Optional.empty(), precision);
     }
 
-    /** {@code datetime => !datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
+    /** {@code datetime => !meta.datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
     public static final DateTimeType UNCONSTRAINED =
             new DateTimeType(Optional.empty(), Optional.empty(), Optional.empty());
 

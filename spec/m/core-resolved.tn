@@ -1,19 +1,20 @@
 !!id:"https://tson.io/2026/39/m/core-resolved.tn"
 !!import:"https://tson.io/2026/39/m/meta.tn"
-@doc:"""
+@meta.doc:"""
   Resolver-output fixture for core.tn (2026 Revision 39 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
-  Conventions as in meta-kernel-resolved.tn.
+  Conventions as in meta-resolved.tn.
 
   Its header is its source's: it imports meta.tn, through which the
-  structural vocabulary (`record`, `enum`, ...) and the kernel reach
-  it. Nothing in the document marks it resolved; a processor reads
+  kernel's entries reach it under `meta` (`meta.record`, `meta.enum`,
+  ...). Nothing in the document marks it resolved; a processor reads
   it as a resolved form because its caller says so ([TSON-SCHEMA]
   Section 8.1). Its type-name tokens resolve in core.tn's locals and
-  the closure of meta.tn. The annotation types used here (`ordering`,
-  `bounded`, `exact`, `numeric`) are meta's. Constructor names at entries' tags
-  (`integer_type`, `decimal_type`, `float_type`, `complex_type`, ...)
-  likewise name meta- and kernel-level entries.
+  the closure of meta.tn. Its first entries are its aliases of the
+  kernel's, each an `!meta.alias`; the annotation types used here
+  are the kernel's (`meta.ordering`, `meta.bounded`, ...).
+  Constructor names at entries' tags (`meta.integer_type`,
+  `meta.decimal_type`, `meta.float_type`, ...) name kernel entries.
 
   The open entries (`tuple1`, `voidable_tuple1`) hold
   their bodies — the application as written, unread until
@@ -22,94 +23,117 @@
   processor comparing these compares wire form, not bound values.
   """
 !schema {
-  @ordering:TOTAL @bounded:false @exact:true @numeric
-  number => !decimal_type {}
+  void => !meta.alias { target: meta.void }
+  boolean => !meta.alias { target: meta.boolean }
+  integer => !meta.alias { target: meta.integer }
+  text => !meta.alias { target: meta.text }
+  identifier => !meta.alias { target: meta.identifier }
+  iri => !meta.alias { target: meta.iri }
+  regex => !meta.alias { target: meta.regex }
+  kind => !meta.alias { target: meta.kind }
+  ref => !meta.alias { target: meta.ref }
+  declared => !meta.alias { target: meta.declared }
+  set => !meta.alias { target: meta.set }
+  enum => !meta.alias { target: meta.enum }
+  doc => !meta.alias { target: meta.doc }
+  annotation => !meta.alias { target: meta.annotation }
+  disjoint => !meta.alias { target: meta.disjoint }
+  deprecated => !meta.alias { target: meta.deprecated }
+  title => !meta.alias { target: meta.title }
+  comment => !meta.alias { target: meta.comment }
+  examples => !meta.alias { target: meta.examples }
+  read_only => !meta.alias { target: meta.read_only }
+  write_only => !meta.alias { target: meta.write_only }
 
-  @ordering:TOTAL @bounded:false @exact:true @numeric
-  rational => !rational_type {}
+  @meta.ordering:TOTAL @meta.bounded:false @meta.exact:true @meta.numeric
+  number => !meta.decimal_type {}
 
-  @ordering:NONE @bounded:false @numeric
-  complex => !complex_type {}
+  @meta.ordering:TOTAL @meta.bounded:false @meta.exact:true @meta.numeric
+  rational => !meta.rational_type {}
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  int8 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 8  signed: true } }
+  @meta.ordering:NONE @meta.bounded:false @meta.numeric
+  complex => !meta.complex_type {}
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  int16 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 16  signed: true } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  int8 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 8  signed: true } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  int32 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 32  signed: true } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  int16 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 16  signed: true } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  int64 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 64  signed: true } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  int32 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 32  signed: true } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  int128 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 128  signed: true } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  int64 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 64  signed: true } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  int256 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 256  signed: true } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  int128 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 128  signed: true } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint8 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 8  signed: false } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  int256 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 256  signed: true } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint16 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 16  signed: false } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  uint8 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 8  signed: false } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint32 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 32  signed: false } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  uint16 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 16  signed: false } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint64 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 64  signed: false } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  uint32 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 32  signed: false } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint128 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 128  signed: false } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  uint64 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 64  signed: false } }
 
-  @ordering:TOTAL @bounded:true @exact:true @numeric
-  uint256 => !integer_type { chain: { supertypes: [integer] }  size: { bits: 256  signed: false } }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  uint128 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 128  signed: false } }
 
-  @ordering:PARTIAL @bounded:false @exact:false @numeric
-  float32 => !float_type { format: BINARY32 }
+  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
+  uint256 => !meta.integer_type { chain: { supertypes: [meta.integer] }  size: { bits: 256  signed: false } }
 
-  @ordering:PARTIAL @bounded:false @exact:false @numeric
-  float64 => !float_type { format: BINARY64 }
+  @meta.ordering:PARTIAL @meta.bounded:false @meta.exact:false @meta.numeric
+  float32 => !meta.float_type { format: BINARY32 }
 
-  @ordering:NONE @bounded:false
-  uri_reference => !uri_type { chain: { subtypes: [uri] } }
+  @meta.ordering:PARTIAL @meta.bounded:false @meta.exact:false @meta.numeric
+  float64 => !meta.float_type { format: BINARY64 }
 
-  @ordering:NONE @bounded:false
-  uri => !uri_type { chain: { supertypes: [uri_reference] }  allow_relative: false }
+  @meta.ordering:NONE @meta.bounded:false
+  uri_reference => !meta.uri_type { chain: { subtypes: [uri] } }
 
-  @ordering:NONE @bounded:false
-  iri_reference => !iri_type {}
+  @meta.ordering:NONE @meta.bounded:false
+  uri => !meta.uri_type { chain: { supertypes: [uri_reference] }  allow_relative: false }
 
-  @ordering:NONE @bounded:false
-  bytes => !bytes_type {}
+  @meta.ordering:NONE @meta.bounded:false
+  iri_reference => !meta.iri_type {}
 
-  @ordering:TOTAL @bounded:true
-  date => !date_type {}
+  @meta.ordering:NONE @meta.bounded:false
+  bytes => !meta.bytes_type {}
 
-  @ordering:TOTAL @bounded:true
-  time => !time_type {}
+  @meta.ordering:TOTAL @meta.bounded:true
+  date => !meta.date_type {}
 
-  @ordering:TOTAL @bounded:true
-  datetime => !datetime_type {}
+  @meta.ordering:TOTAL @meta.bounded:true
+  time => !meta.time_type {}
 
-  @ordering:TOTAL @bounded:true
-  duration => !duration_type {}
+  @meta.ordering:TOTAL @meta.bounded:true
+  datetime => !meta.datetime_type {}
 
-  @ordering:TOTAL @bounded:false
-  period => !period_type {}
+  @meta.ordering:TOTAL @meta.bounded:true
+  duration => !meta.duration_type {}
 
-  @ordering:NONE @bounded:false
-  uuid => !uuid_type {}
+  @meta.ordering:TOTAL @meta.bounded:false
+  period => !meta.period_type {}
 
-  @ordering:NONE @bounded:false
-  email => !email_type {}
+  @meta.ordering:NONE @meta.bounded:false
+  uuid => !meta.uuid_type {}
 
-  tuple1 => !template { parameters: [{ name: T  type: type_kind }]  template: "!tuple { elements: [{ element_type: T }] }" }
+  @meta.ordering:NONE @meta.bounded:false
+  email => !meta.email_type {}
 
-  voidable_tuple1 => !template {
-    parameters: [{ name: T  type: type_kind }]
-    template: "!tuple { elements: [{ element_type: T  voidable: true }] }"
+  tuple1 => !meta.template { parameters: [{ name: T  type: meta.type_kind }]  template: "!meta.tuple { elements: [{ element_type: T }] }" }
+
+  voidable_tuple1 => !meta.template {
+    parameters: [{ name: T  type: meta.type_kind }]
+    template: "!meta.tuple { elements: [{ element_type: T  voidable: true }] }"
   }
+
 }

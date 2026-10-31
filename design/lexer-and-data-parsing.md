@@ -209,16 +209,18 @@ Key points:
   `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
   unchanged and still catches everything else (`!int32"5"`).
 - **A name position takes an `identifier`, not merely a bare token, and the check sits in the grammar.**
-  `type-ref = "!" qualified-name` and `annotation = "@" identifier` (§7.4): `TsonDataStream` matches an annotation's
-  name, and each `.`-separated segment of a tag's (`requireTagName`, none empty), in full against `IdentifierProfile`
+  `type-ref = "!" qualified-name` and `annotation = "@" qualified-name` (§7.4, SPEC-FEEDBACK.md #15): `TsonDataStream`
+  matches each `.`-separated segment of a tag's or an annotation's name (`requireQualifiedName`, none empty) in full
+  against `IdentifierProfile`
   once adjacency is settled, which is §7.6's own two-layer shape —
   the lexer produces a token, and a production that is no part of the token-stream grammar then matches its
   decoded text, exactly as a number is matched. It has to be the profile and not the token class, because
   token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
-  because names and values share one lexical class. So `!42x`, `!x..y` and `@x.y` are syntax errors rather than a
+  because names and values share one lexical class. So `!42x`, `!x..y` and `@x..y` are syntax errors rather than a
   reference to an undeclared type and an annotation carrying a name the format reserves. A dotted tag,
-  `!geo.address { … }`, names a member of a nested schema map, resolved by the reading schema's walk; a schemaless
-  read keeps it as written, as it keeps any tag (`preservingUnknownTypeRefs`). **`field-name` does not reach that check**
+  `!geo.address { … }`, names a member of a nested schema map, resolved by the reading schema's walk, and a dotted
+  annotation, `@meta.doc`, names one the same way; a schemaless read keeps either as written, as it keeps any tag
+  (`preservingUnknownTypeRefs`). **`field-name` does not reach that check**
   ([TSON-DATA] §2.5, [TSON-SCHEMA] §5.2): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`,
   narrower than the map key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because
   what a field name may be is its record's to say. The stream NFC-normalises the name and delivers it;

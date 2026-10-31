@@ -2,6 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -104,7 +105,7 @@ final class ResolvedForm {
         if (SchemaPaths.isNestedMap(value)) {
             // A nested map's members are entries under their paths, each compared on its own; the map is its names.
             Object members = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
-            return "!schema " + ((io.ltr8.tson.schema.meta.Namespace<?>) members).keySet();
+            return "!meta.schema " + ((io.ltr8.tson.schema.meta.Namespace<?>) members).keySet();
         }
         Object entry = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
         Object compared = entry instanceof TemplateBody held ? parsedForComparison(held) : entry;
@@ -154,7 +155,7 @@ final class ResolvedForm {
      */
     static Set<String> markedSynthetics(String resolvedText) {
         Set<String> marked = new TreeSet<>();
-        Matcher matcher = Pattern.compile("@synthetic\\s+([A-Za-z0-9_]+)\\s*=>").matcher(resolvedText);
+        Matcher matcher = Pattern.compile("@meta\\.synthetic\\s+([A-Za-z0-9_]+)\\s*=>").matcher(resolvedText);
         while (matcher.find()) {
             marked.add(withoutHash(matcher.group(1)));
         }
@@ -168,7 +169,7 @@ final class ResolvedForm {
         String canonical = CanonicalIdentity.canonicalize(id);
         Set<String> marked = new TreeSet<>();
         entries.forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical) && entries.getAnnotations(name).has("synthetic")) {
+            if (linked.originOf(name).equals(canonical) && entries.getAnnotations(name).has(TsonSchema.SYNTHETIC)) {
                 marked.add(withoutHash(name));
             }
         });
@@ -180,7 +181,8 @@ final class ResolvedForm {
      * a fixture leaves out of its entries, being compared rather than read, and {@code synthetic}, which
      * {@link #markedSynthetics} compares on its own terms.
      */
-    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "synthetic", "application");
+    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "meta.doc", TsonSchema.SYNTHETIC,
+            TsonSchema.APPLICATION);
 
     /**
      * Each schema-map key's {@code @application} in a §8 resolved-schema document, as the reference's canonical text,
@@ -194,7 +196,7 @@ final class ResolvedForm {
             String name = keyed.getKey();
             MapValue.MapEntry entry = keyed.getValue();
             entry.key().annotations().stream()
-                    .filter(annotation -> annotation.name().equals("application"))
+                    .filter(annotation -> annotation.name().equals(TsonSchema.APPLICATION))
                     .forEach(annotation -> marked.put(withoutHash(name),
                             withoutHashes(writtenApplication(annotation.value().orElseThrow().coreValue()))));
         }
@@ -327,7 +329,7 @@ final class ResolvedForm {
         for (MapValue.MapEntry entry : map.entries()) {
             String path = prefix + ((TokenValue) entry.key().coreValue()).text();
             entries.put(path, entry);
-            if (entry.value().typeRef().filter("schema"::equals).isPresent()
+            if (entry.value().typeRef().filter(t -> t.equals("schema") || t.equals(TsonSchema.SCHEMA)).isPresent()
                     && entry.value().coreValue() instanceof MapValue nested) {
                 addEntries(entries, path + ".", nested);
             }
@@ -337,7 +339,7 @@ final class ResolvedForm {
     /**
      * A §8 resolved-schema document, bound back into the value model, read under its own header's imports -- a
      * resolved form's header is its source's ([TSON-SCHEMA] §8.1) -- and as a resolved form because this caller says
-     * so: its root, tagged {@code !schema}, is read as a value of {@code schema}.
+     * so: its root, tagged {@code !schema}, is read as a value of {@code meta.schema}.
      */
     static Map<String, Object> readResolved(Tson tson, String resolvedText) {
         return readResolved(tson, resolvedText, io.ltr8.tson.compiler.TsonDocumentPeek.of(resolvedText).header().imports());
@@ -351,21 +353,21 @@ final class ResolvedForm {
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> readResolved(Tson tson, String resolvedText, List<String> imports) {
-        List<String> under = imports.isEmpty() ? List.of(TsonBundledSchemas.META_KERNEL_ID) : imports;
+        List<String> under = imports.isEmpty() ? List.of(TsonBundledSchemas.META_ID) : imports;
         return SchemaPaths.withPaths((Map<String, Object>) tson.objectReader()
                 .withImports(under)
-                .readAs(resolvedText, "schema", Object.class));
+                .readAs(resolvedText, TsonSchema.SCHEMA, Object.class));
     }
 
     /**
      * Every problem a resolved form's read reports -- {@link #readResolved(Tson, String)} as a validation, in tree
-     * mode: the form validated as the value of {@code schema} it is, under its own header's imports.
+     * mode: the form validated as the value of {@code meta.schema} it is, under its own header's imports.
      */
     static List<io.ltr8.tson.base.Diagnostic> validateResolved(Tson tson, String resolvedText) {
         List<String> imports = io.ltr8.tson.compiler.TsonDocumentPeek.of(resolvedText).header().imports();
         List<io.ltr8.tson.base.Diagnostic> problems = new java.util.ArrayList<>();
-        tson.treeReader().withImports(imports.isEmpty() ? List.of(TsonBundledSchemas.META_KERNEL_ID) : imports)
-                .withDiagnostics(problems::add).readAs(resolvedText, "schema");
+        tson.treeReader().withImports(imports.isEmpty() ? List.of(TsonBundledSchemas.META_ID) : imports)
+                .withDiagnostics(problems::add).readAs(resolvedText, TsonSchema.SCHEMA);
         return problems;
     }
 }

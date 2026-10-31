@@ -122,7 +122,7 @@ class SchemaDrivenTreeAnnotationTest {
 
         assertEquals(Optional.of("shape"), shape.typeRef());
         assertEquals(Optional.of("point"), shape.get("origin").typeRef());
-        assertEquals(Optional.of("text"), shape.get("name").typeRef());
+        assertEquals(Optional.of("meta.text"), shape.get("name").typeRef());
     }
 
     @Test

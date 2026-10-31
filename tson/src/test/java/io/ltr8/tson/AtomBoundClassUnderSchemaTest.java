@@ -182,16 +182,15 @@ class AtomBoundClassUnderSchemaTest {
     // ── The `value` escape hatch, which reaches a bridged component too ──
 
     /**
-     * A schema reaching {@code value} imports meta-kernel.tn, which is why this is a meta-layer facility
+     * A schema reaching {@code value} imports meta.tn, which is why this is a meta-layer facility
      * rather than something a consumer adopts: an import stands at the importer's governing level (§2.2.3),
-     * so a schema reaching the escape hatch is one the meta-kernel governs.
+     * so a schema reaching the escape hatch is one the kernel governs.
      */
     private static final String VALUE_SCHEMA = """
             !!id:"https://example.test/holder-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              holder => { slot: value }
+              holder => { slot: meta.value }
             }
             """;
 

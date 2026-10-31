@@ -9,7 +9,7 @@ import io.ltr8.tson.schema.meta.IdentifierType;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta-kernel's {@code identifier_type} constructor -- a UAX #31 identifier profile
+ * Parses and validates against the kernel's {@code identifier_type} constructor -- a UAX #31 identifier profile
  * with {@code text_type}'s facets inside it. The kernel's {@code identifier} instance is the type of every
  * naming position in the series: type names, field names and parameter names through the
  * {@code type_name}/{@code field_name}/{@code param_name} roles, and {@code enum}'s members, its {@code type}.
@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 public final class IdentifierParser implements AtomTypeParser<String> {
 
-    /** {@code identifier => !identifier_type { continue_add: "-" }} -- [TSON-DATA] §7.7's identifier. */
+    /** {@code identifier => !meta.identifier_type { continue_add: "-" }} -- [TSON-DATA] §7.7's identifier. */
     public static final IdentifierParser IDENTIFIER = new IdentifierParser(IdentifierType.IDENTIFIER);
 
     /** The one grammar {@code expected} fragment this reports, per {@code AtomTypeException}'s vocabulary. */

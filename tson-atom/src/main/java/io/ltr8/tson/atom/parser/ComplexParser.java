@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta-kernel's {@code complex_type} constructor (§5.6's {@code
+ * Parses and validates against the kernel's {@code complex_type} constructor (§5.6's {@code
  * complex} atom), {@code component} fixed at its default ({@code NUMBER}, exact {@link
  * BigDecimal}) -- see {@link Complex}'s Javadoc for why the other {@code complex_component}
  * members aren't modeled yet. No fields to configure as a result (unlike every other atom type

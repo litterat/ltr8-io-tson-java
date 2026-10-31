@@ -45,15 +45,15 @@ class IdentifierValueHygieneTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              slug => !identifier_type { continue_add: "-" }
-              js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+              slug => !meta.identifier_type { continue_add: "-" }
+              js_name => !meta.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
               handlers => { slug => text }
               bindings => { js_name => text }
               labels => { text => text }
               route => { name: slug }
               registry => { handlers: { slug => text } }
               team => { roles: set<slug> }
-              ranked => !array { element_type: slug  unique_items: true }
+              ranked => !meta.array { element_type: slug  unique_items: true }
               lists => { path: [slug]  tags: set<text>  counts: set<int32> }
             }
             """;
@@ -187,8 +187,8 @@ class IdentifierValueHygieneTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  slug => !identifier_type { continue_add: "-" }
-                  js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+                  slug => !meta.identifier_type { continue_add: "-" }
+                  js_name => !meta.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
                   %s
                 }
                 """.formatted(declaration);

@@ -142,13 +142,19 @@ class Class2ConformanceSuiteTest {
                 assertEquals(List.of(), problems, "a valid schema vector must load cleanly");
                 Map<String, Top> ours = ResolvedForm.ownEntries(tson, identityOf(source));
                 // Under the subject's own imports, which an instance of its namespace type needs (RUNNER.md) -- its
-                // first, which is the one declaring the constructors its entries are written with. Reading under all
-                // of them binds every record of their closure, and SuiteBindings binds by name, one class per name
-                // across the whole corpus: a second fixture's `order` would meet a class written for another's.
+                // first, which is the one declaring the constructors its entries are written with, and every bundled
+                // schema among them, whose names (core's `@annotation`, `text`) an entry states as written. Reading
+                // under every fixture binds every record of their closure, and SuiteBindings binds by name, one class
+                // per name across the whole corpus: a second fixture's `order` would meet a class written for another's.
                 List<String> imports = TsonDocumentPeek.of(source).header().imports();
+                List<String> under = new java.util.ArrayList<>();
+                for (int i = 0; i < imports.size(); i++) {
+                    if (i == 0 || TsonBundledSchemas.declaredSha256(imports.get(i)).isPresent()) {
+                        under.add(imports.get(i));
+                    }
+                }
                 Map<String, Object> expected = ResolvedForm.readResolved(tson,
-                        fieldText(outcomePayload(sidecar), "resolved"),
-                        imports.isEmpty() ? imports : imports.subList(0, 1));
+                        fieldText(outcomePayload(sidecar), "resolved"), under);
                 assertEquals(new TreeSet<>(expected.keySet()), new TreeSet<>(ours.keySet()),
                         "the resolved schema does not declare the entries the vector states");
                 expected.forEach((name, definition) -> assertEquals(

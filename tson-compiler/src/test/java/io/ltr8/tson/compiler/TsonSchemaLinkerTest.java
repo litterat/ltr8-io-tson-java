@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Hand-built schemas only -- {@code tson-schema} has no dependency on {@code tson-compiler}, so it
  * can't reach {@code MetaKernelBootstrapResolver} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
- * in {@code tson-compiler} for the real end-to-end check against meta-kernel.tn itself).
+ * in {@code tson-compiler} for the real end-to-end check against meta.tn itself).
  *
  */
 class TsonSchemaLinkerTest {
@@ -66,11 +66,11 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * {@code !!meta} is {@link TsonBundledSchemas#META_KERNEL_ID} itself -- every caller passes {@code
+     * {@code !!meta} is {@link TsonBundledSchemas#META_ID} itself -- every caller passes {@code
      * null} for {@code loader}, so the structure namespace this would otherwise supply is always
-     * empty regardless of what URI it names; using the real meta-kernel identity instead lets a
+     * empty regardless of what URI it names; using the real kernel identity instead lets a
      * hand-built local entry declare its own {@code constructor: true} vocabulary without tripping
-     * {@code TsonSchemaLinker}'s own "only the meta-kernel may declare constructors" check, which
+     * {@code TsonSchemaLinker}'s own "only the kernel may declare constructors" check, which
      * compares against that exact identity, not merely "is this schema self-referencing."
      */
     private static TsonSchema schemaOf(Map<String, Top> entries) {
@@ -270,7 +270,7 @@ class TsonSchemaLinkerTest {
     }
 
     private static Annotations disjointMarker() {
-        return Annotations.of(List.of(Annotation.of("disjoint")));
+        return Annotations.of(List.of(Annotation.of("meta.disjoint")));
     }
 
     /**
@@ -639,8 +639,8 @@ class TsonSchemaLinkerTest {
      */
     @Test
     void anImportLinksWhateverEitherSchemasMeta() {
-        for (List<String> metas : List.of(List.of("https://example.test/meta.tn", TsonBundledSchemas.META_KERNEL_ID),
-                List.of(TsonBundledSchemas.META_KERNEL_ID, "https://example.test/meta.tn"),
+        for (List<String> metas : List.of(List.of("https://example.test/meta.tn", TsonBundledSchemas.META_ID),
+                List.of(TsonBundledSchemas.META_ID, "https://example.test/meta.tn"),
                 List.of("https://example.test/meta-api.tn", "https://example.test/meta.tn"))) {
             TsonLinkedSchema linked = linkImporting(metas.get(0), metas.get(1));
 

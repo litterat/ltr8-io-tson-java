@@ -87,7 +87,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Optional}-wrapped scalar/record fields, and nested records all bind and round-trip correctly too.
  *
  * <p>What it also surfaces, honestly: generic binding produces output that is structurally
- * equivalent to, but textually more verbose than, {@code meta-kernel-resolved.tn}'s own
+ * equivalent to, but textually more verbose than, {@code meta-resolved.tn}'s own
  * hand-authored style -- no {@code !record} tag at the root (plain records, unlike union
  * members, never self-announce a type-ref), quoted strings where the fixture writes bare tokens
  * (an enum's bridge produces a {@code String}, and {@code TsonObjectWriter} always quotes strings --
@@ -102,18 +102,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DefinitionResolverTest {
 
     private static final String EXPECTED_INTEGER_SIZE =
-            "{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { bits => { type: integer optional: false "
-                    + "voidable: false role: \"FREE\" } signed => { type: boolean optional: false voidable: false "
-                    + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }";
+            "{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { bits => { type: meta.integer optional: "
+                    + "false voidable: false role: \"FREE\" } signed => { type: meta.boolean optional: false "
+                    + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] "
+                    + "parameters: [] }";
 
     /**
-     * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
+     * The same shape as the real fixture resolves it. The kernel types {@code bits} as a count rather than
      * a bare integer, where the hand-written schemas above -- which are about resolution mechanics, not
      * about the kernel's own field types -- keep the plainer spelling.
      */
     private static final String EXPECTED_FIXTURE_INTEGER_SIZE =
-            EXPECTED_INTEGER_SIZE.replace("bits => { type: integer ",
-                    "bits => { type: non_negative_integer ");
+            EXPECTED_INTEGER_SIZE.replace("bits => { type: meta.integer ",
+                    "bits => { type: meta.non_negative_integer ");
 
     /** Throws if ever actually invoked -- most tests below never reach {@code Instance}/{@code AtomRefinement} binding at all; the ones that do build their own {@link DefinitionResolver} wrapping a real compiled reader instead of using this field. */
     private static final DefinitionMetaReader NEVER_CALLED = (type, value) -> {
@@ -169,8 +170,8 @@ class DefinitionResolverTest {
     @Test
     void resolvesAFreshRecordWithPlainRequiredFields() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { integer_size => { bits: integer  signed: boolean } }""").parseSchemaDocument();
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { integer_size => { bits: meta.integer  signed: meta.boolean } }""").parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
 
         Top resolved = resolver.resolve(declaration);
@@ -181,7 +182,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesIntegerSizeFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         SchemaDocument doc = new TsonSchemaParser(readFixture()).parseSchemaDocument();
-        SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
+        SchemaMap.Declaration declaration = doc.body().declarations().get("meta.integer_size");
 
         Top resolved = resolver.resolve(declaration);
 
@@ -194,10 +195,10 @@ class DefinitionResolverTest {
         // resolving a whole document, in source order, is this loop, matching
         // SchemaResolver#resolveSchema's own production loop.
         SchemaDocument doc = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  integer_size => { bits: integer  signed: boolean }
-                  point => { x: integer  y: integer }
+                  integer_size => { bits: meta.integer  signed: meta.boolean }
+                  point => { x: meta.integer  y: meta.integer }
                 }""").parseSchemaDocument();
 
         for (SchemaMap.Declaration declaration : doc.body().declarations().values()) {
@@ -221,10 +222,10 @@ class DefinitionResolverTest {
     @Test
     void structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  integer_size => { bits: integer  signed: boolean }
-                  point => { x: integer  y: integer }
+                  integer_size => { bits: meta.integer  signed: meta.boolean }
+                  point => { x: meta.integer  y: meta.integer }
                 }""").parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
         Map<String, Top> irrelevantStructureNamespace =
@@ -245,7 +246,7 @@ class DefinitionResolverTest {
 
     // ── Top variants DefinitionResolver doesn't produce yet: hand-built,
     //    checked against the real toTson output (see class Javadoc for why it
-    //    diverges, structurally faithfully, from meta-kernel-resolved.tn's own text) ──
+    //    diverges, structurally faithfully, from meta-resolved.tn's own text) ──
 
     @Test
     void writesAValueTypeBody() throws DataBindException {
@@ -260,14 +261,15 @@ class DefinitionResolverTest {
         // Structurally: boolean => !enum { name_type: identifier  members: [...] }
         Top booleanDef = new EnumBody(List.of("true", "false"));
 
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } name_type: \"identifier\" members: [ \"true\" "
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } name_type: \"meta.identifier\" members: "
+                + "[ \"true\" "
                 + "\"false\" ] }",
                 write(booleanDef));
     }
 
     @Test
     void writesAChoiceBody() throws DataBindException {
-        // No user choice type is declared in meta-kernel itself; this checks binding mechanics only.
+        // No user choice type is declared in the kernel itself; this checks binding mechanics only.
         Top choice = new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone")));
 
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } variants: [ email phone ] }",
@@ -312,7 +314,7 @@ class DefinitionResolverTest {
     void resolvesTopAsAFreshEmptyRecord() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
 
-        Top top = resolver.resolve(schemaMap.declarations().get("top"));
+        Top top = resolver.resolve(schemaMap.declarations().get("meta.top"));
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(top, n -> true));
         assertEquals(List.of(), TypeChain.supertypesOf(top));
@@ -324,17 +326,17 @@ class DefinitionResolverTest {
     @Test
     void resolvesAtomProductSumAndAliasByComposingWithTop() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
-        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
+        resolved.put("meta.top", resolver.resolve(schemaMap.declarations().get("meta.top")));
+        resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
 
-        Top atom = resolver.resolve(schemaMap.declarations().get("atom"));
-        resolved.put("atom", atom);
-        Top product = resolver.resolve(schemaMap.declarations().get("product"));
-        resolved.put("product", product);
-        Top sum = resolver.resolve(schemaMap.declarations().get("sum"));
-        resolved.put("sum", sum);
-        Top alias = resolver.resolve(schemaMap.declarations().get("alias"));
-        resolved.put("alias", alias);
+        Top atom = resolver.resolve(schemaMap.declarations().get("meta.atom"));
+        resolved.put("meta.atom", atom);
+        Top product = resolver.resolve(schemaMap.declarations().get("meta.product"));
+        resolved.put("meta.product", product);
+        Top sum = resolver.resolve(schemaMap.declarations().get("meta.sum"));
+        resolved.put("meta.sum", sum);
+        Top alias = resolver.resolve(schemaMap.declarations().get("meta.alias"));
+        resolved.put("meta.alias", alias);
 
         // §4.1: atom/product/sum are each kind PRODUCT -- their own transitive chain is just
         // [type, top], which contains none of the three literal base-kind names, so the structural
@@ -343,29 +345,29 @@ class DefinitionResolverTest {
         assertEquals(EntryKind.PRODUCT, EntryKind.of(product, n -> true));
         assertEquals(EntryKind.PRODUCT, EntryKind.of(sum, n -> true));
         assertEquals(EntryKind.PRODUCT, EntryKind.of(alias, n -> true));
-        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(atom));
-        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(product));
-        assertEquals(List.of("top", "type"), TypeChain.supertypesOf(sum));
-        assertEquals(List.of("top"), TypeChain.supertypesOf(alias));
+        assertEquals(List.of("meta.top", "meta.type"), TypeChain.supertypesOf(atom));
+        assertEquals(List.of("meta.top", "meta.type"), TypeChain.supertypesOf(product));
+        assertEquals(List.of("meta.top", "meta.type"), TypeChain.supertypesOf(sum));
+        assertEquals(List.of("meta.top"), TypeChain.supertypesOf(alias));
 
         // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
-        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
-                + "chain => { type: type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
+                + "chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
                 + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(atom));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
-                + "chain => { type: type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
+                + "chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
                 + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(sum));
 
         // product: two brand-new fields added by the trailing body (type contributes none).
-        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" \"type\" ] subtypes: [] } fields: { "
-                + "chain => { type: type_chain optional: true voidable: false role: \"FREE\" } access_pattern => "
-                + "{ type: product_access_type optional: false voidable: false role: \"FREE\" } size_type => { type: "
-                + "product_size_type optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
+                + "chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } access_pattern => "
+                + "{ type: meta.product_access_type optional: false voidable: false role: \"FREE\" } size_type => { type: "
+                + "meta.product_size_type optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
                 + "\"ABSTRACT\" discriminators: [] parameters: [] }", write(product));
 
         // alias: one brand-new field.
-        assertEquals("{ chain: { parents: [] supertypes: [ \"top\" ] subtypes: [] } fields: { target => { "
-                + "type: type_kind optional: false "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" ] subtypes: [] } fields: { target => { "
+                + "type: meta.type_kind optional: false "
                 + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                         write(alias));
     }
@@ -375,26 +377,27 @@ class DefinitionResolverTest {
     @Test
     void resolvesIntegerTypeWithFieldGroupsAndOptionalFields() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
-        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
-        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
+        resolved.put("meta.top", resolver.resolve(schemaMap.declarations().get("meta.top")));
+        resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
+        resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
 
-        Top integerType = resolver.resolve(schemaMap.declarations().get("integer_type"));
+        Top integerType = resolver.resolve(schemaMap.declarations().get("meta.integer_type"));
 
         // ~atom & {...} -- propagates straight from the "~" marker; kind: ATOM
         // because "atom" (the literal base-kind name) is in integer_type's own transitive chain.
-        assertTrue(TypeChain.supertypesOf(integerType).contains("top"), "a constructor: IS-A top");
+        assertTrue(TypeChain.supertypesOf(integerType).contains("meta.top"), "a constructor: IS-A meta.top");
         assertEquals(EntryKind.ATOM, EntryKind.of(integerType, n -> true));
-        assertEquals(List.of("atom", "top", "type"), TypeChain.supertypesOf(integerType));
+        assertEquals(List.of("meta.atom", "meta.top", "meta.type"), TypeChain.supertypesOf(integerType));
 
-        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
-                        + "fields: { chain => { type: type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "size => { type: integer_size optional: true voidable: false role: \"FREE\" } min => { "
-                        + "type: integer optional: true voidable: false role: \"FREE\" } exclusive_min => { type: "
-                        + "integer optional: true voidable: false role: \"FREE\" } max => { type: integer optional: "
-                        + "true voidable: false role: \"FREE\" } exclusive_max => { type: integer optional: true "
-                        + "voidable: false role: \"FREE\" } multiple_of => { type: non_negative_integer optional: "
-                        + "true voidable: false role: \"FREE\" } members => { type: integer_member_set optional: "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
+                        + "fields: { chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "size => { type: meta.integer_size optional: true voidable: false role: \"FREE\" } min => { "
+                        + "type: meta.integer optional: true voidable: false role: \"FREE\" } exclusive_min => { type: "
+                        + "meta.integer optional: true voidable: false role: \"FREE\" } max => { type: meta.integer "
+                        + "optional: "
+                        + "true voidable: false role: \"FREE\" } exclusive_max => { type: meta.integer optional: true "
+                        + "voidable: false role: \"FREE\" } multiple_of => { type: meta.non_negative_integer optional: "
+                        + "true voidable: false role: \"FREE\" } members => { type: meta.integer_member_set optional: "
                         + "true voidable: false role: \"FREE\" } } groups: [ { members: [ [ \"min\" ] [ "
                         + "\"exclusive_min\" ] ] optional_members: [] optional: true } { members: [ [ \"max\" ] [ "
                         + "\"exclusive_max\" ] ] optional_members: [] optional: true } ] extension: \"OPEN\" "
@@ -410,11 +413,11 @@ class DefinitionResolverTest {
     void resolvesBareTypeReferencesToAnAliasKindEntry() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
 
-        Top typeName = resolver.resolve(schemaMap.declarations().get("type_name"));
-        Top fieldName = resolver.resolve(schemaMap.declarations().get("field_name"));
-        Top paramName = resolver.resolve(schemaMap.declarations().get("param_name"));
-        Top annotation = resolver.resolve(schemaMap.declarations().get("annotation"));
-        Top doc = resolver.resolve(schemaMap.declarations().get("doc"));
+        Top typeName = resolver.resolve(schemaMap.declarations().get("meta.type_name"));
+        Top fieldName = resolver.resolve(schemaMap.declarations().get("meta.field_name"));
+        Top paramName = resolver.resolve(schemaMap.declarations().get("meta.param_name"));
+        Top annotation = resolver.resolve(schemaMap.declarations().get("meta.annotation"));
+        Top doc = resolver.resolve(schemaMap.declarations().get("meta.doc"));
 
         // type_name/field_name/param_name => identifier; each is its own fresh ALIAS entry, not
         // three views of the same one -- source/target both name "identifier" for all three.
@@ -424,7 +427,7 @@ class DefinitionResolverTest {
         assertEquals(EntryKind.ALIAS, EntryKind.of(annotation, n -> true));
         assertEquals(EntryKind.ALIAS, EntryKind.of(doc, n -> true));
 
-        assertEquals("{ target: identifier }", write(typeName));
+        assertEquals("{ target: meta.identifier }", write(typeName));
         assertEquals(write(typeName), write(fieldName));
         assertEquals(write(typeName), write(paramName));
 
@@ -432,9 +435,9 @@ class DefinitionResolverTest {
         // binds it to the value, and the entry's facts carry it: no constructor's record has an annotations
         // field, and a resolved document writes it ahead of the value (§7.4's `*annotation [type-ref]
         // core-value`).
-        assertEquals("{ target: void }", write(annotation));
+        assertEquals("{ target: meta.void }", write(annotation));
 
-        assertEquals("{ target: text }", write(doc));
+        assertEquals("{ target: meta.text }", write(doc));
     }
 
     // ── A sugar form must be lifted before resolution ────────────────────
@@ -448,9 +451,9 @@ class DefinitionResolverTest {
     @Test
     void anUnliftedSugarFormIsABrokenInvariantNotAGap() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { names => [text]
-                  holder => { tags: [text] } }""").parseSchemaDocument().body();
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { names => [meta.text]
+                  holder => { tags: [meta.text] } }""").parseSchemaDocument().body();
 
         for (String declaration : List.of("names", "holder")) {
             IllegalStateException thrown = assertThrows(IllegalStateException.class,
@@ -477,16 +480,16 @@ class DefinitionResolverTest {
      */
     @Test
     void resolvesASizedArrayToAConstructionOfArray() {
-        Top frame = resolveSnippet("frame => [text; 1920]");
+        Top frame = resolveSnippet("frame => [meta.text; 1920]");
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(frame, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(frame));
         assertEquals(List.of(), TypeChain.supertypesOf(frame));
-        assertEquals(Optional.of("array"), snippetFacts.get("frame").constructor(),
+        assertEquals(Optional.of("meta.array"), snippetFacts.get("frame").constructor(),
                 "the constructor the application closes at, not the template it was spelled through");
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, frame);
-        assertEquals(TypeRef.of("text"), body.elementType());
+        assertEquals(TypeRef.of("meta.text"), body.elementType());
         assertEquals(Optional.of(new BigInteger("1920")), body.minItems());
         assertEquals(Optional.of(new BigInteger("1920")), body.maxItems());
     }
@@ -494,11 +497,11 @@ class DefinitionResolverTest {
     /** The three spellings all land on the same shape -- only which bound each supplies differs (§5.3). */
     @Test
     void theOpenEndedSpellingsRouteToArrayMinAndArrayMax() {
-        ArrayBody atLeast = assertInstanceOf(ArrayBody.class, resolveSnippet("score_list => [integer; 1..]"));
+        ArrayBody atLeast = assertInstanceOf(ArrayBody.class, resolveSnippet("score_list => [meta.integer; 1..]"));
         assertEquals(Optional.of(BigInteger.ONE), atLeast.minItems());
         assertEquals(Optional.empty(), atLeast.maxItems());
 
-        ArrayBody atMost = assertInstanceOf(ArrayBody.class, resolveSnippet("recent => [text; ..5]"));
+        ArrayBody atMost = assertInstanceOf(ArrayBody.class, resolveSnippet("recent => [meta.text; ..5]"));
         assertEquals(Optional.empty(), atMost.minItems());
         assertEquals(Optional.of(new BigInteger("5")), atMost.maxItems());
     }
@@ -513,12 +516,12 @@ class DefinitionResolverTest {
      */
     @Test
     void aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes() {
-        Top idList = resolveSnippet("id_list => [text]");
+        Top idList = resolveSnippet("id_list => [meta.text]");
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(idList, n -> true));
         assertEquals(List.of(), TypeChain.supertypesOf(idList));
-        assertEquals(Optional.of("array"), snippetFacts.get("id_list").constructor());
-        assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList).elementType());
+        assertEquals(Optional.of("meta.array"), snippetFacts.get("id_list").constructor());
+        assertEquals(TypeRef.of("meta.text"), assertInstanceOf(ArrayBody.class, idList).elementType());
     }
 
     // ── Type parameters (§5.10): a template's own <T, ...> list ───────────
@@ -544,10 +547,10 @@ class DefinitionResolverTest {
     /** A <b>closed</b> record still resolves at its declaration -- only an open body is held. */
     @Test
     void resolvesAClosedRecordAsAnOrdinaryRecordBody() throws DataBindException {
-        Top pair = resolveSnippet("pair => { first: text  second: text }");
+        Top pair = resolveSnippet("pair => { first: meta.text  second: meta.text }");
 
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { first => { type: text optional: "
-                        + "false voidable: false role: \"FREE\" } second => { type: text optional: false voidable: "
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { first => { type: meta.text optional: "
+                        + "false voidable: false role: \"FREE\" } second => { type: meta.text optional: false voidable: "
                         + "false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(pair));
     }
@@ -560,7 +563,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesACompositionTemplateAsAFlattenedOpenRecord() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   base => {}
                   box => <T> base & { value: T }
@@ -594,9 +597,9 @@ class DefinitionResolverTest {
         resolved.put("q", new RecordBody(RecordBody.fieldMap(), List.of(), RecordExtensionType.OPEN, List.of(),
                 Optional.of("slug")));
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  both => p & q & { label: text }
+                  both => p & q & { label: meta.text }
                 }""").parseSchemaDocument().body();
 
         judging.resolve(schemaMap.declarations().get("both"));
@@ -621,13 +624,13 @@ class DefinitionResolverTest {
     @Test
     void aCompositionTemplateHoldsTheFieldsItAbsorbed() {
         Map<String, Top> entries = resolveAll("""
-                base => { id: text }
+                base => { id: meta.text }
                 box  => <T> base & { value: T }
                 """);
 
         RecordBody box = assertInstanceOf(RecordBody.class, entries.get("box"));
         assertEquals(List.of("id", "value"), List.copyOf(box.fields().keySet()));
-        assertEquals(TypeRef.of("text"), box.fields().get("id").type());
+        assertEquals(TypeRef.of("meta.text"), box.fields().get("id").type());
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "closing completes the chain from these");
     }
 
@@ -639,10 +642,10 @@ class DefinitionResolverTest {
         // record (no supertypes, so no tightening involved), exercising an ordinary literal default.
         SchemaMap schemaMap = kernelDeclarations();
 
-        Top tupleElement = resolver.resolve(schemaMap.declarations().get("tuple_element"));
+        Top tupleElement = resolver.resolve(schemaMap.declarations().get("meta.tuple_element"));
 
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { element_type => { type: "
-                        + "type_kind optional: false voidable: false role: \"FREE\" } voidable => { type: boolean "
+                        + "meta.type_kind optional: false voidable: false role: \"FREE\" } voidable => { type: meta.boolean "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } } groups: [] extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(tupleElement));
@@ -658,12 +661,12 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = SchemaDesugarer.desugar(
                 new TsonSchemaParser(readFixture()).parseSchemaDocument(), Set.of()).body();
 
-        Top fieldGroup = resolver.resolve(schemaMap.declarations().get("field_group"));
+        Top fieldGroup = resolver.resolve(schemaMap.declarations().get("meta.field_group"));
 
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { members => { type: "
-                        + "array_array_text_1_3600e7d5_1_1b8fef23 optional: false voidable: false role: \"FREE\" } "
-                        + "optional_members => { type: array_text_1_3600e7d5 optional: true voidable: false role: "
-                        + "\"FREE\" } optional => { type: boolean optional: true voidable: false role: \"DEFAULT\" "
+                        + "array_array_text_1_dd166912_1_21658029 optional: false voidable: false role: \"FREE\" } "
+                        + "optional_members => { type: array_text_1_dd166912 optional: true voidable: false role: "
+                        + "\"FREE\" } optional => { type: meta.boolean optional: true voidable: false role: \"DEFAULT\" "
                         + "value: false } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(fieldGroup));
     }
@@ -672,10 +675,10 @@ class DefinitionResolverTest {
     void resolvesAnOrdinaryLiteralFixedValue() throws DataBindException {
         // Mirrors array's own "access_pattern?: product_access_type = INDEX" without the surrounding
         // composition, so it isn't also blocked by tightening -- an ordinary (non-parameter) fixed value.
-        Top pinned = resolveSnippet("pinned => { access_pattern?: product_access_type = INDEX }");
+        Top pinned = resolveSnippet("pinned => { access_pattern?: meta.product_access_type = INDEX }");
 
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { access_pattern => { type: "
-                        + "product_access_type optional: true voidable: false role: \"FIXED\" value: INDEX } } groups: "
+                        + "meta.product_access_type optional: true voidable: false role: \"FIXED\" value: INDEX } } groups: "
                         + "[] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(pinned));
     }
@@ -695,11 +698,11 @@ class DefinitionResolverTest {
      */
     @Test
     void aParametricFixedValueRidesTheValueSlotOfAFixedField() {
-        RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: type_kind = T }"));
+        RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: meta.type_kind = T }"));
         RecordField value = sized.fields().get("value");
 
         assertEquals(List.of("T"), OpenEntry.parameterNames(sized));
-        assertEquals(TypeRef.of("type_kind"), value.type());
+        assertEquals(TypeRef.of("meta.type_kind"), value.type());
         assertEquals("T", value.value().orElseThrow().text());
         assertEquals(FieldRole.FIXED, value.role());
         assertFalse(value.optional());
@@ -714,10 +717,10 @@ class DefinitionResolverTest {
     @Test
     void aParametricDefaultValueIsPromotedToRequiredDefault() {
         RecordBody retry = assertInstanceOf(RecordBody.class,
-                resolveSnippet("retry_policy => <N> { attempts?: integer ~ N }"));
+                resolveSnippet("retry_policy => <N> { attempts?: meta.integer ~ N }"));
         RecordField attempts = retry.fields().get("attempts");
 
-        assertEquals(TypeRef.of("integer"), attempts.type());
+        assertEquals(TypeRef.of("meta.integer"), attempts.type());
         assertTrue(attempts.optional());
         assertEquals(FieldRole.DEFAULT, attempts.role());
         assertEquals("N", attempts.value().orElseThrow().text());
@@ -731,28 +734,29 @@ class DefinitionResolverTest {
     @Test
     void resolvesArrayFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
-        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
-        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
-        resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
+        resolved.put("meta.top", resolver.resolve(schemaMap.declarations().get("meta.top")));
+        resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
+        resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
+        resolved.put("meta.product", resolver.resolve(schemaMap.declarations().get("meta.product")));
 
-        Top array = resolver.resolve(schemaMap.declarations().get("array"));
+        Top array = resolver.resolve(schemaMap.declarations().get("meta.array"));
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(array, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(array), "the container constructors carry no parameters");
-        assertTrue(TypeChain.supertypesOf(array).contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("product", "top", "type"), TypeChain.supertypesOf(array));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"product\" \"top\" \"type\" ] subtypes: [] } "
-                        + "fields: { chain => { type: type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "access_pattern => { type: product_access_type optional: true voidable: false role: "
-                        + "\"FIXED\" value: INDEX } size_type => { type: product_size_type optional: true voidable: "
-                        + "false role: \"FIXED\" value: VARIABLE } element_type => { type: type_kind optional: false "
-                        + "voidable: false role: \"FREE\" } voidable => { type: boolean optional: true voidable: "
-                        + "false role: \"DEFAULT\" value: false } ordered => { type: boolean optional: true "
-                        + "voidable: false role: \"DEFAULT\" value: true } unique_items => { type: boolean optional: "
+        assertTrue(TypeChain.supertypesOf(array).contains("meta.top"), "a constructor: IS-A meta.top");
+        assertEquals(List.of("meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(array));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.product\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
+                        + "fields: { chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "access_pattern => { type: meta.product_access_type optional: true voidable: false role: "
+                        + "\"FIXED\" value: INDEX } size_type => { type: meta.product_size_type optional: true voidable: "
+                        + "false role: \"FIXED\" value: VARIABLE } element_type => { type: meta.type_kind optional: false "
+                        + "voidable: false role: \"FREE\" } voidable => { type: meta.boolean optional: true voidable: "
+                        + "false role: \"DEFAULT\" value: false } ordered => { type: meta.boolean optional: true "
+                        + "voidable: false role: \"DEFAULT\" value: true } unique_items => { type: meta.boolean optional: "
                         + "true voidable: false role: \"DEFAULT\" value: false } min_items => { type: "
-                        + "non_negative_integer optional: true voidable: false role: \"FREE\" } max_items => { type: "
-                        + "non_negative_integer optional: true voidable: false role: \"FREE\" } } groups: [] extension: "
+                        + "meta.non_negative_integer optional: true voidable: false role: \"FREE\" } max_items => { type: "
+                        + "meta.non_negative_integer optional: true voidable: false role: \"FREE\" } } groups: [] "
+                        + "extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(array));
     }
@@ -760,27 +764,27 @@ class DefinitionResolverTest {
     @Test
     void resolvesMapFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
-        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
-        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
-        resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
+        resolved.put("meta.top", resolver.resolve(schemaMap.declarations().get("meta.top")));
+        resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
+        resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
+        resolved.put("meta.product", resolver.resolve(schemaMap.declarations().get("meta.product")));
 
-        Top map = resolver.resolve(schemaMap.declarations().get("map"));
+        Top map = resolver.resolve(schemaMap.declarations().get("meta.map"));
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(map, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(map), "the container constructors carry no parameters");
-        assertTrue(TypeChain.supertypesOf(map).contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("product", "top", "type"), TypeChain.supertypesOf(map));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"product\" \"top\" \"type\" ] subtypes: [] } "
-                        + "fields: { chain => { type: type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "access_pattern => { type: product_access_type optional: true voidable: false role: "
-                        + "\"FIXED\" value: NAMED } size_type => { type: product_size_type optional: true voidable: "
-                        + "false role: \"FIXED\" value: VARIABLE } key_type => { type: type_kind optional: false "
-                        + "voidable: false role: \"FREE\" } value_type => { type: type_kind optional: false voidable: "
-                        + "false role: \"FREE\" } voidable => { type: boolean optional: true voidable: false role: "
-                        + "\"DEFAULT\" value: false } ordered => { type: boolean optional: true voidable: false "
-                        + "role: \"DEFAULT\" value: false } min_items => { type: non_negative_integer optional: true "
-                        + "voidable: false role: \"FREE\" } max_items => { type: non_negative_integer optional: true "
+        assertTrue(TypeChain.supertypesOf(map).contains("meta.top"), "a constructor: IS-A meta.top");
+        assertEquals(List.of("meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(map));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.product\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
+                        + "fields: { chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "access_pattern => { type: meta.product_access_type optional: true voidable: false role: "
+                        + "\"FIXED\" value: NAMED } size_type => { type: meta.product_size_type optional: true voidable: "
+                        + "false role: \"FIXED\" value: VARIABLE } key_type => { type: meta.type_kind optional: false "
+                        + "voidable: false role: \"FREE\" } value_type => { type: meta.type_kind optional: false voidable: "
+                        + "false role: \"FREE\" } voidable => { type: meta.boolean optional: true voidable: false role: "
+                        + "\"DEFAULT\" value: false } ordered => { type: meta.boolean optional: true voidable: false "
+                        + "role: \"DEFAULT\" value: false } min_items => { type: meta.non_negative_integer optional: true "
+                        + "voidable: false role: \"FREE\" } max_items => { type: meta.non_negative_integer optional: true "
                         + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] "
                         + "parameters: [] }",
                 write(map));
@@ -791,10 +795,10 @@ class DefinitionResolverTest {
         // "count" is inherited REQUIRED; tightening it to OPTIONAL is not a permitted transition
         // (§5.7's table: REQUIRED -> OPTIONAL is an error).
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  base => { count: integer }
-                  loosened => base & { count?: integer? }
+                  base => { count: meta.integer }
+                  loosened => base & { count?: meta.integer? }
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
@@ -808,9 +812,9 @@ class DefinitionResolverTest {
         // "field: = value" with no type-ref restated inherits the source declaration's type
         // (§5.7's "Elided type-refs"), tightening only the value/state.
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  config => { host: text  port: integer }
+                  config => { host: meta.text  port: meta.integer }
                   production => config & { host?: = "prod.example.com" }
                 }""").parseSchemaDocument().body();
         resolved.put("config", resolver.resolve(schemaMap.declarations().get("config")));
@@ -818,8 +822,8 @@ class DefinitionResolverTest {
         Top production = resolver.resolve(schemaMap.declarations().get("production"));
 
         assertEquals("{ chain: { parents: [] supertypes: [ \"config\" ] subtypes: [] } fields: { host => { type: "
-                        + "text optional: true voidable: false role: \"FIXED\" value: \"prod.example.com\" } port => "
-                        + "{ type: integer optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
+                        + "meta.text optional: true voidable: false role: \"FIXED\" value: \"prod.example.com\" } port => "
+                        + "{ type: meta.integer optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(production));
     }
@@ -844,7 +848,7 @@ class DefinitionResolverTest {
         // (2) a composition body naming no inherited field: a source exists, but declares no such field
         SchemaValidationException composed = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
-                        config => { host: text }
+                        config => { host: meta.text }
                         production => config & { port?: = 8080 }
                         """));
         assertTrue(composed.getMessage().contains("'port'"), composed.getMessage());
@@ -862,23 +866,24 @@ class DefinitionResolverTest {
         // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
         resolveUpToArray();
 
-        Top set = resolver.resolve(schemaMapFromFixture().declarations().get("set_type"));
+        Top set = resolver.resolve(schemaMapFromFixture().declarations().get("meta.set_type"));
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(set, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(set), "the container constructors carry no parameters");
-        assertTrue(TypeChain.supertypesOf(set).contains("top"), "a constructor: IS-A top");
-        assertEquals(List.of("array", "product", "top", "type"), TypeChain.supertypesOf(set));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"array\" \"product\" \"top\" \"type\" ] "
-                        + "subtypes: [] } fields: { chain => { type: type_chain optional: true voidable: false role: "
-                        + "\"FREE\" } access_pattern => { type: product_access_type optional: true voidable: false "
-                        + "role: \"FIXED\" value: INDEX } size_type => { type: product_size_type optional: true "
-                        + "voidable: false role: \"FIXED\" value: VARIABLE } element_type => { type: type_kind "
-                        + "optional: false voidable: false role: \"FREE\" } voidable => { type: boolean optional: "
-                        + "true voidable: false role: \"FIXED\" value: false } ordered => { type: boolean optional: "
-                        + "true voidable: false role: \"FIXED\" value: false } unique_items => { type: boolean "
+        assertTrue(TypeChain.supertypesOf(set).contains("meta.top"), "a constructor: IS-A meta.top");
+        assertEquals(List.of("meta.array", "meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(set));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.array\" \"meta.product\" \"meta.top\" \"meta.type\" ] "
+                        + "subtypes: [] } fields: { chain => { type: meta.type_chain optional: true voidable: false role: "
+                        + "\"FREE\" } access_pattern => { type: meta.product_access_type optional: true voidable: false "
+                        + "role: \"FIXED\" value: INDEX } size_type => { type: meta.product_size_type optional: true "
+                        + "voidable: false role: \"FIXED\" value: VARIABLE } element_type => { type: meta.type_kind "
+                        + "optional: false voidable: false role: \"FREE\" } voidable => { type: meta.boolean optional: "
+                        + "true voidable: false role: \"FIXED\" value: false } ordered => { type: meta.boolean optional: "
+                        + "true voidable: false role: \"FIXED\" value: false } unique_items => { type: meta.boolean "
                         + "optional: true voidable: false role: \"FIXED\" value: true } min_items => { type: "
-                        + "non_negative_integer optional: true voidable: false role: \"FREE\" } max_items => { type: "
-                        + "non_negative_integer optional: true voidable: false role: \"FREE\" } } groups: [] extension: "
+                        + "meta.non_negative_integer optional: true voidable: false role: \"FREE\" } max_items => { type: "
+                        + "meta.non_negative_integer optional: true voidable: false role: \"FREE\" } } groups: [] "
+                        + "extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(set));
     }
@@ -892,10 +897,10 @@ class DefinitionResolverTest {
     @Test
     void refinementRejectsABodyFieldThatAddsRatherThanTightens() throws IOException {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  base => { count: integer }
-                  refined => base ^ { extra: text }
+                  base => { count: meta.integer }
+                  refined => base ^ { extra: meta.text }
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
@@ -912,29 +917,30 @@ class DefinitionResolverTest {
     @Test
     void resolvesEnumTypeAndEnumFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         SchemaMap schemaMap = schemaMapFromFixture();
-        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
-        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
-        Top enumType = resolver.resolve(schemaMap.declarations().get("enum_type"));
-        resolved.put("enum_type", enumType);
-        Top enumDef = resolver.resolve(schemaMap.declarations().get("enum"));
+        resolved.put("meta.top", resolver.resolve(schemaMap.declarations().get("meta.top")));
+        resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
+        resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
+        Top enumType = resolver.resolve(schemaMap.declarations().get("meta.enum_type"));
+        resolved.put("meta.enum_type", enumType);
+        Top enumDef = resolver.resolve(schemaMap.declarations().get("meta.enum"));
 
         // enum_type => atom & { type: type_name  members: enum_set }: the constructor, `type` required.
         assertEquals(EntryKind.ATOM, EntryKind.of(enumType, n -> true));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"top\" \"type\" ] subtypes: [] } "
-                        + "fields: { chain => { type: type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "name_type => { type: identifier_kind optional: false voidable: false role: \"FREE\" } "
-                        + "members => { type: enum_set optional: false voidable: false role: \"FREE\" } } groups: [] "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
+                        + "fields: { chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "name_type => { type: meta.identifier_kind optional: false voidable: false role: \"FREE\" } "
+                        + "members => { type: meta.enum_set optional: false voidable: false role: \"FREE\" } } groups: [] "
                         + "extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(enumType));
         // enum => enum_type ^ { name_type?: = identifier }: a constructor tightening, `name_type` pinned and injected, so
         // `members` is the one unmarked field and `!enum [A B]` stays the positional form.
         assertEquals(EntryKind.ATOM, EntryKind.of(enumDef, n -> true));
-        assertEquals(List.of("atom", "enum_type", "top", "type"), TypeChain.supertypesOf(enumDef));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"atom\" \"enum_type\" \"top\" \"type\" ] "
-                        + "subtypes: [] } fields: { chain => { type: type_chain optional: true voidable: false role: "
-                        + "\"FREE\" } name_type => { type: identifier_kind optional: true voidable: false role: "
-                        + "\"FIXED\" value: identifier } members => { type: enum_set optional: false voidable: false "
+        assertEquals(List.of("meta.atom", "meta.enum_type", "meta.top", "meta.type"), TypeChain.supertypesOf(enumDef));
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.enum_type\" \"meta.top\" \"meta.type\" ] "
+                        + "subtypes: [] } fields: { chain => { type: meta.type_chain optional: true voidable: false role: "
+                        + "\"FREE\" } name_type => { type: meta.identifier_kind optional: true voidable: false role: "
+                        + "\"FIXED\" value: meta.identifier } members => { type: meta.enum_set optional: false "
+                        + "voidable: false "
                         + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(enumDef));
     }
@@ -948,23 +954,23 @@ class DefinitionResolverTest {
         // forward-reference support of its own; MetaKernelBootstrapResolver's own two-pass ordering is what
         // handles that for the whole file -- see its class Javadoc).
         SchemaMap schemaMap = schemaMapFromFixture();
-        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
-        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
-        resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
-        resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
+        resolved.put("meta.top", resolver.resolve(schemaMap.declarations().get("meta.top")));
+        resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
+        resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
+        resolved.put("meta.enum_type", resolver.resolve(schemaMap.declarations().get("meta.enum_type")));
+        resolved.put("meta.enum", resolver.resolve(schemaMap.declarations().get("meta.enum")));
 
-        // "enum" (the constructor bindAtomInstance reads against) is compiled from the full meta-kernel
+        // "enum" (the constructor bindAtomInstance reads against) is compiled from the full the kernel
         // rather than from this test's own narrow `resolved` map, which holds none of the entries its
         // fields name.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         DefinitionResolver accessResolver = definitionResolverFor(metaKernelParser, resolved::get);
-        Top accessType = accessResolver.resolve(schemaMap.declarations().get("product_access_type"));
+        Top accessType = accessResolver.resolve(schemaMap.declarations().get("meta.product_access_type"));
 
         assertEquals(EntryKind.ATOM, EntryKind.of(accessType, n -> true));
-        assertFalse(TypeChain.supertypesOf(accessType).contains("top"), "an instance: IS-A stops at construction");
+        assertFalse(TypeChain.supertypesOf(accessType).contains("meta.top"), "an instance: IS-A stops at construction");
         assertEquals(List.of(), TypeChain.supertypesOf(accessType));
-        assertEquals(Optional.of("enum"), accessResolver.factsOf("product_access_type").constructor());
+        assertEquals(Optional.of("meta.enum"), accessResolver.factsOf("meta.product_access_type").constructor());
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), accessType);
     }
 
@@ -982,15 +988,15 @@ class DefinitionResolverTest {
     @Test
     void booleanInstanceResolvesCorrectlyViaTheCompiledReader() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
-        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
-        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
-        resolved.put("enum_type", resolver.resolve(schemaMap.declarations().get("enum_type")));
-        resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
+        resolved.put("meta.top", resolver.resolve(schemaMap.declarations().get("meta.top")));
+        resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
+        resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
+        resolved.put("meta.enum_type", resolver.resolve(schemaMap.declarations().get("meta.enum_type")));
+        resolved.put("meta.enum", resolver.resolve(schemaMap.declarations().get("meta.enum")));
 
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         Top booleanDef = definitionResolverFor(metaKernelParser, resolved::get).resolve(
-                schemaMap.declarations().get("boolean"));
+                schemaMap.declarations().get("meta.boolean"));
 
         assertEquals(new EnumBody(List.of("true", "false")), booleanDef);
     }
@@ -999,7 +1005,7 @@ class DefinitionResolverTest {
      * {@code bytes => !bytes_type {}} -- the whole binary family, now that the alphabet is a directive
      * rather than a facet. core declares no spelled subtypes: there is nothing for {@code base64} or
      * {@code hex} to be a *type* of, the same octets being {@code "3q2+7w=="} and {@code "deadbeef"}.
-     * {@code binary_type} is declared in meta.tn rather than meta-kernel.tn, so this needs the merged
+     * {@code binary_type} is declared in meta.tn rather than meta.tn, so this needs the merged
      * namespace.
      */
     @Test
@@ -1042,7 +1048,7 @@ class DefinitionResolverTest {
         // default, the same mechanism float32/float64 above rely on.
         SchemaMap core = schemaMapFromFixture("core.tn");
         SchemaMap net = schemaMapFromFixture("net.tn");
-        TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
+        TsonCompiledMetaSchema metaTn1Parser = netCompiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         Top cidr4 = instanceResolver.resolve(net.declarations().get("cidr4"));
@@ -1068,12 +1074,12 @@ class DefinitionResolverTest {
     @Test
     void resolvesRegexAndIriInstancesWithEveryComposedFieldBound() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { plain_regex   => !regex_type {}
-                  bounded_regex => !regex_type { max_length: 40 }
-                  plain_uri     => !iri_type {}
-                  schemed_uri   => !iri_type { allow_relative: false }
-                  https_uri     => !iri_type {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { plain_regex   => !meta.regex_type {}
+                  bounded_regex => !meta.regex_type { max_length: 40 }
+                  plain_uri     => !meta.iri_type {}
+                  schemed_uri   => !meta.iri_type { allow_relative: false }
+                  https_uri     => !meta.iri_type {
                     schemes: [https] allow_fragment: false length: 19 } }""").parseSchemaDocument().body();
         DefinitionResolver resolver = definitionResolverFor(metaKernelCompiled(), EMPTY_NAMESPACE);
 
@@ -1098,7 +1104,7 @@ class DefinitionResolverTest {
         // ipv4 => !ipv4_type {}, ipv6 => !ipv6_type {} -- Ipv4Type/Ipv6Type, same treatment as
         // Cidr4Type/Cidr6Type above (record-only, no vocab compiler, flat String spec).
         SchemaMap schemaMap = schemaMapFromFixture("net.tn");
-        TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
+        TsonCompiledMetaSchema metaTn1Parser = netCompiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         Top ipv4 = instanceResolver.resolve(schemaMap.declarations().get("ipv4"));
@@ -1120,7 +1126,7 @@ class DefinitionResolverTest {
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         Top complex = instanceResolver.resolve(schemaMap.declarations().get("complex"));
-        Top declared = instanceResolver.resolve(new TsonSchemaParser("!schema { declared => !declared_type {} }")
+        Top declared = instanceResolver.resolve(new TsonSchemaParser("!schema { declared => !meta.declared_type {} }")
                 .parseSchemaDocument().body().declarations().get("declared"));
 
         assertEquals(ComplexType.UNCONSTRAINED, complex);
@@ -1139,8 +1145,8 @@ class DefinitionResolverTest {
         Namespace<Top> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { bad => !meta.integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
@@ -1154,8 +1160,8 @@ class DefinitionResolverTest {
         Namespace<Top> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { bad => !meta.top ^ { x: meta.integer } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
@@ -1182,9 +1188,9 @@ class DefinitionResolverTest {
     @Test
     void chainedAtomRefinementMergesWithIntermediateBindingsInsteadOfDiscardingThem() {
         // Atom refinement's own `source` lookup (finding "integer") is a DefinitionGetter lookup
-        // only, per §3.3.1 -- never metaParser -- so meta-kernel's entries seed this test's own local
+        // only, per §3.3.1 -- never metaParser -- so the kernel's entries seed this test's own local
         // `chainNamespace` (shadowing the shared `resolved` field, deliberately: this test needs a
-        // namespace pre-seeded with meta-kernel's own entries, not the shared field's empty start);
+        // namespace pre-seeded with the kernel's own entries, not the shared field's empty start);
         // metaParser is now *also* needed, separately, for bindAtomInstance itself to find and read
         // "integer_type" (the constructor int8's own refinement source resolves through), which was
         // never something namespace lookup alone could provide.
@@ -1193,9 +1199,9 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelEntries.entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  int8    => !integer ^ { size: { bits: 8  signed: true } }
+                  int8    => !meta.integer ^ { size: { bits: 8  signed: true } }
                   bounded => !int8 ^ { min: -100  max: 100 }
                   tighter => !bounded ^ { max: 50 }
                 }""").parseSchemaDocument().body();
@@ -1206,7 +1212,7 @@ class DefinitionResolverTest {
         Top tighter = instanceResolver.resolve(schemaMap.declarations().get("tighter"));
 
         // bounded keeps int8's own size (untouched by bounded's own refinement) alongside its new bounds.
-        assertEquals(Optional.of("integer_type"), instanceResolver.factsOf("bounded").constructor());
+        assertEquals(Optional.of("meta.integer_type"), instanceResolver.factsOf("bounded").constructor());
         assertEquals(List.of("int8"), TypeChain.supertypesOf(bounded));
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
                 Optional.of(java.math.BigInteger.valueOf(-100)), Optional.empty(),
@@ -1215,7 +1221,7 @@ class DefinitionResolverTest {
 
         // tighter keeps int8's size AND bounded's min (neither touched by tighter's own refinement),
         // but overrides bounded's own max with its own.
-        assertEquals(Optional.of("integer_type"), instanceResolver.factsOf("tighter").constructor());
+        assertEquals(Optional.of("meta.integer_type"), instanceResolver.factsOf("tighter").constructor());
         assertEquals(List.of("bounded"), TypeChain.supertypesOf(tighter));
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
                 Optional.of(java.math.BigInteger.valueOf(-100)), Optional.empty(),
@@ -1236,10 +1242,10 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  uint8       => !integer ^ { size: { bits: 8  signed: false } }
-                  percent     => !integer ^ { min: 0  max: 100 }
+                  uint8       => !meta.integer ^ { size: { bits: 8  signed: false } }
+                  percent     => !meta.integer ^ { min: 0  max: 100 }
                   escapesSize => !uint8 ^ { min: -10  max: 300 }
                   escapesMax  => !percent ^ { max: 1000 }
                 }""").parseSchemaDocument().body();
@@ -1268,11 +1274,11 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  reference => !iri_type {}
+                  reference => !meta.iri_type {}
                   schemed   => !reference ^ { allow_relative: false }
-                  relaxed   => !iri ^ { allow_relative: true }
+                  relaxed   => !meta.iri ^ { allow_relative: true }
                 }""").parseSchemaDocument().body();
         chainNamespace.put("reference", instanceResolver.resolve(schemaMap.declarations().get("reference")));
 
@@ -1293,12 +1299,12 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  web      => !iri ^ { schemes: [http https] }
+                  web      => !meta.iri ^ { schemes: [http https] }
                   secure   => !web ^ { schemes: [HTTPS] }
                   ftp      => !web ^ { schemes: [https ftp] }
-                  whole    => !iri ^ { allow_fragment: false }
+                  whole    => !meta.iri ^ { allow_fragment: false }
                   pointing => !whole ^ { allow_fragment: true }
                 }""").parseSchemaDocument().body();
         chainNamespace.put("web", instanceResolver.resolve(schemaMap.declarations().get("web")));
@@ -1327,9 +1333,9 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  percent  => !integer ^ { min: 0  max: 100 }
+                  percent  => !meta.integer ^ { min: 0  max: 100 }
                   restated => !percent ^ { max: 100 }
                   sized    => !percent ^ { size: { bits: 8  signed: false } }
                   oneEnd   => !percent ^ { max: 50 }
@@ -1370,13 +1376,13 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  emptyByRefinement  => !integer ^ { min: 10  max: 3 }
-                  emptyByApplication => !integer_type { min: 10  max: 3 }
-                  emptyText          => !text ^ { min_length: 10  max_length: 3 }
-                  zeroStep           => !integer ^ { multiple_of: 0 }
-                  pinnedToOneValue   => !integer ^ { min: 5  max: 5 }
+                  emptyByRefinement  => !meta.integer ^ { min: 10  max: 3 }
+                  emptyByApplication => !meta.integer_type { min: 10  max: 3 }
+                  emptyText          => !meta.text ^ { min_length: 10  max_length: 3 }
+                  zeroStep           => !meta.integer ^ { multiple_of: 0 }
+                  pinnedToOneValue   => !meta.integer ^ { min: 5  max: 5 }
                 }""").parseSchemaDocument().body();
 
         SchemaValidationException refined = assertThrows(SchemaValidationException.class,
@@ -1444,9 +1450,9 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  short_text  => !text ^ { min_length: 1  max_length: 10 }
+                  short_text  => !meta.text ^ { min_length: 1  max_length: 10 }
                   shorter     => !short_text ^ { max_length: 5 }
                   longer      => !short_text ^ { max_length: 50 }
                 }""").parseSchemaDocument().body();
@@ -1474,12 +1480,12 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { bad => !integer ^ { min: "abc" } }""").parseSchemaDocument().body();
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { bad => !meta.integer ^ { min: "abc" } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("not valid data for 'integer_type'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("not valid data for 'meta.integer_type'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("'abc' is not a valid integer"), thrown.getMessage());
     }
 
@@ -1499,12 +1505,12 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { quantity_t => !integer ^ { minimum: 1  maximum: 100 } }""").parseSchemaDocument().body();
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { quantity_t => !meta.integer ^ { minimum: 1  maximum: 100 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("quantity_t")));
-        assertTrue(thrown.getMessage().contains("unknown field 'minimum' on 'integer_type'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("unknown field 'minimum' on 'meta.integer_type'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("min | max"), thrown.getMessage());
     }
 
@@ -1520,13 +1526,13 @@ class DefinitionResolverTest {
         Map<String, Top> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  sneaky => !template {
-                    parameters: [{ name: T  type: type_kind }]  template: "!array { element_type: T }"
+                  sneaky => !meta.template {
+                    parameters: [{ name: T  type: meta.type_kind }]  template: "!meta.array { element_type: T }"
                   }
-                  open_sneaky => <U> !template {
-                    parameters: [{ name: U  type: type_kind }]  template: "!array { element_type: U }"
+                  open_sneaky => <U> !meta.template {
+                    parameters: [{ name: U  type: meta.type_kind }]  template: "!meta.array { element_type: U }"
                   }
                 }""").parseSchemaDocument().body();
 
@@ -1547,14 +1553,14 @@ class DefinitionResolverTest {
     @Test
     void aMetaReaderFailureThatIsNotAReadDiagnosticStaysALibraryGap() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { bad => !integer ^ { min: 1 } }""").parseSchemaDocument().body();
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { bad => !meta.integer ^ { min: 1 } }""").parseSchemaDocument().body();
         Map<String, Top> namespace = new LinkedHashMap<>(metaKernelCompiled().schema().entries().entries());
         DefinitionResolver gapResolver = new DefinitionResolver(NEVER_CALLED, namespace::get, namespace::get);
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
                 () -> gapResolver.resolve(schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("failed to bind 'integer_type'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("failed to bind 'meta.integer_type'"), thrown.getMessage());
     }
 
     @Test
@@ -1565,8 +1571,8 @@ class DefinitionResolverTest {
         // "resolves but isn't an instance" (the constructor-rejection test above), which requires `I` to resolve.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { bad => !meta.integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
@@ -1589,8 +1595,8 @@ class DefinitionResolverTest {
      * build both a {@link DefinitionMetaReader} that can actually *bind* a constructor-application/
      * atom-refinement value, and the {@code DefinitionResolver} constructor's own structure-namespace
      * parameter (a plain {@code Top} lookup is all that one needs). Generic over whatever
-     * map a caller already has in hand (a hand-built {@code resolved} map, meta-kernel's own entries,
-     * meta.tn's own registered/merged entries, ...). Its identity is the meta-kernel's, so the kernel names it
+     * map a caller already has in hand (a hand-built {@code resolved} map, the kernel's own entries,
+     * meta.tn's own registered/merged entries, ...). Its identity is the kernel's, so the kernel names it
      * holds -- {@code top} and the base kinds -- are the kernel's, which is what a constructor is judged by.
      */
     private static TsonCompiledMetaSchema compileAsMetaParser(Map<String, Top> entries) {
@@ -1601,14 +1607,14 @@ class DefinitionResolverTest {
     private static TsonCompiledMetaSchema compileAsMetaParser(Map<String, Top> entries,
                                                               Map<String, TsonSchema.EntryFacts> facts) {
         // Its own meta, as the real kernel is: the readers of a schema that governs schemas read names only.
-        TsonSchema synthetic = new TsonSchema(TsonBundledSchemas.META_KERNEL_ID, List.of(),
+        TsonSchema synthetic = new TsonSchema(TsonBundledSchemas.META_ID, List.of(),
                 io.ltr8.annotation.AnnotatedMap.of(entries), false, Map.of(), facts);
         TsonLinkedSchema linkedSynthetic = new TsonLinkedSchema(synthetic);
         return new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()).bootstrap(linkedSynthetic);
     }
 
     /**
-     * Meta-kernel, *linked* (via {@link TsonSchemaLinker#linkBootstrap}, so object mode's own
+     * The kernel, *linked* (via {@link TsonSchemaLinker#linkBootstrap}, so object mode's own
      * {@code TsonParserFactoryRegistry} has a genuinely linked schema to validate against), then compiled.
      */
     private static TsonCompiledMetaSchema metaKernelCompiled() {
@@ -1618,55 +1624,42 @@ class DefinitionResolverTest {
     }
 
     /**
-     * Meta-kernel registered, then meta.tn resolved and registered on top -- see {@code
-     * MetaSchemaImportTest} for the same, fully-verified pattern (31/31 declarations, validated).
-     *
-     * <p>Meta-kernel itself is registered via ordinary {@code SchemaResolver.resolveSchema}, not
-     * the raw bootstrap output ({@code TsonSchemaRegistry#register} refuses any self-referential
-     * schema with {@code bootstrap() == true}, materialized or not -- see that method's own Javadoc)
-     * -- mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern: a throwaway
-     * loader, built from the (never-persisted) materialized bootstrap
-     * output, resolves meta-kernel's own document the ordinary way (its own bootstrap branch
-     * supplies the structure namespace, so even {@code boolean => !enum [...]} resolves correctly
-     * despite the forward reference); that result carries no {@code bootstrap} flag, so it can
-     * actually be registered.
+     * The kernel, meta.tn, registered as {@code TsonSchemaRegistry#register} takes it: resolved the ordinary way
+     * through {@code SchemaResolver.resolveSchema}, a throwaway loader's pre-loaded stand-in supplying the vocabulary,
+     * since the raw bootstrap output carries {@code bootstrap() == true} and the registry refuses it -- then compiled.
      */
-    private static TsonCompiledMetaSchema metaTn1Compiled() throws IOException {
+    private static TsonCompiledMetaSchema metaTn1Compiled() {
+        return bundledCompiled(TsonBundledSchemas.META_ID);
+    }
+
+    /** The same, with net.tn resolved and registered over the kernel: its constructors are its own, under {@code net}. */
+    private static TsonCompiledMetaSchema netCompiled() {
+        return bundledCompiled(TsonBundledSchemas.META_ID, TsonBundledSchemas.NET_ID);
+    }
+
+    /** Each of {@code ids} resolved and registered in turn, the last one compiled. */
+    private static TsonCompiledMetaSchema bundledCompiled(String... ids) {
         io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        // Pin-tolerant, because a reference out of meta.tn's own header carries the `?sha256=` its
-        // `!!meta`/`!!import` were stamped with, and TsonBundledSchemas keys on the bare identity. The
-        // production registry never reaches the source for these -- the standard library is already
-        // registered by canonical identity -- so only this throwaway one has to strip the query.
-        TsonCompiledMetaRegistry throwawayRegistry = new TsonCompiledMetaRegistry(context,
+        TsonCompiledSchemaLoader throwawayLoader = new TsonCompiledMetaRegistry(context,
                 uri -> TsonBundledSchemas.fetch(uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri));
-        TsonCompiledSchemaLoader throwawayLoader = throwawayRegistry;
-
-        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
-        SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new SchemaResolver(throwawayLoader).resolveSchema(metaKernelDocument);
-        registry.register(TsonSchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn's own !!import finds it below
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-
-        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn").normalize());
-        // Through SchemaResolver, exactly as meta-kernel goes two lines above, rather than a hand-rolled
-        // declaration loop. The loop skipped every phase that runs *between* declarations -- materialisation
-        // most of all -- so a field typed by a template application (`tags: set<text>`) stayed an
-        // unclosed application and the first read against it met the template instead of the entry it closes.
-        TsonSchema meta = new SchemaResolver(throwawayLoader)
-                .resolveSchema(new TsonSchemaParser(source).parseSchemaDocument());
-        TsonLinkedSchema registeredMeta = registry.register(TsonSchemaLinker.link(meta, registry));
-        return compileAsMetaParser(registeredMeta.schema().entries().entries(), registeredMeta.schema().facts());
+        TsonLinkedSchema registered = null;
+        for (String id : ids) {
+            SchemaDocument document = new TsonSchemaParser(TsonBundledSchemas.fetch(id)).parseSchemaDocument();
+            TsonSchema resolvedSchema = new SchemaResolver(throwawayLoader).resolveSchema(document);
+            registered = registry.register(TsonSchemaLinker.link(resolvedSchema, registry));
+        }
+        return compileAsMetaParser(registered.schema().entries().entries(), registered.schema().facts());
     }
 
     /** Populates the shared {@link #resolved} field up through {@code array} -- callers continue resolving against it via {@link #resolver} directly, no return value needed now that {@link #resolved} is a field, not a per-call local. */
     private void resolveUpToArray() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
-        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("type", resolver.resolve(schemaMap.declarations().get("type")));
-        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
-        resolved.put("product", resolver.resolve(schemaMap.declarations().get("product")));
-        resolved.put("array", resolver.resolve(schemaMap.declarations().get("array")));
+        resolved.put("meta.top", resolver.resolve(schemaMap.declarations().get("meta.top")));
+        resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
+        resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
+        resolved.put("meta.product", resolver.resolve(schemaMap.declarations().get("meta.product")));
+        resolved.put("meta.array", resolver.resolve(schemaMap.declarations().get("meta.array")));
     }
 
     private SchemaMap schemaMapFromFixture() throws IOException {
@@ -1674,7 +1667,7 @@ class DefinitionResolverTest {
     }
 
     /**
-     * meta-kernel.tn's declarations, desugared as {@code SchemaResolver} desugars them: {@code type}'s own
+     * meta.tn's declarations, desugared as {@code SchemaResolver} desugars them: {@code type}'s own
      * fields are {@code [type_kind]} and {@code [type_name]} sugar, and every constructor composes them in.
      */
     private SchemaMap kernelDeclarations() throws IOException {
@@ -1684,13 +1677,13 @@ class DefinitionResolverTest {
     /**
      * Desugars and resolves one declaration, running {@link SchemaDesugarer} in between as {@code
      * SchemaResolver} does -- the phase owns the sugar forms, so a snippet that skipped it would be resolving
-     * a shape the pipeline never produces. The compiled meta-kernel is the resolver's structure namespace,
+     * a shape the pipeline never produces. The compiled the kernel is the resolver's structure namespace,
      * needed because the binding record the desugarer emits is bound through that meta's own reader, the
      * same as any other {@code !C value}.
      */
     private Top resolveSnippet(String declaration) {
         SchemaDocument document = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema { %s }""".formatted(declaration)).parseSchemaDocument();
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
         SchemaMap schemaMap = SchemaDesugarer.desugar(document, Set.of()).body();
@@ -1705,7 +1698,7 @@ class DefinitionResolverTest {
     //    error, and changing membership is a resolver error."
 
     private static final String BOUNDS =
-            "bounds => { a: text  ( min: integer | exclusive_min: integer )? }";
+            "bounds => { a: meta.text  ( min: meta.integer | exclusive_min: meta.integer )? }";
 
     /**
      * Only the group's state moves. Members stay OPTIONAL in {@code fields} -- §5.11 flattens them that way
@@ -1714,7 +1707,7 @@ class DefinitionResolverTest {
     @Test
     void restatingAGroupInARefinementBodyTightensItsStateOnly() {
         Map<String, Top> entries = resolveAll(BOUNDS
-                + "  strict => bounds ^ { ( min: integer | exclusive_min: integer ) }");
+                + "  strict => bounds ^ { ( min: meta.integer | exclusive_min: meta.integer ) }");
 
         RecordBody body = bodyOf(entries.get("strict"));
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), false)), body.groups());
@@ -1733,7 +1726,7 @@ class DefinitionResolverTest {
     @Test
     void restatingAGroupInACompositionBodyTightensItInPlace() {
         Map<String, Top> entries = resolveAll(BOUNDS
-                + "  strict => bounds & { ( min: integer | exclusive_min: integer )  extra: text }");
+                + "  strict => bounds & { ( min: meta.integer | exclusive_min: meta.integer )  extra: meta.text }");
 
         RecordBody body = bodyOf(entries.get("strict"));
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), false)), body.groups());
@@ -1745,7 +1738,7 @@ class DefinitionResolverTest {
     @Test
     void restatingAGroupWithoutChangingItsStateIsANoOp() {
         Map<String, Top> entries = resolveAll(BOUNDS
-                + "  same => bounds ^ { ( min: integer | exclusive_min: integer )? }");
+                + "  same => bounds ^ { ( min: meta.integer | exclusive_min: meta.integer )? }");
 
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), true)),
                 bodyOf(entries.get("same")).groups());
@@ -1754,8 +1747,8 @@ class DefinitionResolverTest {
     @Test
     void rejectsARestatementThatMakesAGroupOptional() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("bounds => { ( min: integer | exclusive_min: integer ) }"
-                        + "  loose => bounds ^ { ( min: integer | exclusive_min: integer )? }"));
+                () -> resolveAll("bounds => { ( min: meta.integer | exclusive_min: meta.integer ) }"
+                        + "  loose => bounds ^ { ( min: meta.integer | exclusive_min: meta.integer )? }"));
         assertTrue(thrown.getMessage().contains("never add one"), thrown.getMessage());
     }
 
@@ -1763,12 +1756,13 @@ class DefinitionResolverTest {
     void rejectsARestatementThatReordersOrDropsAMember() {
         SchemaValidationException reordered = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
-                        + "  odd => bounds ^ { ( exclusive_min: integer | min: integer ) }"));
+                        + "  odd => bounds ^ { ( exclusive_min: meta.integer | min: meta.integer ) }"));
         assertTrue(reordered.getMessage().contains("their members in the same order"), reordered.getMessage());
 
         SchemaValidationException added = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
-                        + "  odd => bounds ^ { ( min: integer | exclusive_min: integer | other: integer ) }"));
+                        + "  odd => bounds ^ { ( min: meta.integer | exclusive_min: meta.integer | other: "
+                        + "meta.integer ) }"));
         assertTrue(added.getMessage().contains("changing membership"), added.getMessage());
     }
 
@@ -1777,7 +1771,7 @@ class DefinitionResolverTest {
     void rejectsARestatementThatChangesAMembersType() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
-                        + "  odd => bounds ^ { ( min: text | exclusive_min: integer ) }"));
+                        + "  odd => bounds ^ { ( min: meta.text | exclusive_min: meta.integer ) }"));
         assertTrue(thrown.getMessage().contains("restated verbatim"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("'min'"), thrown.getMessage());
     }
@@ -1786,8 +1780,8 @@ class DefinitionResolverTest {
     @Test
     void rejectsAGroupOverInheritedFieldsThatWereNeverAGroup() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("pair => { x: integer  y: integer }"
-                        + "  odd => pair ^ { ( x: integer | y: integer ) }"));
+                () -> resolveAll("pair => { x: meta.integer  y: meta.integer }"
+                        + "  odd => pair ^ { ( x: meta.integer | y: meta.integer ) }"));
         assertTrue(thrown.getMessage().contains("not a group"), thrown.getMessage());
     }
 
@@ -1795,16 +1789,16 @@ class DefinitionResolverTest {
     @Test
     void rejectsAWhollyNewGroupInARefinementBody() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("bounds => { a: text }"
-                        + "  odd => bounds ^ { ( p: integer | q: integer ) }"));
+                () -> resolveAll("bounds => { a: meta.text }"
+                        + "  odd => bounds ^ { ( p: meta.integer | q: meta.integer ) }"));
         assertTrue(thrown.getMessage().contains("names no inherited group"), thrown.getMessage());
     }
 
     /** A composition body may still introduce a genuinely new group -- the false branch of the same check. */
     @Test
     void aCompositionBodyStillAddsAWhollyNewGroup() {
-        Map<String, Top> entries = resolveAll("base => { a: text }"
-                + "  extended => base & { ( p: integer | q: integer )? }");
+        Map<String, Top> entries = resolveAll("base => { a: meta.text }"
+                + "  extended => base & { ( p: meta.integer | q: meta.integer )? }");
 
         assertEquals(List.of("a", "p", "q"), fieldNames(entries.get("extended")));
         assertEquals(List.of(FieldGroup.ofSingles(List.of("p", "q"), true)),
@@ -1818,34 +1812,36 @@ class DefinitionResolverTest {
     void resolvesEveryFieldSpelling() {
         RecordBody body = bodyOf(resolveAll("""
                 config => {
-                  host:     text
-                  port?:    integer ~ 8080
-                  debug?:   boolean = false
-                  label?:   text?
-                  version:  text = "2.0"
-                  note:     text?
-                  timeout?: integer? ~ 30
-                  extra?:   void?
+                  host:     meta.text
+                  port?:    meta.integer ~ 8080
+                  debug?:   meta.boolean = false
+                  label?:   meta.text?
+                  version:  meta.text = "2.0"
+                  note:     meta.text?
+                  timeout?: meta.integer? ~ 30
+                  extra?:   meta.void?
                 }
                 """).get("config"));
 
-        assertEquals(Map.entry("host", RecordField.required(TypeRef.of("text"))),
+        assertEquals(Map.entry("host", RecordField.required(TypeRef.of("meta.text"))),
                 body.fields().entrySet().stream().toList().get(0));
-        assertEquals(Map.entry("port", RecordField.defaulted(TypeRef.of("integer"), new Token("8080", Token.Form.UNQUOTED))),
+        assertEquals(Map.entry("port",
+                RecordField.defaulted(TypeRef.of("meta.integer"), new Token("8080", Token.Form.UNQUOTED))),
                 body.fields().entrySet().stream().toList().get(1));
-        assertEquals(Map.entry("debug", RecordField.fixed(TypeRef.of("boolean"), new Token("false", Token.Form.UNQUOTED))),
+        assertEquals(Map.entry("debug",
+                RecordField.fixed(TypeRef.of("meta.boolean"), new Token("false", Token.Form.UNQUOTED))),
                 body.fields().entrySet().stream().toList().get(2));
-        assertEquals(Map.entry("label", RecordField.optionalVoidable(TypeRef.of("text"))),
+        assertEquals(Map.entry("label", RecordField.optionalVoidable(TypeRef.of("meta.text"))),
                 body.fields().entrySet().stream().toList().get(3));
-        assertEquals(Map.entry("version", RecordField.marker(TypeRef.of("text"),
+        assertEquals(Map.entry("version", RecordField.marker(TypeRef.of("meta.text"),
                 new Token("2.0", Token.Form.SINGLE_LINE_QUOTED))),
                 body.fields().entrySet().stream().toList().get(4));
-        assertEquals(Map.entry("note", RecordField.voidable(TypeRef.of("text"))),
+        assertEquals(Map.entry("note", RecordField.voidable(TypeRef.of("meta.text"))),
                 body.fields().entrySet().stream().toList().get(5));
-        assertEquals(Map.entry("timeout", new RecordField(TypeRef.of("integer"), true, true, FieldRole.DEFAULT,
+        assertEquals(Map.entry("timeout", new RecordField(TypeRef.of("meta.integer"), true, true, FieldRole.DEFAULT,
                 Optional.of(new Token("30", Token.Form.UNQUOTED)))),
                         body.fields().entrySet().stream().toList().get(6));
-        assertEquals(Map.entry("extra", RecordField.optionalVoidable(TypeRef.of("void"))),
+        assertEquals(Map.entry("extra", RecordField.optionalVoidable(TypeRef.of("meta.void"))),
                 body.fields().entrySet().stream().toList().get(7));
     }
 
@@ -1857,14 +1853,14 @@ class DefinitionResolverTest {
      */
     @Test
     void theRefusedSpellings() {
-        assertRefused("config => { format?: text? = json }", "pins a voidable type");
-        assertRefused("config => { format: text? = json }", "pins a voidable type");
-        assertRefused("config => { port: integer ~ 8080 }", "always written");
-        assertRefused("config => { extra?: text = _ }", "'_' is none of them");
-        assertRefused("config => { extra?: text? = _ }", "'_' is none of them");
-        assertRefused("config => { extra?: text ~ _ }", "'_' is none of them");
-        assertRefused("pet => { kind?: text =? }", "discriminator");
-        assertRefused("pet => { kind: text? =? }", "discriminator");
+        assertRefused("config => { format?: meta.text? = json }", "pins a voidable type");
+        assertRefused("config => { format: meta.text? = json }", "pins a voidable type");
+        assertRefused("config => { port: meta.integer ~ 8080 }", "always written");
+        assertRefused("config => { extra?: meta.text = _ }", "'_' is none of them");
+        assertRefused("config => { extra?: meta.text? = _ }", "'_' is none of them");
+        assertRefused("config => { extra?: meta.text ~ _ }", "'_' is none of them");
+        assertRefused("pet => { kind?: meta.text =? }", "discriminator");
+        assertRefused("pet => { kind: meta.text? =? }", "discriminator");
     }
 
     private void assertRefused(String schema, String fragment) {
@@ -1880,12 +1876,12 @@ class DefinitionResolverTest {
     @Test
     void restatesAnInheritedFieldAsVoid() {
         Map<String, Top> entries = resolveAll("""
-                base => { name: text  nickname?: text? }
-                anonymous => base ^ { nickname?: void? }
+                base => { name: meta.text  nickname?: meta.text? }
+                anonymous => base ^ { nickname?: meta.void? }
                 """);
 
         RecordField nickname = bodyOf(entries.get("anonymous")).fields().values().stream().toList().get(1);
-        assertEquals(RecordField.optionalVoidable(TypeRef.of("void")), nickname);
+        assertEquals(RecordField.optionalVoidable(TypeRef.of("meta.void")), nickname);
         // unlike removal (§5.9), IS-A survives -- the field is still in the contract
         assertEquals(List.of("base"), TypeChain.supertypesOf(entries.get("anonymous")));
         assertEquals(List.of("name", "nickname"), fieldNames(entries.get("anonymous")));
@@ -1895,7 +1891,7 @@ class DefinitionResolverTest {
     @Test
     void rejectsAModifierOnlyPinToVoid() {
         assertRefused("""
-                base => { name: text  nickname?: text? }
+                base => { name: meta.text  nickname?: meta.text? }
                 anonymous => base ^ { nickname?: = _ }
                 """, "'_' is none of them");
     }
@@ -1909,13 +1905,13 @@ class DefinitionResolverTest {
     @Test
     void aParametricPinOnAnInheritedOptionalFieldIsRequiredAndFixed() {
         Map<String, Top> entries = resolveAll("""
-                base => { bound?: integer }
+                base => { bound?: meta.integer }
                 bounded => <MIN> base ^ { bound: = MIN }
                 """);
 
         RecordBody open = assertInstanceOf(RecordBody.class, entries.get("bounded"));
         RecordField bound = open.fields().get("bound");
-        assertEquals(TypeRef.of("integer"), bound.type(), "the type came from the source");
+        assertEquals(TypeRef.of("meta.integer"), bound.type(), "the type came from the source");
         assertEquals("MIN", bound.value().orElseThrow().text(), "the parameter stands in the value slot");
         // The name is unmarked, so the inherited optional did not survive; the pin is the modifier's.
         assertFalse(bound.optional());
@@ -1933,10 +1929,10 @@ class DefinitionResolverTest {
     @Test
     void aRestatedMemberMayBePinnedAndIsNeverSupplied() {
         RecordBody body = bodyOf(resolveAll(BOUNDS
-                + "  pinned => bounds ^ { min: = 0  exclusive_min: integer = 1 }").get("pinned"));
+                + "  pinned => bounds ^ { min: = 0  exclusive_min: meta.integer = 1 }").get("pinned"));
 
         RecordField min = body.fields().values().stream().toList().get(1);
-        assertEquals(RecordField.fixed(TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
+        assertEquals(RecordField.fixed(TypeRef.of("meta.integer"), new Token("0", Token.Form.UNQUOTED)), min);
         assertEquals(RecordField.Omitted.NOTHING, min.omitted(true));
         assertEquals("fixed", body.fields().values().stream().toList().get(2).describe());
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), true)), body.groups());
@@ -1948,14 +1944,14 @@ class DefinitionResolverTest {
      */
     @Test
     void aRestatedMemberTakesNoNewNameMarkAndNoDefault() {
-        assertRefused(BOUNDS + "  pinned => bounds ^ { min?: integer = 0 }", "adding one loosens its option");
-        assertRefused(BOUNDS + "  pinned => bounds ^ { min: integer ~ 0 }", "takes no default");
+        assertRefused(BOUNDS + "  pinned => bounds ^ { min?: meta.integer = 0 }", "adding one loosens its option");
+        assertRefused(BOUNDS + "  pinned => bounds ^ { min: meta.integer ~ 0 }", "takes no default");
     }
 
     // ── Options of several fields ([TSON-SCHEMA] §5.11) ──────────────────
 
     private static final String FRAGMENT =
-            "fragment => { ( include: text | name?: text  type?: text ) }";
+            "fragment => { ( include: meta.text | name?: meta.text  type?: meta.text ) }";
 
     private static FieldGroup group(List<List<String>> options, List<String> optionalMembers, boolean optional) {
         return new FieldGroup(options, optionalMembers, optional);
@@ -1973,7 +1969,7 @@ class DefinitionResolverTest {
     /** {@code +} lowers to one REQUIRED option, every member optional within it. */
     @Test
     void aPlusGroupResolvesToOneOption() {
-        RecordBody body = bodyOf(resolveAll("contact => { ( email: text | phone: text )+ }").get("contact"));
+        RecordBody body = bodyOf(resolveAll("contact => { ( email: meta.text | phone: meta.text )+ }").get("contact"));
         assertEquals(List.of(group(List.of(List.of("email", "phone")), List.of("email", "phone"),
                 false)), body.groups());
     }
@@ -1981,34 +1977,34 @@ class DefinitionResolverTest {
     /** A restated member's name {@code ?} is never inherited: leaving it off makes the member required there. */
     @Test
     void aRestatedMemberWithoutItsMarkIsRequiredInItsOption() {
-        RecordBody body = bodyOf(resolveAll(FRAGMENT + "  strict => fragment ^ { name: text }").get("strict"));
+        RecordBody body = bodyOf(resolveAll(FRAGMENT + "  strict => fragment ^ { name: meta.text }").get("strict"));
         assertEquals(List.of("type"), body.groups().getFirst().optionalMembers());
         assertTrue(body.fields().values().stream().allMatch(RecordField::optional), "and still an optional field");
 
-        RecordBody kept = bodyOf(resolveAll(FRAGMENT + "  same => fragment ^ { name?: text }").get("same"));
+        RecordBody kept = bodyOf(resolveAll(FRAGMENT + "  same => fragment ^ { name?: meta.text }").get("same"));
         assertEquals(List.of("name", "type"), kept.groups().getFirst().optionalMembers());
     }
 
     /** A {@code +} group's members were written without a {@code ?}, so they are restated that way. */
     @Test
     void aPlusGroupsMemberIsRestatedAsWritten() {
-        String contact = "contact => { ( email: text | phone: text )+ }";
-        RecordBody body = bodyOf(resolveAll(contact + "  narrow => contact ^ { email: text }").get("narrow"));
+        String contact = "contact => { ( email: meta.text | phone: meta.text )+ }";
+        RecordBody body = bodyOf(resolveAll(contact + "  narrow => contact ^ { email: meta.text }").get("narrow"));
         assertEquals(List.of("email", "phone"), body.groups().getFirst().optionalMembers());
 
-        assertRefused(contact + "  marked => contact ^ { email?: text }", "written with '+'");
+        assertRefused(contact + "  marked => contact ^ { email?: meta.text }", "written with '+'");
     }
 
     /** A restated group may drop a member's {@code ?} and never add one. */
     @Test
     void aRestatedGroupMayDropAMarkAndNotAddOne() {
         RecordBody body = bodyOf(resolveAll(FRAGMENT
-                + "  strict => fragment ^ { ( include: text | name: text  type?: text ) }").get("strict"));
+                + "  strict => fragment ^ { ( include: meta.text | name: meta.text  type?: meta.text ) }").get("strict"));
         assertEquals(List.of("type"), body.groups().getFirst().optionalMembers());
 
-        assertRefused("base => { ( a: text | b: text  c?: text ) }"
-                + "  loose => base ^ { ( a: text | b?: text  c?: text ) }", "never add one");
-        assertRefused(FRAGMENT + "  odd => fragment ^ { ( include: text  name: text | type: text ) }",
+        assertRefused("base => { ( a: meta.text | b: meta.text  c?: meta.text ) }"
+                + "  loose => base ^ { ( a: meta.text | b?: meta.text  c?: meta.text ) }", "never add one");
+        assertRefused(FRAGMENT + "  odd => fragment ^ { ( include: meta.text  name: meta.text | type: meta.text ) }",
                 "the same options");
     }
 
@@ -2021,9 +2017,9 @@ class DefinitionResolverTest {
         Map<String, Top> entries = resolveAll(FRAGMENT + """
                   no_include => fragment - { include }
                   no_type => fragment - { type }
-                  endpoint => { ( host: text  port: text | socket: text ) }
+                  endpoint => { ( host: meta.text  port: meta.text | socket: meta.text ) }
                   no_socket => endpoint - { socket }
-                  pair => { ( b: text  a?: text )? }
+                  pair => { ( b: meta.text  a?: meta.text )? }
                   no_b => pair - { b }
                 """);
         assertEquals(List.of(group(List.of(List.of("name", "type")), List.of("name", "type"),
@@ -2051,8 +2047,8 @@ class DefinitionResolverTest {
     void rejectsAFieldNameTwoSupertypesBothContribute() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
-                        address => { street: text  city: text }
-                        contact => { city: text  email: text }
+                        address => { street: meta.text  city: meta.text }
+                        contact => { city: meta.text  email: meta.text }
                         customer => address & contact
                         """));
         assertTrue(thrown.getMessage().contains("'city'"), thrown.getMessage());
@@ -2064,7 +2060,7 @@ class DefinitionResolverTest {
     @Test
     void rejectsAFieldNameDeclaredTwiceInOneBody() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("point => { x: integer  x: text }"));
+                () -> resolveAll("point => { x: meta.integer  x: meta.text }"));
         assertTrue(thrown.getMessage().contains("'x'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("declares it twice"), thrown.getMessage());
     }
@@ -2073,7 +2069,7 @@ class DefinitionResolverTest {
     @Test
     void rejectsAGroupMemberRepeatingAPlainFieldName() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("bounds => { min: integer  ( min: text | other: text ) }"));
+                () -> resolveAll("bounds => { min: meta.integer  ( min: meta.text | other: meta.text ) }"));
         assertTrue(thrown.getMessage().contains("'min'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("group member"), thrown.getMessage());
     }
@@ -2088,10 +2084,10 @@ class DefinitionResolverTest {
     void rejectsRefiningADefinitionWhoseBodyIsABindingRecord() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel("""
-                        bounded => integer ^ { min?: = 0 }
+                        bounded => meta.integer ^ { min?: = 0 }
                         """));
         assertTrue(thrown.getMessage().contains("finished"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("!integer ^"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("!meta.integer ^"), thrown.getMessage());
     }
 
     /**
@@ -2102,7 +2098,7 @@ class DefinitionResolverTest {
     void rejectsComposingWithASupertypeWhoseBodyIsABindingRecord() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel("""
-                        weird => integer & { extra: text }
+                        weird => meta.integer & { extra: meta.text }
                         """));
         assertTrue(thrown.getMessage().contains("no fields to contribute"), thrown.getMessage());
     }
@@ -2123,8 +2119,8 @@ class DefinitionResolverTest {
     void rejectsAChoiceOrABracketedFormAsASupertype() {
         SchemaValidationException choice = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
-                        a => { x: text }
-                        b => { y: text }
+                        a => { x: meta.text }
+                        b => { y: meta.text }
                         odd => a & (a | b)
                         """));
         assertTrue(choice.getMessage().contains("choice"), choice.getMessage());
@@ -2132,21 +2128,21 @@ class DefinitionResolverTest {
 
         SchemaValidationException bracketed = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
-                        a => { x: text }
+                        a => { x: meta.text }
                         odd => a & [a]
                         """));
         assertTrue(bracketed.getMessage().contains("elements"), bracketed.getMessage());
     }
 
     /**
-     * Resolves a hand-written body with meta-kernel's own entries as the type-name namespace, so a
+     * Resolves a hand-written body with the kernel's own entries as the type-name namespace, so a
      * declaration can name a real atom instance ({@code integer => !integer_type {}}) as a source or
      * supertype -- the shapes §5.7/§5.8 reject, which need a non-record body to exist at all.
      */
     private Top resolveSnippetsAgainstMetaKernel(String body) {
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
         SchemaDocument document = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema { %s }""".formatted(body)).parseSchemaDocument();
         Map<String, Top> namespace = new LinkedHashMap<>(metaKernel.schema().entries().entries());
         Top last = null;
@@ -2159,12 +2155,12 @@ class DefinitionResolverTest {
 
     // ── Subtraction (§5.9) ────────────────────────────────────────────────
 
-    private static final String ACCOUNT = "account => { name: text  email: text  password: text }";
+    private static final String ACCOUNT = "account => { name: meta.text  email: meta.text  password: meta.text }";
 
     /** Resolves a whole hand-written schema body in declaration order, so a later entry can compose with an earlier one. */
     private Map<String, Top> resolveAll(String body) {
         SchemaDocument document = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema { %s }""".formatted(body)).parseSchemaDocument();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             resolved.put(declaration.name(), resolver.resolve(declaration));
@@ -2207,8 +2203,8 @@ class DefinitionResolverTest {
     @Test
     void removalsApplyAfterTheSupertypesAndTheBody() {
         Map<String, Top> entries = resolveAll(ACCOUNT
-                + "  user => { badge_id: text }"
-                + "  staff_public => account & user & { badge: text } - { password }");
+                + "  user => { badge_id: meta.text }"
+                + "  staff_public => account & user & { badge: meta.text } - { password }");
 
         Top staff = entries.get("staff_public");
         // inherited in supertype order (minus the removal), then the body's genuinely new field
@@ -2220,7 +2216,7 @@ class DefinitionResolverTest {
     @Test
     void aRemovalCoexistsWithATighteningOfADifferentField() {
         Map<String, Top> entries = resolveAll(ACCOUNT
-                + "  account_view => account & { email?: text ~ \"n/a\" } - { password }");
+                + "  account_view => account & { email?: meta.text ~ \"n/a\" } - { password }");
 
         Top view = entries.get("account_view");
         assertEquals(List.of("name", "email"), fieldNames(view));
@@ -2236,7 +2232,7 @@ class DefinitionResolverTest {
     @Test
     void rejectsARemovalNamingAFieldTheBodyItselfIntroduces() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(ACCOUNT + "  odd => account & { badge: text } - { badge }"));
+                () -> resolveAll(ACCOUNT + "  odd => account & { badge: meta.text } - { badge }"));
         assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("§5.9 rule 4"), thrown.getMessage());
     }
@@ -2245,7 +2241,7 @@ class DefinitionResolverTest {
     @Test
     void rejectsARemovalNamingAFieldTheBodyTightens() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll(ACCOUNT + "  odd => account & { password?: text ~ \"x\" } - { password }"));
+                () -> resolveAll(ACCOUNT + "  odd => account & { password?: meta.text ~ \"x\" } - { password }"));
         assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
     }
 
@@ -2267,7 +2263,7 @@ class DefinitionResolverTest {
     @Test
     void removingAGroupMemberDissolvesAGroupLeftWithOne() {
         Map<String, Top> entries = resolveAll("""
-                bounds => { a: text  ( min: integer | exclusive_min: integer ) }
+                bounds => { a: meta.text  ( min: meta.integer | exclusive_min: meta.integer ) }
                 one_bound => bounds - { exclusive_min }
                 """);
 
@@ -2284,7 +2280,7 @@ class DefinitionResolverTest {
     @Test
     void aDissolvedOptionalGroupLeavesAnOptionalField() {
         Map<String, Top> entries = resolveAll("""
-                bounds => { a: text  ( min: integer | exclusive_min: integer )? }
+                bounds => { a: meta.text  ( min: meta.integer | exclusive_min: meta.integer )? }
                 one_bound => bounds - { exclusive_min }
                 """);
 
@@ -2295,7 +2291,7 @@ class DefinitionResolverTest {
     @Test
     void aGroupWithMembersToSpareSurvivesTheRemoval() {
         Map<String, Top> entries = resolveAll("""
-                stamps => { ( created: text | modified: text | accessed: text )? }
+                stamps => { ( created: meta.text | modified: meta.text | accessed: meta.text )? }
                 fewer => stamps - { accessed }
                 """);
 
@@ -2311,7 +2307,7 @@ class DefinitionResolverTest {
     @Test
     void removingEveryMemberDropsTheGroupItself() {
         Map<String, Top> entries = resolveAll("""
-                bounds => { a: text  ( min: integer | exclusive_min: integer ) }
+                bounds => { a: meta.text  ( min: meta.integer | exclusive_min: meta.integer ) }
                 unbounded => bounds - { min  exclusive_min }
                 """);
 
@@ -2332,7 +2328,7 @@ class DefinitionResolverTest {
         // "top" deliberately left out of the resolved map -- atom's supertype resolves to nothing
         // (the shared resolved field starts empty, and nothing puts "top" into it before this call).
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolver.resolve(schemaMap.declarations().get("atom")));
+                () -> resolver.resolve(schemaMap.declarations().get("meta.atom")));
         assertTrue(thrown.getMessage().contains("names no type this schema declares or imports"),
                 thrown.getMessage());
     }
@@ -2352,7 +2348,7 @@ class DefinitionResolverTest {
     @Test
     void aSealedRecordLowersBothMarksIntoTheBody() {
         RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
-                "pet => abstract { pet_type: text =?  name: text }"));
+                "pet => abstract { pet_type: meta.text =?  name: meta.text }"));
 
         assertEquals(RecordExtensionType.ABSTRACT, body.extension());
         assertEquals(List.of("pet_type"), body.discriminators(),
@@ -2363,7 +2359,7 @@ class DefinitionResolverTest {
     @Test
     void aLoweredMarkLeavesNothingInTheAnnotationChannel() {
         Top pet = resolveSnippetsAgainstMetaKernel(
-                "pet => abstract { pet_type: text =?  name: text }");
+                "pet => abstract { pet_type: meta.text =?  name: meta.text }");
         RecordBody body = assertInstanceOf(RecordBody.class, pet);
 
         assertTrue(snippetFacts.get("pet").annotations().isEmpty(), "the definition mark is gone from the channel");
@@ -2377,8 +2373,8 @@ class DefinitionResolverTest {
     @Test
     void aMarkWordIsAnOrdinaryNameElsewhere() {
         RecordBody holder = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
-                abstract => { a: text }
-                final => { b: text }
+                abstract => { a: meta.text }
+                final => { b: meta.text }
                 holder => { f: abstract  g: final }"""));
 
         assertEquals(RecordExtensionType.OPEN, holder.extension(),
@@ -2389,7 +2385,7 @@ class DefinitionResolverTest {
     @Test
     void anUnmarkedRecordIsOpenAndNoFieldDiscriminates() {
         RecordBody body = assertInstanceOf(RecordBody.class,
-                resolveSnippetsAgainstMetaKernel("plain => { a: text  b: text }"));
+                resolveSnippetsAgainstMetaKernel("plain => { a: meta.text  b: meta.text }"));
 
         assertEquals(RecordExtensionType.OPEN, body.extension());
         assertTrue(body.discriminators().isEmpty());
@@ -2403,8 +2399,8 @@ class DefinitionResolverTest {
     @Test
     void aSubtypeOfASealedBaseIsOpenUnlessItSaysOtherwise() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
-                pet => abstract { pet_type: text =?  name: text }
-                dog => pet & { pet_type?: = "dog"  breed: text }"""));
+                pet => abstract { pet_type: meta.text =?  name: meta.text }
+                dog => pet & { pet_type?: = "dog"  breed: meta.text }"""));
 
         assertEquals(RecordExtensionType.OPEN, dog.extension());
     }
@@ -2423,8 +2419,8 @@ class DefinitionResolverTest {
     @Test
     void aRestatedFieldPinsTheSelectorAndCarriesNoMark() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
-                pet => abstract { pet_type: text =?  name: text }
-                dog => pet & { pet_type?: = "dog"  breed: text }"""));
+                pet => abstract { pet_type: meta.text =?  name: meta.text }
+                dog => pet & { pet_type?: = "dog"  breed: meta.text }"""));
 
         RecordField pinned = dog.fields().entrySet().stream().filter(f -> f.getKey().equals("pet_type"))
                 .map(Map.Entry::getValue).findFirst()
@@ -2440,7 +2436,7 @@ class DefinitionResolverTest {
     @Test
     void twoDefinitionMarksOnOneDeclarationAreRefused() {
         ParseException thrown = assertThrows(ParseException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => abstract final { a: text }"));
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract final { a: meta.text }"));
         assertTrue(thrown.getMessage().contains("on one declaration"), thrown.getMessage());
     }
 
@@ -2453,7 +2449,7 @@ class DefinitionResolverTest {
     @Test
     void aTemplateMayBeSealed() {
         Top box = resolveSnippetsAgainstMetaKernel(
-                "box => <T> { kind: text =?  v: T }");
+                "box => <T> { kind: meta.text =?  v: T }");
 
         RecordBody open = assertInstanceOf(RecordBody.class, box);
         assertEquals(List.of("T"), open.parameterNames());
@@ -2471,7 +2467,7 @@ class DefinitionResolverTest {
     void aTemplateCannotBeFinal() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel(
-                        "box => final <T> { kind: text =?  v: T }"));
+                        "box => final <T> { kind: meta.text =?  v: T }"));
 
         assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
     }
@@ -2494,7 +2490,7 @@ class DefinitionResolverTest {
     @Test
     void aDefinitionMarkOnANonRecordIsRefused() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => abstract !enum [A B]"));
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract !meta.enum [A B]"));
         assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
                 thrown.getMessage());
     }
@@ -2506,13 +2502,13 @@ class DefinitionResolverTest {
     @Test
     void aDefinitionMarkOnANonRecordTemplateIsRefused() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => abstract <T> !array { element_type: T }"));
+                () -> resolveSnippetsAgainstMetaKernel("x => abstract <T> !meta.array { element_type: T }"));
         assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
                 thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("applies '!array'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("applies '!meta.array'"), thrown.getMessage());
     }
 
     private static String readFixture() throws IOException {
-        return Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta-kernel.tn").normalize());
+        return Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn").normalize());
     }
 }

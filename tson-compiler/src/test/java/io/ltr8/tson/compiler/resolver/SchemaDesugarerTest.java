@@ -55,7 +55,7 @@ class SchemaDesugarerTest {
 
     private static SchemaDocument parse(String declarations) {
         return new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                 %s
                 }
@@ -100,11 +100,11 @@ class SchemaDesugarerTest {
     @Test
     void aRewrittenDeclarationKeepsItsSourcePosition() {
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  plain => { a: text }
+                  plain => { a: meta.text }
 
-                  sugared => { tags: [text] }
+                  sugared => { tags: [meta.text] }
                 }""");
         SchemaDocument document = parser.parseSchemaDocument();
         SchemaPositions positions = parser.schemaPositions();
@@ -137,7 +137,7 @@ class SchemaDesugarerTest {
         assertEquals(firstFieldType(document, "holder"), injected.name(),
                 "the use site refers to the injected declaration by name");
         Instance instance = (Instance) injected.typeDef();
-        assertEquals("array", instance.target());
+        assertEquals("meta.array", instance.target());
         assertEquals("{ element_type: text }", instanceBody(instance));
     }
 
@@ -155,7 +155,7 @@ class SchemaDesugarerTest {
         assertEquals(firstFieldType(document, "holder"), injected.name());
         assertTrue(injected.name().startsWith("map_text_integer_"), injected.name());
         Instance instance = (Instance) injected.typeDef();
-        assertEquals("map", instance.target());
+        assertEquals("meta.map", instance.target());
         assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
     }
 
@@ -248,8 +248,8 @@ class SchemaDesugarerTest {
      */
     @Test
     void derivedNamesDoNotRideOnTheAstsOwnStringForms() {
-        assertEquals("array_text_4cc4a482", onlyInjected(desugar("  holder => { xs: [text] }"), "array").name());
-        assertEquals("map_text_integer_5c4af9ec",
+        assertEquals("array_text_621f8dcb", onlyInjected(desugar("  holder => { xs: [text] }"), "array").name());
+        assertEquals("map_text_integer_d32c99ee",
                 onlyInjected(desugar("  holder => { m: {text => integer} }"), "map").name());
     }
 
@@ -257,7 +257,7 @@ class SchemaDesugarerTest {
     void aFormAnImportAlreadyDeclaresIsReferencedNotRedeclared() {
         // The name is derived from the binding record, so an identical form in an imported schema has already
         // produced this type. Redeclaring it would be rejected as a local-vs-import collision -- which is how
-        // this surfaced: meta.tn imports the meta-kernel and repeats several of its forms.
+        // this surfaced: meta.tn imports the kernel and repeats several of its forms.
         String name = onlyInjected(desugar("  holder => { xs: [text] }"), "array").name();
 
         SchemaDocument reusing = desugar("  holder => { xs: [text] }", Set.of(name));
@@ -274,7 +274,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  ids => [text]");
 
         Instance instance = instanceOf(document, "ids");
-        assertEquals("array", instance.target());
+        assertEquals("meta.array", instance.target());
         assertEquals("{ element_type: text }", instanceBody(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
@@ -284,7 +284,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  entries => {text => integer}");
 
         Instance instance = instanceOf(document, "entries");
-        assertEquals("map", instance.target());
+        assertEquals("meta.map", instance.target());
         assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
@@ -355,7 +355,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  pair => [integer, text]");
 
         Instance instance = instanceOf(document, "pair");
-        assertEquals("tuple", instance.target());
+        assertEquals("meta.tuple", instance.target());
         assertEquals("[ { element_type: integer } { element_type: text } ]", tupleElements(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
@@ -377,7 +377,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  contact => (text | integer)");
 
         Instance instance = instanceOf(document, "contact");
-        assertEquals("choice", instance.target());
+        assertEquals("meta.choice", instance.target());
         assertEquals("{ variants: [text integer] }", variantsOf(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
@@ -549,7 +549,7 @@ class SchemaDesugarerTest {
                 .filter(declaration -> declaration.name().startsWith("array_p0_")).findFirst().orElseThrow();
         Instance template = assertInstanceOf(Instance.class, lifted.typeDef());
         assertEquals(List.of("p0"), template.typeParams());
-        assertEquals("array", template.target());
+        assertEquals("meta.array", template.target());
         // The open form is the closed form: one binding record, with the parameter simply standing where a
         // concrete element type would. There is no per-slot quotation to assert against.
         RecordValue payload = assertInstanceOf(RecordValue.class, template.value().coreValue());
@@ -562,7 +562,7 @@ class SchemaDesugarerTest {
         // in the AST.
         Instance boxTemplate =
                 assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
-        assertEquals("record", boxTemplate.target());
+        assertEquals("meta.record", boxTemplate.target());
         assertEquals(applicationValue(lifted.name(), "T"), fieldSlot(boxTemplate, 0, "type"));
     }
 
@@ -586,7 +586,7 @@ class SchemaDesugarerTest {
         Instance template = assertInstanceOf(Instance.class,
                 document.body().declarations().get("vector").typeDef());
         assertEquals(List.of("T"), template.typeParams(), "the declaration's own parameters, as written");
-        assertEquals("array", template.target());
+        assertEquals("meta.array", template.target());
     }
 
     /** A concrete form inside a template still lifts closed: D5 has one rule, and the parameters do not enter it. */
@@ -613,7 +613,7 @@ class SchemaDesugarerTest {
                   holder => { b: box<text> }""");
 
         Instance box = assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
-        assertEquals("record", box.target());
+        assertEquals("meta.record", box.target());
         assertEquals(List.of("T"), box.typeParams(), "the declaration's own list, as written");
         assertEquals(new TokenValue("v", TokenForm.UNQUOTED), fieldKey(box, 0),
                 "the field's name is its key in the held field map");

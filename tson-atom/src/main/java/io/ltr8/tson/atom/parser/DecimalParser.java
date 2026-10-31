@@ -14,7 +14,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Parses and validates against meta-kernel's {@code decimal_type} constructor (§5.6's {@code
+ * Parses and validates against the kernel's {@code decimal_type} constructor (§5.6's {@code
  * number} atom -- SQL's exact tier, ISO/IEC 11404 {@code scaled}). Accepts only {@code
  * integer}/{@code float} forms (§7.6) -- unlike {@link IntegerParser}, no {@code based-integer}
  * either, and unlike {@link FloatParser}, no {@code hex-float} or {@code special-value}: "{@code
@@ -32,7 +32,7 @@ public record DecimalParser(DecimalType constraints) implements AtomTypeParser<B
     /** §5.6's built-in annotation name -- {@code !number}. */
     public static final String TYPENAME = "number";
 
-    /** {@code number => !decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
+    /** {@code number => !meta.decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
     public static final DecimalParser UNCONSTRAINED = new DecimalParser(DecimalType.UNCONSTRAINED);
 
     public DecimalParser(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,

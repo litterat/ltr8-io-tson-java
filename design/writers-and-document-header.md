@@ -23,8 +23,8 @@ keeps the rest of the document. Current form only; history lives in git.
   the arguments one space apart and `>`, the canonical text `map<text list<int32>>`, a value argument keeping its
   token form. `AstWriter` writes a `ReferenceValue` through it, `TreeValueWriter` a `TsonReference`, and
   `DataClassObjectWriter` a `schema.meta.TypeRef` (a `type_kind` value): a name as its one token, as a value written
-  by name has only that spelling ([TSON-SCHEMA] §5.12), and an application as `!alias { target: result<T> }` or
-  `@application:response<order 201>` writes it. A reference some name in which is no qualified name is written as a
+  by name has only that spelling ([TSON-SCHEMA] §5.12), and an application as `!meta.alias { target: result<T> }` or
+  `@meta.application:response<order 201>` writes it. A reference some name in which is no qualified name is written as a
   quoted string, never as bare text that would not read back.
 - `DataClassObjectWriter` writes a `Namespace` as the map it holds: each key keeps its annotations and is bare where
   it is an identifier, quoted otherwise; a value is tagged only where its class carries `@Typename`, which is what

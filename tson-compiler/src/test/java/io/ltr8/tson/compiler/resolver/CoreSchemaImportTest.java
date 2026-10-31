@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The same proof {@link MetaSchemaImportTest} gives for meta.tn, one rung further up the schema
- * ladder: registers meta-kernel explicitly (its own well-known bootstrap case, per {@link
+ * ladder: registers the kernel explicitly (its own well-known bootstrap case, per {@link
  * TsonCompiledMetaRegistry}'s own Javadoc), then loads meta.tn and {@code core.tn} through
  * the fully generic fetch-parse-resolve-register-compile path -- exactly the sequence {@link
  * TsonBundledSchemas}'s own class Javadoc documents as the intended way to load this library's
@@ -50,13 +50,13 @@ class CoreSchemaImportTest {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
-        // meta.tn's own !!import needs meta-kernel present in the *shared* registry first --
-        // meta-kernel's own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry
+        // meta.tn's own !!import needs the kernel present in the *shared* registry first --
+        // the kernel's own bootstrap case (loader.load(META_ID)) is never cached in registry
         // itself (see TsonCompiledMetaRegistry's own Javadoc), so it's registered separately,
         // resolved ordinarily against this same loader (whose own bootstrap branch supplies the
         // structure namespace).
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
+                TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(resolvedMetaKernel);
 
@@ -76,13 +76,13 @@ class CoreSchemaImportTest {
 
         TsonSchema core = registered.get().schema();
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.CORE_ID);
-        assertEquals(30, core.entries().keySet().stream().filter(name -> registered.get().originOf(name).equals(own))
+        assertEquals(51, core.entries().keySet().stream().filter(name -> registered.get().originOf(name).equals(own))
                 .count(), "expected every core.tn declaration to resolve");
 
-        // A representative spread of core.tn's own real declarations -- atom refinements
-        // (int32/positive_integer) and constructor applications (hex, float32, email, complex, unknown) --
-        // all genuinely present in the validated, registered namespace, which also holds meta.tn's and the
-        // kernel's entries: core.tn imports meta.tn, which imports the kernel (§2.2.3).
+        // A representative spread of core.tn's own real declarations -- its 21 aliases of the kernel's entries, atom
+        // refinements (int32) and constructor applications (float32, email, complex) -- all genuinely present in the
+        // validated, registered namespace, which also holds the kernel's entries under `meta`: core.tn imports the
+        // kernel (§2.2.3).
         assertTrue(core.entries().containsKey("int32"));
         assertTrue(core.entries().containsKey("uint8"));
         assertTrue(core.entries().containsKey("bytes"));
@@ -91,10 +91,14 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("email"));
         assertTrue(core.entries().containsKey("complex"));
         assertTrue(core.entries().containsKey("declared"));
-        assertTrue(core.entries().containsKey("record_field"));
+        assertTrue(core.entries().containsKey("meta.record_field"));
+        assertTrue(core.entries().containsKey("text"));
     }
 
-    /** The network families are net.tn's, beside its host name, and core claims none of their names. */
+    /**
+     * The network families are net.tn's: their instances at its root, beside its host name, their constructors under
+     * its {@code net}, and core claims none of their names.
+     */
     @Test
     void theNetworkFamiliesAreNetTnsAndNotCores() {
         TsonSchemaRegistry schemaRegistry = loadMetaKernelMetaAndCore().schemaRegistry();
@@ -105,7 +109,9 @@ class CoreSchemaImportTest {
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.NET_ID);
         TsonLinkedSchema linkedNet = schemaRegistry.get(TsonBundledSchemas.NET_ID).orElseThrow();
         assertEquals(network, net.entries().keySet().stream().filter(name -> linkedNet.originOf(name).equals(own))
+                .filter(name -> !name.equals("net") && !name.startsWith("net.") && !name.startsWith("array_"))
                 .collect(java.util.stream.Collectors.toSet()));
+        assertTrue(net.entries().containsKey("net.ipv4_type"));
         assertTrue(network.stream().noneMatch(core.entries()::containsKey), "core declares a network name");
     }
 

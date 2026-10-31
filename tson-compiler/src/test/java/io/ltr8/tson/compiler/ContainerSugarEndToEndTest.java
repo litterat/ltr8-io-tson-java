@@ -199,7 +199,7 @@ class ContainerSugarEndToEndTest {
         assertNotNull(compile("  holder => { xs: [text] }"));
         assertNotNull(compile("  ids => [text]"));
         assertNotNull(compile("""
-                  text_set => !set_type { element_type: text }
+                  text_set => !meta.set_type { element_type: text }
                   holder => { xs: text_set }"""));
     }
 
@@ -212,7 +212,7 @@ class ContainerSugarEndToEndTest {
     @Test
     void aSetCarriesItsOwnTightenedDefaultsNotArrays() {
         ArrayBody asSet = assertInstanceOf(ArrayBody.class,
-                compile("  xs => !set_type { element_type: text }").schema().entries().get("xs"));
+                compile("  xs => !meta.set_type { element_type: text }").schema().entries().get("xs"));
         assertFalse(asSet.ordered());
         assertTrue(asSet.uniqueItems());
 
@@ -239,7 +239,7 @@ class ContainerSugarEndToEndTest {
         assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
         assertEquals(List.of(), TypeChain.supertypesOf(entry),
                 "empty: this is a construction of `array`, and a constructor is not a supertype");
-        assertEquals(Optional.of("array"), compiled.schema().constructorOf("tag_list"),
+        assertEquals(Optional.of("meta.array"), compiled.schema().constructorOf("tag_list"),
                 "the constructor the sugar names");
 
         // !array { element_type: text  min_items: 1  max_items: 2 } -- only the fields the form binds; the
@@ -256,7 +256,7 @@ class ContainerSugarEndToEndTest {
         TsonCompiledSchema compiled = compile("  index => {text => text; 1..2}");
         Top entry = compiled.schema().entries().get("index");
 
-        assertEquals(Optional.of("map"), compiled.schema().constructorOf("index"));
+        assertEquals(Optional.of("meta.map"), compiled.schema().constructorOf("index"));
         MapBody body = assertInstanceOf(MapBody.class, entry);
         assertEquals(Optional.of(BigInteger.ONE), body.minItems());
         assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
@@ -392,14 +392,14 @@ class ContainerSugarEndToEndTest {
      */
     @Test
     void enumMembersAreIdentifiersAndAtLeastOneAndUnique() {
-        assertNotNull(compile("  e => !enum [OPEN DONE]"));
+        assertNotNull(compile("  e => !meta.enum [OPEN DONE]"));
 
-        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !enum []"))
+        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !meta.enum []"))
                 .getMessage().contains("fewer than the minimum 1"));
         assertTrue(assertThrows(SchemaValidationException.class,
-                () -> compile("  e => !enum [\"in progress\" DONE]"))
+                () -> compile("  e => !meta.enum [\"in progress\" DONE]"))
                 .getMessage().contains("U+0020 at index 2 cannot appear in an identifier"));
-        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !enum [OPEN OPEN]"))
+        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !meta.enum [OPEN OPEN]"))
                 .getMessage().contains("requires unique elements"));
     }
 
@@ -433,7 +433,7 @@ class ContainerSugarEndToEndTest {
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(box.fields().values().stream().toList().get(0).type().name()));
 
-        assertEquals(TypeRef.of("text"), array.elementType());
+        assertEquals(TypeRef.of("meta.text"), array.elementType());
     }
 
     /**
@@ -534,16 +534,16 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * A container constructor's own name at an application head resolves -- the kernel's {@code map} is in every
-     * closure reaching core -- and is refused as what it is: a constructor, closed, taking no type arguments. An
-     * author writing {@code map<text, text>} out of habit is told to drop the arguments, and the sugar
+     * A container constructor's own name at an application head resolves -- the kernel's {@code meta.map} is in
+     * every closure reaching core -- and is refused as what it is: a constructor, closed, taking no type arguments.
+     * An author writing {@code meta.map<text, text>} is told to drop the arguments, and the sugar
      * {@code {text => text}} is the spelling.
      */
     @Test
     void aContainerConstructorsNameAtAHeadTakesNoArguments() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("  holder => { entries: map<text, text> }"));
+                () -> compile("  holder => { entries: meta.map<text, text> }"));
 
-        assertTrue(thrown.getMessage().contains("'map' declares no type parameters"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'meta.map' declares no type parameters"), thrown.getMessage());
     }
 }

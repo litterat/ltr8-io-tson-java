@@ -48,7 +48,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
      * than the text {@code "true"}. The general rule still decides the <em>form</em> -- a JSON boolean or a JSON
      * string, matched on content -- and only the host value differs, exactly as it does on the TSON side.
      */
-    static final ValueReaderFactory ENUM = (name, definition, context) -> "boolean".equals(name)
+    static final ValueReaderFactory ENUM = (name, definition, context) -> "meta.boolean".equals(name)
             ? new AtomReader<>(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
                     () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
                     AtomForm.BOOLEAN, context.locationOf(name), null)

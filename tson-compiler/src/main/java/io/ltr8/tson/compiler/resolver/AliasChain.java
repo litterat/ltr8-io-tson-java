@@ -51,6 +51,33 @@ public final class AliasChain {
     }
 
     /**
+     * Whether {@code annotations} holds one whose name reaches {@code target} through its alias hops: {@code
+     * @disjoint} under core's alias and {@code @meta.disjoint} alike name the kernel's {@code meta.disjoint}, itself
+     * an alias of {@code meta.void}, so the walk asks whether {@code target} is on the chain, not at its end.
+     */
+    public static boolean annotates(io.ltr8.annotation.Annotations annotations, String target,
+                                    Map<String, ? extends Top> entries) {
+        return annotations.values().stream().anyMatch(a -> passesThrough(a.name(), target, entries));
+    }
+
+    /** Whether {@code name}'s alias chain, {@code name} itself included, holds {@code target}. */
+    public static boolean passesThrough(String name, String target, Map<String, ? extends Top> entries) {
+        Set<String> walked = new LinkedHashSet<>();
+        String current = name;
+        while (walked.add(current)) {
+            if (current.equals(target)) {
+                return true;
+            }
+            if (entries.get(current) instanceof Alias alias && alias.target().arguments().isEmpty()) {
+                current = alias.target().name();
+                continue;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    /**
      * The same walk over a namespace still being built, which has a lookup rather than a finished map --
      * {@code TemplateMaterialiser} normalises an application's arguments through this while resolution runs.
      */
@@ -71,7 +98,7 @@ public final class AliasChain {
 
     /**
      * Whether {@code name}'s chain ends at a {@code void} -- the kernel's, core's sibling, or any other {@code
-     * !void_type} -- told by the body's constructor rather than by the name the chain ends at.
+     * !meta.void_type} -- told by the body's constructor rather than by the name the chain ends at.
      */
     public static boolean resolvesToVoid(String name, Map<String, ? extends Top> entries) {
         return terminalDefinition(name, entries).map(d -> d instanceof VoidType).orElse(false);

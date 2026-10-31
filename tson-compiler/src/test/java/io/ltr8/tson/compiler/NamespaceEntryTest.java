@@ -44,16 +44,16 @@ class NamespaceEntryTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/meta-api.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  status_name => identifier
-                  method    => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
-                                 replies?: {status_name => kind<record>} }
-                  api       => !namespace { key_type: identifier  value_type: method }
-                  http_verb => !enum [GET POST]
-                  route     => { verb: http_verb  path: text  handler: ref<method> }
-                  router    => !namespace { key_type: identifier  value_type: route }
+                  status_name => meta.identifier
+                  method    => { request?: meta.kind<meta.record>  response?: meta.type_kind
+                                 errors?: [meta.kind<meta.record>]
+                                 replies?: {status_name => meta.kind<meta.record>} }
+                  api       => !meta.namespace { key_type: meta.identifier  value_type: method }
+                  http_verb => !meta.enum [GET POST]
+                  route     => { verb: http_verb  path: meta.text  handler: meta.ref<method> }
+                  router    => !meta.namespace { key_type: meta.identifier  value_type: route }
                 }
                 """);
     }
@@ -135,12 +135,12 @@ class NamespaceEntryTest {
     @Test
     void aKeyKeepsItsAnnotations() {
         String id = schema("annotated", """
-                documented => !api { @doc:"lists the orders" list => { response: order_list } }""");
+                documented => !api { @meta.doc:"lists the orders" list => { response: order_list } }""");
         assertEquals(List.of(), problems(id));
         Namespace<?> documented = assertInstanceOf(Namespace.class,
                 valueOf(registry().resolveLinked(id).schema().entries().get("documented")));
         AnnotatedMap<String, ?> entries = documented.entries();
-        assertTrue(entries.getAnnotations("list").has("doc"), entries.annotatedKeys().toString());
+        assertTrue(entries.getAnnotations("list").has("meta.doc"), entries.annotatedKeys().toString());
     }
 
     // ── The walk ──────────────────────────────────────────────────────────────────────────────────────
@@ -223,7 +223,7 @@ class NamespaceEntryTest {
     /** The kernel's {@code namespace} is a constructor: an application of it declares a namespace type. */
     @Test
     void theNamespaceConstructorBuildsANamespaceType() {
-        String id = schema("constructed", "more => !namespace { key_type: identifier  value_type: text }");
+        String id = schema("constructed", "more => !meta.namespace { key_type: identifier  value_type: text }");
         assertEquals(List.of(), problems(id));
         TsonLinkedSchema linked = registry().resolveLinked(id);
         assertEquals(EntryKind.PRODUCT, linked.kindOf("more"));
@@ -273,9 +273,9 @@ class NamespaceEntryTest {
     @Test
     void aNamespaceTypeIsAMemberOfItsKindsAndANamespaceEntryOfNone() {
         TsonLinkedSchema linked = registry().resolveLinked(schema("kinds", """
-                namespaces => kind<namespace>
-                types      => kind<type>
-                records    => kind<record>"""));
+                namespaces => kind<meta.namespace>
+                types      => kind<meta.type>
+                records    => kind<meta.record>"""));
 
         assertTrue(members(linked, "namespaces").contains("api"), members(linked, "namespaces").toString());
         assertTrue(members(linked, "types").contains("api"), members(linked, "types").toString());
@@ -317,7 +317,7 @@ class NamespaceEntryTest {
         assertTrue(flat.contains("place_order => { request: order response: order }"), written);
 
         // Read as a schema map, a value of the kernel's `schema`, whose names resolve in the map itself.
-        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META).compiledSchema().find("schema").orElseThrow()
+        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META).compiledSchema().find("meta.schema").orElseThrow()
                 .read(TestDocuments.document("!schema { myapi => " + written + " }"));
         assertEquals(((ValueEntry) myapi).value(), read.get("myapi"));
     }

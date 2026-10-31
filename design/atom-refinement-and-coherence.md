@@ -77,7 +77,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   time. It asks the **container** families the same question through `Product.coherenceCheck()`, the
   structural twin: `min_items` above `max_items` admits no value of any length, and an array and a map share
   the one rule since they carry the identical pair. Stating it on the family rather than with any one
-  spelling is what makes `[text; 5..3]` and the `!array { … min_items: 5 max_items: 3 }` body it denotes get
+  spelling is what makes `[text; 5..3]` and the `!meta.array { … min_items: 5 max_items: 3 }` body it denotes get
   the same verdict — they are one type, and a rule kept in the desugar phase would only ever see the
   first. `TsonSchemaLinker` asks it a second time for the entries **materialisation** mints, which
   resolution never produced: §8.2's "family coherence rules whose operands were parameters" is exactly a

@@ -9,7 +9,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.Optional;
 
 /**
- * Parses a reference that names values -- an instance of the meta-kernel's {@code reference} whose {@code of} is no
+ * Parses a reference that names values -- an instance of the kernel's {@code reference} whose {@code of} is no
  * constructor, spelled {@code ref<method>} or {@code kind<method>} alike. A value is a qualified name, segments between
  * dots, each a [TSON-DATA] §7.7 identifier, read into the {@link TypeRef} it is; a value is no type, so it takes no
  * argument list. What the name reaches is judged where it resolves, when the schema links, never here, so this

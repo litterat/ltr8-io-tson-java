@@ -46,13 +46,13 @@ class SchemaNameAnnotationTest {
         return core.resolveLinked(id);
     }
 
-    /** Bound through the type §6 says the name refers to -- {@code doc => documentation => text}, so a String. */
+    /** Bound through the type §6 says the name refers to -- {@code meta.doc => @meta.annotation meta.text}, a String. */
     @Test
     void aDeclarationsDocArrivesAsAString() {
         Namespace<Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
 
         assertEquals("128-bit identifier per RFC 9562.",
-                core.getAnnotations("uuid").value("doc", String.class).orElseThrow());
+                core.getAnnotations("uuid").value("meta.doc", String.class).orElseThrow());
     }
 
     /** The plain-key interface is untouched, which is the whole point of the facade. */
@@ -66,7 +66,8 @@ class SchemaNameAnnotationTest {
     }
 
     /**
-     * Every entry core.tn declares is documented, and the annotations survive resolution *and* linking --
+     * Every entry core.tn declares is documented, its aliases of the kernel's entries aside, and the annotations
+     * survive resolution *and* linking --
      * the linker rebuilds its entry map several times over, so this is the pass that would silently lose
      * them.
      */
@@ -76,35 +77,36 @@ class SchemaNameAnnotationTest {
         Namespace<Top> core = linked.schema().entries();
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.CORE_ID);
 
-        List<String> declared = core.keySet().stream().filter(k -> linked.originOf(k).equals(own)).toList();
-        long documented = declared.stream().filter(k -> core.getAnnotations(k).has("doc")).count();
+        List<String> declared = core.keySet().stream().filter(k -> linked.originOf(k).equals(own))
+                .filter(k -> !(core.get(k) instanceof io.ltr8.tson.schema.meta.Alias)).toList();
+        long documented = declared.stream().filter(k -> core.getAnnotations(k).has("meta.doc")).count();
         assertEquals(declared.size(), documented, "core.tn documents every declaration it makes");
     }
 
     /** An imported name keeps the documentation its own schema resolved, not the importer's. */
     @Test
     void animportedNameKeepsItsOwnDocumentation() {
-        Namespace<Top> meta = entriesOf(TsonBundledSchemas.META_ID);
-        Namespace<Top> kernel = entriesOf(TsonBundledSchemas.META_KERNEL_ID);
+        Namespace<Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
+        Namespace<Top> kernel = entriesOf(TsonBundledSchemas.META_ID);
 
-        // schema is the meta-kernel's own declaration, reached by meta.tn through its !!import.
-        assertEquals(kernel.getAnnotations("schema").value("doc", String.class),
-                meta.getAnnotations("schema").value("doc", String.class));
-        assertTrue(meta.getAnnotations("schema").has("doc"));
+        // meta.schema is the kernel's own declaration, reached by core.tn through its !!import.
+        assertEquals(kernel.getAnnotations("meta.schema").value("meta.doc", String.class),
+                core.getAnnotations("meta.schema").value("meta.doc", String.class));
+        assertTrue(core.getAnnotations("meta.schema").has("meta.doc"));
     }
 
     /**
-     * §6's split, held: {@code synthetic => @annotation void} writes its marker after {@code =>}, so it is
+     * §6's split, held: {@code synthetic => @meta.annotation meta.void} writes its marker after {@code =>}, so it is
      * the definition's, while the {@code @doc} above the name is the name's. Neither is hoisted onto the
      * other.
      */
     @Test
     void nameAndDefinitionAnnotationsStaySeparate() {
-        Namespace<Top> kernel = entriesOf(TsonBundledSchemas.META_KERNEL_ID);
+        Namespace<Top> kernel = entriesOf(TsonBundledSchemas.META_ID);
 
-        Annotations onValue = factsOf(TsonBundledSchemas.META_KERNEL_ID, "synthetic").annotations();
-        assertTrue(onValue.has("annotation"), "the definition's own marker");
-        assertTrue(kernel.getAnnotations("synthetic").has("doc"), "the name's own documentation");
-        assertTrue(onValue.value("doc", String.class).isEmpty(), "not hoisted onto the definition");
+        Annotations onValue = factsOf(TsonBundledSchemas.META_ID, "meta.synthetic").annotations();
+        assertTrue(onValue.has("meta.annotation"), "the definition's own marker");
+        assertTrue(kernel.getAnnotations("meta.synthetic").has("meta.doc"), "the name's own documentation");
+        assertTrue(onValue.value("meta.doc", String.class).isEmpty(), "not hoisted onto the definition");
     }
 }

@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * [TSON-DATA] §7.7's identifier grammar -- the {@link IdentifierProfile} every naming position of the series uses
  * ({@link #PROFILE}) -- and §8.2's restricted-character rule over it. Type names, field names, parameter names and
- * enum members are all judged here; other profiles are what the meta-kernel's {@code identifier_type} constructs,
+ * enum members are all judged here; other profiles are what the kernel's {@code identifier_type} constructs,
  * for naming positions of an outside system.
  *
  * <p><b>The profile is</b>
@@ -49,7 +49,7 @@ import java.util.Optional;
 public final class IdentifierGrammar {
 
     /**
-     * [TSON-DATA] §7.7's profile: {@code XID_Start}, {@code XID_Continue ∪ { - }}, NFC. Built from the meta-kernel's
+     * [TSON-DATA] §7.7's profile: {@code XID_Start}, {@code XID_Continue ∪ { - }}, NFC. Built from the kernel's
      * {@code identifier} ({@link IdentifierType#IDENTIFIER}), which declares it, so the series names with one
      * definition.
      */

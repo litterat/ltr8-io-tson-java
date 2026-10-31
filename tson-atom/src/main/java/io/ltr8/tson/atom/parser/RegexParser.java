@@ -10,7 +10,7 @@ import io.ltr8.regex.IRegexSyntaxException;
 import io.ltr8.tson.schema.meta.RegexType;
 
 /**
- * Parses and validates against meta-kernel's {@code regex_type} constructor ({@code ~text_type &
+ * Parses and validates against the kernel's {@code regex_type} constructor ({@code ~text_type &
  * atom_specification & { spec: = "https://www.rfc-editor.org/rfc/rfc9485" }}) -- reuses {@link
  * TextParser}'s length/pattern constraint checks (applied to the regex's own source text, not what it
  * matches) via composition rather than duplicating them, and additionally requires that text to be a valid
@@ -33,7 +33,7 @@ import io.ltr8.tson.schema.meta.RegexType;
  */
 public record RegexParser(RegexType constraints) implements AtomTypeParser<String> {
 
-    /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
+    /** {@code regex => !meta.regex_type {}} -- the unconstrained regex type. */
     public static final RegexParser UNCONSTRAINED = new RegexParser(RegexType.UNCONSTRAINED);
 
     @Override

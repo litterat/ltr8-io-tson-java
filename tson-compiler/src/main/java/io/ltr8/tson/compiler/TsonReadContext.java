@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -205,7 +206,7 @@ public interface TsonReadContext {
     record FieldNameRule(String typeName, AtomType<?> type, IdentifierProfile profile, Normalization form) {
 
         /** The kernel's {@code field_name}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
-        public static final FieldNameRule FIELD_NAME = new FieldNameRule("field_name",
+        public static final FieldNameRule FIELD_NAME = new FieldNameRule(KernelNames.of("field_name"),
                 AtomParsers.forType(IdentifierType.IDENTIFIER).orElseThrow(), IdentifierGrammar.PROFILE,
                 Normalization.NFC);
 

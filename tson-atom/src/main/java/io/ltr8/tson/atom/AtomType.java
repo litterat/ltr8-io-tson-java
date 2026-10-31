@@ -4,7 +4,7 @@ import java.util.Optional;
 
 /**
  * A built-in vocabulary atom's parsing contract (§5.2): "which tokens it accepts, and what host
- * value results." One implementation per meta-kernel/meta type constructor that the built-in
+ * value results." One implementation per kernel type constructor that the built-in
  * vocabulary (§5) actually surfaces as a schemaless annotation -- e.g. {@code integer_type} backs
  * {@code IntegerParser}. A single instance is a fully-parameterized *instance* of that constructor,
  * exactly mirroring the schema's own constructor/instance split: {@code int32}'s entry in the

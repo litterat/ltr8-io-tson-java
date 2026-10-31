@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.schema.KernelNames;
 import java.util.Optional;
 
 import io.ltr8.tson.base.Diagnostic;
@@ -76,7 +77,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * neither member is refused as the enum miss it is: {@code ATOM_CONSTRAINT_VIOLATION}, the code every
      * other enum reports.
      */
-    static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) -> "boolean".equals(name)
+    static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) -> KernelNames.of("boolean").equals(name)
             ? AtomTypeReader.of(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
                     () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
                     context.locationOf(name))

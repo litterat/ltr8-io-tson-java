@@ -2123,11 +2123,10 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/38/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/38/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/38/tson-guide |
-| meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/39/m/meta-kernel.tn?sha256=027f89e2242ac5a19b3b9eb3142755c012e3be5c39b3be2d2eef5debc648c77a |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/39/m/meta.tn?sha256=55a8dbae4b2c4ce42df05657c1a9f810817eb87a1b1467758d3ea3f82eb2474f |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/39/m/core.tn?sha256=53ded46a759a3906f536adec3fd90444734944f04e34533ede786f12a3189e1b |
-| net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/39/m/net.tn?sha256=8d125b8f15dc82f6f1bb3dec2165981f7d31241725921c397bf1841eb7f99e46 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/39/m/policy.tn?sha256=5e77fc2729d0d61c7d7ce9f68d74763efaf734f142b9fcd9862585796b1d7168 |
+| meta.tn | TSON Meta-Schema, the pre-loaded kernel (companion artifact) | https://tson.io/2026/39/m/meta.tn?sha256=0335e318a8ea9b3a9e108ac6b0ef6cf930def8353ce3cafbb241d4c037cacd54 |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/39/m/core.tn?sha256=6d57f04f65608aab13769156208c59087b7a3ab3fab695f9b10c0e7a3659f8e0 |
+| net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/39/m/net.tn?sha256=b78221075ed3dbb9411d3d90a39d09f759d98a08dba15f5252dc333cb70d0322 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/39/m/policy.tn?sha256=36c6d94a3423c62d0d963c84020a794567d3d471b344ea6b4652c959e695db6b |
 
 ### 13.3 Informative References
 
@@ -2138,5 +2137,5 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | ISO 8601-1:2019 | Date and time — Representations for information interchange (the informative source behind RFC 3339 Appendix A) | https://www.iso.org/standard/70907.html |
 | JSON Schema 2020-12 | JSON Schema: A Media Type for Describing JSON Documents | https://json-schema.org/specification |
 | W3C XSD Part 2 | XML Schema Part 2: Datatypes Second Edition | https://www.w3.org/TR/xmlschema-2/ |
-| Resolver Output Fixtures | meta-kernel-resolved.tn, meta-resolved.tn, core-resolved.tn, net-resolved.tn (non-normative) | &lt;published alongside this document&gt; |
+| Resolver Output Fixtures | meta-resolved.tn, core-resolved.tn, net-resolved.tn (non-normative) | &lt;published alongside this document&gt; |
 

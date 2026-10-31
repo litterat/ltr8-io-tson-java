@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Parses and validates against meta-kernel's {@code integer_type} constructor (§5.6's integer
+ * Parses and validates against the kernel's {@code integer_type} constructor (§5.6's integer
  * atoms; not yet {@code number}, {@code float32}/{@code float64}, {@code rational}, or {@code
  * complex} -- those are backed by different constructors, {@code decimal_type}/{@code float_type}/
  * {@code rational_type}/{@code complex_type}, and are separate work). Holds a {@link

@@ -11,7 +11,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
 - **An entry is a type exactly when its value is built by a constructor** (IS-A `top`, `EntryKind.isConstructor`).
   `name => !T { … }` with `T` a constructor builds a type; with `T` any other type of the closure -- a record type, a
   namespace type -- the entry is a value of `T` (`ValueEntry(type, value)`, `EntryKind.VALUE`), read against `T` as a
-  data value is and marked by nothing but its tag. A record component, `!record_field { … }`, is a value entry too.
+  data value is and marked by nothing but its tag. A record component, `!meta.record_field { … }`, is a value entry too.
 - **A value of `schema` declares instead** (SPEC-FEEDBACK.md #14). `geo => !schema { … }` is a schema map nested as an
   entry: the parser reads its payload as schema grammar, never as a value body, and its members are declarations of
   the document under their paths. It is held as a `ValueEntry` of `schema` whose `Namespace` is derived from those
@@ -21,9 +21,10 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   is exhaustive with an explicit `ValueEntry` arm and no `default`: `EntryKind.of`, `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
 - **`namespace` is a constructor under `product`**, and a namespace type is an instance of it, resolved to a
-  `NamespaceBody` (`key_type` optional, `value_type`, `ordered`): `schema => !namespace { key_type: type_name
-  value_type: declared }`, `field_map => !namespace { value_type: record_field  ordered: true }`, a schema's own
-  `api => !namespace { key_type: identifier  value_type: method }`. A value of one is the map its facets describe
+  `NamespaceBody` (`key_type` optional, `value_type`, `ordered`): the kernel's `schema => !meta.namespace { key_type:
+  meta.type_name  value_type: meta.declared }` and `field_map => !meta.namespace { value_type: meta.record_field
+  ordered: true }`, a schema's own
+  `api => !meta.namespace { key_type: identifier  value_type: method }`. A value of one is the map its facets describe
   (`NamespaceBody.read()`), and nothing else: a field beside the facets is refused by `namespace`'s own record reader.
 - A stated `key_type` is a member of `identifier_kind`, judged at link (`validateBody`). An absent one means the host
   of a value supplies the family: keys read as `text` (`NamespaceBody.HOST_KEYS`) and are judged by the host, as a
@@ -36,8 +37,8 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
 - A value entry is refused at every type position, in one sentence (`ValuesByName.aValueNoType`): a reference in a
   type declaration (`validateTypeRef`), a kind-typed slot in a value body (`judgeMember`). A data tag naming one
   compiles to a `ValueEntryReader` and is `TYPE_MISMATCH`.
-- **One bind context serves schemas and data** (`Tson.dataBindContext()`, `SchemaMetaNameBinder.over`): a name
-  meta-kernel.tn or meta.tn declares binds to the schema model, every other to the consumer's binder, so a value entry
+- **One bind context serves schemas and data** (`Tson.dataBindContext()`, `SchemaMetaNameBinder.over`): a name under the
+  kernel's `meta` or net.tn's `net` binds to the schema model, every other to the consumer's binder, so a value entry
   binds to the consumer's class by the type's name. **A value entry no class binds is held as a `TsonValue`**, read in
   tree mode (the declaring schema's `TsonCompiledSchemaLoader.treeVocabularyOf`, or for a type of the same document
   `compileReady(…, tree)`), so the schema loads and validates. The bind registry refuses such an entry in the closure it
@@ -75,7 +76,7 @@ Related: `design/linking-and-compilation.md` (link order and values by name), `d
 ## Types and values in one map (§4.1)
 
 The schema map is a value of the kernel's namespace type `schema`, whose `value_type` is `declared`: each entry's
-value names its type by its tag. `declared_type => sum & {}` and `declared => !declared_type {}` are the kernel's, so
+value names its type by its tag. `declared_type => sum & {}` and `declared => !meta.declared_type {}` are the kernel's, so
 the schema map's own type is closed over the kernel alone (`design/declared-positions.md`). A tag naming a
 constructor builds a type; a tag naming any other type builds a value of it. `top` is the root of the constructors
 only, never of what an entry holds.
@@ -87,9 +88,9 @@ value:
 
 ```
 method    => { request?: kind<record>  response?: type_kind  errors?: [kind<record>] }
-interface => !namespace { key_type: method_name  value_type: method }
+interface => !meta.namespace { key_type: method_name  value_type: method }
 binding   => { method: ref<method>  verb: http_verb  route: text }
-bindings  => !namespace { key_type: identifier  value_type: binding }
+bindings  => !meta.namespace { key_type: identifier  value_type: binding }
 ```
 
 `orders => !interface { place_order => { request: place_order_request  response: order } }` and `routes => !bindings
@@ -103,13 +104,13 @@ rule for what a schema map holds and what a data document holds, and keeps `Top`
 `ValueEntry` mirrors a kernel constructor, and `ValueEntry` wraps a value whose type the schema declares.
 
 **A namespace type declares only its facets.** `namespace`'s own record reader refuses any other field, so
-`api => !namespace { key_type: identifier  value_type: method  extends: [a] }` fails at the read ("unknown field").
+`api => !meta.namespace { key_type: identifier  value_type: method  extends: [a] }` fails at the read ("unknown field").
 A construct with fields of its own and a map of members is a record holding both, under a namespace type's key:
 
 ```
-method_map => !namespace { key_type: method_name  value_type: method }
+method_map => !meta.namespace { key_type: method_name  value_type: method }
 interface  => { extends?: [type_name]  methods: method_map }
-interfaces => !namespace { key_type: identifier  value_type: interface }
+interfaces => !meta.namespace { key_type: identifier  value_type: interface }
 ```
 
 **Not a refinement of `map`.** §5.7 forbids a refinement to make a required field optional, and `map`'s `key_type`
@@ -145,13 +146,13 @@ identifier-typed value is a name (`design/name-hygiene-and-minted-names.md`).
 
 `Tson.of` builds one `DataBindContext` from the configured one (`SchemaMetaNameBinder.over`): the consumer's binder,
 profile and atoms (`DataBindContext.toBuilder`, `nameBinder`), composed with `SchemaMetaNameBinder.INSTANCE`, which
-answers for exactly the declarations of meta-kernel.tn and meta.tn (read from the bundled sources) -- so a kernel name
-can never be rebound, and a consumer's `token` is the consumer's although `schema.meta` has a `Token` -- and the
-schema model's own registrations added where absent (`ResolverBindContext.registerAbsent`). The resolution core
-resolves schemas through it and the bind registry reads data through it, so `create_order => !operation { … }` and a
-data document's `!operation { … }` bind to the same class. A class implements nothing; `@Typename` is needed only
-where the binder's convention would not find it. `SchemaMetaNameBinder.extendedWith`/`contextExtendedWith` build the
-same composition for a caller assembling a context themselves.
+answers for exactly the members of meta.tn's `meta` and net.tn's `net` (read from the bundled sources), each by its last
+segment -- so a kernel name can never be rebound, and a consumer's `token` is the consumer's although `schema.meta` has
+a `Token` -- and the schema model's own registrations added where absent (`ResolverBindContext.registerAbsent`). The
+resolution core resolves schemas through it and the bind registry reads data through it, so `create_order => !operation
+{ … }` and a data document's `!operation { … }` bind to the same class. A class implements nothing; `@Typename` is
+needed only where the binder's convention would not find it. `SchemaMetaNameBinder.extendedWith`/`contextExtendedWith`
+build the same composition for a caller assembling a context themselves.
 
 **No class is a tree, not an error, until something binds.** `SchemaResolver` reads the payload in bind mode; a
 `MissingBindingException` there reads it again through `treeVocabularyOf(origin)`, the declaring schema compiled in
@@ -186,7 +187,7 @@ refused under a `String` exactly as under a `TypeRef`.
 
 **In a data document a kind is judged by membership**, over the reading document's closure, and a value's qualified
 name at a reference over any other type is `NOT_IMPLEMENTED` at read (nothing links a data document). So a data
-document importing only meta.tn that writes `!record_field { type: int32 }` is refused, `int32` being core's
+document importing only meta.tn that writes `!meta.record_field { type: int32 }` is refused, `int32` being core's
 (`design/kinds-and-name-types.md`).
 
 ## The walk: by key and by field (`ValuesByName`)
@@ -248,5 +249,5 @@ A schema declaring `method` puts its shared types beside it -- a `status_code` a
 schema importing it names them: an `!!import` contributes its whole namespace (SPEC-FEEDBACK.md #7). The cost is
 reservation: every name in the closure is taken, so a schema importing core.tn cannot declare `identifier`, `record`,
 `namespace` or `title` of its own (`MetaLayerVocabularyTest`). The one thing a schema cannot do is hold a value of a
-type it declares itself: `!api { … }` beside `api => !namespace { … }` waits on `api` being resolved first, which
+type it declares itself: `!api { … }` beside `api => !meta.namespace { … }` waits on `api` being resolved first, which
 outside the kernel's bootstrap is a gap.

@@ -16,7 +16,7 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
 - `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
   *unquoted*.
 - Only a *template* is normalised to a held body; a closed record or closed alias resolves at its declaration. A
-  record template's normalised `!record { … }` payload is bound by the resolver into the open record it denotes
+  record template's normalised `!meta.record { … }` payload is bound by the resolver into the open record it denotes
   (`DefinitionResolver.openRecord`).
 - Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
   facts at their `record_field` defaults.
@@ -31,7 +31,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 - **Which entry a form lifts to is §5.3's one lift rule, and the enclosing declaration's parameters do not
   enter it.** A form naming none of them lifts *closed*, template or not; a form naming one lifts *open* — an
   `Instance` carrying just the parameters it uses, with the position that held it applying them straight
-  back (`<T> { a: [T] }` injects `array_p0_… => <p0> !array { element_type: p0 }` and the field becomes
+  back (`<T> { a: [T] }` injects `array_p0_… => <p0> !meta.array { element_type: p0 }` and the field becomes
   `array_p0_…<T>`). So `<T> { a: [T]  b: [order] }` injects one of each, and only the first waits for
   materialisation.
   - **The parameters are renamed positionally**, because two forms alike up to a consistent renaming are one
@@ -84,7 +84,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 ## Parameterised aliases
 
 - **A parameterised alias is normalised here as well** (§5.10's partial application). `uuid_pair => <B>
-  pair<text, B>` leaves this phase as `<B> !alias { target: pair<text B> }` — §8.1's own reading of what
+  pair<text, B>` leaves this phase as `<B> !meta.alias { target: pair<text B> }` — §8.1's own reading of what
   an alias body is, spellable because the kernel's `alias.target` is a reference, which may carry arguments.
   With it no open form is anything but a constructor application: §12.1's
   `[type-params] "!" type-name ws core-value` covers every template and one walk closes them all.
@@ -95,8 +95,8 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 ## Record templates
 
 - **A record template is normalised here too, and for the same reason the sugar forms are** (`recordBinding`).
-  §5.2 says a bare record body denotes `!record { fields: { … } }`, so `test => <T> { x: T }` leaves this
-  phase as `test => <T> !record { fields: { x => { type: T } } }` — a held application like `<T> [T]`, and
+  §5.2 says a bare record body denotes `!meta.record { fields: { … } }`, so `test => <T> { x: T }` leaves this
+  phase as `test => <T> !meta.record { fields: { x => { type: T } } }` — a held application like `<T> [T]`, and
   closed by the same process. The rule is as fixed and as closed as the sugar table: §5.2's six field
   spellings decide `state` and `value` from the two marks the author wrote, and nothing else is consulted.
   - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because

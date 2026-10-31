@@ -19,7 +19,7 @@ import java.util.Optional;
  * {@code regex_type} is declared by the identical composition and differs only in the document {@code
  * spec} is fixed to.
  */
-@Typename(name = "email_type")
+@Typename(name = "meta.email_type")
 public record EmailType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                          @Field("max_length") Optional<Integer> maxLength,
@@ -42,7 +42,7 @@ public record EmailType(TypeChain chain,
         return new EmailType(chain, spec, minLength, maxLength, length, pattern, members, normalization);
     }
 
-    /** {@code email => !email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */
+    /** {@code email => !meta.email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */
     public static final EmailType UNCONSTRAINED = new EmailType(
             "https://www.rfc-editor.org/rfc/rfc5322", Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE);

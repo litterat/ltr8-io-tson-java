@@ -130,7 +130,7 @@ class ApplicationInContainerPositionTest {
 
         assertEquals(TypeRef.of(instantiation), children.elementType(), "the knot");
         assertEquals(Optional.of(BigInteger.ONE), children.minItems());
-        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries().get(instantiation))
+        assertEquals(TypeRef.of("meta.text"), ((RecordBody) compiled.schema().entries().get(instantiation))
                 .fields().values().stream().toList().get(0).type(), "T bound at the value field too");
     }
 
@@ -234,7 +234,7 @@ class ApplicationInContainerPositionTest {
 
         String form = fieldType(compiled, "a", "g");
         assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(form));
-        assertEquals(Optional.of("array"), compiled.schema().constructorOf(form),
+        assertEquals(Optional.of("meta.array"), compiled.schema().constructorOf(form),
                 "the form stays an instance of the constructor it builds");
         assertEquals(form, fieldType(compiled, "direct", "d"), "the grid is the form written out");
         assertTrue(compiled.schema().applicationOf(form).isEmpty(), "no entry records the application");
@@ -254,7 +254,7 @@ class ApplicationInContainerPositionTest {
         String instantiation = fieldType(compiled, "use", "n");
         Alias hop = assertInstanceOf(Alias.class, compiled.schema().entries().get(instantiation));
         assertEquals("nested", compiled.schema().applicationOf(instantiation).orElseThrow().name());
-        assertEquals(Optional.of("choice"), compiled.schema().constructorOf(hop.target().name()));
+        assertEquals(Optional.of("meta.choice"), compiled.schema().constructorOf(hop.target().name()));
     }
 
     /**
@@ -388,7 +388,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
                 compiled.schema().entries().get(outer.elementType().name()));
 
-        assertEquals(TypeRef.of("text"), inner.elementType());
+        assertEquals(TypeRef.of("meta.text"), inner.elementType());
     }
 
     /**
@@ -411,7 +411,7 @@ class ApplicationInContainerPositionTest {
         Top instantiation = compiled.schema().entries().get(array.elementType().name());
 
         assertEquals(List.of(), OpenEntry.parameterNames(instantiation), "closed");
-        assertEquals(TypeRef.of("text"), ((RecordBody) instantiation).fields()
+        assertEquals(TypeRef.of("meta.text"), ((RecordBody) instantiation).fields()
                 .values().stream().toList().get(0).type(),
                 "T bound");
         assertNotNull(compiled.get("box_carrier")
@@ -443,7 +443,7 @@ class ApplicationInContainerPositionTest {
     @Test
     void aValueArgumentInAClosedContainerKeepsItsToken() {
         TsonCompiledSchema compiled = compile("""
-                  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
                   holder => { p: [vector<float32, 3>] }""");
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "holder", "p"));
@@ -465,7 +465,7 @@ class ApplicationInContainerPositionTest {
      */
     @Test
     void aQuotedValueArgumentIsADifferentApplicationFromABareOne() {
-        String vector = "  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }\n";
+        String vector = "  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }\n";
         TsonCompiledSchema bare = compile(vector + "  holder => { p: [vector<float32, 3>] }");
         TsonCompiledSchema quoted = compile(vector + "  holder => { p: [vector<float32, \"3\">] }");
 
@@ -483,7 +483,7 @@ class ApplicationInContainerPositionTest {
         MapBody map = assertInstanceOf(MapBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, "m", "entries")));
 
-        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries()
+        assertEquals(TypeRef.of("meta.text"), ((RecordBody) compiled.schema().entries()
                 .get(map.valueType().name())).fields().values().stream().toList().get(0).type());
     }
 

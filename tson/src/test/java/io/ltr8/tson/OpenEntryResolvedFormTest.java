@@ -87,7 +87,7 @@ class OpenEntryResolvedFormTest {
     @Test
     void everyPublishedResolvedFixtureValidatesAgainstItsGoverningSchema() throws Exception {
         Tson tson = tson();
-        for (String fixture : List.of("meta-kernel-resolved.tn", "meta-resolved.tn", "core-resolved.tn")) {
+        for (String fixture : List.of("meta-resolved.tn", "core-resolved.tn")) {
             List<Diagnostic> diagnostics =
                     ResolvedForm.validateResolved(tson, Files.readString(specDirectory().resolve(fixture)));
             assertEquals(List.of(), diagnostics, () -> fixture + " does not validate against the schema it names");
@@ -118,11 +118,11 @@ class OpenEntryResolvedFormTest {
     @Test
     void anOpenEntryWithAValueParameterValidates() {
         assertEquals(List.of(), ResolvedForm.validateResolved(tson(), """
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  vector => !template {
-                    parameters: [ { name: T  type: type_kind } { name: N  type: non_negative_integer } ]
-                    template: "!array { element_type: T  min_items: N  max_items: N }"
+                  vector => !meta.template {
+                    parameters: [ { name: T  type: meta.type_kind } { name: N  type: meta.non_negative_integer } ]
+                    template: "!meta.array { element_type: T  min_items: N  max_items: N }"
                   }
                 }
                 """), "a value parameter has no slot to fail against once the body is held as text");
@@ -140,9 +140,9 @@ class OpenEntryResolvedFormTest {
         String resolved = """
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  e => !template {
-                    parameters: [ { name: M  type: text } ]
-                    template: "!enum { members: [a b M] }"
+                  e => !meta.template {
+                    parameters: [ { name: M  type: meta.text } ]
+                    template: "!meta.enum { members: [a b M] }"
                   }
                 }
                 """;
@@ -151,9 +151,9 @@ class OpenEntryResolvedFormTest {
         Map<String, Object> read = ResolvedForm.readResolved(tson, resolved);
 
         TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e"));
-        assertEquals("!enum { members: [a b M] }", e.template(),
+        assertEquals("!meta.enum { members: [a b M] }", e.template(),
                 "the application as written -- no third enum member spelled 'M'");
-        assertEquals(List.of(new TemplateParam("M", TypeRef.of("text"))), e.parameters());
+        assertEquals(List.of(new TemplateParam("M", TypeRef.of("meta.text"))), e.parameters());
     }
 
     // ── The biconditional an entry's parameters rest on ─────────────────
@@ -178,12 +178,12 @@ class OpenEntryResolvedFormTest {
                   uuid_pair      => <B> pair<text, B>
                   boxes          => <T> [T]
                   text_keyed_map => <V> {text => V}
-                  vec            => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  vec            => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
                   composed       => <T> base & { value: T }
                   holder         => { p: pair<text, int32>  q: vec<int32, 3> }
                 }
                 """);
-        List<String> ids = List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
+        List<String> ids = List.of(TsonBundledSchemas.META_ID,
                 TsonBundledSchemas.CORE_ID, "https://example.com/shapes.tn");
 
         List<String> broken = new ArrayList<>();
@@ -237,10 +237,10 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  port   => !integer_type { min: 0  max: 65535 }
+                  port   => !meta.integer_type { min: 0  max: 65535 }
                   age    => !int32 ^ { min: 0  max: 150 }
                   renamed => port
-                  colour => !enum [RED GREEN BLUE]
+                  colour => !meta.enum [RED GREEN BLUE]
                   point  => { x: int32  y: int32 }
                   named  => point & { label: text }
                   boxes  => [point]
@@ -255,16 +255,15 @@ class OpenEntryResolvedFormTest {
         // whose kind is its chain's base kind and not its !record body's PRODUCT.
         tson.resolve("""
                 !!id:"https://example.com/kind-constructors.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  listed      => <T> atom & { members: [T] }
-                  listed_text => listed<text>
-                  payloads     => <T> !namespace { key_type: identifier  value_type: T }
-                  iri_payloads => payloads<iri>
+                  listed      => <T> meta.atom & { members: [T] }
+                  listed_text => listed<meta.text>
+                  payloads     => <T> !meta.namespace { key_type: meta.identifier  value_type: T }
+                  iri_payloads => payloads<meta.iri>
                 }
                 """);
-        List<String> ids = List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
+        List<String> ids = List.of(TsonBundledSchemas.META_ID,
                 TsonBundledSchemas.CORE_ID, "https://example.com/kinds.tn",
                 "https://example.com/kind-constructors.tn");
 
@@ -291,11 +290,14 @@ class OpenEntryResolvedFormTest {
         for (String id : ids) {
             for (Map.Entry<String, Top> entry : perSchema.get(id).entrySet()) {
                 Top definition = entry.getValue();
+                if (io.ltr8.tson.schema.SchemaPaths.isNestedMap(definition)) {
+                    continue; // the kernel's `meta`: a value of meta.schema, whose members are checked on their own
+                }
                 if (OpenEntry.isOpen(definition)) {
                     open++;
                 }
                 closed++;
-                if (!TypeChain.supertypesOf(definition).contains("top") && !(definition instanceof Alias)
+                if (!TypeChain.supertypesOf(definition).contains("meta.top") && !(definition instanceof Alias)
                         && !OpenEntry.isOpen(definition)
                         && !perSchema.get(id).containsKey(headOf(definition))) {
                     neededTheGoverningMeta++;
@@ -331,13 +333,13 @@ class OpenEntryResolvedFormTest {
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
             return EntryKind.ALIAS;
         }
-        if (TypeChain.supertypesOf(definition).contains("top")) {
+        if (TypeChain.supertypesOf(definition).contains("meta.top")) {
             // A constructor: its kind states what its *instances* will be, not what its own body is --
             // `integer_type => atom & { ... }` has a !record body and kind ATOM.
             for (String supertype : TypeChain.supertypesOf(definition)) {
                 switch (supertype) {
-                    case "atom" -> { return EntryKind.ATOM; }
-                    case "sum" -> { return EntryKind.SUM; }
+                    case "meta.atom" -> { return EntryKind.ATOM; }
+                    case "meta.sum" -> { return EntryKind.SUM; }
                     default -> { }
                 }
             }

@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Proves {@code TsonSchemaRegistry}/{@code TsonSchemaLinker} (both in {@code tson-schema}) actually work
- * end-to-end against the real {@code meta-kernel.tn} fixture -- this test lives here, not in
+ * end-to-end against the real {@code meta.tn} fixture -- this test lives here, not in
  * {@code tson-schema}'s own test tree, because it's the only module with both {@link
  * MetaKernelBootstrapResolver} and {@code tson-schema} available (that module has no dependency on {@code
  * tson-compiler} at all).
@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Javadoc). {@code registeringTheRawBootstrapMetaKernelDirectlyIsRejected} and {@code
  * neitherRawNorLinkedBootstrapFormCanEverBeRegistered} below cover that rejection in both forms;
  * {@code registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds} covers the one way
- * meta-kernel's own identity can actually end up registered -- resolved via ordinary {@code
+ * the kernel's own identity can actually end up registered -- resolved via ordinary {@code
  * SchemaResolver.resolveSchema} (which never sets {@code bootstrap}), using the loader's own
  * bootstrap branch as the structure-namespace ground truth, mirroring {@code
  * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern.
@@ -73,18 +73,18 @@ class MetaKernelSchemaRegistryTest {
                     "expected a synthetic entry with head '" + head + "', found: " + syntheticNames);
         }
 
-        Top enumDef = linked.schema().entries().get("enum");
+        Top enumDef = linked.schema().entries().get("meta.enum");
         RecordBody enumBody = (RecordBody) enumDef;
         RecordField membersField = enumBody.fields().entrySet().stream()
                 .filter(f -> f.getKey().equals("members"))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
-        assertEquals(TypeRef.of("enum_set"), membersField.type());
+        assertEquals(TypeRef.of("meta.enum_set"), membersField.type());
     }
 
     /**
      * The raw bootstrap output, wrapped (not genuinely linked -- {@code register} only takes a
      * {@link TsonLinkedSchema} now, so there's no other way to even attempt this) is refused --
-     * meta-kernel's own {@code !!meta} names itself, so nothing can resolve it the ordinary way,
+     * the kernel's own {@code !!meta} names itself, so nothing can resolve it the ordinary way,
      * whatever form it is in.
      */
     @Test
@@ -114,22 +114,22 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.imports(), linked.schema().imports());
-        assertEquals(73, raw.entries().size());
-        assertEquals(73, linked.schema().entries().size());
+        assertEquals(103, raw.entries().size());
+        assertEquals(103, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
     }
 
     /**
-     * The one way meta-kernel's own identity can actually end up registered: resolved via ordinary
+     * The one way the kernel's own identity can actually end up registered: resolved via ordinary
      * {@code SchemaResolver.resolveSchema} against a loader whose own bootstrap branch supplies the
      * complete structure namespace (so even a forward-referencing declaration like {@code boolean =>
      * !enum [...]} resolves correctly, the same as {@code MetaKernelBootstrapResolver}'s own two-pass logic
      * achieves, just via the generic mechanism instead) -- {@code resolveSchema} never sets {@code
      * bootstrap}, so the result passes {@link TsonSchemaRegistry#register}'s guard even though its own
-     * entries are identical to the real, linked meta-kernel. Mirrors {@code
-     * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern, scoped down to meta-kernel alone.
+     * entries are identical to the real, linked the kernel. Mirrors {@code
+     * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern, scoped down to the kernel alone.
      */
     @Test
     void registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds() {
@@ -139,13 +139,13 @@ class MetaKernelSchemaRegistryTest {
         TsonCompiledMetaRegistry compiledRegistry = new TsonCompiledMetaRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
-        String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
+        String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
         TsonSchema resolved = new SchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(73, registered.schema().entries().size());
+        assertEquals(103, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

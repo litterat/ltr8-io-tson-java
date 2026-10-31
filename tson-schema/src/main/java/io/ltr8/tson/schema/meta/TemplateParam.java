@@ -24,11 +24,11 @@ import java.util.Optional;
  * <p>A {@code type} may name an earlier parameter of the same template -- {@code <T, N> { w?: T ~ N }} records
  * {@code N}'s type as {@code T} -- since the value's type is whatever that parameter's argument names.
  */
-@Typename(name = "template_param")
+@Typename(name = "meta.template_param")
 public record TemplateParam(String name, TypeRef type, Optional<TypeRef> bound) {
 
     /** The kind of the types, {@code kind<type>}: what a type parameter's argument is read as, a type name. */
-    public static final TypeRef TYPE_KIND = TypeRef.of("type_kind");
+    public static final TypeRef TYPE_KIND = TypeRef.of("meta.type_kind");
 
     @Record
     public TemplateParam {

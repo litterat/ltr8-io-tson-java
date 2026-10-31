@@ -3,7 +3,7 @@ package io.ltr8.tson.base.atom;
 import java.math.BigDecimal;
 
 /**
- * meta-kernel's {@code complex} host value -- a real/imaginary pair. {@code complex_type.component}
+ * the kernel's {@code complex} host value -- a real/imaginary pair. {@code complex_type.component}
  * (meta.tn) selects the type of both parts from a closed vocabulary (default {@code NUMBER}, i.e.
  * exact {@link BigDecimal}; {@code INTEGER}/{@code RATIONAL}/{@code FLOAT32}/{@code FLOAT64} are the
  * other members) -- this class only implements the default ({@code NUMBER}) case, since {@code

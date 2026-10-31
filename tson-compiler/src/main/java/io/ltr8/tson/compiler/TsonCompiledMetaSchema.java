@@ -68,8 +68,8 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
 
     /**
      * Reads an instance of {@code name}, a constructor in this schema's namespace -- {@code name} is the
-     * declaration's own name (e.g. {@code "record"}), not necessarily its resolved body's own constructor name
-     * (though for every meta-kernel/meta.tn declaration the two are identical).
+     * declaration's own name (e.g. {@code "meta.record"}), not necessarily its resolved body's own constructor name
+     * (though for every kernel declaration the two are identical).
      */
     public TsonTypeReader<?> reader(String name) {
         TsonTypeReader<?> constructor = constructors.get(name);
@@ -117,9 +117,9 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
     }
 
     /**
-     * The constructor name a resolved body identifies as -- its own {@code @Typename}, e.g. {@code
-     * "record"}/{@code "float_type"}. Package-private so {@link TsonSchemaCompiler} dispatches a body to its factory
-     * the same way this class scopes one. A value entry is built by no constructor and is never dispatched.
+     * The constructor name a resolved body identifies as -- its own {@code @Typename}, e.g. {@code "meta.record"}/{@code
+     * "meta.float_type"}. Package-private so {@link TsonSchemaCompiler} dispatches a body to its factory the same way
+     * this class scopes one. A value entry is built by no constructor and is never dispatched.
      */
     static String typenameOf(Top body) {
         Typename typename = body.getClass().getAnnotation(Typename.class);

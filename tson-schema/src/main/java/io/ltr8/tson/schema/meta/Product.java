@@ -3,7 +3,7 @@ package io.ltr8.tson.schema.meta;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code product => type & { access_pattern: ... size_type: ... } }} base kind
+ * The kernel's {@code product => type & { access_pattern: ... size_type: ... } }} base kind
  * (Part 2 §4.1) -- every PRODUCT-kind {@link Top} variant IS-A this: {@link RecordBody},
  * {@link ArrayBody} (and {@code set}, which refines it), {@link MapBody}, and {@link TupleBody} --
  * exactly {@code record}/{@code array}/
@@ -24,7 +24,7 @@ public sealed interface Product extends Type permits RecordBody, ArrayBody, MapB
      * why they share {@link AtomCoherence}'s own comparison rather than each spelling it.
      *
      * <p><b>Stated here rather than where a container is written.</b> [TSON-SCHEMA] §5.3's size specifier and
-     * the explicit {@code !array { ... min_items: ... }} body denote the same type, and a rule that lived
+     * the explicit {@code !meta.array { ... min_items: ... }} body denote the same type, and a rule that lived
      * with either spelling would refuse one and admit the other. §8.2's materialisation-time check has the
      * same need from a third direction -- bounds that were parameters when the template was written -- and
      * reaches the same rule here.

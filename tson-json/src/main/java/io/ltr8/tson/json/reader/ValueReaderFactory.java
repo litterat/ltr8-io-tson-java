@@ -6,7 +6,7 @@ import io.ltr8.tson.schema.meta.Top;
 /**
  * Builds the {@link JsonTypeReader} for one resolved schema entry -- the unit of work {@link
  * ValueReaderFactoryRegistry} dispatches to, keyed by the entry's resolved body's constructor name
- * ({@code "record"}, {@code "array"}, {@code "integer_type"}).
+ * ({@code "meta.record"}, {@code "meta.array"}, {@code "meta.integer_type"}).
  *
  * <p>{@code name} is the <em>declaration's</em> own name, not the constructor's: the two coincide only for a
  * meta-schema's own declarations, and every other declaration differs ({@code float32}, constructed via

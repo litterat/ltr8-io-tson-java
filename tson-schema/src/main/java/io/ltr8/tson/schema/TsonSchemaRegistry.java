@@ -34,13 +34,13 @@ import java.util.Optional;
  * <p><b>{@link #register} refuses any schema whose {@link TsonSchema#bootstrap()} is {@code true}</b> -- the
  * kernel's pre-loaded form ([TSON-SCHEMA] §3.4). {@code bootstrap()} is a real, stored flag that only {@code
  * MetaKernelBootstrapResolver.getMetaKernelSchema()} ever sets, so this guard keeps proving, continuously,
- * that meta-kernel's own identity can only ever be registered by something that genuinely came
+ * that the kernel's own identity can only ever be registered by something that genuinely came
  * from the real bootstrap reader -- not just something shaped like it. {@code
  * TsonSchemaLinker.linkBootstrap} is the one sanctioned way to turn the raw bootstrap form into a
  * {@link TsonLinkedSchema} without this rejection -- it lives there because it's a linking operation,
  * not a storage one, and this registry never stores its own result anyway
  * (a caller that also needs it *persisted* under its own identity still can't register that result
- * directly -- it's still {@code bootstrap() == true}); the one way meta-kernel's own identity can
+ * directly -- it's still {@code bootstrap() == true}); the one way the kernel's own identity can
  * actually be registered is resolving its document a second time, ordinarily (never setting {@code
  * bootstrap}), against a coordinator seeded from the one-off linked bootstrap result.
  */
@@ -107,7 +107,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
         TsonSchema unwrapped = schema.schema();
         if (unwrapped.bootstrap()) {
             throw new SchemaValidationException("'" + unwrapped.id() + "' is the kernel's pre-loaded form "
-                    + "(bootstrap() == true) -- meta-kernel's own identity "
+                    + "(bootstrap() == true) -- the kernel's own identity "
                     + "must be registered via a schema resolved ordinarily (TsonSchemaResolver.resolveSchema,"
                     + " which never sets bootstrap), never the bootstrap-produced form directly, "
                     + "materialized or not");

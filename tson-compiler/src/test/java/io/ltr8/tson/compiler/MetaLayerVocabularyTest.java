@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>The wiring, in full, is three things</b> -- there is nothing else to register:
  * <ol>
- *   <li>a meta-layer schema chaining {@code !!meta} to meta-kernel and declaring a record
+ *   <li>a meta-layer schema chaining {@code !!meta} to the kernel and declaring a record
  *       {@code operation => { ... }} and a namespace of it, {@code operations => !namespace { ... }}
  *       ({@link #META_HTTP_SCHEMA});</li>
  *   <li>a Java class for {@code operation} ({@link Operation}), a plain record;</li>
@@ -57,23 +57,22 @@ class MetaLayerVocabularyTest {
     /** (1) The meta-layer schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               operation => {
-                path:     text
-                method:   text
-                request:  type_kind
-                response: type_kind
+                path:     meta.text
+                method:   meta.text
+                request:  meta.type_kind
+                response: meta.type_kind
               }
-              operations => !namespace { key_type: identifier  value_type: operation }
+              operations => !meta.namespace { key_type: meta.identifier  value_type: operation }
               webhook => {
-                path:     text
-                delivers?: [type_kind]?
+                path:     meta.text
+                delivers?: [meta.type_kind]?
               }
-              webhooks    => !namespace { key_type: identifier  value_type: webhook }
-              status_code => text
-              plain       => { a: text }
+              webhooks    => !meta.namespace { key_type: meta.identifier  value_type: webhook }
+              status_code => meta.text
+              plain       => { a: meta.text }
               envelope    => <T> { body: T }
               pair        => <A, B> { a: A  b: B }
             }
@@ -165,11 +164,11 @@ class MetaLayerVocabularyTest {
     @Test
     void aComponentOfATypeBuildsAValueOfIt() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> linked("component", "  bad => !record_field { name: x  type: text }"));
+                () -> linked("component", "  bad => !meta.record_field { name: x  type: text }"));
 
-        assertTrue(thrown.getMessage().contains("the body is no value of the type 'record_field'")
+        assertTrue(thrown.getMessage().contains("the body is no value of the type 'meta.record_field'")
                 && thrown.getMessage().contains("unknown field 'name'"), thrown.getMessage());
-        assertEquals(EntryKind.VALUE, linked("component-value", "  good => !record_field { type: text }")
+        assertEquals(EntryKind.VALUE, linked("component-value", "  good => !meta.record_field { type: text }")
                 .kindOf("good"));
     }
 
@@ -185,14 +184,15 @@ class MetaLayerVocabularyTest {
         DataNameBinder binder = SchemaMetaNameBinder.extendedWith(CONSUMER_NAMES);
         assertEquals(Operation.class, binder.resolve("operation"),
                 "the name binder is the whole of the registration");
-        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("record"),
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("meta.record"),
                 "and the library's own vocabulary still resolves through it");
 
         Object read = core(consumerContext()).loadMeta(META_HTTP).compiledSchema().find("operation")
                 .orElseThrow()
-                .read(TestDocuments.document("{ path: \"/p\"  method: \"GET\"  request: text  response: integer }"));
+                .read(TestDocuments.document(
+                        "{ path: \"/p\"  method: \"GET\"  request: meta.text  response: meta.integer }"));
 
-        assertEquals(new Operation("/p", "GET", TypeRef.of("text"), TypeRef.of("integer")), read);
+        assertEquals(new Operation("/p", "GET", TypeRef.of("meta.text"), TypeRef.of("meta.integer")), read);
     }
 
     /**
@@ -265,7 +265,7 @@ class MetaLayerVocabularyTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("badtype", SEARCH.replace("method: \"GET\"", "method: [1 2 3]")));
 
-        assertTrue(thrown.getMessage().contains("expected a token for 'text'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("expected a token for 'meta.text'"), thrown.getMessage());
     }
 
     /** A value whose optional list of names is written links: the class declares nothing, so there is nothing to guard. */

@@ -42,21 +42,21 @@ class AliasChainTest {
 
     private static Top kernelEntry(String name) {
         return tson().bindRegistry().core()
-                .resolveLinked(TsonBundledSchemas.META_KERNEL_ID).schema().entries().get(name);
+                .resolveLinked(TsonBundledSchemas.META_ID).schema().entries().get(name);
     }
 
     /** The kernel's own case: {@code template_param.name} is declared {@code param_name} and stays it. */
     @Test
     void aKernelAliasAtAFieldTypeNamesWhatWasWritten() {
-        TypeRef name = fieldType(kernelEntry("template_param"), "name");
-        assertEquals("param_name", name.name());
+        TypeRef name = fieldType(kernelEntry("meta.template_param"), "name");
+        assertEquals("meta.param_name", name.name());
         assertTrue(name.annotations().isEmpty(), "nothing is attached to record where it points");
     }
 
     /** A position naming something that is not an alias is unaffected, as it always was. */
     @Test
     void aNonAliasIsUnaffected() {
-        assertEquals("type_kind", fieldType(kernelEntry("record_field"), "type").name());
+        assertEquals("meta.type_kind", fieldType(kernelEntry("meta.record_field"), "type").name());
     }
 
     private static final String CHAIN = """

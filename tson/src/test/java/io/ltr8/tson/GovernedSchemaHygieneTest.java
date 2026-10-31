@@ -39,13 +39,12 @@ class GovernedSchemaHygieneTest {
     private static final String META_ID = "https://example.test/2026/39/iface-meta-1.tn";
     private static final String META = """
             !!id:"https://example.test/2026/39/iface-meta-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              method_name => identifier
-              iface       => { methods: {method_name => text} }
-              ifaces      => !namespace { key_type: identifier  value_type: iface }
-              routes      => @annotation {method_name => text}
+              method_name => meta.identifier
+              iface       => { methods: {method_name => meta.text} }
+              ifaces      => !meta.namespace { key_type: meta.identifier  value_type: iface }
+              routes      => @meta.annotation {method_name => meta.text}
             }""";
 
     private static final String DATA_ID = "https://example.test/2026/39/iface-data-1.tn";
@@ -54,7 +53,7 @@ class GovernedSchemaHygieneTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              slug  => !identifier_type { continue_add: "-" }
+              slug  => !meta.identifier_type { continue_add: "-" }
               method_name => slug
               iface       => { methods: {method_name => text} }
             }""";

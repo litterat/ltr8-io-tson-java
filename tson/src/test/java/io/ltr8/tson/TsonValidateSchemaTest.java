@@ -216,8 +216,8 @@ class TsonValidateSchemaTest {
     @Test
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
         assertStaysWithTheApplier("box<3>",
-                "'box<...>' substitutes into a body that is not valid data for 'record', the constructor's "
-                        + "own constraint vocabulary -- 'type_kind': '3' is no reference -- '3' is no name: '3': "
+                "'box<...>' substitutes into a body that is not valid data for 'meta.record', the constructor's "
+                        + "own constraint vocabulary -- 'meta.type_kind': '3' is no reference -- '3' is no name: '3': "
                         + "U+0033 at index 0 cannot start an identifier -- an identifier never begins with a digit or "
                         + "a sign");
     }
@@ -510,7 +510,7 @@ class TsonValidateSchemaTest {
         String lib = """
                 !!id:"https://example.test/its-real-name.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !schema { widget => { name: text } }
+                !schema { widget => { name: meta.text } }
                 """;
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(uri -> {

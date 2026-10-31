@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta-kernel's {@code float_type} constructor (§5.6's {@code
+ * Parses and validates against the kernel's {@code float_type} constructor (§5.6's {@code
  * float32}/{@code float64} atoms -- SQL's approximate tier, IEEE 754-2019). Accepts {@code
  * integer}/{@code float}/{@code hex-float}/{@code special-value} forms (§7.6) -- the integer atoms'
  * {@code based-integer} is *not* accepted here, and {@code hex-float} *is*, the reverse of {@link
@@ -33,14 +33,14 @@ import java.util.Optional;
  * loses the sign), while parsing the text directly preserves it correctly.
  *
  * <p>{@code min}/{@code exclusiveMin}/{@code max}/{@code exclusiveMax} are checked against the
- * already-rounded value, not "before rounding" as meta-kernel's own doc for the numeric tiers
+ * already-rounded value, not "before rounding" as the kernel's own doc for the numeric tiers
  * prescribes -- no built-in instance ({@code float32}/{@code float64} both leave every constraint at
  * its default) exercises this path today, so exact pre-rounding bound checking is deferred until a
  * schema (Part 2) actually needs it rather than implemented speculatively.
  */
 public record FloatParser(FloatType constraints) implements AtomTypeParser<Number> {
 
-    /** {@code float32 => !float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin. */
+    /** {@code float32 => !meta.float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin. */
     public static final FloatParser FLOAT32 = new FloatParser(FloatType.FLOAT32);
     public static final FloatParser FLOAT64 = new FloatParser(FloatType.FLOAT64);
 

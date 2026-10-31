@@ -31,7 +31,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
 
 - **`TsonCompiledMetaRegistry`** is the shared **meta/resolution core**, and *is* the on-demand
   `TsonCompiledSchemaLoader`. It owns the paired `TsonSchemaRegistry`, a bind-mode resolver, a
-  `SchemaSource`, content-hash verification, and the meta-kernel bootstrap. Its loader interface:
+  `SchemaSource`, content-hash verification, and the kernel's bootstrap. Its loader interface:
   `resolveLinked(uri) → TsonLinkedSchema` (an `!!import` target, or a user schema —
   fetched/resolved/linked/registered), and `loadMeta(uri)` / `vocabularyOf(identity) → TsonCompiledMetaSchema`,
   a schema's **compiled vocabulary**: the readers a schema importing it reads a `!C { … }` body or an annotation
@@ -42,12 +42,12 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   pending, tree)` compiles a resolution in progress, its document's entries ready so far, in either mode, neither
   registered nor cached: what a value read against an entry of the same document is read through (`WaitOrder`).
   Any schema compiles to one (`TsonCompiledMetaSchema.compile`), **on first use and cached per identity**, never
-  per closure: a schema applying only the kernel's and meta.tn's constructors reaches exactly those two compiled
-  schemas, and core.tn, net.tn and policy.tn are compiled here only if something applies a constructor or an
-  annotation type they declare. `withStandardLibrary(context, source)` builds a core with the five bundled schemas
-  resolved and registered (meta-kernel, meta, core, net, policy); an overload takes the identifier policy and the
+  per closure: a schema applying only the kernel's constructors reaches exactly the kernel's compiled schema, and
+  core.tn, net.tn and policy.tn are compiled here only if something applies a constructor or an annotation type they
+  declare. `withStandardLibrary(context, source)` builds a core with the four bundled schemas resolved and registered
+  (meta, the kernel, then core, net, policy); an overload takes the identifier policy and the
   `LimitsPolicy` user schemas resolve under (`limits()`, whose wait depth `SchemaResolver` counts), and the bundled
-  schemas resolve under the defaults whatever is configured, so a deployment cannot break them. The meta-kernel is
+  schemas resolve under the defaults whatever is configured, so a deployment cannot break them. The kernel is
   always read from `TsonBundledSchemas`, whatever the `SchemaSource`: it is the revision the library was built for.
 - **`TsonCompiledSchemaRegistry`** is a **per-mode registry of compiled user schemas** over a core, built
   via `TsonCompiledSchemaRegistry.tree(core)` / `bind(core, context)`. **The read mode is which registry
@@ -57,15 +57,15 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   that schema's own compilation, several are linked as a schema with no entries of its own importing each (a name
   two declare differently being §2.2.3's collision), under a derived identity never registered, and compiled once
   per set.
-- **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A
-  schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue`
-  can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile
-  runs in the registry's mode (one factory set, no scoping: linking already established that every head the
-  schema applies is in its namespace). The core and the bind read registry share one `DataBindContext`, the
-  configured one composed with `SchemaMetaNameBinder.INSTANCE`, which owns the names meta-kernel.tn and meta.tn
-  declare (`SchemaMetaNameBinder.over`, `design/front-door-and-config.md`), so a schema's value entry and a data document's
-  value of the same type bind to the same class. A user schema importing core.tn gets core.tn's entries merged into
-  its own linked form (by `link`) and compiled inline in the read registry's mode.
+- **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A schema's own
+  `!meta.enum`/`!meta.integer_type` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue` can't
+  stand in — so every read registry shares the one bind-mode core for resolution; only the final compile runs in the
+  registry's mode (one factory set, no scoping: linking already established that every head the schema applies is in its
+  namespace). The core and the bind read registry share one `DataBindContext`, the configured one composed with
+  `SchemaMetaNameBinder.INSTANCE`, which owns the names under the kernel's `meta` and net.tn's `net`
+  (`SchemaMetaNameBinder.over`, `design/front-door-and-config.md`), so a schema's value entry and a data document's
+  value of the same type bind to the same class. A user schema importing core.tn gets core.tn's entries merged into its
+  own linked form (by `link`) and compiled inline in the read registry's mode.
 - **A schema obtained to bind holds no tree.** The bind registry's `get(uri)`, `get(uri, receiver)`, `get(imports,
   receiver)` and `compile(linked)` refuse a value entry of the compiled closure that the core held as a tree, an
   instance of a constructor of no types included (`refuseUnbound`): `MissingBindingException`, a `BIND_MISMATCH` naming

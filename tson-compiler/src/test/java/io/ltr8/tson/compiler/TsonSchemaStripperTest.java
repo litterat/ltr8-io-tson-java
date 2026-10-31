@@ -58,7 +58,7 @@ class TsonSchemaStripperTest {
     @Test
     void keepingDocsDropsOnlyTheComments() {
         String schema = """
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 @doc:"Shapes."
                 !schema {
                   @doc:"A point." @title:"Point" @comment:"Kept in step with shapes-1."
@@ -67,7 +67,7 @@ class TsonSchemaStripperTest {
                 """;
 
         assertEquals("""
-                !!import:"39/meta"
+                !!import:"39/core"
                 @doc:"Shapes." !schema {
                 @doc:"A point." @title:"Point" point => { @examples:[1.0 2.5] x: float64 }
                 }
@@ -79,10 +79,10 @@ class TsonSchemaStripperTest {
     void keepsAdjacencyAsWritten() {
         String schema = """
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !schema {   pair    =>   {   a?:text~"x"     b:  array<int32>  }   }
+                !schema {   pair    =>   {   a?:meta.text~"x"     b:  meta.array<int32>  }   }
                 """;
 
-        assertEquals("!!import:\"39/meta\"\n!schema {\npair => { a?:text~\"x\" b: array<int32> }\n}\n",
+        assertEquals("!!import:\"39/meta\"\n!schema {\npair => { a?:meta.text~\"x\" b: meta.array<int32> }\n}\n",
                 TsonSchemaStripper.strip(schema));
     }
 
@@ -90,7 +90,7 @@ class TsonSchemaStripperTest {
     @Test
     void rewritesAMultiLineTokenSingleLine() {
         String schema = """
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
                   @title:\"""
                     Two "quoted"
@@ -100,7 +100,7 @@ class TsonSchemaStripperTest {
                 }
                 """;
 
-        assertEquals("!!import:\"39/meta\"\n!schema {\n@title:\"Two \\\"quoted\\\"\\nlines\" thing => int32\n}\n",
+        assertEquals("!!import:\"39/core\"\n!schema {\n@title:\"Two \\\"quoted\\\"\\nlines\" thing => int32\n}\n",
                 TsonSchemaStripper.stripKeepingDocs(schema));
     }
 
@@ -109,7 +109,7 @@ class TsonSchemaStripperTest {
     void shortensOnlyTheSpecLibrary() {
         String schema = """
                 !!import:"http://tson.io/2026/39/m/meta.tn%s"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 !!import:"https://tson.io/2026/39/x/core.tn"
                 !!import:"https://example.test/2026/39/m/core.tn"
                 !schema { thing => int32 }
@@ -117,7 +117,7 @@ class TsonSchemaStripperTest {
 
         assertEquals("""
                 !!import:"39/meta"
-                !!import:"39/meta-kernel"
+                !!import:"39/core"
                 !!import:"https://tson.io/2026/39/x/core.tn"
                 !!import:"https://example.test/2026/39/m/core.tn"
                 !schema {
@@ -128,16 +128,16 @@ class TsonSchemaStripperTest {
 
     @Test
     void stripsEveryBundledSchemaToValidSyntax() {
-        for (String id : List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
+        for (String id : List.of(TsonBundledSchemas.META_ID,
                 TsonBundledSchemas.CORE_ID)) {
             String source = TsonBundledSchemas.fetch(id);
             String stripped = TsonSchemaStripper.strip(source);
 
             assertTrue(stripped.length() < source.length() / 2, id);
-            assertFalse(stripped.contains("@doc"), id);
-            assertFalse(stripped.contains("@comment"), id);
-            assertFalse(stripped.contains("@title"), id);
-            assertFalse(stripped.contains("@examples"), id);
+            assertFalse(stripped.contains("@doc") || stripped.contains("@meta.doc"), id);
+            assertFalse(stripped.contains("@comment") || stripped.contains("@meta.comment"), id);
+            assertFalse(stripped.contains("@title") || stripped.contains("@meta.title"), id);
+            assertFalse(stripped.contains("@examples") || stripped.contains("@meta.examples"), id);
             assertFalse(stripped.contains("sha256"), id);
             assertTrue(stripped.lines().allMatch(line -> line.equals("}") || !line.isBlank()), id);
         }
@@ -147,13 +147,13 @@ class TsonSchemaStripperTest {
     @Test
     void startsEachDeclarationOnItsOwnLine() {
         String schema = """
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema { @doc:"Paired." @title:"Pair" pair => <A, B> { first: A second: B } @deprecated old => int32
                   @doc:"Last." last => { @examples:{ a => 1 } m?: int32 } }
                 """;
 
         assertEquals("""
-                !!import:"39/meta"
+                !!import:"39/core"
                 !schema {
                 pair => <A, B> { first: A second: B }
                 @deprecated old => int32

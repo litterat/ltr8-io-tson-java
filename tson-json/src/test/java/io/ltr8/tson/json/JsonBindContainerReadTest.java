@@ -70,7 +70,7 @@ class JsonBindContainerReadTest {
                 byPoint:  {point => text}
               }
               sorted => { tags: set<text> }
-              ranked => !map { key_type: text  value_type: int32  ordered: true }
+              ranked => !meta.map { key_type: text  value_type: int32  ordered: true }
               league => { table: ranked }
             }
             """;

@@ -20,16 +20,16 @@ Related: `design/cli-config-hashing.md` (bundled schemas, restamping), `design/c
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
 copy. `spec/` holds local snapshots for quick reference: `spec/tson-part1-data.md`,
-`spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core,net,policy}.tn` (the spec's own bundled
-schema documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core, network and
-policy libraries built on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat
-`spec/` as a cache, not a source of truth — with **two** standing exceptions. The five `.tn` schemas are
+`spec/tson-part2-schema.md`, and `spec/m/{meta,core,net,policy}.tn` (the spec's own bundled
+schema documents — the kernel, every declaration under its `meta`, and the core, network and policy libraries built
+on it) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat
+`spec/` as a cache, not a source of truth — with **two** standing exceptions. The four `.tn` schemas are
 **packaged from here at build time**, so they are the live copies rather than a snapshot. And
 **`spec/tson-part3-json.md` is editable in place**: see "Part 3 is drafted here" below.
 
 On `main` the bundled schemas carry **Revision 38 identities** (`https://tson.io/2026/38/m/*.tn`); on
 `r2026-39-proposal` they carry Revision 39's (`/2026/39/m/`). `spec/` holds
-**Revision 38** of Parts 1 and 2, a cache, not edited here except for §13.2's five artifact rows,
+**Revision 38** of Parts 1 and 2, a cache, not edited here except for §13.2's artifact rows,
 so the table names the bytes beside it and stays checkable; its Part 1 and Guide rows stay at the revision
 those documents actually are. **§13.2 is one more pin to move** whenever the artifacts change.
 `scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins, and the spec
@@ -49,17 +49,20 @@ concern**: the library verifies the packaged bytes against `TsonBundledSchemas`'
 one stale constant fails `Tson.standard()` and with it most of the suite. Restamping after each edit is what
 lets a schema change land across several commits with the integrity checks left on.
 
-**The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
-`@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
-does it: every entry must read back into `schema.meta`, have a counterpart here and resolve identically,
-and every schema-map key must carry the same annotations (`@ordering`, `@bounded`, `@exact`, `@numeric`,
-`@synthetic`). `@doc` is not compared: a fixture keeps only its header note for the reader and leaves entry
-docs out, since it exists to be compared and a summary of a source doc only drifts from it. **Key annotations
-are compared from the parsed text**, never through the bound document, which drops them, so both sides would
-carry none and agree for the wrong reason. They are the only external statement of what a conforming resolver
-produces. Keep them in step with the `.tn` beside them. A fixture's header is its source's and its root is
-`!schema`; nothing marks it resolved, so `ResolvedFixtureTest` reads it as one (`parseResolvedForm()`, or
-`withImports(imports).readAs(text, "schema")`), the kernel's form, which imports nothing, under the pre-loaded kernel.
+**The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own `@doc` — "Parse
+the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest` does it: every entry must read
+back into `schema.meta`, have a counterpart here and resolve identically, and every schema-map key must carry the same
+annotations (`@meta.ordering`, `@meta.bounded`, `@meta.exact`, `@meta.numeric`, `@meta.synthetic`). `@meta.doc` is not
+compared: a fixture keeps only its header note for the reader and leaves entry docs out, since it exists to be compared
+and a summary of a source doc only drifts from it. **Key annotations are compared from the parsed text**, never through
+the bound document, which drops them, so both sides would carry none and agree for the wrong reason. They are the only
+external statement of what a conforming resolver produces. Keep them in step with the `.tn` beside them. A fixture's
+header is its source's and its root is `!schema`, the spelling of the kernel's `meta.schema`; nothing marks it resolved,
+so `ResolvedFixtureTest` reads it as one (`parseResolvedForm()`, or `withImports(imports).readAs(text, "meta.schema")`),
+the kernel's form, which imports nothing, under the pre-loaded kernel. The kernel's form, `meta-resolved.tn`, writes the
+map `meta` nested, tagged `!meta.schema`, its six synthetics at the root. A fixture holding an instance of a constructor
+its own source declares (net.tn's `ipv4 => !net.ipv4_type {}`) is read beside its source, a resolved form being read
+under its source's imports and not over its own entries (`SPEC-FEEDBACK.md #4`).
 
 ### Writing the bundled schemas' docs
 
@@ -70,7 +73,7 @@ the schemas ship in the library and are read as the normative vocabulary, so an 
 - **Stays:** what the entry is, and for a type its value space — which values, how equality and ordering work; what
   each field or facet means, with its unit; coherence rules and schema-load/resolver errors; refinement rules (what a
   refinement may set, tighten, never change); defaults and what omission yields; cross-layer name-resolution facts
-  (a kernel or meta.tn name every schema importing core reaches, and so cannot redeclare); how TSON text spells a value,
+  (a name core reaches at its root, or `meta`, which every schema importing core reserves); how TSON text spells a value,
   said by name; mappings a converter needs (JSON Schema `number`, a host language's closed-set construct); one short
   example where the spelling is not obvious; the spec citations attached to sentences that stay.
 - **Goes:** history ("earlier revisions called", "was removed", "unchanged", "now", "remains"); rationale ("because",

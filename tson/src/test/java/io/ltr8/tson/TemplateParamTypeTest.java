@@ -29,11 +29,11 @@ class TemplateParamTypeTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               percent  => !integer ^ { min: 0  max: 100 }
-              vector   => <T, N> !array { element_type: T  min_items: N  max_items: N }
+              vector   => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
               counted  => <C> { c?: percent ~ C }
               outer    => <X> counted<X>
               typed_by => <T, N> { w?: T ~ N }
-              names    => <M> !enum [a b M]
+              names    => <M> !meta.enum [a b M]
               named    => names<c>
               holder   => { n: named }
             }
@@ -56,7 +56,8 @@ class TemplateParamTypeTest {
     /** A type slot gives {@code type_kind}; a scalar slot of the applied constructor gives that slot's type. */
     @Test
     void aSlotGivesItsDeclaredType() {
-        assertEquals(List.of(param("T", "type_kind"), param("N", "non_negative_integer")), parameters().get("vector"));
+        assertEquals(List.of(param("T", "meta.type_kind"), param("N", "meta.non_negative_integer")),
+                parameters().get("vector"));
     }
 
     /** A routed default is read as the field's own declared type, not as {@code record_field.value}'s. */
@@ -74,7 +75,7 @@ class TemplateParamTypeTest {
     /** A field typed by a parameter makes the routed parameter's type that parameter. */
     @Test
     void aTypeMayNameAnEarlierParameter() {
-        assertEquals(List.of(param("T", "type_kind"), param("N", "T")), parameters().get("typed_by"));
+        assertEquals(List.of(param("T", "meta.type_kind"), param("N", "T")), parameters().get("typed_by"));
     }
 
     /**
@@ -83,7 +84,7 @@ class TemplateParamTypeTest {
      */
     @Test
     void thePositionalFormIsWalkedLikeTheRecordItSpells() {
-        assertEquals(List.of(param("M", "text")), parameters().get("names"));
+        assertEquals(List.of(param("M", "meta.text")), parameters().get("names"));
 
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, SCHEMA)))));
@@ -113,7 +114,7 @@ class TemplateParamTypeTest {
     @Test
     void coresTemplatesRecordTheirTypes() {
         Map<String, List<TemplateParam>> core = parameters();
-        assertEquals(List.of(param("T", "type_kind")), core.get("set"));
+        assertEquals(List.of(param("T", "meta.type_kind")), core.get("meta.set"));
     }
 
     // ── A template over a meta constructor is the meta's ─────────────────────────────
@@ -129,37 +130,35 @@ class TemplateParamTypeTest {
 
     /**
      * {@code N} stands in {@code array.min_items}, so its type is the kernel's {@code non_negative_integer}, the slot's
-     * own (§5.10): {@code vec<0>} is a valid application, and a text argument is refused. A schema declaring its own
-     * entry under that name collides with the kernel's, which every closure reaching core holds (§2.2.3).
+     * own (§5.10): {@code vec<0>} is a valid application, and a text argument is refused. A schema may declare its own
+     * entry under the kernel member's name, the kernel's being {@code meta.non_negative_integer} (§2.2.3).
      */
     @Test
     void aConstructorTemplatesValueIsTheSlotsType() {
         assertEquals(List.of(), load("""
-                  vec => <N> !array { element_type: text  min_items: N }
+                  vec => <N> !meta.array { element_type: text  min_items: N }
                   v0  => vec<0>
                 """));
         List<Diagnostic> wide = load("""
-                  vec    => <N> !array { element_type: text  min_items: N }
+                  vec    => <N> !meta.array { element_type: text  min_items: N }
                   holder => { a: vec<"abc"> }
                 """);
         assertEquals(1, wide.size(), wide::toString);
         assertTrue(wide.getFirst().message().contains("binds 'N' to 'abc'"), wide::toString);
-        List<Diagnostic> collides = load("""
+        assertEquals(List.of(), load("""
                   non_negative_integer => !integer ^ { min: 1 }
-                """);
-        assertEquals(1, collides.size(), collides::toString);
-        assertTrue(collides.getFirst().message().contains("collides"), collides::toString);
+                """));
     }
 
     /** A written type on such a template narrows the slot's type, and a type that is no narrowing of it is refused. */
     @Test
     void aConstructorTemplatesWrittenTypeNarrowsTheSlotsType() {
         assertEquals(List.of(), load("""
-                  vec => <N: non_negative_integer> !array { element_type: text  max_items: N }
+                  vec => <N: meta.non_negative_integer> !meta.array { element_type: text  max_items: N }
                   v3  => vec<3>
                 """));
         List<Diagnostic> core = load("""
-                  vec => <N: int8> !array { element_type: text  max_items: N }
+                  vec => <N: int8> !meta.array { element_type: text  max_items: N }
                 """);
         assertEquals(1, core.size(), core::toString);
         assertTrue(core.getFirst().message().contains("does not IS-A"), core::toString);

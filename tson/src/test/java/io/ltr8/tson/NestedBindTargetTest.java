@@ -44,7 +44,7 @@ class NestedBindTargetTest {
               keyed    => { values: {int32 => text} }
               grid     => { rows: [[int32]] }
               holes    => { rows: [[int32?]] }
-              ranked   => !map { key_type: text  value_type: int32  ordered: true }
+              ranked   => !meta.map { key_type: text  value_type: int32  ordered: true }
               tables   => { maps: [ranked] }
               pairs    => { values: [[text, int32]] }
               point    => { x: int32  y: int32 }

@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ([TSON-SCHEMA] §4.1), and composition propagates the supertype chain, so an entry composing with a constructor is
  * one too, by construction: nothing can derive from a constructor and fail to be one.
  *
- * <p>Any schema may declare one (SPEC-FEEDBACK.md #7): the base kinds are the meta-kernel's, and every closure
+ * <p>Any schema may declare one (SPEC-FEEDBACK.md #7): the base kinds are the kernel's, and every closure
  * reaching meta.tn holds them. A schema importing the one that declares a constructor applies it, and so does the
  * document declaring it, in wait order ([TSON-SCHEMA] §3.4.1): the instance waits on the constructor being ready.
  */
@@ -40,7 +40,7 @@ class ConstructorLevelDisciplineTest {
                 .validateSchema(source);
     }
 
-    private static final String KERNEL = "https://tson.io/2026/39/m/meta-kernel.tn";
+    private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
     private static final String META = "https://tson.io/2026/39/m/meta.tn";
     private static final String CORE = "https://tson.io/2026/39/m/core.tn";
 
@@ -48,15 +48,15 @@ class ConstructorLevelDisciplineTest {
     @Test
     void aMetaSchemaMayDeriveFromAConstructor() {
         assertEquals(List.of(), problems(KERNEL, KERNEL, """
-                  c        => product & { id: identifier }
-                  composed => c & { extra: identifier }
+                  c        => meta.product & { id: meta.identifier }
+                  composed => c & { extra: meta.identifier }
                 """));
     }
 
     /** Refining a kernel constructor is the same case. */
     @Test
     void aMetaSchemaMayRefineAConstructor() {
-        assertEquals(List.of(), problems(KERNEL, KERNEL, "  refined => array ^ { ordered?: = false }"));
+        assertEquals(List.of(), problems(KERNEL, KERNEL, "  refined => meta.array ^ { ordered?: = false }"));
     }
 
     /** The derived entry IS-A {@code top}, so it is constructor level and applicable. */
@@ -64,23 +64,23 @@ class ConstructorLevelDisciplineTest {
     void theDerivedEntryIsItselfConstructorLevel() {
         String source = """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  c        => product & { id: identifier }
-                  composed => c & { extra: identifier }
+                  c        => meta.product & { id: meta.identifier }
+                  composed => c & { extra: meta.identifier }
                 }
                 """;
         var entries = Tson.standard().resolve(source).schema().entries();
 
-        assertTrue(TypeChain.supertypesOf(entries.get("c")).contains("top"), "the base-kind composition");
-        assertTrue(TypeChain.supertypesOf(entries.get("composed")).contains("top"), "and everything deriving from it");
+        assertTrue(TypeChain.supertypesOf(entries.get("c")).contains("meta.top"), "the base-kind composition");
+        assertTrue(TypeChain.supertypesOf(entries.get("composed")).contains("meta.top"),
+                "and everything deriving from it");
     }
 
     /** An ordinary schema composes a base kind: the kernel's {@code product} is in its namespace. */
     @Test
     void anOrdinarySchemaDeclaresAConstructor() {
-        assertEquals(List.of(), problems(META, CORE, "  mine => product & { id: identifier }"));
+        assertEquals(List.of(), problems(META, CORE, "  mine => meta.product & { id: identifier }"));
     }
 
     /** A constructor an ordinary library declares is applied by a schema importing it. */
@@ -92,7 +92,7 @@ class ConstructorLevelDisciplineTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  steps => !namespace { key_type: identifier  value_type: text }
+                  steps => !meta.namespace { key_type: identifier  value_type: text }
                 }
                 """;
         String importer = """
@@ -117,12 +117,12 @@ class ConstructorLevelDisciplineTest {
     @Test
     void theDeclaringDocumentAppliesItsOwnConstructorInEitherOrder() {
         assertEquals(List.of(), problems(META, CORE, """
-                  my_array => array ^ { ordered?: = false }
+                  my_array => meta.array ^ { ordered?: = false }
                   tags     => !my_array { element_type: text }
                 """));
         assertEquals(List.of(), problems(META, CORE, """
                   tags     => !my_array { element_type: text }
-                  my_array => array ^ { ordered?: = false }
+                  my_array => meta.array ^ { ordered?: = false }
                 """));
     }
 
@@ -133,7 +133,7 @@ class ConstructorLevelDisciplineTest {
      */
     @Test
     void anInstanceOfANewFormIsAGap() {
-        for (String kind : List.of("atom", "product", "sum")) {
+        for (String kind : List.of("meta.atom", "meta.product", "meta.sum")) {
             List<Diagnostic> problems = problems(META, CORE, """
                       c => %s & { extra: text }
                       x => !c { extra: "hello" }

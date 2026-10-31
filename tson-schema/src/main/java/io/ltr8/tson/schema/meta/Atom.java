@@ -3,7 +3,7 @@ package io.ltr8.tson.schema.meta;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
+ * The kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
  * Top} variant IS-A this. {@link ValueType} and {@link VoidType} back {@code value} and {@code void}, the
  * two atoms with no constraint vocabulary; {@link EnumBody} backs {@code boolean} and the kernel's other
  * internal enumerations, a listed set of names; {@link ReferenceBody} backs {@code reference}, a computed one -- the

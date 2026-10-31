@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.compiler.stream.DocumentStart;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.Annotation;
@@ -494,7 +495,10 @@ public final class TsonSchemaParser extends TsonDataParser {
         requireQualifiedName(name);
         String target = name.text();
 
-        if (DocumentStart.SCHEMA_TAG.equals(target) && check(TokenType.LBRACE)) {
+        // A nested schema map is tagged `!schema`, the spelling the root's tag has, or by its type's path,
+        // `!meta.schema`, as resolved output writes it: one grammar for both.
+        if ((DocumentStart.SCHEMA_TAG.equals(target) || TsonSchema.SCHEMA.equals(target))
+                && check(TokenType.LBRACE)) {
             return nestedSchemaMap(typeParams);
         }
         if (check(TokenType.CARET)) {
@@ -1056,7 +1060,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /**
      * {@code type-name = identifier} (§12.1, through the kernel's {@code type_name} role; {@code param-name}
-     * shares it verbatim). The token is matched in full against meta-kernel's {@code identifier} profile, which
+     * shares it verbatim). The token is matched in full against the kernel's {@code identifier} profile, which
      * <b>subsumes</b> §12.1's separate "numbers are not declarable names" rule rather than standing beside it:
      * identifier-Start is {@code XID_Start}, and every spelling the number grammar admits begins with a digit, a
      * sign or a dot, all of which sit in token-Start only so a <em>number</em> can be an unquoted token. One rule

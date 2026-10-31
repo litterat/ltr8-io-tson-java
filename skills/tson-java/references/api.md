@@ -39,7 +39,7 @@ public final class Tson {
 }
 ```
 
-`Tson.standard()` bootstraps the five bundled schemas — meta-kernel, meta.tn, core.tn, net.tn and policy.tn — and returns
+`Tson.standard()` bootstraps the four bundled schemas — meta.tn (the kernel), core.tn, net.tn and policy.tn — and returns
 an immutable instance.
 Resolution is **always bind-anchored** (meta instances bind to `schema.meta.Top`), so `resolve` takes no
 mode; only the final compile picks one, which is why **the read mode is which registry you hold**.
@@ -476,12 +476,11 @@ everything, are fail-fast by design.
   `FieldName`, `TokenEvent`, `ReferenceEvent` (a reference with arguments, assembled whole), `VoidEvent`,
   `EmptyBraceEvent`, `TypeRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
-- `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`:
-  the schema pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`,
-  `contextExtendedWith(binder)`, `extendedWith(binder)`, `over(context)`: the names meta-kernel.tn and meta.tn
-  declare bound to the schema model, every other name to the consumer's — `over` is what `Tson.of` builds its one
-  context with), and
-  `SourcePositionStringBridge`.
+- `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`: the schema
+  pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`, `contextExtendedWith(binder)`,
+  `extendedWith(binder)`, `over(context)`: the names under the kernel's `meta` and net.tn's `net` bound to the schema
+  model, each by its last segment, every other name to the consumer's — `over` is what `Tson.of` builds its one context
+  with), and `SourcePositionStringBridge`.
 
 ---
 
@@ -547,7 +546,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     public EntryFacts factsOf(String name);              // NONE for a name with no facts
     public Optional<SourcePosition> positionOf(String name); // absent for an entry the resolver minted
     public Optional<String> constructorOf(String name);  // the constructor tag the entry's value applies
-    public Optional<TypeRef> applicationOf(String name); // the @application on its key (§8.2)
+    public Optional<TypeRef> applicationOf(String name); // the @meta.application on its key (§8.2)
 }
 
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
@@ -555,7 +554,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public String originOf(String entryName);       // which document declared it, transitively
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
     public Optional<Top> nameType(String entryName); // a record's name_type, where not field_name
-    public boolean isKernel(String entryName);      // the meta-kernel's own entry, judged by origin
+    public boolean isKernel(String entryName);      // the kernel's own entry, judged by origin
     public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
     public boolean isConstructor(String name, Top value); // IS-A the kernel's top
     public Optional<NamespaceBody> namespace(String entryName); // the namespace type it is, if it is one
@@ -570,8 +569,9 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
 }
 
 public final class TsonBundledSchemas {
-    public static final String META_KERNEL_ID / META_ID / CORE_ID / POLICY_ID;
-    public static final String META_KERNEL_SHA256 / META_SHA256 / CORE_SHA256 / POLICY_SHA256;
+    public static final String META_ID / CORE_ID / NET_ID / POLICY_ID;   // META_ID is the kernel
+    public static final String META_SHA256 / CORE_SHA256 / NET_SHA256 / POLICY_SHA256;
+    public static boolean isKernel(String identity);
     public static Optional<String> declaredSha256(String uri);
     public static String fetch(String uri);
 }
@@ -598,13 +598,13 @@ value model — pure records, sealed interfaces and enums, §8's `Top` and its b
 a `Type` carries its own chain (`Type.chain()`, a `TypeChain` of `parents`, `supertypes` and
 `subtypes`, with accessors for each on `Type`, and `TypeChain.supertypesOf(top)` and its siblings for any
 value); the application an entry is the instantiation of is the derived
-`@application` on its key (`TsonSchema.applicationOf`), stated as written, nested arguments unreduced
-(`@application:pair<box<text> int32>`); and what is not part of the value — where it was declared, its
+`@meta.application` on its key (`TsonSchema.applicationOf`), stated as written, nested arguments unreduced
+(`@meta.application:pair<box<text> int32>`); and what is not part of the value — where it was declared, its
 value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
 host values the atoms read to
 are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`,
 `Alias`, `TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a
-map of them, a namespace type (`operations => !namespace { key_type: identifier  value_type: operation }`, a
+map of them, a namespace type (`operations => !meta.namespace { key_type: identifier  value_type: operation }`, a
 `NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search =>
 { … } }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a
 member of no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind

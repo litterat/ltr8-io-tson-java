@@ -44,9 +44,9 @@ class JsonAtomReadTest {
               key        => uuid
               day        => date
               blob       => bytes
-              colour     => !enum [ RED GREEN BLUE ]
-              words      => !identifier_type { continue_add: "-"  medial: " " }
-              activity   => !enum_type { name_type: words  members: [sedentary "lightly active"] }
+              colour     => !meta.enum [ RED GREEN BLUE ]
+              words      => !meta.identifier_type { continue_add: "-"  medial: " " }
+              activity   => !meta.enum_type { name_type: words  members: [sedentary "lightly active"] }
               country    => !text ^ { length: 2  members: ["AU" "NZ"] }
               flag       => boolean
               nothing    => void
@@ -68,13 +68,13 @@ class JsonAtomReadTest {
             JsonSchemaCompiler.compile(TSON.resolve(SCHEMA), ValueReaderFactoryRegistry.atoms());
 
     /**
-     * The kernel's own compiled readers. {@code value} and {@code identifier} are declared by meta-kernel.tn
+     * The kernel's own compiled readers. {@code value} and {@code identifier} are declared by meta.tn
      * and by nothing else -- core.tn re-declares only {@code void} -- so the two {@code unit} instances this
      * encoding reads by rules of its own (§5.7) are reachable only here.
      */
     private static final JsonCompiledSchema KERNEL = JsonSchemaCompiler.compile(
-            TSON.schemaRegistry().get(TsonBundledSchemas.META_KERNEL_ID)
-                    .orElseThrow(() -> new IllegalStateException("meta-kernel.tn is not registered")),
+            TSON.schemaRegistry().get(TsonBundledSchemas.META_ID)
+                    .orElseThrow(() -> new IllegalStateException("meta.tn is not registered")),
             ValueReaderFactoryRegistry.atoms());
 
     /** One value read at {@code typeName}, with every problem collected rather than thrown. */
@@ -272,25 +272,25 @@ class JsonAtomReadTest {
      */
     @Test
     void theValueEscapeHatchClassifiesByJsonsOwnGrammar() {
-        assertEquals(Boolean.TRUE, read(KERNEL, "value", "true").accepted());
-        assertEquals(new BigInteger("7"), read(KERNEL, "value", "7").accepted());
-        assertEquals(new BigDecimal("7.5"), read(KERNEL, "value", "7.5").accepted());
-        assertEquals("null", read(KERNEL, "value", "\"null\"").accepted());
+        assertEquals(Boolean.TRUE, read(KERNEL, "meta.value", "true").accepted());
+        assertEquals(new BigInteger("7"), read(KERNEL, "meta.value", "7").accepted());
+        assertEquals(new BigDecimal("7.5"), read(KERNEL, "meta.value", "7.5").accepted());
+        assertEquals("null", read(KERNEL, "meta.value", "\"null\"").accepted());
     }
 
     /** §5.7: {@code value} admits scalars, so an object or array there is a validation error. */
     @Test
     void theValueEscapeHatchRefusesAContainer() {
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "value", "{\"a\": 1}").refusal().code());
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "value", "[1]").refusal().code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "meta.value", "{\"a\": 1}").refusal().code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "meta.value", "[1]").refusal().code());
     }
 
     /** {@code identifier} is the third {@code unit} instance, and the one the shared vocabulary does answer for. */
     @Test
     void identifierFacesTheSharedNameProfile() {
-        assertEquals("order_id", read(KERNEL, "identifier", "\"order_id\"").accepted());
+        assertEquals("order_id", read(KERNEL, "meta.identifier", "\"order_id\"").accepted());
         assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
-                read(KERNEL, "identifier", "\"42nd\"").refusal().code());
+                read(KERNEL, "meta.identifier", "\"42nd\"").refusal().code());
     }
 
     /**

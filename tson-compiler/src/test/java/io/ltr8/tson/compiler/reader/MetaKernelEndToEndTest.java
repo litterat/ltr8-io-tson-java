@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * The real proof this whole sketch works, not against small hand-built fragments: compiles the
- * ENTIRE real, registered {@code meta-kernel.tn} schema (55 entries after materialization -- see
+ * ENTIRE real, registered {@code meta.tn} schema (55 entries after materialization -- see
  * {@code MetaKernelSchemaRegistryTest}) with a registry covering every factory this codebase
  * currently has, then reads real TSON data text against several of its own genuinely useful record
  * types -- including {@code top} itself, the case that motivated {@link VariantParser}'s own
@@ -68,7 +68,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(73, registered.entries().size());
+        assertEquals(103, registered.entries().size());
     }
 
     /**
@@ -81,12 +81,12 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         ReadException untagged = assertThrows(ReadException.class,
-                () -> compiled.get("top").read(TestDocuments.document("{}")));
+                () -> compiled.get("meta.top").read(TestDocuments.document("{}")));
         ReadException self = assertThrows(ReadException.class,
-                () -> compiled.get("top").read(TestDocuments.document("!top {}")));
+                () -> compiled.get("meta.top").read(TestDocuments.document("!meta.top {}")));
 
-        assertTrue(untagged.getMessage().contains("'top' is abstract"), untagged.getMessage());
-        assertTrue(self.getMessage().contains("a tag naming 'top' selects nothing"), self.getMessage());
+        assertTrue(untagged.getMessage().contains("'meta.top' is abstract"), untagged.getMessage());
+        assertTrue(self.getMessage().contains("a tag naming 'meta.top' selects nothing"), self.getMessage());
         assertTrue(self.getMessage().contains("record"), "the subtypes that would satisfy it: " + self.getMessage());
     }
 
@@ -97,7 +97,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("enum")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("meta.enum")
                 .read(TestDocuments.document("{ members: [true false] }")));
 
         assertEquals(List.of("true", "false"), result.get("members"));
@@ -108,7 +108,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("integer_size")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("meta.integer_size")
                 .read(TestDocuments.document("{ bits: 32 signed: true }")));
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
@@ -120,7 +120,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("field_group")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("meta.field_group")
                 .read(TestDocuments.document("{ members: [[foo] [bar baz]] optional_members: [baz] optional: true }")));
 
         assertEquals(List.of(List.of("foo"), List.of("bar", "baz")), result.get("members"));
@@ -133,11 +133,11 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("tuple_element")
-                .read(TestDocuments.document("{ element_type: text voidable: true }")));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("meta.tuple_element")
+                .read(TestDocuments.document("{ element_type: meta.text voidable: true }")));
 
         assertEquals(true, result.get("voidable"));
-        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("text"), result.get("element_type"),
+        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("meta.text"), result.get("element_type"),
                 "a type_kind slot holds a type's name, as the reference it is");
     }
 }

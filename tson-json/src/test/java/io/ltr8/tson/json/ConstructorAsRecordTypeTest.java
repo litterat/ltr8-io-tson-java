@@ -33,12 +33,12 @@ class ConstructorAsRecordTypeTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              holder   => { spec: uuid_type }
-              pick     => { t: kind<record> }
-              tpick    => { t: type_kind }
+              holder   => { spec: meta.uuid_type }
+              pick     => { t: kind<meta.record> }
+              tpick    => { t: meta.type_kind }
               boxed    => <T> { v: T }
-              box_spec => boxed<uuid_type>
-              specs    => [uuid_type]
+              box_spec => boxed<meta.uuid_type>
+              specs    => [meta.uuid_type]
             }
             """;
 
@@ -56,7 +56,7 @@ class ConstructorAsRecordTypeTest {
     void aConstructorTypedFieldHoldsADeclarationInTheTree() {
         Tson tson = tson();
         assertEquals(List.of(), tson.validate(HEAD + "!holder { spec: { version: 4 } }"));
-        assertEquals(List.of(), tson.validate(HEAD + "!holder { spec: !uuid_type { version: 4 } }"));
+        assertEquals(List.of(), tson.validate(HEAD + "!holder { spec: !meta.uuid_type { version: 4 } }"));
         assertEquals(List.of(), tson.validate(HEAD + "!specs [{ version: 4 } {}]"));
         assertEquals(List.of(), tson.validate(HEAD + "!box_spec { v: { version: 4 } }"));
 
@@ -77,13 +77,13 @@ class ConstructorAsRecordTypeTest {
     @Test
     void aKindOfRecordHoldsAConstructorsName() {
         Tson tson = tson();
-        assertEquals(List.of(), tson.validate(HEAD + "!pick { t: uuid_type }"));
-        assertEquals(List.of(), tson.validate(HEAD + "!pick { t: record }"));
-        assertEquals(List.of(), tson.validate(HEAD + "!tpick { t: uuid_type }"));
+        assertEquals(List.of(), tson.validate(HEAD + "!pick { t: meta.uuid_type }"));
+        assertEquals(List.of(), tson.validate(HEAD + "!pick { t: meta.record }"));
+        assertEquals(List.of(), tson.validate(HEAD + "!tpick { t: meta.uuid_type }"));
 
         ConstructorPick pick = assertInstanceOf(ConstructorPick.class, tson.objectReader().withSchema(ID)
-                .readAs("{ t: uuid_type }", "pick", Object.class));
-        assertEquals(TypeRef.of("uuid_type"), pick.t());
+                .readAs("{ t: meta.uuid_type }", "pick", Object.class));
+        assertEquals(TypeRef.of("meta.uuid_type"), pick.t());
     }
 
     @Test
@@ -92,7 +92,7 @@ class ConstructorAsRecordTypeTest {
         Json json = Json.standard().withSchemas(tson.schemaRegistry());
 
         assertEquals(List.of(), json.validate("{\"spec\": {\"version\": 4}}", ID, "holder"));
-        assertEquals(List.of(), json.validate("{\"t\": \"uuid_type\"}", ID, "pick"));
+        assertEquals(List.of(), json.validate("{\"t\": \"meta.uuid_type\"}", ID, "pick"));
         List<Diagnostic> problems = json.validate("{\"spec\": {\"nope\": 4}}", ID, "holder");
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, problems.getFirst().code(), problems::toString);
     }

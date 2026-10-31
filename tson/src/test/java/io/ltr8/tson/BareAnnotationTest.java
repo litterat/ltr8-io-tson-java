@@ -28,7 +28,7 @@ class BareAnnotationTest {
 
     @Test
     void aVoidTypedMarkerIsWrittenBare() {
-        assertEquals(List.of(), validate("@deprecated old => @numeric int32"));
+        assertEquals(List.of(), validate("@deprecated old => @meta.numeric int32"));
         assertEquals(List.of(), validate("@deprecated:_ old => int32"));
     }
 

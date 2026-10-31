@@ -44,12 +44,11 @@ class TemplateClosesByApplicationTest {
     private static String meta(String extraDeclarations) {
         return """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   base       => {}
-                  my_bounded => <N> array ^ { max_items?: = N }
-                  my_set     => <T> array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }
+                  my_bounded => <N> meta.array ^ { max_items?: = N }
+                  my_set     => <T> meta.array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }
                   box        => <T> base & { value: T }
                   %s
                 }
@@ -111,7 +110,7 @@ class TemplateClosesByApplicationTest {
      */
     @Test
     void anUnmarkedTemplateGetsTheSameAdviceRatherThanTheRefinementHint() {
-        List<Diagnostic> problems = schemaProblems("b => !box { value: text }");
+        List<Diagnostic> problems = schemaProblems("b => !box { value: meta.text }");
 
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("box<...>"), problems::toString);
@@ -135,7 +134,7 @@ class TemplateClosesByApplicationTest {
      */
     @Test
     void aTypeChannelConstructorParameterPinsWhenItCloses() {
-        assertEquals(List.of(), metaProblems("tags => my_set<text>"));
+        assertEquals(List.of(), metaProblems("tags => my_set<meta.text>"));
         List<Diagnostic> problems = metaProblems("tags => my_set<no_such_type>");
 
         assertEquals(1, problems.size(), problems::toString);

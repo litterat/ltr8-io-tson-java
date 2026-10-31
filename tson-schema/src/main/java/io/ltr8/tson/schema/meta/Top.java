@@ -1,7 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 /**
- * The meta-kernel's structural root, {@code top => abstract {}} (Part 2 §4.1) -- every constructor IS-A it -- and
+ * The kernel's structural root, {@code top => abstract {}} (Part 2 §4.1) -- every constructor IS-A it -- and
  * in Java what a schema map's entries are: {@code schema => {type_name => declared}}, an entry being its value
  * (Part 2 §8.1), a body a constructor built or a {@link ValueEntry}. A marker interface, not a
  * class (Java records can't extend a class, only implement interfaces), added purely to replicate
@@ -12,7 +12,7 @@ package io.ltr8.tson.schema.meta;
  * through {@code type}) becomes {@link Alias} implementing this interface directly. Lets a consumer
  * test kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product} rather than
  * switching on {@link EntryKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same
- * sealed hierarchy directly for {@code !record}/{@code !array}/etc. type-refs -- {@code
+ * sealed hierarchy directly for {@code !meta.record}/{@code !meta.array}/etc. type-refs -- {@code
  * DefaultUnionBinder} recurses through a multi-level sealed hierarchy like this one (a permitted
  * subclass that's itself sealed is flattened, not left as an unusable "member"), which is what
  * makes binding straight against {@code Top}/{@link Atom} practical at all (see {@code ltr8-bind}'s

@@ -64,7 +64,7 @@ class TinySchemaImportsCoreTn1Test {
      * A {@link DataNameBinder} that manually resolves {@code "my_record"} to {@link MyRecord}
      * directly, falling back to {@link SchemaMetaNameBinder#INSTANCE}'s own {@code
      * io.ltr8.tson.schema.meta} convention for every other name this test's own compile still needs
-     * (meta-kernel's/meta.tn's/core.tn's own composite constructors -- {@code record}, {@code
+     * (the kernel's/meta.tn's/core.tn's own composite constructors -- {@code record}, {@code
      * array}, ...) -- exactly the pattern {@link SchemaMetaNameBinder}'s own class Javadoc describes
      * for "a caller binding their own schema to their own Java library."
      */
@@ -81,10 +81,10 @@ class TinySchemaImportsCoreTn1Test {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
-        // meta-kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own
+        // the kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own
         // class Javadoc for why this step can't just be another loader.load(...) call.
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
+                TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(resolvedMetaKernel);
 

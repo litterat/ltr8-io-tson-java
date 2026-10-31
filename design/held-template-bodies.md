@@ -39,7 +39,7 @@ substitution rewrites and the declaration-time checks inspect. This note also ow
 Related: `design/template-materialisation.md` (the closing pass: identity, declared applications, the expansion
 rule, on-demand closing, kind, regularity), `design/desugaring-open-forms-and-templates.md` (how sugar and aliases are
 normalised into held bodies, open and closed lifts, value-argument identity), `design/resolver-vocabulary-and-bootstrap.md`
-(`WireForm`, `DerivedName`, `@synthetic`), `design/schema-resolution.md` (`parameterised`, `openRecord`, marks on an
+(`WireForm`, `DerivedName`, `@meta.synthetic`), `design/schema-resolution.md` (`parameterised`, `openRecord`, marks on an
 open record), `design/constructor-application.md`, `design/linking-and-compilation.md`.
 
 ## The two shapes of an open entry
@@ -67,21 +67,20 @@ its base), and an application nothing declares is its expansion.
   or an uninterpreted token — a field's `type` (a `type_kind` reference, with arguments while open), its `value`, an
   application's arguments — so the open record is a value of the vocabulary as it stands: a `RecordBody` with
   `parameters`, its chain keeping the parents as written. `DefinitionResolver.openRecord` binds the desugared
-  `!record { … }` payload through `record`'s own reader once `ParameterTypes.checkSlots` has confined its parameters;
+  `!meta.record { … }` payload through `record`'s own reader once `ParameterTypes.checkSlots` has confined its parameters;
   a composition or refinement template is the *flattened* record resolution builds, with its parameters stated
   (`DefinitionResolver.parameterised`), because both absorb fields from a source. Either way a selector typed by a
   parameter is refused (`refuseParameterTypedSelector`). An error placeholder for an open declaration is an open empty
   record (`SchemaResolver.unresolved`), so it closes like any record template.
-- **Every other open entry is held text.** `set` resolves to
-  `!template { parameters: [{ name: T  type: type_kind }]  template: "!set_type { element_type: T }" }`. That covers
-  an open instance (`<T, N> !array { … }`), an open sugar form (`<T> [T]`, `<T> ( T | error )`), and §5.10's partial
-  application, `uuid_pair => <B> pair<uuid, B>`, held as the `!alias { target: pair<uuid B> }` §8.1 says it
-  denotes — spellable because `alias.target` is a reference, which may carry arguments. Its kind is `TEMPLATE` whatever
-  its head (`design/template-materialisation.md`).
+- **Every other open entry is held text.** `set` resolves to `!meta.template { parameters: [{ name: T  type: type_kind
+  }]  template: "!meta.set_type { element_type: T }" }`. That covers an open instance (`<T, N> !meta.array { … }`), an
+  open sugar form (`<T> [T]`, `<T> ( T | error )`), and §5.10's partial application, `uuid_pair => <B> pair<uuid, B>`,
+  held as the `!meta.alias { target: pair<uuid B> }` §8.1 says it denotes — spellable because `alias.target` is a
+  reference, which may carry arguments. Its kind is `TEMPLATE` whatever its head (`design/template-materialisation.md`).
   - **Why text, not a value of the constructor's vocabulary.** A parameter stands wherever a token stands —
     `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a collection — so a
     body carrying one is typed by no constructor's record shape until it closes. Read as one, `min_items: N` fails
-    against `non_negative_integer`, and `!enum { members: [a b M] }` reads *cleanly*, binding `M` as a third member
+    against `non_negative_integer`, and `!meta.enum { members: [a b M] }` reads *cleanly*, binding `M` as a third member
     spelled `M`. `OpenEntryResolvedFormTest` pins that it reads back as held text.
   - **The tree is built, not held.** `HeldBody.held` writes the tree it is given (`DataClassObjectWriter`,
     vocabulary-free, token forms preserved) and keeps none of it; `HeldBody.of` parses the text back. Handing back the
@@ -101,7 +100,7 @@ The tree is parsed once per closing and dropped with it. The head decides what t
 that is shared — substitute (`WireForm.substitute`), then close the applications the substituted body holds.
 
 - **Anything but `record` or `alias`** (`closeHeldTemplate`, via `closeHeld`): the substituted wire is bound
-  through **the constructor's own compiled reader**, the one a written `!array { … }` binds through, so the result is
+  through **the constructor's own compiled reader**, the one a written `!meta.array { … }` binds through, so the result is
   an ordinary `ArrayBody`/`MapBody`/`ChoiceBody`/… named for its binding record (`DerivedName.ofBinding`). A failure
   there is §8.2's deferred value-level check, with no code of its own, for whatever the call-site check (below) could
   not judge: the reader reports it exactly as it would for a written body.
@@ -113,7 +112,7 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
   target's argument list and closes what results, so `uuid_pair<int32>` *is* the entry `pair<uuid, int32>` denotes,
   and the alias's `target` must close to a bare name or it is an `IllegalStateException`. §5.10 mints no intermediate
   entry per alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's
-  `@application`. `ident => <T> T` applied to `text` is `text`.
+  `@meta.application`. `ident => <T> T` applied to `text` is `text`.
   - **Arity is the alias's own**, checked against its `parameters` before composing, so `uuid_pair<int32, text>` names
     `uuid_pair`'s one parameter rather than `pair`'s two.
   - **A self-applying alias is a cycle, not a knot.** The knot-tying memo answers a recursive application with the
@@ -164,7 +163,7 @@ that is shared — substitute (`WireForm.substitute`), then close the applicatio
 
 Each parameter records the type an argument for it is read as (`template_param.type`, §5.10), derived from the
 positions it stands in; the kind follows from it. §12.1 decides an argument's channel by token shape, so an unquoted
-non-numeric argument arrives as a reference — wrong for `e => <M> !enum { members: [a b M] }` applied as `e<c>`, where
+non-numeric argument arrives as a reference — wrong for `e => <M> !meta.enum { members: [a b M] }` applied as `e<c>`, where
 `c` is a member. What settles it is the declared type of the slot the parameter stands in, read from the constructor's
 own vocabulary: `array.element_type` is `type_kind`, `enum.members` is `enum_set` (of `text`), `record_field.value` is
 `value`. §4.2 types every slot that names a type `type_kind`, an application included, so a schema's own
@@ -184,10 +183,10 @@ Beyond those:
   what its author wrote.
 - **Several uses must agree**: the type is the use type that IS-A every other, uses unordered by IS-A are refused at
   the declaration, and a parameter standing in both kinds of position keeps its own message. A parameter standing for a
-  whole collection or record (`<T> !enum { members: T }`) is refused as neither a kind of type nor a scalar.
+  whole collection or record (`<T> !meta.enum { members: T }`) is refused as neither a kind of type nor a scalar.
 - **A routed default or fixed value** (a parameter at `record_field.value`) is read as the field's declared type, from
   the sibling `type` slot: `w?: T ~ N` gives `N` the type `T`, an earlier parameter. A payload in §5.6's positional form
-  (`!enum [a b M]`) is walked as the one unmarked field it binds.
+  (`!meta.enum [a b M]`) is walked as the one unmarked field it binds.
 - **The template's form decides where value types are read** (`ParameterTypes.readsInStructure`, §5.10). A template
   whose held head is a constructor other than `record` reads its value parameters' types, written ones included,
   among the schema's imported entries: the constructor's compiled reader reads the argument, and its slot types are
@@ -195,7 +194,7 @@ Beyond those:
   reads in the schema's whole namespace. A template whose head is
   another open template takes that template's form; a deferred use takes its callee's. An alias's head is
   `alias`, a constructor, so a written value type on an alias must name an imported type too. A written type
-  must also IS-A the derived one: `<N: int8> !array { … max_items: N }` is refused, core's `int8` not being a
+  must also IS-A the derived one: `<N: int8> !meta.array { … max_items: N }` is refused, core's `int8` not being a
   `non_negative_integer` (`TemplateParamTypeTest`). A type parameter's bound is the schema's in every form.
 - **A written type narrows, read by the derived kind** (`<T: text, N: int8>`, from
   `SchemaMap.Declaration.parameterTypes`): on a value parameter it replaces `type` and must IS-A the derived one; on a
@@ -219,5 +218,5 @@ Beyond those:
   `record` — a field name, a group member, `optional`, `voidable`, `role`, `extension`, `name_type`,
   `discriminators`, a bare parent — is refused naming the slot (`parameter 'K' stands at a key of record.fields`),
   since each would leave the family base without a shape its applications share. The general kind check runs first,
-  so `<T> !record { fields: T }` keeps its "neither a kind of type nor a scalar" verdict. A template over any other
-  constructor keeps every scalar slot (`<V> !tuple { … voidable: V }`).
+  so `<T> !meta.record { fields: T }` keeps its "neither a kind of type nor a scalar" verdict. A template over any other
+  constructor keeps every scalar slot (`<V> !meta.tuple { … voidable: V }`).

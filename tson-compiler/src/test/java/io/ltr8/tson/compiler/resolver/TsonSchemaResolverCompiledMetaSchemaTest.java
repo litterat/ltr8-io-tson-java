@@ -36,20 +36,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Proves the guarantee {@link SchemaResolver#resolveSchema(SchemaDocument)} relies on to derive
- * its own structure namespace -- a {@link TsonCompiledSchemaLoader} that already has meta-kernel and
- * meta.tn registered and compiled can, given a document's own real {@code !!import} target (just
+ * its own structure namespace -- a {@link TsonCompiledSchemaLoader} that already has the kernel, meta.tn,
+ * registered and compiled can, given a document's own real {@code !!import} target (just
  * a URI of {@code document.imports()}), {@link TsonCompiledSchemaLoader#load} it and get back a
  * *compiled* meta-schema genuinely usable to read real data -- not merely present. Exercised
  * directly against the loader itself, not through the resolver, since that's exactly what {@code
- * resolveSchema} does internally with no further logic of its own. Proven in both directions of the
- * real import chain: core.tn's own {@code !!import} target (meta.tn) and meta.tn's own {@code
- * !!import} target (meta-kernel itself). Also covers {@code resolveSchema} itself, separately, below.
+ * resolveSchema} does internally with no further logic of its own: core.tn's own {@code !!import} target is the
+ * kernel, which imports nothing. Also covers {@code resolveSchema} itself, separately, below.
  * Deliberately doesn't touch {@code bindAtomInstance} at all (see that
  * method's own Javadoc for why that's a separate, later step); this only proves the wiring to
  * *reach* a compiled governing schema works.
  *
- * <p>Reading an entry that isn't itself a {@code ~}-marked constructor (e.g. {@code
- * bytes_encoding}, {@code product_access_type}, {@code top} -- ordinary declarations, not vocabulary
+ * <p>Reading an entry that isn't itself a constructor (e.g. {@code
+ * meta.bytes_encoding}, {@code meta.product_access_type}, {@code meta.top} -- ordinary declarations, not vocabulary
  * this codebase's own factories build against) goes through {@link
  * TsonCompiledMetaSchema#compiledSchema()}'s own unscoped {@code get}, not {@link
  * TsonCompiledMetaSchema#reader}, which is deliberately scoped to constructor-declared entries only
@@ -58,18 +57,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TsonSchemaResolverCompiledMetaSchemaTest {
 
     /**
-     * Now that {@code bindAtomInstance} needs a real, object-binding-mode compiled reader for the
-     * schema it's resolving against (see {@code SchemaResolver}'s own field), meta.tn itself can no
-     * longer be loaded via a bare DOM-mode registry -- its own Instance declarations (e.g. {@code
-     * bytes_encoding => !enum [...]}) go through {@code resolveInstance}/{@code bindAtomInstance}
-     * just like any other schema's. Resolve meta-kernel ordinarily first (object mode's own {@link
-     * ValueReaderFactoryRegistry#bind} needs no materialized schema up front the way the old
-     * eager-validation design did -- see {@code TsonObjectBinder}'s own retirement note), then
-     * resolve meta.tn itself via {@link TsonBundledSchemas} -- {@link
-     * TsonCompiledMetaRegistry#load}'s own generic fetch-parse-resolve-register-compile path,
-     * not a hand-rolled duplicate of it.
+     * The kernel, meta.tn, registered: its own instance declarations ({@code meta.bytes_encoding => !meta.enum
+     * [...]}) go through {@code resolveInstance}/{@code bindAtomInstance} as any schema's do, against the readers of
+     * the loader's pre-loaded stand-in.
      *
-     * <p><b>Meta-kernel itself is registered via ordinary {@code SchemaResolver.resolveSchema}, not
+     * <p><b>The kernel itself is registered via ordinary {@code SchemaResolver.resolveSchema}, not
      * the raw bootstrap output</b> ({@code TsonSchemaRegistry#register} refuses <i>any</i>
      * self-referential schema with {@code bootstrap() == true}, materialized or not). The loader's own
      * bootstrap branch supplies the compiled readers while resolving (so even {@code boolean =>
@@ -89,7 +81,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
         TsonCompiledMetaRegistry loader = registry;
 
-        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
+        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(metaKernel);
@@ -100,11 +92,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     /**
-     * A standalone way to get a plain, registrable, non-bootstrap meta-kernel {@link TsonSchema}
+     * A standalone way to get a plain, registrable, non-bootstrap kernel {@link TsonSchema}
      * value -- resolved via its own throwaway object-mode loader (the only mode {@code
      * bindAtomInstance}'s own {@code (Top) metaParser.reader(...).read(...)} cast can work against, for
-     * meta-kernel's own {@code Instance} declarations), independent of whatever mode the *caller's*
-     * own registry happens to use. Used by tests that need meta-kernel registered into a DOM-mode
+     * the kernel's own {@code Instance} declarations), independent of whatever mode the *caller's*
+     * own registry happens to use. Used by tests that need the kernel registered into a DOM-mode
      * registry for some *other* scenario they're testing (e.g. "meta.tn was never registered"),
      * where object mode would be beside the point.
      */
@@ -113,7 +105,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaRegistry throwawayRegistry = new TsonCompiledMetaRegistry(context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader throwawayLoader = throwawayRegistry;
 
-        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
+        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         return new SchemaResolver(throwawayLoader).resolveSchema(metaKernelDocument);
     }
@@ -129,7 +121,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.imports().getFirst());
 
-        assertTrue(compiledMeta.schema().entries().containsKey("bytes_encoding"));
+        assertTrue(compiledMeta.schema().entries().containsKey("meta.bytes_encoding"));
     }
 
     @Test
@@ -138,44 +130,24 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.imports().getFirst());
-        Object result = compiledMeta.compiledSchema().get("bytes_encoding")
+        Object result = compiledMeta.compiledSchema().get("meta.bytes_encoding")
                 .read(TestDocuments.document("BASE64"));
 
         assertEquals("BASE64", result);
     }
 
-    /**
-     * The other direction of the same import chain: meta.tn's own {@code !!import} names
-     * meta-kernel itself, not meta.tn's own compiled reader.
-     */
+    /** The kernel imports nothing: it is the bottom of every import chain, pre-loaded rather than resolved (§3.4). */
     @Test
-    void metaTn1sOwnMetaTargetResolvesToMetaKernelsCompiledReader() {
+    void theKernelImportsNothingAndItsCompiledReaderReadsRealData() {
         TsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
-        SchemaDocument metaDocument =
+        SchemaDocument kernelDocument =
                 new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
 
-        // meta's own !!import names meta-kernel with a ?sha256= pin -- compare by identity.
-        assertEquals(CanonicalIdentity.canonicalize(TsonBundledSchemas.META_KERNEL_ID),
-                CanonicalIdentity.canonicalize(metaDocument.imports().getFirst()));
-
-        TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.imports().getFirst());
-
-        // "integer_type" is meta-kernel's own -- not one of meta.tn's own 31 declarations -- so its
-        // presence confirms this genuinely reached meta-kernel's compiled reader, not meta.tn's own.
-        assertTrue(compiledMetaKernel.schema().entries().containsKey("integer_type"));
-    }
-
-    @Test
-    void theCompiledMetaKernelSchemaGenuinelyReadsRealData() {
-        TsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
-        SchemaDocument metaDocument =
-                new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
-
-        TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.imports().getFirst());
-        Object result = compiledMetaKernel.compiledSchema().get("product_access_type")
-                .read(TestDocuments.document("INDEX"));
-
-        assertEquals("INDEX", result);
+        assertEquals(List.of(), kernelDocument.imports());
+        TsonCompiledMetaSchema compiledKernel = loader.loadMeta(TsonBundledSchemas.META_ID);
+        assertTrue(compiledKernel.schema().entries().containsKey("meta.integer_type"));
+        assertEquals("INDEX", compiledKernel.compiledSchema().get("meta.product_access_type")
+                .read(TestDocuments.document("INDEX")));
     }
 
     @Test
@@ -184,19 +156,18 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     @Test
-    void aLoaderThatNeverGotMetaTn1RegisteredThrowsClearly() {
+    void aLoaderThatNeverGotCoreRegisteredThrowsClearly() {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
-        // meta-kernel only -- no meta.tn -- governed by its own freshly bootstrapped compiled form (loadMeta).
+        // The kernel only -- no core.tn -- governed by its own freshly bootstrapped compiled form (loadMeta).
         registry.register(resolveMetaKernelOrdinarily());
         TsonCompiledSchemaLoader loader = registry;
-        SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
-        // meta.tn isn't meta-kernel's own well-known bootstrap case, and the default SchemaSource
+        // core.tn isn't the kernel's own well-known bootstrap case, and the default SchemaSource
         // fetches nothing -- so this is exactly SchemaSource.registeredOnly()'s own rejection.
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> loader.loadMeta(coreDocument.imports().getFirst()));
+                () -> loader.loadMeta(TsonBundledSchemas.CORE_ID));
         assertEquals(SchemaFetchException.Reason.NOT_PERMITTED, thrown.reason());
-        assertTrue(thrown.getMessage().contains("meta.tn"));
+        assertTrue(thrown.getMessage().contains("core.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 
@@ -206,7 +177,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!id:"https://example.test/mini.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              nothing => !void_type {}
+              nothing => !meta.void_type {}
             }
             """;
 
@@ -215,8 +186,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        // "void_type" is not local to mini.tn -- reachable because its import, meta.tn, contributes its whole
-        // namespace (meta-kernel's entries among it, through meta.tn's own !!import).
+        // "meta.void_type" is not local to mini.tn -- reachable because its import, the kernel, contributes its
+        // whole namespace.
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         Top voidDef = resolved.entries().get("nothing");
@@ -227,19 +198,21 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     void resolveSchemaThrowsClearlyWhenAnImportCantBeResolvedAtAll() {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
         SchemaResolver resolver = new SchemaResolver(registry);
-        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
+        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT.replace("m/meta.tn", "m/core.tn"))
+                .parseSchemaDocument();
 
-        // The default source fetches nothing, so what fails is obtaining the import, not resolving it -- and
-        // SchemaSource.fetch names the type that says so.
+        // The default source fetches nothing, and core.tn is not the kernel the library serves from its own
+        // bytes, so what fails is obtaining the import, not resolving it -- and SchemaSource.fetch names the
+        // type that says so.
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
                 () -> resolver.resolveSchema(miniDocument));
-        assertTrue(thrown.getMessage().contains("meta.tn"));
+        assertTrue(thrown.getMessage().contains("core.tn"));
     }
 
     /**
      * The definition mark and the selector are grammar ([TSON-SCHEMA] §5.2, §12.1), so they are read before
      * the governing meta is consulted and lower under a meta that declares no annotation at all -- the
-     * meta-kernel here. Nothing resolves them against a namespace, which is why no meta-schema can give the
+     * kernel here. Nothing resolves them against a namespace, which is why no meta-schema can give the
      * words another meaning and why no name has to be reserved to keep them.
      *
      * <p>Non-vacuous, and {@link #anOrdinaryUnknownAnnotationIsStillTheAuthorsError} is why: the same document
@@ -272,26 +245,24 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String KERNEL_GOVERNED_MARKS = """
             !!id:"https://example.test/marks.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              pet => abstract { pet_type: identifier =?  nick: identifier }
+              pet => abstract { pet_type: meta.identifier =?  nick: meta.identifier }
             }
             """;
 
     private static final String KERNEL_GOVERNED_UNKNOWN_MARK = """
             !!id:"https://example.test/unknown-mark.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              pet => @totally_unknown_xyz { nick: identifier }
+              pet => @totally_unknown_xyz { nick: meta.identifier }
             }
             """;
 
     private static final String MINI_DOCUMENT_NO_ID = """
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              nothing => !void_type {}
+              nothing => !meta.void_type {}
             }
             """;
 
@@ -312,7 +283,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!id:"mini.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              nothing => !void_type {}
+              nothing => !meta.void_type {}
             }
             """;
 
@@ -329,9 +300,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"meta-kernel.tn"
+            !!import:"meta.tn"
             !schema {
-              nothing => !void_type {}
+              nothing => !meta.void_type {}
             }
             """;
 
@@ -341,16 +312,15 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument malformedImportDocument = new TsonSchemaParser(MINI_DOCUMENT_MALFORMED_IMPORT).parseSchemaDocument();
 
         assertEquals(2, malformedImportDocument.imports().size());
-        // "meta-kernel.tn" alone is a syntactically valid relative-reference URI, but has no scheme.
+        // "meta.tn" alone is a syntactically valid relative-reference URI, but has no scheme.
         assertThrows(SchemaValidationException.class, () -> resolver.resolveSchema(malformedImportDocument));
     }
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              my_type => atom & {}
+              my_type => meta.atom & {}
             }
             """;
 
@@ -358,8 +328,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     void resolveSchemaGenuinelyMergesImportedEntriesIntoTheTypeNameNamespace() {
         // A bare type-ref (§8.3) is carried through unverified regardless of whether the target
         // exists anywhere, so that alone wouldn't prove anything -- composition is the real test:
-        // resolveComposition does exactly one resolved.get(supertypeName), no fallback, so "atom"
-        // (meta-kernel's own, zero fields) is only findable here if !!import's own entries were
+        // resolveComposition does exactly one resolved.get(supertypeName), no fallback, so "meta.atom"
+        // (the kernel's own, zero fields) is only findable here if !!import's own entries were
         // genuinely merged into the namespace, not just validated as well-formed URIs.
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_MERGED).parseSchemaDocument();
@@ -367,38 +337,37 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         // Transitive, per SchemaResolver's own induction: direct supertype + its own supertype chain.
-        assertEquals(List.of("atom", "top", "type"), TypeChain.supertypesOf(resolved.entries().get("my_type")));
+        assertEquals(List.of("meta.atom", "meta.top", "meta.type"),
+                TypeChain.supertypesOf(resolved.entries().get("my_type")));
         // Imported entries are visible during resolution but never part of the result itself.
         assertEquals(Set.of("my_type"), resolved.entries().keySet());
     }
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              void => !void_type {}
+              meta => !meta.void_type {}
             }
             """;
 
     @Test
     void resolveSchemaRejectsALocalDeclarationCollidingWithAnImportedName() {
-        // meta-kernel itself already declares "void" -- redeclaring it locally while also importing
-        // meta-kernel is exactly SchemaValidator's own "collides with an entry of the same name
-        // brought in by !!import" rule, now caught here too, one stage earlier.
+        // The kernel declares "meta", the schema map holding all of its entries -- redeclaring it locally while
+        // also importing the kernel is SchemaValidator's own "collides with an entry of the same name brought in
+        // by !!import" rule, caught here one stage earlier.
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL).parseSchemaDocument();
 
         SchemaValidationException thrown = assertThrows(
                 SchemaValidationException.class, () -> resolver.resolveSchema(miniDocument));
-        assertTrue(thrown.getMessage().contains("void"));
+        assertTrue(thrown.getMessage().contains("meta"));
         assertTrue(thrown.getMessage().contains("!!import"));
     }
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               placeholder => unit
@@ -406,8 +375,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             """;
 
     /**
-     * The bundled chain's own diamond: this kernel-governed document imports meta-kernel directly *and* meta.tn, which
-     * imports meta-kernel itself. Every one of meta-kernel's names therefore arrives by two routes -- but
+     * A diamond: this document imports the kernel twice. Every one of the kernel's names therefore arrives by two
+     * routes -- but
      * they are one schema's entries, so they unify rather than colliding, and {@code unit} resolves
      * (§2.2.3). A name-occurrence collision rule rejects this document instead, which
      * is what makes the diamond unauthorable for every practical schema.
@@ -433,12 +402,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         String ordinaryImportingTheKernel = """
                 !!id:"https://example.test/mini.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !schema { my_type => { v: identifier } }
+                !schema { my_type => { v: meta.identifier } }
                 """;
         String kernelGovernedImportingCore = """
                 !!id:"https://example.test/mini.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema { my_type => { v: text } }
                 """;
@@ -450,17 +418,16 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     /**
-     * Every edge the bundled chain and a meta layer use links: meta.tn importing the meta-kernel, policy.tn importing
-     * core.tn, a meta layer importing meta.tn, and a schema that layer governs importing core.tn.
+     * Every edge the bundled chain and a meta layer use links: policy.tn importing core.tn, a meta layer importing
+     * the kernel, and a schema importing that layer and core.tn.
      */
     @Test
     void theBundledChainAndALayersGovernedSchemaStillLink() {
         Map<String, String> sources = Map.of(
                 "https://example.test/meta-api.tn", """
                         !!id:"https://example.test/meta-api.tn"
-                        !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                         !!import:"https://tson.io/2026/39/m/meta.tn"
-                        !schema { status_name => identifier }
+                        !schema { status_name => meta.identifier }
                         """,
                 "https://example.test/orders.tn", """
                         !!id:"https://example.test/orders.tn"
@@ -484,35 +451,35 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
         TsonCompiledSchemaLoader loader = registry;
 
-        // Meta-kernel's own !!meta names itself -- if resolve() ever fell through to the generic
+        // The kernel is its own vocabulary -- if resolve() ever fell through to the generic
         // fetch-and-resolve-via-SchemaResolver(this) path for this URI, this call would recurse
         // forever (resolveSchema -> loader.loadMeta(sameUri) -> ...).
         // Completing at all is the proof; the assertions below just confirm it's genuinely usable.
-        TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
+        TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_ID);
 
-        // The same entry set a genuinely registered meta-kernel has: the bootstrap desugars its own document,
+        // The same entry set a genuinely registered kernel has: the bootstrap desugars its own document,
         // so TsonSchemaLinker.linkBootstrap has nothing left to add. Never registered (see the next test).
-        assertEquals(73, compiled.schema().entries().size());
+        assertEquals(103, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
-        assertNotNull(compiled.compiledSchema().get("integer_size")
+        assertNotNull(compiled.compiledSchema().get("meta.integer_size")
                 .read(TestDocuments.document("{ bits: 8 signed: true }")));
     }
 
     @Test
     void loaderBuildsTheBootstrapOnceAndNeverRegistersIt() {
         // The bootstrap stand-in is built once per registry and answers every lookup, but is never registered
-        // -- the permanent, materialized registry entry for meta-kernel comes from a separate, deliberate
+        // -- the permanent, materialized registry entry for the kernel comes from a separate, deliberate
         // "load and register" step done once elsewhere.
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
         TsonCompiledSchemaLoader loader = registry;
 
-        TsonCompiledMetaSchema first = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
-        TsonCompiledMetaSchema second = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
+        TsonCompiledMetaSchema first = loader.loadMeta(TsonBundledSchemas.META_ID);
+        TsonCompiledMetaSchema second = loader.loadMeta(TsonBundledSchemas.META_ID);
 
         assertSame(first, second);
-        assertTrue(registry.get(TsonBundledSchemas.META_KERNEL_ID).isEmpty());
-        assertTrue(registry.schemaRegistry().get(TsonBundledSchemas.META_KERNEL_ID).isEmpty());
+        assertTrue(registry.get(TsonBundledSchemas.META_ID).isEmpty());
+        assertTrue(registry.schemaRegistry().get(TsonBundledSchemas.META_ID).isEmpty());
     }
 
     @Test
@@ -521,44 +488,29 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
 
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> loader.loadMeta("https://tson.io/2026/39/m/meta.tn"));
+                () -> loader.loadMeta("https://tson.io/2026/39/m/core.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 
     @Test
     void loaderResolvesANonBootstrapUriGenericallyViaAPluggedInSchemaSource() {
-        // Proves the generic fetch -> parse -> resolve -> register -> compile path works end to end
-        // for a real, non-trivial schema (meta.tn itself), not just the meta-kernel special case --
-        // TsonBundledSchemas hands back meta.tn's own real bundled source text, and resolution
-        // proceeds through SchemaResolver(this loader).
-        //
-        // Meta-kernel itself must already be explicitly, permanently registered first: meta.tn's
-        // own !!import of meta-kernel is merged twice over, by two different mechanisms --
-        // SchemaResolver's own resolution-time merge (which goes through this loader, so the
-        // one-off bootstrap alone would satisfy it) *and* SchemaValidator's own registration-time
-        // merge (run inside TsonSchemaRegistry#register, via its own registered-only TsonSchemaLoader,
-        // which knows nothing about this loader or its bootstrap case). The one-off bootstrap
-        // is never registered into TsonSchemaRegistry (see the "never caches" test above), so without
-        // this explicit step, registering meta.tn would fail validation with "!!import '...' is
-        // not registered" even though resolution itself succeeded.
+        // The kernel registered explicitly, through ordinary SchemaResolver.resolveSchema rather than the raw
+        // bootstrap output (TsonSchemaRegistry#register refuses a schema with bootstrap() == true), and then
+        // served from the registry, not from the one-off bootstrap stand-in.
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
-        // Registered via ordinary SchemaResolver.resolveSchema, not the raw bootstrap output --
-        // TsonSchemaRegistry#register now refuses any self-referential schema with bootstrap() == true,
-        // materialized or not (see its own Javadoc); resolveSchema never sets that flag.
-        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
+        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(metaKernel);
 
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_ID);
 
-        assertEquals("BASE64", compiled.compiledSchema().get("bytes_encoding")
+        assertEquals("BASE64", compiled.compiledSchema().get("meta.bytes_encoding")
                 .read(TestDocuments.document("BASE64")));
-        // Still there, from the explicit pre-registration step above -- meta.tn's own resolution
-        // didn't need to (and doesn't) re-register it.
-        assertTrue(registry.get(TsonBundledSchemas.META_KERNEL_ID).isPresent());
+        // Still there, from the explicit registration step above.
+        assertTrue(registry.get(TsonBundledSchemas.META_ID).isPresent());
     }
 }

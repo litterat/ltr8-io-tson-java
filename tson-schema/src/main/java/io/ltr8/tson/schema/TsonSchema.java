@@ -38,9 +38,9 @@ import java.util.Optional;
  * declared, the annotations written on its value, the constructor its value applies and the entry a refinement
  * names. None of it is a field of any constructor, so binding a value never fills it, and none of it is written.
  *
- * <p><b>An instantiation's application is a key annotation</b>, {@code @application} ({@link #applicationOf}):
+ * <p><b>An instantiation's application is a key annotation</b>, {@code @meta.application} ({@link #applicationOf}):
  * an entry of any kind can close a template application, so the fact is about the entry and sits beside it, as
- * {@code @synthetic} does, where resolved output writes it and ingest reads it as stated.
+ * {@code @meta.synthetic} does, where resolved output writes it and ingest reads it as stated.
  *
  * <p><b>{@code id} is required, not {@code Optional}</b> -- the grammar itself marks {@code !!id} optional (a raw
  * parsed {@code SchemaDocument} can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*,
@@ -68,11 +68,11 @@ import java.util.Optional;
  * <p><b>{@link #bootstrap()}</b> -- {@code true} <i>only</i> for a schema {@code MetaKernelBootstrapResolver}
  * itself produced (the kernel, pre-loaded by special resolution, [TSON-SCHEMA] §3.4). A real, stored flag,
  * not derived from the identity -- a *derived* check can't tell "this schema really
- * was produced by reading meta-kernel.tn through the real bootstrap reader" apart from
+ * was produced by reading meta.tn through the real bootstrap reader" apart from
  * "this schema merely happens to carry the kernel's {@code !!id}," and the whole point
  * of gating {@link TsonSchemaRegistry#register}/{@code TsonSchemaLinker.linkBootstrap} on it is to keep
  * proving, continuously, that the real reader is what produces whatever ever gets registered under
- * meta-kernel's own identity -- not just that something of the right shape did. This one stays a flag
+ * the kernel's own identity -- not just that something of the right shape did. This one stays a flag
  * rather than becoming a type, unlike linked-ness above: it's true for exactly one
  * object in the entire system, ever, so a dedicated type would only relocate the flag (it would
  * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
@@ -95,14 +95,14 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * (which is what tells a derived name from a declared one). {@code annotations} are those written after
      * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before
      * the name are the key's ({@link #entries}). {@code constructor} is the constructor
-     * the value applies -- the tag resolved output writes, {@code !integer_type}, {@code !enum}, {@code
-     * !set_type} -- which binding erases into a class that several constructors share. {@code refines} is the
+     * the value applies -- the tag resolved output writes, {@code !meta.integer_type}, {@code !meta.enum}, {@code
+     * !meta.set_type} -- which binding erases into a class that several constructors share. {@code refines} is the
      * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
      * which is what lets a tightened constructor bind as the one it tightens, and the chain cannot tell it from a
      * composition adding nothing. All of it is provenance, and none of it is written ([TSON-SCHEMA] §8.1).
-     * {@code synthetic} is the key's {@code @synthetic} mark as {@link #factsOf} reads it: a form no author
+     * {@code synthetic} is the key's {@code @meta.synthetic} mark as {@link #factsOf} reads it: a form no author
      * named, which a message names by its spelling or not at all. {@code closes} is every application the resolver
-     * closed to this entry, as it met them, an expansion's among them, which carries no {@code @application}: what
+     * closed to this entry, as it met them, an expansion's among them, which carries no {@code @meta.application}: what
      * lets a data read resolve an application by structural identity to the entry the schema closed it to
      * ([TSON-SCHEMA] §8.2, SPEC-FEEDBACK.md #12).
      */
@@ -306,7 +306,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     }
 
     /**
-     * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): the {@code @application} its key
+     * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): the {@code @meta.application} its key
      * carries, which the resolver writes wherever an entry closes one -- a record template's member, a namespace
      * entry, the alias a template's application closes to. Empty for an entry that closes none.
      */
@@ -314,12 +314,12 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
         return applicationOf(entries.getAnnotations(name));
     }
 
-    /** The application a key's {@code annotations} name, if they carry {@code @application}. */
+    /** The application a key's {@code annotations} name, if they carry {@code @meta.application}. */
     public static Optional<TypeRef> applicationOf(Annotations annotations) {
         return annotations.value(APPLICATION, TypeRef.class);
     }
 
-    /** {@code annotations} with {@code @application:application} added -- the key of an instantiation. */
+    /** {@code annotations} with {@code @meta.application:application} added -- the key of an instantiation. */
     public static Annotations withApplication(Annotations annotations, TypeRef application) {
         List<io.ltr8.annotation.Annotation> values = new java.util.ArrayList<>(annotations.values());
         values.removeIf(annotation -> annotation.name().equals(APPLICATION));
@@ -328,13 +328,13 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     }
 
     /** The kernel's {@code schema}, the namespace type the schema map is a value of. */
-    public static final String SCHEMA = "schema";
+    public static final String SCHEMA = "meta.schema";
 
     /** The kernel's {@code application} annotation, derived and never author-written (§8.2). */
-    public static final String APPLICATION = "application";
+    public static final String APPLICATION = "meta.application";
 
     /** The kernel's {@code synthetic} annotation: the key of a form no author named (§8.2). */
-    public static final String SYNTHETIC = "synthetic";
+    public static final String SYNTHETIC = "meta.synthetic";
 
     /**
      * The constructor {@code name}'s value applies: the one its facts record, and otherwise the one its Java

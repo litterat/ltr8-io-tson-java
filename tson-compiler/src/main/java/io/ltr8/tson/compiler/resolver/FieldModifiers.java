@@ -16,7 +16,7 @@ import java.util.Optional;
  * the author wrote, which is why it can be answered before a field's type is known.
  *
  * <p><b>Two phases ask it.</b> {@link SchemaDesugarer} asks when it rewrites a record template's body into
- * the {@code !record { fields: [ ... ] }} §5.2 says it denotes, and writes the answer as wire fields;
+ * the {@code !meta.record { fields: [ ... ] }} §5.2 says it denotes, and writes the answer as wire fields;
  * {@code DefinitionResolver} asks when it resolves a closed record body, and writes the answer into a
  * {@code RecordField}. One table, so the spellings and the errors around them cannot drift apart between a
  * template and the closed record beside it.

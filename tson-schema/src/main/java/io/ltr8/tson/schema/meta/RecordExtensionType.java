@@ -1,9 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
 /**
- * The meta-kernel's {@code record_extension_type} enum (Part 2 §5.2, §8.1) -- how a record may be realised.
+ * The kernel's {@code record_extension_type} enum (Part 2 §5.2, §8.1) -- how a record may be realised.
  * {@link #OPEN} is the default and is omitted from resolver output text ("Fields at their default values are
- * omitted", {@code meta-kernel-resolved.tn}'s own conventions note).
+ * omitted", {@code kernel-resolved.tn}'s own conventions note).
  *
  * <p>{@link #OPEN} is the ordinary case: the record has instances of its own and may be composed onto or
  * refined. {@link #ABSTRACT} has none of its own, so a value at a position typed by it is a value of some

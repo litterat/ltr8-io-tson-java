@@ -49,7 +49,7 @@ import java.util.function.UnaryOperator;
  * called {@code record}, but a Java class named {@code Record} would collide, confusingly, with
  * {@code java.lang.Record} (the very language feature every type in this model is built from).
  */
-@Typename(name = "record")
+@Typename(name = "meta.record")
 public record RecordBody(TypeChain chain, Namespace<RecordField> fields,
                           List<FieldGroup> groups, RecordExtensionType extension, List<String> discriminators,
                           @Field("name_type") Optional<String> nameType,
@@ -61,10 +61,10 @@ public record RecordBody(TypeChain chain, Namespace<RecordField> fields,
      * stating nothing, because the two resolve in different namespaces: a name an author wrote resolves in the
      * author's own schema first, as an enum's does, and the absent default is the kernel's.
      */
-    public static final String FIELD_NAME = "field_name";
+    public static final String FIELD_NAME = "meta.field_name";
 
     /** The kernel's {@code field_map}, the namespace type a record's {@link #fields} are a value of. */
-    public static final String FIELD_MAP = "field_map";
+    public static final String FIELD_MAP = "meta.field_map";
 
     /**
      * <b>Absent and empty are the same value</b> for the three the kernel makes optional ({@code chain}, {@code

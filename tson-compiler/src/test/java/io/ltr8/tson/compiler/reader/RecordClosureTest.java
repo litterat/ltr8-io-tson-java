@@ -142,19 +142,19 @@ class RecordClosureTest {
     @Test
     void closureReachesObjectBindingModeToo() {
         Map<String, Top> entries = new LinkedHashMap<>();
-        entries.put("integer", atom(IntegerType.UNCONSTRAINED));
-        entries.put("text", atom(TextType.UNCONSTRAINED));
-        entries.put("text_member_set", ArrayBody.of(TypeRef.of("text")));
-        entries.put("normalization", new EnumBody(
+        entries.put("meta.integer", atom(IntegerType.UNCONSTRAINED));
+        entries.put("meta.text", atom(TextType.UNCONSTRAINED));
+        entries.put("meta.text_member_set", ArrayBody.of(TypeRef.of("meta.text")));
+        entries.put("meta.normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
-        entries.put("text_type", RecordBody.of(RecordBody.fieldMap(
+        entries.put("meta.text_type", RecordBody.of(RecordBody.fieldMap(
                 KernelChainFields.chainField(entries),
-                Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
-                Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
-                Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
-                Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
-                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
-                Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
+                Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("meta.integer"))),
+                Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("meta.integer"))),
+                Map.entry("length", RecordField.optionalVoidable(TypeRef.of("meta.integer"))),
+                Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("meta.text"))),
+                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("meta.text_member_set"))),
+                Map.entry("normalization", RecordField.defaulted(TypeRef.of("meta.normalization"),
                         new Token("NONE", Token.Form.UNQUOTED))))));
         TsonSchema schema = new TsonSchema("https://example.test/bind-closure.tn",
                 List.of(), entries);
@@ -163,7 +163,7 @@ class RecordClosureTest {
                 ValueReaderFactoryRegistry.bind(context));
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
-        Object bound = compiled.get("text_type")
+        Object bound = compiled.get("meta.text_type")
                 .read(TestDocuments.document("{ min_length: 1  minLength: 2 }", problems));
 
         Diagnostic diagnostic = problems.diagnostics().getFirst();
@@ -175,6 +175,6 @@ class RecordClosureTest {
 
         // The same schema, the same reader, nothing unknown: the binding itself still works.
         assertEquals(Optional.of(1), assertInstanceOf(TextType.class,
-                compiled.get("text_type").read(TestDocuments.document("{ min_length: 1 }"))).minLength());
+                compiled.get("meta.text_type").read(TestDocuments.document("{ min_length: 1 }"))).minLength());
     }
 }

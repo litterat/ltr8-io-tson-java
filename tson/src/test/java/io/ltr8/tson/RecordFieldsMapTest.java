@@ -39,7 +39,7 @@ class RecordFieldsMapTest {
     @Test
     void theExplicitFormStatesFieldsAsAMapKeyedByName() {
         assertEquals(List.of(), validateSchema("explicit", """
-                  point => !record { fields: { x => { type: int32 }  y => { type: int32  optional: true } } }
+                  point => !meta.record { fields: { x => { type: int32 }  y => { type: int32  optional: true } } }
                 """));
     }
 
@@ -52,12 +52,12 @@ class RecordFieldsMapTest {
     void aNameWrittenTwiceInTheExplicitFormIsTheMapsDuplicateKey() {
         Diagnostic read = only(Tson.standard().validate("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !record { fields: { x => { type: integer }  x => { type: text } } }
+                !meta.record { fields: { x => { type: meta.integer }  x => { type: meta.text } } }
                 """));
         assertEquals(Diagnostic.Code.DUPLICATE_MAP_KEY, read.code(), read.toString());
 
         Diagnostic declared = only(validateSchema("twice", """
-                  point => !record { fields: { x => { type: int32 }  x => { type: text } } }
+                  point => !meta.record { fields: { x => { type: int32 }  x => { type: text } } }
                 """));
         assertTrue(declared.message().contains("duplicate key 'x' in 'fields'"), declared.message());
         assertTrue(!declared.message().contains("are one"), "never the linker's name-type verdict");
@@ -70,8 +70,8 @@ class RecordFieldsMapTest {
     @Test
     void twoSpellingsOfOneNameAreTheLinkersToRefuse() {
         Diagnostic problem = only(validateSchema("folded", """
-                  folded => !identifier_type { normalization: NFKC_CASEFOLD }
-                  row => !record { name_type: folded  fields: { name => { type: text }  NAME => { type: text } } }
+                  folded => !meta.identifier_type { normalization: NFKC_CASEFOLD }
+                  row => !meta.record { name_type: folded  fields: { name => { type: text }  NAME => { type: text } } }
                 """));
         assertTrue(problem.code() != Diagnostic.Code.DUPLICATE_MAP_KEY, problem.toString());
         assertTrue(problem.message().contains("'name' and 'NAME' are one value of its name_type 'folded'"),

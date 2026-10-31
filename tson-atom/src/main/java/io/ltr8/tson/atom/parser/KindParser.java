@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses and validates against a reference that names types -- an instance of the meta-kernel's {@code reference}
+ * Parses and validates against a reference that names types -- an instance of the kernel's {@code reference}
  * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, spelled {@code kind<record>} or {@code ref<record>} alike.
  * A value is a type's name or an application, read by {@link ReferenceGrammar} into the {@link TypeRef} it is, and
  * then judged a member: the entry it denotes must be one of the reference's linked members. The value is the

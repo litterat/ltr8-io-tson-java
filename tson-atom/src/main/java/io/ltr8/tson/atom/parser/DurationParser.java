@@ -45,7 +45,7 @@ public record DurationParser(DurationType constraints) implements AtomTypeParser
     /** §5.5's built-in annotation name -- {@code !duration}. */
     public static final String TYPENAME = "duration";
 
-    /** {@code duration => !duration_type {}} -- the unconstrained duration. */
+    /** {@code duration => !meta.duration_type {}} -- the unconstrained duration. */
     public static final DurationParser UNCONSTRAINED = new DurationParser(DurationType.UNCONSTRAINED);
 
     public DurationParser(Optional<Duration> min, Optional<Duration> max) {

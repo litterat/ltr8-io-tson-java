@@ -82,6 +82,9 @@ final class WaitGraph {
     private record Shape(String terminal, DataValue declaration, Form form) {
     }
 
+    private static final String SCHEMA = "meta.schema";
+    private static final String ALIAS = "meta.alias";
+
     private final Map<String, DataValue> declarations = new LinkedHashMap<>();
     private final Map<String, List<Annotation>> keyAnnotations = new LinkedHashMap<>();
     private final Map<String, Map<String, Wait>> waits = new LinkedHashMap<>();
@@ -99,16 +102,32 @@ final class WaitGraph {
         if (!(root.coreValue() instanceof MapValue map)) {
             throw new IllegalArgumentException("the document root is not a schema map: " + root.coreValue());
         }
-        for (MapValue.MapEntry entry : map.entries()) {
-            String name = text(entry.key().coreValue());
-            graph.declarations.put(name, entry.value());
-            graph.keyAnnotations.put(name, entry.key().annotations());
-        }
+        graph.declare("", map);
         for (Map.Entry<String, DataValue> entry : graph.declarations.entrySet()) {
             graph.readEntry(entry.getKey(), entry.getValue());
         }
         graph.readDocument(root);
         return graph;
+    }
+
+    /**
+     * The entries of a schema map, a nested map's members under their paths ({@code meta.record}): a schema map
+     * nested as an entry declares as the root does, and is itself no entry a read waits on.
+     */
+    private void declare(String prefix, MapValue map) {
+        for (MapValue.MapEntry entry : map.entries()) {
+            String name = prefix + text(entry.key().coreValue());
+            if (isSchemaMap(entry.value()) && entry.value().coreValue() instanceof MapValue members) {
+                declare(name + ".", members);
+                continue;
+            }
+            declarations.put(name, entry.value());
+            keyAnnotations.put(name, entry.key().annotations());
+        }
+    }
+
+    private static boolean isSchemaMap(DataValue value) {
+        return value.typeRef().filter(t -> t.equals("schema") || t.equals(SCHEMA)).isPresent();
     }
 
     /** Every entry, in document order. */
@@ -204,7 +223,7 @@ final class WaitGraph {
             return;
         }
         read.read(declaration, head.get(), "head", "");
-        if (head.get().equals("alias")) {
+        if (head.get().equals(ALIAS)) {
             targetName(declaration).ifPresentOrElse(
                     target -> read.waitOn(target, "alias target", "target"),
                     () -> problems.add(name + ": an alias with no target name"));
@@ -213,7 +232,7 @@ final class WaitGraph {
 
     private void readDocument(DataValue root) {
         Read read = new Read("<document>");
-        String rootType = root.typeRef().orElse("schema");
+        String rootType = root.typeRef().filter(t -> !t.equals("schema")).orElse(SCHEMA);
         read.waitOn(rootType, "head", "");
         read.annotations(root.annotations(), "");
         Shape shape = shape(rootType, read, "");
@@ -417,27 +436,27 @@ final class WaitGraph {
         }
         Set<String> constructorSupertypes = new HashSet<>(supertypes(declarations.get(constructor)));
         Form form;
-        if (constructor.equals("record")) {
+        if (constructor.equals("meta.record")) {
             if ("ABSTRACT".equals(token(field(declaration, "extension")))) {
                 form = Form.ABSTRACT;
             } else {
                 form = Form.RECORD;
             }
-        } else if (constructor.equals("array") || constructorSupertypes.contains("array")) {
+        } else if (constructor.equals("meta.array") || constructorSupertypes.contains("meta.array")) {
             form = Form.ARRAY;
-        } else if (constructor.equals("map")) {
+        } else if (constructor.equals("meta.map")) {
             form = Form.MAP;
-        } else if (constructor.equals("namespace")) {
+        } else if (constructor.equals("meta.namespace")) {
             form = Form.NAMESPACE;
-        } else if (constructor.equals("declared_type")) {
+        } else if (constructor.equals("meta.declared_type")) {
             form = Form.DECLARED;
-        } else if (constructor.equals("tuple")) {
+        } else if (constructor.equals("meta.tuple")) {
             form = Form.TUPLE;
-        } else if (constructor.equals("choice")) {
+        } else if (constructor.equals("meta.choice")) {
             form = Form.CHOICE;
-        } else if (constructor.equals("template")) {
+        } else if (constructor.equals("meta.template")) {
             form = Form.TEMPLATE;
-        } else if (constructorSupertypes.contains("atom")) {
+        } else if (constructorSupertypes.contains("meta.atom")) {
             form = Form.ATOM;
         } else {
             problems.add(terminal + ": no form for its constructor " + constructor);
@@ -455,7 +474,7 @@ final class WaitGraph {
             if (declaration == null) {
                 return null;
             }
-            if (!"alias".equals(declaration.typeRef().orElse(""))) {
+            if (!ALIAS.equals(declaration.typeRef().orElse(""))) {
                 return current;
             }
             current = targetName(declaration).orElse(null);
@@ -470,7 +489,7 @@ final class WaitGraph {
     private Optional<String> namespaceType(Shape shape, String slot, Read read, String path) {
         String type = token(field(shape.declaration(), slot));
         if (type == null && slot.equals("key_type")) {
-            return Optional.of("text");
+            return Optional.of("meta.text");
         }
         if (type == null) {
             problems.add(read.entry + ": namespace " + shape.terminal() + " carries no " + slot + " (" + path + ")");

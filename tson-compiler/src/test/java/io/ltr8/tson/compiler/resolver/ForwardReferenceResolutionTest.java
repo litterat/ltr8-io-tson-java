@@ -25,7 +25,7 @@ class ForwardReferenceResolutionTest {
     private static TsonSchema resolve(String body) {
         String document = """
                 !!id:"https://example.test/fwd.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                 """ + body + "\n}\n";
         SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.unicode.Xid;
 
 /**
@@ -56,11 +57,15 @@ final class InternalName {
     /**
      * {@code text} as one part of a derived name -- its head, or one of its segments.
      *
-     * <p>Three cases, in the order they are tested:
+     * <p>A kernel path is first reduced to its member's name, {@code meta.text} to {@code text}: the readable half
+     * says what a name came from, and every kernel name carries the one prefix. Then four cases, in the order they
+     * are tested:
      *
      * <ul>
      *   <li><b>ASCII, admitted by §7.7, and within {@link #MAX_PART}</b> -- spliced verbatim. This is the
      *   ordinary case: a type name, a verb, a bound, an enum member.</li>
+     *   <li><b>A qualified name of ASCII identifiers, within {@link #MAX_PART}</b> -- each dot written {@code _}:
+     *   {@code geo.address} reads {@code geo_address}.</li>
      *   <li><b>ASCII, but not admitted or too long</b> -- the admitted characters, truncated to the budget,
      *   then a hash of the whole. A path {@code "/x"} reads {@code x_h00000f2f} and {@code 1.0} reads
      *   {@code 1_0_h0002f0a5}: the readable part still says what it came from, and the hash keeps two texts
@@ -73,8 +78,13 @@ final class InternalName {
      * template name and so already starts legally, and everything after it sits at a continue position.
      */
     static String part(String text) {
+        // A kernel entry reads as its own name, `meta.array` as `array`: every kernel name has the one prefix.
+        text = KernelNames.member(text);
         if (isAdmittedAscii(text) && text.length() <= MAX_PART) {
             return text;
+        }
+        if (isQualifiedAscii(text) && text.length() <= MAX_PART) {
+            return text.replace('.', '_');
         }
         return isAscii(text) ? joined(truncated(admittedOf(text)), hash(text)) : hash(text);
     }
@@ -92,6 +102,20 @@ final class InternalName {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (c > 0x7F || !(Xid.isContinue(c) || c == '-')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * A qualified name, its segments joined by {@code .}, each an ASCII identifier -- {@code meta.text}, {@code
+     * geo.address} -- which a part spells with each dot written {@code _}. Its own path is no part of identity,
+     * which the structural hash carries, so no hash of the text is needed to keep two paths apart.
+     */
+    private static boolean isQualifiedAscii(String text) {
+        for (String segment : text.split("\\.", -1)) {
+            if (segment.isEmpty() || !isAdmittedAscii(segment) || !Xid.isStart(segment.charAt(0))) {
                 return false;
             }
         }

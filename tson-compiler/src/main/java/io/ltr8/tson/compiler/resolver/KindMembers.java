@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Alias;
@@ -33,8 +34,8 @@ import java.util.function.Function;
  * <p><b>Membership of a type name is one walk</b> over resolved entries, never over spellings. From an entry, alias
  * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a template
  * over another constructor (a {@code template} body, which is no type) and a value entry are no type's name. For every
- * other entry the type of its value -- the tag resolved output writes, {@code !record}, {@code !identifier_type},
- * {@code !namespace} -- is followed, through a constructor template's held body to the constructor it applies, until a
+ * other entry the type of its value -- the tag resolved output writes, {@code !meta.record}, {@code !meta.identifier_type},
+ * {@code !meta.namespace} -- is followed, through a constructor template's held body to the constructor it applies, until a
  * constructor is reached, and the entry is a member when that constructor is {@code of} or has {@code of} among its
  * supertypes. A record template is built with {@code record}, so a reference over {@code record} holds it. So does
  * the kernel's {@code top}, a fresh abstract record IS-A nothing. So does a constructor whose declaration is a record,
@@ -57,7 +58,7 @@ import java.util.function.Function;
  */
 public final class KindMembers {
 
-    private static final String TOP = "top";
+    private static final String TOP = KernelNames.of("top");
 
     private KindMembers() {
     }
@@ -113,7 +114,7 @@ public final class KindMembers {
                 return current.equals(constructorOf);
             }
             if (next.get().definition() instanceof TemplateBody held) {
-                // A constructor template (`kind => <T> !reference { of: T }`): built with what its body applies.
+                // A constructor template (`kind => <T> !meta.reference { of: T }`): built with what its body applies.
                 Optional<String> applied = HeldBody.of(held).application().typeRef();
                 if (applied.isEmpty()) {
                     return false;

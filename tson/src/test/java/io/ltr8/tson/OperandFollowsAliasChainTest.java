@@ -181,7 +181,7 @@ class OperandFollowsAliasChainTest {
     @Test
     void aCompositionThroughAnAliasToANonRecordInstantiationIsRefused() {
         assertTrue(refusal("ofc9", """
-                  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
                   triple => vector<text, 3>
                   sub    => triple & { extra: text }
                 """).contains("has no fields to contribute"));

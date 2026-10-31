@@ -57,8 +57,8 @@ including records, record groups, enums and some in-built types. The `2026/39` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=75b5eb0d41b26b1c6eef6af71e404a1dfb9db7ce1d33a9514df9b06051d9f2ed"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=53ded46a759a3906f536adec3fd90444734944f04e34533ede786f12a3189e1b"
+!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=f6396ea1f6e38ed9b0084e0f0b7a812ab2504f61cc190bd30efe74c160ac06f4"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=6d57f04f65608aab13769156208c59087b7a3ab3fab695f9b10c0e7a3659f8e0"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 !schema {
   role => !enum [admin member guest]
@@ -571,18 +571,20 @@ vocabulary — parse → resolve → link → register → compile → read:
 `Tson.standard()` wires all of this together for the standard library and hands you a `Tson` whose `resolve`/`compile`
 run the pipeline for you (as shown in the [reader table](#reading-and-writing-tson-choosing-an-entry-point)'s schema
 example) — so you rarely touch the individual stages directly. Under the hood, resolving a schema reads each constructor
-it applies (`!enum`, `!integer_type`) through the compiled form of the schema in its import closure that declares it,
-or, for one the schema declares itself, through readers compiled from its entries ready so far: every declaration is
-made ready in wait order, whatever order it is written in, so a constructor and its instances, or a type and a value of
-it, may share a document either way round. Every name a schema writes resolves in that one namespace — its own entries
-and its imports, transitively — and every name of the kernel reaches it only by import (core.tn imports meta.tn, which
-imports meta-kernel). The kernel itself imports nothing and applies only its own constructors, a cycle closed by
+it applies (`!meta.enum`, `!meta.integer_type`) through the compiled form of the schema in its import closure that
+declares it, or, for one the schema declares itself, through readers compiled from its entries ready so far: every
+declaration is made ready in wait order, whatever order it is written in, so a constructor and its instances, or a type
+and a value of it, may share a document either way round. Every name a schema writes resolves in that one namespace —
+its own entries and its imports, transitively — and every name of the kernel reaches it only by import, under the one
+name `meta` (`meta.record`, `meta.integer_type`): core.tn imports meta.tn, the kernel, and names the instances a data
+schema writes bare (`text`, `integer`, `boolean`, `kind`, `doc`, …) at its own root by alias. The kernel itself imports
+nothing and applies only its own constructors, a cycle closed by
 pre-loading a hand-written bootstrap (`MetaKernelBootstrapResolver`) rather than resolving it from a document. See
 [design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
-including how meta-kernel/meta.tn/core.tn are loaded and registered together.
+including how meta.tn, core.tn, net.tn and policy.tn are loaded and registered together.
 
 Vocabulary of your own — a schema declaring record types or namespace types
-(`api => !namespace { key_type: identifier  value_type: method }`) whose values other schemas hold as entries
+(`api => !meta.namespace { key_type: identifier  value_type: method }`) whose values other schemas hold as entries
 (`orders => !api { … }`) — is a schema like any other, reached by `!!import` through the configured `SchemaAccess`.
 Those values bind through the same `ProcessorConfig.withDataBindContext` as data does; where no class binds a value's
 type it is held as a tree, so the schema still loads and validates, and only a schema obtained to bind refuses it.

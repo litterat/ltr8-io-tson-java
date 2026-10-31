@@ -16,8 +16,8 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Compiles this module's own {@code diagnostics.tn} (a small schema, governed by meta.tn and
- * importing core.tn, declaring {@code diagnostic}/{@code policy}/{@code
+ * Compiles this module's own {@code diagnostics.tn} (a small schema, importing core.tn and
+ * policy.tn, declaring {@code diagnostic}/{@code policy}/{@code
  * validation_report}/{@code file_report}/{@code validation_run}), *compiled* in object-binding mode --
  * bound directly to {@link CliDiagnostic}/{@link CliPolicy}/{@link ValidationReport}/{@link
  * FileReport}/{@link ValidationRun} via

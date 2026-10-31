@@ -6,7 +6,7 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code type_chain} ([TSON-SCHEMA] §4.1): where an entry sits in the
+ * The kernel's {@code type_chain} ([TSON-SCHEMA] §4.1): where an entry sits in the
  * IS-A order. Carried by every {@link Type}, as {@code type}'s one field, and asked of any {@link Top} by the
  * statics here, which answer empty for a value that carries none. Which application an entry is the instantiation
  * of is no part of it: an entry of any kind can be one, so that fact sits on the entry's key ({@code
@@ -23,7 +23,7 @@ import java.util.List;
  * it as stated, since a flat body and its chain cannot be recomputed from each other. Absent and empty are one
  * chain, and one list.
  */
-@Typename(name = "type_chain")
+@Typename(name = "meta.type_chain")
 public record TypeChain(List<TypeRef> parents, List<String> supertypes, List<String> subtypes) {
 
     /** The chain of a value no declaration placed: a fresh record, an instance. */

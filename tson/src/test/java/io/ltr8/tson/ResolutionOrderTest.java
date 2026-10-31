@@ -45,7 +45,7 @@ class ResolutionOrderTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              counted => array ^ { ordered?: = false }
+              counted => meta.array ^ { ordered?: = false }
               counts  => !counted { element_type: int32  min_items: 1 }
               names   => !counted { element_type: label }
               label   => @kind_note:"a name" !text ^ { max_length: 32 }
@@ -53,11 +53,11 @@ class ResolutionOrderTest {
               point   => { x: int32  y: int32  next?: point }
               line    => { from: point  to: point }
               origin  => !line { from: { x: 1  y: 2 }  to: { x: 3  y: 4  next: { x: 5  y: 6 } } }
-              @kind_note:"steps" steps => !namespace { key_type: identifier  value_type: label }
+              @kind_note:"steps" steps => !meta.namespace { key_type: identifier  value_type: label }
               plan    => !steps { first => "a"  second => "b" }
               base    => { id: int32 }
               derived => base & { extra?: counts }
-              step    => top & { takes: type_kind }
+              step    => meta.top & { takes: meta.type_kind }
               s       => !step { takes: derived }
             }
             """, """
@@ -66,7 +66,7 @@ class ResolutionOrderTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               geo => !schema {
-                counted => array ^ { ordered?: = false }
+                counted => meta.array ^ { ordered?: = false }
                 counts  => !geo.counted { element_type: int32  min_items: 1 }
                 point   => { x: int32  y: int32 }
                 origin  => !geo.point { x: 0  y: 0 }
@@ -135,7 +135,7 @@ class ResolutionOrderTest {
     @Test
     void eachBundledSchemaResolvesTheSameInAnyOrder() {
         Tson tson = tson();
-        for (String id : List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
+        for (String id : List.of(TsonBundledSchemas.META_ID,
                 TsonBundledSchemas.CORE_ID, TsonBundledSchemas.NET_ID, TsonBundledSchemas.POLICY_ID)) {
             assertOrderIndependent(tson, id, TsonBundledSchemas.fetch(id));
         }

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -65,18 +66,18 @@ import java.util.function.UnaryOperator;
  * head each form desugars to and the vocabulary field each argument fills are a fixed table (§5.3):
  *
  * <pre>
- * [T]              !array { element_type: T }
- * [T; N..M]        !array { element_type: T  min_items: N  max_items: M }
+ * [T]              !meta.array { element_type: T }
+ * [T; N..M]        !meta.array { element_type: T  min_items: N  max_items: M }
  * [T?; ...]        the corresponding form with voidable: true bound directly
- * [T, U]           !tuple { elements: [{ element_type: T } { element_type: U }] }
- * (A | B)          !choice { variants: [A B] }
- * {K =&gt; V}         !map   { key_type: K  value_type: V }
+ * [T, U]           !meta.tuple { elements: [{ element_type: T } { element_type: U }] }
+ * (A | B)          !meta.choice { variants: [A B] }
+ * {K =&gt; V}         !meta.map   { key_type: K  value_type: V }
  * {K =&gt; V; N..M}   the same, with min_items/max_items
  * </pre>
  *
  * This phase therefore consults no governing meta at all. The kernel's container constructors are
  * parameterless (§4.2), so nothing about routing is stated in a meta to be read off it: the table above is
- * the whole rule, and the meta-kernel's own bootstrap needs no special case.
+ * the whole rule, and the kernel's own bootstrap needs no special case.
  *
  * <p><b>A nested bracket or brace form expands innermost first.</b> §5.3's declaration-level container
  * syntax nests inside itself -- {@code [[T; N]; N]}, {@code {text =&gt; [order; 1..]}} -- so a position
@@ -110,19 +111,19 @@ import java.util.function.UnaryOperator;
 final class SchemaDesugarer {
 
     /** §5.3's desugar target for {@code [T]} and the sized forms, fixed by the sugar rather than by the author. */
-    private static final String ARRAY = "array";
+    private static final String ARRAY = KernelNames.of("array");
 
     /** §5.3's desugar target for <code>{K =&gt; V}</code>, fixed the same way {@link #ARRAY} is. */
-    private static final String MAP = "map";
+    private static final String MAP = KernelNames.of("map");
 
     /** §5.3's desugar target for {@code [T, U]}. */
-    private static final String TUPLE = "tuple";
+    private static final String TUPLE = KernelNames.of("tuple");
 
     /** §5.4's desugar target for {@code (A | B)}. */
-    private static final String CHOICE = "choice";
+    private static final String CHOICE = KernelNames.of("choice");
 
     /** §5.10's desugar target for a partial application {@code <B> pair<text, B>} -- an alias body. */
-    private static final String ALIAS = "alias";
+    private static final String ALIAS = KernelNames.of("alias");
 
     /** The vocabulary fields the desugar table binds -- fixed by the table, not looked up in a governing meta. */
     private static final String ELEMENT_TYPE = "element_type";
@@ -168,7 +169,7 @@ final class SchemaDesugarer {
      * Names already in scope from {@code !!import}. A sugar form that generates a name an import already
      * declares is <em>referenced</em> rather than redeclared: the name is derived from the resolved binding
      * record itself, so an identical form in an imported schema has already produced the same type. Without
-     * this, meta.tn's own {@code [type_name]} would redeclare the one it imports from the meta-kernel and be
+     * this, a schema writing {@code [meta.text; 1..]} would redeclare the one it imports from the kernel and be
      * rejected as a local-vs-import collision.
      */
     private final Set<String> imported;
@@ -218,7 +219,7 @@ final class SchemaDesugarer {
      * The names {@code desugared} holds that {@code original} did not: the entries this phase lifted, and so
      * exactly the schema's <b>synthetic entries</b> ([TSON-SCHEMA] §5.3's lift rule -- closed for a concrete
      * form, open for a parameter-bearing one). Both callers of {@link #desugar} need the set: one to mark
-     * each of them {@code @synthetic} at its key (§8.2), and {@code SchemaResolver} also to tell a generated
+     * each of them {@code @meta.synthetic} at its key (§8.2), and {@code SchemaResolver} also to tell a generated
      * head closing its own intermediate form from an authored one.
      *
      * <p>A set difference rather than a field on the pass, because {@link #hoist} does not inject a form an
@@ -349,7 +350,7 @@ final class SchemaDesugarer {
                 // see currentParameters.
                 StructuralDef body = structuralDef(structural.body());
                 // §5.2's own rewrite, applied where the body is written: a bare record body denotes
-                // `!record { fields: { ... } }`, which `DefinitionResolver.openRecord` binds into the open
+                // `!meta.record { fields: { ... } }`, which `DefinitionResolver.openRecord` binds into the open
                 // record it is. See recordBinding.
                 //
                 // Every parameterised record body takes this path, `~`-marked or not. A composition or
@@ -381,7 +382,7 @@ final class SchemaDesugarer {
                 }
                 if (!reference.typeParams().isEmpty()) {
                     // §5.10's partial application, and the last open form that was not a constructor
-                    // application: `uuid_pair => <B> pair<text, B>` denotes `!alias { target:
+                    // application: `uuid_pair => <B> pair<text, B>` denotes `!meta.alias { target:
                     // pair<text, B> }`, so it is written that way here and closes by the same walk as
                     // every other template. `alias.target` is a reference, which carries the arguments.
                     yield instance(new Binding(ALIAS, List.of(
@@ -606,7 +607,7 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code !array { element_type: T [voidable: true] [min_items: N] [max_items: M] }} -- the whole array
+     * {@code !meta.array { element_type: T [voidable: true] [min_items: N] [max_items: M] }} -- the whole array
      * row of the desugar table, the unsized and sized spellings alike.
      *
      * <p><b>The element {@code ?} binds {@code voidable} directly</b>, alongside the bounds rather than through
@@ -638,7 +639,7 @@ final class SchemaDesugarer {
     }
 
     /**
-     * <code>!map { key_type: K  value_type: V [voidable: true] [min_items: N] [max_items: M] }</code> --
+     * <code>!meta.map { key_type: K  value_type: V [voidable: true] [min_items: N] [max_items: M] }</code> --
      * the map row of the desugar table. The <b>value</b> carries {@code voidable} the way an array element
      * does, written only when marked, for the reason {@link #arrayBinding} omits an unmarked element's: the
      * kernel's default is false, so writing it would put a field at its default value into every map.
@@ -667,7 +668,7 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code !tuple { elements: [{ element_type: T } { element_type: U }] }} -- the tuple row of the table.
+     * {@code !meta.tuple { elements: [{ element_type: T } { element_type: U }] }} -- the tuple row of the table.
      *
      * <p><b>Why this is not {@link #choiceBinding}.</b> Both are variadic and both fill one collection-typed
      * vocabulary field. What differs is what one position <em>is</em>: a variant is a bare reference,
@@ -694,7 +695,7 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code !choice { variants: [A B ...] }} -- the choice row of the table. Variants arrive already
+     * {@code !meta.choice { variants: [A B ...] }} -- the choice row of the table. Variants arrive already
      * expanded: a nested inline form is hoisted by the caller first, so what reaches here is a {@link
      * SimpleRef} or -- for a §5.10 application, which has no entry to be hoisted to until materialisation
      * mints one -- a {@code GenericRef}.
@@ -721,7 +722,7 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code !record { fields: { x => { type: T } ... } }} -- §5.2's own rewrite of a bare record body,
+     * {@code !meta.record { fields: { x => { type: T } ... } }} -- §5.2's own rewrite of a bare record body,
      * applied where the body is written so that a record template holds an application like every other open
      * form.
      *
@@ -906,7 +907,7 @@ final class SchemaDesugarer {
 
     /**
      * The same construction with a parameter list, for a form naming a parameter of the declaration it sits
-     * in -- {@code <p0> !array { element_type: p0 }}. {@code typeParams} is that form's own list, already
+     * in -- {@code <p0> !meta.array { element_type: p0 }}. {@code typeParams} is that form's own list, already
      * renamed positionally.
      *
      * <p><b>The open form is the closed form.</b> One binding record serves both, because an open entry's

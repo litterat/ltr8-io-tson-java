@@ -106,7 +106,7 @@ class RecordTemplateTest {
 
         Top entry = compiled.schema().entries().get(made.get(0));
         assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, made.get(0), "v").type(), "T := text");
+        assertEquals(TypeRef.of("meta.text"), fieldOf(compiled, made.get(0), "v").type(), "T := text");
     }
 
     /**
@@ -125,7 +125,7 @@ class RecordTemplateTest {
         assertTrue(compiled.schema().applicationOf(minted).isEmpty(), "a minted expansion records no application");
         TypeRef source = compiled.schema().applicationOf("tb").orElseThrow();
         assertEquals("box", source.name());
-        assertEquals(List.of(new TypeArgument.Ref(TypeRef.of("text"))), source.arguments());
+        assertEquals(List.of(new TypeArgument.Ref(TypeRef.of("meta.text"))), source.arguments());
     }
 
     /**
@@ -191,7 +191,7 @@ class RecordTemplateTest {
                 () -> "nothing is minted beside the declaration: " + instantiationsOf(compiled, "box"));
         assertEquals("text_box", fieldType(compiled, "holder", "b"),
                 "the use site names the declaration the application denotes");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, "text_box", "v").type(), "T := text");
+        assertEquals(TypeRef.of("meta.text"), fieldOf(compiled, "text_box", "v").type(), "T := text");
     }
 
     /** A value parameter binds the literal it was applied with, and the route is gone once bound (§5.10). */
@@ -245,7 +245,7 @@ class RecordTemplateTest {
         assertEquals(2, instantiationsOf(compiled, "box").size());
         String outer = fieldType(compiled, "holder", "b");
         String inner = fieldOf(compiled, outer, "v").type().name();
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, inner, "v").type());
+        assertEquals(TypeRef.of("meta.text"), fieldOf(compiled, inner, "v").type());
     }
 
     /**
@@ -314,7 +314,7 @@ class RecordTemplateTest {
                   use   => { u: tmpl<text> }""");
 
         assertEquals(1, instantiationsOf(compiled, "tmpl").size());
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, fieldType(compiled, "use", "u"), "a").type());
+        assertEquals(TypeRef.of("meta.text"), fieldOf(compiled, fieldType(compiled, "use", "u"), "a").type());
         assertNotNull(compiled.get("use")
                 .read(TestDocuments.document("{ u: { a: \"x\"  b: [ { id: \"1\" } ] } }")));
     }
@@ -459,7 +459,7 @@ class RecordTemplateTest {
                   box => <T> { v: T }
                   pinned => box<text> ^ { v?: = "fixed" }""");
 
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, "pinned", "v").type());
+        assertEquals(TypeRef.of("meta.text"), fieldOf(compiled, "pinned", "v").type());
         assertEquals("fixed", fieldOf(compiled, "pinned", "v").value().orElseThrow().text());
     }
 
@@ -490,7 +490,7 @@ class RecordTemplateTest {
                   holder => { u: vip<text> }""");
 
         String use = fieldType(compiled, "holder", "u");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, use, "v").type(),
+        assertEquals(TypeRef.of("meta.text"), fieldOf(compiled, use, "v").type(),
                 "absorbed from box<T> while open, closed with vip");
         assertEquals(TypeRef.of("text"), fieldOf(compiled, use, "extra").type());
     }
@@ -555,7 +555,7 @@ class RecordTemplateTest {
                           retry => <N> { attempts?: int32 ~ N }
                           holder => { r: retry<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("'retry<...>' binds 'N' to 'text'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'retry<...>' binds 'N' to 'meta.text'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("not a value of int32"), thrown.getMessage());
     }
 
@@ -621,7 +621,7 @@ class RecordTemplateTest {
         assertEquals(1, instantiationsOf(compiled, "pair").size(), "one entry for the one closed pair");
         String closed = fieldType(compiled, "holder", "p");
         assertEquals(closed, fieldType(compiled, "holder", "q"), "the alias and the direct form are one type");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, closed, "first").type());
+        assertEquals(TypeRef.of("meta.text"), fieldOf(compiled, closed, "first").type());
         assertEquals(TypeRef.of("int32"), fieldOf(compiled, closed, "second").type());
     }
 
@@ -653,7 +653,7 @@ class RecordTemplateTest {
                   holder => { a: box<ident<text>> }""");
 
         assertEquals(1, instantiationsOf(compiled, "box").size(), "ident<text> is text, so only box is closed");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, fieldType(compiled, "holder", "a"), "v").type());
+        assertEquals(TypeRef.of("meta.text"), fieldOf(compiled, fieldType(compiled, "holder", "a"), "v").type());
     }
 
     /** An alias over an <em>open instance</em> template closes by that path, one hop further in. */

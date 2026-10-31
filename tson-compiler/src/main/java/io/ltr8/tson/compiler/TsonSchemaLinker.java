@@ -153,11 +153,14 @@ import java.util.stream.Collectors;
  */
 public final class TsonSchemaLinker {
 
-    /** meta.tn's {@code void}-targeted marker (§5.4), written bare -- presence is the assertion. */
-    private static final String DISJOINT = "disjoint";
+    /** The kernel's {@code void}-targeted marker (§5.4), written bare -- presence is the assertion. */
+    private static final String DISJOINT = KernelNames.of("disjoint");
 
     /** The constructor every type a value can have is built with: what `type_kind` is the kind of. */
-    private static final String TYPE = "type";
+    private static final String TYPE = KernelNames.of("type");
+
+    /** The constructor of the identifier families, the kind a namespace's {@code key_type} is a member of. */
+    private static final String IDENTIFIER_TYPE = KernelNames.of("identifier_type");
 
     /** [TSON-SCHEMA] §4.1's structural root -- what an entry IS-A when it is a constructor. */
 
@@ -166,13 +169,13 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Links {@code bootstrap} -- meta-kernel's own raw, pre-loaded bootstrap output (see {@link
+     * Links {@code bootstrap} -- the kernel's own raw, pre-loaded bootstrap output (see {@link
      * TsonSchema#bootstrap()}'s own Javadoc for why it can't be resolved the ordinary way). It lives here
      * rather than on {@link TsonSchemaRegistry} because it belongs with the verb it performs: linking, not
      * storage -- and this is a link whose result the registry deliberately never stores (see below).
      *
      * <p>Takes no {@link TsonSchemaLoader} -- unlike {@link #link}, which always needs one for
-     * {@code !!import} lookups -- because meta-kernel's own document, the only real caller of this method,
+     * {@code !!import} lookups -- because the kernel's own document, the only real caller of this method,
      * never has any {@code !!import}s: its header is its {@code !!id} alone ([TSON-SCHEMA] §3.4) -- so {@link
      * #mergeImports} never reaches the loader, and
      * passing {@code null} through is safe for this specific, guaranteed-narrow case, not a general
@@ -199,7 +202,7 @@ public final class TsonSchemaLinker {
                     + "link directly for an ordinary schema instead");
         }
         // The bootstrap is this library's own artifact, not user input, so it is linked under the default
-        // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
+        // rather than under whatever a caller configured -- a policy should not be able to break the kernel.
         return linkWith(bootstrap, null, null, IdentifierPolicy.defaults(), null, Set.of());
     }
 
@@ -671,7 +674,7 @@ public final class TsonSchemaLinker {
 
         Set<String> localNames = new LinkedHashSet<>();
         // A constructor is judged by where `top` is defined, never by its spelling (§4.1).
-        Predicate<String> kernel = name -> TsonBundledSchemas.isMetaKernel(origins.get(name));
+        Predicate<String> kernel = name -> TsonBundledSchemas.isKernel(origins.get(name));
 
         for (Map.Entry<String, Top> entry : schema.entries().entrySet()) {
             if (merged.containsKey(entry.getKey())) {
@@ -947,8 +950,8 @@ public final class TsonSchemaLinker {
             if (!(entries.get(name) instanceof ChoiceBody choice)) {
                 continue;
             }
-            if (!facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).annotations().has(DISJOINT)
-                    && !entries.getAnnotations(name).has(DISJOINT)) {
+            if (!AliasChain.annotates(facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).annotations(), DISJOINT,
+                    entries) && !AliasChain.annotates(entries.getAnnotations(name), DISJOINT, entries)) {
                 continue;
             }
             if (choice.disjoint().equals(Optional.of(true))) {
@@ -1062,7 +1065,7 @@ public final class TsonSchemaLinker {
      * two-valued, so a linked choice always carries the fact.
      *
      * <p><b>It is written on the body, which is the only thing that has variants to be disjoint over.</b>
-     * An entry with no {@code !choice} body has nowhere to put the fact, so "absent on every other
+     * An entry with no {@code !meta.choice} body has nowhere to put the fact, so "absent on every other
      * definition" stops being a rule anyone can break.
      */
     private static Map<String, Top> computeDisjointness(Map<String, Top> merged) {
@@ -1083,7 +1086,7 @@ public final class TsonSchemaLinker {
      * index is computed over the <em>governing</em> schema's closure, so one reference holds different members in two
      * schemas importing different sets, and whatever a body arrived carrying is discarded rather than trusted. A
      * reference over a constructor also carries the applications the closure closed, each with the entry it denotes
-     * -- its {@code @application}s and every application the resolver closed ({@code EntryFacts.closes}) -- so a
+     * -- its {@code @meta.application}s and every application the resolver closed ({@code EntryFacts.closes}) -- so a
      * data value written as an application is judged through that entry. The
      * index is never written: resolved output states {@code of} alone.
      *
@@ -1218,7 +1221,7 @@ public final class TsonSchemaLinker {
     private static void validateEntry(String name, Top def, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors) {
         checkOpenEntryUsesEveryParameter(name, def);
-        // A chain reaches a constructor whenever a refinement derives from one -- meta-kernel's own `set_type =>
+        // A chain reaches a constructor whenever a refinement derives from one -- the kernel's own `set_type =>
         // array ^ {...}` resolves with [array, product, top, type] -- and every name on it is in the one namespace,
         // the defining schema's closure being inside the importer's (§2.2.3).
         for (String supertype : TypeChain.supertypesOf(def)) {
@@ -1271,6 +1274,14 @@ public final class TsonSchemaLinker {
             // The target in full: an alias naming an application states its arguments there, and a closed one
             // names the entry materialisation minted for it.
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
+            // An alias naming a template bare names the template under another name (core's `kind => meta.kind`),
+            // applied as its target is, so it is no use of the template without its arguments.
+            case Alias ref when ref.target().arguments().isEmpty()
+                    && OpenEntry.isOpen(namespace.get(AliasChain.terminal(ref.target().name(), namespace))) -> {
+                if (!namespace.containsKey(ref.target().name())) {
+                    throw new UnresolvedReference(entryName, "", ref.target().name());
+                }
+            }
             case Alias ref -> validateTypeRef(ref.target(), namespace, ownParameters, null,
                     entryName, "");
             case MapBody m -> {
@@ -1284,8 +1295,8 @@ public final class TsonSchemaLinker {
                     TypeRef key = n.keyType().get();
                     validateTypeRef(key, namespace, ownParameters, constructors, entryName, " key_type");
                     // A namespace's keys are names: `key_type` is typed identifier_kind (§4.1, §7.4).
-                    if (constructors != null && namespace.containsKey("identifier_type") && !ownParameters
-                            .contains(key.name()) && !KindMembers.isMember(key.name(), "identifier_type",
+                    if (constructors != null && namespace.containsKey(IDENTIFIER_TYPE) && !ownParameters
+                            .contains(key.name()) && !KindMembers.isMember(key.name(), IDENTIFIER_TYPE,
                                     namespace::get, constructors, namespace::get)) {
                         throw new SchemaValidationException("'" + entryName + "' key_type names '" + key.name()
                                 + "', which is no identifier family -- a namespace's keys are names, so its key type "
@@ -1414,7 +1425,7 @@ public final class TsonSchemaLinker {
      *
      * <p>Arguments are compared as written rather than flattened through: only the head name is walked. The
      * gap is unreachable from the sugar -- {@code SchemaDesugarer} hoists any argument-bearing variant to a
-     * bare name -- and reaches only a hand-written {@code !choice { variants: [...] } } naming two
+     * bare name -- and reaches only a hand-written {@code !meta.choice { variants: [...] } } naming two
      * differently-spelled applications of one type.
      */
     private static void checkVariantsAreDistinct(String entryName, ChoiceBody choice,
@@ -1439,14 +1450,14 @@ public final class TsonSchemaLinker {
      * optionality as a choice, and optionality belongs to the position -- a field's {@code ?} state, the
      * {@code _} sentinel -- never to the type occupying it. Judged at the end of the chain, like
      * distinctness, so an alias of {@code void} is caught under whatever name the author wrote, and by its
-     * {@code !void_type} body, so core's sibling is caught as the kernel's is.
+     * {@code !meta.void_type} body, so core's sibling is caught as the kernel's is.
      */
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
                                                  Map<String, Top> namespace) {
         for (TypeRef variant : choice.variants()) {
             if (AliasChain.resolvesToVoid(variant.name(), namespace)) {
                 throw new SchemaValidationException("'" + entryName + "' has a variant"
-                        + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
+                        + (variant.name().equals(KernelNames.of("void")) ? "" : " '" + variant.name() + "'")
                         + " resolving to 'void' -- optionality is not choice (§5.4): a value's absence is the "
                         + "position's own state, so mark the position optional ('?') instead of uniting its "
                         + "type with void");
@@ -1559,7 +1570,7 @@ public final class TsonSchemaLinker {
      * resolution, beside its own constructor's vocabulary check -- and one that failed there is replaced by a
      * placeholder and never reaches this, so nothing is reported twice. What is left for this to catch is
      * exactly the set resolution never produced: {@code sized<10, 3>} over an array template, and
-     * {@code b<10>} over {@code <N> !integer_type { min: N max: 3 }}, whose bounds were parameters until an
+     * {@code b<10>} over {@code <N> !meta.integer_type { min: N max: 3 }}, whose bounds were parameters until an
      * application supplied them.
      */
     private static void checkCoherent(Top body) {
@@ -1585,7 +1596,7 @@ public final class TsonSchemaLinker {
 
     /**
      * [TSON-SCHEMA] §5.2's dependency between a field's two halves: a {@code ~}/{@code =} value must be a
-     * value of the field's own declared type. meta-kernel states it on {@code record_field.value} -- "the
+     * value of the field's own declared type. The kernel states it on {@code meta.record_field.value} -- "the
      * type of fixed/default values, which must be the field's declared type" -- and calls it "a dependency
      * the schema language does not express directly", which is what leaves it to a check like this one.
      *
@@ -1845,7 +1856,9 @@ public final class TsonSchemaLinker {
             }
             return;
         }
-        Top referenced = namespace.get(ref.name());
+        // An application through an alias of a template applies the template ([TSON-SCHEMA] §8.3).
+        Top referenced = namespace.get(ref.arguments().isEmpty() ? ref.name()
+                : AliasChain.terminal(ref.name(), namespace));
         if (referenced == null) {
             return; // a name no entry holds is resolution's to refuse, not arity's
         }

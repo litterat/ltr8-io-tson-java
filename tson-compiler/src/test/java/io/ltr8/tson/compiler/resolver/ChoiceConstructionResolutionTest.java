@@ -23,16 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ChoiceConstructionResolutionTest {
 
-    /** Governed by meta-kernel, which defines the {@code choice} constructor; its compiled form bootstraps on demand. */
+    /** Governed by the kernel, which defines the {@code choice} constructor; its compiled form bootstraps on demand. */
     private static SchemaResolver metaKernelGovernedResolver() {
         return new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
     }
 
     private static final String CHOICE_DOCUMENT = """
             !!id:"https://example.test/choice.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              contact => !choice { variants: [text integer] }
+              contact => !meta.choice { variants: [meta.text meta.integer] }
             }
             """;
 
@@ -45,7 +45,7 @@ class ChoiceConstructionResolutionTest {
 
         Top contact = resolved.entries().get("contact");
         ChoiceBody body = assertInstanceOf(ChoiceBody.class, contact);
-        assertEquals(List.of("text", "integer"), body.variants().stream().map(TypeRef::name).toList());
+        assertEquals(List.of("meta.text", "meta.integer"), body.variants().stream().map(TypeRef::name).toList());
         // Each variant is a bare reference -- empty arguments, never null.
         assertTrue(body.variants().stream().allMatch(variant -> variant.arguments().isEmpty()));
     }

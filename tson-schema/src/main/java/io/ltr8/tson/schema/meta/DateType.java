@@ -10,14 +10,14 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code date_type} constructor (§5.4's {@code date} atom, RFC 3339 {@code
+ * The kernel's {@code date_type} constructor (§5.4's {@code date} atom, RFC 3339 {@code
  * full-date}). Pure constraint values, no parsing/validation behavior -- {@code tson-compiler}'s
  * {@code DateParser} holds one of these and does the actual reading/writing.
  *
- * <p>Also an {@link Atom} variant: {@code date => !date_type {}} is a constructor-application
+ * <p>Also an {@link Atom} variant: {@code date => !meta.date_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "date_type")
+@Typename(name = "meta.date_type")
 public record DateType(TypeChain chain,
         Optional<LocalDate> min, @Field("exclusive_min") Optional<LocalDate> exclusiveMin,
                        Optional<LocalDate> max, @Field("exclusive_max") Optional<LocalDate> exclusiveMax)
@@ -57,7 +57,7 @@ public record DateType(TypeChain chain,
         this(min, Optional.empty(), max, Optional.empty());
     }
 
-    /** {@code date => !date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
+    /** {@code date => !meta.date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
     public static final DateType UNCONSTRAINED = new DateType(Optional.empty(), Optional.empty());
 
     /**

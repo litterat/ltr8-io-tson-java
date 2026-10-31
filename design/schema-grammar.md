@@ -83,17 +83,17 @@ materialization, no validation (those are the resolver's/linker's jobs).
   the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution
   derives rather than shaping the type-def, and the declaration survives every desugar rewrite of its type-def.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
-  [type-params] "!" qualified-name ws core-value`) -- `vector => <T, N> !array { element_type: T  min_items: N }`.
+  [type-params] "!" qualified-name ws core-value`) -- `vector => <T, N> !meta.array { element_type: T  min_items: N }`.
   §12.1 has one production for both, and its own note says so: "`!` opens an `instance`, with or without a
   preceding `<…>`". `Instance` carries
   the parameter list, and `parseTypeDef` reads that list *before* dispatching on `!` -- one token then
   decides.
   - **The payload is a `core-value`, and nothing narrower.** An open entry's body is held rather than read
     against its constructor's vocabulary until materialisation substitutes, so there is no per-slot quotation
-    to constrain it and a collection payload is as ordinary as a scalar one: `<T> !choice { variants:
+    to constrain it and a collection payload is as ordinary as a scalar one: `<T> !meta.choice { variants:
     [T error] }` parses and resolves, which is §5.10's "collection-valued slots are parameterizable". The
     kernel declares no `template_argument` or `instance_template` for a quotation to need.
-  - **An application is data too**: `!array { element_type: box<text> }` is a `core-value`, the reference
+  - **An application is data too**: `!meta.array { element_type: box<text> }` is a `core-value`, the reference
     production being [TSON-DATA] §7.4's (SPEC-FEEDBACK.md #12), and it is what the sugar `[box<text>]` expands
     to. What a payload cannot spell is sugar: `[text]` in a payload is a data array, never the array type, so a
     sugar argument there is named by the entry that declares it. That line falls where the
@@ -147,7 +147,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   restates plain fields or another group, so each presence rule has one spelling ([TSON-SCHEMA] §5.11).
   - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
     — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
-    declaration and the explicit `!map { key_type: … }` form.
+    declaration and the explicit `!meta.map { key_type: … }` form.
 - **`{` at a type position dispatches by consuming one token and inspecting** (`braceTypeDef`/
   `braceOpensMap`) — [TSON-DATA] §2.8's record/map idiom, imported wholesale into the schema grammar as
   §12.2 asks. `}`, `(` (a leading field group) and `@` (annotations, which the map sugar admits nowhere

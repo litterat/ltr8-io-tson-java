@@ -53,7 +53,7 @@ class SealedFamilyCheckTest {
      * @discriminator} are already on, and the reason there is no name left to reserve once the mark is a word
      * the grammar reads.
      *
-     * <p>Asserted here rather than against the meta-kernel, whose bootstrap resolves no annotation at all: a
+     * <p>Asserted here rather than against the kernel, whose bootstrap resolves no annotation at all: a
      * schema governed by the kernel would ignore the name instead, and the kernel governs only the three
      * bundled schemas.
      */
@@ -326,8 +326,8 @@ class SealedFamilyCheckTest {
 
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         Diagnostic refusal = diagnostics.getFirst();
-        assertTrue(refusal.message().contains("'dog_of<text>' composes onto 'pet'"), refusal.message());
-        assertTrue(refusal.message().contains("'my_name => dog_of<text>'"), refusal.message());
+        assertTrue(refusal.message().contains("'dog_of<meta.text>' composes onto 'pet'"), refusal.message());
+        assertTrue(refusal.message().contains("'my_name => dog_of<meta.text>'"), refusal.message());
         assertEquals("/kennel", refusal.schemaPointer().orElse(""), refusal.toString());
     }
 

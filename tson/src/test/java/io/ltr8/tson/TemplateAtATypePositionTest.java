@@ -89,7 +89,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aConstructorApplicationTemplateIsStillRefused() {
         assertTrue(refusal("t5", """
-                  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
                   holder => { p: vector }
                 """).contains("a template is not a type until it is applied"));
     }

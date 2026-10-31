@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * The meta-kernel's {@code text_type} constructor -- the Unicode code point sequence type every
+ * The kernel's {@code text_type} constructor -- the Unicode code point sequence type every
  * other text-shaped atom composes with. Pure constraint values, no parsing/validation behavior --
  * {@code tson-compiler}'s {@code TextParser} holds one of these and does the actual reading/writing.
  *
@@ -37,10 +37,10 @@ import java.util.stream.Stream;
  * -- judges the value, never the spelling. A member is a value too, so it is put into the form before it is
  * judged.
  *
- * <p>Also an {@link Atom} variant: {@code text => !text_type {}} is a constructor-application
+ * <p>Also an {@link Atom} variant: {@code text => !meta.text_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "text_type")
+@Typename(name = "meta.text_type")
 public record TextType(TypeChain chain,
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
@@ -86,7 +86,7 @@ public record TextType(TypeChain chain,
         return members.map(set -> set.stream().map(member -> Nfc.of(normalization.apply(member))).toList());
     }
 
-    /** {@code text => !text_type {}} -- the unconstrained text type. */
+    /** {@code text => !meta.text_type {}} -- the unconstrained text type. */
     public static final TextType UNCONSTRAINED =
             new TextType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 

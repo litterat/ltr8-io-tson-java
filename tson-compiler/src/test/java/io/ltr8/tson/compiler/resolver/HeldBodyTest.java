@@ -100,7 +100,7 @@ class HeldBodyTest {
     /** A record template is a record with parameters, never held text (§5.10): the door refuses one. */
     @Test
     void aRecordIsNeverHeld() {
-        assertThrows(IllegalStateException.class, () -> template("record"));
+        assertThrows(IllegalStateException.class, () -> template("meta.record"));
     }
 
     /** A held body belongs to an entry that declares parameters; one with none is a closed entry (§5.10). */

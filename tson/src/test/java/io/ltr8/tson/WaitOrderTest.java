@@ -67,11 +67,11 @@ class WaitOrderTest {
     @Test
     void aConstructorAndItsInstanceShareADocumentInEitherOrder() {
         for (String declarations : List.of("""
-                  counted => array ^ { ordered?: = false }
+                  counted => meta.array ^ { ordered?: = false }
                   counts  => !counted { element_type: int32 }
                 """, """
                   counts  => !counted { element_type: int32 }
-                  counted => array ^ { ordered?: = false }
+                  counted => meta.array ^ { ordered?: = false }
                 """)) {
             Tson tson = tson(declarations);
             assertEquals(List.of(), tson.validateSchema(schema(declarations)));
@@ -168,7 +168,7 @@ class WaitOrderTest {
         // A head and an operand are one edge: an instance whose constructor composes it waits through both.
         problems = validateSchema("""
                   made => !maker { }
-                  maker => top & made & { }
+                  maker => meta.top & made & { }
                 """);
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("waits on 'maker' waits on 'made'")
@@ -251,7 +251,7 @@ class WaitOrderTest {
     // ── A constructor no class backs ───────────────────────────────────────
 
     private static final String STEPS = """
-              step => top & { takes: type_kind }
+              step => meta.top & { takes: meta.type_kind }
               order => { id: int32 }
               s => !step { takes: order }
             """;

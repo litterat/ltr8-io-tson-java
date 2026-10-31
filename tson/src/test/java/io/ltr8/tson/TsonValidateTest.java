@@ -504,7 +504,7 @@ class TsonValidateTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  status => !enum [PENDING SHIPPED DELIVERED]
+                  status => !meta.enum [PENDING SHIPPED DELIVERED]
                   label  => !text ^ { max_length: 4 }
                   order  => { status: status  label: label  when: date }
                 }

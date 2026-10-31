@@ -3,7 +3,7 @@ package io.ltr8.tson.schema.meta;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code sum => type & {}} base kind (Part 2 §4.1) -- every SUM-kind {@link Top} variant
+ * The kernel's {@code sum => type & {}} base kind (Part 2 §4.1) -- every SUM-kind {@link Top} variant
  * IS-A this. Two of them: {@link ChoiceBody} ({@code choice => ~sum & { variants: [type_kind] }}, §5.4), the
  * closed sum that enumerates its variants, and {@link DeclaredType} ({@code declared_type => sum & {}}), the open
  * one whose variants are the types of the governing closure. {@code disjoint} is derived on the first and absent

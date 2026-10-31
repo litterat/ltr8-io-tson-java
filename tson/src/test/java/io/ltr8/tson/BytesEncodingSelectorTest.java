@@ -49,8 +49,8 @@ class BytesEncodingSelectorTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              hexdigest => !bytes_type { encoding: HEX  length: 4 }
-              b32       => !bytes_type { encoding: BASE32 }
+              hexdigest => !meta.bytes_type { encoding: HEX  length: 4 }
+              b32       => !meta.bytes_type { encoding: BASE32 }
               aliased   => hexdigest
               box => <T> { value: T }
 

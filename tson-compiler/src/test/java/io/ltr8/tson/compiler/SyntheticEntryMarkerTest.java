@@ -110,7 +110,7 @@ class SyntheticEntryMarkerTest {
     }
 
     private static boolean marked(Namespace<Top> entries, String name) {
-        return entries.getAnnotations(name).has("synthetic");
+        return entries.getAnnotations(name).has(TsonSchema.SYNTHETIC);
     }
 
     /** An inline sugar form lifts to an entry of its own (§5.3), and that entry is a synthetic one. */
@@ -148,7 +148,7 @@ class SyntheticEntryMarkerTest {
     void aDeclarationWhoseOwnBodyIsASugarFormIsNotSynthetic() {
         Namespace<Top> entries = entriesOf(ID);
 
-        assertEquals(Optional.of("array"), factsOf(ID, "tag_list").constructor());
+        assertEquals(Optional.of("meta.array"), factsOf(ID, "tag_list").constructor());
         assertFalse(marked(entries, "tag_list"), "the declaration is the construction, not a lift of one");
     }
 
@@ -182,7 +182,7 @@ class SyntheticEntryMarkerTest {
     /** The marker is the key's, not the definition's -- §6 forbids hoisting between the two positions. */
     @Test
     void theDefinitionValueNeverCarriesTheMarker() {
-        localEntries().forEach((name, definition) -> assertFalse(factsOf(ID, name).annotations().has("synthetic"),
+        localEntries().forEach((name, definition) -> assertFalse(factsOf(ID, name).annotations().has(TsonSchema.SYNTHETIC),
                 name + " carries @synthetic on its definition, where §6 puts declaration metadata on the key"));
     }
 

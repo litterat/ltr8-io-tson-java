@@ -28,13 +28,13 @@ class IdentifierFamilyTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              slug => !identifier_type { continue_add: "-" }
+              slug => !meta.identifier_type { continue_add: "-" }
               snake_name => !slug ^ { pattern: "[a-z][a-z0-9_]*" }
-              direction => !identifier_type { members: [north south] }
+              direction => !meta.identifier_type { members: [north south] }
               route => { name: snake_name  heading: direction }
               handlers => { slug => text }
-              kebab_name => !identifier_type { medial: "-" }
-              js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+              kebab_name => !meta.identifier_type { medial: "-" }
+              js_name => !meta.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
               short_kebab => !kebab_name ^ { max_length: 12  medial: "-" }
               header => { name: kebab_name  binding: js_name }
             }
@@ -117,7 +117,7 @@ class IdentifierFamilyTest {
     @Test
     void anIncoherentProfileIsRefused() {
         List<Diagnostic> refused = tson().validateSchema(
-                schemaWith("both => !identifier_type { continue_add: \"-\"  medial: \"-\" }"));
+                schemaWith("both => !meta.identifier_type { continue_add: \"-\"  medial: \"-\" }"));
         assertEquals(1, refused.size(), refused.toString());
         assertTrue(refused.getFirst().message().contains("medial and also Start or Continue"),
                 refused.getFirst().toString());
@@ -129,7 +129,7 @@ class IdentifierFamilyTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  slug => !identifier_type { continue_add: "-" }
+                  slug => !meta.identifier_type { continue_add: "-" }
                   %s
                 }
                 """.formatted(declaration);

@@ -74,7 +74,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   entry is caught and substituted with an `ErrorReader` wrapping it — the schema still compiles, only
   *reading* that entry fails, with the original message preserved. Real causes: a constructor with no
   registered factory — which only a schema's own constructor this library has never seen can be, every
-  constructor meta-kernel.tn and meta.tn declare having a factory — or a factory that rejects one entry.
+  constructor the kernel (meta.tn) and net.tn declare having a factory — or a factory that rejects one entry.
     - **It reports `NOT_IMPLEMENTED` and skips the value**, the same report-then-skip shape `OpenTemplateReader` uses
       (with `TYPE_MISMATCH`) for the entry it refuses — report before consuming so the position names the value, then
       `EventSkip.dataValue` so the stream stays in step. The code, not the channel, is what says this is a gap rather

@@ -10,14 +10,15 @@ The schema grammar itself is in `design/schema-grammar.md`.
   declaration that is rebuilt has its position re-registered against the node replacing it (`SchemaDesugarerTest`).
 - `TypeRef.arguments` non-empty means an open form, a template application; everything closed is an entry referenced by
   a bare name, so `DefinitionResolver` only ever sees a bare reference or `!C value`.
-- The phase is purely syntactic and consults no other schema: the sugar table is fixed, so meta-kernel's bootstrap
-  needs no special case.
+- The phase is purely syntactic and consults no other schema: the sugar table is fixed, its targets the kernel's
+  `meta.array`, `meta.map`, `meta.tuple`, `meta.choice`, `meta.enum`, `meta.record` and `meta.alias` whatever a
+  document imports, so the kernel's bootstrap needs no special case.
 - An injected name derives from the resolved binding record, never the spelling and never the AST's own `toString` or
   `hashCode`; `SchemaDesugarerTest` pins two derived names to exact strings.
 - An injected entry is a root entry, one per form schema-wide, sugar written inside a nested `!schema` map included:
   `[uuid]` in `geo.tagged` and in a root record is one `array_uuid_…`, and a dotted head contributes `geo_inner_tag`
   to a name (`InternalName.part`).
-- A form an `!!import` already declares is referenced, not redeclared — and is not marked `@synthetic` by this document.
+- A form an `!!import` already declares is referenced, not redeclared — and is not marked `@meta.synthetic` by this document.
 - An element, position or map-value `?` binds `state` directly; an unmarked one states nothing; a map key takes no `?`.
 - An invalid sugar form is reported per declaration through `DesugarFailureReporter`, not thrown.
 
@@ -40,7 +41,7 @@ rather than splitting it across the resolver (declaration position) and the link
 carried structurally in place: a use site holds a bare reference to its entry", and the materialised entries
 merge under `!!import` by the same structural identities they have within a schema. Two rules make it so:
 §4.2's `array`/`set`/`map` constructors are parameterless, so a container at a use site cannot be an
-application at all — nothing in meta-kernel takes type parameters, `map` holding `key_type`/`value_type` as
+application at all — none of the kernel's constructors takes type parameters, `map` holding `key_type`/`value_type` as
 ordinary fields — and §5.3 states one lift rule, every sugar form lifting at desugar, a concrete form to a
 closed synthetic entry. `ResolvedFixtureTest` asserts the resolved fixtures and this output agree entry for
 entry.
@@ -58,7 +59,7 @@ and none holds:
 
 - *An entry set wider than the declaration set is untidy.* It is already normal — `subtypes` and `disjoint`
   are resolver-derived too, so §8 output has never been the author's declarations and nothing else.
-- *It would avoid needing a `@synthetic` marker.* That marker is an optional display hint for tooling
+- *It would avoid needing a `@meta.synthetic` marker.* That marker is an optional display hint for tooling
   folding entries back into nested form; needing one is not a reason to restructure the representation.
 - *Ingest gets simpler.* Speculation about code that does not exist yet, against machinery that works.
 - *Derived names leak across `!!import`.* They must be stable **within** an implementation, including across
@@ -78,22 +79,22 @@ rebuilt and called a cache.
 
   | Source form | Binding record |
   |---|---|
-  | `[T]` | `!array { element_type: T }` |
+  | `[T]` | `!meta.array { element_type: T }` |
   | `[T; N]` / `[T; N..M]` / `[T; N..]` / `[T; ..M]` | the same, plus `min_items`/`max_items` |
   | `[T?]`, `[T?; …]` | the corresponding form with `voidable: true` bound directly |
-  | `[T, U, …]` | `!tuple { elements: [{ element_type: T } { element_type: U }] }` |
-  | `(A \| B)` | `!choice { variants: [A B] }` |
-  | `{K => V}` | `!map { key_type: K  value_type: V }` |
+  | `[T, U, …]` | `!meta.tuple { elements: [{ element_type: T } { element_type: U }] }` |
+  | `(A \| B)` | `!meta.choice { variants: [A B] }` |
+  | `{K => V}` | `!meta.map { key_type: K  value_type: V }` |
   | `{K => V?}`, `{K => V?; …}` | the corresponding form with `voidable: true` bound directly |
   | `{K => V; N..M}` | the same, plus `min_items`/`max_items` |
 
   The constructors being parameterless (§4.2), the table above is the whole rule: `SchemaResolver` threads no
-  imported entries into the phase, and **meta-kernel's bootstrap needs no special case** — routing read
-  off the imported vocabulary would, for the three constructors meta-kernel applies to itself, have to come from
+  imported entries into the phase, and **the kernel's bootstrap needs no special case** — routing read
+  off the imported vocabulary would, for the three constructors the kernel applies to itself, have to come from
   the very entries it is in the middle of producing.
 - **A generic application is a user template, and this phase mostly leaves it alone.** `name<args>` resolves
   its head in the schema's one namespace (§3.3.1) — parameters, then locals, then the closure — so
-  `map<text, text>` finds the kernel's `map`, a parameterless constructor, and is refused as declaring no type
+  `meta.map<text, text>` finds the kernel's `meta.map`, a parameterless constructor, and is refused as declaring no type
   parameters (`ContainerSugarEndToEndTest`); `{text => text}` is the spelling. A head that resolves to a
   template is a §5.10 one. Substitution happens over the **resolved** form
   (`TemplateMaterialiser`, `design/template-materialisation.md`), not over the AST, so an application passes through
@@ -106,8 +107,8 @@ rebuilt and called a cache.
   `head_value_value_hash`, derived from the record the form desugars to, so `[T; 3]` and `[T; 3..3]` land on
   the same entry and any two structurally identical forms anywhere in the document collapse to one
   declaration (§8.2's structural-equality rule). A form an `!!import` already declares is **referenced, not
-  redeclared**, which is why the phase takes the imported name set (meta.tn repeats several of meta-kernel's
-  forms; redeclaring would be a local-vs-import collision). The hash half runs over a rendering the phase
+  redeclared**, which is why the phase takes the imported name set (a schema writing `[meta.text; 1..]` writes
+  a form the kernel lifts; redeclaring would be a local-vs-import collision). The hash half runs over a rendering the phase
   builds itself — one tag per value shape, records and arrays recursed, author text written length-first —
   and **never over the AST's own `toString`**, whose format the JDK documents as subject to change and which
   moves whenever a record's components are renamed; the records' `hashCode` is worse still, being free to
@@ -124,7 +125,7 @@ rebuilt and called a cache.
   namespace exists, imports merged. `TsonSchemaLinker.checkVariantsAreDistinct` asks it
   (`design/choice-disjointness.md`).
 - **Both declaration-level tiers desugar in place.** At declaration position the form *is* the construction
-  (`pair => [integer, text]` becomes `!tuple { … }`, like `ids => [text]`, `entries => {text => integer}` and
+  (`pair => [integer, text]` becomes `!meta.tuple { … }`, like `ids => [text]`, `entries => {text => integer}` and
   `contact => (A | B)`); inline, each is hoisted into its own declaration and referenced.
 - **A nested form desugars innermost-first**, and needs no machinery of its own: an element holds a
   `TypeRef`, so `typeRef` recurses into it and the inner form is already a plain name by the time the
@@ -135,7 +136,7 @@ rebuilt and called a cache.
   position, the flat declaration `[integer]` and an inline field's `[integer]` alike. An injected **tuple**'s
   name derives from its positions' `voidable` as well as their types, or `[T, U?]` and `[T, U]` would land on
   one entry.
-- **The element `?` binds `voidable` directly.** `[T?]` becomes `!array { element_type: T  voidable: true }` —
+- **The element `?` binds `voidable` directly.** `[T?]` becomes `!meta.array { element_type: T  voidable: true }` —
   §5.3's "elements at any position MAY be the absent sentinel `_`; absent elements occupy positional slots".
   It has no parameter to route through, which is why §5.3 gives the `?` forms no template route. An unmarked
   element states nothing and lets §5.2's default injection supply `false`, exactly as an unmarked
@@ -176,10 +177,10 @@ rebuilt and called a cache.
     An *injected* declaration still has no position, correctly — it has no source text of its own.
 - **Every entry it lifts is a *synthetic* entry, and is marked as one.** `SchemaDesugarer.lifted(original,
   desugared)` is the set difference between the two documents, and that set is exactly what §8.2's derived
-  `@synthetic` marker goes on — attached at the schema-map key by the caller, not here, since this phase
+  `@meta.synthetic` marker goes on — attached at the schema-map key by the caller, not here, since this phase
   deals in AST and the marker belongs to resolved output (`design/resolver-vocabulary-and-bootstrap.md`). A set difference
   rather than a field on the pass, because `hoist` deliberately does *not* inject a form an `!!import`
   already declares: that entry is the same form resolved by the schema that owns it, and marking it here
   would put this document's derived marker on someone else's key.
-- **The meta-kernel runs this phase too, with no accommodation at all** — it reads through itself, and
+- **The kernel runs this phase too, with no accommodation at all** — it reads through itself, and
   with the table fixed there is nothing to look up.

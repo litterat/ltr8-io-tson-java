@@ -35,10 +35,10 @@ import java.util.Optional;
  * own source text ({@link String}), not a compiled {@link java.util.regex.Pattern} -- see {@link
  * TextType#pattern()}.
  *
- * <p>{@code uri_reference => !uri_type {}} resolves to exactly {@link #REFERENCE}, and {@code uri =>
+ * <p>{@code uri_reference => !meta.uri_type {}} resolves to exactly {@link #REFERENCE}, and {@code uri =>
  * !uri_reference ^ { allow_relative: false }} to {@link #URI}.
  */
-@Typename(name = "uri_type")
+@Typename(name = "meta.uri_type")
 public record UriType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
@@ -70,7 +70,7 @@ public record UriType(TypeChain chain,
     /** RFC 3986, the one {@code spec} every {@code uri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3986";
 
-    /** {@code uri_reference => !uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
+    /** {@code uri_reference => !meta.uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
     public static final UriType REFERENCE = new UriType(SPEC, Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), true, true, Normalization.NONE);
 

@@ -9,13 +9,14 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
 
 **Invariants**
 
-- A name held in a slot is a value of the kernel's one atom of names, `reference => atom & { of: type_kind }`
-  (`ReferenceBody`). It admits a name exactly when the type of the named
-  entry's value, its tag, past its alias hops, IS-A `of`: `order => { … }` holds a value of `record`, `int32 =>
-  !integer ^ { … }` one of `integer_type`, `orders => !api { … }` one of `api`. `kind => <T> !reference { of: T }`
-  and `ref => <T> !reference { of: T }` are its two spellings, so `kind<order>` and `ref<order>` mint one entry;
-  `identifier_kind`, `atom_kind` and `type_kind` are `!reference { of: … }`. A field's type position, `kind<record>`
-  and `ref<method>` differ only in `of`.
+- A name held in a slot is a value of the kernel's one atom of names, `meta.reference => meta.atom & { of:
+  meta.type_kind }` (`ReferenceBody`). It admits a name exactly when the type of the named entry's value, its tag,
+  past its alias hops, IS-A `of`: `order => { … }` holds a value of `meta.record`, `int32 => !integer ^ { … }` one of
+  `meta.integer_type`, `orders => !api { … }` one of `api`. `meta.kind => <T> !meta.reference { of: T }` and `meta.ref
+  => <T> !meta.reference { of: T }` are its two spellings, which core names `kind` and `ref` by alias, so `kind<order>`,
+  `ref<order>` and `meta.kind<order>` mint one entry, an application through an alias of a template applying the
+  template (`TemplateMaterialiser.templateHead`); `meta.identifier_kind`, `meta.atom_kind` and `meta.type_kind` are
+  `!meta.reference { of: … }`. A field's type position, `kind<meta.record>` and `ref<method>` differ only in `of`.
 - **What `of` names decides what the slot holds, never the spelling** (`KindMembers.namesTypes`). Over a constructor,
   `top` or IS-A it, the values admitted are types: the slot holds a type's name, its path from the root (`order`,
   `geo.address`), judged a member over the governing closure (`KindMembers`) and delivered to a host as a `TypeRef`. Over any
@@ -28,12 +29,12 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   of a nested `!schema` map, a key of a namespace value, a field of a record value. Inside `geo`, a sibling is
   `geo.address`, and a bare `address` is the root's or unresolved. There is no lexical scope, so no shadowing rule.
 - The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members,
-  applications, entries, shown)`: the entry each application the closure closed denotes, an `@application` or an
+  applications, entries, shown)`: the entry each application the closure closed denotes, an `@meta.application` or an
   expansion's `EntryFacts.closes`; the final namespace's entries, which a reference read here names; and the members
   as a message names them, a minted one by its application), and `ValuesByName` re-derives it from `of` over the
   final namespace whatever the read guessed; `TsonSchema.SlotType`'s `KIND` and `REFERENCE`
   roles are only how the read read the name. The index is never written: a resolved form states
-  `!reference { of: … }` alone, a written `members:` is refused as an unknown field, and equality and `toString`
+  `!meta.reference { of: … }` alone, a written `members:` is refused as an unknown field, and equality and `toString`
   exclude it (`ReferenceBody.memberNames()` is the processor's own).
 - `of` names any type or constructor of the writer's namespace. Refused are a name resolving to nothing (an unresolved
   reference), an open entry and a value entry (`KindMembers.ofRefusal`, from `validateBody`). `kind<top>` holds every
@@ -44,8 +45,8 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   It is data grammar ([TSON-DATA] §7.4): `reference = qualified-name "<" ws type-args ws ">"`, the `<` adjacent to the
   name (§7.5), arguments separated by whitespace or a comma, each a reference (a qualified name, with or without
   arguments) or any other token, a number or a quoted token, which is a value. **A quoted token is never a
-  reference**: a reference is written unquoted wherever it stands, `!alias { target: result<T> }`,
-  `@application:response<order 201>`, `parents: [result<T>]`, and a reference without arguments is one token. The
+  reference**: a reference is written unquoted wherever it stands, `!meta.alias { target: result<T> }`,
+  `@meta.application:response<order 201>`, `parents: [result<T>]`, and a reference without arguments is one token. The
   stream assembles one into a single `ReferenceEvent` and the AST into a `ReferenceValue`, each holding the parsed
   `TypeRef` (`design/lexer-and-data-parsing.md`); JSON, which has no unquoted form, holds the same text in a string,
   read by `io.ltr8.tson.atom.ReferenceGrammar`. The canonical text (`TypeRef.text()`) has no whitespace and one space
@@ -54,7 +55,7 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   entry. The grammar classifies an argument, a reference first; the head's parameters judge whether it binds a type or a
   value (§5.10), so `TypeArgument` compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
 - A reference carries arguments only where an application is still open: a record template's `chain.parents` and
-  field types, held text (`!alias { target: pair<uuid B> }` inside `template.template`), and the `application`
+  field types, held text (`!meta.alias { target: pair<uuid B> }` inside `template.template`), and the `application`
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
   resolution and arity, and its arguments by the head's parameters: only an argument at a type parameter is judged
   as a type's name (`TsonSchemaLinker.typeArguments`).
@@ -104,7 +105,7 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   spelling named: `order_box => box<order>`, then the bare name. In a data document the kind's reader (`KindParser`)
   judges an application through the entry it denotes, resolved bottom-up by structural identity
   (`ReferenceBody.entryOf`): each argument that is itself an application first, then the application over those
-  entries, against every application the closure closed, `@application`s and the `EntryFacts.closes` the resolver
+  entries, against every application the closure closed, `@meta.application`s and the `EntryFacts.closes` the resolver
   records (`TemplateMaterialiser.closedApplications`, generated heads skipped). A schema loads only when every
   application in it closes, so data never creates one: an application nothing in the closure closed is refused
   (`ATOM_CONSTRAINT_VIOLATION`, "names no type this schema closes"), as a name no member is. The name itself is
@@ -119,11 +120,12 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
 - A slot that names a value is typed by a reference over a type that is no constructor, `ref<method>` by convention
   and `kind<method>` alike. Its value is a qualified name. A slot typed by a record holds the record's value inline
   and takes no name.
-- Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `kind` and `ref` are in every closure reaching
-  meta.tn or core.tn, and `!reference { of: order }` applied directly is no different (`ReferenceDeclarationTest`). A
-  value's qualified name is judged by what it reaches, which only a link can judge: a reference over a type that is
-  no constructor reads its grammar in a schema document (`AtomParsers.inSchemaDocument`), and in a data document
-  `AtomTypeReader` reports it as a gap (`NOT_IMPLEMENTED`), a data document never being linked.
+- Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `meta.kind` and `meta.ref` are in every closure
+  reaching meta.tn, and core names them `kind` and `ref` at its root, and `!meta.reference { of: order }` applied
+  directly is no different (`ReferenceDeclarationTest`). A value's qualified name is judged by what it reaches, which
+  only a link can judge: a reference over a type that is no constructor reads its grammar in a schema document
+  (`AtomParsers.inSchemaDocument`), and in a data document `AtomTypeReader` reports it as a gap (`NOT_IMPLEMENTED`), a
+  data document never being linked.
 - A recorded name at a kind-typed slot of a value body is judged a member by `ValuesByName.judgeMember`; a qualified
   name there is refused where it reaches a value, and where it goes on past a type, which admits no further segment.
   `ValuesByName.judge` resolves a name's first segment in the root namespace, collapses each segment that selects a
@@ -186,7 +188,7 @@ declared type IS-A `T`, which is §5.12's by-name slot (`ValuesByName`). The two
 both recorded: IS-A (`supertypes`, inverse `subtypes`) and instance-of (the body's tag, inverse the names a kind
 admits, derived at link and never written). Folding instance-of
 into the chain would claim a value of `uuid` is a value of `uuid_type`, whose values are types, which it is not. A
-namespace type is no exception: `api => !namespace { … }` is an instance of `namespace`, and a value of `api` is a map.
+namespace type is no exception: `api => !meta.namespace { … }` is an instance of `namespace`, and a value of `api` is a map.
 
 ## The kernel's slots
 
@@ -213,14 +215,14 @@ namespace type is no exception: `api => !namespace { … }` is an instance of `n
 
 The schema map and a record's `fields` are values of the kernel's two namespace types, `schema` and `field_map`,
 and in Java each is a `Namespace` (`TsonSchema.entries`, `RecordBody.fields`). A
-namespace type is an instance of `namespace` stating its facets (`field_map => !namespace { value_type: record_field
+namespace type is an instance of `namespace` stating its facets (`field_map => !meta.namespace { value_type: record_field
 ordered: true }`), resolved to a `NamespaceBody`, and a value of one is written and read as a map from its `key_type`
 to its `value_type` (`NamespaceBody.read`). Its keys are the key rows above: of the stated family where `key_type` is
 given, and where it is absent, of the family the host supplies, read by spelling and judged once the host resolves (a
 record's field names by its `name_type`). Its values are judged by `value_type`.
 
 An entry may itself be a value of a namespace type: `myapi => !api { get_orders => { response: order_list } }`,
-in a schema importing one declaring `api => !namespace { key_type: identifier  value_type: method }`. Its tag is the
+in a schema importing one declaring `api => !meta.namespace { key_type: identifier  value_type: method }`. Its tag is the
 type, its keys the key rows above under `api`'s family, its values judged by `method`, and it is what a qualified
 name's further segment enters (`myapi.get_orders` at a `ref<method>` slot). In Java it is a `ValueEntry` holding a
 `Namespace`, and its kind is `VALUE`; a value of a record type, `create_order => !operation { … }`, is one too, and a

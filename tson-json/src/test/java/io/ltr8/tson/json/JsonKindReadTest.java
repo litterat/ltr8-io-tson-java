@@ -35,10 +35,10 @@ class JsonKindReadTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              stock_id    => !uuid_type {}
-              customer_id => !uuid_type {}
+              stock_id    => !meta.uuid_type {}
+              customer_id => !meta.uuid_type {}
               sku         => text
-              ledger      => { named: kind<uuid_type> }
+              ledger      => { named: kind<meta.uuid_type> }
             }
             """;
 

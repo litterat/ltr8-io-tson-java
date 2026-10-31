@@ -36,19 +36,18 @@ class RefHostShapeTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/ref-host-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  rh_method         => { request?: kind<record> }
-                  rh_interface      => !namespace { key_type: identifier  value_type: rh_method }
-                  rh_ref_type_ref   => { method: ref<rh_method> }
-                  rh_ref_text       => { method: ref<rh_method> }
-                  rh_kind_type_ref  => { request: kind<record> }
-                  rh_kind_text      => { request: kind<record> }
-                  rh_ref_type_refs  => !namespace { key_type: identifier  value_type: rh_ref_type_ref }
-                  rh_ref_texts      => !namespace { key_type: identifier  value_type: rh_ref_text }
-                  rh_kind_type_refs => !namespace { key_type: identifier  value_type: rh_kind_type_ref }
-                  rh_kind_texts     => !namespace { key_type: identifier  value_type: rh_kind_text }
+                  rh_method         => { request?: meta.kind<meta.record> }
+                  rh_interface      => !meta.namespace { key_type: meta.identifier  value_type: rh_method }
+                  rh_ref_type_ref   => { method: meta.ref<rh_method> }
+                  rh_ref_text       => { method: meta.ref<rh_method> }
+                  rh_kind_type_ref  => { request: meta.kind<meta.record> }
+                  rh_kind_text      => { request: meta.kind<meta.record> }
+                  rh_ref_type_refs  => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_type_ref }
+                  rh_ref_texts      => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_text }
+                  rh_kind_type_refs => !meta.namespace { key_type: meta.identifier  value_type: rh_kind_type_ref }
+                  rh_kind_texts     => !meta.namespace { key_type: meta.identifier  value_type: rh_kind_text }
                 }
                 """);
     }
@@ -138,7 +137,7 @@ class RefHostShapeTest {
     @Test
     void aReferenceToTheWrongKindOfValueWithATextHostIsJudged() {
         refused(schema("ref-text-kind", "b => !rh_ref_texts { one => { method: order } }"),
-                "wants a 'rh_method'", "'order' is an entry whose body is built by 'record'");
+                "wants a 'rh_method'", "'order' is an entry whose body is built by 'meta.record'");
     }
 
     @Test

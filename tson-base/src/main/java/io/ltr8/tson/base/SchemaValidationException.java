@@ -4,7 +4,7 @@ package io.ltr8.tson.base;
  * <b>The author's schema is wrong</b> -- a rule the spec states, broken by the document, at any phase that
  * reads one: resolution (a tightening outside §5.7's transition table, a refinement body that adds rather
  * than tightens, a name in a {@code !} position resolving in neither namespace), linking (an unresolved
- * reference, a constructor declared by a schema no meta-kernel governs), or registration (a
+ * reference, a constructor declared by a schema no kernel governs), or registration (a
  * malformed/non-canonical {@code !!id}, a duplicate identity). Unchecked, matching {@code LexException}/
  * {@code ParseException}'s own established shape elsewhere in this codebase.
  *

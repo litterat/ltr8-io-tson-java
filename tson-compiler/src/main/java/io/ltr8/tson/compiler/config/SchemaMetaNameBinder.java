@@ -5,6 +5,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
+import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 
 import java.util.LinkedHashSet;
@@ -13,20 +14,22 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * The {@link DataNameBinder} for the schema model ({@code io.ltr8.tson.schema.meta}): the names meta-kernel.tn and
- * meta.tn declare, bound by a snake_case-to-PascalCase mangling of the name into that package ({@code
- * "integer_size"} -> {@code IntegerSize}, {@code "record_field"} -> {@code RecordField}), with {@link #ALIASES} where
- * the mangling does not reach the class.
+ * The {@link DataNameBinder} for the schema model ({@code io.ltr8.tson.schema.meta}): the names the kernel, meta.tn,
+ * declares under its {@code meta} map and net.tn under its {@code net} map, each bound by its last segment, mangled
+ * from snake_case to PascalCase into that package ({@code "meta.integer_size"} -> {@code IntegerSize}, {@code
+ * "net.ipv4_type"} -> {@code Ipv4Type}), with {@link #ALIASES} where the mangling does not reach the class. A
+ * consumer's dotted name binds to a sub-package per earlier segment ({@link DataNameBinder.DefaultDataNameBinder});
+ * a name of this vocabulary does not, its first segment naming the bundled map that declares it.
  *
- * <p><b>It answers only for that vocabulary.</b> The two schemas are the ones whose values the schema model
- * describes; core.tn, net.tn and policy.tn declare ordinary types over them, whose values are data. The package
+ * <p><b>It answers only for that vocabulary.</b> Those two maps are the ones whose values the schema model
+ * describes; core.tn, net.tn's root and policy.tn declare ordinary types over them, whose values are data. The package
  * also holds classes no schema declares -- {@code Token}, {@code EntryKind}, {@code OpenEntry}, {@code ValueEntry},
  * {@code AtomCoherence} and the like, the resolver's own model -- and a name that merely mangles to one of them
  * ({@code token}) is not this binder's: it refuses it, so a consumer's type of that name binds through the
  * consumer's binder. The vocabulary is read from the bundled sources themselves, once ({@link Vocabulary}), so it
  * cannot drift from them.
  *
- * <p>A constructor's description in meta-kernel ({@code record => ~product & { fields: ... groups: ... }}) has the
+ * <p>A constructor's description in the kernel ({@code record => meta.product & { fields: ... }}) has the
  * shape of the {@code *Body} class that represents a bound instance of it ({@link
  * io.ltr8.tson.schema.meta.RecordBody}, {@link io.ltr8.tson.schema.meta.ArrayBody}, ...), and each such class's own
  * {@code @Typename} is the bare constructor name, so the schema-name-to-class direction needs the {@code "_body"}
@@ -70,15 +73,16 @@ public final class SchemaMetaNameBinder {
     private static final DataNameBinder MANGLED = new DataNameBinder.DefaultDataNameBinder(Set.of(NAMESPACE), ALIASES);
 
     /**
-     * The schema model's binder: a name meta-kernel.tn or meta.tn declares, mangled into {@code
-     * io.ltr8.tson.schema.meta}; any other name is refused, whatever class it would mangle to.
+     * The schema model's binder: a name the kernel declares under {@code meta} or net.tn under {@code net}, its last
+     * segment mangled into {@code io.ltr8.tson.schema.meta}; any other name is refused, whatever class it would
+     * mangle to.
      */
     public static final DataNameBinder INSTANCE = name -> {
         if (!Vocabulary.NAMES.contains(name)) {
-            throw new DataBindException("'" + name + "' is not declared by meta-kernel.tn or meta.tn, so the schema "
-                    + "model does not bind it");
+            throw new DataBindException("'" + name + "' is not declared under meta.tn's 'meta' or net.tn's 'net', so "
+                    + "the schema model does not bind it");
         }
-        return MANGLED.resolve(name);
+        return MANGLED.resolve(SchemaPaths.member(name));
     };
 
     /**
@@ -110,8 +114,8 @@ public final class SchemaMetaNameBinder {
      * The one context a processor binds schemas and data through, from the context a consumer configured: that
      * context's binder, profile and atom registrations, with {@link #INSTANCE} composed with its binder ({@link
      * #extendedWith}), and the schema model's own registrations added where it lacks them ({@link
-     * ResolverBindContext#registerAbsent}). The kernel's and meta.tn's names are fixed; every other name is the
-     * consumer's binder's to answer.
+     * ResolverBindContext#registerAbsent}). The names under the kernel's {@code meta} and net.tn's {@code net} are
+     * fixed; every other name is the consumer's binder's to answer.
      */
     public static DataBindContext over(DataBindContext consumer) {
         Objects.requireNonNull(consumer, "consumer");
@@ -120,7 +124,7 @@ public final class SchemaMetaNameBinder {
     }
 
     /**
-     * {@link #INSTANCE} for a name meta-kernel.tn or meta.tn declares, {@code additional} for every other -- the
+     * {@link #INSTANCE} for a name of its vocabulary, {@code additional} for every other -- the
      * binder half of {@link #contextExtendedWith}, for a caller assembling a {@link DataBindContext} themselves.
      *
      * <p>Decided by the name, never by a failed lookup: a vocabulary name {@link #INSTANCE} binds no class for
@@ -140,9 +144,9 @@ public final class SchemaMetaNameBinder {
     }
 
     /**
-     * The names {@link #INSTANCE} answers for: every declaration of the bundled meta-kernel.tn and meta.tn, read
-     * from their source by the schema parser on first use. An {@link #ALIASES} key outside it would be an alias
-     * nothing can ask for, so one is a broken invariant.
+     * The names {@link #INSTANCE} answers for: every member of the bundled meta.tn's {@code meta} map and net.tn's
+     * {@code net} map, by path, read from their source by the schema parser on first use. An {@link #ALIASES} key
+     * naming no member's last segment would be an alias nothing can ask for, so one is a broken invariant.
      */
     private static final class Vocabulary {
 
@@ -150,14 +154,20 @@ public final class SchemaMetaNameBinder {
 
         private static Set<String> read() {
             Set<String> names = new LinkedHashSet<>();
-            for (String id : new String[] {TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID}) {
-                names.addAll(new TsonSchemaParser(TsonBundledSchemas.fetch(id)).parseSchemaDocument()
-                        .body().declarations().keySet());
+            for (String id : new String[] {TsonBundledSchemas.META_ID, TsonBundledSchemas.NET_ID}) {
+                for (String name : new TsonSchemaParser(TsonBundledSchemas.fetch(id)).parseSchemaDocument()
+                        .body().declarations().keySet()) {
+                    if (SchemaPaths.isPath(name)) {
+                        names.add(name);
+                    }
+                }
             }
+            Set<String> members = new LinkedHashSet<>();
+            names.forEach(name -> members.add(SchemaPaths.member(name)));
             for (String alias : ALIASES.keySet()) {
-                if (!names.contains(alias)) {
-                    throw new IllegalStateException("alias '" + alias + "' names no declaration of meta-kernel.tn "
-                            + "or meta.tn");
+                if (!members.contains(alias)) {
+                    throw new IllegalStateException("alias '" + alias + "' names no member of meta.tn's 'meta' or "
+                            + "net.tn's 'net'");
                 }
             }
             return Set.copyOf(names);

@@ -78,7 +78,7 @@ import java.util.stream.Collectors;
  *
  * <p><b>Positional form (§5.6):</b> a record whose fields include exactly one that is not optional (never a
  * defaulted, fixed or optional one, even if it's the only field present) can be filled by a bare, non-braced
- * value standing in for that one field -- {@code !enum [true false]}'s own {@code [true false]}
+ * value standing in for that one field -- {@code !meta.enum [true false]}'s own {@code [true false]}
  * filling {@code enum}'s sole required field, {@code members}, without ever writing {@code {
  * members: [true false] } }. {@link #positionalFieldIndex} (that field's own schema position, or
  * {@code -1} if the record doesn't qualify) is computed once, in the constructor, by counting required
@@ -93,7 +93,7 @@ import java.util.stream.Collectors;
  * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
  * ReferenceNameReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
  * positional field is <b>atom</b>-typed -- {@code record_field}'s {@code type}, a {@code type_kind}, so {@code
- * !record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,
+ * !meta.record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,
  * where the explicit record is the only spelling. The record reader refuses a name it does not take as no record,
  * since a component that holds the name is read by {@link ReferenceNameReader} instead and never reaches this
  * class. A data document has no namespace to resolve a name in,

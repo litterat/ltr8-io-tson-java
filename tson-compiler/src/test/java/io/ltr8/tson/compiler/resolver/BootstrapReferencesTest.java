@@ -15,9 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The bootstrap route states references the way ordinary resolution does.
  *
- * <p>{@link MetaKernelBootstrapResolver} resolves meta-kernel by a shorter route -- two passes and no
+ * <p>{@link MetaKernelBootstrapResolver} resolves the kernel by a shorter route -- two passes and no
  * materialisation, because {@code !!meta} naming itself leaves ordinary resolution nothing to bootstrap
- * from. Shorter, not different: this output governs every schema whose {@code !!meta} is meta-kernel, so a
+ * from. Shorter, not different: this output governs every schema whose {@code !!meta} is the kernel, so a
  * use site the two routes disagreed about would be two answers to one question. Several tests drive this
  * route deliberately to exercise every step, which is exactly why it must not quietly diverge.
  *
@@ -34,13 +34,13 @@ class BootstrapReferencesTest {
                 .filter(f -> f.getKey().equals(name)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
-    /** meta-kernel's own references, stated as written -- the fixture's own spelling. */
+    /** The kernel's own references, stated as written -- the fixture's own spelling. */
     @Test
     void aUseSiteNamesWhatWasWrittenOnTheBootstrapRouteToo() {
         TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        RecordField name = field(kernel.entries().get("template_param"), "name");
-        assertEquals("param_name", name.type().name());
+        RecordField name = field(kernel.entries().get("meta.template_param"), "name");
+        assertEquals("meta.param_name", name.type().name());
         assertTrue(name.type().annotations().isEmpty(), "nothing records where it points");
     }
 
@@ -48,18 +48,18 @@ class BootstrapReferencesTest {
     @Test
     void aNonAliasIsUnaffectedOnTheBootstrapRoute() {
         Top recordField = MetaKernelBootstrapResolver.getMetaKernelSchema()
-                .entries().get("record_field");
+                .entries().get("meta.record_field");
 
-        assertEquals("type_kind", field(recordField, "type").type().name());
+        assertEquals("meta.type_kind", field(recordField, "type").type().name());
         assertTrue(field(recordField, "type").type().annotations().isEmpty());
     }
 
     /** The chain stays walkable through the entries, which is what a reader collapses it by. */
     @Test
     void anAliasEntryKeepsItsHopOnTheBootstrapRoute() {
-        Top typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("type_name");
+        Top typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("meta.type_name");
 
-        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("identifier"),
+        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("meta.identifier"),
                 assertInstanceOf(Alias.class, typeName).target());
     }
 }

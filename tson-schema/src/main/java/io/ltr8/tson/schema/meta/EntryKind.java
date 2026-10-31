@@ -32,7 +32,7 @@ public enum EntryKind {
      * reaches ({@link #ofChain}): {@code integer_type => atom & { ... }} is a record describing atoms, and the kind
      * of a constructor is what its instances are.
      *
-     * @param kernel whether a chain's name denotes the meta-kernel's own entry of that name -- a kind is judged by
+     * @param kernel whether a chain's name denotes the kernel's own entry of that name -- a kind is judged by
      *               where a base kind is defined, never by its spelling, so a schema's own {@code atom => { ... }}
      *               composed into {@code payload => atom & { ... }} leaves {@code payload} a PRODUCT
      */
@@ -62,13 +62,13 @@ public enum EntryKind {
                 continue;
             }
             switch (supertype) {
-                case "atom" -> {
+                case "meta.atom" -> {
                     return ATOM;
                 }
-                case "product" -> {
+                case "meta.product" -> {
                     return PRODUCT;
                 }
-                case "sum" -> {
+                case "meta.sum" -> {
                     return SUM;
                 }
                 default -> {
@@ -79,7 +79,7 @@ public enum EntryKind {
     }
 
     /**
-     * Whether {@code value} IS-A the meta-kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
+     * Whether {@code value} IS-A the kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
      * {@code alias} or {@code template} -- what a construction may apply, and what a compiled
      * schema builds an instance reader for. Read off the chain, so a
      * template composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would; and
@@ -91,6 +91,6 @@ public enum EntryKind {
      * @param name the entry whose value {@code value} is
      */
     public static boolean isConstructor(String name, Top value, Predicate<String> kernel) {
-        return (TypeChain.supertypesOf(value).contains("top") || "top".equals(name)) && kernel.test("top");
+        return (TypeChain.supertypesOf(value).contains("meta.top") || "meta.top".equals(name)) && kernel.test("meta.top");
     }
 }

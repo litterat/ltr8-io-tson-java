@@ -36,14 +36,13 @@ class SubtypeBehindFieldTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/sb-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   sb_endpoint  => abstract {}
-                  sb_op        => sb_endpoint & { request?: type_kind }
-                  sb_ops       => !namespace { key_type: identifier  value_type: sb_endpoint }
-                  sb_resource  => { endpoints: {identifier => sb_endpoint} }
-                  sb_resources => !namespace { key_type: identifier  value_type: sb_resource }
+                  sb_op        => sb_endpoint & { request?: meta.type_kind }
+                  sb_ops       => !meta.namespace { key_type: meta.identifier  value_type: sb_endpoint }
+                  sb_resource  => { endpoints: {meta.identifier => sb_endpoint} }
+                  sb_resources => !meta.namespace { key_type: meta.identifier  value_type: sb_resource }
                 }
                 """);
     }

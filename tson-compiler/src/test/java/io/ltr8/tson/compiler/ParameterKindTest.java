@@ -79,7 +79,7 @@ class ParameterKindTest {
     @Test
     void anArgumentBindingAValueParameterIsAMemberRatherThanAReference() {
         TsonCompiledSchema compiled = compile("""
-                  e   => <M> !enum { members: [a b M] }
+                  e   => <M> !meta.enum { members: [a b M] }
                   use => e<c>""");
 
         assertEquals(List.of("a", "b", "c"),
@@ -94,7 +94,7 @@ class ParameterKindTest {
     @Test
     void aValueArgumentIsRecordedAsAValueInTheInstantiationSource() {
         TsonCompiledSchema compiled = compile("""
-                  e   => <M> !enum { members: [a b M] }
+                  e   => <M> !meta.enum { members: [a b M] }
                   use => e<c>""");
 
         // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose facts
@@ -112,7 +112,7 @@ class ParameterKindTest {
     @Test
     void anArgumentBindingATypeParameterIsStillAReference() {
         TsonCompiledSchema compiled = compile("""
-                  arr => <T> !array { element_type: T }
+                  arr => <T> !meta.array { element_type: T }
                   use => arr<int32>""");
 
         // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose facts
@@ -135,8 +135,8 @@ class ParameterKindTest {
      */
     @Test
     void aParameterStandingForACollectionIsRefusedAtTheDeclaration() {
-        for (String declaration : List.of("  bad => <T> !enum { members: T }",
-                                           "  bad => <T> !record { fields: T }")) {
+        for (String declaration : List.of("  bad => <T> !meta.enum { members: T }",
+                                           "  bad => <T> !meta.record { fields: T }")) {
             String message = rejected(declaration);
 
             assertTrue(message.contains("parameter 'T' stands where"), message);
@@ -179,7 +179,7 @@ class ParameterKindTest {
         TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 
-        assertEquals("text", assertInstanceOf(TypeArgument.Ref.class, argument).ref().name());
+        assertEquals("meta.text", assertInstanceOf(TypeArgument.Ref.class, argument).ref().name());
     }
 
     /** And the self-applying alias template is judged on the loop, not on its parameter's kind. */
@@ -198,7 +198,7 @@ class ParameterKindTest {
     @Test
     void anApplicationClosedOnDemandClassifiesItsArgumentsToo() {
         TsonCompiledSchema compiled = compile("""
-                  st => !enum [red green]
+                  st => !meta.enum [red green]
                   t  => <M> { a?: st ~ M }
                   x  => t<red> & { b: text }""");
 

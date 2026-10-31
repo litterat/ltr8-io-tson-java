@@ -9,10 +9,10 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * An instance of the meta-kernel's {@code enum_type} constructor, resolved (Part 2 §7.4, §8.1): the {@code
+ * An instance of the kernel's {@code enum_type} constructor, resolved (Part 2 §7.4, §8.1): the {@code
  * name_type} its members are drawn from, an identifier family, and the {@code members} it lists. Backs {@code
  * boolean} ({@code [true false]}), the kernel's own internal enumerations ({@code product_access_type}, {@code
- * field_role}, ...), and every {@code !enum [...]} and {@code !enum_type { ... }} instance, including those of a
+ * field_role}, ...), and every {@code !meta.enum [...]} and {@code !meta.enum_type { ... }} instance, including those of a
  * meta layer's own {@code enum_type} tightenings. Kept as an ordered {@code List}, as the IS-A chain every {@link
  * Type} carries is -- member order is preserved for deterministic output, not semantically significant.
  *
@@ -22,12 +22,12 @@ import java.util.Objects;
  * checked at linking rather than by {@link #coherenceCheck}. A record's {@code name_type} is the same mechanism
  * over its field names.
  */
-@Typename(name = "enum")
+@Typename(name = "meta.enum")
 public record EnumBody(TypeChain chain,
         @Field("name_type") String nameType, List<String> members) implements Atom {
 
     /** The name type {@code enum} pins: an enumeration of identifiers. */
-    public static final String IDENTIFIER = "identifier";
+    public static final String IDENTIFIER = "meta.identifier";
 
     @Record
     public EnumBody {
@@ -46,7 +46,7 @@ public record EnumBody(TypeChain chain,
         return new EnumBody(chain, nameType, members);
     }
 
-    /** An enumeration of identifiers -- {@code !enum [...]} -- for the callers that build one and say nothing else. */
+    /** An enumeration of identifiers -- {@code !meta.enum [...]} -- for the callers that build one and say nothing else. */
     public EnumBody(List<String> members) {
         this(IDENTIFIER, members);
     }

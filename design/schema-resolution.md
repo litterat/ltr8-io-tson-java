@@ -9,13 +9,15 @@ facts and refinement, groups, subtraction, and the exception boundary.
 - Every name a declaration writes resolves in the schema's one namespace, its own entries and the closure of its
   `!!import`s (SPEC-FEEDBACK.md #7). An annotation on a declaration resolves there (§3.3.3); a
   name that misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its
-  type. Only the meta-kernel bootstrap, resolving `meta-kernel.tn` itself, skips the check.
+  type. Only the kernel's bootstrap, resolving meta.tn itself, skips the check.
 - **Every name resolves from the root** (SPEC-FEEDBACK.md #14). A name written inside a nested `!schema` map resolves
   as one written at the root does: a sibling is `geo.address`, never a bare `address`. There is no lexical scope.
 - **A nested map's members are entries under their paths; the nested map's value is derived, never maintained by
-  hand.** `TsonSchema.entries` holds `geo.address` as it holds `order`, and `geo`'s `ValueEntry` of `schema` is
+  hand.** `TsonSchema.entries` holds `geo.address` as it holds `order`, and `geo`'s `ValueEntry` of `meta.schema` is
   rebuilt from the path entries by `SchemaPaths.synced` in `TsonSchema`'s compact constructor. A phase that edits a
-  member edits its path entry.
+  member edits its path entry: where a path entry and the nested map's own copy disagree, the path entry is the one
+  held, whichever comes first (the kernel's `meta` precedes its members, and a linked schema rebuilt from a partly
+  ready namespace carries a stale copy).
 - Every declaration is made ready in wait order (`WaitOrder`, §3.4.1), never source order: a read against an entry
   of the same document — `!C { … }` with `C` local, a value of a local type, an annotation whose type is local —
   makes that entry ready first, in either order. Entries waiting on each other are a `SchemaValidationException`
@@ -33,7 +35,7 @@ facts and refinement, groups, subtraction, and the exception boundary.
   omission yields, so that order is asked of `RecordField.omitted`.
 - An entry is its value (§8.1). Every type body, a record template's included, carries its own chain, `type`'s one
   field `chain`, a `TypeChain`: `parents` as written, `supertypes`, `subtypes`. The application an entry
-  instantiates is the derived `@application` on its key (`TsonSchema.applicationOf`). What no value holds — where
+  instantiates is the derived `@meta.application` on its key (`TsonSchema.applicationOf`). What no value holds — where
   the entry was declared, the annotations on its value, its constructor, the entry a `^` names — is
   `TsonSchema.EntryFacts`, never a field of any constructor.
 - `supertypes` is names without arguments, each a path from the root, sorted, complete to a fixed point through applied
@@ -55,8 +57,8 @@ facts and refinement, groups, subtraction, and the exception boundary.
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
 `design/template-materialisation.md` and `design/held-template-bodies.md` (§5.10 closing, applied-parent edges),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@synthetic`, the
-meta-kernel bootstrap), `design/meta-layer-namespaces.md` (value entries),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.synthetic`, the
+kernel's bootstrap), `design/meta-layer-namespaces.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
 
 ## The two resolvers
@@ -201,23 +203,25 @@ returns a `ValueEntry(T, value)` of kind `VALUE`, `T` recorded as the entry's co
 (`design/meta-layer-namespaces.md` has the read, the binding and the tree fallback). The resolver's part: a head that
 is itself a value is refused (a value has no instances), a braced payload at an atom type is refused with the `^` it
 is missing, and a payload that is no value of `T` is refused against the entry with the read's path. A namespace type
-is the other side of the line: `api => !namespace { … }` applies the constructor `namespace` and builds a type, a
+is the other side of the line: `api => !meta.namespace { … }` applies the constructor `namespace` and builds a type, a
 `NamespaceBody`.
 
 ## Nested schema maps
 
-`geo => !schema { address => { … } }` declares: every value of `schema` does, as the root does. `TsonSchemaParser`
+`geo => !schema { address => { … } }` declares: every value of `meta.schema` does, as the root does. The tag is
+`!schema`, the root's spelling, or `!meta.schema`, as resolved output writes a nested map (`TsonSchemaParser` takes
+either). The kernel is one such map, `meta`, and net.tn's constructors another, `net`. `TsonSchemaParser`
 puts each member into the document's one declaration map under its path (`geo.address`, `geo.inner.deep`), and the
 entry `geo` itself is a `SchemaMapDef` holding its members' own names. So every phase reads a member as a root entry:
 the desugar phase lifts its sugar, the wait order readies it, and a reference to `geo.address` anywhere is a lookup
-of that key. `DefinitionResolver` resolves the `SchemaMapDef` to `ValueEntry("schema", Namespace("schema", {}))`,
+of that key. `DefinitionResolver` resolves the `SchemaMapDef` to `ValueEntry("meta.schema", Namespace("meta.schema", {}))`,
 waiting on nothing, and `SchemaPaths.synced` fills it from the path entries wherever a `TsonSchema` is built,
 innermost map first, the members' key annotations kept. A schema built from a resolved form read back holds the
 nested map alone, and `synced` keys its members under their paths (`SchemaPaths.withPaths` does the same for a
 resolved form read as a plain map).
 
 A member's identity is its path: two maps may each declare `address`, and a diagnostic, a kind's member list, a
-chain and an `@application` name it `geo.address`. A value of any other namespace type, `!api { … }`, stays a value
+chain and an `@meta.application` name it `geo.address`. A value of any other namespace type, `!api { … }`, stays a value
 entry (above).
 
 ## Fields
@@ -246,7 +250,7 @@ cell for cell without the matrix existing in code. No rule compares a restated t
 §5.8), one path for refinement and composition. Concatenation, because [TSON-DATA] §3.1 makes an annotation name
 repeatable — "the inherited `@doc`" names nothing when two were written. Restatement first, because
 `Annotations.get`/`value` take the first occurrence, so the nearer declaration wins at every lookup. No annotation
-the kernel or meta.tn declares changes how a value reads, so the ordering is pinned over resolved output
+the kernel declares changes how a value reads, so the ordering is pinned over resolved output
 (`RestatedFieldAnnotationsTest`).
 
 ## Field groups
@@ -290,17 +294,17 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
 (`SchemaResolver.unresolved`) that keeps the failed declaration's type parameters.
 
 - **One schema construct reaches `NOT_IMPLEMENTED`: an instance of a user constructor of types**
-  (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `type` builds types, and a type's body is
-  one of the schema model's, built only by the kernel's and meta.tn's constructors. Composing `atom`, `product` or
-  `sum` directly (`c => product & { … }`) makes a new form, which a processor backs with readers and writers of its
-  own; this library backs none beyond the bundled ones, so the refusal is a capability verdict, and stays one.
-  Composing an existing constructor (`c => record & { extra: text }`) makes no new form, and is refused the same way
-  today only because no body in the schema model holds the added facet (`BACKLOG.md`). An instance of a constructor
-  composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a tree where no class binds
-  the head — as a value entry's payload is (`design/meta-layer-namespaces.md`). The other `UnsupportedOperationException`
+  (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `type` builds types, and a type's body is one
+  of the schema model's, built only by the kernel's and net.tn's constructors. Composing `meta.atom`, `meta.product` or
+  `meta.sum` directly (`c => meta.product & { … }`) makes a new form, which a processor backs with readers and writers
+  of its own; this library backs none beyond the bundled ones, so the refusal is a capability verdict, and stays one.
+  Composing an existing constructor (`c => meta.record & { extra: text }`) makes no new form, and is refused the same
+  way today only because no body in the schema model holds the added facet (`BACKLOG.md`). An instance of a constructor
+  composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a tree where no class binds the
+  head — as a value entry's payload is (`design/meta-layer-namespaces.md`). The other `UnsupportedOperationException`
   sites are the catch-alls around the compiled reader (an exception none of the classified ones), a failed
   re-serialisation of an atom refinement's source, a closed application with no `ApplicationCloser` (a resolver built
-  standalone), and the bootstrap's closed switch over `meta-kernel.tn`'s own declarations.
+  standalone), and the bootstrap's closed switch over the kernel's own declarations.
 - **A body the constructor's vocabulary rejects** arrives as a `ReadException` and is restated as a schema error
   (`bodyIsNotValidData`, `payloadFailure`). The read `Diagnostic` is dropped: it was produced against a
   `DataValueEvents` replay whose positions are placeholders and whose path points into a synthetic body. The real
@@ -318,7 +322,7 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
   §10.1 lets an id-less schema be registered under an application-supplied identity, a route no front door here
   offers, so a conforming processor may load the same document cleanly and no vector states the refusal.
 
-**No gap reaches a read either:** every constructor `meta-kernel.tn` and `meta.tn` declare builds a real reader, and
+**No gap reaches a read either:** every constructor meta.tn and net.tn declare builds a real reader, and
 `CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReader`. The machinery stays because the
 extension point can still reach it — a schema's own constructor this library has no factory for — and it rides in
 the report, located at the value it could not read (`TsonCli.exitCodeFor` lifts the run to 70).

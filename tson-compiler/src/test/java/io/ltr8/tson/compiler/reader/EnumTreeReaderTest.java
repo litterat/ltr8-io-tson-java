@@ -37,17 +37,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class EnumTreeReaderTest {
 
     private static TsonCompiledSchema compiled() {
-        // The whole real meta-kernel closure, not a hand-picked subset -- "boolean"'s own source
+        // The whole real kernel closure, not a hand-picked subset -- "boolean"'s own source
         // names "enum", "enum" composes with "atom", and so on transitively; cherry-picking just
-        // "boolean" drags in most of meta-kernel anyway via SchemaValidator's own reference checks,
+        // "boolean" drags in most of the kernel anyway via SchemaValidator's own reference checks,
         // so there's nothing simpler about trying to trim it down. One extra local entry on top.
         Map<String, Top> entries =
                 new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries().entries());
         entries.put("flag_holder", RecordBody.of(RecordBody.fieldMap(Map.entry("flag",
-                RecordField.required(TypeRef.of("boolean"))))));
-        // !!meta must be the real meta-kernel identity, not a placeholder -- this schema's own
-        // locals are meta-kernel's real constructor vocabulary verbatim, plus one extra entry, so
-        // TsonSchemaLinker's own "only a meta-kernel-governed schema may declare constructors" check
+                RecordField.required(TypeRef.of("meta.boolean"))))));
+        // !!meta must be the real kernel identity, not a placeholder -- this schema's own
+        // locals are the kernel's real constructor vocabulary verbatim, plus one extra entry, so
+        // TsonSchemaLinker's own "only a kernel-governed schema may declare constructors" check
         // requires it (the placeholder "meta.tn" this used to point at was never registered in
         // schemaRegistry below, so it was already functionally inert either way).
         TsonSchema schema = new TsonSchema("https://example.test/flag.tn",

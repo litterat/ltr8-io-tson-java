@@ -40,21 +40,20 @@ class ValueThroughFieldTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-shop.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              endpoint     => { request?: kind<record>  response?: type_kind }
-              endpoint_map => !namespace { key_type: identifier  value_type: endpoint }
-              service      => { extends?: [identifier]  fallback?: endpoint  endpoints: endpoint_map }
-              services     => !namespace { key_type: identifier  value_type: service }
-              route        => { endpoint: ref<endpoint>  verb: text }
-              routes       => !namespace { key_type: identifier  value_type: route }
-              shape        => { fields: field_map }
-              shapes       => !namespace { key_type: identifier  value_type: shape }
-              pick         => { field: ref<record_field> }
-              picks        => !namespace { key_type: identifier  value_type: pick }
+              endpoint     => { request?: meta.kind<meta.record>  response?: meta.type_kind }
+              endpoint_map => !meta.namespace { key_type: meta.identifier  value_type: endpoint }
+              service      => { extends?: [meta.identifier]  fallback?: endpoint  endpoints: endpoint_map }
+              services     => !meta.namespace { key_type: meta.identifier  value_type: service }
+              route        => { endpoint: meta.ref<endpoint>  verb: meta.text }
+              routes       => !meta.namespace { key_type: meta.identifier  value_type: route }
+              shape        => { fields: meta.field_map }
+              shapes       => !meta.namespace { key_type: meta.identifier  value_type: shape }
+              pick         => { field: meta.ref<meta.record_field> }
+              picks        => !meta.namespace { key_type: meta.identifier  value_type: pick }
               unbound      => { endpoints: endpoint_map }
-              unbounds     => !namespace { key_type: identifier  value_type: unbound }
+              unbounds     => !meta.namespace { key_type: meta.identifier  value_type: unbound }
             }
             """;
 

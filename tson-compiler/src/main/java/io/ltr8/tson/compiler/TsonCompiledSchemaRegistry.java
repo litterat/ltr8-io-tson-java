@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * queryable {@code TsonValue} tree or as real Java objects.
  *
  * <p><b>Resolution is always bind-anchored, so it is delegated to the core regardless of this registry's
- * own read mode.</b> Resolving a schema's own {@code !enum}/{@code !integer} instances binds them to
+ * own read mode.</b> Resolving a schema's own {@code !meta.enum}/{@code !integer} instances binds them to
  * {@code schema.meta} objects (a DOM reader's {@code Map} output can't stand in), so every mode shares the
  * one bind-mode core for resolution; only the final compile of the already-resolved, already-linked schema
  * runs in this registry's mode, through the mode's factory set alone: the schema's constructor usage was already

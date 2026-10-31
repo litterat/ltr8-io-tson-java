@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code iri_type} constructor (§5.5's {@code iri} and {@code iri_reference} atoms): {@code
+ * The kernel's {@code iri_type} constructor (§5.5's {@code iri} and {@code iri_reference} atoms): {@code
  * text_type}'s length and pattern facets, {@code atom_specification}'s {@code spec} pinned to RFC 3987, and
  * {@code uri_type}'s own {@code schemes}, {@code allow_relative} and {@code allow_fragment}. Pure constraint
  * values -- {@code tson-atom}'s {@code IriParser} holds one of these and does the reading.
@@ -19,10 +19,10 @@ import java.util.Optional;
  * so their comparison rules are {@link UriType}'s, reached through {@link #uriFacets()} rather than restated.
  * Every field is flat, mirroring the resolved shape -- see {@link UriType}.
  *
- * <p>{@code iri_reference => !iri_type {}} resolves to exactly {@link #REFERENCE}, and {@code iri =>
+ * <p>{@code iri_reference => !meta.iri_type {}} resolves to exactly {@link #REFERENCE}, and {@code iri =>
  * !iri_reference ^ { allow_relative: false }} to {@link #IRI}.
  */
-@Typename(name = "iri_type")
+@Typename(name = "meta.iri_type")
 public record IriType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
@@ -54,7 +54,7 @@ public record IriType(TypeChain chain,
     /** RFC 3987, the one {@code spec} every {@code iri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3987";
 
-    /** {@code iri_reference => !iri_type {}} -- §5.5's {@code !iri_reference}, an IRI or a relative reference. */
+    /** {@code iri_reference => !meta.iri_type {}} -- §5.5's {@code !iri_reference}, an IRI or a relative reference. */
     public static final IriType REFERENCE = new IriType(SPEC, Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), true, true, Normalization.NONE);
 

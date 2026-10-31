@@ -1,9 +1,9 @@
-# Resolver vocabulary, alias hops, `@synthetic`, and the meta-kernel bootstrap
+# Resolver vocabulary, alias hops, `@meta.synthetic`, and the kernel bootstrap
 
 The facts the resolver phases share rather than own: the three leaf classes (`WireForm`, `MetaRefs`, `DerivedName`),
 how an alias chain is kept in resolved output and walked, the one derived marker, the compiled vocabulary a
-resolution reads `!C` bodies and annotation values through, and the special-cased bootstrap that resolves meta-kernel
-itself. Current form only; history lives in git.
+resolution reads `!C` bodies and annotation values through, and the special-cased bootstrap that resolves the kernel,
+meta.tn, itself. Current form only; history lives in git.
 
 **Invariants**
 
@@ -17,15 +17,19 @@ itself. Current form only; history lives in git.
   asserted by value, never by `startsWith`.
 - Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
   `ALIAS` entry. `AliasChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
-- `@synthetic` goes on the **key** of exactly the sugar-form entries (both channels), never on an instantiation entry
-  or an entry's value, and the linker re-attaches it (`withNameAnnotations`), imports included.
-- `@application` goes on the **key** of exactly the entries that close an application, whatever their kind, by the
-  same path; `@synthetic` is recomputed on ingest, `@application` read as stated, and an author writing it is refused.
+- `@meta.synthetic` goes on the **key** of exactly the sugar-form entries (both channels), never on an instantiation
+  entry or an entry's value, and the linker re-attaches it (`withNameAnnotations`), imports included.
+- `@meta.application` goes on the **key** of exactly the entries that close an application, whatever their kind, by
+  the same path; `@meta.synthetic` is recomputed on ingest, `@meta.application` read as stated, and an author writing it
+  is refused.
+- Every kernel entry is named by its path under the kernel's one root entry, `meta` (`SPEC-FEEDBACK.md #15`): a Java
+  literal naming one is `KernelNames.of("record")`, `"meta.record"`, never the bare member, and the minted names'
+  readable half reads a kernel path as its member (`InternalName.part`: `array_text_…`, `record_…`).
 - The bootstrap hand-builds exactly the pre-loaded set — the instances and the one refinement on the kernel's one
   wait cycle (`SPEC-FEEDBACK.md #4`, rule 4) — and makes every other entry ready by `WaitOrder`, the one algorithm
   every schema's resolution runs. The order is the waits', never source order. `MetaKernelBootstrapResolverTest`
   holds the set to the measured cycle and the output to the kernel's ordinary resolution in any declaration order;
-  it attaches no `@synthetic`.
+  it attaches no `@meta.synthetic`.
 - A `!C { … }` body or an annotation value against an imported entry is read through the compiled form of the schema
   that declared it (`SchemaResolver.Vocabulary`, by the origin the import merge recorded), never through one compiled
   per closure; against an entry of the same document, through readers compiled from that document's entries ready so
@@ -144,6 +148,15 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `AL
   parameter is its own terminal) and the second has none. **`ParameterTypes` keeps its own loop deliberately**:
   it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the template
   being the answer there. `AliasChainWalkTest` pins all four stops.
+- **Core's root names are aliases of the kernel's** (`text => meta.text`, `kind => meta.kind`; SPEC-FEEDBACK.md #15),
+  so three positions walk a chain where a declared entry used to stand. An application through an alias of a template
+  applies the template (`TemplateMaterialiser.templateHead`, `checkArity`), its identity the template's, so
+  `kind<order>` and `meta.kind<order>` close to one entry; an alias naming a template bare is no use of the template
+  without arguments (`validateBody`'s `Alias` arm). An atom refinement's source written as an alias refines the
+  instance at the end of the chain, and its chain names that instance (`resolveAtomRefinement`: `!integer ^ { … }`
+  IS-A `meta.integer`). An annotation is identified by the entries on its alias chain, not by its end
+  (`AliasChain.annotates`/`passesThrough`): `@disjoint` reaches `meta.disjoint` and then `meta.void`, and the linker
+  asks whether `meta.disjoint` is on the way.
 - **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
   terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
   alias names; `FieldValueConformanceTest` pins both directions.
@@ -158,9 +171,9 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `AL
   diagnostic naming the hop the author wrote — and end to end by `ResolvedFixtureTest` against the spec's own
   `spec/m/*-resolved.tn`.
 
-## The derived key annotations: `@synthetic` and `@application` (`tson-compiler/.../resolver/SchemaResolver.java`)
+## The derived key annotations: `@meta.synthetic` and `@meta.application` (`tson-compiler/.../resolver/SchemaResolver.java`)
 
-§8.2 puts a bare **`@synthetic` on the key of every entry the resolver materialised from a sugar form**, and
+§8.2 puts a bare **`@meta.synthetic` on the key of every entry the resolver materialised from a sugar form**, and
 on no other. It is *derived* — attached by the resolver rather than written by an author, and discarded and
 recomputed on ingest (§8.1), so it carries no decode force and cannot be forged into a resolved document to
 change how it reads. It is built by name rather than resolved in the schema's namespace the way an author-written
@@ -188,18 +201,18 @@ annotation is: there is no author to resolve against, and the value is fixed.
   fold-back-into-display case the marker serves; an instantiation is a type the author named by its
   application. Marking too much would be as wrong as marking too
   little, so `SyntheticEntryMarkerTest` asserts both halves.
-- **`@application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
-  closes a template application, the application it is the instantiation of, `@application:box<int32>`, a
+- **`@meta.application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
+  closes a template application, the application it is the instantiation of, `@meta.application:box<int32>`, a
   `type_kind` reference carrying arguments, written unquoted and stated as written: nested arguments unreduced
-  (`@application:pair<box<text> int32>`), a bare-name argument past its alias hops, an argument at a value parameter
+  (`@meta.application:pair<box<text> int32>`), a bare-name argument past its alias hops, an argument at a value parameter
   a value token (`TemplateMaterialiser.asWritten`). An expansion carries none; what a data read and a message need
   of it is `TsonSchema.EntryFacts.closes`, held in memory and never written. It is about the entry, not about a
   type — a record template's member, a value entry (`order_api => orders<order>` over `orders => <T> !interface {
   get => { response: T } }`), the `Alias` a non-record template's application closes to — which is why it is no
   field of `type_chain`. The materialiser records
   each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
-  it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@synthetic`;
-  `TsonSchema.applicationOf` is the one accessor. **Unlike `@synthetic` it is read as stated on ingest**, not
+  it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@meta.synthetic`;
+  `TsonSchema.applicationOf` is the one accessor. **Unlike `@meta.synthetic` it is read as stated on ingest**, not
   recomputed: it is the one fact the entry's value does not state, and what an imported schema's instantiations unify
   by. An author writing it is a resolver error (`DefinitionResolver.refuseWrittenApplication`), as writing `chain` is.
 - **It survives linking and the import merge**, which is where a key-side fact is easiest to lose: the linker
@@ -207,13 +220,13 @@ annotation is: there is no author to resolve against, and the value is fixed.
   through (`withNameAnnotations`), imports included, so an imported synthetic keeps the marker its own schema
   gave it.
 - **The bootstrap route attaches none, deliberately.** `MetaKernelBootstrapResolver` exists to be *just*
-  enough to load the real meta-kernel from its own file, and nothing in the pipeline reads this marker — it is
-  informational. meta-kernel's own eight synthetics are marked anyway, because the entries anything else sees come from
-  ordinary resolution: the bootstrap output stands in only as the transient vocabulary the kernel's own ordinary
-  resolution reads through.
+  enough to load the real kernel from its own file, and nothing in the pipeline reads this marker — it is
+  informational. The kernel's own six synthetics, minted at meta.tn's root, are marked anyway, because the entries
+  anything else sees come from ordinary resolution: the bootstrap output stands in only as the transient vocabulary the
+  kernel's own ordinary resolution reads through.
 - Cross-checked against the spec's own output by
-  `ResolvedFixtureTest.theSameEntriesAreMarkedSyntheticOnBothSides` — eight keys in meta-kernel, five in
-  meta.tn, none in core.tn, which writes no inline form. It reads the fixtures' marked keys from their
+  `ResolvedFixtureTest.theSameEntriesAreMarkedSyntheticOnBothSides` — six keys in meta.tn, two in net.tn, none in
+  core.tn, which writes no inline form. It reads the fixtures' marked keys from their
   *text*, because a key-position annotation is still dropped when a resolved-form document is read back
   (`BACKLOG.md`), and a bound comparison would have both sides render nothing and agree for the wrong reason.
 
@@ -226,7 +239,7 @@ identity of the schema that declared it, and its private `Vocabulary` reads `!C 
 reader. **Why the declaring schema's compile suffices**: an entry's reader was compiled over its declaring schema's
 closure, which is inside the importer's, so it reads everything its body can name. Nothing is compiled per closure;
 each declaring schema is compiled once and cached by identity (`design/compiled-registries.md`), and a schema applying
-only the kernel's and meta.tn's constructors reaches exactly those two.
+only the kernel's constructors reaches exactly the kernel's compile.
 
 - **A local head or annotation type is read through the entries ready so far.** `Vocabulary` tells a local name
   from an import by the recorded origins, and reads a local one through `WaitOrder.read`: readers compiled by
@@ -242,11 +255,14 @@ only the kernel's and meta.tn's constructors reaches exactly those two.
 - **The kernel reads through itself.** Its resolution is handed the pre-loaded stand-in, which answers for every
   name, the one cycle being closed by pre-loading (§3.4).
 
-## Meta-kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
+## Kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 
-Meta-kernel is special: its header is its `!!id` alone and its root `!schema`, so it imports nothing and applies only
-its own constructors (§3.4's one cycle, closed by pre-loading, not resolution). It is never resolved from a document,
-and its names reach any other schema only by import. Ordinary resolution can't bootstrap it: an instance waits on its
+The kernel, meta.tn, is special: its header is its `!!id` alone and its root `!schema`, holding one entry, `meta =>
+!schema { … }`, whose members are every kernel declaration, each named by its path (`meta.record`; `SPEC-FEEDBACK.md
+#15`). It imports nothing and applies only its own constructors (§3.4's one cycle, closed by pre-loading, not
+resolution). It is never resolved from a document, and its names reach any other schema only by import, under the one
+reserved name `meta`. Inside it every sibling is written by its path, as every name resolves from the root (#14), and
+the synthetics its sugar lifts are minted at its root. Ordinary resolution can't bootstrap it: an instance waits on its
 constructor being ready, and the instances on the kernel's one wait cycle wait on each other, so they are built by
 hand (§3.4), and only the wait order over what that leaves is the algorithm every schema runs.
 
@@ -257,17 +273,19 @@ Its output is what ordinary resolution of the kernel against it produces, entry 
 constructor, positions included (the bootstrap resolves with the parser's positions).
 
 - **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the kernel's
-  one wait cycle, the one holding `record`: `value`, `boolean`, `field_role`, `enum_set`, `integer`,
-  `non_negative_integer`, `text`, `type_kind`, `field_map` (`PRE_LOADED`), and the arrays lifted over `type_kind`,
-  `field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted array is named by its content, so it
-  is designated by what it holds). `instanceBody` covers the shapes those apply — a bare `{}` (each target's
-  unconstrained constant), a bare token array (`enum`), and a record of tokens (`reference`, `namespace` for
-  `field_map`, the `array`/`set_type` binding records the desugar phase lifts, with their `min_items`/`max_items`) —
-  and refuses any other target;
-  `refinedBody` merges the integer family's `min` and `max`. `MetaKernelBootstrapResolverTest` measures the cycle with
-  `WaitGraph` from `meta-kernel-resolved.tn` and asserts the hand-built names equal it, so a kernel edit that moves the
-  cycle fails there. `KernelWaitGraphTest` prints the measurement: one cycle, 25 of the kernel's 73 entries (67
-  declarations and 6 desugared arrays), longest wait chain 4.
+  one wait cycle, the one holding `meta.record`: `meta.value`, `meta.boolean`, `meta.field_role`, `meta.enum_set`,
+  `meta.integer`, `meta.non_negative_integer`, `meta.text`, `meta.type_kind`, `meta.field_map` (`PRE_LOADED`), and the
+  arrays lifted over `meta.type_kind`, `meta.field_group` and `meta.text` and arrays of those (`PRE_LOADED_ELEMENTS` — a
+  lifted array is named by its content, so it is designated by what it holds; an entry the source declares is no lift,
+  so `meta.examples => @meta.annotation [meta.text]` is read, not built). `instanceBody` covers the shapes those apply —
+  a bare `{}` (each target's unconstrained constant), a bare token array (`enum`), and a record of tokens (`reference`,
+  `namespace` for `field_map`, the `array`/`set_type` binding records the desugar phase lifts, with their
+  `min_items`/`max_items`) — and refuses any other target; `refinedBody` merges the integer family's `min` and `max`.
+  `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from `meta-resolved.tn` (the map `meta` read as
+  its members under their paths) and asserts the hand-built names equal it, so a kernel edit that moves the cycle fails
+  there. `KernelWaitGraphTest` prints the measurement: one cycle, 25 of the kernel's 102 entries (96 members of `meta`
+  and 6 desugared arrays at the root), longest wait chain 4; meta.tn's atom constructors and annotation types are
+  ordered after the cycle.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies.
@@ -278,17 +296,19 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   `PendingTypeReader`. A read that reaches one throws `PendingTypeReader.NotReady`; the order makes that entry
   ready, drops the compile, and reads again. A held value reached through one
   binds as written — what base type resolution gives the token, carried to its component by the field's bridge — and
-  is judged when the whole kernel links. That is how `iri` is read against `iri_type`, whose `spec` pin is typed by
-  `iri` itself: rule 3 says the pin orders nothing, and binding it as written is what makes that true here.
+  is judged when the whole kernel links. That is how `meta.iri` is read against `meta.iri_type`, whose `spec` pin is typed by
+  `meta.iri` itself: rule 3 says the pin orders nothing, and binding it as written is what makes that true here.
 - **The order is computed.** The bootstrap is `WaitOrder`'s `Readiness` (`handBuilt` for the pre-loaded set,
   `DefinitionResolver` for the rest), and the order is the `DefinitionGetter` every lookup goes through, making an
   entry ready the first time anything asks for it. An entry waiting on itself is the `SchemaValidationException`
   every schema gets, naming the cycle; the bootstrap rethrows every failure, since only a kernel edit can put a cycle
   outside the pre-loaded set. The kernel is resolved under the default wait depth. The driving loop's order changes
   how many compiles run, never the output (`theBootstrapIsTheSameInAnyOrder`): an instance whose read reaches an
-  entry not yet ready (`scheme_name` reaching `identifier_base` and `normalization`) forces another compile.
+  entry not yet ready (`meta.scheme_name` reaching `meta.identifier_base` and `meta.normalization`) forces another
+  compile. Its output's nested map `meta` is derived from the members, so the order test compares its names.
 - **Parameter types are derived after every entry is ready**, through `ParameterTypes.inferAll` as `SchemaResolver`
-  derives a schema's, so `kind` and `ref` carry `T: type_kind`, a type parameter, as their ordinary resolution does.
+  derives a schema's, so `meta.kind` and `meta.ref` carry `T: meta.type_kind`, a type parameter, as their ordinary
+  resolution does.
 - **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
   first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by
   (`TsonCompiledMetaRegistry.loadMeta` links and compiles the output into the stand-in).
@@ -296,8 +316,8 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   predicate that admits every name (`name -> true`); ordinary resolution judges by the origin of each name in the
   merged namespace instead. In both, a head declared beside its instance is made ready in wait order.
 - **Desugaring needs no equivalent trick.** The container constructors are parameterless (§4.2), so the desugar table
-  is fixed by the sugar forms and nothing is looked up in another schema. Meta-kernel's eight sugar forms are
-  ordinary declarations by the time the linker sees them.
+  is fixed by the sugar forms and nothing is looked up in another schema. The kernel's six sugar forms are
+  ordinary declarations at its root by the time the linker sees them.
 - **Cost.** The two partial links and compiles make a warm bootstrap about 11 ms, and it runs once per registry:
   `loadMeta` builds the stand-in on the first lookup of the kernel's identity and reuses it until the ordinarily
   resolved kernel is registered (`registerBundled`), after which the kernel's vocabulary is that registered schema's

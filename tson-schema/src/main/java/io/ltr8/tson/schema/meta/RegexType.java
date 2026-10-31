@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code regex_type} constructor (Part 2 §5.7: {@code regex_type => ~text_type &
+ * The kernel's {@code regex_type} constructor (Part 2 §5.7: {@code regex_type => ~text_type &
  * atom_specification & { spec: = "https://www.rfc-editor.org/rfc/rfc9485" } }) -- {@code text_type}'s
  * length and pattern facets plus {@code atom_specification}'s {@code spec}, pinned to RFC 9485, the
  * I-Regexp specification. Pure constraint values, no parsing/validation behavior -- {@code
@@ -33,10 +33,10 @@ import java.util.Optional;
  * <p>{@code normalization} is fixed to {@code NONE}: putting a pattern into another form changes what it
  * matches ({@code [A-Z]} folds to {@code [a-z]}), so a regex is always the text as written.
  *
- * <p>{@code regex => !regex_type {}} is a constructor-application instance (§5.5) whose resolved body
+ * <p>{@code regex => !meta.regex_type {}} is a constructor-application instance (§5.5) whose resolved body
  * is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "regex_type")
+@Typename(name = "meta.regex_type")
 public record RegexType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                         @Field("max_length") Optional<Integer> maxLength,
@@ -59,7 +59,7 @@ public record RegexType(TypeChain chain,
         return new RegexType(chain, spec, minLength, maxLength, length, pattern, members, normalization);
     }
 
-    /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
+    /** {@code regex => !meta.regex_type {}} -- the unconstrained regex type. */
     public static final RegexType UNCONSTRAINED = new RegexType(
             "https://www.rfc-editor.org/rfc/rfc9485", Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE);

@@ -27,7 +27,7 @@ import java.util.Optional;
  * naming values carries {@link Closure#NONE}, and names nothing.
  *
  * <p>An argument-carrying reference survives only where an application is still open: a record template's
- * {@code chain.parents} and field types, held text, and the {@code @application} annotation. A closed application
+ * {@code chain.parents} and field types, held text, and the {@code @meta.application} annotation. A closed application
  * lifts to an entry and is named bare where it stands (§5.3).
  *
  * <p>{@code arguments} normalises {@code null} to empty: absent and empty are one state, and there is no spelling of

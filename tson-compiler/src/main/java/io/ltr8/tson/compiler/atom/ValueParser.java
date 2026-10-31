@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 /**
- * Parses meta-kernel's {@code value}, the instance of the {@code value_type} constructor (§4.2, §8.1) --
+ * Parses the kernel's {@code value}, the instance of the {@code value_type} constructor (§4.2, §8.1) --
  * the "escape hatch primitive": per its own kernel doc, "the result of base type resolution
  * ([TSON-DATA] §4) applied to a source token, with no further interpretation... the host runtime is
  * responsible for type-checking values at use site." It runs {@link BaseTypeResolver} -- boolean/number/string, §4.5's

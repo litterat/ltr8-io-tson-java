@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * {@code paren-type = "(" type-ref "|" type-ref *("|" type-ref) ")"} (Part 2 §12.1, §5.4) -- a
- * choice type, at least two variants. Desugars to {@code !choice { variants: [...] }} at
+ * choice type, at least two variants. Desugars to {@code !meta.choice { variants: [...] }} at
  * resolution (§5.4, not implemented at this grammar-only stage).
  */
 public record ChoiceRef(List<TypeRef> variants) implements TypeRef {

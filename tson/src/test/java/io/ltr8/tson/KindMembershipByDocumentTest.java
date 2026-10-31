@@ -26,12 +26,12 @@ class KindMembershipByDocumentTest {
     void aDataDocumentUnderMetaJudgesMembershipInMetasClosure() {
         assertEquals(List.of(), validate("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !record_field { type: integer }
+                !meta.record_field { type: meta.integer }
                 """));
 
         List<Diagnostic> problems = validate("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !record_field { type: int32 }
+                !meta.record_field { type: int32 }
                 """);
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("'int32' is not a member"), problems::toString);
@@ -42,7 +42,7 @@ class KindMembershipByDocumentTest {
         assertEquals(List.of(), validate("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
-                !record_field { type: int32 }
+                !meta.record_field { type: int32 }
                 """));
     }
 
@@ -53,10 +53,10 @@ class KindMembershipByDocumentTest {
         Tson.standard().treeReader().withImports(List.of(TsonBundledSchemas.META_ID)).withDiagnostics(problems::add)
                 .readAs("""
                         !schema {
-                          point => !record { fields: { x => !record_field { type: coordinate } } }
-                          coordinate => !alias { target: integer }
+                          point => !meta.record { fields: { x => !meta.record_field { type: coordinate } } }
+                          coordinate => !meta.alias { target: integer }
                         }
-                        """, "schema");
+                        """, "meta.schema");
 
         assertEquals(List.of(), problems);
     }

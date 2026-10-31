@@ -27,8 +27,8 @@ class PositionalNameTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               named  => { v: text }
-              slot   => { type: kind<record> }
-              holder => { c?: named  p?: slot  q?: kind<record> }
+              slot   => { type: kind<meta.record> }
+              holder => { c?: named  p?: slot  q?: kind<meta.record> }
             }""";
 
     private static List<Diagnostic> read(String data) {
@@ -82,7 +82,7 @@ class PositionalNameTest {
                     !!import:"https://tson.io/2026/39/m/meta.tn"
                     !!import:"https://tson.io/2026/39/m/core.tn"
                     !schema {
-                      r => !record { fields: %s }
+                      r => !meta.record { fields: %s }
                     }""".formatted(fields)), fields);
         }
     }

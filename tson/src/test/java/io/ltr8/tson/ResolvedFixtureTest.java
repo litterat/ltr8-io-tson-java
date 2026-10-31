@@ -49,13 +49,23 @@ class ResolvedFixtureTest {
     }
 
     private static Comparison compare(String label, String fixtureFile, String id) throws Exception {
-        return new Comparison(label, fixtureEntries(fixtureFile), ourEntries(id),
+        return new Comparison(label, fixtureEntries(fixtureFile, id), ourEntries(id),
                 Files.readString(specDirectory().resolve(fixtureFile)));
     }
 
-    private static Map<String, Object> fixtureEntries(String file) throws Exception {
-        Map<String, Object> bound =
-                ResolvedForm.readResolved(tson(), Files.readString(specDirectory().resolve(file)));
+    /**
+     * A fixture read under its header's imports and, beside them, its source: an entry of net.tn's is an instance of
+     * a constructor net.tn itself declares, and a resolved form is read under its source's imports rather than over
+     * its own entries ({@code SPEC-FEEDBACK.md #4}, "What is not running").
+     */
+    private static Map<String, Object> fixtureEntries(String file, String id) throws Exception {
+        String text = Files.readString(specDirectory().resolve(file));
+        java.util.List<String> imports = new java.util.ArrayList<>(
+                io.ltr8.tson.compiler.TsonDocumentPeek.of(text).header().imports());
+        if (!id.equals(TsonBundledSchemas.META_ID)) {
+            imports.add(id);
+        }
+        Map<String, Object> bound = ResolvedForm.readResolved(tson(), text, imports);
         assertNotNull(bound, file + " did not read back at all");
         return bound;
     }
@@ -84,8 +94,7 @@ class ResolvedFixtureTest {
         return List.of(
                 compare("core.tn", "core-resolved.tn", TsonBundledSchemas.CORE_ID),
                 compare("net.tn", "net-resolved.tn", TsonBundledSchemas.NET_ID),
-                compare("meta.tn", "meta-resolved.tn", TsonBundledSchemas.META_ID),
-                compare("meta-kernel.tn", "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID));
+                compare("meta.tn", "meta-resolved.tn", TsonBundledSchemas.META_ID));
     }
 
     // ── The absolutes ────────────────────────────────────────────────────
@@ -155,7 +164,6 @@ class ResolvedFixtureTest {
     @Test
     void everyKeyCarriesTheSameAnnotations() throws Exception {
         Map<String, String> fixtures = Map.of(
-                "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID,
                 "meta-resolved.tn", TsonBundledSchemas.META_ID,
                 "core-resolved.tn", TsonBundledSchemas.CORE_ID,
                 "net-resolved.tn", TsonBundledSchemas.NET_ID);
@@ -167,7 +175,7 @@ class ResolvedFixtureTest {
         }
         // Non-vacuous: core marks its atoms, so an empty-equals-empty pass is not available here either.
         assertTrue(ResolvedForm.fixtureKeyAnnotations(Files.readString(specDirectory().resolve("core-resolved.tn")))
-                .get("int32").contains("@ordering:TOTAL"), "core-resolved.tn marks int32 @ordering:TOTAL");
+                .get("int32").contains("@meta.ordering:TOTAL"), "core-resolved.tn marks int32 @meta.ordering:TOTAL");
     }
 
     /**
@@ -178,7 +186,6 @@ class ResolvedFixtureTest {
     @Test
     void everyValueCarriesTheSameAnnotations() throws Exception {
         Map<String, String> fixtures = Map.of(
-                "meta-kernel-resolved.tn", TsonBundledSchemas.META_KERNEL_ID,
                 "meta-resolved.tn", TsonBundledSchemas.META_ID,
                 "core-resolved.tn", TsonBundledSchemas.CORE_ID,
                 "net-resolved.tn", TsonBundledSchemas.NET_ID);
@@ -190,16 +197,16 @@ class ResolvedFixtureTest {
         }
         // Non-vacuous: the kernel marks its annotation types on their values.
         assertTrue(ResolvedForm.fixtureValueAnnotations(Files.readString(specDirectory()
-                .resolve("meta-kernel-resolved.tn"))).get("doc").contains("@annotation"),
-                "meta-kernel-resolved.tn marks doc's value @annotation");
+                .resolve("meta-resolved.tn"))).get("meta.doc").contains("@meta.annotation"),
+                "meta-resolved.tn marks meta.doc's value @meta.annotation");
     }
 
     /**
      * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
      * {@code @synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
      * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark six keys
-     * in meta-kernel and four in meta.tn; core.tn and net.tn write no inline form and have none, which is as
-     * much a statement as the other two.
+     * in meta.tn and two in net.tn, each at its document's root; core.tn writes no inline form and has none,
+     * which is as much a statement as the other two.
      *
      * <p>This is the one assertion here that does not go through the bound document -- see {@link
      * ResolvedForm#markedSynthetics}.
@@ -208,11 +215,9 @@ class ResolvedFixtureTest {
     void theSameEntriesAreMarkedSyntheticOnBothSides() throws Exception {
         // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
         // scan that stopped matching or a resolver that stopped marking.
-        assertEquals(6, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks six keys");
-        assertEquals(2, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks two keys");
+        assertEquals(6, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks six keys");
+        assertEquals(2, fixtureSynthetics("net-resolved.tn").size(), "net.tn marks two keys");
 
-        assertEquals(fixtureSynthetics("meta-kernel-resolved.tn"),
-                ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_KERNEL_ID), "meta-kernel.tn");
         assertEquals(fixtureSynthetics("meta-resolved.tn"),
                 ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_ID), "meta.tn");
         assertEquals(fixtureSynthetics("core-resolved.tn"),

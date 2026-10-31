@@ -38,7 +38,7 @@ public record UriParser(UriType constraints) implements AtomTypeParser<Iri> {
     /** {@code uri => !uri_reference ^ { allow_relative: false }} -- §5.5's {@code !uri}, which has a scheme. */
     public static final UriParser UNCONSTRAINED = new UriParser(UriType.URI);
 
-    /** {@code uri_reference => !uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
+    /** {@code uri_reference => !meta.uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
     public static final UriParser REFERENCE = new UriParser(UriType.REFERENCE);
 
     /**

@@ -21,7 +21,7 @@ class BundledSchemaPinTest {
     void everyHeldDigestMatchesItsShippedResource() {
         // The held constant must equal the packaged file's content hash -- else the two have drifted
         // (this is the "check the held digest against what's in the file").
-        assertDigestMatches(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_KERNEL_SHA256);
+        assertDigestMatches(TsonBundledSchemas.META_ID, TsonBundledSchemas.META_SHA256);
         assertDigestMatches(TsonBundledSchemas.META_ID, TsonBundledSchemas.META_SHA256);
         assertDigestMatches(TsonBundledSchemas.CORE_ID, TsonBundledSchemas.CORE_SHA256);
     }
@@ -30,8 +30,8 @@ class BundledSchemaPinTest {
     void aCorrectlyPinnedReferenceToEachBundledSchemaVerifies() {
         Tson tson = Tson.standard();
         assertDoesNotThrow(() -> {
-            // meta-kernel and meta.tn are governing metas (loadMeta); core.tn is a non-meta import (resolveLinked).
-            tson.loader().loadMeta(TsonBundledSchemas.META_KERNEL_ID + "?sha256=" + TsonBundledSchemas.META_KERNEL_SHA256);
+            // the kernel and meta.tn are governing metas (loadMeta); core.tn is a non-meta import (resolveLinked).
+            tson.loader().loadMeta(TsonBundledSchemas.META_ID + "?sha256=" + TsonBundledSchemas.META_SHA256);
             tson.loader().loadMeta(TsonBundledSchemas.META_ID + "?sha256=" + TsonBundledSchemas.META_SHA256);
             tson.loader().resolveLinked(TsonBundledSchemas.CORE_ID + "?sha256=" + TsonBundledSchemas.CORE_SHA256);
         });

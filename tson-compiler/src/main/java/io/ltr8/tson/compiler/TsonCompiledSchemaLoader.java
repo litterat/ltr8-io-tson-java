@@ -18,18 +18,18 @@ import java.util.Set;
  *       <i>resolved</i> form, merged into the importer's namespace, or compiled per-mode by a {@code
  *       TsonCompiledSchemaRegistry}.
  *   <li>{@link #loadMeta} -- the <i>compiled</i> vocabulary of the schema that declared a constructor or an
- *       annotation type the importer applies: its {@code !enum}/{@code !integer} instances are read into {@code
+ *       annotation type the importer applies: its {@code !meta.enum}/{@code !integer} instances are read into {@code
  *       schema.meta} objects during the importer's own resolution.
  * </ul>
  *
- * <p>Not a plain registry lookup, because meta-kernel is never resolved from a document: it is pre-loaded
+ * <p>Not a plain registry lookup, because the kernel is never resolved from a document: it is pre-loaded
  * ([TSON-SCHEMA] §3.4), and an implementation answers a request for it directly, via {@link
  * MetaKernelBootstrapResolver#getMetaKernelSchema()}'s bootstrap.
  *
  * <p>Also the natural, single place to enforce policy over <i>what</i> gets resolved from <i>where</i>
  * (whitelisting/blacklisting hosts, disk-only resolution) -- see {@link SchemaSource}, the pluggable
  * hook the implementation ({@code TsonCompiledMetaRegistry}) defers to for exactly this, once a request
- * isn't already cached and isn't the meta-kernel bootstrap case.
+ * isn't already cached and isn't the kernel bootstrap case.
  */
 public interface TsonCompiledSchemaLoader {
 

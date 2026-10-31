@@ -110,7 +110,7 @@ declared `List<String>` compares by name. A token outside the grammar is a parse
 (`allow_idn`, `allow_parameters`, `types`, `suffixes`) is a constraint violation, the value being one.
 
 **`boolean` is in that table** ([TSON-DATA] §5.5): the tokens `true` and `false`, case-sensitive, over the kernel's
-`!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and `!boolean true` are one
+`!meta.enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and `!boolean true` are one
 value — §4.2's special status for the two tokens is a base-resolution rule a typed position never reaches.
 `BooleanParser` is the one statement of what `boolean` reads; the compiled reader stack's enum factory
 (`AtomTypeReader.ENUM_OBJECT_MODE`) asks the vocabulary for it by name, which is the name-keyed read the invariant
@@ -171,13 +171,13 @@ does narrow, such as a media type that must parse, is a type of its own.
   alone), and `identifier_type` by `IdentifierParser` — the text put into its `normalization` form, matched against
   the type's own `IdentifierProfile` (a profile failure is a parse failure), then `text_type`'s facets through
   `TextParser`. So a naming convention is a `pattern`, a closed vocabulary of names is `members`, and an identifier is
-  string-class (§5.4). The kernel's `void` is `!void_type {}`, so the linker's refusal of a `void` variant and the
+  string-class (§5.4). The kernel's `void` is `!meta.void_type {}`, so the linker's refusal of a `void` variant and the
   inhabitance check ask the body (`AliasChain.resolvesToVoid`), not the name.
 - **`identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `ASCII`, `NONE`), `start_add`,
   `continue_add`, `medial` and `exclude` code-point sets, with `text_type`'s `normalization` defaulting to `NFC`.
   `IdentifierType.profile()` builds the `IdentifierProfile` on each call, and `IdentifierParser` holds the one it
   built, so a read builds nothing. The kernel declares two instances, told apart by entry name:
-  `identifier => !identifier_type { continue_add: "-" }` (`IdentifierType.IDENTIFIER`) and `scheme_name`
+  `identifier => !meta.identifier_type { continue_add: "-" }` (`IdentifierType.IDENTIFIER`) and `scheme_name`
   (`IdentifierType.SCHEME_NAME`). `MetaKernelBootstrapResolver` refuses either stating any other body, so the
   constants and the declarations cannot drift. Every schema importing core reaches the kernel's `identifier`, and
   so cannot declare one of its own; a differently named identifier family is an `identifier_type` instance. How the
@@ -233,7 +233,7 @@ does narrow, such as a media type that must parse, is a type of its own.
   rationale it carries no `multiple_of`: a step cannot hold on a binary grid.
 - **A `value`-typed slot is read under the atom of the position it stands in.** [TSON-SCHEMA] §7.4 types a
   constructor's constraint fields `value`, and the bootstrap ordering leaves no alternative — `duration_type` defines a
-  duration and `duration => !duration_type {}` is a layer up in core.tn — so a bound is decoded by §4, which resolves
+  duration and `duration => !meta.duration_type {}` is a layer up in core.tn — so a bound is decoded by §4, which resolves
   boolean, number and string and none of those is a duration, a date or a UUID. `ValueParser.read(token, target)` asks
   `HostAtoms.forHostType` which built-in produces the position's own host type and re-reads the token under it;
   `ValueParser.at(target)` is the same as a reader, which `reader.BindTargets` swaps in at a record field and at any

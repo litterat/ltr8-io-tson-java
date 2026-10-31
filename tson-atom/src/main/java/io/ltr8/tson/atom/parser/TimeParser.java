@@ -32,7 +32,7 @@ public record TimeParser(TimeType constraints) implements AtomTypeParser<OffsetT
     /** §5.4's built-in annotation name -- {@code !time}. */
     public static final String TYPENAME = "time";
 
-    /** {@code time => !time_type {}} -- the unconstrained time, §5.4's {@code !time}. */
+    /** {@code time => !meta.time_type {}} -- the unconstrained time, §5.4's {@code !time}. */
     public static final TimeParser UNCONSTRAINED = new TimeParser(TimeType.UNCONSTRAINED);
 
     public TimeParser(Optional<OffsetTime> min, Optional<OffsetTime> max) {

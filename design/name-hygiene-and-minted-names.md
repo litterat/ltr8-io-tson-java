@@ -69,7 +69,7 @@ switches the confusable check (`appliesSkeletonDistinctness()`), which each scop
 Restrictive are incomparable. The default is Highly Restrictive over a whole name, which refuses
 `id_пользователя`; the relaxation to reach for is the *unit*, since `perSegment()` admits that and still
 refuses `аdmin`. The bootstrap links under the default rather than under a caller's policy: a configuration
-should not be able to break meta-kernel.
+should not be able to break the kernel.
 
 ## Minted names (`InternalName`, `MintedNames`)
 
@@ -90,10 +90,13 @@ requirements meet there, and the second is why meeting the first is not enough:
   recommended default for containing a Russian word. Exempting minted names from the walk answers that and
   opens a worse hole: the namespace then takes on whatever a document happens to contain, unchecked.
 
-So the rule is ASCII, in three cases. What is ASCII and admitted by §7.7 is spliced verbatim — the ordinary
-case, a type name or a verb or a bound. What is ASCII but not admitted keeps its admitted characters and
-gains a hash, so `"/x"` reads `x_h00000f2f` and `1.0` reads `1_0_h0000bdb3`; a dotted head, `geo.inner.tag`, is
-this case too (`array_geo_inner_tag_h…`), a minted name being one identifier. Anything else is the hash alone.
+So the rule is ASCII, in four cases, after a kernel path is read as its member (`meta.text` as `text`, so the
+kernel's `[meta.text; 1..]` mints `array_text_1_…` and a `meta.array` head reads `array`). What is ASCII and admitted
+by §7.7 is spliced verbatim — the ordinary case, a type name or a verb or a bound. A qualified name of ASCII
+identifiers, `geo.inner.tag`, writes each dot `_` (`array_geo_inner_tag_…`), a minted name being one identifier; its
+path is no part of identity, so it needs no hash of its own. What is ASCII but not admitted keeps its admitted
+characters and gains a hash, so `"/x"` reads `x_h00000f2f` and `1.0` reads `1_0_h0000bdb3`. Anything else is the hash
+alone.
 **Hashed rather than dropped**, because replacing it would collapse two different values onto one readable
 half, where a hash keeps them visibly distinct and keeps the name inspectable — a reader holding the schema
 can hash the same text and match it. Nothing identity depends on is at stake either way: that is the
@@ -132,7 +135,7 @@ positions only some of those reach: an enum member and a group's member labels g
 and for script mixing, and never for a restricted character, invisibly.
 
 **An enum's members and a record's field names are judged under their name type's profile.** Both `name_type`s are
-identifier families (`enum`'s is the kernel's `identifier`; `!enum_type { name_type: words … }` or a record's
+identifier families (`enum`'s is the kernel's `identifier`; `!meta.enum_type { name_type: words … }` or a record's
 `name_type: json_name` names the author's own), so the names are names and all three mechanisms reach them, with the
 profile's added characters — a `start_add`, a `continue_add`, a `medial` — counted as its own rather than as
 restricted characters (`NameType.profile`, passed to `checkScope`). That exemption has a floor

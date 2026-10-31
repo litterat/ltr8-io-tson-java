@@ -20,12 +20,12 @@ import java.util.List;
  * FloatType#format} already does.
  *
  * <p>{@link Component} mirrors {@code complex_component}'s own five members (meta.tn: {@code
- * complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]}) -- a plain nested enum,
+ * complex_component => !meta.enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]}) -- a plain nested enum,
  * not a {@code typeName()}-mapped one like {@link FloatType.Format}, since nothing here multiplexes a
  * single Java class across several built-in annotation names the way that one does. {@link
  * BytesType.Encoding} is the third of these plain nested enums and is mirrored the same way.
  */
-@Typename(name = "complex_type")
+@Typename(name = "meta.complex_type")
 public record ComplexType(TypeChain chain,
         Component component) implements Atom {
     /** The chain normalised: absent and empty are one list. */
@@ -58,7 +58,7 @@ public record ComplexType(TypeChain chain,
         }
     }
 
-    /** {@code complex => !complex_type {}} -- the unconstrained complex number, core.tn's own {@code !complex}. */
+    /** {@code complex => !meta.complex_type {}} -- the unconstrained complex number, core.tn's own {@code !complex}. */
     public static final ComplexType UNCONSTRAINED = new ComplexType(Component.NUMBER);
 
     /**

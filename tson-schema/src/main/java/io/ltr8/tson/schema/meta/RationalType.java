@@ -11,14 +11,14 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code rational_type} constructor (§5.6's {@code rational} atom). Pure
+ * The kernel's {@code rational_type} constructor (§5.6's {@code rational} atom). Pure
  * constraint values, no parsing/validation behavior -- {@code tson-compiler}'s {@code RationalParser}
  * holds one of these and does the actual reading/writing.
  *
- * <p>Also an {@link Atom} variant: {@code rational => !rational_type {}} is a
+ * <p>Also an {@link Atom} variant: {@code rational => !meta.rational_type {}} is a
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "rational_type")
+@Typename(name = "meta.rational_type")
 public record RationalType(TypeChain chain,
         Optional<Rational> min,
         @Field("exclusive_min") Optional<Rational> exclusiveMin,
@@ -26,7 +26,7 @@ public record RationalType(TypeChain chain,
         @Field("exclusive_max") Optional<Rational> exclusiveMax,
         @Field("multiple_of") Optional<Rational> multipleOf) implements Atom {
 
-    /** {@code rational => !rational_type {}} -- the unconstrained rational, §5.6's {@code !rational}. */
+    /** {@code rational => !meta.rational_type {}} -- the unconstrained rational, §5.6's {@code !rational}. */
     public static final RationalType UNCONSTRAINED = new RationalType(
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 

@@ -8,7 +8,7 @@ position is refused. Current form only; history lives in git.
 - The kernel's `declared_type => sum & {}` has one instance, the kernel's `declared`, and one reader per encoding:
   `DeclaredReader` (TSON text) and `DispatchDeclaredReader` (JSON). Both select a reader and build nothing, so one
   factory serves every mode.
-- The schema map's values are `declared` (`schema => !namespace { key_type: type_name  value_type: declared }`): a
+- The schema map's values are `declared` (`schema => !meta.namespace { key_type: type_name  value_type: declared }`): a
   type entry's tag names its constructor, a value entry's its type. Where the tag selects a namespace type, the TSON
   reader delivers the map as the `Namespace` it is (`NamespaceInstanceReader`, `design/meta-layer-namespaces.md`).
 - The closure is fixed at compile time: the entry belongs to one schema, and every name it holds is resolved through

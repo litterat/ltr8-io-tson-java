@@ -4,7 +4,7 @@ import java.math.BigInteger;
 import java.util.Objects;
 
 /**
- * meta-kernel's {@code rational} host value -- an exact fraction, {@code numerator}/{@code
+ * the kernel's {@code rational} host value -- an exact fraction, {@code numerator}/{@code
  * denominator}, {@code denominator} always strictly positive (§7.6's grammar never permits a
  * negative or zero denominator; any sign belongs to the numerator). Lives in {@code schema.meta},
  * not {@code tson-compiler}, because {@code RationalType}'s own {@code min}/{@code max}/{@code

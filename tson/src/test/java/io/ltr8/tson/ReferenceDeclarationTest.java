@@ -11,14 +11,14 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * A reference ({@code ref<T>}, the meta-kernel's {@code reference}) is declared in any schema: one namespace per schema
+ * A reference ({@code ref<T>}, the kernel's {@code reference}) is declared in any schema: one namespace per schema
  * (SPEC-FEEDBACK.md #7) puts the kernel's {@code ref} in every closure reaching core.tn or meta.tn, a schema a meta
  * layer governs among them, and the constructor applied directly is no different from the template that spells it.
  * What a reference may name is still judged: a type, never a constructor, whose types a kind names.
  */
 class ReferenceDeclarationTest {
 
-    private static final String KERNEL = "https://tson.io/2026/39/m/meta-kernel.tn";
+    private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
     private static final String META = "https://tson.io/2026/39/m/meta.tn";
     private static final String CORE = "https://tson.io/2026/39/m/core.tn";
 
@@ -36,6 +36,11 @@ class ReferenceDeclarationTest {
               order => { id: text }
               rpick => { m: ref<order> }""";
 
+    /** The same, importing the kernel alone: its entries are named by their paths. */
+    private static final String KERNEL_PICKS = """
+              order => { id: meta.text }
+              rpick => { m: meta.ref<order> }""";
+
     @Test
     void anOrdinarySchemaDeclaresAReference() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/picks.tn", META, CORE,
@@ -47,7 +52,7 @@ class ReferenceDeclarationTest {
     void aSchemaAMetaLayerGovernsDeclaresAReference() {
         String metaId = "https://example.test/meta-picks.tn";
         String layer = schema(metaId, KERNEL, META, """
-                  picked => { m: ref<picked> }""");
+                  picked => { m: meta.ref<picked> }""");
         String governed = schema("https://example.test/governed-picks.tn", metaId, CORE, PICKS);
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(metaId, layer)))));
@@ -61,14 +66,14 @@ class ReferenceDeclarationTest {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/picks.tn", META, CORE,
                 """
                   order => { id: text }
-                  oref  => !reference { of: order }
+                  oref  => !meta.reference { of: order }
                   rpick => { m: oref }""")));
     }
 
     @Test
     void aKernelGovernedSchemaDeclaresAReference() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/meta-picks.tn", KERNEL,
-                META, PICKS)));
+                META, KERNEL_PICKS)));
     }
 
     /**
@@ -78,6 +83,6 @@ class ReferenceDeclarationTest {
     @Test
     void aReferenceToAConstructorNamesTypes() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/ref-to-constructor.tn",
-                META, CORE, "  pick => { m: ref<record> }")));
+                META, CORE, "  pick => { m: ref<meta.record> }")));
     }
 }

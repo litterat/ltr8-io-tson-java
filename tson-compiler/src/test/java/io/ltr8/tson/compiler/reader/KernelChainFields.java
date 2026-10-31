@@ -29,7 +29,7 @@ final class KernelChainFields {
     /** The kernel's own {@code chain} field, its type's closure added to {@code entries}. */
     static Map.Entry<String, RecordField> chainField(Map<String, Top> entries) {
         TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        RecordField declared = ((RecordBody) kernel.entries().get("type")).fields().get("chain");
+        RecordField declared = ((RecordBody) kernel.entries().get("meta.type")).fields().get("chain");
         copy(declared.type(), kernel, entries);
         return Map.entry("chain", declared);
     }

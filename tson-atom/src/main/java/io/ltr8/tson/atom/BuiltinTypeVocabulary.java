@@ -69,8 +69,8 @@ import java.util.Optional;
  * with the shape core.tn gives it) -- the RFC 5322 pin is scoped there to the {@code dot-atom "@" dot-atom}
  * core, which is exactly what {@link EmailParser} accepts.
  *
- * <p>And with {@code boolean} ([TSON-DATA] §5.5's {@code !boolean}, meta-kernel's own
- * {@code !enum [true false]}): the tokens {@code true} and {@code false}, case-sensitive.
+ * <p>And with {@code boolean} ([TSON-DATA] §5.5's {@code !boolean}, the kernel's own
+ * {@code !meta.enum [true false]}): the tokens {@code true} and {@code false}, case-sensitive.
  */
 public final class BuiltinTypeVocabulary {
 

@@ -56,8 +56,8 @@ with no compatibility guarantee between revisions — so a schema `!!id` pinned 
 ## Workflow
 
 1. **Decide whether you need a schema at all.** Reading one document with no schema is one
-   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the five
-   bundled schemas (meta-kernel, meta, core, net, policy) and is what you need only once a *schema* is in play.
+   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the four
+   bundled schemas (meta, core, net, policy) and is what you need only once a *schema* is in play.
 2. **Pick the reader from the matrix below** — the two questions are *what drives the interpretation*
    (the wire alone, your Java class, or a TSON schema) and *what you want out* (a `TsonValue` tree, or
    a bound Java object).
@@ -108,7 +108,7 @@ import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetchi
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
 
-Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn, core.tn, net.tn and policy.tn
+Tson tson = Tson.standard();   // bootstraps meta.tn (the kernel), core.tn, net.tn and policy.tn
 
 String schema = """
         !!id:"https://example.com/2026/39/app/order-1.tn"
@@ -195,11 +195,11 @@ returns that same node, so the first failure stays the informative one.
 node because there is one no-value spelling: `TsonVoid` carries `_` and a collecting-mode read failure.
 The token `null` is not absence — §4 resolves it to the string `null`, so it arrives as a `TsonAtom`.
 
-**A reference with arguments is data, written unquoted** (`t: set<text>`, `@application:response<order 201>`;
+**A reference with arguments is data, written unquoted** (`t: set<text>`, `@meta.application:response<order 201>`;
 [TSON-DATA] §7.4). A schemaless read keeps one as a `TsonReference` — `segments()`, `arguments()` (each read by the
 ordinary rule: `201` a number, `text` a string, a nested application another `TsonReference`), `text()` for the
 canonical spelling — and resolves nothing, so it has no referent. Under a schema, a value at a kind-typed position
-(`kind<T>`, `type_kind`) arrives in tree mode as an atom holding a `schema.meta.TypeRef` (`as(TypeRef.class)`), never
+(`kind<T>`, `meta.type_kind`) arrives in tree mode as an atom holding a `schema.meta.TypeRef` (`as(TypeRef.class)`), never
 a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names in the schema it was
 read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text, a type
 mismatch.
@@ -304,7 +304,7 @@ project shipped exactly that bug.
 
 ## Fetching schemas
 
-Out of the box a `Tson` serves only the five bundled schemas (meta-kernel, meta, core, net, policy):
+Out of the box a `Tson` serves only the four bundled schemas (meta, core, net, policy):
 `SchemaAccess.registeredOnly()` is the default, so anything else must be registered first or reachable through a
 configured source. Two fetching sources ship, plus a non-fetching third:
 
@@ -474,8 +474,8 @@ type**: an `identifier_type` whose profile admits the extra characters. State it
 base, and compose that base; a composition takes its supertypes' one name type (Part 2 §5.2):
 
 ```
-json_name   => !identifier_type { start_add: "@$" }
-json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
+json_name   => !meta.identifier_type { start_add: "@$" }
+json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
 node        => json_record & { "@id": text  "$ref"?: text  label: text }
 ```
 
@@ -484,7 +484,7 @@ node        => json_record & { "@id": text  "$ref"?: text  label: text }
   `$import`, `$type` and `$value` mean anything to the encoding, so a record should not declare those three.
 - **Bind it through the component that states it**: `public record Node(@Field("@id") String id,
   @Field("$ref") String ref, String label) {}`.
-- **Other name types**: words with a space (`!identifier_type { continue_add: "-"  medial: " " }`), names compared
+- **Other name types**: words with a space (`!meta.identifier_type { continue_add: "-"  medial: " " }`), names compared
   without case (`normalization: NFKC_CASEFOLD`, so `NAME` is the field `name`), HTTP-style header names (`start:
   ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD`). A name type's normalization must imply NFC.
 - **Records that inherit share one name type**, the default included: a plain record composed into a `json_record`

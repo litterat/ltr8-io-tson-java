@@ -6,7 +6,7 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 
 /**
- * meta.tn's {@code ipv6_type} constructor (IPv6 address constraint vocabulary, RFC 4291) --
+ * net.tn's {@code net.ipv6_type} constructor (IPv6 address constraint vocabulary, RFC 4291) --
  * {@link Ipv4Type}'s exact IPv6 counterpart, same shape, different RFC citation. Pure constraint
  * values, no parsing/validation behavior -- {@code tson-compiler}'s {@code Ipv6Parser} does the actual
  * reading/writing, {@code within}/{@code excluding} unmodeled as in {@link Ipv4Type}. See {@link
@@ -14,7 +14,7 @@ import java.util.List;
  * String} and {@code within}/{@code excluding} are bare {@code List<String>} with a defensive
  * compact constructor.
  */
-@Typename(name = "ipv6_type")
+@Typename(name = "net.ipv6_type")
 public record Ipv6Type(TypeChain chain,
         String spec, List<String> within, List<String> excluding) implements Atom {
 
@@ -36,7 +36,7 @@ public record Ipv6Type(TypeChain chain,
         return new Ipv6Type(chain, spec, within, excluding);
     }
 
-    /** {@code ipv6 => !ipv6_type {}} -- the unconstrained IPv6 address, core.tn's own {@code !ipv6}. */
+    /** {@code ipv6 => !net.ipv6_type {}} -- the unconstrained IPv6 address, core.tn's own {@code !ipv6}. */
     public static final Ipv6Type UNCONSTRAINED =
             new Ipv6Type("https://www.rfc-editor.org/rfc/rfc4291", List.of(), List.of());
 
@@ -70,9 +70,9 @@ public record Ipv6Type(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>Every entry of {@code within} and {@code excluding} must be a network. The facets are typed
-     * {@code [value]} in meta.tn -- they list networks, and meta declares no network instance to type them
-     * by, core.tn doing that and core importing meta -- so any token satisfies the vocabulary and a missing
-     * prefix length or a transposed octet reaches here as ordinary text.
+     * {@code [meta.value]} in net.tn -- they list networks, and no facet is typed by a family's own instance
+     * ({@code cidr4}) -- so any token satisfies the vocabulary and a missing prefix length or a transposed octet
+     * reaches here as ordinary text.
      *
      * <p>It is checked here rather than anywhere downstream because it is this family's rule: a malformed
      * entry makes the facet unreadable, which is the same kind of defect as a floor above a ceiling. Every

@@ -29,7 +29,7 @@ import java.util.Optional;
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
  * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(ProcessorConfig)}, or
- * {@link #standard()} for the defaults, which bootstraps the five bundled schemas (meta-kernel, meta, core,
+ * {@link #standard()} for the defaults, which bootstraps the four bundled schemas (kernel, meta, core,
  * net, policy) into a fresh, governed environment:
  *
  * <pre>{@code
@@ -59,7 +59,7 @@ import java.util.Optional;
  * immutable, queryable {@code TsonValue} (structure-preserving, typed leaves -- the recommended default);
  * {@link #bindRegistry()} reads to real Java objects (bound via {@link #dataBindContext()}). Both sit over one shared, bind-mode
  * resolution core: resolving an {@code Instance}/{@code AtomRefinement} declaration (meta.tn's/core.tn's own
- * {@code binary_encoding => !enum [...]}, {@code int32 => !integer ^ {...}}, and so on) binds it to a {@code
+ * {@code bytes_encoding => !meta.enum [...]}, {@code int32 => !meta.integer ^ {...}}, and so on) binds it to a {@code
  * schema.meta.Top} object, which a non-binding reader's output can't stand in for -- so resolution is always
  * bind-anchored regardless of read mode, and {@link #resolve} takes no mode. Only the final compile of an
  * already-resolved, already-linked schema (a registry's own {@code compile}/{@code get}) picks a mode.
@@ -71,10 +71,10 @@ import java.util.Optional;
  * consumer's classes as its data does. A value entry no class binds is held as a tree: the schema loads and
  * validates, and {@link #bindRegistry()} refuses it with {@code BIND_MISMATCH} at the entry.
  *
- * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link SchemaSource#registeredOnly()}
- * is the default source, so a schema governed by or importing anything else has to be registered first, or
- * reachable through a source configured on {@link ProcessorConfig} -- {@link HttpSchemaSource} and {@link
- * FileSchemaSource} ship, and both deny by default.
+ * <p>Out of the box this serves only the four bundled schemas, meta.tn (the kernel), core.tn, net.tn and policy.tn:
+ * {@link SchemaSource#registeredOnly()} is the default source, so a schema importing anything else has to be
+ * registered first, or reachable through a source configured on {@link ProcessorConfig} -- {@link HttpSchemaSource}
+ * and {@link FileSchemaSource} ship, and both deny by default.
  *
  * <p>{@link TsonObjectReader}/{@link TsonObjectWriter} live in {@code tson-compiler}'s own root
  * package, alongside the other read-side front doors -- {@code DefinitionResolver}, part of that
@@ -117,7 +117,7 @@ public final class Tson {
     }
 
     /**
-     * Bootstraps meta-kernel/meta.tn/core.tn under {@code config} and returns the governed environment.
+     * Bootstraps meta.tn and core.tn under {@code config} and returns the governed environment.
      *
      * <p>The configuration is a value and lives in {@code tson-base}, so the same one configures every
      * encoding; what cannot live there is this method, which names the compiler's own registry. That split
@@ -125,9 +125,9 @@ public final class Tson {
      */
     public static Tson of(ProcessorConfig config) {
         // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
-        // bundled meta-kernel/meta/core, and the access's source is consulted only for other URIs. It
+        // bundled meta/core, and the access's source is consulted only for other URIs. It
         // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
-        // can't resolve the !enum/!integer instances a meta-schema declares). One context serves the core
+        // can't resolve the !meta.enum/!integer instances a meta-schema declares). One context serves the core
         // and the object readers: the configured one, the kernel's names composed under its binder.
         DataBindContext context = SchemaMetaNameBinder.over(config.dataBindContext());
         SchemaSource source = config.schemaAccess().source();

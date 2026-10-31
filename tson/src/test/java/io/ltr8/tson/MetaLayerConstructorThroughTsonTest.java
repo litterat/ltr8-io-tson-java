@@ -47,19 +47,18 @@ class MetaLayerConstructorThroughTsonTest {
     /** The meta-layer schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               operation => {
-                path:     text
-                method:   text
-                request:  type_kind
-                response: type_kind
+                path:     meta.text
+                method:   meta.text
+                request:  meta.type_kind
+                response: meta.type_kind
               }
-              operations => !namespace { key_type: identifier  value_type: operation }
+              operations => !meta.namespace { key_type: meta.identifier  value_type: operation }
               webhook => {
-                path:     text
-                delivers?: [type_kind]?
+                path:     meta.text
+                delivers?: [meta.type_kind]?
               }
             }
             """;
@@ -168,7 +167,7 @@ class MetaLayerConstructorThroughTsonTest {
         DataNameBinder binder = SchemaMetaNameBinder.extendedWith(CONSUMER_NAMES);
 
         assertEquals(Operation.class, binder.resolve("operation"));
-        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("record"));
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("meta.record"));
 
         DataBindContext context = SchemaMetaNameBinder.contextExtendedWith(CONSUMER_NAMES);
         assertEquals(Operation.class, context.getDescriptor("operation").typeClass());

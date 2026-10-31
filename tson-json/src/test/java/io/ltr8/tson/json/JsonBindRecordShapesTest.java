@@ -44,15 +44,14 @@ class JsonBindRecordShapesTest {
     private static final String FACETS = "https://example.test/bind-facets-1.tn";
 
     /**
-     * {@code value} is meta-kernel.tn's, and an import stands at the importer's governing level (§2.2.3): a schema
-     * reaching the escape hatch is one the meta-kernel governs.
+     * {@code value} is meta.tn's, and an import stands at the importer's governing level (§2.2.3): a schema
+     * reaching the escape hatch is one the kernel governs.
      */
     private static final String FACETS_SCHEMA = """
             !!id:"https://example.test/bind-facets-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              facet => { limit: value  scale: value  label: value }
+              facet => { limit: meta.value  scale: meta.value  label: meta.value }
             }
             """;
 

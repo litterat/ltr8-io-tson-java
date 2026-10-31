@@ -138,7 +138,8 @@ and handed to the front door as the one context schemas and data bind through
 binding. A new fixture record is a new host record beside them; the fixture's `@doc` lists the records its value entries
 hold, which is the corpus's half of the contract (`RUNNER.md`).
 **A `schema/` vector's expected side is read under the subject's first `!!import`** (`ResolvedForm.readResolved`, a
-`withImports(…).readAs(text, "schema")` read; the pre-loaded kernel where the subject imports nothing), and the object
+`withImports(…).readAs(text, "meta.schema")` read, its root tag `!schema` the spelling of `meta.schema`; the
+pre-loaded kernel where the subject imports nothing), and the object
 reader binds through `SuiteBindings` too: a fixture imports meta.tn and adds its own types, and a value entry in
 resolved output is typed by that fixture alone, so a vector showing a value by name written back as written
 reads only there. Only the first: `SuiteBindings` binds by name across the corpus, and reading under every import
@@ -174,7 +175,7 @@ for a verdict.
 expectation format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a
 valid vector's subject is a schema document and its expected side is that document's resolved output in §8's
 own form, read back through `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question
-of `spec/m/*-resolved.tn`) and compared entry for entry, `@synthetic` key markers included. A nested schema map is
+of `spec/m/*-resolved.tn`) and compared entry for entry, `@meta.synthetic` key markers included. A nested schema map is
 walked into: `ResolvedForm.entries` keys each member under its path, `readResolved` adds the path keys a schema holds
 (`SchemaPaths.withPaths`), and the nested map's own entry compares as its member names. `link/` states
 individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived disjointness, §8.2's

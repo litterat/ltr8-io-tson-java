@@ -95,7 +95,7 @@ class TemplateParentExtensionTest {
     @Test
     void aConstructorApplicationTemplateHasNoParent() {
         assertEquals(Optional.empty(), parentOf("p5",
-                "  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }\n", "vector"));
+                "  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }\n", "vector"));
     }
 
     /** §5.10's partial application: a reference is indirection, so it has nothing to be abstract over. */
@@ -123,7 +123,7 @@ class TemplateParentExtensionTest {
     @Test
     void aDiscriminatorTypedByAnApplicationOfAParameterIsRefused() {
         String refusal = refusal("p8", """
-                  capped => <M> !integer_type { max: M }
+                  capped => <M> !meta.integer_type { max: M }
                   pet     => <M, N> { kind: capped<M> = N  name: text }
                   cat     => pet<9, 3>
                 """);

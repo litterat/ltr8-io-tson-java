@@ -12,7 +12,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta.tn's {@code media_type_type} (net.tn's {@code media_type}): a media type and its
+ * Parses and validates against net.tn's {@code net.media_type_type} (net.tn's {@code media_type}): a media type and its
  * parameters, read to an {@link MediaType}, whose grammar and equality are {@code io.ltr8.net}'s. A token that is not
  * a media type is a parse failure; one outside a facet -- parameters where {@code allow_parameters} is false, a type
  * or suffix the lists do not hold -- is a constraint violation, the value being a media type.
@@ -25,7 +25,7 @@ public record MediaTypeParser(MediaTypeType constraints) implements AtomTypePars
     /** net.tn's annotation name -- {@code !media_type}. */
     public static final String TYPENAME = "media_type";
 
-    /** {@code media_type => !media_type_type {}}. */
+    /** {@code media_type => !net.media_type_type {}}. */
     public static final MediaTypeParser UNCONSTRAINED = new MediaTypeParser(MediaTypeType.UNCONSTRAINED);
 
     @Override

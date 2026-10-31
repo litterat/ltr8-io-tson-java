@@ -10,16 +10,16 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code float_type} constructor (§5.6's {@code float32}/{@code float64} atoms
+ * The kernel's {@code float_type} constructor (§5.6's {@code float32}/{@code float64} atoms
  * -- SQL's approximate tier, IEEE 754-2019). Pure constraint values, no parsing/validation behavior
  * -- {@code tson-compiler}'s {@code FloatParser} holds one of these and does the actual
  * reading/writing.
  *
- * <p>Also an {@link Atom} variant: {@code float32 => !float_type { format: BINARY32 } }/{@code
+ * <p>Also an {@link Atom} variant: {@code float32 => !meta.float_type { format: BINARY32 } }/{@code
  * float64} are constructor-application instances (§5.5) whose resolved bodies are exactly {@link
  * #FLOAT32}/{@link #FLOAT64}.
  */
-@Typename(name = "float_type")
+@Typename(name = "meta.float_type")
 public record FloatType(TypeChain chain,
         Format format,
         Optional<BigDecimal> min,
@@ -47,7 +47,10 @@ public record FloatType(TypeChain chain,
         }
     }
 
-    /** {@code float32 => !float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin -- every other field left at its default ({@code ~ true} / absent). */
+    /**
+     * {@code float32 => !meta.float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin -- every other
+     * field left at its default ({@code ~ true} / absent).
+     */
     public static final FloatType FLOAT32 = unconstrained(Format.BINARY32);
     public static final FloatType FLOAT64 = unconstrained(Format.BINARY64);
 

@@ -25,7 +25,7 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   author error (`requireAuthorable`).
 - An atom instance is **ATOM-kinded and not itself applicable**; both halves are needed, and IS-A `atom` alone runs
   backwards (true of the constructor, false of every instance).
-- `!alias { target: X }` resolves to the alias's own entry — `kind: ALIAS`, `X` as source and body — the same
+- `!meta.alias { target: X }` resolves to the alias's own entry — `kind: ALIAS`, `X` as source and body — the same
   entry `name => X` denotes.
 - Construction transfers kind and no supertypes (§5.5), so an instance carries an empty chain and is not itself a
   constructor. Any schema may declare a constructor; nothing ties it to what the document imports.
@@ -62,15 +62,15 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `namespace`, `alias` and `template` — judged by where `top` is defined (one predicate the resolver, the
   compiled vocabulary's reader table and the linker all ask), and over a template's chain as over a closed one's.
   Every other head is an ordinary type, and the entry is a value of it (`resolveValueEntry`): a component record,
-  `!record_field { … }`, a namespace type, `!api { … }`, and a consumer's record type, `!operation { … }`, alike. **A
+  `!meta.record_field { … }`, a namespace type, `!api { … }`, and a consumer's record type, `!operation { … }`, alike. **A
   per-entry constructor marker would be both too narrow and inconsistent.** `alias` describes no value, so it
   would go unmarked, and the language needs it applicable — which takes a by-name exception that the open and closed
-  paths must then both remember, or `<T> !alias { target: T }` resolves while `!alias { target: int32 }`
+  paths must then both remember, or `<T> !meta.alias { target: T }` resolves while `!meta.alias { target: int32 }`
   does not, one construction with two answers. IS-A `top` needs no exception. `top`, `type` and the base kinds are
   admitted and then refused as abstract (§4.1, `refuseAbstractHead`): each is `extension: ABSTRACT`, so its reader
   is the abstract dispatch every abstract record has, and a tag naming the base itself is refused naming the subtypes
   that would satisfy the position, which is the better message.
-  **Admitting `alias` closed means giving it the alias's own entry**, not just letting it through: `!alias
+  **Admitting `alias` closed means giving it the alias's own entry**, not just letting it through: `!meta.alias
   { target: X }` resolves to `kind: ALIAS` with `X` as its body, the same entry `name => X` denotes (§8.3),
   where a construction of any other head takes the head's kind and records the head as its constructor
   (`design/schema-resolution.md`). The closed
@@ -78,7 +78,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   body unread and so goes by the head's name. **`template` is admitted by the predicate and refused by name**
   (`requireAuthorable`, on both paths). It is IS-A `top` because resolved output is typed by it, but it is resolver
   vocabulary (§8.1): an open entry's body, derived from a declaration's `<…>` and never applied by a source
-  declaration. Admitted, `!template { parameters: [T] template: "…" }` would mint an open entry with a hand-written
+  declaration. Admitted, `!meta.template { parameters: [T] template: "…" }` would mint an open entry with a hand-written
   held body, skipping every declaration-time check §5.10 makes of a template. Tested at the chain's end, so an
   alias of it is refused too. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's
   question — *is this an atom instance?* — as **ATOM-kinded and not itself applicable**, which is exactly what an
@@ -88,7 +88,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   *constructor* and false of every instance — measured, it disagrees with the truth on 103 of the 211 bundled
   entries, selecting precisely the wrong side — while kind alone cannot separate them either, an atom constructor
   being ATOM-kinded exactly like its instances. Together they agree on all 211. The construction hint in the
-  refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather than advice that
+  refusal rides on the same applicability question, so `!meta.top ^ { … }` gets the plain answer rather than advice that
   would fail in turn. **There is no marker.** §12.1's grammar
   has no constructor sigil and §8.1's `type` no `constructor` field: what makes an entry a constructor is that it
   IS-A `top`, which its supertype chain records. **There is no level discipline**: composition propagates the

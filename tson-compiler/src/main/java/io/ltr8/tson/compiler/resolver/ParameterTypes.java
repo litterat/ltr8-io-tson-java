@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -63,13 +64,13 @@ import java.util.function.Function;
  * </ul>
  *
  * <p>Anything else -- a parameter standing where a record, a collection or a choice is declared, as in
- * {@code <T> !enum { members: T }} -- is refused here. §5.10 confines value parameters to scalars and type
+ * {@code <T> !meta.enum { members: T }} -- is refused here. §5.10 confines value parameters to scalars and type
  * parameters to references, so a parameter standing for a whole {@code enum_set} is neither, and refusing it
  * at the declaration is what turns "every application of this fails" into "this template is wrong".
  *
  * <p><b>A record template admits a parameter in three places only</b> ([TSON-SCHEMA] §5.10): a field's type, a
  * field's default or fixed value, and an argument of an application -- a field type's or a parent's. Anywhere
- * else in a {@code !record} body -- a field name, a group member, a field's {@code optional}, {@code voidable} or
+ * else in a {@code !meta.record} body -- a field name, a group member, a field's {@code optional}, {@code voidable} or
  * {@code role}, the record's {@code extension}, {@code name_type} or {@code discriminators}, a bare parent -- is
  * refused here, because each would leave the family base without a shape its applications share: the base
  * cannot list a field whose name is an argument, or say whether a field is optional when that is one.
@@ -104,10 +105,10 @@ final class ParameterTypes {
     }
 
     /** The kernel record whose {@code value} slot routes a default or fixed value into its sibling's type. */
-    private static final String RECORD_FIELD = "record_field";
+    private static final String RECORD_FIELD = KernelNames.of("record_field");
 
     /** The constructor a record template's payload applies. */
-    private static final String RECORD = "record";
+    private static final String RECORD = KernelNames.of("record");
 
     /** The one slot of a record template a parameter may stand in as a whole token: a field's type. */
     private static final String FIELD_TYPE = RECORD_FIELD + "." + WireForm.TYPE;
@@ -122,7 +123,7 @@ final class ParameterTypes {
     }
 
     /** [TSON-SCHEMA] §4.1's root: an entry IS-A it is a constructor. */
-    private static final String TOP = "top";
+    private static final String TOP = KernelNames.of("top");
 
     private ParameterTypes() {
     }
@@ -130,7 +131,7 @@ final class ParameterTypes {
     /**
      * Whether {@code template}'s value parameters are typed by the applied constructor's slots, read and checked among
      * the schema's imports (§5.10): a template whose body applies a constructor other than {@code record} -- {@code vec
-     * => <N> !array { element_type: text  min_items: N }} -- binds its values into the constructor's own structure, so
+     * => <N> !meta.array { element_type: text  min_items: N }} -- binds its values into the constructor's own structure, so
      * {@code N} is the kernel's {@code non_negative_integer}, and a written narrowing names an imported type too, the
      * constructor's reader being the one that reads the argument. A record template's fields are typed by the schema,
      * so its parameters read in the schema's namespace. A template whose body applies another template takes that
@@ -141,7 +142,7 @@ final class ParameterTypes {
         Top current = template;
         for (int hop = 0; hop < 64 && OpenEntry.isOpen(current); hop++) {
             String head = HeldBody.of(current).application().typeRef().orElse(null);
-            if (head == null || head.equals("record")) {
+            if (head == null || head.equals(RECORD)) {
                 return false;
             }
             Top applied = entries.apply(head);
@@ -477,11 +478,26 @@ final class ParameterTypes {
             if (!a.type().arguments().isEmpty() || !b.type().arguments().isEmpty()) {
                 return false;
             }
-            Top definition = lookup(a, local, meta);
+            // An alias is a hop and no second type (§8.3): `text` over `text => meta.text` IS-A what `meta.text` is.
+            String aTerminal = terminal(a, local, meta);
+            String bTerminal = terminal(b, local, meta);
+            if (aTerminal.equals(bTerminal)) {
+                return true;
+            }
+            Top definition = lookup(new Use(TypeRef.of(aTerminal), a.local()), local, meta);
             if (definition == null) {
                 return false;
             }
-            return TypeChain.supertypesOf(definition).contains(b.type().name());
+            return TypeChain.supertypesOf(definition).contains(bTerminal)
+                    || TypeChain.supertypesOf(definition).contains(b.type().name());
+        }
+
+        /** {@code use}'s name past its alias hops, looked up as {@link #lookup} looks it up. */
+        private static String terminal(Use use, Function<String, Top> local, Function<String, Top> meta) {
+            return AliasChain.terminal(use.type().name(), name -> {
+                Top first = (use.local() ? local : meta).apply(name);
+                return first != null ? first : (use.local() ? meta : local).apply(name);
+            });
         }
 
         private static Top lookup(Use use, Function<String, Top> local,
@@ -527,7 +543,7 @@ final class ParameterTypes {
 
         /**
          * A constructor's payload: a record of bindings, or §5.6's positional form -- a record with exactly one
-         * unmarked field takes that field's value alone, which is how {@code !enum [a b M]} binds {@code members}.
+         * unmarked field takes that field's value alone, which is how {@code !meta.enum [a b M]} binds {@code members}.
          */
         private void payload(CoreValue payload, String constructor, RecordBody vocabulary) {
             if (payload instanceof RecordValue wire) {

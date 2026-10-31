@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn's {@code cidr4_type} constructor (IPv4-network constraint vocabulary, RFC 4632):
+ * net.tn's {@code net.cidr4_type} constructor (IPv4-network constraint vocabulary, RFC 4632):
  * prefix-length bounds plus CIDR-text network lists. Pure constraint values, no parsing/validation
  * behavior -- {@code tson-compiler}'s {@code Cidr4Parser} holds one of these and does the actual
  * reading/writing, applying all four facets: a value's prefix length against the bounds, and the value
@@ -36,7 +36,7 @@ import java.util.Optional;
  * {@code null} (`ltr8-bind` has no auto-defaulting for a missing collection field), so the
  * constructor null-coalesces to {@link List#of()}.
  */
-@Typename(name = "cidr4_type")
+@Typename(name = "net.cidr4_type")
 public record Cidr4Type(TypeChain chain,
         String spec, @Field("min_prefix") Optional<Integer> minPrefix,
                          @Field("max_prefix") Optional<Integer> maxPrefix,
@@ -61,7 +61,7 @@ public record Cidr4Type(TypeChain chain,
         return new Cidr4Type(chain, spec, minPrefix, maxPrefix, within, excluding);
     }
 
-    /** {@code cidr4 => !cidr4_type {}} -- the unconstrained IPv4 network, core.tn's own {@code !cidr4}. */
+    /** {@code cidr4 => !net.cidr4_type {}} -- the unconstrained IPv4 network, core.tn's own {@code !cidr4}. */
     public static final Cidr4Type UNCONSTRAINED = new Cidr4Type(
             "https://www.rfc-editor.org/rfc/rfc4632", Optional.empty(), Optional.empty(), List.of(), List.of());
 
@@ -96,7 +96,7 @@ public record Cidr4Type(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>The sharpest case in the package, because the schema names the rule outright rather than
-     * leaving it to be inferred: meta.tn's own {@code @doc} for this constructor says the prefix
+     * leaving it to be inferred: net.tn's own {@code @meta.doc} for this constructor says the prefix
      * bounds narrow "within the family range 0-32" and that "bounds outside that range are invalid at
      * the schema level". So both facets are judged twice -- against each other, and against the 32
      * bits an IPv4 address has.

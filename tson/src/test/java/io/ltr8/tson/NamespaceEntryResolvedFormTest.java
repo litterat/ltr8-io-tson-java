@@ -26,13 +26,12 @@ class NamespaceEntryResolvedFormTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-api.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              status_name => identifier
-              method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
-                               replies?: {status_name => kind<record>} }
-              api         => !namespace { key_type: identifier  value_type: method }
+              status_name => meta.identifier
+              method      => { request?: meta.kind<meta.record>  response?: meta.type_kind  errors?: [meta.kind<meta.record>]
+                               replies?: {status_name => meta.kind<meta.record>} }
+              api         => !meta.namespace { key_type: meta.identifier  value_type: method }
             }
             """;
 

@@ -100,8 +100,8 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
   importer fails to load before linking is reached.
 - **Collisions are decided by origin.** One schema reached by several routes unifies (the diamond every schema
   importing core.tn forms; the copies differ only in the `subtypes` each route credited, so they union, `unified`).
-  Two *different* schemas declaring one name is an error naming both, an entry of the kernel or meta.tn included:
-  every closure reaching them reserves their names. Because identities carry the spec revision, a
+  Two *different* schemas declaring one name is an error naming both, the kernel's `meta` and core's root
+  names included: every closure reaching them reserves their names. Because identities carry the spec revision, a
   closure reaching both `/2026/37/m/core.tn` and `/2026/39/m/core.tn` is refused here rather than surfacing later as a
   field conflict between two identically spelled types. Listing one schema twice, or under two spellings of one
   identity, is redundant rather than an error. An unregistered import is a `SchemaValidationException`.
@@ -181,7 +181,7 @@ overwrite) and any `bootstrap() == true` schema, the kernel's pre-loaded form. `
 form for the on-demand resolve path, where two threads resolving one document both arrive with equivalent results;
 it overwrites nothing either. `get(uri)` canonicalizes; `getByCanonicalIdentity` trusts its caller to have.
 `TsonSchemaLoader` is the pluggable import lookup, registered-only by default (nothing fetched).
-`TsonSchemaLinker.linkBootstrap` is the one sanctioned way to link meta-kernel's raw bootstrap output without
+`TsonSchemaLinker.linkBootstrap` is the one sanctioned way to link the kernel's raw bootstrap output without
 registering it. `linkReady(ready, loader, pending)` is the one partial link: a resolution in progress links its
 document's entries ready so far to compile readers for the next read (`WaitOrder`), a reference to a pending
 declaration is passed over there and nowhere else, and it reports nothing, each entry being judged when the whole
@@ -191,8 +191,8 @@ pin naming a declaration not yet ready (enum's `name_type: = identifier` mid-boo
 
 ## Namespace types (§4.1)
 
-A namespace type is an instance of the kernel's `namespace` constructor, `!namespace { key_type: …  value_type: …
-ordered: … }` (`field_map` and `schema` in the kernel, `headers => !namespace { key_type: header_name  value_type:
+A namespace type is an instance of the kernel's `namespace` constructor, `!meta.namespace { key_type: …  value_type: …
+ordered: … }` (`field_map` and `schema` in the kernel, `headers => !meta.namespace { key_type: header_name  value_type:
 text }` in any schema), and resolves to a `NamespaceBody`. A value of it is a map from `key_type` to `value_type`.
 
 - **The map is what the facets state.** `NamespaceBody.read()` gives the `MapBody`: keys of `key_type`, values of

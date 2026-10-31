@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn's {@code cidr6_type} constructor (IPv6-network constraint vocabulary, RFC 4291) --
+ * net.tn's {@code net.cidr6_type} constructor (IPv6-network constraint vocabulary, RFC 4291) --
  * {@link Cidr4Type}'s exact IPv6 counterpart, same shape, different RFC citation and prefix-length
  * family range (0-128 instead of 0-32). See {@link Cidr4Type}'s own
  * Javadoc for why {@code spec} is a flat {@link String} rather than a {@link java.net.URI} and why
@@ -17,7 +17,7 @@ import java.util.Optional;
  * for both of this family's rules. {@code tson-compiler}'s {@code Cidr6Parser} holds one of these and does
  * the actual reading/writing.
  */
-@Typename(name = "cidr6_type")
+@Typename(name = "net.cidr6_type")
 public record Cidr6Type(TypeChain chain,
         String spec, @Field("min_prefix") Optional<Integer> minPrefix,
                          @Field("max_prefix") Optional<Integer> maxPrefix,
@@ -42,7 +42,7 @@ public record Cidr6Type(TypeChain chain,
         return new Cidr6Type(chain, spec, minPrefix, maxPrefix, within, excluding);
     }
 
-    /** {@code cidr6 => !cidr6_type {}} -- the unconstrained IPv6 network, core.tn's own {@code !cidr6}. */
+    /** {@code cidr6 => !net.cidr6_type {}} -- the unconstrained IPv6 network, core.tn's own {@code !cidr6}. */
     public static final Cidr6Type UNCONSTRAINED = new Cidr6Type(
             "https://www.rfc-editor.org/rfc/rfc4291", Optional.empty(), Optional.empty(), List.of(), List.of());
 
@@ -64,7 +64,7 @@ public record Cidr6Type(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>The IPv6 twin of {@link Cidr4Type#coherenceCheck} -- same two judgements, same {@code
-     * within}/{@code excluding} rules, over the 128 bits meta.tn's own {@code @doc} names as this
+     * within}/{@code excluding} rules, over the 128 bits net.tn's own {@code @meta.doc} names as this
      * family's range.
      */
     @Override

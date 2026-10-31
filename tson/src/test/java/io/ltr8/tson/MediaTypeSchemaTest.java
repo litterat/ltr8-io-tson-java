@@ -21,8 +21,8 @@ class MediaTypeSchemaTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !!import:"https://tson.io/2026/39/m/net.tn"
             !schema {
-              content_type => !media_type_type { allow_parameters: true }
-              json_type => !media_type_type { types: [application]  suffixes: [json] }
+              content_type => !net.media_type_type { allow_parameters: true }
+              json_type => !net.media_type_type { types: [application]  suffixes: [json] }
               attachment => { data: bytes  type: media_type }
               message => { body: text  content_type: content_type }
               document => { type: json_type }
@@ -90,7 +90,7 @@ class MediaTypeSchemaTest {
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !!import:"https://tson.io/2026/39/m/net.tn"
                 !schema {
-                  json_type => !media_type_type { suffixes: [json] }
+                  json_type => !net.media_type_type { suffixes: [json] }
                   wider => !json_type ^ { suffixes: [json xml] }
                 }
                 """));
@@ -111,7 +111,7 @@ class MediaTypeSchemaTest {
                     !!import:"https://tson.io/2026/39/m/meta.tn"
                     !!import:"https://tson.io/2026/39/m/core.tn"
                     !!import:"https://tson.io/2026/39/m/net.tn"
-                    !schema { odd => !media_type_type { %s } }
+                    !schema { odd => !net.media_type_type { %s } }
                     """.formatted(facet)), facet);
         }
     }

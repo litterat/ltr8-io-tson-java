@@ -11,9 +11,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * An instance of the meta-kernel's {@code reference} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom
+ * An instance of the kernel's {@code reference} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom
  * whose values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link #of}. {@code
- * kind<record>}, {@code ref<record>} and {@code !reference { of: record }} are one instance; the two templates are
+ * kind<record>}, {@code ref<record>} and {@code !meta.reference { of: record }} are one instance; the two templates are
  * spellings, and the slot's meaning comes from {@link #of} and never from which one was written.
  *
  * <p><b>What {@link #of} names decides what the slot holds.</b> Where it is a constructor ({@code top} or IS-A it),
@@ -30,7 +30,7 @@ import java.util.Optional;
  * hold one instance with different members, and an importer that re-derives an entry an import already minted unifies
  * with it rather than colliding (§8.2).
  */
-@Typename(name = "reference")
+@Typename(name = "meta.reference")
 public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index> index) implements Atom {
 
     /**

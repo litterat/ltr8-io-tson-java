@@ -38,7 +38,7 @@ public record EmailParser(EmailType constraints) implements AtomTypeParser<Strin
     /** core.tn's own name for this atom -- registered as a built-in despite §5.5's table, see this class's own Javadoc. */
     public static final String TYPENAME = "email";
 
-    /** {@code email => !email_type {}} -- the unconstrained address, core.tn's own {@code email}. */
+    /** {@code email => !meta.email_type {}} -- the unconstrained address, core.tn's own {@code email}. */
     public static final EmailParser UNCONSTRAINED = new EmailParser(EmailType.UNCONSTRAINED);
 
     /**

@@ -28,7 +28,7 @@ Related: `design/diagnostic-model.md` (the `Diagnostic` model and the codes the 
 
 ## Bundled schema documents (`tson-schema/TsonBundledSchemas.java`)
 
-The published identities of the five bundled schemas (`META_KERNEL_ID`/`META_ID`/`CORE_ID`/`NET_ID`/`POLICY_ID`),
+The published identities of the four bundled schemas (`META_ID`, the kernel, `CORE_ID`, `NET_ID`, `POLICY_ID`),
 their raw text (`fetch(uri)`, off `tson-schema`'s classpath) and one held digest each (`*_SHA256`), checked against
 the packaged resource on every load. The `.tn` resources are copied from `spec/m/` by `processResources`, so there
 is one copy on disk. `fetch` is a static method rather than a `SchemaSource` instance; a caller needing a source
@@ -50,14 +50,14 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
   everything keys by canonical identity (scheme and query stripped).
 - **Verification is wired through the loader**: a data document's `!!import`s and each transitive `!!import` carrying
   a pin are checked before use, and a schema registered from text is hashed by the call that registers it.
-  `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — meta imports
-  meta-kernel, core and net import meta, and policy imports core, each by a pinned reference — so bootstrap verifies
-  all of it. Meta-kernel imports nothing; its own `!!id` carries its pin.
+  `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — core and net
+  import meta, the kernel, and policy imports core, each by a pinned reference — so bootstrap verifies all of it. The
+  kernel imports nothing; its own `!!id` carries its pin.
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place, replacing any prior query. It is
   idempotent: the hashed bytes never change, so the pin stays valid.
 - **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read,
   never to load. The `!!id`, header pins and `@doc`/`@title`/`@examples`/`@comment` go; a header reference to
-  meta-kernel, meta or core shortens to `"39/core"`; each directive and declaration gets one line. `--keep-docs`
+  meta or core shortens to `"39/core"`; each directive and declaration gets one line. `--keep-docs`
   (`stripKeepingDocs`) keeps the three written for the schema's readers and drops `@comment`, written for its
   maintainers. It never re-pins and never rewrites the file: the output claims no identity, because its bytes are
   not the published document's. **Whitespace collapses to one space and is never removed**, so tokens that touched
@@ -261,6 +261,6 @@ list**, distinct because a `DataNameBinder` is fixed when a `DataBindContext` is
 - `SchemaMetaNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three
   registrations for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose
   `SourcePositionStringBridge` names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a
-  `DataNameBinder` over `io.ltr8.tson.schema.meta` that answers only for the names meta-kernel.tn and meta.tn
-  declare. The context of the kernel's bootstrap and of a registry built
+  `DataNameBinder` over `io.ltr8.tson.schema.meta` that answers only for the names under the kernel's `meta` and
+  net.tn's `net`, each bound by its last segment. The context of the kernel's bootstrap and of a registry built
   directly with no consumer classes, not a consumer default.

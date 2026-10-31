@@ -18,7 +18,7 @@ import java.util.function.ToIntFunction;
  * <p><b>Both base kinds reach it, which is the point of it being here rather than on either.</b> An
  * atom's {@code min}/{@code max} family and a container's {@code min_items}/{@code max_items} pair ask
  * the identical question of the identical shape; two implementations of it would be two places for one
- * to drift, and drift is exactly how {@code [text; 5..3]} came to be refused while the {@code !array {
+ * to drift, and drift is exactly how {@code [text; 5..3]} came to be refused while the {@code !meta.array {
  * ... }} body it denotes was accepted.
  *
  * <p>Every {@code check*} method appends a human-readable violation fragment to {@code out} and
@@ -145,8 +145,8 @@ final class AtomCoherence {
     /**
      * Every entry of a {@code within}/{@code excluding} list must be a network of the family's own width.
      *
-     * <p>The facets are typed {@code [value]} (meta.tn cannot name a network instance -- core declares those,
-     * and core imports meta), so they arrive as text and the family that owns the rule is the only place that
+     * <p>The facets are typed {@code [meta.value]} in net.tn (no facet is typed by a family's own instance), so
+     * they arrive as text and the family that owns the rule is the only place that
      * can judge them. {@link io.ltr8.net.CidrNetwork#parse} is the grammar, and it refuses a
      * malformed address, a prefix outside the family range, and nonzero host bits alike.
      */

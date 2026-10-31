@@ -37,7 +37,7 @@ class JsonIdentifierValueHygieneTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              slug => !identifier_type { continue_add: "-" }
+              slug => !meta.identifier_type { continue_add: "-" }
               handlers => { slug => text }
               labels => { text => text }
               route => { name: slug }

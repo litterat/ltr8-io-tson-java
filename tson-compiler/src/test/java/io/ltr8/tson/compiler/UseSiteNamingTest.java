@@ -41,7 +41,7 @@ class UseSiteNamingTest {
               small => !integer ^ { max: 100 }
               pct   => small
               outer => pct
-              b     => <N> !integer_type { min: N  max: 100 }
+              b     => <N> !meta.integer_type { min: N  max: 100 }
             """;
 
     /** Every diagnostic a read of {@code data} against {@code declarations} reports, message only. */

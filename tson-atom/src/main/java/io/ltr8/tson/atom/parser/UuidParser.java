@@ -9,9 +9,9 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Parses and validates against meta-kernel's {@code uuid_type} constructor (§5.5's {@code uuid}
+ * Parses and validates against the kernel's {@code uuid_type} constructor (§5.5's {@code uuid}
  * atom, RFC 9562). A pure format check (§5.2: "the remaining atoms are pure format checks") unless
- * {@code version} is set, which no built-in instance does -- {@code uuid => !uuid_type {}} in
+ * {@code version} is set, which no built-in instance does -- {@code uuid => !meta.uuid_type {}} in
  * core.tn is fully unconstrained. Holds a {@link UuidType} -- the pure constraint values,
  * unchanged by this split -- rather than declaring those fields itself.
  *
@@ -37,7 +37,7 @@ public record UuidParser(UuidType constraints) implements AtomTypeParser<UUID> {
     /** §5.5's built-in annotation name -- {@code !uuid}. */
     public static final String TYPENAME = "uuid";
 
-    /** {@code uuid => !uuid_type {}} -- the unconstrained UUID, §5.5's {@code !uuid}. */
+    /** {@code uuid => !meta.uuid_type {}} -- the unconstrained UUID, §5.5's {@code !uuid}. */
     public static final UuidParser UNCONSTRAINED = new UuidParser(UuidType.UNCONSTRAINED);
 
     public UuidParser(Optional<Integer> version) {

@@ -713,7 +713,7 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * A name position's token, matched in full against meta-kernel's {@code identifier} profile (§7.1's name
+     * A name position's token, matched in full against the kernel's {@code identifier} profile (§7.1's name
      * profile). The two-layer shape is §7.6's, stated there for numbers: the lexer produces a token, and a
      * production that is no part of the token-stream grammar then matches its decoded text. Token-Start admits
      * {@code Nd}, {@code -}, {@code +} and {@code .} so a <em>number</em> can be an unquoted token, and those
@@ -736,16 +736,24 @@ public final class TsonDataStream implements TsonEventSource {
      * entry a qualified tag names is the reading schema's walk, and a schemaless read keeps it as written.
      */
     private void requireTagName(Token name) {
+        requireQualifiedName(name, "type name");
+    }
+
+    /**
+     * A {@code qualified-name} (§7.4) at a name position, a tag's or an annotation's: one identifier, or several
+     * joined by {@code .}, each matched as {@link #requireIdentifier} matches a name.
+     */
+    private void requireQualifiedName(Token name, String role) {
         String text = name.text();
         if (text.indexOf('.') < 0) {
-            requireIdentifier(name, "type name");
+            requireIdentifier(name, role);
             return;
         }
         for (String segment : text.split("\\.", -1)) {
             Optional<String> violation = segment.isEmpty() ? Optional.of("a segment between the dots is empty")
                     : IdentifierGrammar.validate(segment);
             if (violation.isPresent()) {
-                throw new ParseException("invalid type name '" + text + "' -- " + violation.get(), name.start());
+                throw new ParseException("invalid " + role + " '" + text + "' -- " + violation.get(), name.start());
             }
         }
     }
@@ -940,7 +948,8 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * One standalone annotation (§3.1): {@code "@" identifier [ ":" data-value ]}. Split out
+     * One standalone annotation (§3.1): {@code "@" qualified-name [ ":" data-value ]}, the name resolving from the
+     * root as every name does ({@code @doc}, {@code @meta.doc}). Split out
      * of {@link DataValueFrame} so {@link #nextAnnotationEvents()} can drive exactly this
      * production on its own -- [TSON-SCHEMA]'s own annotation positions (§12.1) reuse it the same
      * way {@link TsonSchemaParser} reuses {@code TsonDataParser.parseAnnotation()} today.
@@ -956,7 +965,7 @@ public final class TsonDataStream implements TsonEventSource {
             if (!at.adjacentTo(name)) {
                 throw parseError("'@' must be immediately adjacent to the annotation name (no whitespace)");
             }
-            requireIdentifier(name, "annotation name");
+            requireQualifiedName(name, "annotation name");
             advance();
 
             if (check(TokenType.COLON) && name.adjacentTo(peekToken())) {

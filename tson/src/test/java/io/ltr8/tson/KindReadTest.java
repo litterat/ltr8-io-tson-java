@@ -39,15 +39,15 @@ class KindReadTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              stock_id    => !uuid_type {}
-              customer_id => !uuid_type {}
+              stock_id    => !meta.uuid_type {}
+              customer_id => !meta.uuid_type {}
               sku         => text
-              ledger      => { named: kind<uuid_type>  fallback?: kind<uuid_type> ~ customer_id }
+              ledger      => { named: kind<meta.uuid_type>  fallback?: kind<meta.uuid_type> ~ customer_id }
               box         => <T> { v: T }
               pair        => <A, B> { a: A  b: B }
               inner       => box<text>
               outer       => pair<box<text> int32>
-              typed       => { t: type_kind }
+              typed       => { t: meta.type_kind }
             }""";
 
     private static final SchemaSource SOURCE = uri -> IDS_SCHEMA;
@@ -101,7 +101,7 @@ class KindReadTest {
     }
 
     /**
-     * A refusal lists the kind's members as an author can write them: the entry {@code kind<uuid_type>} closed to is
+     * A refusal lists the kind's members as an author can write them: the entry {@code kind<meta.uuid_type>} closed to is
      * minted under a name nobody wrote, and the list names it by its application.
      */
     @Test
@@ -109,7 +109,7 @@ class KindReadTest {
         List<Diagnostic> problems = problems("!typed { t: nope }");
         assertEquals(1, problems.size(), problems.toString());
         String message = problems.getFirst().message();
-        assertTrue(message.contains("kind<uuid_type>"), message);
+        assertTrue(message.contains("kind<meta.uuid_type>"), message);
         assertFalse(message.contains("reference_uuid_type"), message);
         assertFalse(problems.getFirst().expected().contains("reference_uuid_type"), problems.getFirst().expected());
     }

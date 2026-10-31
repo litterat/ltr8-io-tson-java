@@ -29,7 +29,7 @@ public record PeriodParser(PeriodType constraints) implements AtomTypeParser<Per
     /** §5.5's built-in annotation name -- {@code !period}. */
     public static final String TYPENAME = "period";
 
-    /** {@code period => !period_type {}} -- the unconstrained period. */
+    /** {@code period => !meta.period_type {}} -- the unconstrained period. */
     public static final PeriodParser UNCONSTRAINED = new PeriodParser(PeriodType.UNCONSTRAINED);
 
     public PeriodParser(Optional<Period> min, Optional<Period> max) {

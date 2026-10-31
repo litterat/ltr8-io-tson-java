@@ -7,7 +7,7 @@ import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 
 /**
- * meta-kernel's {@code boolean => !enum [true false]}, read as a genuine {@code Boolean}.
+ * the kernel's {@code boolean => !meta.enum [true false]}, read as a genuine {@code Boolean}.
  *
  * <p><b>An enum whose two members stand for host values</b>, which is what separates it from every other
  * enum instance: {@link EnumParser} hands back the member's own text, exactly right for a user-defined
