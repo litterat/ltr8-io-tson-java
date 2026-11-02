@@ -2,10 +2,10 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.numeric.DecimalType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.Top;
 
 /**

@@ -9,8 +9,8 @@ import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.atom.number.NumberNarrowing;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.List;
@@ -22,11 +22,11 @@ import java.util.stream.Collectors;
  * atoms; not yet {@code number}, {@code float32}/{@code float64}, {@code rational}, or {@code
  * complex} -- those are backed by different constructors, {@code decimal_type}/{@code float_type}/
  * {@code rational_type}/{@code complex_type}, and are separate work). Holds a {@link
- * io.ltr8.tson.schema.meta.IntegerType} -- the pure constraint *values* {@code integer_type}
+ * io.ltr8.tson.schema.numeric.IntegerType} -- the pure constraint *values* {@code integer_type}
  * declares in the schema ({@code size}/{@code min}/{@code exclusive_min}/{@code max}/{@code
  * exclusive_max}/{@code multiple_of}/{@code members}), unchanged by this split -- rather than declaring
  * those fields itself; this class contributes only the parsing/validation *behavior* that consumes them.
- * Every other built-in vocabulary constructor to come follows the same split (a {@code schema.meta}
+ * Every other built-in vocabulary constructor to come follows the same split (a schema-model
  * values class plus a {@code vocab} compiler holding it), not a one-off for the integer family.
  *
  * <p>Accepts only the {@code integer}/{@code based-integer} grammar forms (§7.6) -- §5.6's table is

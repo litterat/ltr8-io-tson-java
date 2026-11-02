@@ -12,10 +12,10 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -219,8 +219,8 @@ class RecordBindReaderTest {
         // email_type's own compiled reader, producing a real EmailType, not a TextType.
         Object subtypeResult = compiled.get("unicode.text_type")
                 .read(TestDocuments.document("!net.email_type { min_length: 5 }"));
-        io.ltr8.tson.schema.meta.EmailType emailType =
-                assertInstanceOf(io.ltr8.tson.schema.meta.EmailType.class, subtypeResult);
+        io.ltr8.tson.schema.net.EmailType emailType =
+                assertInstanceOf(io.ltr8.tson.schema.net.EmailType.class, subtypeResult);
         assertEquals(5, emailType.minLength().orElseThrow());
     }
 

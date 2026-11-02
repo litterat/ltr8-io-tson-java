@@ -5,7 +5,7 @@ plugins {
 dependencies {
     api(project(":tson-base"))
     // api, not implementation -- this module now has a module-info.java (requires io.ltr8.annotation,
-    // deliberately not `requires transitive`, since no public schema.meta method signature exposes an
+    // deliberately not `requires transitive`, since no public schema-model method signature exposes an
     // annotation type directly). JPMS module-path resolution still needs io.ltr8.annotation physically
     // present for any downstream compilation that transitively requires io.ltr8.tson.schema (tson-compiler,
     // tson) -- Gradle's own implementation/api split controls compile-classpath *type* visibility, which
@@ -15,7 +15,7 @@ dependencies {
     // `text_type.members` must answer to a `pattern` on the same body, which is a regex match. The engine
     // is an internal library like any other and the check belongs beside the length checks that share its
     // method, so the constraint model carries the dependency rather than splitting one coherence rule
-    // across two modules. `implementation`: no public schema.meta signature names a ltr8-regex type.
+    // across two modules. `implementation`: no public schema-model signature names a ltr8-regex type.
     implementation(project(":ltr8-regex"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))

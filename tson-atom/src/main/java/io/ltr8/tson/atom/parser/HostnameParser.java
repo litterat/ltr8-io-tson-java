@@ -5,7 +5,7 @@ import io.ltr8.net.HostSyntaxException;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.HostnameType;
+import io.ltr8.tson.schema.net.HostnameType;
 
 import java.util.Optional;
 

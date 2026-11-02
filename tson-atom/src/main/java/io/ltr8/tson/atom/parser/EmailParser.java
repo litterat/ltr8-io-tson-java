@@ -6,7 +6,7 @@ import io.ltr8.regex.IRegex;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.net.EmailType;
 import java.util.regex.Pattern;
 
 /**

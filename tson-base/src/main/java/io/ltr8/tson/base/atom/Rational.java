@@ -6,8 +6,8 @@ import java.util.Objects;
 /**
  * the kernel's {@code rational} host value -- an exact fraction, {@code numerator}/{@code
  * denominator}, {@code denominator} always strictly positive (§7.6's grammar never permits a
- * negative or zero denominator; any sign belongs to the numerator). Lives in {@code schema.meta},
- * not {@code tson-compiler}, because {@code RationalType}'s own {@code min}/{@code max}/{@code
+ * negative or zero denominator; any sign belongs to the numerator). Lives below the schema model,
+ * not in {@code tson-compiler}, because {@code numeric.RationalType}'s own {@code min}/{@code max}/{@code
  * multipleOf} constraint fields are typed as this.
  *
  * <p><b>Not normalized, but compared by value.</b> numeric.tn's own doc for {@code numeric.rational_type} is

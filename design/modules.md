@@ -46,12 +46,16 @@ module has a real `module-info.java`; module names mirror each module's root exp
   described at (`TypeArguments`, `DefaultRecordBinder.resolveRecord(context, class, parameterizedType)`), so
   `Namespace<RecordField>` binds `entries` as a map of `RecordField`; a type variable left in place has no
   descriptor, so a raw generic record is still not describable.
-- **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
-  records/sealed interfaces/enums, §8's `Top` and its bodies, `TsonSchema`; `Top` is sealed all the way down, a schema's
-  value entry arriving as a `ValueEntry` whose value binds to the consumer's classes or is held as a tree). **The host
+- **`tson-schema`** — the resolved-schema *value* model — pure records/sealed interfaces/enums, §8's `Top` and its
+  bodies, `TsonSchema`; `Top` is sealed all the way down, a schema's value entry arriving as a `ValueEntry` whose value
+  binds to the consumer's classes or is held as a tree. One package per namespace its entries are declared in, so a
+  kernel name binds by its path (`numeric.integer_type` to `schema.numeric.IntegerType`): `schema.meta` (`Top`, the
+  constructor bodies, `TypeRef`, `Namespace`, the resolver's own model), `schema.unicode`, `schema.numeric`,
+  `schema.net`, `schema.binary` and `schema.temporal` (the atom families), and the unexported `schema.atom` (the
+  facet-comparison mechanics every family shares, `AtomNarrowing` and `AtomCoherence`). **The host
   value types are not here**: `Rational` and `Complex` are `base.atom`'s and the `CidrNetwork` pair `ltr8-net`'s,
   because *what do I get back from `!rational`?* is a question about the type system rather than about §8's model, and
-  they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
+  they depend on nothing. The model reads them structurally — `RationalType`'s
   `min`/`max`/`multiple_of` are `Rational` values — a pull from above rather than a reason to live above. Plus the schema
   registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`),
   `TsonBundledSchemas`, `KernelNames` (the kernel's machinery is named by its path under one of six maps,

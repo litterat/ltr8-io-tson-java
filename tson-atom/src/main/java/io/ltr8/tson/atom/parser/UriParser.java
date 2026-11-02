@@ -7,7 +7,7 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.regex.IRegex;
-import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.net.UriType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;

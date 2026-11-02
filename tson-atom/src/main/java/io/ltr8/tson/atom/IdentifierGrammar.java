@@ -1,6 +1,6 @@
 package io.ltr8.tson.atom;
 
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
 
 import java.util.Optional;

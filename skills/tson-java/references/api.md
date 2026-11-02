@@ -481,7 +481,8 @@ everything, are fail-fast by design.
   pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`, `contextExtendedWith(binder)`,
   `extendedWith(binder)`, `over(context)`: every entry of meta.tn (its root names and its members of `meta`, `atom`,
   `numeric`, `unicode`, `net` and `binary`) and each library's members under its map (`numeric`, `temporal`, `net`) bound to
-  the schema model, each by its last segment, every other name to the consumer's — `over` is what `Tson.of` builds its one
+  the schema model, each by its path (`numeric.integer_type` to `io.ltr8.tson.schema.numeric.IntegerType`), every other
+  name to the consumer's — `over` is what `Tson.of` builds its one
   context with), and `SourcePositionStringBridge`.
 
 ---
@@ -532,8 +533,9 @@ public record TsonReference(List<String> segments, List<TsonValue> arguments, Op
 public record TsonDocument(Optional<String> id, List<String> imports, TsonValue root) {}
 ```
 
-A `TsonDocument` is always a *data* document: a schema document (root tagged `!schema`) has `schema.meta` as its
-model, and a data read refuses one. Read-side only; no builders or transforms yet.
+A `TsonDocument` is always a *data* document: a schema document (root tagged `!schema`) has the resolved-schema
+model (`io.ltr8.tson.schema.meta` and its sibling packages) as its model, and a data read refuses one. Read-side
+only; no builders or transforms yet.
 
 ---
 
@@ -597,9 +599,13 @@ its URI spelling and NFC; `validate(id)` requires a document's own `!!id` to be 
 `toUri(reference)` is the URI spelling for a fetch. An identity with no host must have an absolute path, so
 `/local/orders.tn`, `file:/local/orders.tn` and `file:///local/orders.tn` are one identity.
 
-The module exports two packages: `io.ltr8.tson.schema` (the above) and `io.ltr8.tson.schema.meta`, the resolved-schema
-value model — pure records, sealed interfaces and enums, §8's `Top` and its bodies. A schema map's entry is its value:
-a `Type` carries its own chain (`Type.chain()`, a `TypeChain` of `parents`, `supertypes` and
+The module exports `io.ltr8.tson.schema` (the above) and the resolved-schema value model — pure records, sealed
+interfaces and enums, §8's `Top` and its bodies — one package per namespace its entries are declared in:
+`io.ltr8.tson.schema.meta` (`Top`, `Type`, `Atom`, the constructor bodies, `Namespace`, `ValueEntry`, `TypeRef`, …),
+`unicode` (`TextType`, `IdentifierType`, `RegexType`, `TextFamily`), `numeric` (`IntegerType`, `IntegerSize`,
+`DecimalType`, `FloatType`, `RationalType`, `ComplexType`), `net` (`IriType`, `UriType`, `EmailType`, `UuidType`, …),
+`binary` (`BytesType`) and `temporal` (`DateType`, `DateTimeType`, `TimeType`, `DurationType`, `PeriodType`). A schema
+map's entry is its value: a `Type` carries its own chain (`Type.chain()`, a `TypeChain` of `parents`, `supertypes` and
 `subtypes`, with accessors for each on `Type`, and `TypeChain.supertypesOf(top)` and its siblings for any
 value); the application an entry is the instantiation of is the derived
 `@meta.application` on its key (`TsonSchema.applicationOf`), stated as written, nested arguments unreduced

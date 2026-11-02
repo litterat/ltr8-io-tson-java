@@ -21,7 +21,7 @@ import java.util.Set;
  * RecordBindReader.Factory} specifically when the declaration's own bound Java class is a real
  * {@code DataClassRecord} rather than a marker {@code DataClassUnion} -- {@code text_type} is the
  * one real fixture case (composing with {@code uri_type}/{@code regex_type}/{@code email_type} on
- * top of it, but itself directly instantiable as a plain {@link io.ltr8.tson.schema.meta.TextType}).
+ * top of it, but itself directly instantiable as a plain {@link io.ltr8.tson.schema.unicode.TextType}).
  * A pure marker root with no data of its own (bound to a Java sealed interface, e.g. {@code
  * top}/{@code atom}) still goes through {@link VariantBindReader} instead, whose {@code ownParser} is
  * a stand-in that always throws.

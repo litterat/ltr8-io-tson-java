@@ -87,7 +87,7 @@ Schema documents: **parse → desugar → resolve → link → register → comp
 | `tson-base` | Shared by every encoding: `Diagnostic`, policies, schema sources, host atom values, byte I/O |
 | `ltr8-annotation` | Binding annotations and the `Annotations` carrier |
 | `ltr8-bind` | Generic `DataValue`↔object binding engine; knows nothing of schemas |
-| `tson-schema` | `schema.meta` resolved-schema value model, registry, `TsonBundledSchemas` |
+| `tson-schema` | Resolved-schema value model (`schema.meta`, and a package per namespace), registry, `TsonBundledSchemas` |
 | `tson-atom` | The built-in atom vocabulary, over `String`, and §7.7's name grammar, shared by both encodings |
 | `tson-tree` | `TsonValue` data tree model; depends on nothing |
 | `ltr8-regex` | RFC 9485 I-Regexp engine; depends on nothing |
@@ -164,7 +164,7 @@ One line each; the class Javadoc and the note carry the why. Read before touchin
 - `Position` must keep the record's default `toString()` — `ResolvedForm` normalises positions by regex over it.
 - `CompiledReaders` is rebound exactly once, from the `Compilation` to the finished `TsonCompiledSchema`.
 - `verifyFixed` compares with the pre-rebind parser (`FixedCheck`).
-- A `schema.meta` bind target with more than one public constructor needs `@Record` on the canonical one.
+- A schema-model bind target with more than one public constructor needs `@Record` on the canonical one.
 - An atom body's components mirror its constructor's *resolved* (flattened) shape, one component per schema field name —
   a nested or missing one binds `null` silently.
 - Atom refinement merges through `writer.DataClassObjectWriter` on the wire record before binding — never through the

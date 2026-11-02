@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * {@code core.tn} (governed by {@code meta.tn}, the same as {@code core.tn} itself) and uses two
  * of its real declarations, plus a small, locally-declared one-field record bound to a real Java
  * class the caller supplies manually (not resolved via {@link SchemaMetaNameBinder}'s own {@code
- * io.ltr8.tson.schema.meta} convention -- {@code my_record} has no class there at all). The point:
+ * io.ltr8.tson.schema} convention -- {@code my_record} has no class there at all). The point:
  * proving {@code core.tn} can be {@code !!import}ed by an *ordinary* consuming schema, not just
  * registered on its own the way {@link CoreSchemaImportTest} does, and that a real consumer's own
  * record type -- composed with {@code core.tn}'s own vocabulary as a field -- compiles and reads
@@ -45,7 +45,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class TinySchemaImportsCoreTn1Test {
 
-    /** The Java shape {@code my_record => { value: int32 }} is manually bound to below -- deliberately outside {@code io.ltr8.tson.schema.meta}, so {@link SchemaMetaNameBinder}'s own namespace convention can't find it by accident. */
+    /**
+     * The Java shape {@code my_record => { value: int32 }} is manually bound to below -- deliberately outside {@code
+     * io.ltr8.tson.schema}, so {@link SchemaMetaNameBinder}'s own namespace convention can't find it by accident.
+     */
     public record MyRecord(Integer value) {
     }
 
@@ -63,7 +66,7 @@ class TinySchemaImportsCoreTn1Test {
     /**
      * A {@link DataNameBinder} that manually resolves {@code "my_record"} to {@link MyRecord}
      * directly, falling back to {@link SchemaMetaNameBinder#INSTANCE}'s own {@code
-     * io.ltr8.tson.schema.meta} convention for every other name this test's own compile still needs
+     * io.ltr8.tson.schema} convention for every other name this test's own compile still needs
      * (the kernel's/meta.tn's/core.tn's own composite constructors -- {@code record}, {@code
      * array}, ...) -- exactly the pattern {@link SchemaMetaNameBinder}'s own class Javadoc describes
      * for "a caller binding their own schema to their own Java library."

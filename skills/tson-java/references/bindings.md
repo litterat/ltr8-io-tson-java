@@ -241,7 +241,7 @@ against that schema's fields, and a disagreement is a `BindMismatchException`.
 `DataBridge` (the two-way conversion behind an `@Atom` or a registered host type) and `ToData` are
 interfaces in the same package, not annotations.
 
-**A `schema.meta` bind target with more than one public constructor needs `@Record` on the canonical
+**A schema-model bind target with more than one public constructor needs `@Record` on the canonical
 one**, or `DefaultRecordBinder` throws.
 
 ### Receiving wire annotations

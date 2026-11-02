@@ -262,6 +262,7 @@ list**, distinct because a `DataNameBinder` is fixed when a `DataBindContext` is
 - `SchemaMetaNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three registrations
   for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose `SourcePositionStringBridge`
   names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a `DataNameBinder` over
-  `io.ltr8.tson.schema.meta` that answers only for every entry of meta.tn (its root names and its members of its six maps)
-  and each library's members under its map (`numeric`, `temporal`, `net`), each bound by its last segment. The context of the
+  `io.ltr8.tson.schema` that answers only for every entry of meta.tn (its root names and its members of its six maps)
+  and each library's members under its map (`numeric`, `temporal`, `net`), each bound by its path, a sub-package per
+  segment before the last (`numeric.integer_type` to `numeric.IntegerType`). The context of the
   kernel's bootstrap and of a registry built directly with no consumer classes, not a consumer default.

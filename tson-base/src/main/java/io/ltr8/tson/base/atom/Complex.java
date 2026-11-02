@@ -11,8 +11,8 @@ import java.math.BigDecimal;
  * complex_type} instance and never refines {@code component}; a schema (Part 2) narrowing it to a
  * different component type is separate, not-yet-relevant work. {@code complex_type}'s one facet is that
  * selector rather than a bound, so unlike {@link Rational} -- whose {@code min}/{@code max}/{@code
- * multiple_of} are {@code Rational} values and give {@code schema.meta.RationalType} something of this type
- * to hold -- {@code schema.meta.ComplexType} holds no value of this type at all, and {@code ComplexParser}
+ * multiple_of} are {@code Rational} values and give {@code schema.numeric.RationalType} something of this type
+ * to hold -- {@code schema.numeric.ComplexType} holds no value of this type at all, and {@code ComplexParser}
  * takes no configuration from it.
  *
  * <p>Unlike {@code Rational}, there's no numeric.tn doc calling for value-based equality here, so this

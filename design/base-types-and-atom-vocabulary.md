@@ -132,7 +132,7 @@ last, as the numeric tiers do: a member set names the whole value space, so the 
 present.
 
 **A text family's value is its text in the type's `normalization` form** (`Normalization`, `ltr8-unicode`'s, which
-`schema.meta` binds the kernel's enum to directly; [TSON-SCHEMA] §5.5). `unicode.text_type` carries the facet and every
+the schema model binds the kernel's enum to directly; [TSON-SCHEMA] §5.5). `unicode.text_type` carries the facet and every
 family composing it inherits it — `NONE` by default, `NFC` on `unicode.identifier_type`, fixed to `NONE` on
 `unicode.regex_type` (folding a pattern changes what it matches) and on `net.uri_type`, `net.iri_type` and `net.email_type`
 (a URI's path and query and a mailbox's local part compare with case). Each parser puts the text into the form first and
@@ -161,7 +161,8 @@ rather than a facet; that is why `doc`'s CommonMark is its type's documented con
 does narrow, such as a media type that must parse, is a type of its own.
 
 - **Each constructor splits into two classes across two modules:** a constraint-*values* record in
-  `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, …, the kernel's `*_type` shape) and a same-named `*Parser` in
+  the package of its namespace (`numeric.IntegerType`, `unicode.TextType`, …, the kernel's `*_type` shape) and a
+  same-named `*Parser` in
   the unexported `atom.parser` that holds one and does the `read`/`write`/validate work.
 - **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not `Pattern`**:
   `regex` IS-A piece of text (§5.7), and a plain equatable `String` binds generically with no `DataBridge`. The text is

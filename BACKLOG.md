@@ -41,7 +41,7 @@ spec-required case:
 - [ ] **Rename the meta-layer vocabulary the header no longer has.** `TsonCompiledMetaRegistry`,
   `TsonCompiledMetaSchema`, `TsonCompiledSchemaLoader.loadMeta` and `SchemaMetaNameBinder` name a "meta" no
   directive states: each is the compiled vocabulary of an imported schema, or
-  the bind context for `schema.meta`'s classes. A rename across some 130 files, done as one IDE refactor.
+  the bind context for the schema model's classes. A rename across some 130 files, done as one IDE refactor.
 - [ ] **A data reference does not follow alias chains inside its arguments** ([TSON-SCHEMA] §8.2, §8.3). With
   `user_id => uuid` and the schema closing `box<uuid>`, a data document writing `box<user_id>` at a kind-typed slot is
   matched only through the bottom-up lookup (`ReferenceBody.entryOf`), not by the identity §8.2 gives it, which

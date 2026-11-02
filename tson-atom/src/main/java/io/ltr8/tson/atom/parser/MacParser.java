@@ -5,7 +5,7 @@ import java.util.Optional;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.schema.meta.MacType;
+import io.ltr8.tson.schema.net.MacType;
 
 /**
  * Parses and validates against net.tn's {@code net.mac_type} constructor (§5.5's {@code mac} atom, EUI-48 per

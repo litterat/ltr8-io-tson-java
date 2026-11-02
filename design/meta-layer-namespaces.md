@@ -153,9 +153,10 @@ identifier-typed value is a name (`design/name-hygiene-and-minted-names.md`).
 `Tson.of` builds one `DataBindContext` from the configured one (`SchemaMetaNameBinder.over`): the consumer's binder, profile
 and atoms (`DataBindContext.toBuilder`, `nameBinder`), composed with `SchemaMetaNameBinder.INSTANCE`, which answers for
 exactly every entry of meta.tn, its root names and its members of its six maps, and the members numeric.tn, temporal.tn and
-net.tn declare under `numeric`, `temporal` and `net` (read from the bundled sources), each by its last segment -- so a kernel
-name can never be rebound, a member a consumer contributes to an open map is the consumer's, and a consumer's `token` is the
-consumer's although `schema.meta` has a `Token` -- and the schema model's own registrations added where absent
+net.tn declare under `numeric`, `temporal` and `net` (read from the bundled sources), each by its path into the package of
+its namespace (`numeric.integer_type` to `io.ltr8.tson.schema.numeric.IntegerType`) -- so a kernel name can never be
+rebound, a member a consumer contributes to an open map is the consumer's, and a consumer's `meta.token` is the consumer's
+although `schema.meta` has a `Token` -- and the schema model's own registrations added where absent
 (`ResolverBindContext.registerAbsent`). The resolution core resolves schemas through it and the bind registry reads data
 through it, so `create_order => !operation { … }` and a data document's `!operation { … }` bind to the same class. A class
 implements nothing; `@Typename` is needed only where the binder's convention would not find it.

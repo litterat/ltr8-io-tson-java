@@ -8,7 +8,7 @@ import io.ltr8.tson.atom.AtomValidationException;
 import java.util.List;
 import io.ltr8.net.CidrInet6Network;
 import io.ltr8.net.CidrNetwork;
-import io.ltr8.tson.schema.meta.Cidr6Type;
+import io.ltr8.tson.schema.net.Cidr6Type;
 
 /**
  * Parses and validates against net.tn's {@code net.cidr6_type} constructor (§5.5's {@code cidr6} atom, RFC

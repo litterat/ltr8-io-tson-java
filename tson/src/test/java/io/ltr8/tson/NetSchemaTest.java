@@ -10,8 +10,8 @@ import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.HostType;
-import io.ltr8.tson.schema.meta.HostnameType;
+import io.ltr8.tson.schema.net.HostType;
+import io.ltr8.tson.schema.net.HostnameType;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

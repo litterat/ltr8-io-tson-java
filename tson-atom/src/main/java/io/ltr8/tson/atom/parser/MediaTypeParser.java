@@ -5,7 +5,7 @@ import io.ltr8.net.MediaTypeSyntaxException;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.MediaTypeType;
+import io.ltr8.tson.schema.net.MediaTypeType;
 
 import java.util.List;
 import java.util.Locale;

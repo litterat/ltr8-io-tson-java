@@ -2,7 +2,7 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.TimeType;
+import io.ltr8.tson.schema.temporal.TimeType;
 import org.junit.jupiter.api.Test;
 import java.math.BigInteger;
 import java.time.OffsetTime;

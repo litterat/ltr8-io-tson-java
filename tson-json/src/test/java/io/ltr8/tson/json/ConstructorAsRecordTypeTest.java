@@ -6,7 +6,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.net.UuidType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

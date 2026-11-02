@@ -21,7 +21,7 @@ public sealed interface Product extends Type permits RecordBody, ArrayBody, MapB
      * <p>The default admits everything, which is correct for a family with no orderable facet at all
      * ({@link RecordBody}, {@link TupleBody}); {@link ArrayBody} and {@link MapBody} carry the {@code
      * min_items}/{@code max_items} pair and override it. That pair is one rule over two families, which is
-     * why they share {@link AtomCoherence}'s own comparison rather than each spelling it.
+     * why they share {@code AtomCoherence}'s own comparison rather than each spelling it.
      *
      * <p><b>Stated here rather than where a container is written.</b> [TSON-SCHEMA] §5.3's size specifier and
      * the explicit {@code !meta.array { ... min_items: ... }} body denote the same type, and a rule that lived

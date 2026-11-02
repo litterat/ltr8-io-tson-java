@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.schema.atom.AtomNarrowing;
 
 import java.util.ArrayList;
 import java.util.List;

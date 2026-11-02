@@ -5,7 +5,8 @@ Which tokens each family accepts and what host value results, over a `String`, s
 `design/atom-refinement-and-coherence.md`.
 
 - `AtomType` takes text only. Anything depending on *how* a token was written (`value`, `Token`) stays in the encoding.
-- Each family is a constraint record in `schema.meta` plus a same-named `*Parser` in the unexported `atom.parser`.
+- Each family is a constraint record in its namespace's package (`schema.numeric.IntegerType`) plus a same-named
+  `*Parser` in the unexported `atom.parser`.
 - Pattern facets are `String`, matched through `ltr8-regex` (I-Regexp) — never `java.util.regex`.
 - `AtomParsers` is the one answer to "which parser reads this body"; the compiled readers and the linker both ask it.
 - `IdentifierGrammar.PROFILE` is built from `IdentifierType.IDENTIFIER`, never restated; `validate`/`hygiene` report

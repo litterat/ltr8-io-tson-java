@@ -1,12 +1,16 @@
 # tson-schema — the resolved-schema value model and the registry
 
-`schema.meta` (pure records, sealed interfaces, enums — §8's model), `TsonSchemaRegistry`/`TsonLinkedSchema`/
-`TsonSchemaLoader`, and `TsonBundledSchemas`. Read `design/linking-and-compilation.md` for the
+The resolved-schema model (pure records, sealed interfaces, enums — §8's model), one package per namespace its entries
+are declared in (`schema.meta`, `unicode`, `numeric`, `net`, `binary`, `temporal`; the unexported `schema.atom` holds the
+families' shared facet mechanics), `TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`, and
+`TsonBundledSchemas`. Read `design/linking-and-compilation.md` for the
 registry and identity, `design/meta-layer-namespaces.md` for `NamespaceBody`, `Namespace` and `ValueEntry`,
 `design/held-template-bodies.md` for `TemplateBody`.
 
 - Names no `tson-compiler` type — the engine depends on this module, not the reverse. Where a compiler type is needed
   structurally, declare a local stand-in (`schema.meta.Token`, `SourcePosition`).
+- A class lives in the package of the namespace its entry is declared in, so the binder reaches it by path
+  (`numeric.integer_type` is `schema.numeric.IntegerType`); a class no entry declares stays in `schema.meta`.
 - `Top` is sealed all the way down: `Type`, `Alias`, `TemplateBody`, `ValueEntry`. An entry whose tag names an
   ordinary type is a `ValueEntry` wrapping the value (a `Namespace`, a bound object, or a tree); `Namespace` is the
   value of a namespace type and no `Top`.

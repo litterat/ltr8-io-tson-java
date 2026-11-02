@@ -5,7 +5,7 @@ import java.util.Optional;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.Ipv6Type;
+import io.ltr8.tson.schema.net.Ipv6Type;
 import java.util.List;
 import io.ltr8.net.CidrInet6Network;
 import io.ltr8.net.InternetAddress;

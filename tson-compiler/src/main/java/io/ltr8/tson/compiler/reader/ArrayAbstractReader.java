@@ -10,7 +10,7 @@ import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 
 import java.math.BigInteger;
 import java.util.Optional;

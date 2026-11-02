@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.numeric.IntegerType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

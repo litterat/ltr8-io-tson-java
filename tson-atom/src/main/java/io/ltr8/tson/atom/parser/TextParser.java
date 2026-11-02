@@ -5,7 +5,7 @@ import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.unicode.Nfc;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.regex.IRegex;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import java.util.Optional;
 
 /**

@@ -4,7 +4,7 @@ import io.ltr8.net.Iri;
 import io.ltr8.net.IriSyntaxException;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.schema.meta.IriType;
+import io.ltr8.tson.schema.net.IriType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;

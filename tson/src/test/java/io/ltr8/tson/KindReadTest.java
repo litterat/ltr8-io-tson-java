@@ -12,7 +12,7 @@ import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.net.UuidType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

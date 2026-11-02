@@ -7,12 +7,12 @@ import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Ipv4Type;
+import io.ltr8.tson.schema.net.Ipv4Type;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
@@ -260,9 +260,9 @@ class KernelUnderMetaTest {
     }
 
     /**
-     * The schema model binds what the kernel declares, by its last segment, and the members of the libraries'
-     * {@code numeric}, {@code temporal} and {@code net}; a path a consumer contributes to an open map is the consumer's
-     * binder's.
+     * The schema model binds what the kernel declares, and the members of the libraries' {@code numeric}, {@code
+     * temporal} and {@code net}, by path into the package of its namespace; a path a consumer contributes to an open
+     * map is the consumer's binder's.
      */
     @Test
     void theSchemaModelBindsTheKernelDocumentsDeclarations() throws Exception {
@@ -270,10 +270,16 @@ class KernelUnderMetaTest {
         assertEquals(UuidType.class, SchemaMetaNameBinder.INSTANCE.resolve("net.uuid_type"));
         assertEquals(RecordField.class, SchemaMetaNameBinder.INSTANCE.resolve("meta.record_field"));
         assertEquals(Ipv4Type.class, SchemaMetaNameBinder.INSTANCE.resolve("net.ipv4_type"));
-        assertEquals(io.ltr8.tson.schema.meta.DecimalType.class,
+        assertEquals(io.ltr8.tson.schema.numeric.DecimalType.class,
                 SchemaMetaNameBinder.INSTANCE.resolve("numeric.decimal_type"));
-        assertEquals(io.ltr8.tson.schema.meta.DateType.class, SchemaMetaNameBinder.INSTANCE.resolve("temporal.date_type"));
-        assertEquals(io.ltr8.tson.schema.meta.BytesType.class, SchemaMetaNameBinder.INSTANCE.resolve("binary.bytes_type"));
+        assertEquals(io.ltr8.tson.schema.temporal.DateType.class,
+                SchemaMetaNameBinder.INSTANCE.resolve("temporal.date_type"));
+        assertEquals(io.ltr8.tson.schema.binary.BytesType.class, SchemaMetaNameBinder.INSTANCE.resolve("binary.bytes_type"));
+        assertEquals(io.ltr8.tson.schema.temporal.DateTimeType.class,
+                SchemaMetaNameBinder.INSTANCE.resolve("temporal.datetime_type"));
+        assertEquals(io.ltr8.tson.schema.numeric.IntegerType.class,
+                SchemaMetaNameBinder.INSTANCE.resolve("numeric.integer_type"));
+        assertEquals(io.ltr8.tson.schema.unicode.TextType.class, SchemaMetaNameBinder.INSTANCE.resolve("unicode.text_type"));
         assertThrows(io.ltr8.bind.DataBindException.class, () -> SchemaMetaNameBinder.INSTANCE.resolve("record"));
         assertThrows(io.ltr8.bind.DataBindException.class,
                 () -> SchemaMetaNameBinder.INSTANCE.resolve("meta.short_text_type"));

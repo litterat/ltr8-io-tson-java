@@ -37,8 +37,9 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   parser's own `ast.Document(id, imports, root)` rather than a value model with a hole where the document
   should be. It needs no dependency, so `tson-tree` still requires nothing.
   - **Nothing says it is a data document**, because a data read is what produced it: a root tagged `!schema` is
-    a *schema* document, whose value model is `schema.meta`, and a Class 1 read refuses one. Classifying a
-    document before deciding how to read it is `TsonDocumentPeek.isSchemaDocument()`'s question, answered from
+    a *schema* document, whose value model is the schema model (`schema.meta` and its sibling packages), and a
+    Class 1 read refuses one. Classifying a document before deciding how to read it is
+    `TsonDocumentPeek.isSchemaDocument()`'s question, answered from
     the root's tag, never from the header.
   - **`readDocument` sits beside `read`, which still hands back the root value.** Changing what a read
     hands back, and every caller with it, would be a cost of *replacing* `read`, not of the wrapper.

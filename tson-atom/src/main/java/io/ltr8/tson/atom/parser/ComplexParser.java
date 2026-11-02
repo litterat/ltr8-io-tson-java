@@ -17,7 +17,7 @@ import java.util.Optional;
  * members aren't modeled yet. No fields to configure as a result (unlike every other atom type
  * here): {@code complex_type} itself has none besides {@code component}, and {@code complex} has no
  * useful total order to bound (numeric.tn: "{@code @atom.ordering:NONE}"), so this is a stateless singleton
- * with no separate {@code schema.meta.ComplexType} values class to hold -- there's nothing to split
+ * with no separate {@code schema.numeric.ComplexType} values class to hold -- there's nothing to split
  * out.
  *
  * <p>Accepts {@code complex}/{@code float}/{@code integer} forms (§7.6, §5.6) -- not {@code

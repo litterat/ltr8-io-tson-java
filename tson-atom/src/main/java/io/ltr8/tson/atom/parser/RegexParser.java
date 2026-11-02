@@ -7,7 +7,7 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.regex.IRegexSyntaxException;
-import io.ltr8.tson.schema.meta.RegexType;
+import io.ltr8.tson.schema.unicode.RegexType;
 
 /**
  * Parses and validates against the kernel's {@code regex_type} constructor ({@code ~text_type &

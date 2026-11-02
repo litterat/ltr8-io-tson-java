@@ -49,7 +49,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   duplicating number-grammar handling (`0xFF`, `_` separators, quoted-vs-unquoted) and bypassing the compiled
   reader's own defaults — which costs more than the round-trip does.
 - **A refinement must narrow, and this is enforced** (§5.7). After binding, `checkNarrows` asks the
-  constraint family itself — `Atom.constraintsCheck(refined)`, one rule per `schema.meta` family over the
+  constraint family itself — `Atom.constraintsCheck(refined)`, one rule per atom family of the schema model over the
   shared `AtomNarrowing` mechanics — whether the merged result is a valid tightening of the source's own body,
   and throws `SchemaValidationException` if not (`!uint8 ^ { min: -10 max: 300 }` is rejected). Comparing
   the *merged* result rather than the refinement body is what lets an unmentioned facet tighten vacuously; a

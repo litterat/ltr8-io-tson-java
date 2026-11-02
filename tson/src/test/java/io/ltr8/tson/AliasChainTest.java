@@ -90,7 +90,7 @@ class AliasChainTest {
         assertEquals("b", fieldType(resolve(CHAIN, "holder"), "f").name());
         assertEquals(TypeRef.of("a"), assertInstanceOf(Alias.class,
                 resolve(CHAIN, "b")).target());
-        assertInstanceOf(io.ltr8.tson.schema.meta.TextType.class, resolve(CHAIN, "a"));
+        assertInstanceOf(io.ltr8.tson.schema.unicode.TextType.class, resolve(CHAIN, "a"));
     }
 
     /** An argument list is no different -- a lifted synthetic's element type names what was written too. */

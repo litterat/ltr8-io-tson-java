@@ -335,11 +335,14 @@ and `CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReade
 point can still reach it — a schema's own constructor this library has no factory for — and it rides in the report, located
 at the value it could not read (`TsonCli.exitCodeFor` lifts the run to 70).
 
-## The `schema.meta` value model
+## The schema value model
 
-One Java type per kernel record or enum; `Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as
-Java subtyping, and an entry's kind is `EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record
-carries `TypeChain chain` as its first component, mirroring the constructor's flattened shape (`type`'s field first);
+One Java type per kernel record or enum, in the package of the namespace that declares its entry (`schema.meta`,
+`schema.unicode`, `schema.numeric`, `schema.net`, `schema.binary`, `schema.temporal`), so the binder reaches it by
+path (`design/front-door-and-config.md`); a class no entry declares stays in `schema.meta`.
+`Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as Java subtyping, and an entry's kind is
+`EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record carries `TypeChain chain` as its first
+component, mirroring the constructor's flattened shape (`type`'s field first);
 `Alias`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), one
 argument of a reference, because a record of two `Optional`s would not say that exactly one is present; it compares
 by its canonical text, the head's parameter and not the grammar deciding which it binds. `TypeRef` is the parsed form

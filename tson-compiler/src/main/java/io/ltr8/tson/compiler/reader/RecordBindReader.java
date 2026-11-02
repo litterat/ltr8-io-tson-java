@@ -346,7 +346,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * real Java object "just {@code top}" could construct, so every genuine value at such a position
      * must carry an explicit subtype type-ref. A {@link DataClassRecord} instead -- {@code text_type}
      * is the one real fixture case, directly instantiable as a plain {@link
-     * io.ltr8.tson.schema.meta.TextType} *and* composed on top of by {@code uri_type}/{@code
+     * io.ltr8.tson.schema.unicode.TextType} *and* composed on top of by {@code uri_type}/{@code
      * regex_type}/{@code email_type} -- means {@code ownParser} is a real, reachable {@link
      * RecordBindReader} for the declaration's own body; dispatch to a named subtype is bounded by the
      * schema's own {@code subtypes()} list, not by any Java type, via {@link VariantSchemaReader} (see

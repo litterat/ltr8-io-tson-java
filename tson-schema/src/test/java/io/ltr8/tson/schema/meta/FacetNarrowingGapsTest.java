@@ -1,5 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.net.Cidr4Type;
+import io.ltr8.tson.schema.net.Ipv4Type;
+import io.ltr8.tson.schema.net.UuidType;
+import io.ltr8.tson.schema.unicode.TextType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

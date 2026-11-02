@@ -5,8 +5,8 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.IdentifierProfile.Base;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.unicode.TextType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

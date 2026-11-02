@@ -27,7 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TsonCompiledSchemaRegistryTest {
 
-    /** The Java shape {@code my_record => { value: int32 }} binds to in object-binding mode -- outside {@code io.ltr8.tson.schema.meta}, so {@link SchemaMetaNameBinder}'s own convention can't find it by accident. */
+    /**
+     * The Java shape {@code my_record => { value: int32 }} binds to in object-binding mode -- outside {@code
+     * io.ltr8.tson.schema}, so {@link SchemaMetaNameBinder}'s own convention can't find it by accident.
+     */
     public record MyRecord(Integer value) {
     }
 

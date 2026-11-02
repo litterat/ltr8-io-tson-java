@@ -7,7 +7,7 @@ import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.atom.number.NumberNarrowing;
-import io.ltr8.tson.schema.meta.FloatType;
+import io.ltr8.tson.schema.numeric.FloatType;
 import java.math.BigDecimal;
 import java.util.Optional;
 

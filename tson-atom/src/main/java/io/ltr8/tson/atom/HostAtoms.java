@@ -30,7 +30,7 @@ import io.ltr8.net.CidrInet4Network;
 import io.ltr8.net.CidrInet6Network;
 import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.base.atom.Rational;
-import io.ltr8.tson.schema.meta.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerSize;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.Inet4Address;

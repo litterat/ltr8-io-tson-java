@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * declared as its own instance of the constructor. Refining for length is unaffected and inherits the
  * alphabet.
  *
- * <p>This is what tells {@code encoding} from {@link io.ltr8.tson.schema.meta.ComplexType}'s {@code
+ * <p>This is what tells {@code encoding} from {@link io.ltr8.tson.schema.numeric.ComplexType}'s {@code
  * component}, also a selector and refinable: {@code component} narrows the value space, and this does not.
  */
 class BytesEncodingSelectorTest {
