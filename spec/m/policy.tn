@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/policy.tn?sha256=36c6d94a3423c62d0d963c84020a794567d3d471b344ea6b4652c959e695db6b"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=6d57f04f65608aab13769156208c59087b7a3ab3fab695f9b10c0e7a3659f8e0"
+!!id:"https://tson.io/2026/39/m/policy.tn?sha256=c933a060cd78183d5c8bae76c6fd500c5d28bf3c0ef69e2e830827856f8c5897"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=4ac202cad2f2a6c2903050043e411c1161c92dfcf7f570d530c8f8109d1141e3"
 @doc:"""
   TSON processor policy — what a processor admits and spends (2026 Revision 39
   draft).
@@ -13,12 +13,18 @@
   document may name, import or otherwise select the policy it is judged under.
 
   `identifier_policy` and `token_policy` are §8.2's two policies, and `limits`
-  is §9.1's and [TSON-SCHEMA] §11.5's. A script is named by its Unicode Script property value alias
-  (UAX #24), `Latin`, `Cyrillic`, `Han`.
+  is §9.1's and [TSON-SCHEMA] §11.5's. A script is named by its Unicode Script
+  property value alias (UAX #24), `Latin`, `Cyrillic`, `Han`.
+
+  It imports core.tn, for the sized integers its limits are typed by and the
+  kernel's `text`, `boolean` and `enum`, and so shares one closure with any
+  schema importing core.tn: a `[text]` written here and one written in a
+  library of that closure are one synthetic entry ([TSON-SCHEMA] §8.2). Its
+  entries sit at its root, and it declares no namespace of its own.
   """
 !schema {
   @doc:"UTS #39 §5.2's restriction levels, strictest first."
-  restriction_level => !meta.enum [
+  restriction_level => !enum [
     ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
   ]
 

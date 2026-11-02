@@ -49,7 +49,7 @@ class JsonChoiceReadTest {
               unit_circle => circle & { fixed: boolean }
 
               loose  => ( float64 | text )
-              strict => !meta.float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
+              strict => !numeric.float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
               tight  => ( strict | text )
 
               holder => { pick: scalar_or_list }

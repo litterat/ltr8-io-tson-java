@@ -36,7 +36,7 @@ public record IriParser(IriType constraints) implements AtomTypeParser<Iri> {
     /** {@code iri => !iri_reference ^ { allow_relative: false }} -- §5.5's {@code !iri}, which has a scheme. */
     public static final IriParser UNCONSTRAINED = new IriParser(IriType.IRI);
 
-    /** {@code iri_reference => !meta.iri_type {}} -- §5.5's {@code !iri_reference}, an IRI or a relative reference. */
+    /** {@code iri_reference => !net.iri_type {}} -- §5.5's {@code !iri_reference}, an IRI or a relative reference. */
     public static final IriParser REFERENCE = new IriParser(IriType.REFERENCE);
 
     /** {@link #REFERENCE} bound to {@code java.net.URI}, the reading a {@code URI} component gets. */

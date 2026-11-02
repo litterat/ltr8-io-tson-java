@@ -478,9 +478,9 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The template an application's head names: the head itself, or, where it is an alias of a template (core's
-     * {@code kind => meta.kind}), the template at the end of its alias chain, the alias being the same entry under
-     * another name ([TSON-SCHEMA] §8.3). Identity is the template's, so {@code kind<order>} and {@code
+     * The template an application's head names: the head itself, or, where it is an alias of a template ({@code
+     * kind_of => kind}), the template at the end of its alias chain, the alias being the same entry under
+     * another name ([TSON-SCHEMA] §8.3). Identity is the template's, so {@code kind_of<order>} and {@code
      * meta.kind<order>} close to one entry.
      */
     private String templateHead(String head) {
@@ -501,7 +501,7 @@ final class TemplateMaterialiser {
      *
      * <p><b>An author who wants two boxes told apart has two spellings that say so</b>, and this is what
      * makes them mean something: {@code user_id => !uuid ^ {}} is a refinement, IS-A {@code uuid} and not its
-     * siblings, and {@code user_id => !meta.uuid_type {}} is a fresh type related to neither. Both are ordinary
+     * siblings, and {@code user_id => !net.uuid_type {}} is a fresh type related to neither. Both are ordinary
      * entries rather than references, so neither is dereferenced here.
      *
      * <p><b>What this normalises is identity, not provenance.</b> The minted entry is keyed on the canonical
@@ -1024,7 +1024,7 @@ final class TemplateMaterialiser {
      * but §5.10 says an argument is "read by the position it lands in" -- and once the parameter's kind is
      * inferred, the position is known before substitution rather than after. An argument binding a
      * <b>value</b> parameter becomes the token it always was: {@code e<c>} against
-     * {@code e => <M> !meta.enum {{ members: [a b M] }}} records {@code value: c}, so nothing downstream asks the
+     * {@code e => <M> !enum {{ members: [a b M] }}} records {@code value: c}, so nothing downstream asks the
      * namespace for a type called {@code c}.
      *
      * <p>Only a bare reference converts. One carrying arguments is an application, which no value parameter
@@ -1069,7 +1069,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * Each argument against the parameter it binds ({@code template_param}, [TSON-SCHEMA] §5.10): a type argument
+     * Each argument against the parameter it binds ({@code meta.template_param}, [TSON-SCHEMA] §5.10): a type argument
      * must name a type that IS-A the parameter's {@code bound}, and a value argument must be a value of the
      * parameter's {@code type} -- or of the type an earlier parameter's argument names, where the type is that
      * parameter.

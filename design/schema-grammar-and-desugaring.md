@@ -11,8 +11,8 @@ The schema grammar itself is in `design/schema-grammar.md`.
 - `TypeRef.arguments` non-empty means an open form, a template application; everything closed is an entry referenced by
   a bare name, so `DefinitionResolver` only ever sees a bare reference or `!C value`.
 - The phase is purely syntactic and consults no other schema: the sugar table is fixed, its targets the kernel's
-  `meta.array`, `meta.map`, `meta.tuple`, `meta.choice`, `meta.enum`, `meta.record` and `meta.alias` whatever a
-  document imports, so the kernel's bootstrap needs no special case.
+  `meta.array`, `meta.map`, `meta.tuple`, `meta.choice` and `meta.alias` whatever a document imports, so the kernel's
+  bootstrap needs no special case, and every closure holds every target.
 - An injected name derives from the resolved binding record, never the spelling and never the AST's own `toString` or
   `hashCode`; `SchemaDesugarerTest` pins two derived names to exact strings.
 - An injected entry is a root entry, one per form schema-wide, sugar written inside a nested `!schema` map included:
@@ -40,11 +40,10 @@ rather than splitting it across the resolver (declaration position) and the link
 **The injected-entry half is the spec's own rule.** §8.2: "**Every application materialises** ... Nothing is
 carried structurally in place: a use site holds a bare reference to its entry", and the materialised entries
 merge under `!!import` by the same structural identities they have within a schema. Two rules make it so:
-§4.2's `array`/`set`/`map` constructors are parameterless, so a container at a use site cannot be an
-application at all — none of the kernel's constructors takes type parameters, `map` holding `key_type`/`value_type` as
-ordinary fields — and §5.3 states one lift rule, every sugar form lifting at desugar, a concrete form to a
-closed synthetic entry. `ResolvedFixtureTest` asserts the resolved fixtures and this output agree entry for
-entry.
+§4.2's `meta.array`/`meta.map` constructors are parameterless, so a container at a use site cannot be
+an application at all — no constructor of the kernel's takes type parameters, `meta.map` holding
+`key_type`/`value_type` as ordinary fields — and §5.3 states one lift rule, every sugar form lifting at desugar, a concrete
+form to a closed synthetic entry. `ResolvedFixtureTest` asserts the resolved fixtures and this output agree entry for entry.
 
 **The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
 whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare
@@ -90,7 +89,7 @@ rebuilt and called a cache.
 
   The constructors being parameterless (§4.2), the table above is the whole rule: `SchemaResolver` threads no
   imported entries into the phase, and **the kernel's bootstrap needs no special case** — routing read
-  off the imported vocabulary would, for the three constructors the kernel applies to itself, have to come from
+  off the imported vocabulary would, for the constructors the kernel applies to itself, have to come from
   the very entries it is in the middle of producing.
 - **A generic application is a user template, and this phase mostly leaves it alone.** `name<args>` resolves
   its head in the schema's one namespace (§3.3.1) — parameters, then locals, then the closure — so
@@ -107,7 +106,7 @@ rebuilt and called a cache.
   `head_value_value_hash`, derived from the record the form desugars to, so `[T; 3]` and `[T; 3..3]` land on
   the same entry and any two structurally identical forms anywhere in the document collapse to one
   declaration (§8.2's structural-equality rule). A form an `!!import` already declares is **referenced, not
-  redeclared**, which is why the phase takes the imported name set (a schema writing `[meta.text; 1..]` writes
+  redeclared**, which is why the phase takes the imported name set (a schema writing `[text; 1..]` writes
   a form the kernel lifts; redeclaring would be a local-vs-import collision). The hash half runs over a rendering the phase
   builds itself — one tag per value shape, records and arrays recursed, author text written length-first —
   and **never over the AST's own `toString`**, whose format the JDK documents as subject to change and which
@@ -115,7 +114,7 @@ rebuilt and called a cache.
   differ between two runs of the same application. `SchemaDesugarerTest` pins two derived names to exact
   strings, because a change to them is a change to the resolved form of every schema.
 - **The variadic pair, `choice` and `tuple`, differ in what one position *is*.** A variant is a bare
-  `type_kind` reference; an element is a `tuple_element` record carrying a type **and** its own `voidable`, so each
+  `meta.type_kind` reference; an element is a `meta.tuple_element` record carrying a type **and** its own `voidable`, so each
   tuple position needs a record built for it. `voidable` is written only for a marked position — the member
   is defaulted (`voidable?: boolean ~ false`), so an unmarked one is spelled by omitting it,
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the
@@ -144,11 +143,11 @@ rebuilt and called a cache.
   one injected entry. `[T?; 3]` — the form §5.3 states the rule through — puts the fact and both bounds on
   one binding record, which is the shape the whole table is written in. On the read side `ArrayAbstractReader`
   admits `_` under `voidable` and counts it toward the bounds. **A map's value takes the same
-  `?`** and binds the same field — `map` carries `voidable` for it (§5.3's `{K => V?}` row) — so
+  `?`** and binds the same field — `meta.map` carries `voidable` for it (§5.3's `{K => V?}` row) — so
   `{K => V}` means what `[T]` means and an author who wants a void value writes it. The *key* takes none: §2.9
   forbids a void key outright, so there is nothing for a marker to bind.
 - **The size specifier is one rule over the `min_items`/`max_items` pair, for arrays and maps alike.** There
-  is no template in between — the kernel declares no size template — and each of the
+  is no template in between — no bundled schema declares a size template — and each of the
   four spellings binds the pair directly, an exact `N` pinning both. §5.3's bound coherence (`min <= max`) is
   checked here, where the bounds are literal at schema load; a bound naming a value parameter is
   materialisation's question. The rejection of a **vacuous `[T; 0..]`** is here too: §5.3 makes `0..` a

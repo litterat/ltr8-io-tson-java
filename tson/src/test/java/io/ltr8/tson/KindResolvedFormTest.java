@@ -21,11 +21,11 @@ class KindResolvedFormTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/kind-resolved.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              stock_id    => !meta.uuid_type {}
-              customer_id => !meta.uuid_type {}
-              any_id      => !meta.reference { of: meta.uuid_type }
+              stock_id    => !net.uuid_type {}
+              customer_id => !net.uuid_type {}
+              any_id      => !meta.reference { of: net.uuid_type }
             }""";
 
     private static Tson tson() {
@@ -37,13 +37,13 @@ class KindResolvedFormTest {
         Tson tson = tson();
         ReferenceBody linked = assertInstanceOf(ReferenceBody.class,
                 tson.resolve(SCHEMA).schema().entries().get("any_id"));
-        assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
+        assertEquals(List.of("customer_id", "stock_id", "uuid"), linked.memberNames());
 
         String written = tson.objectWriter().toTson(linked);
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: \"meta.uuid_type\" }", written);
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: \"net.uuid_type\" }", written);
 
         ReferenceBody read = assertInstanceOf(ReferenceBody.class,
-                tson.objectReader().withSchema(TsonBundledSchemas.META_ID).readAs(written, "meta.reference", Object.class));
+                tson.objectReader().withSchema(TsonBundledSchemas.CORE_ID).readAs(written, "meta.reference", Object.class));
         assertEquals(Optional.empty(), read.index());
         assertEquals(linked, read);
     }

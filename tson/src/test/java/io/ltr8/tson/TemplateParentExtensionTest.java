@@ -123,7 +123,7 @@ class TemplateParentExtensionTest {
     @Test
     void aDiscriminatorTypedByAnApplicationOfAParameterIsRefused() {
         String refusal = refusal("p8", """
-                  capped => <M> !meta.integer_type { max: M }
+                  capped => <M> !numeric.integer_type { max: M }
                   pet     => <M, N> { kind: capped<M> = N  name: text }
                   cat     => pet<9, 3>
                 """);

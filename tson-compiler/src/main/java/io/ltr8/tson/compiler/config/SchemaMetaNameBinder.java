@@ -4,6 +4,8 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.ast.schema.SchemaMap;
+import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -12,17 +14,24 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
- * The {@link DataNameBinder} for the schema model ({@code io.ltr8.tson.schema.meta}): the names the kernel, meta.tn,
- * declares under its {@code meta} map and net.tn under its {@code net} map, each bound by its last segment, mangled
- * from snake_case to PascalCase into that package ({@code "meta.integer_size"} -> {@code IntegerSize}, {@code
- * "net.ipv4_type"} -> {@code Ipv4Type}), with {@link #ALIASES} where the mangling does not reach the class. A
- * consumer's dotted name binds to a sub-package per earlier segment ({@link DataNameBinder.DefaultDataNameBinder});
- * a name of this vocabulary does not, its first segment naming the bundled map that declares it.
+ * The {@link DataNameBinder} for the schema model ({@code io.ltr8.tson.schema.meta}): the names the kernel,
+ * meta.tn, declares -- its root vocabulary and its members of {@code meta}, {@code atom}, {@code numeric}, {@code
+ * unicode}, {@code net} and {@code binary} -- and the members numeric.tn adds to {@code numeric}, temporal.tn
+ * declares under {@code temporal} and net.tn adds to {@code net}, each bound by its last segment, mangled from
+ * snake_case to PascalCase into that package ({@code "numeric.integer_size"} -> {@code IntegerSize}, {@code
+ * "unicode.text_type"} -> {@code TextType}, {@code "net.uuid_type"} -> {@code UuidType}, {@code "net.ipv4_type"} ->
+ * {@code Ipv4Type}), with {@link #ALIASES} where the mangling does not reach the class ({@code "atom.specification"}
+ * -> {@code AtomSpecification}). A consumer's dotted name binds to a sub-package per
+ * earlier segment ({@link DataNameBinder.DefaultDataNameBinder}); a name of this vocabulary does not, its first segment
+ * naming the bundled map that declares it.
  *
- * <p><b>It answers only for that vocabulary.</b> Those two maps are the ones whose values the schema model
- * describes; core.tn, net.tn's root and policy.tn declare ordinary types over them, whose values are data. The package
+ * <p><b>It answers only for that vocabulary, by declaring document.</b> Those entries are the ones whose values the
+ * schema model describes; the libraries' roots, core.tn and policy.tn declare ordinary types over them, whose values are
+ * data, and a member a consumer's schema contributes to an open map ({@code meta}, {@code numeric}, …) is the
+ * consumer's own. The package
  * also holds classes no schema declares -- {@code Token}, {@code EntryKind}, {@code OpenEntry}, {@code ValueEntry},
  * {@code AtomCoherence} and the like, the resolver's own model -- and a name that merely mangles to one of them
  * ({@code token}) is not this binder's: it refuses it, so a consumer's type of that name binds through the
@@ -66,6 +75,7 @@ public final class SchemaMetaNameBinder {
             Map.entry("enum_type", "enum_body"),
             Map.entry("template", "template_body"),
             Map.entry("datetime_type", "date_time_type"),
+            Map.entry("specification", "atom_specification"),
             Map.entry("field_name", "identifier"),
             Map.entry("type_name", "identifier"),
             Map.entry("param_name", "identifier"));
@@ -73,14 +83,13 @@ public final class SchemaMetaNameBinder {
     private static final DataNameBinder MANGLED = new DataNameBinder.DefaultDataNameBinder(Set.of(NAMESPACE), ALIASES);
 
     /**
-     * The schema model's binder: a name the kernel declares under {@code meta} or net.tn under {@code net}, its last
-     * segment mangled into {@code io.ltr8.tson.schema.meta}; any other name is refused, whatever class it would
-     * mangle to.
+     * The schema model's binder: a name the kernel declares, or a library declares under its own map, its last
+     * segment mangled into {@code io.ltr8.tson.schema.meta}; any other name is refused, whatever class it would mangle to.
      */
     public static final DataNameBinder INSTANCE = name -> {
         if (!Vocabulary.NAMES.contains(name)) {
-            throw new DataBindException("'" + name + "' is not declared under meta.tn's 'meta' or net.tn's 'net', so "
-                    + "the schema model does not bind it");
+            throw new DataBindException("'" + name + "' is declared by neither the kernel nor under a bundled "
+                    + "library's 'numeric', 'temporal' or 'net' map, so the schema model does not bind it");
         }
         return MANGLED.resolve(SchemaPaths.member(name));
     };
@@ -114,8 +123,8 @@ public final class SchemaMetaNameBinder {
      * The one context a processor binds schemas and data through, from the context a consumer configured: that
      * context's binder, profile and atom registrations, with {@link #INSTANCE} composed with its binder ({@link
      * #extendedWith}), and the schema model's own registrations added where it lacks them ({@link
-     * ResolverBindContext#registerAbsent}). The names under the kernel's {@code meta} and net.tn's {@code net} are
-     * fixed; every other name is the consumer's binder's to answer.
+     * ResolverBindContext#registerAbsent}). The names of the kernel and under the libraries' maps are fixed; every
+     * other name is the consumer's binder's to answer.
      */
     public static DataBindContext over(DataBindContext consumer) {
         Objects.requireNonNull(consumer, "consumer");
@@ -144,9 +153,13 @@ public final class SchemaMetaNameBinder {
     }
 
     /**
-     * The names {@link #INSTANCE} answers for: every member of the bundled meta.tn's {@code meta} map and net.tn's
-     * {@code net} map, by path, read from their source by the schema parser on first use. An {@link #ALIASES} key
-     * naming no member's last segment would be an alias nothing can ask for, so one is a broken invariant.
+     * The names {@link #INSTANCE} answers for, read from the bundled sources by the schema parser on first use: every
+     * entry the kernel, meta.tn, declares -- its root vocabulary and its members of its six maps, by path -- and
+     * the members numeric.tn, temporal.tn and net.tn declare under {@code numeric}, {@code temporal} and {@code net}.
+     * Each binds by its last segment, so no two may share one: a second is a broken invariant. The vocabulary is
+     * fixed by declaring document, so a member a consumer's schema contributes to an open map is the consumer's
+     * binder's to answer. An {@link #ALIASES} key naming no entry's last segment would be an alias nothing can ask for,
+     * so one is a broken invariant.
      */
     private static final class Vocabulary {
 
@@ -154,20 +167,30 @@ public final class SchemaMetaNameBinder {
 
         private static Set<String> read() {
             Set<String> names = new LinkedHashSet<>();
-            for (String id : new String[] {TsonBundledSchemas.META_ID, TsonBundledSchemas.NET_ID}) {
-                for (String name : new TsonSchemaParser(TsonBundledSchemas.fetch(id)).parseSchemaDocument()
-                        .body().declarations().keySet()) {
-                    if (SchemaPaths.isPath(name)) {
+            for (String id : Stream.concat(Stream.of(TsonBundledSchemas.META_ID),
+                    TsonBundledSchemas.LIBRARY_IDS.stream()).toList()) {
+                // The kernel's every entry; each library's every entry under its own map.
+                boolean kernel = id.equals(TsonBundledSchemas.META_ID);
+                Map<String, SchemaMap.Declaration> declared = new TsonSchemaParser(TsonBundledSchemas.fetch(id))
+                        .parseSchemaDocument().body().declarations();
+                declared.forEach((name, declaration) -> {
+                    boolean map = declaration.typeDef() instanceof SchemaMapDef;
+                    if (!map && (SchemaPaths.isPath(name) || kernel)) {
                         names.add(name);
                     }
-                }
+                });
             }
             Set<String> members = new LinkedHashSet<>();
-            names.forEach(name -> members.add(SchemaPaths.member(name)));
+            for (String name : names) {
+                if (!members.add(SchemaPaths.member(name))) {
+                    throw new IllegalStateException("'" + name + "' shares its last segment with another bundled "
+                            + "entry, so the schema model cannot bind both");
+                }
+            }
             for (String alias : ALIASES.keySet()) {
                 if (!members.contains(alias)) {
-                    throw new IllegalStateException("alias '" + alias + "' names no member of meta.tn's 'meta' or "
-                            + "net.tn's 'net'");
+                    throw new IllegalStateException("alias '" + alias + "' names no entry of meta.tn or of a "
+                            + "bundled library's map");
                 }
             }
             return Set.copyOf(names);

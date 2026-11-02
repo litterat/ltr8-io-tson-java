@@ -14,7 +14,7 @@ import java.net.UnknownHostException;
 
 /**
  * the kernel's {@code ipv4_type} constructor (§5.5's {@code ipv4} atom, RFC 3986's {@code
- * IPv4address} production -- core.tn: "dotted-quad per the RFC 3986 IPv4address production").
+ * IPv4address} production -- net.tn: "dotted-quad per the RFC 3986 IPv4address production").
  *
  * <p><b>Deliberately does not delegate parsing to {@link java.net.InetAddress}.</b> Confirmed
  * empirically before writing this: {@code InetAddress.ofLiteral} -- the no-DNS, literal-only entry

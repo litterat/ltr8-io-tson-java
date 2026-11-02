@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 
 /**
- * Resolves a schema/wire-format type name (e.g. {@code "integer_size"}) to the Java class a
+ * Resolves a schema/wire-format type name (e.g. {@code "numeric.integer_size"}) to the Java class a
  * {@link DataBindContext} should build a descriptor for -- the general form of the
  * "type-to-Class binding" problem every serialization library eventually needs: there is no
  * reflection API to enumerate "every class in a package," so this is necessarily a name lookup

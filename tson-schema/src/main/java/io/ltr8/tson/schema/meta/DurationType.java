@@ -13,7 +13,7 @@ import java.util.Optional;
 /**
  * meta's {@code duration_type} constructor: elapsed time, as a signed <b>exact decimal</b> number of seconds
  * ([TSON-SCHEMA] §5.5) -- {@code number}'s value space in seconds, bounded at both ends by a signed 64-bit
- * count of nanoseconds. Instance is {@code duration} in core.
+ * count of nanoseconds. Instance is {@code duration}, in temporal.tn.
  *
  * <p><b>Totally ordered, and that is what the facets rest on.</b> The lexical form admits no Y and no
  * month-M component -- {@code P1M} is a month and belongs to {@link PeriodType}, a minute being {@code PT1M}
@@ -33,7 +33,7 @@ import java.util.Optional;
  * #isMultiple}'s own {@code toNanos} cannot overflow. A bound built programmatically rather than read is
  * checked against the ceiling by {@link #coherenceCheck}, which is what keeps that true.
  */
-@Typename(name = "meta.duration_type")
+@Typename(name = "temporal.duration_type")
 public record DurationType(TypeChain chain,
         Optional<Duration> min,
         @Field("exclusive_min") Optional<Duration> exclusiveMin,
@@ -42,7 +42,7 @@ public record DurationType(TypeChain chain,
         Optional<BigInteger> precision,
         @Field("multiple_of") Optional<Duration> multipleOf) implements Atom {
 
-    /** {@code duration => !meta.duration_type {}} -- the unconstrained duration. */
+    /** {@code duration => !temporal.duration_type {}} -- the unconstrained duration. */
     public static final DurationType UNCONSTRAINED = new DurationType(Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 

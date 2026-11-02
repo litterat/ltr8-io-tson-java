@@ -13,10 +13,10 @@ import java.util.Optional;
 /**
  * Parses and validates against the kernel's {@code complex_type} constructor (§5.6's {@code
  * complex} atom), {@code component} fixed at its default ({@code NUMBER}, exact {@link
- * BigDecimal}) -- see {@link Complex}'s Javadoc for why the other {@code complex_component}
+ * BigDecimal}) -- see {@link Complex}'s Javadoc for why the other {@code numeric.complex_component}
  * members aren't modeled yet. No fields to configure as a result (unlike every other atom type
  * here): {@code complex_type} itself has none besides {@code component}, and {@code complex} has no
- * useful total order to bound (meta.tn: "{@code @ordering:NONE}"), so this is a stateless singleton
+ * useful total order to bound (numeric.tn: "{@code @atom.ordering:NONE}"), so this is a stateless singleton
  * with no separate {@code schema.meta.ComplexType} values class to hold -- there's nothing to split
  * out.
  *

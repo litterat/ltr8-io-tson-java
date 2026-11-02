@@ -11,10 +11,10 @@ import java.util.Optional;
  * constraint values, no parsing/validation behavior -- {@code tson-compiler}'s {@code UuidParser}
  * holds one of these and does the actual reading/writing.
  *
- * <p>Also an {@link Atom} variant: {@code uuid => !meta.uuid_type {}} is a constructor-application
+ * <p>Also an {@link Atom} variant: {@code uuid => !net.uuid_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "meta.uuid_type")
+@Typename(name = "net.uuid_type")
 public record UuidType(TypeChain chain,
         Optional<Integer> version) implements Atom {
     /** The chain normalised: absent and empty are one list. */
@@ -33,7 +33,7 @@ public record UuidType(TypeChain chain,
         return new UuidType(chain, version);
     }
 
-    /** {@code uuid => !meta.uuid_type {}} -- the unconstrained UUID, §5.5's {@code !uuid}. */
+    /** {@code uuid => !net.uuid_type {}} -- the unconstrained UUID, §5.5's {@code !uuid}. */
     public static final UuidType UNCONSTRAINED = new UuidType(Optional.empty());
 
 

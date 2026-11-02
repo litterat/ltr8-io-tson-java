@@ -17,10 +17,10 @@ import java.util.Optional;
  * {@code tson-compiler}'s {@code DecimalParser} holds one of these and does the actual
  * reading/writing.
  *
- * <p>Also an {@link Atom} variant: {@code number => !meta.decimal_type {}} is a constructor-application
+ * <p>Also an {@link Atom} variant: {@code number => !numeric.decimal_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "meta.decimal_type")
+@Typename(name = "numeric.decimal_type")
 public record DecimalType(TypeChain chain,
         Optional<BigDecimal> min,
         @Field("exclusive_min") Optional<BigDecimal> exclusiveMin,
@@ -31,7 +31,7 @@ public record DecimalType(TypeChain chain,
         @Field("fraction_digits") Optional<Integer> fractionDigits,
         Optional<List<BigDecimal>> members) implements Atom {
 
-    /** {@code number => !meta.decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
+    /** {@code number => !numeric.decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
     public static final DecimalType UNCONSTRAINED = new DecimalType(
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
@@ -111,7 +111,7 @@ public record DecimalType(TypeChain chain,
      * <p>Bounds must leave a value between them, and the two precision facets must leave a shape
      * describable: {@code fraction_digits} counts digits after the point out of the {@code
      * total_digits} significant digits available, so a scale above the precision describes no number.
-     * That is SQL's own {@code DECIMAL(precision, scale)} rule, which meta.tn's {@code @doc} names
+     * That is SQL's own {@code DECIMAL(precision, scale)} rule, which numeric.tn's {@code @doc} names
      * this pair after.
      *
      * <p>{@code multiple_of: 0} is unsound rather than vacuous here, exactly as for {@link

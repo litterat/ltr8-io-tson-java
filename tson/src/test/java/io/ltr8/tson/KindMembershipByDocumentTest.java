@@ -26,7 +26,7 @@ class KindMembershipByDocumentTest {
     void aDataDocumentUnderMetaJudgesMembershipInMetasClosure() {
         assertEquals(List.of(), validate("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !meta.record_field { type: meta.integer }
+                !meta.record_field { type: integer }
                 """));
 
         List<Diagnostic> problems = validate("""

@@ -9,7 +9,7 @@ import java.util.HexFormat;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta.tn's {@code bytes_type} constructor ([TSON-SCHEMA] §5.5, RFC 4648).
+ * Parses and validates against the kernel's {@code binary.bytes_type} constructor ([TSON-SCHEMA] §5.5, RFC 4648).
  *
  * <p>One class, not one per alphabet, though each alphabet's decode algorithm is genuinely different: that
  * is the same shape of branching {@link IntegerParser} does on {@code size.signed()} and {@link FloatParser}

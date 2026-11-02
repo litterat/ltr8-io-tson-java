@@ -82,8 +82,8 @@ class TupleReadTest {
         TsonValue pair = read("[integer, text]", "pair", "[42 \"hello\"]");
 
         assertInstanceOf(TsonTuple.class, pair);
-        assertEquals(Optional.of("meta.integer"), pair.get(0).typeRef(), "each position keeps its own type");
-        assertEquals(Optional.of("meta.text"), pair.get(1).typeRef());
+        assertEquals(Optional.of("integer"), pair.get(0).typeRef(), "each position keeps its own type");
+        assertEquals(Optional.of("text"), pair.get(1).typeRef());
     }
 
     /** An inline tuple at a field position is hoisted, so the field's value carries the injected entry's name. */
@@ -143,7 +143,7 @@ class TupleReadTest {
         TsonValue pair = read("[integer?, text]", "pair", "[_ \"hello\"]");
 
         assertTrue(pair.get(0).isVoid());
-        assertEquals("!pair [ _ !meta.text \"hello\" ]", new TsonTreeWriter().toTson(pair));
+        assertEquals("!pair [ _ !text \"hello\" ]", new TsonTreeWriter().toTson(pair));
     }
 
     /** And a REQUIRED one does not -- the default state, since a tuple element's `state` defaults to REQUIRED. */

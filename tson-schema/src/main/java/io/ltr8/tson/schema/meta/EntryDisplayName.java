@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * paged&lt;order&gt;} for an application that keeps an entry of its own, and a synthetic record as the body a
  * record is written with, <code>{ v: text }</code>. <b>An application nothing declares is its expansion</b>
  * (§5.10), minted under a name no author wrote and named by the application that closed to it, as written ({@link
- * TsonSchema.EntryFacts#closes}): {@code b<10>} over {@code b => <N> !meta.integer_type { min: N  max: 100 }} is shown as
+ * TsonSchema.EntryFacts#closes}): {@code b<10>} over {@code b => <N> !numeric.integer_type { min: N  max: 100 }} is shown as
  * {@code b<10>}, and {@code bx<int32>} as itself rather than its body. A synthetic form with no sugar spelling and
  * no application has no authored name ({@link #authored}, read off the key's {@code @meta.synthetic}, {@link
  * TsonSchema.EntryFacts#synthetic}), and a message leaves it unnamed, located by its position. An entry with no

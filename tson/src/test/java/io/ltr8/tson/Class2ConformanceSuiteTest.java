@@ -142,35 +142,29 @@ class Class2ConformanceSuiteTest {
                 assertEquals(List.of(), problems, "a valid schema vector must load cleanly");
                 Map<String, Top> ours = ResolvedForm.ownEntries(tson, identityOf(source));
                 // Under the subject's own imports, which an instance of its namespace type needs (RUNNER.md) -- its
-                // first, which is the one declaring the constructors its entries are written with, and every bundled
-                // schema among them, whose names (core's `@annotation`, `text`) an entry states as written. Reading
-                // under every fixture binds every record of their closure, and SuiteBindings binds by name, one class
-                // per name across the whole corpus: a second fixture's `order` would meet a class written for another's.
+                // first, which is the one declaring the constructors its entries are written with. Reading under all
+                // of them binds every record of their closure, and SuiteBindings binds by name, one class per name
+                // across the whole corpus: a second fixture's `order` would meet a class written for another's.
                 List<String> imports = TsonDocumentPeek.of(source).header().imports();
-                List<String> under = new java.util.ArrayList<>();
-                for (int i = 0; i < imports.size(); i++) {
-                    if (i == 0 || TsonBundledSchemas.declaredSha256(imports.get(i)).isPresent()) {
-                        under.add(imports.get(i));
-                    }
-                }
                 Map<String, Object> expected = ResolvedForm.readResolved(tson,
-                        fieldText(outcomePayload(sidecar), "resolved"), under);
+                        fieldText(outcomePayload(sidecar), "resolved"),
+                        imports.isEmpty() ? imports : imports.subList(0, 1));
                 assertEquals(new TreeSet<>(expected.keySet()), new TreeSet<>(ours.keySet()),
                         "the resolved schema does not declare the entries the vector states");
                 expected.forEach((name, definition) -> assertEquals(
                         ResolvedForm.rendered(definition), ResolvedForm.rendered(ours.get(name)),
                         name + " does not resolve to what the vector states"));
-                // §8.2 puts the derived @synthetic marker on the key of every entry the resolver
+                // §8.2 puts the derived @meta.synthetic marker on the key of every entry the resolver
                 // materialised from a sugar form and on no other, so the marked set is a claim in its own
                 // right -- and one a bound comparison cannot make, a key-position annotation being dropped
                 // when a resolved-form document is read back.
                 assertEquals(ResolvedForm.markedSynthetics(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourSynthetics(tson, identityOf(source)),
-                        "the entries marked @synthetic are not the ones the vector marks");
+                        "the entries marked @meta.synthetic are not the ones the vector marks");
                 // §8.2's second key annotation: each instantiation states, on its key, the application it is.
                 assertEquals(ResolvedForm.markedApplications(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourApplications(tson, identityOf(source)),
-                        "the entries' @application are not the ones the vector states");
+                        "the entries' @meta.application are not the ones the vector states");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
             case "refused" -> assertRefused(sidecar, problems, "schema");

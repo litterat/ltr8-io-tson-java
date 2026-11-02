@@ -18,6 +18,10 @@ facts and refinement, groups, subtraction, and the exception boundary.
   member edits its path entry: where a path entry and the nested map's own copy disagree, the path entry is the one
   held, whichever comes first (the kernel's `meta` precedes its members, and a linked schema rebuilt from a partly
   ready namespace carries a stale copy).
+- **A nested map is open** (SPEC-FEEDBACK.md #14). A document's own `!schema` map is resolved locally, its members
+  under their paths; where an import declares a map of the same path, the two are one map, the union of their
+  members, and only a member path declared twice collides (§2.2.3). `SchemaResolver.mergeImports` and the local
+  collision loop pass over a nested map met twice; `design/linking-and-compilation.md` has the merge.
 - Every declaration is made ready in wait order (`WaitOrder`, §3.4.1), never source order: a read against an entry
   of the same document — `!C { … }` with `C` local, a value of a local type, an annotation whose type is local —
   makes that entry ready first, in either order. Entries waiting on each other are a `SchemaValidationException`
@@ -48,7 +52,7 @@ facts and refinement, groups, subtraction, and the exception boundary.
 - An application of a family base minted at a use site is a member of nothing; only a declared one gains the edge to
   its base (`SchemaResolver.familyBaseEdges`).
 - Subtraction runs last and empties the chain (every supertype goes); nothing is kept in its place.
-- A field's name is its key in `record.fields` (`RecordBody.fields`, the kernel's `field_map`) and never one of its
+- A field's name is its key in `meta.record.fields` (`RecordBody.fields`, the kernel's `meta.field_map`) and never one of its
   facts; declaration order is part of the value, and `RecordBody.equals` compares it.
 - The exception's class picks the diagnostic code (`SchemaResolver.Problems.report`): `SchemaValidationException` →
   `SCHEMA_ERROR` (a `SchemaRefusalException` keeps its rule's code, §8.2's or `LIMIT_EXCEEDED`),
@@ -104,7 +108,7 @@ goes through, so an entry is made ready the first time anything asks for it, and
 - **Wait depth is counted here**, order-independently, and a chain past `LimitsPolicy.maxWaitDepth` refuses its head
   with `LIMIT_EXCEEDED` (`design/processor-policy.md`).
 - **Rule 6: a judgement that walks a name waits for everything.** §5.8's one name type over a composition's
-  supertypes (`requireOneNameType`) walks a name type to its terminal (`field_name` → `identifier`); run during
+  supertypes (`requireOneNameType`) walks a name type to its terminal (`meta.field_name` → `meta.identifier`); run during
   resolution it would make the composition wait on what it only names. `DefinitionResolver` defers it, and
   `judgeDeferred` runs it once every entry is ready, a failure reported against its declaration
   (`DefinitionResolverTest.aCompositionsNameTypesAreJudgedOnceEveryEntryIsReady`).
@@ -203,14 +207,16 @@ returns a `ValueEntry(T, value)` of kind `VALUE`, `T` recorded as the entry's co
 (`design/meta-layer-namespaces.md` has the read, the binding and the tree fallback). The resolver's part: a head that
 is itself a value is refused (a value has no instances), a braced payload at an atom type is refused with the `^` it
 is missing, and a payload that is no value of `T` is refused against the entry with the read's path. A namespace type
-is the other side of the line: `api => !meta.namespace { … }` applies the constructor `namespace` and builds a type, a
+is the other side of the line: `api => !meta.namespace { … }` applies the constructor `meta.namespace` and builds a type, a
 `NamespaceBody`.
 
 ## Nested schema maps
 
 `geo => !schema { address => { … } }` declares: every value of `meta.schema` does, as the root does. The tag is
 `!schema`, the root's spelling, or `!meta.schema`, as resolved output writes a nested map (`TsonSchemaParser` takes
-either). The kernel is one such map, `meta`, and net.tn's constructors another, `net`. `TsonSchemaParser`
+either). The kernel's machinery is one such map, `meta`; the data-format libraries'
+constructors are three more, numeric.tn's `numeric`, temporal.tn's `temporal` and net.tn's `net`.
+`TsonSchemaParser`
 puts each member into the document's one declaration map under its path (`geo.address`, `geo.inner.deep`), and the
 entry `geo` itself is a `SchemaMapDef` holding its members' own names. So every phase reads a member as a root entry:
 the desugar phase lifts its sugar, the wait order readies it, and a reference to `geo.address` anywhere is a lookup
@@ -220,13 +226,15 @@ innermost map first, the members' key annotations kept. A schema built from a re
 nested map alone, and `synced` keys its members under their paths (`SchemaPaths.withPaths` does the same for a
 resolved form read as a plain map).
 
-A member's identity is its path: two maps may each declare `address`, and a diagnostic, a kind's member list, a
-chain and an `@meta.application` name it `geo.address`. A value of any other namespace type, `!api { … }`, stays a value
-entry (above).
+A member's identity is its declaring document plus its path: two maps may each declare `address`, and a diagnostic, a
+kind's member list, a chain and an `@meta.application` name it `geo.address`. A map of one path that several documents of a
+closure declare is one map whose members are the union of theirs; the annotations on each `geo => !schema { … }`
+entry are its own document's, and the merged map carries none of an import's. A value of any other namespace type,
+`!api { … }`, stays a value entry (above).
 
 ## Fields
 
-**A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`), held under its name in
+**A resolved field is four facts, not a state** (`RecordField`, the kernel's `meta.record_field`), held under its name in
 `record.fields`. §5.2's `name?: type? ~ value` has one mark per fact: the name's `?` is `optional`, the type's `?` is
 `voidable`, and `~`/`=` give the `role` (DEFAULT or FIXED) and its `value`. `FieldModifiers.of` maps the marks one to
 one and adds only refusals — a default on an unmarked name, a pin on a voidable type, `= _` and `~ _` (spell
@@ -255,8 +263,8 @@ the kernel declares changes how a value reads, so the ordering is pinned over re
 
 ## Field groups
 
-A group is options of members (`GroupDef`, the kernel's `field_group`; §5.11): an option is chosen when any member is
-present, a chosen option holds every member `optional_members` does not name, and `field_group.optional` decides
+A group is options of members (`GroupDef`, the kernel's `meta.field_group`; §5.11): an option is chosen when any member is
+present, a chosen option holds every member `optional_members` does not name, and `meta.field_group.optional` decides
 whether no option may be chosen. `GroupDef.fieldGroup` is the one lowering, for a fresh body and a held one: `+`
 becomes the non-optional group of one option whose members are all optional within it, so a one-option non-optional group is
 always a `+` group. Members flatten as optional fields whatever the group says. The parser refuses the shapes that
@@ -294,17 +302,17 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
 (`SchemaResolver.unresolved`) that keeps the failed declaration's type parameters.
 
 - **One schema construct reaches `NOT_IMPLEMENTED`: an instance of a user constructor of types**
-  (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `type` builds types, and a type's body is one
-  of the schema model's, built only by the kernel's and net.tn's constructors. Composing `meta.atom`, `meta.product` or
-  `meta.sum` directly (`c => meta.product & { … }`) makes a new form, which a processor backs with readers and writers
-  of its own; this library backs none beyond the bundled ones, so the refusal is a capability verdict, and stays one.
-  Composing an existing constructor (`c => meta.record & { extra: text }`) makes no new form, and is refused the same
-  way today only because no body in the schema model holds the added facet (`BACKLOG.md`). An instance of a constructor
-  composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a tree where no class binds the
-  head — as a value entry's payload is (`design/meta-layer-namespaces.md`). The other `UnsupportedOperationException`
-  sites are the catch-alls around the compiled reader (an exception none of the classified ones), a failed
-  re-serialisation of an atom refinement's source, a closed application with no `ApplicationCloser` (a resolver built
-  standalone), and the bootstrap's closed switch over the kernel's own declarations.
+  (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `meta.type` builds types, and a type's body is
+  one of the schema model's, built only by the bundled constructors (meta.tn's, numeric.tn's, temporal.tn's and net.tn's).
+  Composing `meta.atom`, `meta.product` or `meta.sum` directly (`c => meta.product & { … }`) makes a new form, which a
+  processor backs with readers and writers of its own; this library backs none beyond the bundled ones, so the refusal is a
+  capability verdict, and stays one. Composing an existing constructor (`c => meta.record & { extra: text }`) makes no new
+  form, and is refused the same way today only because no body in the schema model holds the added facet (`BACKLOG.md`). An
+  instance of a constructor composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a tree
+  where no class binds the head — as a value entry's payload is (`design/meta-layer-namespaces.md`). The other
+  `UnsupportedOperationException` sites are the catch-alls around the compiled reader (an exception none of the classified
+  ones), a failed re-serialisation of an atom refinement's source, a closed application with no `ApplicationCloser` (a
+  resolver built standalone), and the bootstrap's closed switch over the kernel's own declarations.
 - **A body the constructor's vocabulary rejects** arrives as a `ReadException` and is restated as a schema error
   (`bodyIsNotValidData`, `payloadFailure`). The read `Diagnostic` is dropped: it was produced against a
   `DataValueEvents` replay whose positions are placeholders and whose path points into a synthetic body. The real
@@ -322,10 +330,10 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
   §10.1 lets an id-less schema be registered under an application-supplied identity, a route no front door here
   offers, so a conforming processor may load the same document cleanly and no vector states the refusal.
 
-**No gap reaches a read either:** every constructor meta.tn and net.tn declare builds a real reader, and
-`CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReader`. The machinery stays because the
-extension point can still reach it — a schema's own constructor this library has no factory for — and it rides in
-the report, located at the value it could not read (`TsonCli.exitCodeFor` lifts the run to 70).
+**No gap reaches a read either:** every constructor meta.tn, numeric.tn, temporal.tn and net.tn declare builds a real reader,
+and `CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReader`. The machinery stays because the extension
+point can still reach it — a schema's own constructor this library has no factory for — and it rides in the report, located
+at the value it could not read (`TsonCli.exitCodeFor` lifts the run to 70).
 
 ## The `schema.meta` value model
 

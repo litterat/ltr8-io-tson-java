@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Rule 4 makes the pre-loaded set a measurement rather than a list: it is exactly the one cycle the kernel must
  * close, {@code meta.record} and what reading a {@code !meta.record} waits on. So this reads {@code
- * spec/m/meta-resolved.tn} schemalessly, builds the wait graph from the fixture's own declarations, and
+ * spec/fixtures/meta-resolved.tn} schemalessly, builds the wait graph from the fixture's own declarations, and
  * asserts that the graph has exactly one cycle, that it holds {@code meta.record}, and that every other entry reads in
  * an order whose longest wait chain is within rule 6's default bound of 64. The measurements go to stdout.
  */
@@ -47,6 +47,51 @@ class KernelWaitGraphTest {
         assertEquals(List.of(preloaded), cycles, "the wait graph has a cycle other than record's");
         int longest = depth.values().stream().mapToInt(Integer::intValue).max().orElse(0);
         assertTrue(longest <= WAIT_DEPTH_LIMIT, "the longest wait chain is " + longest);
+    }
+
+    /**
+     * The kernel holds what its one cycle needs to resolve and link on its own -- the cycle, what reading the document
+     * itself waits on (its root tag's {@code meta.schema}, the key and value types that reads, the annotations on its
+     * header and on its keys, {@code @atom.ordering} and {@code @atom.bounded} among them), and every entry a
+     * declaration of that set names, closed to a fixed point -- and the concepts that belong with them, which nothing in
+     * the closure names: the map, tuple and choice constructors, the tuple's element and the one-element tuple
+     * templates, held template bodies and the {@code application} annotation, the {@code kind} and {@code ref}
+     * references with {@code atom_kind}, {@code field_name}, the {@code set} template, the {@code disjoint} assertion,
+     * the octet-sequence constructor with its encodings and instance, {@code iri_reference}, and the classifying
+     * annotations {@code exact} and {@code numeric}. The measurement: a cycle of 25, a closure of 64.
+     */
+    @Test
+    void theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts() throws Exception {
+        WaitGraph graph = WaitGraph.of(fixture());
+        Set<String> cycle = graph.components().stream().filter(graph::isCycle).filter(c -> c.contains("meta.record"))
+                .findFirst().orElseThrow();
+        Set<String> closure = new java.util.TreeSet<>(cycle);
+        java.util.Deque<String> work = new java.util.ArrayDeque<>(cycle);
+        graph.documentWaits().keySet().stream().filter(graph.entries()::contains).filter(closure::add)
+                .forEach(work::add);
+        while (!work.isEmpty()) {
+            graph.references(work.pop()).stream().filter(closure::add).forEach(work::add);
+        }
+        Set<String> related = new java.util.TreeSet<>(graph.entries());
+        related.removeAll(closure);
+        Set<String> beyond = new java.util.TreeSet<>(closure);
+        beyond.removeAll(cycle);
+        long nested = graph.entries().stream().filter(name -> name.indexOf('.') >= 0).count();
+        System.out.println("kernel: " + graph.entries().size() + " entries, " + nested + " under its maps and "
+                + (graph.entries().size() - nested) + " at the root; the cycle's closure " + closure.size()
+                + " (the cycle's " + cycle.size() + " and " + beyond.size() + " more)");
+        System.out.println("  closure beyond the cycle: " + beyond);
+        System.out.println("  related concepts beyond the closure: " + related);
+
+        assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
+        assertEquals(25, cycle.size(), "the cycle");
+        assertEquals(64, closure.size(), "the cycle's closure");
+        assertEquals(new java.util.TreeSet<>(List.of("bytes", "iri_reference", "meta.application", "meta.atom_kind",
+                "binary.bytes_encoding", "binary.bytes_type", "meta.choice", "meta.disjoint", "atom.exact",
+                "meta.field_name", "meta.kind", "meta.map", "atom.numeric", "meta.ref", "meta.template", "meta.tuple",
+                "meta.tuple1", "meta.tuple_element", "meta.voidable_tuple1", "set")),
+                new java.util.TreeSet<>(related.stream().filter(name -> !name.startsWith("array_")).toList()),
+                "the related concepts");
     }
 
     // ── Measuring ────────────────────────────────────────────────────────
@@ -161,13 +206,13 @@ class KernelWaitGraphTest {
         return new TsonDataParser(Files.readString(specDirectory().resolve("meta-resolved.tn"))).parseResolvedForm();
     }
 
-    /** {@code spec/m}, found by walking up rather than assumed relative to a working directory. */
+    /** {@code spec/fixtures}, found by walking up rather than assumed relative to a working directory. */
     private static Path specDirectory() {
         Path directory = Path.of("").toAbsolutePath();
-        while (directory != null && !Files.isDirectory(directory.resolve("spec/m"))) {
+        while (directory != null && !Files.isDirectory(directory.resolve("spec/fixtures"))) {
             directory = directory.getParent();
         }
-        assertNotNull(directory, "no spec/m above " + Path.of("").toAbsolutePath());
-        return directory.resolve("spec/m");
+        assertNotNull(directory, "no spec/fixtures above " + Path.of("").toAbsolutePath());
+        return directory.resolve("spec/fixtures");
     }
 }

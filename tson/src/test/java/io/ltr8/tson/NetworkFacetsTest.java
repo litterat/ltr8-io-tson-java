@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * §5.5's {@code within} and {@code excluding}, which were declared by four constructors and applied by none.
  *
- * <p><b>The two families read them differently, and meta.tn says so.</b> For an <em>address</em>: it "must
+ * <p><b>The two families read them differently, and net.tn says so.</b> For an <em>address</em>: it "must
  * lie inside at least one {@code within} network when the field is present, and inside no {@code excluding}
  * network — {@code excluding} carves holes out of {@code within}". For a <em>network</em>: the value "must be
  * a subnet of at least one" {@code within}, and "must not overlap any listed" {@code excluding} — "overlap,
@@ -112,7 +112,7 @@ class NetworkFacetsTest {
 
     /**
      * A malformed entry is refused at schema load rather than surfacing as every value failing against a
-     * constraint the author believes they wrote. The facets are typed {@code [value]}, so nothing in the
+     * constraint the author believes they wrote. The facets are typed {@code [meta.value]}, so nothing in the
      * vocabulary catches it.
      */
     @Test

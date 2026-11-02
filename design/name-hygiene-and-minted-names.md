@@ -79,7 +79,7 @@ other** (`InternalName`). Both naming sites splice author-written content into t
 arguments — so a derived name is a place where a document's own text reaches the schema namespace. Two
 requirements meet there, and the second is why meeting the first is not enough:
 
-- **[TSON-SCHEMA] §8.2's freshness MUST**, that an internal name is a valid `identifier`. Splicing raw text
+- **[TSON-SCHEMA] §8.2's freshness MUST**, that an internal name is a valid `meta.identifier`. Splicing raw text
   breaks it outright: a `text` field holding a path puts `/` in a name, and §7.7 admits only `XID_Continue` and
   `-`. An HTTP operation is the case that finds it — a schema's value entries are motivated by one, and
   every realistic path carries a slash.
@@ -90,8 +90,8 @@ requirements meet there, and the second is why meeting the first is not enough:
   recommended default for containing a Russian word. Exempting minted names from the walk answers that and
   opens a worse hole: the namespace then takes on whatever a document happens to contain, unchecked.
 
-So the rule is ASCII, in four cases, after a kernel path is read as its member (`meta.text` as `text`, so the
-kernel's `[meta.text; 1..]` mints `array_text_1_…` and a `meta.array` head reads `array`). What is ASCII and admitted
+So the rule is ASCII, in four cases, after a kernel path is read as its member (a `meta.array` head reads
+`array`, so the kernel's `[meta.type_kind]` mints `array_type_kind_…`). What is ASCII and admitted
 by §7.7 is spliced verbatim — the ordinary case, a type name or a verb or a bound. A qualified name of ASCII
 identifiers, `geo.inner.tag`, writes each dot `_` (`array_geo_inner_tag_…`), a minted name being one identifier; its
 path is no part of identity, so it needs no hash of its own. What is ASCII but not admitted keeps its admitted
@@ -135,13 +135,13 @@ positions only some of those reach: an enum member and a group's member labels g
 and for script mixing, and never for a restricted character, invisibly.
 
 **An enum's members and a record's field names are judged under their name type's profile.** Both `name_type`s are
-identifier families (`enum`'s is the kernel's `identifier`; `!meta.enum_type { name_type: words … }` or a record's
+identifier families (`enum`'s is the kernel's `meta.identifier`; `!meta.enum_type { name_type: words … }` or a record's
 `name_type: json_name` names the author's own), so the names are names and all three mechanisms reach them, with the
 profile's added characters — a `start_add`, a `continue_add`, a `medial` — counted as its own rather than as
 restricted characters (`NameType.profile`, passed to `checkScope`). That exemption has a floor
 (`IdentifierProfile.incoherence`): an addition may not be a Default_Ignorable_Code_Point, a control, or a space other
 than U+0020, or a profile could carry an invisible character past every rule. A closed set of text that is no name is
-no enum: it is `text_type`'s `members` facet, a value set no name rule reaches. A scope list can be reviewed; three
+no enum: it is `unicode.text_type`'s `members` facet, a value set no name rule reaches. A scope list can be reviewed; three
 call sites cannot. What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`), which is
 validity, is stable across Unicode versions, and really is a parse error; `IdentifierGrammar.hygiene` returns the
 restricted-character rule's verdict rather than throwing, because a refusal is not one.

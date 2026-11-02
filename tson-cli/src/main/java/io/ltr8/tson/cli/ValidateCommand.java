@@ -333,10 +333,7 @@ final class ValidateCommand {
 
     /** The bundled standard-library identities, which {@code ProcessorConfig} always serves from its own resources. */
     private static boolean isBundledId(String id) {
-        return id.equals(TsonBundledSchemas.META_ID)
-                || id.equals(TsonBundledSchemas.CORE_ID)
-                || id.equals(TsonBundledSchemas.NET_ID)
-                || id.equals(TsonBundledSchemas.POLICY_ID);
+        return TsonBundledSchemas.IDS.contains(id);
     }
 
     /**

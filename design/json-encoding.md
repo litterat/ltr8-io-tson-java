@@ -135,7 +135,7 @@ And three shapes that look like they belong on that list and do not: **tuples** 
 are ordinary JSON arrays; **defaults** convert and inject on decode (§6.1.3), so a document omitting a
 defaulted member reads; and **a member name that is not an identifier** — JSON-LD's `@type`, JSON Schema's `$ref` —
 is a field name under the record's name type ([TSON-SCHEMA] §5.2): the converter declares the profile its names
-need, `json_name => !meta.identifier_type { start_add: "@$" }`, once on a fieldless abstract base its records compose,
+need, `json_name => !unicode.identifier_type { start_add: "@$" }`, once on a fieldless abstract base its records compose,
 and the names are judged under it with full hygiene. None is friction for the producer.
 
 ### Where the on-ramp actually breaks

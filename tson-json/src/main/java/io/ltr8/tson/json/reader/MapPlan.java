@@ -29,7 +29,7 @@ import java.util.Optional;
  * both, so a decoder that decided per value would be reading speculatively.
  * <ul>
  *   <li><b>Object form</b> -- when {@code K} resolves to a type whose parsing contract reads token content: every
- *       atom family, every enum, and {@code identifier}. A JSON object, each member name a key token faced to
+ *       atom family, every enum, and {@code meta.identifier}. A JSON object, each member name a key token faced to
  *       {@code K}'s own contract ({@link #keyParser}).</li>
  *   <li><b>Pairs form</b> -- when {@code K} is anything else, the compound keys [TSON-DATA] §2.6 admits. A JSON
  *       array of two-element arrays, each key read at {@code K}'s reader ({@link #schemaKey}), and so without a

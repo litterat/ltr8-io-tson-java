@@ -43,7 +43,8 @@ class CompiledSchemaTreeReadTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) read(compiled, "{ bits: 32 signed: true }", "meta.integer_size");
+        Map<String, Object> result = (Map<String, Object>) read(compiled, "{ bits: 32 signed: true }",
+                "numeric.integer_size");
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
         assertEquals(true, result.get("signed")); // boolean reads as a real Boolean in tree mode
@@ -63,7 +64,7 @@ class CompiledSchemaTreeReadTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) read(compiled, "{ members: [true false] }", "meta.enum");
+        Map<String, Object> result = (Map<String, Object>) read(compiled, "{ members: [true false] }", "enum");
 
         assertEquals(List.of("true", "false"), result.get("members"));
     }
@@ -72,6 +73,6 @@ class CompiledSchemaTreeReadTest {
     void badDataStillFailsWithAClearError() {
         TsonCompiledSchema compiled = compiled();
 
-        assertThrows(ReadException.class, () -> read(compiled, "{}", "meta.integer_size"));
+        assertThrows(ReadException.class, () -> read(compiled, "{}", "numeric.integer_size"));
     }
 }

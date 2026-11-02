@@ -42,7 +42,8 @@ class StripCommandTest {
         String out = capture(true,
                 () -> assertEquals(0, TsonCli.run(new String[] {"strip", "--keep-docs", file.toString()})));
 
-        assertEquals("!!import:\"39/meta\"\n!!import:\"39/core\"\n!schema {\n@doc:\"A thing.\" thing => int32\n}\n", out);
+        assertEquals("!!import:\"39/meta\"\n!!import:\"39/core\"\n!schema {\n@doc:\"A thing.\" thing => int32\n}\n",
+                out);
     }
 
     @Test

@@ -113,7 +113,7 @@ class DispatchedAnnotationTest {
                 !!import:"https://example.test/dispatch-1.tn"
                 !chooser { pick: @note:"chosen" !integer 42 }""").get("pick");
 
-        assertEquals(Optional.of("meta.integer"), pick.typeRef());
+        assertEquals(Optional.of("integer"), pick.typeRef());
         assertEquals(42, pick.asInt().orElseThrow());
         assertEquals("chosen", pick.annotations().getFirst().value().orElseThrow().asString().orElseThrow());
     }
@@ -129,7 +129,7 @@ class DispatchedAnnotationTest {
                 !!import:"https://example.test/dispatch-1.tn"
                 !chooser { pick: @note:"chosen" 42 }""").get("pick");
 
-        assertEquals(Optional.of("meta.integer"), pick.typeRef());
+        assertEquals(Optional.of("integer"), pick.typeRef());
         assertEquals("chosen", pick.annotations().getFirst().value().orElseThrow().asString().orElseThrow());
     }
 

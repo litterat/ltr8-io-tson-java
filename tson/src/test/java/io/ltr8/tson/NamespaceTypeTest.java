@@ -30,8 +30,8 @@ class NamespaceTypeTest {
             !!id:"https://example.test/meta-headers.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              header_name => !meta.identifier_type { continue_add: "-" }
-              headers     => !meta.namespace { key_type: header_name  value_type: meta.text }
+              header_name => !unicode.identifier_type { continue_add: "-" }
+              headers     => !meta.namespace { key_type: header_name  value_type: text }
               %s
             }
             """;
@@ -69,7 +69,7 @@ class NamespaceTypeTest {
 
     @Test
     void aValueIsJudgedByTheValueType() {
-        assertEquals(1, read("{ accept => [meta.text] }").size());
+        assertEquals(1, read("{ accept => [text] }").size());
     }
 
     /** The record of facets is never what is read: a field named for one is a key like any other. */
@@ -97,7 +97,7 @@ class NamespaceTypeTest {
     void theLinkedSchemaRecordsTheMapAndTheKind() {
         TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
 
-        assertEquals(Optional.of(new NamespaceBody(Optional.of(TypeRef.of("header_name")), TypeRef.of("meta.text"), false)),
+        assertEquals(Optional.of(new NamespaceBody(Optional.of(TypeRef.of("header_name")), TypeRef.of("text"), false)),
                 meta.namespace("headers"));
         assertEquals(EntryKind.PRODUCT, meta.kindOf("headers"));
         assertEquals(Optional.of("meta.namespace"), meta.schema().constructorOf("headers"));
@@ -128,7 +128,7 @@ class NamespaceTypeTest {
                 !!id:"https://example.test/governed.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  hs => !meta.namespace { key_type: meta.identifier  value_type: meta.text }
+                  hs => !meta.namespace { key_type: meta.identifier  value_type: text }
                 }
                 """);
 

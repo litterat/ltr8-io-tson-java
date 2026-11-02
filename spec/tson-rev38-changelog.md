@@ -4,7 +4,7 @@ against: "TSON 2026 Revision 37 (Working Draft)"
 status: "Adjudicated 2026-10-26. The five normative artifacts and four resolved fixtures are at `/2026/38/` identities, re-stamped after adjudication for the doc lines §6 lists, each pin verified over the shipped bytes, and Part 2 §13.2 carries them (§6). Part 1, Part 2, Part 3 and the Developer Guide are revised against them in the order §3 lists; Part 3 arrived partly consumed and is completed in a second pass (§7); an independent verification pass over the four documents, the register and the artifacts is recorded in §8, and the implementation's own, which folded eleven findings into the text, in §9."
 inputs:
   - "SPEC-FEEDBACK.md (25 entries, renumbered against Revision 37; all new — Revision 37 closed every entry open against Revision 36)"
-  - "Revised companion artifacts at /2026/38/ identities: meta-kernel.tn, meta.tn, core.tn, net.tn, policy.tn and four resolved fixtures (implementing #2, #5, #6, #8, #9, #10, #12, #14, #15, #17, #22, #23 and #24)"
+  - "Revised companion artifacts at /2026/38/ identities: meta-kernel.tn, meta-core.tn, core.tn, net.tn, policy.tn and four resolved fixtures (implementing #2, #5, #6, #8, #9, #10, #12, #14, #15, #17, #22, #23 and #24)"
   - "tson-part3-json.md, edited directly as findings arose (carrying the Part 3 halves of #1, #4, #10, #17 and #22)"
 ---
 
@@ -59,7 +59,7 @@ artifacts, and Revision 38 adopts them as its baseline. Summarising the normativ
   atoms below. Core no longer declares the five, so a schema importing core alone may
   declare `mac` or `hostname` for itself. Meta's network constructors say "Instance is
   `ipv4` in net". (Part 1 §5.5, §5.6, §10; Part 2 §1.5, §9, §13.2; core, meta, net.)
-- **#5 — `hostname_type`.** Meta declares `hostname_type => atom & atom_specification & {
+- **#5 — `hostname_type`.** Meta declares `hostname_type => atom & meta.atom_specification & {
   spec?: = "…rfc5890"  allow_idn?: boolean ~ true }` and net instances `hostname`: a domain
   name in LDH, A-label or U-label form, in any mix, `A`–`Z` read as `a`–`z` and nothing
   else mapped, each label at most 63 octets and the name at most 253 in A-label form, no
@@ -67,13 +67,13 @@ artifacts, and Revision 38 adopts them as its baseline. Summarising the normativ
   `Example.COM`, `example.com`, `xn--bcher-kva.example` and `bücher.example` are two
   values, and the canonical text is the lowercase U-label form. (Part 1 §5.5, §10; Part 2
   §5.5, §9, §13; meta, net.)
-- **#6 — `host_type`.** Meta declares `host_type => atom & atom_specification & { spec?:
+- **#6 — `host_type`.** Meta declares `host_type => atom & meta.atom_specification & { spec?:
   = "…rfc3987" }` and net instances `host`: RFC 3987's `ihost` profiled to DNS — a
   `hostname`, an IPv4 address, or an IPv6 address with or without brackets, no zone
   identifier — one string-class atom whose value is the member's with the member's own
   equality, an IPv4 address never equal to an IPv6 one. (Part 1 §2.2.1, §5.5; Part 2 §5.5,
   §9; meta, net.)
-- **#8 — `media_type_type`.** Meta declares `media_type_type => atom & atom_specification
+- **#8 — `media_type_type`.** Meta declares `media_type_type => atom & meta.atom_specification
   & { spec?: = "…rfc6838"  allow_parameters?: boolean ~ false  types?: [text]  suffixes?:
   [text] }` and net instances `media_type`: an RFC 6838 media type with RFC 9110 §8.3.1
   parameters where an instance admits them, the type, subtype and parameter names and a
@@ -81,30 +81,30 @@ artifacts, and Revision 38 adopts them as its baseline. Summarising the normativ
   lowercase with parameters sorted by name. (Part 1 §5.5, §10; Part 2 §5.5, §5.7, §9;
   meta, net.)
 - **#9 — the `type` kind.** The kernel declares `type => abstract top & { chain?:
-  type_chain }`, and `atom`, `product` and `sum` compose it; `reference`, `template` and
+  meta.type_chain }`, and `atom`, `product` and `sum` compose it; `reference`, `template` and
   `namespace` compose `top` directly, and `data` is gone. An entry is a type exactly when
   it IS-A `type`; IS-A `top` is still the constructor predicate. Every constructor under a
   base kind gains `type` in its chain. (Part 2 §4.1, §4.2, §8.1, §9; kernel, fixtures.)
 - **#10 — a record's field names have a type.** `record` gains `name_type?:
-  identifier_kind`, and `enum_type.type` is renamed `name_type` and retyped
-  `identifier_kind`: an enum's members and a record's field names are names drawn from an
+  meta.identifier_kind`, and `enum_type.type` is renamed `name_type` and retyped
+  `meta.identifier_kind`: an enum's members and a record's field names are names drawn from an
   identifier family, held to it by the same three rules. `text_enum` is removed, a closed
-  set of text being `text_type`'s `members` facet; `identifier_base` gains `ASCII`, and
-  `scheme_name` is restated over it (`start: ASCII  continue: ASCII  continue_add: "+-."
+  set of text being `text_type`'s `members` facet; `meta.identifier_base` gains `ASCII`, and
+  `meta.scheme_name` is restated over it (`start: ASCII  continue: ASCII  continue_add: "+-."
   exclude: "_"  normalization: ASCII_CASEFOLD`, the same set). `record.discriminators` and
-  `field_group`'s member slots are `text`, each judged by the record's name type. (Part 1
+  `meta.field_group`'s member slots are `text`, each judged by the record's name type. (Part 1
   §1.5, §2.5, §2.8, §7.1, §7.4, §7.7, §8.1, §8.2; Part 2 §5.2, §5.4, §5.8, §5.11, §7.4,
   §7.7, §8.1, §9, §11.4, §12.1; Part 3 §1.3, §3.2, §6.1.1, §8.3.1, §9.4; kernel, fixtures.)
-- **#12 — a record's fields are a map keyed by name.** `record_field` loses `name`;
-  `field_map => namespace & { key_type?: ~ field_name  value_type: = record_field
+- **#12 — a record's fields are a map keyed by name.** `meta.record_field` loses `name`;
+  `field_map => namespace & { key_type?: ~ meta.field_name  value_type: = meta.record_field
   ordered?: = true }` joins the kernel and `record.fields` is `field_map`. The explicit
   form is `!record { fields: { x => { type: int32 } … } }`; the brace form an author writes
   is unchanged. (Part 2 §5.2, §5.6, §8.1; kernel, fixtures.)
 - **#14 — `type_definition` goes; a type carries its own chain.** `type_chain => {
-  parents?: [type_ref]  supertypes?: [type_name]  subtypes?: [type_name] }` is `type`'s one
-  field; `record.supertypes` is removed; `application => @annotation type_ref` is a
+  parents?: [type_ref]  supertypes?: [meta.type_name]  subtypes?: [meta.type_name] }` is `type`'s one
+  field; `record.supertypes` is removed; `application => @meta.annotation type_ref` is a
   resolver-attached key annotation, read as stated on ingest; `schema => namespace & {
-  key_type: = type_name  value_type: = top }`. An entry resolves to its value, and output
+  key_type: = meta.type_name  value_type: = top }`. An entry resolves to its value, and output
   is source with sugar expanded, bodies flattened and chains computed. (Part 2 §1.3, §1.6,
   §4.1, §5.5, §5.7–§5.9, §6, §7.2, §8.1–§8.3, §9, §10.1; kernel, every fixture.)
 - **#15 — `top`, `type`, the base kinds and `namespace` are `abstract`.** Each states
@@ -112,29 +112,29 @@ artifacts, and Revision 38 adopts them as its baseline. Summarising the normativ
   any abstract record's is, naming the subtypes that would satisfy it. §3.3.1's "base
   kind's own reader" sentence is retired. (Part 2 §3.3.1, §4.1, §12.1; kernel, fixture.)
 - **#17 — a record template is a `record` with `parameters`.** `record` gains
-  `parameters?: [template_param]`; `template` holds every other open body and loses
+  `parameters?: [meta.template_param]`; `template` holds every other open body and loses
   `extension` and `discriminators`. A record template is a family base, ABSTRACT by
   construction, its own `extension` each application's, and its `chain.parents` the
   parents as written, one of which may be an application. (Part 2 §4.1, §5.10, §8.1, §9;
   kernel, fixture.)
-- **#22 — kinds.** `kind_type => atom & { of: type_name  members?: [type_name] }` is the
+- **#22 — kinds.** `kind_type => atom & { of: meta.type_name  members?: [meta.type_name] }` is the
   atom whose values are the names of the types in the closure built with `of`, with
   `kind => <T> !kind_type { of: T }` as its inline spelling and `members` a resolver-derived
-  index. The kernel declares `identifier_kind`, `atom_kind` and `type_kind`, types both
-  `name_type` slots by `identifier_kind`, and retypes every slot that names the type of a
-  value — `record_field.type`, `tuple_element.element_type`, `array.element_type`,
-  `map.key_type` and `value_type`, `choice.variants`, `template_param.type` and `bound` —
-  as `type_kind`; `type_ref` stands only where an application may. Core declares a `kind`
+  index. The kernel declares `meta.identifier_kind`, `meta.atom_kind` and `meta.type_kind`, types both
+  `name_type` slots by `meta.identifier_kind`, and retypes every slot that names the type of a
+  value — `meta.record_field.type`, `meta.tuple_element.element_type`, `array.element_type`,
+  `map.key_type` and `value_type`, `choice.variants`, `meta.template_param.type` and `bound` —
+  as `meta.type_kind`; `type_ref` stands only where an application may. Core declares a `kind`
   sibling. (Part 2 §4.2, §5.3, §5.10, §7.4, §8.1, §9, §13; Part 3 §5, §5.6; kernel, core,
   fixtures.)
-- **#23 — `namespace`.** `namespace => abstract top & { key_type: identifier_kind
-  value_type: type_kind  ordered?: boolean ~ false }` is the constructor whose instances
+- **#23 — `namespace`.** `namespace => abstract top & { key_type: meta.identifier_kind
+  value_type: meta.type_kind  ordered?: boolean ~ false }` is the constructor whose instances
   are maps keyed by names; `schema` and `field_map` are the kernel's two. A value of a
   namespace type is read as the map it describes, never as a record of its facets; a
   meta-schema declares one and a schema it governs holds a value of it as an entry
   (`orders => !interface { … }`), which is a value and never a type. (Part 2 §2.2.2,
   §2.2.3, §4.1, §5.2, §8.1, §9; kernel, fixture.)
-- **#24 — `ref_type`.** `ref_type => atom & { of: type_name }` with `ref => <T> !ref_type
+- **#24 — `ref_type`.** `ref_type => atom & { of: meta.type_name }` with `ref => <T> !ref_type
   { of: T }` is the atom whose values are qualified names of values; `of` names a type of
   the writer's own namespace, never a constructor. Kernel vocabulary only: core declares no
   `ref`, a reference naming an entry that holds a value, which only a kernel-governed
@@ -143,19 +143,19 @@ artifacts, and Revision 38 adopts them as its baseline. Summarising the normativ
 The artifacts also carry housekeeping the register did not raise, adopted here on the same
 footing:
 
-- **`identifier_kind`'s members are listed.** The kernel's resolved fixture writes
-  `members: [field_name identifier param_name scheme_name type_name]` — the three roles
-  are aliases of a member and listed beside it — and `atom_kind` and `type_kind` list
-  theirs, `type_kind`'s including `top`, `namespace`, `field_map`, `schema` and the
+- **`meta.identifier_kind`'s members are listed.** The kernel's resolved fixture writes
+  `members: [meta.field_name identifier meta.param_name meta.scheme_name meta.type_name]` — the three roles
+  are aliases of a member and listed beside it — and `meta.atom_kind` and `meta.type_kind` list
+  theirs, `meta.type_kind`'s including `top`, `namespace`, `field_map`, `schema` and the
   synthetic arrays.
-- **`record_extension_type`'s doc** no longer cites §5.9's emptied `supertypes`: "a
+- **`meta.record_extension_type`'s doc** no longer cites §5.9's emptied `supertypes`: "a
   subtracted record's chain is empty, so it mints no IS-A edge".
 - **`core.tn`'s reference list** drops RFC 4291, RFC 4632 and RFC 9542 with the families
   that left; `net.tn`'s carries them with RFC 1123, RFC 3492, RFC 5890–5893, RFC 5952,
   RFC 6838, RFC 6839 and RFC 9110 §8.3.1.
 - **The resolved fixtures' conventions note** is rewritten for the new output shape: an
   entry is its value, a type body carries `chain`, a composition's fields are flattened
-  with `chain` first, and a slot that names a type is `type_kind` and holds a bare name.
+  with `chain` first, and a slot that names a type is `meta.type_kind` and holds a bare name.
 
 ---
 
@@ -175,19 +175,19 @@ footing:
 | 10 | A record's field names have a type: `record.name_type` | **Accept — the baseline above, and every reading the register settles as built**: one field for one mechanism on both constructors; a name type is an identifier family whose `normalization` implies NFC (`NONE` refused, `ASCII_CASEFOLD` admitted only over an all-ASCII profile); a document's name is matched in the type's form and an undeclared name is a closure error whether or not it is a value of the type; inheritance keeps one name type, as the constructor's rule, and supertypes with different ones do not compose; the brace form states a type by composition onto a fieldless abstract base and has no syntax of its own; a profile may not add a Default_Ignorable_Code_Point, a control or a space other than U+0020; a schema's own references to its fields match exactly; a lookahead does not judge a name; a document that names a schema has its field names judged by that schema alone, and a Class 1 processor reading it holds field names to no name rule. **Language changes:** `enum_type.type` is `name_type`; `!text_enum [...]` is `!text ^ { members: [...] }` or an enum over the author's own identifier type; a field-name position admits any single-line token. [settled — implemented] |
 | 11 | The guide and the schema skill should say what `name_type` makes possible | **Accept for the guide** — a new section on the register's seven-point outline (§7.2). The `tson-schema` skill is published with the series but is not among this revision's inputs; its edits are recorded as outstanding (§5). [settled] |
 | 12 | A record's fields are a map keyed by name | **Accept — the baseline above**, with the map ordered, the key family the record's `name_type`, and a duplicate refused by the layer that can see it: a spelling written twice is the map's duplicate key, two spellings that are one value of the name type are the linker's resolver error. [settled — implemented] |
-| 13 | A value written by name: a qualified name | **Accept, as #24 refines it.** A new [TSON-SCHEMA] §5.12 states the qualified name — segments joined by `.`, the first a type name resolved as a `type_ref` is, each further one selecting a key of a namespace value or a field of a record value, every hop written, no index and no quoted segment — and its judgement: found first, judged after, never a choice among candidates, each refusal naming its own step. Under #24 a name stands at a slot typed `ref<T>` and nowhere else, so #13's bare-name-at-a-product-position rule is subsumed: §5.6's positional form keeps a bare token where the positional field is atom-typed, and in a schema document a product- or sum-typed positional fill is written as the explicit record (the register's decision 1); a data document reads every bare token as before (decision 3). Decisions 2, 4–11 are taken as built. [TSON-DATA] §7.1's `.` is the separator of [TSON-SCHEMA] §5.12. One consequence is flagged for confirmation (§5): `record_field.type` is now `type_kind`, an atom, so by the rule as stated `fields: { p => x }` is a positional fill and not the withdrawn spelling the register's vector pins. **[editorial]** [settled] |
-| 14 | `type_definition` goes | **Accept — the baseline above.** §8.1 is retitled and rewritten around `type_ref` and `type_argument`; an entry resolves to its value; an entry's kind is its value's type's kind, judged by origin; `source` is gone and the sentences naming it in §5.5, §5.7, §5.8 and §5.10 read the tag; §5.9's lineage sentences and rule 10 go, a subtracted record's chain being empty; §7.2's "never the body's lineage" goes; `@application` is a key annotation beside `@synthetic`, derived, never author-written, read as stated on ingest; `chain` is never written by a declaration and never declared by a constructor. The in-memory fact the implementation keeps for a tightened constructor's one parent is noted and asks nothing of the text. [settled — implemented] |
+| 13 | A value written by name: a qualified name | **Accept, as #24 refines it.** A new [TSON-SCHEMA] §5.12 states the qualified name — segments joined by `.`, the first a type name resolved as a `type_ref` is, each further one selecting a key of a namespace value or a field of a record value, every hop written, no index and no quoted segment — and its judgement: found first, judged after, never a choice among candidates, each refusal naming its own step. Under #24 a name stands at a slot typed `meta.ref<T>` and nowhere else, so #13's bare-name-at-a-product-position rule is subsumed: §5.6's positional form keeps a bare token where the positional field is atom-typed, and in a schema document a product- or sum-typed positional fill is written as the explicit record (the register's decision 1); a data document reads every bare token as before (decision 3). Decisions 2, 4–11 are taken as built. [TSON-DATA] §7.1's `.` is the separator of [TSON-SCHEMA] §5.12. One consequence is flagged for confirmation (§5): `meta.record_field.type` is now `meta.type_kind`, an atom, so by the rule as stated `fields: { p => x }` is a positional fill and not the withdrawn spelling the register's vector pins. **[editorial]** [settled] |
+| 14 | `type_definition` goes | **Accept — the baseline above.** §8.1 is retitled and rewritten around `type_ref` and `type_argument`; an entry resolves to its value; an entry's kind is its value's type's kind, judged by origin; `source` is gone and the sentences naming it in §5.5, §5.7, §5.8 and §5.10 read the tag; §5.9's lineage sentences and rule 10 go, a subtracted record's chain being empty; §7.2's "never the body's lineage" goes; `@meta.application` is a key annotation beside `@meta.synthetic`, derived, never author-written, read as stated on ingest; `chain` is never written by a declaration and never declared by a constructor. The in-memory fact the implementation keeps for a tightened constructor's one parent is noted and asks nothing of the text. [settled — implemented] |
 | 15 | `top`, `type` and the base kinds are `abstract` | **Accept — the baseline above.** An annotation typed by a base kind is a schema error in either §6 position. [settled — implemented] |
 | 16 | A record template's parameters stand in three places; a parameter is never an operand | **Accept.** §5.10 "Held bodies": in a `!record` body a parameter stands only at a field's type, a field's default or fixed value, or an argument of an application, anywhere else a resolver error naming the slot; §5.8: an operand may carry arguments naming the parameters, and an operand that is itself a parameter is a resolver error, under the shadowing rule. Templates over other constructors are unchanged. [settled] |
 | 17 | A record template is a `record` with `parameters` | **Accept — the baseline above.** A record template is not held; the base's ABSTRACT is by construction and the record's own `extension` is each application's; `template` is not a type and an application of it is its expansion; a record template named bare at an operand of `&` or `^` is a resolver error. [settled — implemented] |
 | 18 | An application nothing declares is its expansion | **Accept.** §8.2: a fully-bound application of a template materialises its expansion, a synthetic entry keyed on its content, and mints no instantiation entry unless the expansion names the application itself, where the knot is tied on the application; a minted record is a member of nothing, and one whose chain would name a declared type is a resolver error at the declaration that wrote the application; a declaration names only itself; a diagnostic names what the author wrote. The `vector_pixel_af3` example is rewritten. **A verdict change**, stated in §4: a minted record composing an application only a use site mints now loads. [settled] |
 | 19 | A selector's type may contain no parameter, value parameters included | **Accept** — §5.10: a selector's declared type mentions none of the template's parameters, at any depth; a parameter-free application satisfies it. [settled] |
-| 20 | A routed `= P` is FIXED where it is written | **Accept** — §5.7 "Open modifiers": the role is the modifier's, as beside a literal, and materialisation substitutes the argument into `value` without changing a fact; a FREE field never carries a value, open or closed. The kernel's `record_field` doc already states it. [settled — implemented] |
+| 20 | A routed `= P` is FIXED where it is written | **Accept** — §5.7 "Open modifiers": the role is the modifier's, as beside a literal, and materialisation substitutes the argument into `value` without changing a fact; a FREE field never carries a value, open or closed. The kernel's `meta.record_field` doc already states it. [settled — implemented] |
 | 21 | A template's parameter pin is a selector whatever its name's mark | **Accept** — §5.7 and §5.10 drop "on an unmarked name"; the base reads the selector required with the pin dropped, and each member is FIXED to its argument, optional as the name was marked. [settled] |
-| 22 | The types built with a constructor are a kind: `kind_type` | **Accept — the baseline above**, with `of` resolving in the structure namespace and naming `type` or `namespace` or a constructor below either (#23), membership one walk over resolved entries, a kind no bound, members computed at link over the governing closure, and the inline `kind<T>` sugar. **Open — two remainders** (§5): whether a kind admits an abstract type (running: membership by construction, which the text states), and the higher kind `kind_type.of` would want, which the series has none of. [settled — implemented / open] |
-| 23 | A namespace is a constructor whose instances are maps | **Accept — the baseline above**, with the reading rule, membership (a namespace constructor is a type and a member of `type_kind` and the namespace kinds and of no other), only a namespace entered by a qualified name, a namespace type declared only by a meta-schema, and `data` removed. **Open — one remainder** (§5): whether a namespace *entry* (`myapi => !api { … }`) is listed by `kind<api>` and `kind<namespace>` as running, or only where its value is a type; the text states the running behaviour, marked for confirmation. **[editorial]** A namespace keyed by text and `&` over namespace values are not proposed and not taken. [settled — implemented / open] |
-| 24 | A reference to a value: `ref_type` | **Accept — the baseline above.** The slot declares the spelling: a slot typed `ref<T>` holds the name and nothing else, one typed `T` the value inline; a kind-typed slot of a value body holds one bare name and refuses a braced application; a reference is kernel vocabulary and core declares none. [settled — implemented] |
-| 25 | An import stands at the importer's governing level | **Accept** — §2.2.3: an imported schema MUST stand at the importer's governing level, both named the meta-kernel as their `!!meta` or neither, judged per import edge; a meta-schema declares the vocabulary its constructors use, and an ordinary schema reaches a meta-schema's constructors only through its `!!meta`. The bundled chain already imports at one level throughout. **A language change:** a schema governed by `meta.tn` importing `meta-kernel.tn` or a meta layer, and a kernel-governed schema importing `core.tn`, are refused. [settled] |
+| 22 | The types built with a constructor are a kind: `kind_type` | **Accept — the baseline above**, with `of` resolving in the structure namespace and naming `type` or `namespace` or a constructor below either (#23), membership one walk over resolved entries, a kind no bound, members computed at link over the governing closure, and the inline `meta.kind<T>` sugar. **Open — two remainders** (§5): whether a kind admits an abstract type (running: membership by construction, which the text states), and the higher kind `kind_type.of` would want, which the series has none of. [settled — implemented / open] |
+| 23 | A namespace is a constructor whose instances are maps | **Accept — the baseline above**, with the reading rule, membership (a namespace constructor is a type and a member of `meta.type_kind` and the namespace kinds and of no other), only a namespace entered by a qualified name, a namespace type declared only by a meta-schema, and `data` removed. **Open — one remainder** (§5): whether a namespace *entry* (`myapi => !api { … }`) is listed by `meta.kind<api>` and `meta.kind<namespace>` as running, or only where its value is a type; the text states the running behaviour, marked for confirmation. **[editorial]** A namespace keyed by text and `&` over namespace values are not proposed and not taken. [settled — implemented / open] |
+| 24 | A reference to a value: `ref_type` | **Accept — the baseline above.** The slot declares the spelling: a slot typed `meta.ref<T>` holds the name and nothing else, one typed `T` the value inline; a kind-typed slot of a value body holds one bare name and refuses a braced application; a reference is kernel vocabulary and core declares none. [settled — implemented] |
+| 25 | An import stands at the importer's governing level | **Accept** — §2.2.3: an imported schema MUST stand at the importer's governing level, both named the meta-kernel as their `!!meta` or neither, judged per import edge; a meta-schema declares the vocabulary its constructors use, and an ordinary schema reaches a meta-schema's constructors only through its `!!meta`. The bundled chain already imports at one level throughout. **A language change:** a schema governed by `meta-core.tn` importing `meta-kernel.tn` or a meta layer, and a kernel-governed schema importing `core.tn`, are refused. [settled] |
 
 Counts: **25 accepted** (1–25 — of which #22 and #23 carry open remainders), **0
 declined**, and **3 open questions carried** (#22's two, #23's one), plus the open
@@ -263,14 +263,14 @@ questions are recorded here and are NOT reflected as open text in the specificat
 7. **§3.3.1** — the base-kind reader sentence goes (#15); `reference.target` and
    `kind_type.of` are the two slots beside a `!` head that may name a constructor (#22);
    the namespace types (`field_map` and `schema` among them) join what is applicable and
-   `type_chain` and `template_param` what is not, the kernel's `!schema { … }` being the
+   `meta.type_chain` and `meta.template_param` what is not, the kernel's `!schema { … }` being the
    application resolver output writes (#23).
 8. **§4.1** — rewritten: `top => abstract {}`, `type`, the three base kinds composing
    `type`, `namespace` composing `top` with its reading rule, `reference` and `template`;
-   no `data`; the IS-A order and `type_chain`; a kind derived by origin (#9, #14, #15,
+   no `data`; the IS-A order and `meta.type_chain`; a kind derived by origin (#9, #14, #15,
    #23).
-9. **§4.2** — `kind_type`, `kind`, `identifier_kind`, `atom_kind` and `type_kind`;
-   `ref_type` and `ref`, kernel vocabulary; a type slot is `type_kind` (#22, #24).
+9. **§4.2** — `kind_type`, `kind`, `meta.identifier_kind`, `meta.atom_kind` and `meta.type_kind`;
+   `ref_type` and `ref`, kernel vocabulary; a type slot is `meta.type_kind` (#22, #24).
 10. **§4.3** — the operations table: subtraction empties the chain and keeps no lineage
     (#14).
 11. **§5.2** — `name_type` and its rules — the default, inheritance, the brace form by
@@ -278,7 +278,7 @@ questions are recorded here and are NOT reflected as open text in the specificat
     a document's name judged by the record that reads it; `fields` as a map and the
     duplicate layers; `discriminators` `[text; 1..]`; "a family member is declared"
     rewritten for #18, a minted record being a member of nothing (#10, #12, #18).
-12. **§5.3** — a type slot is `type_kind` and holds a bare name; an argument is read as
+12. **§5.3** — a type slot is `meta.type_kind` and holds a bare name; an argument is read as
     its parameter's type (#22).
 13. **§5.4** — an enum's class is read off its members under its `name_type`, an
     identifier family; the `text_enum` sentence goes; a kind and a reference are
@@ -300,24 +300,24 @@ questions are recorded here and are NOT reflected as open text in the specificat
     constructor is held; a parameter stands in three places in a record body; a selector
     mentions no parameter; the base's ABSTRACT is by construction; a record template
     named bare at an operand is refused; an application nothing declares is its
-    expansion; `type_kind` marks a type parameter (#16, #17, #18, #19, #22).
+    expansion; `meta.type_kind` marks a type parameter (#16, #17, #18, #19, #22).
 20. **§5.11** — member slots are `text`, judged by the record's name type (#10, #12).
-21. **New §5.12 — Values by name** — the qualified name, `ref<T>`, the judgement, the
+21. **New §5.12 — Values by name** — the qualified name, `meta.ref<T>`, the judgement, the
     refusal table, and what the rule does not decide (#13, #24).
 22. **§6** — `application` joins `synthetic` among the resolver-attached annotations
     (#14).
 23. **§7.2** — subsumption reads `chain.supertypes`; the lineage sentence goes; `!schema`
     marks a namespace value (#14, #23).
-24. **§7.4** — `enum_type.name_type: identifier_kind`; `text_enum` removed and a closed
-    text set pointed at `text_type.members`; `identifier_base` with `ASCII` and
-    `scheme_name` restated; a name type's form implies NFC; the profile floor (#10).
+24. **§7.4** — `enum_type.name_type: meta.identifier_kind`; `text_enum` removed and a closed
+    text set pointed at `text_type.members`; `meta.identifier_base` with `ASCII` and
+    `meta.scheme_name` restated; a name type's form implies NFC; the profile floor (#10).
 25. **§7.7** — a document's field names are matched in the record's name type's form,
     stated as a paragraph of its own since §7.2 and Part 1 §2.5 cite §7.7 for it (#10).
 26. **§8.1** — retitled "Output Records: `type_ref` and `type_argument`" and rewritten:
-    an entry is its value; `type_chain` and where `parents` holds an application; kind
-    derived by origin; where `type_ref` stands and where `type_kind` does;
-    `record_field` without `name`; `field_map`; `@application`; the ingest rules —
-    `chain` read as stated, `members` and `subtypes` recomputed, `@application` kept;
+    an entry is its value; `meta.type_chain` and where `parents` holds an application; kind
+    derived by origin; where `type_ref` stands and where `meta.type_kind` does;
+    `meta.record_field` without `name`; `field_map`; `@meta.application`; the ingest rules —
+    `chain` read as stated, `members` and `subtypes` recomputed, `@meta.application` kept;
     the body-patterns table (#9, #10, #12, #14, #17, #22, #23).
 27. **§8.2** — two identities restated without `source`; an application nothing declares
     is its expansion; the self-reaching case; a minted record is a member of nothing; the
@@ -330,7 +330,7 @@ questions are recorded here and are NOT reflected as open text in the specificat
     holds an application" (#2, #9, #10, #12, #14, #17, #22, #23, #24).
 30. **§10.1, §11.2, §11.5** — the two outcomes of #1; a fetch refusal does not disclose
     the allowlist **[editorial]**; an allowlist matches a host as a `host` value (#4, #5).
-34. **§7.8** — `scoped.schemas` is written keyed by `schema_identity`, as `meta.tn`
+34. **§7.8** — `scoped.schemas` is written keyed by `schema_identity`, as `meta-core.tn`
     declares it and as the same paragraph already said; Revision 37's `{uri => …}` was a
     slip **[editorial]**.
 35. **§5.9** — rule 8: a subtracted construction whose head is a constructor is no longer
@@ -371,10 +371,10 @@ Changes a Revision 37 implementer must act on:
 1. **Resolved output has a new shape.** `type_definition` is gone: an entry is its value
    (`person => !record { … }`, `age => !integer_type { chain: { supertypes: [integer] }
    min: 0 }`), a type carries `chain: { parents? supertypes? subtypes? }`, a record's
-   `fields` is a map from name to `record_field` with no `name` inside, and a record
+   `fields` is a map from name to `meta.record_field` with no `name` inside, and a record
    template is `!record { fields: { … }  parameters: [ … ] }`. Every fixture changes.
 2. **A record's field names have a type.** `record.name_type` names an identifier family,
-   `field_name` by default; `enum_type.type` is `name_type`; `text_enum` is gone. A
+   `meta.field_name` by default; `enum_type.type` is `name_type`; `text_enum` is gone. A
    schema translated from JSON-LD or OpenAPI declares `json_name => !identifier_type {
    start_add: "@$" }` on a fieldless abstract base and composes it.
 3. **A field-name position admits any single-line token.** Schemaless, a name that is no
@@ -387,14 +387,14 @@ Changes a Revision 37 implementer must act on:
 6. **`namespace` is a constructor whose instances are maps.** `schema` and `field_map`
    are compositions over it; a meta-schema declares its own, and a governed schema holds
    a value of it as an entry.
-7. **Kinds.** `kind<C>` is an atom whose values are the names of the types built with
-   `C`; every slot that names the type of a value is `type_kind` and holds a bare name;
+7. **Kinds.** `meta.kind<C>` is an atom whose values are the names of the types built with
+   `C`; every slot that names the type of a value is `meta.type_kind` and holds a bare name;
    `type_ref` stands only where an application may. Core declares `kind`, so a schema
    importing core may no longer declare one.
-8. **References.** `ref<T>` is an atom whose values are qualified names, `orders.place_order`,
-   kernel vocabulary only; a slot typed `ref<T>` holds a name and a slot typed `T` a
+8. **References.** `meta.ref<T>` is an atom whose values are qualified names, `orders.place_order`,
+   kernel vocabulary only; a slot typed `meta.ref<T>` holds a name and a slot typed `T` a
    value inline.
-9. **An import stands at the importer's level.** A `meta.tn`-governed schema may not
+9. **An import stands at the importer's level.** A `meta-core.tn`-governed schema may not
    import the kernel or a meta layer; a kernel-governed schema may not import core.
 10. **The network types are in `net.tn`.** `ipv4`, `ipv6`, `cidr4`, `cidr6` and `mac`
     leave core; `hostname`, `host` and `media_type` join beside them, in the library and
@@ -412,8 +412,8 @@ Changes a Revision 37 implementer must act on:
 15. **An application nothing declares is its expansion**, and mints no instantiation
     entry; a minted record is a member of nothing. One verdict changes: `u: vip<text>`
     over `vip => <T> box<T> & { … }` beside `w: box<text>` now loads.
-16. **`identifier_base` gains `ASCII`**, and `scheme_name` is written over it.
-17. **`@application`** is a derived key annotation on an entry that closes an application,
+16. **`meta.identifier_base` gains `ASCII`**, and `meta.scheme_name` is written over it.
+17. **`@meta.application`** is a derived key annotation on an entry that closes an application,
     read as stated on ingest; a declaration never writes it, nor `chain`.
 18. **Every bundled pin changes** (§6).
 
@@ -429,13 +429,13 @@ only — the specification text carries no open questions.
 |---|---|---|
 | Rev 35 #25 (→ —) | Annotation cardinality as the means of per-name replacement. | Open — recorded as considered. |
 | Rev 37 #10 (Part 3) | The two MUSTs [TSON-JSON] §6.4 states for an ordered map. | Open — still the spec author's to confirm; not raised in the register. |
-| #22 (remainder) | Whether a kind admits an abstract type: membership by construction, as running (`kind<record>` holds `pet => abstract { … }` and a family base; `kind<namespace>` holds `namespace` itself), or a concrete-only kind. | **Confirmed** (§9): membership by construction, as the text states; a record template is listed, and naming it at a kind-typed slot is refused as open (§4.2, §5.12). |
-| #22 (remainder) | `kind_type.of` is typed `type_name` and not by a kind: its values are names of constructors, which no kind covers, so it would want a classifier of constructors the series has none of. | Open — the store is stated in prose, as every constructor role's is. |
-| #23 (remainder) | Whether a namespace *entry* (`myapi => !api { … }`) is listed by `kind<api>` and `kind<namespace>`, as running, or a kind's members are entries IS-A `type` or namespace constructors only. | **Confirmed** (§9): a namespace entry is listed by the kinds of its constructor and by no kind of types; the sentence was missing and §4.2 now carries it. |
-| #13 (reading) | `record_field.type` is `type_kind` under #22, an atom; by §5.6's rule as #13 states it, `!record { fields: { p => x } }` is then an atom-typed positional fill of `type`, not the withdrawn product-typed spelling the register's vector pins. The text states the rule; the vector may be stale. | **Confirmed** (§9): the text is right and the implementation admits the fill; the register's vector was stale. |
+| #22 (remainder) | Whether a kind admits an abstract type: membership by construction, as running (`meta.kind<record>` holds `pet => abstract { … }` and a family base; `meta.kind<namespace>` holds `namespace` itself), or a concrete-only kind. | **Confirmed** (§9): membership by construction, as the text states; a record template is listed, and naming it at a kind-typed slot is refused as open (§4.2, §5.12). |
+| #22 (remainder) | `kind_type.of` is typed `meta.type_name` and not by a kind: its values are names of constructors, which no kind covers, so it would want a classifier of constructors the series has none of. | Open — the store is stated in prose, as every constructor role's is. |
+| #23 (remainder) | Whether a namespace *entry* (`myapi => !api { … }`) is listed by `meta.kind<api>` and `meta.kind<namespace>`, as running, or a kind's members are entries IS-A `type` or namespace constructors only. | **Confirmed** (§9): a namespace entry is listed by the kinds of its constructor and by no kind of types; the sentence was missing and §4.2 now carries it. |
+| #13 (reading) | `meta.record_field.type` is `meta.type_kind` under #22, an atom; by §5.6's rule as #13 states it, `!record { fields: { p => x } }` is then an atom-typed positional fill of `type`, not the withdrawn product-typed spelling the register's vector pins. The text states the rule; the vector may be stale. | **Confirmed** (§9): the text is right and the implementation admits the fill; the register's vector was stale. |
 | #1 (addition) | A refusal under a fetch policy SHOULD NOT disclose the allowlist ([TSON-SCHEMA] §11.2). | **Confirmed** (§9). The reference implementation discloses the list at adjudication and is to change. |
 | §5.9 rule 8 (reading) | A subtracted construction headed by a constructor is not itself a constructor: its chain is empty, and IS-A `top` is the predicate (§4.2). Revision 37 said "a constructor with lineage and no contract". | **Confirmed** (§9): the chain is empty and the application is refused as not applicable. |
-| §8.1 (consequence of #22) | `record_field.type` is `type_kind`, an atom, so `record_field` has a positional form and a data document may write `fields: { x => text }`; canonical output writes the explicit record. | **Confirmed** (§9), in a schema document as in a data document (§5.6). |
+| §8.1 (consequence of #22) | `meta.record_field.type` is `meta.type_kind`, an atom, so `meta.record_field` has a positional form and a data document may write `fields: { x => text }`; canonical output writes the explicit record. | **Confirmed** (§9), in a schema document as in a data document (§5.6). |
 | #4 (considered) | An identity atom whose equality is canonical identity. | **Not taken** — every atom pins an external standard, `identity` is a name core should not take, and canonical text in `text` meets the need. |
 | #6 (considered) | `allow_zone` on `host_type`, for a listener binding a link-local address. | **Not taken** — recorded as the likely first facet. |
 | #8 (considered) | `uri_template`. | **Not taken** — a pattern over values is not a value. |
@@ -468,8 +468,8 @@ level rule per import edge.
      admits `namespace` or a constructor below either, and said a kind is "not IS-A
      `top`" with no exception for a namespace constructor; it now states §4.2's rule,
      membership by construction included.
-   - The kernel's `type` doc said `type_kind` holds "the one constructor"; its `top` doc
-     omitted the namespace types; its `type_chain` doc said a template's `parents` are
+   - The kernel's `type` doc said `meta.type_kind` holds "the one constructor"; its `top` doc
+     omitted the namespace types; its `meta.type_chain` doc said a template's `parents` are
      "kept after it closes" — each now says what §4.1 and §4.2 say.
    - `core.tn`'s header listed `uri` among core's same-named siblings of kernel and meta
      entries; the sibling is `iri`.
@@ -479,7 +479,7 @@ level rule per import edge.
      `namespace`, and a record template as a `record` with `parameters`. `core-resolved.tn`'s
      note cited §8.1 for the shadowing rule, which is §5.10's.
 4. **Not verified**, carried as a note: ingest of resolved output is unimplemented, so
-   #14's "read `chain` as stated" and "keep `@application`" and #22's recomputed `members`
+   #14's "read `chain` as stated" and "keep `@meta.application`" and #22's recomputed `members`
    are stated in §8.1 and not running; a later schema's application is not yet unified
    with an imported library's declared one for the same reason.
 
@@ -510,7 +510,7 @@ series references move to `/2026/38/`.
 5. **§9.4** — the outcome paragraph reads refused and undetermined as #1 states them,
    already in place; the series references in §11.2 follow.
 6. **Cross-references.** `[TSON-SCHEMA] §8.1`'s title changes, and the three places
-   Part 3 cites it for `record_field`'s facts are checked against the renumbered
+   Part 3 cites it for `meta.record_field`'s facts are checked against the renumbered
    section; no section number moves.
 
 ### 7.2 Developer Guide
@@ -536,11 +536,11 @@ as it stands, and history lives in the change logs.
 7. **§3.5** — where the policy lives: `policy.tn` (Revision 37's answer, which the guide
    still described as undefined), and refused against undetermined (#1).
 8. **§4.5** — the network library beside "why core is small" (#2).
-9. **§6.1** — retitled "`value`, `void`, `identifier` and the kinds" (#22); **§6.4** —
+9. **§6.1** — retitled "`value`, `void`, `meta.identifier` and the kinds" (#22); **§6.4** —
    `namespace` beside `scoped` as the kernel's other open construct (#23).
 10. **New §6.8 — "Kinds, namespaces and references"** — the proto-schema reading of
-    `kind<C>` (a universe's code type, a subuniverse carved by construction), why a kind
-    is not a sum, `namespace` as the constructor whose instances are maps, `ref<T>` and
+    `meta.kind<C>` (a universe's code type, a subuniverse carved by construction), why a kind
+    is not a sum, `namespace` as the constructor whose instances are maps, `meta.ref<T>` and
     the qualified name, and the meta-service example end to end (#13, #22, #23, #24).
 11. **New §6.9 — "Host names, hosts and media types"** (#5, #6, #8).
 12. **§7's worked example** is rewritten in the new output shape: entries as values, a
@@ -549,7 +549,7 @@ as it stands, and history lives in the change logs.
     construction), `fields` as maps, and `history`'s array naming the synthetic the
     expansion lands on. **[editorial]** — no shipped fixture holds a record template or
     an instantiation; the shape follows §8.1 and §8.2 as revised.
-13. **§8.1** — two identities restated without `source`; `@application` on a declared
+13. **§8.1** — two identities restated without `source`; `@meta.application` on a declared
     entry that closes an application (#14, #18).
 14. **§8.3, §9.2** — refused against undetermined in diagnostics and at the boundary
     (#1); an import at the importer's level (#25).
@@ -566,9 +566,9 @@ Run after the parts and the guide were revised, by a reader who had not produced
 against the register and the nine artifacts. Each of the 25 entries' suggested-resolution
 items was found in the sections it names in Parts 1, 2 and 3; the five pins were
 recomputed over the shipped bytes and match §13.2; the kernel's declarations (`record`,
-`record_field`, `template_param`, `kind_type`, `ref_type`, `namespace`, `field_map`,
-`schema`, `type_chain`, `enum_type`, `identifier_base`, `scheme_name`), core's `kind` and
-absent `ref`, net's eight entries and the fixture's `type_kind` membership (`top`,
+`meta.record_field`, `meta.template_param`, `kind_type`, `ref_type`, `namespace`, `field_map`,
+`schema`, `meta.type_chain`, `enum_type`, `meta.identifier_base`, `meta.scheme_name`), core's `kind` and
+absent `ref`, net's eight entries and the fixture's `meta.type_kind` membership (`top`,
 `namespace`, `field_map`, `schema` and the synthetic arrays in; `type`, `atom`, `record`
 out) agree with §4.2 and §9; no Revision 37 vocabulary remains outside sentences that name
 an earlier revision; §5.12's nine citations resolve and §6–§8 keep their numbers. What the
@@ -576,10 +576,10 @@ pass found, and what was done:
 
 1. Part 2 §7.7 was cited by §7.2 and by Part 1 §2.5 for the name-type matching rule and did
    not state it — stated now (§3.2 item 25).
-2. Part 2 §7.8's `scoped` was written `{uri => …}` where `meta.tn` keys it by
+2. Part 2 §7.8's `scoped` was written `{uri => …}` where `meta-core.tn` keys it by
    `schema_identity`, as the same paragraph said; corrected in Part 2 and the guide (§3.2
    item 34).
-3. Part 2 §5.2 and §9 counted `type` among `record_field`'s "four facts"; the kernel counts
+3. Part 2 §5.2 and §9 counted `type` among `meta.record_field`'s "four facts"; the kernel counts
    four beside `type`, and the text now does.
 4. Part 2 §4.1 said a record template's `parents` are kept "after the template closes",
    which read as the instantiation's; it now says the template entry keeps them and a
@@ -590,7 +590,7 @@ pass found, and what was done:
    was so, and the log now says what the parts do. Part 1 §10.1 gains the RFC 5322 row
    §5.5 has cited since Revision 36, and the guide the RFC 5891 row its range implied.
 7. The kernel fixture's conventions note disagrees with #20 and with the kernel's own
-   `record_field` doc; recorded in §6.3 beside the three doc lines already there.
+   `meta.record_field` doc; recorded in §6.3 beside the three doc lines already there.
 8. The guide's §2.11 lacked one of the register's four stated costs (a host binding names
    a relaxed name through the name the record states); added.
 
@@ -618,9 +618,9 @@ this pass, so the register opens against Revision 38 empty:
 4. Part 2 §5.2 and §11.4 put an undeclared name at closure before hygiene, against
    [TSON-JSON] §9.4 and the readers; a value of the name type now meets §8.2 first.
 5. Part 2 §4.2 states that a namespace entry is listed by its constructor's kinds, the
-   namespace-type carve-out in the membership walk, where `kind<namespace>` holds
-   `namespace` itself, `top` as a constructor and a `type_kind` member, and why
-   `ref_type.of` is `type_name`; §9's "the one slot typed `type_name`" is corrected.
+   namespace-type carve-out in the membership walk, where `meta.kind<namespace>` holds
+   `namespace` itself, `top` as a constructor and a `meta.type_kind` member, and why
+   `ref_type.of` is `meta.type_name`; §9's "the one slot typed `meta.type_name`" is corrected.
 6. §5.12 refused a record template a kind lists; both facts are now stated together.
 7. §5.6 and §5.12 overstated which bare tokens are refused; §4.2's placement paragraph
    said a subtraction off a constructor IS-A `top`, against §5.9 rule 8.
@@ -630,9 +630,9 @@ this pass, so the register opens against Revision 38 empty:
    §5.8's alias-to-instantiation sentence.
 9. §8.2's `vector<pixel, 1920>` use site beside `hd_row`, its identity bullet, §8.3's
    "the one `!reference`", §5.10's `c3` and §5.10.1 disagreed on instantiation identity
-   and `@application`; and #18's verdict change is now stated in §8.2.
+   and `@meta.application`; and #18's verdict change is now stated in §8.2.
 10. "Empty chain" where the fixture has `subtypes`, "four facts" counting `type`,
-    `extension` unmarked in §9, and the canonical `!record_field` tag.
+    `extension` unmarked in §9, and the canonical `!meta.record_field` tag.
 11. A dozen wrong examples and cross-references, the §5.10 selector example, `{ _id: 1 }`
     in Part 1 §2.5 and a literal U+00AD in §8.2 among them.
 

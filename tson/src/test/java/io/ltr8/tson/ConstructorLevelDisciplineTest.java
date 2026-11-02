@@ -80,7 +80,7 @@ class ConstructorLevelDisciplineTest {
     /** An ordinary schema composes a base kind: the kernel's {@code product} is in its namespace. */
     @Test
     void anOrdinarySchemaDeclaresAConstructor() {
-        assertEquals(List.of(), problems(META, CORE, "  mine => meta.product & { id: identifier }"));
+        assertEquals(List.of(), problems(META, CORE, "  mine => meta.product & { id: meta.identifier }"));
     }
 
     /** A constructor an ordinary library declares is applied by a schema importing it. */
@@ -92,7 +92,7 @@ class ConstructorLevelDisciplineTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  steps => !meta.namespace { key_type: identifier  value_type: text }
+                  steps => !meta.namespace { key_type: meta.identifier  value_type: text }
                 }
                 """;
         String importer = """

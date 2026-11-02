@@ -139,7 +139,7 @@ class OpenOperandCompositionTest {
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("id", "tag", "value"), closed.fields().keySet().stream().toList(),
                 "customer's field, then box's flattened field set, in composition order");
-        assertEquals("meta.text", closed.fields().values().stream().toList().get(2).type().name(),
+        assertEquals("text", closed.fields().values().stream().toList().get(2).type().name(),
                 () -> "the parameter absorbed from box<T> closes with vip: "
                         + closed.fields().values().stream().toList().get(2));
     }
@@ -228,7 +228,7 @@ class OpenOperandCompositionTest {
         RecordBody closed = (RecordBody) compiled.schema().entries()
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("tag", "note", "value"), closed.fields().keySet().stream().toList());
-        assertEquals("meta.text", closed.fields().values().stream().toList().get(2).type().name(),
+        assertEquals("text", closed.fields().values().stream().toList().get(2).type().name(),
                 "the parameter survived the refinement");
     }
 
@@ -257,13 +257,13 @@ class OpenOperandCompositionTest {
         RecordBody held = (RecordBody) compiled.schema().entries().get(v);
         assertEquals(List.of("u"), held.fields().keySet().stream().toList(),
                 () -> "'v' should name the inner<text> instantiation, not bare 'inner': " + v);
-        assertEquals("meta.text", held.fields().values().stream().toList().get(0).type().name(),
+        assertEquals("text", held.fields().values().stream().toList().get(0).type().name(),
                 "the argument list survived, so U closed to text");
     }
 
     /**
      * The one position a bound reference cannot be written into: a reference's own head, which is a
-     * {@code type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
+     * {@code meta.type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
      * at the template's declaration, before substitution has anything to say about it.
      */
     @Test

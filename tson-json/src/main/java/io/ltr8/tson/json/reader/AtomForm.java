@@ -33,7 +33,7 @@ enum AtomForm {
     /** §5.3's exact tier: {@code integer} and its refinements, and {@code number}. The literal is the content. */
     NUMBER,
 
-    /** §5.5, §5.6 and {@code identifier}: every family whose content grammar lives above the lexer. */
+    /** §5.5, §5.6 and {@code meta.identifier}: every family whose content grammar lives above the lexer. */
     STRING,
 
     /**

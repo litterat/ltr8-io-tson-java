@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A value written by name at a slot typed {@code ref<T>} ([TSON-SCHEMA] §5.12), end to end: a meta layer declaring an
+ * A value written by name at a slot typed {@code meta.ref<T>} ([TSON-SCHEMA] §5.12), end to end: a meta layer declaring an
  * interface, a namespace of methods, and a namespace of HTTP bindings each naming the method it serves, a schema
  * under it declaring an interface, and a schema importing that one binding a method -- the read that keeps the name,
  * the linker that resolves it and judges its referent, and each refusal with the step it names.
@@ -53,8 +53,8 @@ class ValuesByNameTest {
                                    errors?: [meta.kind<meta.record>]
                                    replies?: {status_name => meta.kind<meta.record>} }
                   interface   => !meta.namespace { key_type: method_name  value_type: method }
-                  http_verb   => !meta.enum [GET POST]
-                  binding     => { method: meta.ref<method>  verb: http_verb  route: meta.text }
+                  http_verb   => !enum [GET POST]
+                  binding     => { method: meta.ref<method>  verb: http_verb  route: text }
                   bindings    => !meta.namespace { key_type: meta.identifier  value_type: binding }
                   filed_in_references => { request: meta.kind<meta.record>  method?: meta.ref<method> }
                   filed_nowhere       => { request: meta.kind<meta.record> }
@@ -186,7 +186,7 @@ class ValuesByNameTest {
                 api => !interface { m => { errors: [not_found place_order_request] } }""")));
         refused(api("errors-refused", """
                 api => !interface { m => { errors: [order uuid] } }"""),
-                "/m/errors/1", "'uuid' is an entry whose body is built by 'meta.uuid_type'", "no 'meta.record'");
+                "/m/errors/1", "'uuid' is an entry whose body is built by 'net.uuid_type'", "no 'meta.record'");
     }
 
     // ── Refusals, each naming its step ──────────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ class ValuesByNameTest {
         refused(api("uuid", """
                 user_id => uuid
                 api => !interface { m => { request: user_id } }"""),
-                "/m/request", "'user_id' (an alias of 'uuid')", "built by 'meta.uuid_type'", "no 'meta.record'");
+                "/m/request", "'user_id' (an alias of 'uuid')", "built by 'net.uuid_type'", "no 'meta.record'");
     }
 
     /**
@@ -278,7 +278,7 @@ class ValuesByNameTest {
                 api => !interface { m => { replies: { ok => order  missing => not_found } } }""")));
         refused(api("replies-refused", """
                 api => !interface { m => { replies: { ok => uuid } } }"""),
-                "/m/replies/ok", "built by 'meta.uuid_type'");
+                "/m/replies/ok", "built by 'net.uuid_type'");
     }
 
     @Test
@@ -322,7 +322,7 @@ class ValuesByNameTest {
     /** A reference component at an atom-typed slot is the class's mistake: there a token is a literal. */
     @Test
     void aReferenceIsNoAtomsComponent() {
-        assertMisbound("name_at_text", "meta.text", "is not a reference");
+        assertMisbound("name_at_text", "text", "is not a reference");
     }
 
     /** The grammar is the linker's: each segment between the dots is an identifier, none empty. */
@@ -383,10 +383,10 @@ class ValuesByNameTest {
     @Test
     void aReferenceByNameFiledInReferencesIsStillJudgedBySlot() {
         refused(api("filed-text", """
-                a => !refs { x => { request: text } }"""), "'a' at /x/request", "built by 'meta.text_type'");
+                a => !refs { x => { request: text } }"""), "'a' at /x/request", "built by 'unicode.text_type'");
         refused(api("filed-alias", """
                 user_id => uuid
-                a => !refs { x => { request: user_id } }"""), "'a' at /x/request", "built by 'meta.uuid_type'");
+                a => !refs { x => { request: user_id } }"""), "'a' at /x/request", "built by 'net.uuid_type'");
         assertEquals(List.of(), problems(api("filed-right", """
                 a => !refs { x => { request: order  method: orders.place_order } }""")));
     }
@@ -412,10 +412,10 @@ class ValuesByNameTest {
     @Test
     void aReferenceByNameDeclaredNowhereIsStillJudgedBySlot() {
         refused(api("nowhere-text", """
-                a => !nowheres { x => { request: text } }"""), "'a' at /x/request", "built by 'meta.text_type'");
+                a => !nowheres { x => { request: text } }"""), "'a' at /x/request", "built by 'unicode.text_type'");
         refused(api("nowhere-alias", """
                 user_id => uuid
-                a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'meta.uuid_type'");
+                a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'net.uuid_type'");
         assertEquals(List.of(), problems(api("nowhere-right", """
                 a => !nowheres { x => { request: order } }""")));
     }

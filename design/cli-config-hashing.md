@@ -28,11 +28,13 @@ Related: `design/diagnostic-model.md` (the `Diagnostic` model and the codes the 
 
 ## Bundled schema documents (`tson-schema/TsonBundledSchemas.java`)
 
-The published identities of the four bundled schemas (`META_ID`, the kernel, `CORE_ID`, `NET_ID`, `POLICY_ID`),
-their raw text (`fetch(uri)`, off `tson-schema`'s classpath) and one held digest each (`*_SHA256`), checked against
-the packaged resource on every load. The `.tn` resources are copied from `spec/m/` by `processResources`, so there
-is one copy on disk. `fetch` is a static method rather than a `SchemaSource` instance; a caller needing a source
-passes `TsonBundledSchemas::fetch`.
+The published identities of the six bundled schemas (`META_ID`, the kernel; `NUMERIC_ID`, `TEMPORAL_ID` and `NET_ID`, the
+data-format libraries, `LIBRARY_IDS`; `CORE_ID`; `POLICY_ID`; all six in dependency order as `IDS`), their raw text
+(`fetch(uri)`, off `tson-schema`'s classpath) and one held digest each (`*_SHA256`), checked against the packaged resource on
+every load. The `.tn` resources are copied from `spec/m/` by `processResources`, so there is one copy on disk. `fetch` is a
+static method rather than a `SchemaSource` instance; a caller needing a source passes `TsonBundledSchemas::fetch`.
+`isKernel(identity)` is true for meta.tn alone, the one kernel document, whose entries are judged the kernel's own by origin
+and which is pre-loaded by special resolution (`design/resolver-vocabulary-and-bootstrap.md`).
 
 The digests are over the `spec/m/` bytes, which are the live artifacts. At Revision 38 they equal the pins the
 published artifacts and Part 2 §13.2 carry; on a proposal branch they are this repo's own until the revision lands.
@@ -50,26 +52,25 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
   everything keys by canonical identity (scheme and query stripped).
 - **Verification is wired through the loader**: a data document's `!!import`s and each transitive `!!import` carrying
   a pin are checked before use, and a schema registered from text is hashed by the call that registers it.
-  `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — core and net
-  import meta, the kernel, and policy imports core, each by a pinned reference — so bootstrap verifies all of it. The
-  kernel imports nothing; its own `!!id` carries its pin.
+  `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — numeric,
+  temporal and net each import the kernel, core imports the three, and policy imports core, each by a pinned reference —
+  so bootstrap verifies all of it. The kernel, meta.tn, imports nothing; its own `!!id` carries its pin.
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place, replacing any prior query. It is
   idempotent: the hashed bytes never change, so the pin stays valid.
-- **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read,
-  never to load. The `!!id`, header pins and `@doc`/`@title`/`@examples`/`@comment` go; a header reference to
-  meta or core shortens to `"39/core"`; each directive and declaration gets one line. `--keep-docs`
-  (`stripKeepingDocs`) keeps the three written for the schema's readers and drops `@comment`, written for its
-  maintainers. It never re-pins and never rewrites the file: the output claims no identity, because its bytes are
-  not the published document's. **Whitespace collapses to one space and is never removed**, so tokens that touched
-  still touch and adjacency (§7.2) reads the same. The output is re-lexed against the intended tokens and
-  re-parsed, either failure being a fault here. Every other annotation stays, since several are checked.
-- **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole chain, which no single-file
-  command can do: an edit to meta.tn moves meta's `!!id`, every `!!import` pinning it, each of those documents' own
-  `!!id`, the `TsonBundledSchemas` constants, and the getting-started example's pins in `README.md` and
-  `InitCommand.java` — the example pins core, so its own digest moves with core's. It hashes with
-  `tail -n +2 | shasum -a 256` rather than calling `tson hash`, so it runs when the tree does not compile. Only a
-  reference already carrying `?sha256=` is re-stamped: pinning is optional, and an unpinned mention is not a stale
-  pin. When to run it and what it does not cover are in `design/process.md`.
+- **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read, never to
+  load. The `!!id`, header pins and `@doc` go; a header reference to meta, numeric, temporal, net or core shortens to its
+  revision and name, `"39/numeric"`; each directive and declaration gets one line. `--keep-docs` (`stripKeepingDocs`) keeps
+  `@doc`, for a model that should read the documentation. It never re-pins and never rewrites the file: the output claims no
+  identity, because its bytes are not the published document's. **Whitespace collapses to one space and is never removed**,
+  so tokens that touched still touch and adjacency (§7.2) reads the same. The output is re-lexed against the intended tokens
+  and re-parsed, either failure being a fault here. Every other annotation stays, since several are checked.
+- **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole chain, which no single-file command can do:
+  an edit to meta.tn moves its `!!id`, each library's `!!import` pinning it, each library's own `!!id`, and so every pin up
+  the chain through core.tn to policy.tn, the `TsonBundledSchemas` constants, and the getting-started example's pins in
+  `README.md` and `InitCommand.java` — the example pins core, so its own digest moves with core's. It hashes with
+  `tail -n +2 | shasum -a 256` rather than calling `tson hash`, so it runs when the tree does not compile. Only a reference
+  already carrying `?sha256=` is re-stamped: pinning is optional, and an unpinned mention is not a stale pin. When to run it
+  and what it does not cover are in `design/process.md`.
 
 ## `tson validate`
 
@@ -258,9 +259,9 @@ list**, distinct because a `DataNameBinder` is fixed when a `DataBindContext` is
   consumer layers a binder onto. `Tson.of` composes the schema model's binder and registrations onto whichever it is
   (`SchemaMetaNameBinder.over`), and `Tson.dataBindContext()` returns that composition.
   `registerAtoms(AtomContext.hostTypes())` adds the same list to any builder, so it lives in one place.
-- `SchemaMetaNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three
-  registrations for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose
-  `SourcePositionStringBridge` names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a
-  `DataNameBinder` over `io.ltr8.tson.schema.meta` that answers only for the names under the kernel's `meta` and
-  net.tn's `net`, each bound by its last segment. The context of the kernel's bootstrap and of a registry built
-  directly with no consumer classes, not a consumer default.
+- `SchemaMetaNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three registrations
+  for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose `SourcePositionStringBridge`
+  names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a `DataNameBinder` over
+  `io.ltr8.tson.schema.meta` that answers only for every entry of meta.tn (its root names and its members of its six maps)
+  and each library's members under its map (`numeric`, `temporal`, `net`), each bound by its last segment. The context of the
+  kernel's bootstrap and of a registry built directly with no consumer classes, not a consumer default.

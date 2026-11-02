@@ -32,7 +32,7 @@ class UnregisteredMetaConstructorTest {
                 !!id:"https://example.test/meta-unreg.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  operation => meta.top & { path: meta.text }
+                  operation => meta.top & { path: text }
                 }
                 """);
         DOCUMENTS.put("https://example.test/api-unreg.tn", """

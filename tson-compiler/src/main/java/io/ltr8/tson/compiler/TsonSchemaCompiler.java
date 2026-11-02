@@ -42,7 +42,7 @@ import java.util.function.Function;
  * Compilation#resolve} catches it and substitutes an {@link ErrorReader}, so the schema as a whole
  * still compiles; only actually reading a value against that one entry fails, at that point. This
  * covers both a constructor with no {@link ValueReaderFactory} to dispatch to, and a factory that exists
- * but rejects this particular entry. Every constructor meta.tn and net.tn declare has a factory,
+ * but rejects this particular entry. Every constructor the kernel and the three libraries declare has a factory,
  * so the first case is a constructor a schema declared itself that this library has never seen.
  *
  * <p><b>An entry declaring type parameters never reaches a factory at all</b>, and compiles to one of two

@@ -40,7 +40,7 @@ class UnjudgedDocumentTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  json_name => !meta.identifier_type { start_add: "@" }
+                  json_name => !unicode.identifier_type { start_add: "@" }
                   node => !meta.record { name_type: json_name  fields: { "@id" => { type: nonesuch } } }
                 }
                 """;

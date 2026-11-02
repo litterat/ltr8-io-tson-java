@@ -24,7 +24,7 @@ class JsonFieldNameTypeTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              json_name => !meta.identifier_type { start_add: "@$" }
+              json_name => !unicode.identifier_type { start_add: "@$" }
               node => !meta.record { name_type: json_name  fields: {
                 "@id" => { type: text }  label => { type: text } } }
               json_ref => !meta.record { name_type: json_name  fields: {
@@ -32,18 +32,18 @@ class JsonFieldNameTypeTest {
               typed => !meta.record { name_type: json_name  fields: { "$type" => { type: text } } }
               address => json_record & { city: text }
               located => ld_node & address
-              folded => !meta.identifier_type { normalization: NFKC_CASEFOLD }
+              folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }
               frow => !meta.record { name_type: folded  fields: { name => { type: text } } }
               fbase => !meta.record { name_type: folded  extension: ABSTRACT  fields: {} }
               pet => abstract fbase & { kind: text =?  name: text }
               dog => pet & { kind?: = "dog"  breed: text }
               kennel => { p: pet }
-              words => !meta.identifier_type { continue_add: "-"  medial: " " }
+              words => !unicode.identifier_type { continue_add: "-"  medial: " " }
               row => !meta.record { name_type: words  fields: { "first name" => { type: text } } }
               json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
               ld_node => json_record & { "@id": text  label: text }
               ld_holder => { n: ld_node }
-              ld_name => !meta.identifier_type { start_add: "@" }
+              ld_name => !unicode.identifier_type { start_add: "@" }
               ld_only => !meta.record { name_type: ld_name  fields: { "@id" => { type: text } } }
               plain => { a: text }
             }

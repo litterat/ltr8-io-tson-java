@@ -60,10 +60,10 @@ class MetaKernelSchemaRegistryTest {
 
         // One desugared entry per distinct sugar form: an `array` entry per distinct form of §5.3's `[X]`
         // field-type sugar, repeated uses of one form deduplicating to one entry -- `[text; 1..]` serves both
-        // `discriminators`, `field_group.optional_members` and the options inside `field_group.members`. `enum`'s
-        // member set is not among them: `enum_set` is a declaration the fixture writes, since `set` has no sugar
+        // `discriminators`, `meta.field_group.optional_members` and the options inside `meta.field_group.members`. `enum`'s
+        // member set is not among them: `meta.enum_set` is a declaration the fixture writes, since `set` has no sugar
         // of its own, and nor is `record.fields`, the fixture's own ordered `field_map`.
-        Set<String> expectedHeads = Set.of("array_tuple_element", "array_text",
+        Set<String> expectedHeads = Set.of("array_array_text_1", "array_text_1",
                 "array_type_kind", "array_template_param", "array_field_group");
         Set<String> syntheticNames = new HashSet<>(linked.schema().entries().keySet());
         syntheticNames.removeIf(name -> expectedHeads.stream().noneMatch(head -> name.startsWith(head + "_")));
@@ -73,7 +73,7 @@ class MetaKernelSchemaRegistryTest {
                     "expected a synthetic entry with head '" + head + "', found: " + syntheticNames);
         }
 
-        Top enumDef = linked.schema().entries().get("meta.enum");
+        Top enumDef = linked.schema().entries().get("enum");
         RecordBody enumBody = (RecordBody) enumDef;
         RecordField membersField = enumBody.fields().entrySet().stream()
                 .filter(f -> f.getKey().equals("members"))
@@ -114,8 +114,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.imports(), linked.schema().imports());
-        assertEquals(103, raw.entries().size());
-        assertEquals(103, linked.schema().entries().size());
+        assertEquals(91, raw.entries().size());
+        assertEquals(91, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
@@ -145,7 +145,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(103, registered.schema().entries().size());
+        assertEquals(91, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

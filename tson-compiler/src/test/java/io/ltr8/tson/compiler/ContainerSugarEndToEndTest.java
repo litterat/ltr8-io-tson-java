@@ -107,8 +107,8 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>A collection-valued slot holds an application like every other {@code type_kind}-typed slot.</b>
-     * {@code variants} is a {@code [type_kind]}, so a §5.10 application standing in one is spelled as its
+     * <b>A collection-valued slot holds an application like every other {@code meta.type_kind}-typed slot.</b>
+     * {@code variants} is a {@code [meta.type_kind]}, so a §5.10 application standing in one is spelled as its
      * reference and rewritten to the entry it denotes one pass later -- the same route a field
      * type, an {@code element_type} and a map's {@code key_type}/{@code value_type} already took. Refusing the
      * variant in {@code choiceBinding} instead would leave the <em>whole</em> choice unlifted, and an unlifted
@@ -128,7 +128,7 @@ class ContainerSugarEndToEndTest {
         assertInstanceOf(RecordBody.class, compiled.schema().entries().get(variant));
     }
 
-    /** The tuple half of the same rule: {@code elements} is a collection of {@code tuple_element} records. */
+    /** The tuple half of the same rule: {@code elements} is a collection of {@code meta.tuple_element} records. */
     @Test
     void anApplicationIsATupleElementLikeAnyOtherReference() {
         TsonCompiledSchema compiled = compile("""
@@ -386,20 +386,20 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * `enum.members` is typed through `enum_set`, so members reach the contract by the other route — the
+     * `enum.members` is typed through `meta.enum_set`, so members reach the contract by the other route — the
      * constructor body read back against the kernel's own vocabulary — and pick up `min_items: 1` and the
      * set's uniqueness with it. That each member is an identifier is `enum`'s `type`, checked at linking.
      */
     @Test
     void enumMembersAreIdentifiersAndAtLeastOneAndUnique() {
-        assertNotNull(compile("  e => !meta.enum [OPEN DONE]"));
+        assertNotNull(compile("  e => !enum [OPEN DONE]"));
 
-        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !meta.enum []"))
+        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !enum []"))
                 .getMessage().contains("fewer than the minimum 1"));
         assertTrue(assertThrows(SchemaValidationException.class,
-                () -> compile("  e => !meta.enum [\"in progress\" DONE]"))
+                () -> compile("  e => !enum [\"in progress\" DONE]"))
                 .getMessage().contains("U+0020 at index 2 cannot appear in an identifier"));
-        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !meta.enum [OPEN OPEN]"))
+        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !enum [OPEN OPEN]"))
                 .getMessage().contains("requires unique elements"));
     }
 
@@ -433,7 +433,7 @@ class ContainerSugarEndToEndTest {
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(box.fields().values().stream().toList().get(0).type().name()));
 
-        assertEquals(TypeRef.of("meta.text"), array.elementType());
+        assertEquals(TypeRef.of("text"), array.elementType());
     }
 
     /**

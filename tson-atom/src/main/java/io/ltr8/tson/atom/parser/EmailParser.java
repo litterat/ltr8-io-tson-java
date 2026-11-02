@@ -10,13 +10,13 @@ import io.ltr8.tson.schema.meta.EmailType;
 import java.util.regex.Pattern;
 
 /**
- * Parses and validates against meta.tn's {@code email_type} constructor (core.tn's {@code email}, pinned to
+ * Parses and validates against net.tn's {@code net.email_type} constructor (net.tn's {@code email}, pinned to
  * RFC 5322). Composes {@code text_type}'s length and pattern facets, checked exactly as {@link TextParser}
  * checks its own, plus an address-shape check on top -- without that last part {@code !email} would say
  * nothing {@code text} doesn't.
  *
  * <p><b>A §5.5 built-in</b>, carried in the same "Network Types" group as {@code uuid}, {@code ipv4},
- * {@code ipv6}, {@code cidr4}, {@code cidr6} and {@code mac}, and given the identical shape by core.tn.
+ * {@code ipv6}, {@code cidr4}, {@code cidr6} and {@code mac}, and given the identical shape by net.tn.
  *
  * <p><b>The format check is a documented subset of RFC 5322, not the whole grammar.</b> Accepted is the
  * {@code dot-atom "@" dot-atom} core: one or more dot-separated atoms of RFC 5322's {@code atext} on each
@@ -35,10 +35,10 @@ import java.util.regex.Pattern;
  */
 public record EmailParser(EmailType constraints) implements AtomTypeParser<String> {
 
-    /** core.tn's own name for this atom -- registered as a built-in despite §5.5's table, see this class's own Javadoc. */
+    /** net.tn's own name for this atom -- registered as a built-in despite §5.5's table, see this class's own Javadoc. */
     public static final String TYPENAME = "email";
 
-    /** {@code email => !meta.email_type {}} -- the unconstrained address, core.tn's own {@code email}. */
+    /** {@code email => !net.email_type {}} -- the unconstrained address, net.tn's own {@code email}. */
     public static final EmailParser UNCONSTRAINED = new EmailParser(EmailType.UNCONSTRAINED);
 
     /**

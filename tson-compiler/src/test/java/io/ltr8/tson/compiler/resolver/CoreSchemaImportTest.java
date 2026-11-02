@@ -51,7 +51,7 @@ class CoreSchemaImportTest {
         TsonCompiledSchemaLoader loader = registry;
 
         // meta.tn's own !!import needs the kernel present in the *shared* registry first --
-        // the kernel's own bootstrap case (loader.load(META_ID)) is never cached in registry
+        // the kernel's own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry
         // itself (see TsonCompiledMetaRegistry's own Javadoc), so it's registered separately,
         // resolved ordinarily against this same loader (whose own bootstrap branch supplies the
         // structure namespace).
@@ -76,13 +76,13 @@ class CoreSchemaImportTest {
 
         TsonSchema core = registered.get().schema();
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.CORE_ID);
-        assertEquals(51, core.entries().keySet().stream().filter(name -> registered.get().originOf(name).equals(own))
+        assertEquals(6, core.entries().keySet().stream().filter(name -> registered.get().originOf(name).equals(own))
                 .count(), "expected every core.tn declaration to resolve");
+        assertTrue(core.entries().containsKey("title") && core.entries().containsKey("examples"));
 
-        // A representative spread of core.tn's own real declarations -- its 21 aliases of the kernel's entries, atom
-        // refinements (int32) and constructor applications (float32, email, complex) -- all genuinely present in the
-        // validated, registered namespace, which also holds the kernel's entries under `meta`: core.tn imports the
-        // kernel (§2.2.3).
+        // A representative spread of the libraries' real declarations core.tn imports -- atom refinements (int32) and
+        // constructor applications (float32, email, complex) -- all genuinely present in the validated, registered
+        // namespace, which also holds the kernel's entries under `meta`: an import contributes its closure (§2.2.3).
         assertTrue(core.entries().containsKey("int32"));
         assertTrue(core.entries().containsKey("uint8"));
         assertTrue(core.entries().containsKey("bytes"));
@@ -90,14 +90,14 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("float64"));
         assertTrue(core.entries().containsKey("email"));
         assertTrue(core.entries().containsKey("complex"));
-        assertTrue(core.entries().containsKey("declared"));
+        assertTrue(core.entries().containsKey("meta.declared"));
         assertTrue(core.entries().containsKey("meta.record_field"));
         assertTrue(core.entries().containsKey("text"));
     }
 
     /**
-     * The network families are net.tn's: their instances at its root, beside its host name, their constructors under
-     * its {@code net}, and core claims none of their names.
+     * The network families are net.tn's: their instances at its root, their constructors under its {@code net}, and
+     * core.tn, importing it, holds each by net.tn's identity.
      */
     @Test
     void theNetworkFamiliesAreNetTnsAndNotCores() {
@@ -105,14 +105,17 @@ class CoreSchemaImportTest {
         TsonSchema net = schemaRegistry.get(TsonBundledSchemas.NET_ID).orElseThrow().schema();
         TsonSchema core = schemaRegistry.get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
-        Set<String> network = Set.of("ipv4", "ipv6", "cidr4", "cidr6", "mac", "hostname", "host", "media_type");
+        Set<String> network = Set.of("email", "ipv4", "ipv6", "cidr4", "cidr6", "mac", "hostname", "host", "media_type",
+                "uri_reference", "uri", "uuid");
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.NET_ID);
         TsonLinkedSchema linkedNet = schemaRegistry.get(TsonBundledSchemas.NET_ID).orElseThrow();
         assertEquals(network, net.entries().keySet().stream().filter(name -> linkedNet.originOf(name).equals(own))
                 .filter(name -> !name.equals("net") && !name.startsWith("net.") && !name.startsWith("array_"))
                 .collect(java.util.stream.Collectors.toSet()));
         assertTrue(net.entries().containsKey("net.ipv4_type"));
-        assertTrue(network.stream().noneMatch(core.entries()::containsKey), "core declares a network name");
+        TsonLinkedSchema linkedCore = schemaRegistry.get(TsonBundledSchemas.CORE_ID).orElseThrow();
+        assertTrue(network.stream().allMatch(name -> linkedCore.originOf(name).equals(own)),
+                "core.tn holds net.tn's names as net.tn's");
     }
 
     /**

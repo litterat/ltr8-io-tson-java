@@ -37,7 +37,7 @@ import java.util.Optional;
  * <p><b>It is not a parser.</b> Nothing here turns a token into a host value: it answers <em>is this a legal
  * name</em> over text a caller already holds. The callers of {@link #validate} are both encodings' readers, the
  * schema parser, the resolver and the linker -- none of them reading a value. Reading a value of the kernel's
- * {@code identifier} is {@link io.ltr8.tson.atom.parser.IdentifierParser#IDENTIFIER}'s, which puts the text into
+ * {@code meta.identifier} is {@link io.ltr8.tson.atom.parser.IdentifierParser#IDENTIFIER}'s, which puts the text into
  * NFC first where this refuses text not in it.
  *
  * <p><b>§8.2 and the profile's own characters.</b> A character a profile adds -- this one's {@code -}, another's
@@ -50,7 +50,7 @@ public final class IdentifierGrammar {
 
     /**
      * [TSON-DATA] §7.7's profile: {@code XID_Start}, {@code XID_Continue ∪ { - }}, NFC. Built from the kernel's
-     * {@code identifier} ({@link IdentifierType#IDENTIFIER}), which declares it, so the series names with one
+     * {@code meta.identifier} ({@link IdentifierType#IDENTIFIER}), which declares it, so the series names with one
      * definition.
      */
     public static final IdentifierProfile PROFILE = IdentifierType.IDENTIFIER.profile();

@@ -43,7 +43,7 @@ class KindSlotGapsTest {
                 !!id:"https://example.test/gap-meta.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  gap_status        => !meta.integer_type { min: 100  max: 599 }
+                  gap_status        => !numeric.integer_type { min: 100  max: 599 }
                   gap_reply         => { status: gap_status  body: meta.type_kind }
                   gap_operation     => { request: meta.type_kind  replies?: [gap_reply] }
                   gap_operations    => !meta.namespace { key_type: meta.identifier  value_type: gap_operation }
@@ -179,7 +179,7 @@ class KindSlotGapsTest {
     @Test
     void anAnnotatedKeyIsWrittenInThePointer() {
         refused(schema("annotated-key",
-                "r => !gap_replies { @meta.doc:\"the success reply\" ok => { status: 200  body: no_such } }"), "/ok/body");
+                "r => !gap_replies { @doc:\"the success reply\" ok => { status: 200  body: no_such } }"), "/ok/body");
     }
 
     /** A value entry's value. */

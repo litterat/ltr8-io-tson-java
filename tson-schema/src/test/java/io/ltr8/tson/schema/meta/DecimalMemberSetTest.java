@@ -52,7 +52,7 @@ class DecimalMemberSetTest {
 
     @Test
     void aMemberThatIsNotANumberIsTheAuthorsError() {
-        // meta.tn: "a member that does not parse as a decimal fails at schema load". `value` admitting
+        // numeric.tn: "a member that does not parse as a decimal fails at schema load". `value` admitting
         // anything is a property of the slot, not a licence for what stands in it.
         SchemaValidationException refused = assertThrows(SchemaValidationException.class,
                 () -> withMembers(BigInteger.ONE, "abc"));
@@ -61,7 +61,7 @@ class DecimalMemberSetTest {
 
     @Test
     void twoSpellingsOfOneValueAreOneMemberAndSoADuplicate() {
-        // meta.tn: "1 and 1.0 are one member and a duplicate rather than two". The `set` the facet is
+        // numeric.tn: "1 and 1.0 are one member and a duplicate rather than two". The `set` the facet is
         // declared as cannot see it -- its uniqueness rule runs on the decoded elements, where the two are a
         // BigInteger and a BigDecimal and nothing compares them.
         SchemaValidationException refused = assertThrows(SchemaValidationException.class,

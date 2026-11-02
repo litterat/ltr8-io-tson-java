@@ -15,7 +15,7 @@ import java.util.Optional;
  * multiple-of constraint. Pure constraint values, no parsing or validation behavior -- {@code
  * tson-compiler}'s {@code IntegerParser} holds one of these and does the actual reading/writing.
  *
- * <p>Also an {@link Atom} variant: {@code integer => !meta.integer_type {}} is a constructor-application
+ * <p>Also an {@link Atom} variant: {@code integer => !numeric.integer_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly this shape, bound the same way every other {@link
  * Top} variant round-trips through generic binding. Mutual exclusion between {@code min}/{@code
  * exclusiveMin} and between {@code max}/{@code exclusiveMax} is enforced by this record's own
@@ -28,7 +28,7 @@ import java.util.Optional;
  * one exists, and throws {@code CodeAnalysisException} ("Could not find constructor") otherwise
  * unless one is explicitly marked.
  */
-@Typename(name = "meta.integer_type")
+@Typename(name = "numeric.integer_type")
 public record IntegerType(TypeChain chain,
         Optional<IntegerSize> size,
         Optional<BigInteger> min,
@@ -146,7 +146,7 @@ public record IntegerType(TypeChain chain,
      *
      * <p>Judged on the <em>effective</em> range, the same fold {@link #constraintsCheck} compares
      * against: a stated bound and the one {@link #size} implies contradict each other exactly as
-     * readily as two stated bounds do, so {@code !meta.integer_type { size: { bits: 8  signed: false }
+     * readily as two stated bounds do, so {@code !numeric.integer_type { size: { bits: 8  signed: false }
      * min: 300 }} is caught by the same comparison that catches {@code min: 10  max: 3}. This is the
      * one family where a body can be empty without stating both ends.
      *

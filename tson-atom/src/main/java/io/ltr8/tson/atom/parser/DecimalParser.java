@@ -32,7 +32,7 @@ public record DecimalParser(DecimalType constraints) implements AtomTypeParser<B
     /** §5.6's built-in annotation name -- {@code !number}. */
     public static final String TYPENAME = "number";
 
-    /** {@code number => !meta.decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
+    /** {@code number => !numeric.decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
     public static final DecimalParser UNCONSTRAINED = new DecimalParser(DecimalType.UNCONSTRAINED);
 
     public DecimalParser(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
@@ -97,7 +97,7 @@ public record DecimalParser(DecimalType constraints) implements AtomTypeParser<B
                 throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
             }
         });
-        // Both digit-count facets measure the value, never the spelling: meta.tn's own @doc says "scale is
+        // Both digit-count facets measure the value, never the spelling: numeric.tn's own @doc says "scale is
         // not part of the value -- 1, 1.0 and 1.00 are one value", so 1.230 has three significant digits and
         // two after the point, and `fraction_digits: 2` admits "any hundredth" whatever the author typed.
         // The value handed back is still exactly as written; only the measurement strips.

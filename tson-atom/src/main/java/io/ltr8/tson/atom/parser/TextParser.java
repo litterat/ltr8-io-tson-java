@@ -34,7 +34,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
     /** The §5.5 annotation name this atom is reached by. */
     public static final String TYPENAME = "text";
 
-    /** {@code text => !meta.text_type {}} -- the unconstrained text type. */
+    /** {@code text => !unicode.text_type {}} -- the unconstrained text type. */
     public static final TextParser UNCONSTRAINED = new TextParser(TextType.UNCONSTRAINED);
 
     public TextParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,

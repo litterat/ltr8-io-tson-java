@@ -169,7 +169,7 @@ final class SchemaDesugarer {
      * Names already in scope from {@code !!import}. A sugar form that generates a name an import already
      * declares is <em>referenced</em> rather than redeclared: the name is derived from the resolved binding
      * record itself, so an identical form in an imported schema has already produced the same type. Without
-     * this, a schema writing {@code [meta.text; 1..]} would redeclare the one it imports from the kernel and be
+     * this, a schema writing {@code [text; 1..]} would redeclare the one it imports from the kernel and be
      * rejected as a local-vs-import collision.
      */
     private final Set<String> imported;
@@ -672,7 +672,7 @@ final class SchemaDesugarer {
      *
      * <p><b>Why this is not {@link #choiceBinding}.</b> Both are variadic and both fill one collection-typed
      * vocabulary field. What differs is what one position <em>is</em>: a variant is a bare reference,
-     * while an element is a {@code tuple_element} record carrying a type <em>and</em> its own {@code voidable},
+     * while an element is a {@code meta.tuple_element} record carrying a type <em>and</em> its own {@code voidable},
      * so each position needs a record built for it rather than a name token. {@code voidable} is written only
      * for a marked position, for the reason {@link #arrayBinding} omits an unmarked element's.
      *
@@ -702,7 +702,7 @@ final class SchemaDesugarer {
      *
      * <p><b>A variant is written through {@link #refValue}, like every other type slot.</b>
      * A collection-valued slot is no different from a named one in what it holds: {@code variants} is a
-     * {@code [type_kind]}, so an application standing in it is spelled as its reference and
+     * {@code [meta.type_kind]}, so an application standing in it is spelled as its reference and
      * rewritten to the entry it denotes one pass later ({@code TemplateMaterialiser.mapBodyRefs}, which maps
      * a choice's variants like any other reference). Refusing the application here instead left the whole
      * choice unlifted, and a form the desugar table did not reduce reaches {@code DefinitionResolver} as a
@@ -733,13 +733,13 @@ final class SchemaDesugarer {
      * substitution. §5.2's rewrite is syntactic, as fixed and as closed as the sugar table above, so it belongs beside it.
      *
      * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
-     * fixed on the {@code record} constructor and an unmarked field's facts are {@code record_field}'s own
+     * fixed on the {@code record} constructor and an unmarked field's facts are {@code meta.record_field}'s own
      * defaults, so neither is stated -- the same economy {@link #arrayBinding} makes
      * with an unmarked element's {@code state}, and what keeps the held form the one the author would
      * recognise.
      *
      * <p><b>A parameter rides the ordinary {@code value} slot</b>, with §8.1's shadowing rule to tell it from
-     * a literal. That is what a held body buys, and why the kernel's {@code record_field} needs no separate
+     * a literal. That is what a held body buys, and why the kernel's {@code meta.record_field} needs no separate
      * parameter channel: a body read as constructor vocabulary at its declaration could not say which of the
      * two a token is, and a held body is read as vocabulary only once its parameters are gone. The role is the
      * modifier's either way ({@link FieldModifiers}), so closing substitutes a value and changes no fact.
@@ -836,7 +836,7 @@ final class SchemaDesugarer {
     }
 
     /**
-     * One {@code record_field}, with {@code state} and {@code value} written only where the author's marks
+     * One {@code meta.record_field}, with {@code state} and {@code value} written only where the author's marks
      * say something the constructor's own defaults do not.
      *
      * <p>A field with no type-ref is a §5.7 tightening entry, which needs a source to elide toward and so

@@ -15,7 +15,7 @@ import java.util.function.BiConsumer;
  * {@link NamespaceBody}) -- written and read as the map its facets describe. The kernel declares two, and every
  * resolved schema holds values of both: the schema map is a value of {@code schema} ({@code TsonSchema.entries}),
  * and a record's fields are a value of {@code field_map} ({@link RecordBody#fields}). A schema declares its own,
- * {@code api => !meta.namespace { key_type: identifier  value_type: method }}, and the entry {@code myapi => !api {
+ * {@code api => !meta.namespace { key_type: meta.identifier  value_type: method }}, and the entry {@code myapi => !api {
  * get_orders => { ... } }} in a schema importing it holds a third, as a {@link ValueEntry}.
  *
  * <p>{@link #type} names the namespace type the value is a value of, which fixes the family its keys are names of

@@ -10,7 +10,7 @@ history lives in git.
   spelling, and an untagged root is a syntax error.
 - It `extends TsonDataParser` in the same package and calls its package-private methods rather than re-implementing
   Part 1's grammar.
-- `type-name = identifier`: every declared name and type parameter is matched against `IdentifierProfile`; a type
+- `type-name = meta.identifier`: every declared name and type parameter is matched against `IdentifierProfile`; a type
   reference's head and a `!` head are each a `qualified-name`, each segment so matched, with an argument list's `<`
   adjacent to a reference's head (§12.3). Field names are the one naming position the parser leaves alone.
 - A document has one declaration map. `geo => !schema { … }` is a schema map nested as an entry: its members go into
@@ -39,7 +39,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   re-implementing them, adding only the schema-only tokens (`~ ^ & | ( ) < > ? ; -`).
 - **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
   takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
-  the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's `schema`
+  the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's `meta.schema`
   whatever the document imports, so it is matched as a spelling, never looked up; an untagged root is a syntax
   error saying the document is data.
 - **A schema map nests as an entry** (`nestedSchemaMap`, SPEC-FEEDBACK.md #14). A `!` head spelled `schema` and
@@ -49,7 +49,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   declaration map, a nested map's under its path (`geo.address`, `geo.inner.deep`): the path is the member's identity
   and the key every later phase addresses it by. The entry `geo` is a `SchemaMapDef` of its members' own names, in
   source order. A recovered syntax error in a member is reported against its path.
-- **`type-name = identifier`, and that one rule replaces §12.1's number rule rather than joining it.**
+- **`type-name = meta.identifier`, and that one rule replaces §12.1's number rule rather than joining it.**
   `expectTypeName` matches every declared name, type parameter and referenced name against
   `IdentifierProfile`, and `parseAtomRefinementOrInstance` matches each segment of the `!` head
   (`requireQualifiedName`). §12.1 states separately that
@@ -59,7 +59,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `-foo`), which a number rule alone lets through. Field names are the one naming position the parser leaves
   alone: `field-name` stays lexical for the Class 1 reason (`design/lexer-and-data-parsing.md`), and
   `DefinitionResolver.requireIdentifier` applies the contract to the ones a declaration actually binds.
-  §12.1's `type-name = identifier` states it, and its note carries the field-name half.
+  §12.1's `type-name = meta.identifier` states it, and its note carries the field-name half.
 - **`SchemaMap.declarations` is a `Map<String, Declaration>`** (a `LinkedHashMap`, insertion order
   preserved) — §3.4.1's Pass 1 shape and the schema's own `{type_name => top}`. A duplicate
   name overwrites, same "grammar layer doesn't dedupe" treatment the data grammar gives duplicate fields.

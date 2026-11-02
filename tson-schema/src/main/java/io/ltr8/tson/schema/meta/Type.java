@@ -3,7 +3,7 @@ package io.ltr8.tson.schema.meta;
 import java.util.List;
 
 /**
- * The kernel's {@code type => abstract top & { chain?: type_chain }} (Part 2 §4.1): the
+ * The kernel's {@code type => abstract top & { chain?: meta.type_chain }} (Part 2 §4.1): the
  * kind of the kinds that describe the shape of a data value. {@link Atom}, {@link Product} and {@link Sum} each
  * {@code extends Type}, as {@code atom}, {@code product} and {@code sum} compose with {@code type}; {@link Alias}
  * and {@link Namespace} do not, as their kernel entries compose with {@code top} directly. So a body describes a

@@ -44,8 +44,8 @@ class JsonAtomReadTest {
               key        => uuid
               day        => date
               blob       => bytes
-              colour     => !meta.enum [ RED GREEN BLUE ]
-              words      => !meta.identifier_type { continue_add: "-"  medial: " " }
+              colour     => !enum [ RED GREEN BLUE ]
+              words      => !unicode.identifier_type { continue_add: "-"  medial: " " }
               activity   => !meta.enum_type { name_type: words  members: [sedentary "lightly active"] }
               country    => !text ^ { length: 2  members: ["AU" "NZ"] }
               flag       => boolean
@@ -68,7 +68,7 @@ class JsonAtomReadTest {
             JsonSchemaCompiler.compile(TSON.resolve(SCHEMA), ValueReaderFactoryRegistry.atoms());
 
     /**
-     * The kernel's own compiled readers. {@code value} and {@code identifier} are declared by meta.tn
+     * The kernel's own compiled readers. {@code value} and {@code meta.identifier} are declared by meta.tn
      * and by nothing else -- core.tn re-declares only {@code void} -- so the two {@code unit} instances this
      * encoding reads by rules of its own (§5.7) are reachable only here.
      */
@@ -285,7 +285,7 @@ class JsonAtomReadTest {
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "meta.value", "[1]").refusal().code());
     }
 
-    /** {@code identifier} is the third {@code unit} instance, and the one the shared vocabulary does answer for. */
+    /** {@code meta.identifier} is the third {@code unit} instance, and the one the shared vocabulary does answer for. */
     @Test
     void identifierFacesTheSharedNameProfile() {
         assertEquals("order_id", read(KERNEL, "meta.identifier", "\"order_id\"").accepted());

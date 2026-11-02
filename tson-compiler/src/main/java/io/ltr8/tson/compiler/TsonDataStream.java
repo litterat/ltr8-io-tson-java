@@ -713,7 +713,7 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * A name position's token, matched in full against the kernel's {@code identifier} profile (§7.1's name
+     * A name position's token, matched in full against the kernel's {@code meta.identifier} profile (§7.1's name
      * profile). The two-layer shape is §7.6's, stated there for numbers: the lexer produces a token, and a
      * production that is no part of the token-stream grammar then matches its decoded text. Token-Start admits
      * {@code Nd}, {@code -}, {@code +} and {@code .} so a <em>number</em> can be an unquoted token, and those
@@ -949,7 +949,7 @@ public final class TsonDataStream implements TsonEventSource {
 
     /**
      * One standalone annotation (§3.1): {@code "@" qualified-name [ ":" data-value ]}, the name resolving from the
-     * root as every name does ({@code @doc}, {@code @meta.doc}). Split out
+     * root as every name does ({@code @doc}, {@code @doc}). Split out
      * of {@link DataValueFrame} so {@link #nextAnnotationEvents()} can drive exactly this
      * production on its own -- [TSON-SCHEMA]'s own annotation positions (§12.1) reuse it the same
      * way {@link TsonSchemaParser} reuses {@code TsonDataParser.parseAnnotation()} today.

@@ -33,7 +33,7 @@ public record RationalParser(RationalType constraints) implements AtomTypeParser
     /** §5.6's built-in annotation name -- {@code !rational}. */
     public static final String TYPENAME = "rational";
 
-    /** {@code rational => !meta.rational_type {}} -- the unconstrained rational, §5.6's {@code !rational}. */
+    /** {@code rational => !numeric.rational_type {}} -- the unconstrained rational, §5.6's {@code !rational}. */
     public static final RationalParser UNCONSTRAINED = new RationalParser(RationalType.UNCONSTRAINED);
 
     public RationalParser(Optional<Rational> min, Optional<Rational> exclusiveMin, Optional<Rational> max,

@@ -81,10 +81,10 @@ class ValueReaderFactoryRegistryTest {
     void treeAndBindBothReadBooleanEnumMembersAsRealBooleans() {
         Top booleanEntry = new EnumBody(List.of("true", "false"));
 
-        TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("meta.enum")
-                .create("meta.boolean", booleanEntry, CONTEXT);
+        TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
+                .create("boolean", booleanEntry, CONTEXT);
         TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
-                .resolve("meta.enum").create("meta.boolean", booleanEntry, CONTEXT);
+                .resolve("enum").create("boolean", booleanEntry, CONTEXT);
 
         // Both use the object-binding enum factory, so boolean reads as a real Boolean (tree wraps it in a TsonAtom).
         assertEquals(Boolean.TRUE, Dom.of((TsonValue) treeReader.read(TestDocuments.document("true"))));
@@ -95,10 +95,10 @@ class ValueReaderFactoryRegistryTest {
     void treeAndBindReadAnOrdinaryEnumMemberAsItsText() {
         Top statusEntry = new EnumBody(List.of("ACTIVE", "INACTIVE"));
 
-        TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("meta.enum")
+        TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("status", statusEntry, CONTEXT);
         TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
-                .resolve("meta.enum").create("status", statusEntry, CONTEXT);
+                .resolve("enum").create("status", statusEntry, CONTEXT);
 
         assertEquals("ACTIVE", Dom.of((TsonValue) treeReader.read(TestDocuments.document("ACTIVE"))));
         assertEquals("ACTIVE", bindReader.read(TestDocuments.document("ACTIVE")));

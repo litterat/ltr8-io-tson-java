@@ -16,7 +16,7 @@ import java.util.Optional;
  * itself against {@code within} and {@code excluding}.
  *
  * <p><b>{@code spec} is flat, and a bare {@link String}</b> -- two separate requirements, both confirmed
- * empirically, not assumed. <b>Flat</b>, because {@code atom_specification}'s own {@code spec} field
+ * empirically, not assumed. <b>Flat</b>, because {@code atom.specification}'s own {@code spec} field
  * composes into {@code cidr4_type} flat (composition always flattens, §5.8) and {@code tson-compiler}'s
  * compiled {@code Record*Reader} fills a field, including a fixed field's schema-composed
  * default, under its own schema field name -- a component nesting it under a name the wire doesn't carry
@@ -27,7 +27,7 @@ import java.util.Optional;
  * TextType.pattern} is an {@code Optional<String>} rather than a compiled {@code Pattern}. Every atom
  * body in this package citing an external document follows both rules.
  *
- * <p>{@code within}/{@code excluding} are the schema's own {@code [value]?} (an optional array of
+ * <p>{@code within}/{@code excluding} are the schema's own {@code [meta.value]?} (an optional array of
  * the kernel's untyped {@code value}) -- modeled as a bare, always-present {@code List<String>}
  * (never {@code Optional<List<T>>}, which {@code ltr8-bind} doesn't support -- the same reason
  * every body's {@code supertypes}/{@code subtypes} are bare lists too), carrying each CIDR-text
@@ -61,7 +61,7 @@ public record Cidr4Type(TypeChain chain,
         return new Cidr4Type(chain, spec, minPrefix, maxPrefix, within, excluding);
     }
 
-    /** {@code cidr4 => !net.cidr4_type {}} -- the unconstrained IPv4 network, core.tn's own {@code !cidr4}. */
+    /** {@code cidr4 => !net.cidr4_type {}} -- the unconstrained IPv4 network, net.tn's own {@code !cidr4}. */
     public static final Cidr4Type UNCONSTRAINED = new Cidr4Type(
             "https://www.rfc-editor.org/rfc/rfc4632", Optional.empty(), Optional.empty(), List.of(), List.of());
 
@@ -96,7 +96,7 @@ public record Cidr4Type(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>The sharpest case in the package, because the schema names the rule outright rather than
-     * leaving it to be inferred: net.tn's own {@code @meta.doc} for this constructor says the prefix
+     * leaving it to be inferred: net.tn's own {@code @doc} for this constructor says the prefix
      * bounds narrow "within the family range 0-32" and that "bounds outside that range are invalid at
      * the schema level". So both facets are judged twice -- against each other, and against the 32
      * bits an IPv4 address has.

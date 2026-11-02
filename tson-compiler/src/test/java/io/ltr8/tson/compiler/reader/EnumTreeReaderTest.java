@@ -44,7 +44,7 @@ class EnumTreeReaderTest {
         Map<String, Top> entries =
                 new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries().entries());
         entries.put("flag_holder", RecordBody.of(RecordBody.fieldMap(Map.entry("flag",
-                RecordField.required(TypeRef.of("meta.boolean"))))));
+                RecordField.required(TypeRef.of("boolean"))))));
         // !!meta must be the real kernel identity, not a placeholder -- this schema's own
         // locals are the kernel's real constructor vocabulary verbatim, plus one extra entry, so
         // TsonSchemaLinker's own "only a kernel-governed schema may declare constructors" check

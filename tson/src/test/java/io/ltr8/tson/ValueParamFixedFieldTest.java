@@ -173,7 +173,7 @@ class ValueParamFixedFieldTest {
 
     /**
      * <b>The kernel declares one value channel, and a schema exercising every template shape resolves
-     * against it.</b> {@code record_field}'s labelled {@code ( value | value_param )?} group is gone: a
+     * against it.</b> {@code meta.record_field}'s labelled {@code ( value | value_param )?} group is gone: a
      * routed parameter rides {@code value} like any other token, with §8.1's shadowing rule to tell it from a
      * literal. The separate channel existed only because a body read as constructor vocabulary at its
      * declaration cannot otherwise say which of the two a token is, and no body is read that way any more.

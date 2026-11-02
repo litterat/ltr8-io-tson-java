@@ -82,7 +82,7 @@ class TsonSchemaLinkerTest {
         return new TsonSchema("https://example.test/s.tn", List.of(), AnnotatedMap.of(entries), false, Map.of(), facts);
     }
 
-    /** {@code @disjoint} written after {@code =>}, on {@code name}'s value -- the entry's facts. */
+    /** {@code @meta.disjoint} written after {@code =>}, on {@code name}'s value -- the entry's facts. */
     private static Map<String, TsonSchema.EntryFacts> disjointOn(String name) {
         return Map.of(name, TsonSchema.EntryFacts.NONE.withAnnotations(disjointMarker()));
     }
@@ -274,7 +274,7 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * §5.4's `@disjoint` assertion refuted: the author asserts disjointness the resolver can disprove.
+     * §5.4's `@meta.disjoint` assertion refuted: the author asserts disjointness the resolver can disprove.
      * Written after {@code =>}, so the marker rides on the value, among the entry's facts.
      */
     @Test
@@ -639,9 +639,9 @@ class TsonSchemaLinkerTest {
      */
     @Test
     void anImportLinksWhateverEitherSchemasMeta() {
-        for (List<String> metas : List.of(List.of("https://example.test/meta.tn", TsonBundledSchemas.META_ID),
-                List.of(TsonBundledSchemas.META_ID, "https://example.test/meta.tn"),
-                List.of("https://example.test/meta-api.tn", "https://example.test/meta.tn"))) {
+        for (List<String> metas : List.of(List.of("https://example.test/meta-core.tn", TsonBundledSchemas.META_ID),
+                List.of(TsonBundledSchemas.META_ID, "https://example.test/meta-core.tn"),
+                List.of("https://example.test/meta-api.tn", "https://example.test/meta-core.tn"))) {
             TsonLinkedSchema linked = linkImporting(metas.get(0), metas.get(1));
 
             assertEquals(Set.of("imported_a", "local_a"), linked.schema().entries().keySet(), metas::toString);

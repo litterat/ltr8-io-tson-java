@@ -40,7 +40,7 @@ class SkeletonDistinctnessPolicyTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              slug => !meta.identifier_type { continue_add: "-" }
+              slug => !unicode.identifier_type { continue_add: "-" }
               handlers => { slug => text }
               registry => { handlers: { slug => text } }
               team => { roles: set<slug> }

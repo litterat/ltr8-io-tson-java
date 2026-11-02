@@ -326,8 +326,8 @@ class SealedFamilyCheckTest {
 
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         Diagnostic refusal = diagnostics.getFirst();
-        assertTrue(refusal.message().contains("'dog_of<meta.text>' composes onto 'pet'"), refusal.message());
-        assertTrue(refusal.message().contains("'my_name => dog_of<meta.text>'"), refusal.message());
+        assertTrue(refusal.message().contains("'dog_of<text>' composes onto 'pet'"), refusal.message());
+        assertTrue(refusal.message().contains("'my_name => dog_of<text>'"), refusal.message());
         assertEquals("/kennel", refusal.schemaPointer().orElse(""), refusal.toString());
     }
 

@@ -42,7 +42,7 @@ class BindMismatchClassificationTest {
             !!id:"https://example.test/meta-bindmismatch.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              notification  => { path: meta.text }
+              notification  => { path: text }
               notifications => !meta.namespace { key_type: meta.identifier  value_type: notification }
             }
             """;

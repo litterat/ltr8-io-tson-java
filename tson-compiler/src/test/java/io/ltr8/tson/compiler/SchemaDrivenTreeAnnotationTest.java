@@ -49,8 +49,8 @@ class SchemaDrivenTreeAnnotationTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              label => @annotation text
-              checked => @annotation void
+              label => @meta.annotation text
+              checked => @meta.annotation void
               point => { x: int32  y: int32 }
               shape => { name: text  origin: point  tags: [text] }
               circle => shape & { radius: int32 }
@@ -105,7 +105,7 @@ class SchemaDrivenTreeAnnotationTest {
     @Test
     void anAnnotationValueIsReadByTheTypeItNames() {
         // @doc resolves through core's doc -> documentation -> text, @label through this schema's own
-        // `label => @annotation text`. Both come back as read values, not raw tokens.
+        // `label => @meta.annotation text`. Both come back as read values, not raw tokens.
         TsonValue shape = read(VALID);
 
         assertEquals(Optional.of("a shape"), shape.annotations().get(0).value().orElseThrow().asString());
@@ -122,7 +122,7 @@ class SchemaDrivenTreeAnnotationTest {
 
         assertEquals(Optional.of("shape"), shape.typeRef());
         assertEquals(Optional.of("point"), shape.get("origin").typeRef());
-        assertEquals(Optional.of("meta.text"), shape.get("name").typeRef());
+        assertEquals(Optional.of("text"), shape.get("name").typeRef());
     }
 
     @Test

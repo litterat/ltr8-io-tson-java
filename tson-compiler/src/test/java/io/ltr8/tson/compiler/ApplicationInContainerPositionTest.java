@@ -130,7 +130,7 @@ class ApplicationInContainerPositionTest {
 
         assertEquals(TypeRef.of(instantiation), children.elementType(), "the knot");
         assertEquals(Optional.of(BigInteger.ONE), children.minItems());
-        assertEquals(TypeRef.of("meta.text"), ((RecordBody) compiled.schema().entries().get(instantiation))
+        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries().get(instantiation))
                 .fields().values().stream().toList().get(0).type(), "T bound at the value field too");
     }
 
@@ -388,7 +388,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
                 compiled.schema().entries().get(outer.elementType().name()));
 
-        assertEquals(TypeRef.of("meta.text"), inner.elementType());
+        assertEquals(TypeRef.of("text"), inner.elementType());
     }
 
     /**
@@ -411,7 +411,7 @@ class ApplicationInContainerPositionTest {
         Top instantiation = compiled.schema().entries().get(array.elementType().name());
 
         assertEquals(List.of(), OpenEntry.parameterNames(instantiation), "closed");
-        assertEquals(TypeRef.of("meta.text"), ((RecordBody) instantiation).fields()
+        assertEquals(TypeRef.of("text"), ((RecordBody) instantiation).fields()
                 .values().stream().toList().get(0).type(),
                 "T bound");
         assertNotNull(compiled.get("box_carrier")
@@ -483,7 +483,7 @@ class ApplicationInContainerPositionTest {
         MapBody map = assertInstanceOf(MapBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, "m", "entries")));
 
-        assertEquals(TypeRef.of("meta.text"), ((RecordBody) compiled.schema().entries()
+        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries()
                 .get(map.valueType().name())).fields().values().stream().toList().get(0).type());
     }
 

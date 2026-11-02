@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A value of a namespace type standing as an entry: {@code myapi => !api { get_orders => { ... } }} under a meta
- * layer declaring {@code api => !namespace { key_type: identifier  value_type: method }}. The payload reads as
+ * layer declaring {@code api => !namespace { key_type: meta.identifier  value_type: method }}. The payload reads as
  * the map {@code api} describes, each key under its key family and each value under its value type, and the entry is
  * a {@link Namespace} built by {@code api}: a value, never a type, and what a qualified name's segment selects a key
  * of ({@code handler: myapi.get_orders}).
@@ -51,8 +51,8 @@ class NamespaceEntryTest {
                                  errors?: [meta.kind<meta.record>]
                                  replies?: {status_name => meta.kind<meta.record>} }
                   api       => !meta.namespace { key_type: meta.identifier  value_type: method }
-                  http_verb => !meta.enum [GET POST]
-                  route     => { verb: http_verb  path: meta.text  handler: meta.ref<method> }
+                  http_verb => !enum [GET POST]
+                  route     => { verb: http_verb  path: text  handler: meta.ref<method> }
                   router    => !meta.namespace { key_type: meta.identifier  value_type: route }
                 }
                 """);
@@ -135,12 +135,12 @@ class NamespaceEntryTest {
     @Test
     void aKeyKeepsItsAnnotations() {
         String id = schema("annotated", """
-                documented => !api { @meta.doc:"lists the orders" list => { response: order_list } }""");
+                documented => !api { @doc:"lists the orders" list => { response: order_list } }""");
         assertEquals(List.of(), problems(id));
         Namespace<?> documented = assertInstanceOf(Namespace.class,
                 valueOf(registry().resolveLinked(id).schema().entries().get("documented")));
         AnnotatedMap<String, ?> entries = documented.entries();
-        assertTrue(entries.getAnnotations("list").has("meta.doc"), entries.annotatedKeys().toString());
+        assertTrue(entries.getAnnotations("list").has("doc"), entries.annotatedKeys().toString());
     }
 
     // ── The walk ──────────────────────────────────────────────────────────────────────────────────────
@@ -223,7 +223,7 @@ class NamespaceEntryTest {
     /** The kernel's {@code namespace} is a constructor: an application of it declares a namespace type. */
     @Test
     void theNamespaceConstructorBuildsANamespaceType() {
-        String id = schema("constructed", "more => !meta.namespace { key_type: identifier  value_type: text }");
+        String id = schema("constructed", "more => !meta.namespace { key_type: meta.identifier  value_type: text }");
         assertEquals(List.of(), problems(id));
         TsonLinkedSchema linked = registry().resolveLinked(id);
         assertEquals(EntryKind.PRODUCT, linked.kindOf("more"));
@@ -232,7 +232,7 @@ class NamespaceEntryTest {
 
     // ── The entry is no type ──────────────────────────────────────────────────────────────────────────
 
-    /** {@code type_kind} holds the names of types; a namespace value is a value, so a value body's slot refuses it. */
+    /** {@code meta.type_kind} holds the names of types; a namespace value is a value, so a value body's slot refuses it. */
     @Test
     void aNamespaceEntryAtATypeKindSlotIsRefused() {
         refused(schema("type-slot", "other => !api { m => { response: myapi } }"),
@@ -245,7 +245,7 @@ class NamespaceEntryTest {
                 "'other' at /m/request", "'myapi' is a value of the type 'api'", "not a type");
     }
 
-    /** A field of a type declaration is a {@code type_kind} slot too, judged by the linker. */
+    /** A field of a type declaration is a {@code meta.type_kind} slot too, judged by the linker. */
     @Test
     void aNamespaceEntryTypesNoField() {
         refused(schema("field", "holder => { s: myapi }"), "'myapi'", "a value of the type 'api'", "not a type");
@@ -266,16 +266,16 @@ class NamespaceEntryTest {
     // ── Kinds ─────────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Construction is the walk a kind's members take: {@code api} is built with {@code namespace}, so {@code
-     * kind<namespace>} and {@code type_kind} hold it. {@code myapi} is a value of {@code api}, built by no constructor,
-     * so no kind holds it; a reference names it ({@code ref<api>}).
+     * Construction is the walk a kind's members take: {@code api} is built with {@code namespace}, so
+     * {@code meta.kind<namespace>} and {@code meta.type_kind} hold it. {@code myapi} is a value of {@code api}, built
+     * by no constructor, so no kind holds it; a reference names it ({@code meta.ref<api>}).
      */
     @Test
     void aNamespaceTypeIsAMemberOfItsKindsAndANamespaceEntryOfNone() {
         TsonLinkedSchema linked = registry().resolveLinked(schema("kinds", """
-                namespaces => kind<meta.namespace>
-                types      => kind<meta.type>
-                records    => kind<meta.record>"""));
+                namespaces => meta.kind<meta.namespace>
+                types      => meta.kind<meta.type>
+                records    => meta.kind<meta.record>"""));
 
         assertTrue(members(linked, "namespaces").contains("api"), members(linked, "namespaces").toString());
         assertTrue(members(linked, "types").contains("api"), members(linked, "types").toString());
@@ -285,12 +285,12 @@ class NamespaceEntryTest {
     }
 
     /**
-     * {@code api} is a type and no constructor, so a reference over it names values: {@code kind<api>} is {@code
-     * ref<api>}, and the names it admits are the entries holding a value of {@code api}, judged where one is written.
+     * {@code api} is a type and no constructor, so a reference over it names values: {@code meta.kind<api>} is {@code
+     * meta.ref<api>}, and the names it admits are the entries holding a value of {@code api}, judged where one is written.
      */
     @Test
     void aKindOfANamespaceTypeNamesItsValues() {
-        assertEquals(List.of(), problems(schema("kind-of-api", "apis => kind<api>")));
+        assertEquals(List.of(), problems(schema("kind-of-api", "apis => meta.kind<api>")));
     }
 
     private static List<String> members(TsonLinkedSchema linked, String kind) {

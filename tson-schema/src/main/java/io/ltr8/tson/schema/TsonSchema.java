@@ -18,7 +18,7 @@ import java.util.Optional;
 
 /**
  * A resolved schema (Part 2 §8): a value of the kernel's {@code schema}, the namespace type
- * <code>{type_name =&gt; declared}</code> ({@link #entries}, a {@link Namespace} typed {@value #SCHEMA}), plus the
+ * <code>{meta.type_name =&gt; declared}</code> ({@link #entries}, a {@link Namespace} typed {@value #SCHEMA}), plus the
  * directives its own document header carried ({@code !!id}, {@code !!import}*, §2.2)
  * -- the "produced schema" this module exists for, as opposed to {@code tson-compiler}'s grammar-only {@code
  * SchemaDocument}/{@code SchemaMap}. {@code entries}' insertion order is preserved, matching {@code
@@ -95,7 +95,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * (which is what tells a derived name from a declared one). {@code annotations} are those written after
      * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before
      * the name are the key's ({@link #entries}). {@code constructor} is the constructor
-     * the value applies -- the tag resolved output writes, {@code !meta.integer_type}, {@code !meta.enum}, {@code
+     * the value applies -- the tag resolved output writes, {@code !numeric.integer_type}, {@code !enum}, {@code
      * !meta.set_type} -- which binding erases into a class that several constructors share. {@code refines} is the
      * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
      * which is what lets a tightened constructor bind as the one it tightens, and the chain cannot tell it from a
@@ -190,17 +190,17 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * The declared type of a slot holding a reference by name, in the namespace of the schema declaring the slot's
      * record, which the reading schema's closure contains: what the reader of that slot was built from, so the linker
      * judges the name without walking the path back through the declarations. {@code of} is the slot's reference's
-     * {@code of}; {@code name} is the declared type as a message
-     * names it, {@code kind<record>} or {@code type_kind}. The role is how the read read the name; the linker judges
-     * it by what {@code of} names, a constructor's names being types' and any other type's values'.
+     * {@code of}; {@code name} is the declared type as a message names it, {@code meta.kind<record>} or
+     * {@code meta.type_kind}. The role is how the read read the name; the linker judges it by what {@code of} names, a
+     * constructor's names being types' and any other type's values'.
      */
     public record SlotType(Role role, String of, String name) {
 
         /** What the slot holds, which decides how the name it holds is judged. */
         public enum Role {
-            /** A type's name, read where {@code of} is a constructor ({@code kind<record>}, {@code type_kind}). */
+            /** A type's name, read where {@code of} is a constructor ({@code meta.kind<record>}, {@code meta.type_kind}). */
             KIND,
-            /** A value's qualified name, read where {@code of} is any other type ({@code ref<method>}). */
+            /** A value's qualified name, read where {@code of} is any other type ({@code meta.ref<method>}). */
             REFERENCE
         }
 
@@ -212,12 +212,12 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
 
         /** A slot typed by a kind whose {@code of} is {@code of}, named {@code name} where an author named it. */
         public static SlotType kind(String of, String name) {
-            return new SlotType(Role.KIND, of, name != null ? name : "kind<" + of + ">");
+            return new SlotType(Role.KIND, of, name != null ? name : "meta.kind<" + of + ">");
         }
 
-        /** A slot typed {@code ref<of>}, named {@code name} where an author named it. */
+        /** A slot typed {@code meta.ref<of>}, named {@code name} where an author named it. */
         public static SlotType reference(String of, String name) {
-            return new SlotType(Role.REFERENCE, of, name != null ? name : "ref<" + of + ">");
+            return new SlotType(Role.REFERENCE, of, name != null ? name : "meta.ref<" + of + ">");
         }
     }
 

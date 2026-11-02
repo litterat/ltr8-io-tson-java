@@ -51,9 +51,9 @@ public final class AliasChain {
     }
 
     /**
-     * Whether {@code annotations} holds one whose name reaches {@code target} through its alias hops: {@code
-     * @disjoint} under core's alias and {@code @meta.disjoint} alike name the kernel's {@code meta.disjoint}, itself
-     * an alias of {@code meta.void}, so the walk asks whether {@code target} is on the chain, not at its end.
+     * Whether {@code annotations} holds one whose name reaches {@code target} through its alias hops: an alias of
+     * the kernel's {@code meta.disjoint} names it as {@code @meta.disjoint} does, {@code meta.disjoint} itself being an
+     * alias of {@code void}, so the walk asks whether {@code target} is on the chain, not at its end.
      */
     public static boolean annotates(io.ltr8.annotation.Annotations annotations, String target,
                                     Map<String, ? extends Top> entries) {

@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * *reach* a compiled governing schema works.
  *
  * <p>Reading an entry that isn't itself a constructor (e.g. {@code
- * meta.bytes_encoding}, {@code meta.product_access_type}, {@code meta.top} -- ordinary declarations, not vocabulary
+ * binary.bytes_encoding}, {@code meta.product_access_type}, {@code meta.top} -- ordinary declarations, not vocabulary
  * this codebase's own factories build against) goes through {@link
  * TsonCompiledMetaSchema#compiledSchema()}'s own unscoped {@code get}, not {@link
  * TsonCompiledMetaSchema#reader}, which is deliberately scoped to constructor-declared entries only
@@ -57,9 +57,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TsonSchemaResolverCompiledMetaSchemaTest {
 
     /**
-     * The kernel, meta.tn, registered: its own instance declarations ({@code meta.bytes_encoding => !meta.enum
-     * [...]}) go through {@code resolveInstance}/{@code bindAtomInstance} as any schema's do, against the readers of
-     * the loader's pre-loaded stand-in.
+     * The kernel, meta.tn, and numeric.tn registered: their own instance declarations ({@code ieee_format =>
+     * !enum [...]}) go through {@code resolveInstance}/{@code bindAtomInstance} as any schema's do, against the
+     * readers of the loader's pre-loaded stand-in.
      *
      * <p><b>The kernel itself is registered via ordinary {@code SchemaResolver.resolveSchema}, not
      * the raw bootstrap output</b> ({@code TsonSchemaRegistry#register} refuses <i>any</i>
@@ -87,6 +87,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         registry.register(metaKernel);
 
         loader.loadMeta(TsonBundledSchemas.META_ID);
+        loader.loadMeta(TsonBundledSchemas.NUMERIC_ID);
 
         return loader;
     }
@@ -115,13 +116,13 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
-        // core's own !!import names meta.tn with a ?sha256= pin -- compare by identity.
-        assertEquals(CanonicalIdentity.canonicalize(TsonBundledSchemas.META_ID),
+        // core's first !!import names numeric.tn with a ?sha256= pin -- compare by identity.
+        assertEquals(CanonicalIdentity.canonicalize(TsonBundledSchemas.NUMERIC_ID),
                 CanonicalIdentity.canonicalize(coreDocument.imports().getFirst()));
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.imports().getFirst());
 
-        assertTrue(compiledMeta.schema().entries().containsKey("meta.bytes_encoding"));
+        assertTrue(compiledMeta.schema().entries().containsKey("atom.ordering"));
     }
 
     @Test
@@ -130,10 +131,10 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.imports().getFirst());
-        Object result = compiledMeta.compiledSchema().get("meta.bytes_encoding")
-                .read(TestDocuments.document("BASE64"));
+        Object result = compiledMeta.compiledSchema().get("atom.ordering")
+                .read(TestDocuments.document("TOTAL"));
 
-        assertEquals("BASE64", result);
+        assertEquals("TOTAL", result);
     }
 
     /** The kernel imports nothing: it is the bottom of every import chain, pre-loaded rather than resolved (§3.4). */
@@ -145,7 +146,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         assertEquals(List.of(), kernelDocument.imports());
         TsonCompiledMetaSchema compiledKernel = loader.loadMeta(TsonBundledSchemas.META_ID);
-        assertTrue(compiledKernel.schema().entries().containsKey("meta.integer_type"));
+        assertTrue(compiledKernel.schema().entries().containsKey("numeric.integer_type"));
         assertEquals("INDEX", compiledKernel.compiledSchema().get("meta.product_access_type")
                 .read(TestDocuments.document("INDEX")));
     }
@@ -459,10 +460,10 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         // The same entry set a genuinely registered kernel has: the bootstrap desugars its own document,
         // so TsonSchemaLinker.linkBootstrap has nothing left to add. Never registered (see the next test).
-        assertEquals(103, compiled.schema().entries().size());
+        assertEquals(91, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
-        assertNotNull(compiled.compiledSchema().get("meta.integer_size")
+        assertNotNull(compiled.compiledSchema().get("numeric.integer_size")
                 .read(TestDocuments.document("{ bits: 8 signed: true }")));
     }
 
@@ -508,8 +509,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_ID);
 
-        assertEquals("BASE64", compiled.compiledSchema().get("meta.bytes_encoding")
-                .read(TestDocuments.document("BASE64")));
+        assertEquals("TOTAL", compiled.compiledSchema().get("atom.ordering")
+                .read(TestDocuments.document("TOTAL")));
         // Still there, from the explicit registration step above.
         assertTrue(registry.get(TsonBundledSchemas.META_ID).isPresent());
     }

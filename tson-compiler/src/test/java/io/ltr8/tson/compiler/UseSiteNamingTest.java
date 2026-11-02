@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * author wrote as {@code @alias} on the type-ref, so {@code c: pct} over {@code pct => small} arrives at the
  * reader as {@code small} -- one shared reader, correctly named {@code small} for a position that names it
  * directly, and wrong for one that does not. A minted application ({@code e: b<10>}) is its expansion, an
- * entry whose content-derived key ({@code integer_type_10_100_786fbcfb}) appears nowhere in the author's file,
+ * entry whose content-derived key ({@code numeric_integer_type_10_100_786fbcfb}) appears nowhere in the author's file,
  * so its message leads with no name at all.
  *
  * <p>The name is chosen where a composite reader wires
@@ -41,7 +41,7 @@ class UseSiteNamingTest {
               small => !integer ^ { max: 100 }
               pct   => small
               outer => pct
-              b     => <N> !meta.integer_type { min: N  max: 100 }
+              b     => <N> !numeric.integer_type { min: N  max: 100 }
             """;
 
     /** Every diagnostic a read of {@code data} against {@code declarations} reports, message only. */

@@ -1,7 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 /**
- * The kernel's {@code record_extension_type} enum (Part 2 §5.2, §8.1) -- how a record may be realised.
+ * The kernel's {@code meta.record_extension_type} enum (Part 2 §5.2, §8.1) -- how a record may be realised.
  * {@link #OPEN} is the default and is omitted from resolver output text ("Fields at their default values are
  * omitted", {@code kernel-resolved.tn}'s own conventions note).
  *

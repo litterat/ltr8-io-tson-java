@@ -19,31 +19,32 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * The one predicate a name slot applies ([TSON-SCHEMA] §4.2, §5.12): a {@code reference} over {@code of} admits a
- * name exactly when <b>the type of the named entry's value, past its alias hops, IS-A {@code of}</b>. An entry's value
- * has a type, its tag: {@code order => { … }} holds a value of {@code record}, {@code int32 => !integer ^ { … }} a
- * value of {@code integer_type}, {@code orders => !api { … }} a value of {@code api}. A field's type position
- * ({@code type_kind}, the reference over {@code type}), {@code kind<record>} and {@code ref<method>} all ask it.
+ * The one predicate a name slot applies ([TSON-SCHEMA] §4.2, §5.12): a {@code reference} over {@code of} admits a name
+ * exactly when <b>the type of the named entry's value, past its alias hops, IS-A {@code of}</b>. An entry's value has a
+ * type, its tag: {@code order => { … }} holds a value of {@code record}, {@code int32 => !integer ^ { … }} a value of
+ * {@code integer_type}, {@code orders => !api { … }} a value of {@code api}. A field's type position
+ * ({@code meta.type_kind}, the reference over {@code type}), {@code meta.kind<record>} and {@code meta.ref<method>} all
+ * ask it.
  *
  * <p><b>What {@code of} names decides which names a slot holds</b> ({@link #namesTypes}): a constructor, {@code top}
  * or IS-A it, has types as its values, so the slot holds type names and the linker computes them ({@link #of}); any
  * other type has values as its values, and the slot holds a value's qualified name, which the linker judges where it
- * is written ({@code ValuesByName}). The partition is by {@code of}, never by the spelling: {@code kind<order>} and
- * {@code ref<order>} are one reference.
+ * is written ({@code ValuesByName}). The partition is by {@code of}, never by the spelling: {@code meta.kind<order>} and
+ * {@code meta.ref<order>} are one reference.
  *
  * <p><b>Membership of a type name is one walk</b> over resolved entries, never over spellings. From an entry, alias
  * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a template
  * over another constructor (a {@code template} body, which is no type) and a value entry are no type's name. For every
- * other entry the type of its value -- the tag resolved output writes, {@code !meta.record}, {@code !meta.identifier_type},
- * {@code !meta.namespace} -- is followed, through a constructor template's held body to the constructor it applies, until a
- * constructor is reached, and the entry is a member when that constructor is {@code of} or has {@code of} among its
- * supertypes. A record template is built with {@code record}, so a reference over {@code record} holds it. So does
- * the kernel's {@code top}, a fresh abstract record IS-A nothing. So does a constructor whose declaration is a record,
- * {@code uuid_type => atom & { … }}: its value is a record whose instances are declarations, and nothing in the
+ * other entry the type of its value -- the tag resolved output writes, {@code !meta.record}, {@code
+ * !unicode.identifier_type}, {@code !meta.namespace} -- is followed, through a constructor template's held body to the
+ * constructor it applies, until a constructor is reached, and the entry is a member when that constructor is {@code of} or
+ * has {@code of} among its supertypes. A record template is built with {@code record}, so a reference over {@code record}
+ * holds it. So does the kernel's {@code top}, a fresh abstract record IS-A nothing. So does a constructor whose declaration
+ * is a record, {@code uuid_type => atom & { … }}: its value is a record whose instances are declarations, and nothing in the
  * predicate sets it apart -- {@link io.ltr8.tson.schema.meta.EntryKind#isConstructor} answers for applicability, a
  * different question, and is not consulted here.
  *
- * <p><b>A reference is a member of itself where the walk says so.</b> {@code type_kind} is built with {@code
+ * <p><b>A reference is a member of itself where the walk says so.</b> {@code meta.type_kind} is built with {@code
  * reference}, which IS-A {@code type}, so it is one of the names it holds. Nothing loops: membership reads
  * constructors and never a reference's own members, and a value of a reference is a name, not a value read through
  * the type it names.
@@ -54,7 +55,7 @@ import java.util.function.Function;
  * itself reaches it whether or not a namespace in reach declares it: the name is the constructor's.
  *
  * <p><b>A reference is not a bound.</b> {@code of} is the type of the named entry's value, and the walk is
- * construction; {@code template_param.bound} names a type the argument itself IS-A.
+ * construction; {@code meta.template_param.bound} names a type the argument itself IS-A.
  */
 public final class KindMembers {
 

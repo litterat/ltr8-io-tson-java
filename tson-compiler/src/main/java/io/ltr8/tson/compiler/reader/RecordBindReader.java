@@ -211,7 +211,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      *
      * <p><b>Why a slot can want the raw token.</b> The kernel types every such slot {@code value}, whose
      * reader decodes ([TSON-DATA] §4) -- {@code 3} to an integer, {@code "3"} to a string. A component
-     * declared {@code Token} wants what was written: {@code record_field}'s own fixed and default values are
+     * declared {@code Token} wants what was written: {@code meta.record_field}'s own fixed and default values are
      * read later by the field's declared type and compared against what a document writes. A decoded host
      * object cannot fill one, and §8.2 wants the spelling kept.
      *

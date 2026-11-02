@@ -82,7 +82,7 @@ class TimeParserTest {
 
     /**
      * <b>{@code precision} constrains the value, not the spelling</b> (§5.5): {@code precision: N} admits an
-     * instant that is a whole number of 10⁻ᴺ seconds. meta.tn's own {@code @doc} gives the example this
+     * instant that is a whole number of 10⁻ᴺ seconds. temporal.tn's own {@code @doc} gives the example this
      * turns on -- "{@code 12:00:00.500} is admitted under {@code precision: 1}". The atom is exact either way: an
      * instant genuinely off the grid is refused rather than rounded onto it.
      */
@@ -97,7 +97,7 @@ class TimeParserTest {
         assertThrows(AtomValidationException.class, () -> type.read(token("10:15:30.1234Z")));
     }
 
-    /** meta.tn's own worked example, which counting written digits refuses and the value rule admits. */
+    /** numeric.tn's own worked example, which counting written digits refuses and the value rule admits. */
     @Test
     void aTrailingZeroSpellingOfAnAdmittedValueIsAdmitted() {
         TimeParser tenths = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),

@@ -102,9 +102,9 @@ class SchemaDesugarerTest {
         TsonSchemaParser parser = new TsonSchemaParser("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  plain => { a: meta.text }
+                  plain => { a: text }
 
-                  sugared => { tags: [meta.text] }
+                  sugared => { tags: [text] }
                 }""");
         SchemaDocument document = parser.parseSchemaDocument();
         SchemaPositions positions = parser.schemaPositions();
@@ -736,7 +736,7 @@ class SchemaDesugarerTest {
         return heldFields(template).entries().get(n).key().coreValue();
     }
 
-    /** One member of the {@code n}th {@code record_field} in a held {@code !record} binding record. */
+    /** One member of the {@code n}th {@code meta.record_field} in a held {@code !record} binding record. */
     private static CoreValue fieldSlot(Instance template, int n, String member) {
         RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().coreValue();
         return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()

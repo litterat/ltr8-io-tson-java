@@ -19,7 +19,7 @@
   reason DUPLICATE_FIELD's absence was a defect rather than an economy.
   """
 !schema {
-  diagnostic_code => !meta.enum [
+  diagnostic_code => !enum [
     FIELD_REQUIRED FIELD_FIXED FIELD_GROUP TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF SCOPE_NOT_ADMITTED
     ATOM_FORM_INVALID ATOM_CONSTRAINT_VIOLATION
     UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD CONFUSABLE_NAMES RESTRICTED_CHARACTER RESTRICTED_SCRIPT
@@ -38,7 +38,7 @@
     judged -- a schema that could not be obtained, a type with no Java class here, a construct not
     implemented -- so acceptance cannot be stated.
     """
-  outcome => !meta.enum [ ACCEPTED REJECTED UNDETERMINED ]
+  outcome => !enum [ ACCEPTED REJECTED UNDETERMINED ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule
     in the schema (schema_id, schema_pointer, schema_position). Either end may be missing -- a problem

@@ -103,7 +103,7 @@ fixed rather than kept.
   `Xid.UNICODE_VERSION` declares the version, as §7.1 asks.
 - **`Xid` is the shared property, and neither profile is it.** `Xid.isStart`/`isContinue` are exactly
   `XID_Start`/`XID_Continue`, joiners included; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts
-  nothing, and the kernel's `identifier` contract (`IdentifierProfile`) adds only `-`, requires NFC and applies
+  nothing, and the kernel's `meta.identifier` contract (`IdentifierProfile`) adds only `-`, requires NFC and applies
   the contextual joiner rule below. Keeping the property in one place is what stops the two drifting.
 - **ZWNJ/ZWJ continue a token; whether they may appear in a *name* is decided one layer up.** U+200C and
   U+200D are in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), and §7.1 admits them on that basis,
@@ -208,7 +208,7 @@ Key points:
   whether or not a space precedes them, since an adjacency message sends authors to the spaced spelling;
   `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
   unchanged and still catches everything else (`!int32"5"`).
-- **A name position takes an `identifier`, not merely a bare token, and the check sits in the grammar.**
+- **A name position takes an `meta.identifier`, not merely a bare token, and the check sits in the grammar.**
   `type-ref = "!" qualified-name` and `annotation = "@" qualified-name` (§7.4, SPEC-FEEDBACK.md #15): `TsonDataStream`
   matches each `.`-separated segment of a tag's or an annotation's name (`requireQualifiedName`, none empty) in full
   against `IdentifierProfile`
@@ -219,7 +219,7 @@ Key points:
   because names and values share one lexical class. So `!42x`, `!x..y` and `@x..y` are syntax errors rather than a
   reference to an undeclared type and an annotation carrying a name the format reserves. A dotted tag,
   `!geo.address { … }`, names a member of a nested schema map, resolved by the reading schema's walk, and a dotted
-  annotation, `@meta.doc`, names one the same way; a schemaless read keeps either as written, as it keeps any tag
+  annotation, `@atom.ordering`, names one the same way; a schemaless read keeps either as written, as it keeps any tag
   (`preservingUnknownTypeRefs`). **`field-name` does not reach that check**
   ([TSON-DATA] §2.5, [TSON-SCHEMA] §5.2): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`,
   narrower than the map key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because

@@ -20,7 +20,7 @@ public enum EntryKind {
      * A held template -- [TSON-SCHEMA] §5.10's open entry over any constructor but {@code record}, whose body is a
      * {@link TemplateBody}. It is not a type: it cannot validate data, and naming one where a type is expected is
      * a resolver error. A record template is a type, the family base, and takes a record's kind. Like {@link
-     * #ALIAS} it is a {@code type_kind} and not a base kind (§4.1), and it says nothing about what an
+     * #ALIAS} it is a {@code meta.type_kind} and not a base kind (§4.1), and it says nothing about what an
      * application of the template will produce -- that is the kind of the entry materialisation mints, derived
      * from the constructor its closed body applies.
      */
@@ -86,7 +86,7 @@ public enum EntryKind {
      * judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:
      * it is what every other answer IS-A, and as abstract as the base kinds beneath it, so its own reader is what
      * refuses a direct application of it. That is applicability, not kind membership: by the chain {@code top} is
-     * a type, and a member of {@code type_kind}.
+     * a type, and a member of {@code meta.type_kind}.
      *
      * @param name the entry whose value {@code value} is
      */

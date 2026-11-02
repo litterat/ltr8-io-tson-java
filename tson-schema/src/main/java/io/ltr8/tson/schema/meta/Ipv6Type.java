@@ -36,7 +36,7 @@ public record Ipv6Type(TypeChain chain,
         return new Ipv6Type(chain, spec, within, excluding);
     }
 
-    /** {@code ipv6 => !net.ipv6_type {}} -- the unconstrained IPv6 address, core.tn's own {@code !ipv6}. */
+    /** {@code ipv6 => !net.ipv6_type {}} -- the unconstrained IPv6 address, net.tn's own {@code !ipv6}. */
     public static final Ipv6Type UNCONSTRAINED =
             new Ipv6Type("https://www.rfc-editor.org/rfc/rfc4291", List.of(), List.of());
 

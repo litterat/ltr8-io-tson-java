@@ -53,8 +53,8 @@ import java.util.UUID;
  * wrote.
  *
  * <p><b>It exists for the {@code value}-typed slot.</b> [TSON-SCHEMA] §7.4 types a constructor's constraint
- * fields {@code meta.value}, and the bootstrap ordering behind it leaves no choice: {@code meta.duration_type} is
- * what defines a duration, and {@code duration => !meta.duration_type {}} lives a layer up in core.tn, so the kernel
+ * fields {@code value}, and the bootstrap ordering behind it leaves no choice: {@code temporal.duration_type} is
+ * what defines a duration, and {@code duration => !temporal.duration_type {}} lives a layer up in temporal.tn, so the kernel
  * cannot write {@code min: duration}. A slot typed {@code value} is decoded by [TSON-DATA] §4 base type
  * resolution and by nothing else, which resolves three classes and none of them is a duration -- so {@code
  * min: PT30M} arrives as the string {@code PT30M} and the position's own type is the only thing that says
@@ -161,7 +161,7 @@ public final class HostAtoms {
             Map.entry(double.class, FloatParser.FLOAT64), Map.entry(Double.class, FloatParser.FLOAT64),
             Map.entry(BigDecimal.class, DecimalParser.UNCONSTRAINED));
 
-    /** {@code core.tn}'s own {@code int<bits> => !integer ^ { size: { bits: <bits> signed: true } } }. */
+    /** {@code numeric.tn}'s own {@code int<bits> => !integer ^ { size: { bits: <bits> signed: true } } }. */
     private static AtomType<?> integer(int bits) {
         return new IntegerParser(new IntegerSize(bits, true));
     }

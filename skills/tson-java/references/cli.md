@@ -62,11 +62,9 @@ cached copy binds wherever it sits — or the `!!id` of a schema file on the com
 
 `tson strip <schema>` prints a schema's **reading form** to standard output — the same declarations in as few
 tokens as the syntax allows, for a reader that reads the schema rather than loading it, such as a language model
-given it in a prompt. The `!!id`, every `!!import` pin, and every `@doc`, `@title`, `@examples` and
-`@comment` are removed; a reference to the spec's own library is shortened to its revision and name
-(`!!import:"39/core"`); each directive and declaration gets one line. Other annotations stay, and other
-references keep their URLs. `--keep-docs` keeps `@doc`, `@title` and `@examples`; `@comment`, a note for
-maintainers, still goes.
+given it in a prompt. The `!!id`, every `!!import` pin, and every `@doc` are removed; a reference to the spec's own library
+is shortened to its revision and name (`!!import:"39/core"`); each directive and declaration gets one line. Other annotations
+stay, and other references keep their URLs. `--keep-docs` keeps `@doc`.
 
 The output is valid syntax but **not a loadable schema** — nothing resolves `"39/core"` — so the file is never
 rewritten. Exit codes: `0` printed, `1` not a well-formed schema document, `2` usage or an unreadable file.

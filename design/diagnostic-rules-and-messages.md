@@ -153,7 +153,7 @@ such an overload is how a diagnostic ends up with a blank structured half). `mes
 is free to do what a template could not: cite the spec, or name the fix.
 
 ```
-annotation '@title' is written bare, which §6 treats as '@title:_', but 'title' does not admit the void sentinel
+annotation '@doc' is written bare, which §6 treats as '@doc:_', but 'doc' does not admit the void sentinel
 'contact' has no variant matching this untagged value -- expected a value of one of
     (email, phone), or an explicit type annotation
 ```

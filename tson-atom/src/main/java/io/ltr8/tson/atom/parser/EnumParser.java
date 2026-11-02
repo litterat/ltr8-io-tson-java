@@ -17,8 +17,8 @@ import java.util.List;
  *
  * <p><b>Matches on the token's text directly, never through {@code BaseTypeResolver}'s
  * boolean/number/string identification.</b> This is the one thing that makes {@code boolean
- * => !meta.enum [true false]} readable at all: routed through generic identification (as a binding of the *schema*
- * {@code !meta.enum [true false]} instance through {@code TsonObjectReader}'s ordinary array/atom path would be),
+ * => !enum [true false]} readable at all: routed through generic identification (as a binding of the *schema*
+ * {@code !enum [true false]} instance through {@code TsonObjectReader}'s ordinary array/atom path would be),
  * {@code "true"}/
  * {@code "false"} get identified as actual TSON booleans before {@code EnumBody.members: List
  * <String>} ever sees them -- a real, permanent limit of generic binding (see this repo's own

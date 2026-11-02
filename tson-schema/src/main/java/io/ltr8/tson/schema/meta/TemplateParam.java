@@ -7,14 +7,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * One parameter of an open entry ({@code template_param}, [TSON-SCHEMA] §5.10, §8.1): its name, the type an
+ * One parameter of an open entry ({@code meta.template_param}, [TSON-SCHEMA] §5.10, §8.1): its name, the type an
  * argument for it is read as, and -- for a type parameter -- the bound an argument's type must IS-A.
  *
  * <p><b>{@link #type} is derived from the positions the parameter stands in</b>: a type slot gives
- * {@code type_kind}, a scalar slot of the applied constructor gives that slot's declared type, a routed default or
+ * {@code meta.type_kind}, a scalar slot of the applied constructor gives that slot's declared type, a routed default or
  * fixed value gives the field's own declared type, and a parameter riding another template's argument list takes
  * that template's recorded type for the position. So the parameter's kind is not a separate field: it is a type
- * parameter exactly when {@link #type} is {@code type_kind}.
+ * parameter exactly when {@link #type} is {@code meta.type_kind}.
  *
  * <p><b>A declaration may narrow what it derives</b>, {@code <T: text, N: int8>}, read by the kind the positions
  * give: on a value parameter it narrows {@link #type}; on a type parameter it is {@link #bound}. The two kinds
@@ -27,7 +27,7 @@ import java.util.Optional;
 @Typename(name = "meta.template_param")
 public record TemplateParam(String name, TypeRef type, Optional<TypeRef> bound) {
 
-    /** The kind of the types, {@code kind<type>}: what a type parameter's argument is read as, a type name. */
+    /** The kind of the types, {@code meta.kind<type>}: what a type parameter's argument is read as, a type name. */
     public static final TypeRef TYPE_KIND = TypeRef.of("meta.type_kind");
 
     @Record

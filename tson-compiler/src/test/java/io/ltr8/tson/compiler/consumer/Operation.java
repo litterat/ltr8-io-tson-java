@@ -12,7 +12,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * MetaLayerVocabularyTest#CONSUMER_NAMES}). {@link Typename} states the name it binds under where the binder's
  * convention would not find it; here it agrees with the convention.
  *
- * <p>{@code request}/{@code response} are {@link TypeRef}s at slots typed {@code type_kind}: the read records each
+ * <p>{@code request}/{@code response} are {@link TypeRef}s at slots typed {@code meta.type_kind}: the read records each
  * name with its slot and the linker judges it a member, so a name that resolves to nothing is an author error.
  */
 @Typename(name = "operation")

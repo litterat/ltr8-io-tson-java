@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.EntryKind;
@@ -40,7 +41,8 @@ class ChoiceSugarResolutionTest {
                 %s
                 }
                 """.formatted(body);
-        SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
+        SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(),
+                TsonBundledSchemas::fetch));
         return resolver.resolveSchema(new TsonSchemaParser(document).parseSchemaDocument());
     }
 
@@ -66,11 +68,11 @@ class ChoiceSugarResolutionTest {
      */
     @Test
     void aDeclaredChoiceIsASumEntryCarryingAChoiceBody() {
-        TsonSchema schema = resolve("  contact => (meta.text | meta.integer)");
+        TsonSchema schema = resolve("  contact => (text | integer)");
 
         Top contact = schema.entries().get("contact");
         assertEquals(EntryKind.SUM, EntryKind.of(contact, n -> true));
-        assertEquals(List.of("meta.text", "meta.integer"), variantNames(contact));
+        assertEquals(List.of("text", "integer"), variantNames(contact));
         assertEquals(java.util.Optional.of("meta.choice"), schema.constructorOf("contact"));
         assertTrue(TypeChain.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got "
                 + TypeChain.supertypesOf(contact));
@@ -79,9 +81,9 @@ class ChoiceSugarResolutionTest {
     /** More than two variants: §5.4 sets a floor of two, not a ceiling, and the array field takes them positionally. */
     @Test
     void aDeclaredChoiceKeepsEveryVariantInOrder() {
-        TsonSchema schema = resolve("  scalar => (meta.text | meta.integer | meta.boolean)");
+        TsonSchema schema = resolve("  scalar => (text | integer | boolean)");
 
-        assertEquals(List.of("meta.text", "meta.integer", "meta.boolean"), variantNames(schema.entries().get("scalar")));
+        assertEquals(List.of("text", "integer", "boolean"), variantNames(schema.entries().get("scalar")));
     }
 
     /**
@@ -92,10 +94,10 @@ class ChoiceSugarResolutionTest {
      */
     @Test
     void anInlineChoiceIsHoistedAndReferredToByName() {
-        TsonSchema schema = resolve("  person => { contact: (meta.text | meta.integer) }");
+        TsonSchema schema = resolve("  person => { contact: (text | integer) }");
 
         Map.Entry<String, Top> choice = injected(schema, "choice_text_integer_");
-        assertEquals(List.of("meta.text", "meta.integer"), variantNames(choice.getValue()));
+        assertEquals(List.of("text", "integer"), variantNames(choice.getValue()));
 
         RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
         assertEquals(choice.getKey(), person.fields().values().iterator().next().type().name());
@@ -108,10 +110,10 @@ class ChoiceSugarResolutionTest {
      */
     @Test
     void aVariantThatIsItselfASugarFormIsHoistedFirst() {
-        TsonSchema schema = resolve("  contact => ([meta.text] | meta.integer)");
+        TsonSchema schema = resolve("  contact => ([text] | integer)");
 
         String array = injected(schema, "array_text_").getKey();
-        assertEquals(List.of(array, "meta.integer"), variantNames(schema.entries().get("contact")));
+        assertEquals(List.of(array, "integer"), variantNames(schema.entries().get("contact")));
     }
 
     /**
@@ -121,7 +123,7 @@ class ChoiceSugarResolutionTest {
     @Test
     void twoIdenticalInlineChoicesCollapseToOneDeclaration() {
         TsonSchema schema = resolve("""
-                  person => { home: (meta.text | meta.integer)  work: (meta.text | meta.integer) }""");
+                  person => { home: (text | integer)  work: (text | integer) }""");
 
         String choice = injected(schema, "choice_text_integer_").getKey();
         RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));

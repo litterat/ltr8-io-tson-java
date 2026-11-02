@@ -9,7 +9,7 @@ import java.util.Optional;
 /**
  * The kernel's {@code namespace} constructor's own vocabulary, resolved ([TSON-SCHEMA] §4.1, §8.1): a map type
  * keyed by names. A namespace type is an instance, as a map type is one of {@code map} -- the kernel's {@code
- * schema} and {@code field_map}, and a schema's own {@code api => !meta.namespace { key_type: identifier  value_type:
+ * schema} and {@code field_map}, and a schema's own {@code api => !meta.namespace { key_type: meta.identifier  value_type:
  * method }} -- and a value of it is the map its facets describe, delivered as a {@link Namespace} where the position
  * asks for one. {@code access_pattern}/{@code size_type} are fixed ({@code NAMED}/{@code VARIABLE}) and never appear in
  * output.
@@ -34,7 +34,7 @@ public record NamespaceBody(TypeChain chain, @Field("key_type") Optional<TypeRef
     public static final String NAMESPACE = "meta.namespace";
 
     /** What a key of a host-supplied family is read as: a token, its spelling, judged later by the host. */
-    public static final String HOST_KEYS = "meta.text";
+    public static final String HOST_KEYS = "text";
 
     /** The chain normalised: absent and empty are one list. */
     @Record

@@ -42,7 +42,7 @@ public record GroupDef(List<Annotation> annotations, List<List<Member>> options,
     }
 
     /**
-     * The kernel's {@code field_group} for this group. {@code +} is sugar: {@code ( a: A | b: B )+} is the
+     * The kernel's {@code meta.field_group} for this group. {@code +} is sugar: {@code ( a: A | b: B )+} is the
      * non-optional group of one option whose members are all optional within it, so at least one is present.
      */
     public FieldGroup fieldGroup() {

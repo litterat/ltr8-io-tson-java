@@ -13,7 +13,7 @@ import io.ltr8.unicode.Xid;
  * the second is why the first is not enough on its own.
  *
  * <ul>
- *   <li><b>[TSON-SCHEMA] §8.2's freshness MUST</b>: an internal name is a valid {@code identifier}. Splicing
+ *   <li><b>[TSON-SCHEMA] §8.2's freshness MUST</b>: an internal name is a valid {@code meta.identifier}. Splicing
  *   raw text broke it outright -- a {@code text} field holding a path put {@code /} in a name, and
  *   [TSON-DATA] §7.7 admits only {@code XID_Continue} and {@code -}.</li>
  *   <li><b>§8.2's name hygiene has to be able to judge the result.</b> Admitting every {@code XID_Continue}
@@ -57,9 +57,10 @@ final class InternalName {
     /**
      * {@code text} as one part of a derived name -- its head, or one of its segments.
      *
-     * <p>A kernel path is first reduced to its member's name, {@code meta.text} to {@code text}: the readable half
-     * says what a name came from, and every kernel name carries the one prefix. Then four cases, in the order they
-     * are tested:
+     * <p>A path under {@code meta} is first reduced to its member's name, {@code meta.type_kind} to {@code type_kind}:
+     * the readable half says what a name came from, and the type system's names carry the one prefix. A path under
+     * the kernel's other maps keeps its first segment, {@code unicode.text_type} reading {@code unicode_text_type}.
+     * Then four cases, in the order they are tested:
      *
      * <ul>
      *   <li><b>ASCII, admitted by §7.7, and within {@link #MAX_PART}</b> -- spliced verbatim. This is the
@@ -78,7 +79,7 @@ final class InternalName {
      * template name and so already starts legally, and everything after it sits at a continue position.
      */
     static String part(String text) {
-        // A kernel entry reads as its own name, `meta.array` as `array`: every kernel name has the one prefix.
+        // A member of `meta` reads as its own name, `meta.array` as `array`.
         text = KernelNames.member(text);
         if (isAdmittedAscii(text) && text.length() <= MAX_PART) {
             return text;
@@ -109,7 +110,7 @@ final class InternalName {
     }
 
     /**
-     * A qualified name, its segments joined by {@code .}, each an ASCII identifier -- {@code meta.text}, {@code
+     * A qualified name, its segments joined by {@code .}, each an ASCII identifier -- {@code text}, {@code
      * geo.address} -- which a part spells with each dot written {@code _}. Its own path is no part of identity,
      * which the structural hash carries, so no hash of the text is needed to keep two paths apart.
      */

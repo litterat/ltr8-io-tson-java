@@ -29,7 +29,7 @@ class VoidVocabularyTest {
               slots   => !meta.array { element_type: int32  voidable: true }
               entries => !meta.map { key_type: text  value_type: int32  voidable: true }
               pair    => !meta.tuple { elements: [{ element_type: int32 } { element_type: text  voidable: true }] }
-              one     => { only: voidable_tuple1<int32> }
+              one     => { only: meta.voidable_tuple1<int32> }
               contact => !meta.record { fields: { email => { type: text  optional: true }
                                              phone => { type: text  optional: true } }
                                    groups: [ { members: [[email] [phone]]  optional: true } ] }

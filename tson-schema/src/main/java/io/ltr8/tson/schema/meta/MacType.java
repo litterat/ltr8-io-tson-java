@@ -34,6 +34,6 @@ public record MacType(TypeChain chain,
         return new MacType(chain, spec);
     }
 
-    /** {@code mac => !net.mac_type {}} -- the unconstrained MAC address, core.tn's own {@code !mac}. */
+    /** {@code mac => !net.mac_type {}} -- the unconstrained MAC address, net.tn's own {@code !mac}. */
     public static final MacType UNCONSTRAINED = new MacType("https://www.rfc-editor.org/rfc/rfc9542");
 }

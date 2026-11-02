@@ -94,7 +94,8 @@ class TsonCompiledSchemaRegistryTest {
     void theCoreCompilesOnlyTheSchemasAResolutionReadsThrough() {
         TsonCompiledMetaRegistry core = core();
 
-        // The kernel is the vocabulary every bundled schema's constructions read through -- compiled and cached here.
+        // The kernel documents are the vocabulary every bundled schema's constructions read through -- compiled and
+        // cached here.
         assertTrue(core.get(TsonBundledSchemas.META_ID).isPresent());
 
         // net.tn is read through by no other bundled schema -- resolved+registered, but never compiled here.

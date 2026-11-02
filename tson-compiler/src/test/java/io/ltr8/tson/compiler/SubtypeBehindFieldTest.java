@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A kind-typed slot that only a tagged subtype declares is judged wherever the value sits: held directly under a
- * namespace key, or one record field further down. {@code sb_op} declares {@code request: type_kind}; its base {@code
+ * namespace key, or one record field further down. {@code sb_op} declares {@code request: meta.type_kind}; its base {@code
  * sb_endpoint} declares nothing, and {@code sb_resource.endpoints} holds the family by its base. The slot's declared
  * type comes with the name from the reader that read it, so nothing walks the declared types back to the slot.
  */

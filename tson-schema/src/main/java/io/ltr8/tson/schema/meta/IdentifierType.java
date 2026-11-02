@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The kernel's {@code identifier_type} constructor ({@code text_type & atom_specification & { ... }}) -- a
+ * The kernel's {@code identifier_type} constructor ({@code text_type & atom.specification & { ... }}) -- a
  * UAX #31 identifier profile, with {@code text_type}'s facets applied inside it: lengths, a {@code pattern} such
  * as a naming convention, and {@code members} for a closed vocabulary of names. Pure constraint values;
  * {@code tson-atom}'s {@code IdentifierParser} holds one and does the reading, through the
@@ -28,11 +28,11 @@ import java.util.Optional;
  * <p>Every field is flat, mirroring the resolved shape rather than the composition that produced it, as
  * {@link UriType}'s are. {@code continue} is a Java keyword, so its component is {@link #continueBase}.
  *
- * <p>{@code identifier => !meta.identifier_type { continue_add: "-" }} is a constructor-application instance (§5.5)
+ * <p>{@code identifier => !unicode.identifier_type { continue_add: "-" }} is a constructor-application instance (§5.5)
  * whose resolved body is exactly {@link #IDENTIFIER}, and whose profile is [TSON-DATA] §7.7's: {@code tson-atom}'s
  * {@code IdentifierGrammar} builds the series' name grammar from it.
  */
-@Typename(name = "meta.identifier_type")
+@Typename(name = "unicode.identifier_type")
 public record IdentifierType(TypeChain chain,
         String spec,
         @Field("min_length") Optional<Integer> minLength,
@@ -72,13 +72,13 @@ public record IdentifierType(TypeChain chain,
     /** {@code identifier_type.spec}'s pinned value. */
     public static final String SPEC = "https://www.unicode.org/reports/tr31/";
 
-    /** {@code identifier => !meta.identifier_type { continue_add: "-" }} -- [TSON-DATA] §7.7's identifier. */
+    /** {@code identifier => !unicode.identifier_type { continue_add: "-" }} -- [TSON-DATA] §7.7's identifier. */
     public static final IdentifierType IDENTIFIER = new IdentifierType(SPEC, Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Base.XID, Base.XID, Optional.empty(),
             Optional.of("-"), Optional.empty(), Optional.empty(), Normalization.NFC);
 
     /**
-     * {@code scheme_name => !meta.identifier_type { start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"
+     * {@code scheme_name => !unicode.identifier_type { start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"
      * normalization: ASCII_CASEFOLD }} -- RFC 3986 §3.1's scheme, the element of {@code uri_type.schemes}: a
      * letter, then letters, digits, {@code + - .}. The profile judges the folded value, so it admits a scheme
      * however its ASCII letters are cased, and nothing that is not ASCII.
@@ -110,7 +110,7 @@ public record IdentifierType(TypeChain chain,
      *
      * <p>The text facets narrow as {@link TextType}'s own rule says, {@code normalization} among them. <b>The
      * profile facets do not move at all</b>: a refinement restates each one or leaves it. Narrowing a profile
-     * has no use a fresh {@code !meta.identifier_type} does not serve better, and an addition set cannot follow the
+     * has no use a fresh {@code !unicode.identifier_type} does not serve better, and an addition set cannot follow the
      * other facets' set-once rule, because setting {@code start_add} on a source that left it unset widens the profile --
      * the one direction a refinement never goes. The sets compare as sets, however they are spelled.
      */

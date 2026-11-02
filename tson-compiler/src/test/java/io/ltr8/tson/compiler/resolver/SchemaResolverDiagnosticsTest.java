@@ -163,7 +163,7 @@ class SchemaResolverDiagnosticsTest {
         assertEquals(List.of("/bad_max", "/bad_min"),
                 diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
         for (Diagnostic diagnostic : diagnostics) {
-            assertTrue(diagnostic.message().contains("not valid data for 'meta.integer_type'"), diagnostic.message());
+            assertTrue(diagnostic.message().contains("not valid data for 'numeric.integer_type'"), diagnostic.message());
             assertTrue(diagnostic.schemaPosition().isPresent(), diagnostic.schemaPointer().orElseThrow());
         }
     }

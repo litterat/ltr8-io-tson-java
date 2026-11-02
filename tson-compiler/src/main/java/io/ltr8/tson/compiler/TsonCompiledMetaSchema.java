@@ -16,8 +16,8 @@ import java.util.Set;
  * heads and annotation values through. One namespace per schema ([TSON-SCHEMA] §3.3.1, SPEC-FEEDBACK.md #7) puts
  * every constructor of the import closure in reach, and the resolver reads {@code !C value} through the compiled form
  * of the schema that declared {@code C} ({@code SchemaResolver}'s vocabulary), which is one of these. Any schema
- * compiles to one -- the kernel, meta.tn, a library declaring constructors of its own -- and {@link
- * TsonCompiledMetaRegistry#loadMeta} caches each by identity.
+ * compiles to one -- meta.tn, numeric.tn, temporal.tn, net.tn, a library declaring constructors of its own -- and
+ * {@link TsonCompiledMetaRegistry#loadMeta} caches each by identity.
  *
  * <p>Holds, beside the compiled entries, the reader for an <em>instance</em> of each constructor it declares or
  * imports ({@link #reader}): every entry IS-A {@code top}, keyed by its own name. The factory that builds a reader for
@@ -83,9 +83,9 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
     /**
      * Every entry IS-A {@code top} ([TSON-SCHEMA] §4.1), with the reader for an instance of it -- the same predicate
      * {@code DefinitionResolver}'s own gate asks, so a head that gate admits has a reader here, and one it refuses
-     * never reaches this table. Wider than {@code constructor}, by the base kinds and {@code alias}; narrower than
-     * the whole namespace, by every component record ({@code record_field}, {@code template_param}, …), which is a part of
-     * a type and not one.
+     * never reaches this table. Wider than {@code constructor}, by the base kinds and {@code alias}; narrower than the
+     * whole namespace, by every component record ({@code meta.record_field}, {@code meta.template_param}, …), which is
+     * a part of a type and not one.
      */
     private static Map<String, TsonTypeReader<?>> buildConstructors(TsonCompiledSchema compiledSchema) {
         Map<String, TsonTypeReader<?>> constructors = new HashMap<>();
@@ -118,7 +118,7 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
 
     /**
      * The constructor name a resolved body identifies as -- its own {@code @Typename}, e.g. {@code "meta.record"}/{@code
-     * "meta.float_type"}. Package-private so {@link TsonSchemaCompiler} dispatches a body to its factory the same way
+     * "numeric.float_type"}. Package-private so {@link TsonSchemaCompiler} dispatches a body to its factory the same way
      * this class scopes one. A value entry is built by no constructor and is never dispatched.
      */
     static String typenameOf(Top body) {

@@ -141,7 +141,7 @@ class AtomValueReaderTest {
     @Test
     void iriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        Map<String, Object> result = readAgainstRealEntry("meta.iri", metaKernel.entries().get("meta.iri"),
+        Map<String, Object> result = readAgainstRealEntry("iri", metaKernel.entries().get("iri"),
                 "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
         assertEquals(io.ltr8.net.Iri.parse("https://example.com/a/b?x=1#frag", io.ltr8.net.Iri.Grammar.IRI),
@@ -151,7 +151,7 @@ class AtomValueReaderTest {
     @Test
     void regexUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        Map<String, Object> result = readAgainstRealEntry("meta.regex", metaKernel.entries().get("meta.regex"),
+        Map<String, Object> result = readAgainstRealEntry("regex", metaKernel.entries().get("regex"),
                 "{ value: \"[a-z]+\" }");
 
         assertEquals("[a-z]+", result.get("value"));

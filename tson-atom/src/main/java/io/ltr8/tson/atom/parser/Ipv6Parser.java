@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 
 /**
  * the kernel's {@code ipv6_type} constructor (§5.5's {@code ipv6} atom, RFC 4291 §2.2's text
- * representation -- core.tn: "IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers
+ * representation -- net.tn: "IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers
  * (RFC 4007, {@code fe80::1%eth0}) are host-local and excluded from the contract.").
  *
  * <p>Same reasoning as {@link Ipv4Parser}: this does not hand the token's text to {@code
@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  *
  * <p>Zone identifiers ({@code %eth0}) need no special-case rejection: {@code %} simply isn't in
  * this grammar's character set, so a zone suffix fails as an ordinary malformed group -- matching
- * core.tn's exclusion of them from the contract.
+ * net.tn's exclusion of them from the contract.
  *
  * <p>Unlike {@link Ipv4Parser}'s decimal octets, a hex group's leading zeros are not rejected --
  * RFC 4291 §2.2 defines a group as "one to four hexadecimal digits", a digit *count* restriction,

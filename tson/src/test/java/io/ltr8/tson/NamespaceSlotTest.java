@@ -90,7 +90,7 @@ class NamespaceSlotTest {
     void aRootReadAskedForANamespaceDeliversTheConstructorsInstance() {
         Tson tson = tson();
         Namespace<?> read = tson.objectReader().withSchema(TsonBundledSchemas.META_ID)
-                .readAs("{ person => !meta.record { fields: { name => !meta.record_field { type: meta.text } } } }",
+                .readAs("{ person => !meta.record { fields: { name => !meta.record_field { type: text } } } }",
                         "meta.schema", Namespace.class);
         assertEquals(TsonSchema.SCHEMA, read.type());
         assertInstanceOf(RecordBody.class, read.get("person"));

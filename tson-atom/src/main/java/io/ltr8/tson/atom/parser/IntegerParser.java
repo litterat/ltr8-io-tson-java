@@ -157,7 +157,7 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
     /**
      * The width bounds precomputed, because they are constants of the type and were being rebuilt on every
      * value validated: {@code BigInteger.TWO.pow(bits)} per bound per integer read, which profiling put at
-     * 5% of everything a bind read allocated. Keyed by {@link IntegerSize} and covering the ladder core.tn
+     * 5% of everything a bind read allocated. Keyed by {@link IntegerSize} and covering the ladder numeric.tn
      * declares; an exotic width falls through to {@link #bounds} computing its own, so nothing here grows
      * with what a schema declares.
      */
@@ -198,7 +198,7 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
     }
 
     /**
-     * {@link #hostType} for the ladder core.tn declares, computed once: {@link #read} asks it for every value,
+     * {@link #hostType} for the ladder numeric.tn declares, computed once: {@link #read} asks it for every value,
      * and deriving it means both width bounds, which is what {@link #STANDARD_BOUNDS} exists to avoid.
      */
     private static final Map<IntegerSize, Class<?>> STANDARD_HOSTS = standardHosts();

@@ -5,16 +5,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * The real, published identities of the four schema documents this library bundles and pre-loads -- meta (the
- * kernel: every kind, constructor, base instance and annotation type of the series under one entry, {@code meta},
- * pre-loaded by special resolution, [TSON-SCHEMA] §3.4), core (the core type library, importing meta), net (the
- * network type library: addresses, networks and host names, importing meta) and policy (the processor policy's
- * vocabulary, [TSON-DATA] §8.2, §9.1) -- plus {@link #fetch}, their raw source text, straight off this module's own
- * classpath.
+ * The real, published identities of the six schema documents this library bundles and pre-loads -- meta (the kernel:
+ * the one wait cycle a processor closes by pre-loading, every name it references and the concepts that belong with
+ * them, [TSON-SCHEMA] §3.4), the three data-format libraries importing it alone, numeric (the exact and approximate
+ * numbers), temporal (dates, times, durations and periods) and net (addresses, networks, host names, URIs and UUIDs),
+ * core (importing the three, so one import has every bundled type, and declaring the author annotations) and policy
+ * (the processor policy's vocabulary, [TSON-DATA] §8.2, §9.1) -- plus {@link #fetch}, their raw source text, straight
+ * off this module's own classpath. Each document's root holds the vocabulary an author writes, and its machinery
+ * sits under open nested maps: the kernel's under six ({@link KernelNames}), the libraries' constructors under
+ * {@code numeric}, {@code temporal} and {@code net}, numeric's and net's being two of the kernel's.
  *
  * <p>Both the identities and their source text live here, in {@code tson-schema}: "what these documents
  * are" (identity) and "where their content lives" (fetch) sit in the one module every consumer of them
@@ -30,16 +34,23 @@ import java.util.Optional;
 public final class TsonBundledSchemas {
 
     /**
-     * The kernel's own real, published identity -- see {@code spec/m/meta.tn}'s own {@code !!id}. The one kernel this
-     * library's compiled-reader machinery is built against, pre-loaded and bound to the software's revision.
+     * The kernel's own real, published identity -- see {@code spec/m/meta.tn}'s own {@code !!id}. The one document
+     * pre-loaded and bound to the software's revision, and the one this library's compiled-reader machinery is built
+     * against.
      */
     public static final String META_ID = "https://tson.io/2026/39/m/meta.tn";
 
-    /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
-    public static final String CORE_ID = "https://tson.io/2026/39/m/core.tn";
+    /** numeric's own real, published identity -- see {@code spec/m/numeric.tn}'s own {@code !!id}. */
+    public static final String NUMERIC_ID = "https://tson.io/2026/39/m/numeric.tn";
+
+    /** temporal's own real, published identity -- see {@code spec/m/temporal.tn}'s own {@code !!id}. */
+    public static final String TEMPORAL_ID = "https://tson.io/2026/39/m/temporal.tn";
 
     /** net's own real, published identity -- see {@code spec/m/net.tn}'s own {@code !!id}. */
     public static final String NET_ID = "https://tson.io/2026/39/m/net.tn";
+
+    /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
+    public static final String CORE_ID = "https://tson.io/2026/39/m/core.tn";
 
     /** policy's own real, published identity -- see {@code spec/m/policy.tn}'s own {@code !!id}. */
     public static final String POLICY_ID = "https://tson.io/2026/39/m/policy.tn";
@@ -50,42 +61,63 @@ public final class TsonBundledSchemas {
      * pre-loaded schema can be verified, and so the shipped resource can be checked against its own published digest
      * ({@link #declaredSha256}).
      */
-    public static final String META_SHA256 = "0335e318a8ea9b3a9e108ac6b0ef6cf930def8353ce3cafbb241d4c037cacd54";
+    public static final String META_SHA256 = "42525fb6ede3f8252c61606d2da0e5abb1086015acce1b2c0ccf3ce038749681";
+
+    /** numeric's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/numeric.tn}'s !!id. */
+    public static final String NUMERIC_SHA256 = "05cdc90d827b98132fe24fa36597e3fd58670678827d2cec578cb2635cd498e1";
+
+    /** temporal's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/temporal.tn}'s !!id. */
+    public static final String TEMPORAL_SHA256 = "cd009d945ced685234626c30e98bccc2dec38e9c2a8037e530bcd3c05606eee2";
+
+    /** net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code !!id}. */
+    public static final String NET_SHA256 = "fa2d2ddead277bdba71ee76c0f764bffe65b8235f454d71a2ea8436b0fd02330";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. */
-    public static final String CORE_SHA256 = "6d57f04f65608aab13769156208c59087b7a3ab3fab695f9b10c0e7a3659f8e0";
+    public static final String CORE_SHA256 = "4ac202cad2f2a6c2903050043e411c1161c92dfcf7f570d530c8f8109d1141e3";
+
+    /** policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s !!id. */
+    public static final String POLICY_SHA256 = "c933a060cd78183d5c8bae76c6fd500c5d28bf3c0ef69e2e830827856f8c5897";
 
     /**
-     * net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code
-     * !!id}.
+     * The six identities in dependency order: the kernel, the three libraries importing it alone, core importing the
+     * libraries, and policy. An entry's document precedes every document importing it.
      */
-    public static final String NET_SHA256 = "b78221075ed3dbb9411d3d90a39d09f759d98a08dba15f5252dc333cb70d0322";
+    public static final List<String> IDS = List.of(META_ID, NUMERIC_ID, TEMPORAL_ID, NET_ID, CORE_ID, POLICY_ID);
 
     /**
-     * policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s {@code
-     * !!id}.
+     * The data-format libraries, each importing the kernel alone and declaring its constructors under a schema map of
+     * its own name ({@code numeric}, {@code temporal}, {@code net}), in dependency order.
      */
-    public static final String POLICY_SHA256 = "36c6d94a3423c62d0d963c84020a794567d3d471b344ea6b4652c959e695db6b";
+    public static final List<String> LIBRARY_IDS = List.of(NUMERIC_ID, TEMPORAL_ID, NET_ID);
 
     private static final Map<String, String> RESOURCES = Map.of(
-            META_ID, "/meta.tn",
-            CORE_ID, "/core.tn",
-            NET_ID, "/net.tn",
-            POLICY_ID, "/policy.tn");
+            CanonicalIdentity.canonicalize(META_ID), "/meta.tn",
+            CanonicalIdentity.canonicalize(NUMERIC_ID), "/numeric.tn",
+            CanonicalIdentity.canonicalize(TEMPORAL_ID), "/temporal.tn",
+            CanonicalIdentity.canonicalize(NET_ID), "/net.tn",
+            CanonicalIdentity.canonicalize(CORE_ID), "/core.tn",
+            CanonicalIdentity.canonicalize(POLICY_ID), "/policy.tn");
 
     private static final Map<String, String> DIGESTS = Map.of(
             CanonicalIdentity.canonicalize(META_ID), META_SHA256,
-            CanonicalIdentity.canonicalize(CORE_ID), CORE_SHA256,
+            CanonicalIdentity.canonicalize(NUMERIC_ID), NUMERIC_SHA256,
+            CanonicalIdentity.canonicalize(TEMPORAL_ID), TEMPORAL_SHA256,
             CanonicalIdentity.canonicalize(NET_ID), NET_SHA256,
+            CanonicalIdentity.canonicalize(CORE_ID), CORE_SHA256,
             CanonicalIdentity.canonicalize(POLICY_ID), POLICY_SHA256);
+
+    private static final String KERNEL_IDENTITY = CanonicalIdentity.canonicalize(META_ID);
 
     private TsonBundledSchemas() {
     }
 
     /**
-     * Whether {@code identity} names the kernel, meta.tn, in any spelling of its identity -- the test an entry's origin
-     * is put to for the entry to be the kernel's own, which is what a kind and a constructor are judged by
-     * ([TSON-SCHEMA] §4.1). {@code false} for {@code null} and for a string that names no identity.
+     * Whether {@code identity} names the kernel, meta.tn, in any spelling of its identity: the one document
+     * pre-loaded by special resolution ([TSON-SCHEMA] §3.4), and the test an entry's origin is put to for the entry to
+     * be the kernel's own, which is what a kind and a constructor are judged by ([TSON-SCHEMA] §4.1). An entry's
+     * identity is its declaring document and its path, so a member a user schema contributes to {@code meta}, or a
+     * library to {@code numeric}, is no kernel entry. {@code false} for {@code null} and for a string that names no
+     * identity.
      */
     public static boolean isKernel(String identity) {
         if (identity == null) {
@@ -101,8 +133,6 @@ public final class TsonBundledSchemas {
         }
     }
 
-    private static final String KERNEL_IDENTITY = CanonicalIdentity.canonicalize(META_ID);
-
     /**
      * The published content-hash digest this library holds for {@code uri} if it names a pre-loaded
      * bundled schema, else empty ([TSON-SCHEMA] §10.2). Matched by canonical identity, so a plain or a
@@ -113,19 +143,24 @@ public final class TsonBundledSchemas {
     }
 
     /**
-     * Returns one of the four bundled schemas' own raw source text, straight off this module's own
+     * Returns one of the six bundled schemas' own raw source text, straight off this module's own
      * classpath -- the resources {@code tson-schema/build.gradle.kts}'s {@code processResources} task
-     * copies in from the repo's own {@code spec/m/}.
+     * copies in from the repo's own {@code spec/m/}. Matched by canonical identity, as {@link #declaredSha256} is,
+     * so an {@code !!import} that pins its target ({@code core.tn}'s of the libraries) is served as written.
      *
-     * @throws IllegalStateException if {@code uri} isn't one of {@link #META_ID}/{@link #CORE_ID}/{@link
-     *                                #NET_ID}/{@link #POLICY_ID}
+     * @throws IllegalStateException if {@code uri} names none of {@link #IDS}
      */
     public static String fetch(String uri) {
-        String resource = RESOURCES.get(uri);
+        String resource;
+        try {
+            resource = RESOURCES.get(CanonicalIdentity.canonicalize(uri));
+        } catch (io.ltr8.tson.base.SchemaValidationException notAnIdentity) {
+            resource = null;
+        }
         if (resource == null) {
             throw new IllegalStateException(
                     "'" + uri + "' is not one of this library's own bundled schemas "
-                            + "(meta, core, net, policy)");
+                            + "(meta, numeric, temporal, net, core, policy)");
         }
         try (InputStream in = TsonBundledSchemas.class.getResourceAsStream(resource)) {
             if (in == null) {

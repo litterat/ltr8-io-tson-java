@@ -32,7 +32,7 @@ class JsonQualifiedTagTest {
                 address => { street: text }
                 point   => { x: int32  y: int32 }
               }
-              holder => { at: (geo.address | geo.point)  any: declared }
+              holder => { at: (geo.address | geo.point)  any: meta.declared }
             }""";
 
     private static Tson processor() {

@@ -10,7 +10,7 @@ history lives in git.
   identifier family -- a member name keying a map whose key type is one included; the token policy reaches map keys and
   string values.
 - Under a schema only an **unmatched** name is judged, and it is judged before it is reported as `UNRECOGNIZED_FIELD`:
-  declared fields, then hygiene. Nothing collects between them -- a record absorbs no member it does not declare.
+  meta.declared fields, then hygiene. Nothing collects between them -- a record absorbs no member it does not declare.
 - A map key is a name only where its type is an identifier family, so open-ended data in a map keyed by anything else
   meets no identifier rule.
 - `JsonObjectReader` holds a position and `JsonTreeReader`'s schemaless read does not: that read applies no identifier

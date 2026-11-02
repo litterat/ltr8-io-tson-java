@@ -226,7 +226,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     /**
      * [TSON-DATA] §8.2's <b>restricted-character and restricted-script</b> rules over the three names a Class 1
      * document carries -- a type-ref name, an annotation name and a record's field names, every position §7.4
-     * marks {@code identifier}.
+     * marks {@code meta.identifier}.
      *
      * <p>A field name reaches the same rules as the other two because it is the same thing: §2.5 makes it an
      * identifier at every layer, so there is one name rule and no per-conformance-class exception to it. The

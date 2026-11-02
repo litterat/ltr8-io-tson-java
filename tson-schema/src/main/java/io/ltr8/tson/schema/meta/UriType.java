@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn's {@code uri_type} constructor (§5.5's {@code uri} and {@code uri_reference} atoms):
- * {@code text_type}'s length and pattern facets, {@code atom_specification}'s {@code spec} pinned to RFC
+ * net.tn's {@code net.uri_type} constructor (§5.5's {@code uri} and {@code uri_reference} atoms):
+ * {@code text_type}'s length and pattern facets, {@code atom.specification}'s {@code spec} pinned to RFC
  * 3986, and its own {@code schemes}, {@code allow_relative} and {@code allow_fragment} fields. Pure constraint values, no
  * parsing/validation behavior -- {@code tson-atom}'s {@code UriParser} holds one of these and does the
  * actual reading/writing.
@@ -35,10 +35,10 @@ import java.util.Optional;
  * own source text ({@link String}), not a compiled {@link java.util.regex.Pattern} -- see {@link
  * TextType#pattern()}.
  *
- * <p>{@code uri_reference => !meta.uri_type {}} resolves to exactly {@link #REFERENCE}, and {@code uri =>
+ * <p>{@code uri_reference => !net.uri_type {}} resolves to exactly {@link #REFERENCE}, and {@code uri =>
  * !uri_reference ^ { allow_relative: false }} to {@link #URI}.
  */
-@Typename(name = "meta.uri_type")
+@Typename(name = "net.uri_type")
 public record UriType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                       @Field("max_length") Optional<Integer> maxLength,
@@ -70,7 +70,7 @@ public record UriType(TypeChain chain,
     /** RFC 3986, the one {@code spec} every {@code uri_type} carries. */
     public static final String SPEC = "https://www.rfc-editor.org/rfc/rfc3986";
 
-    /** {@code uri_reference => !meta.uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
+    /** {@code uri_reference => !net.uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
     public static final UriType REFERENCE = new UriType(SPEC, Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), true, true, Normalization.NONE);
 
@@ -79,7 +79,7 @@ public record UriType(TypeChain chain,
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true, Normalization.NONE);
 
     /**
-     * Whether {@code scheme} is one {@link #schemes} admits: compared in {@code scheme_name}'s form, the scheme
+     * Whether {@code scheme} is one {@link #schemes} admits: compared in {@code net.scheme_name}'s form, the scheme
      * folded as §3.1 compares one, so {@code HTTP} is the element {@code http}.
      */
     public boolean admitsScheme(String scheme) {

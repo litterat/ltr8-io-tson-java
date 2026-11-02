@@ -45,8 +45,8 @@ class IdentifierValueHygieneTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              slug => !meta.identifier_type { continue_add: "-" }
-              js_name => !meta.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+              slug => !unicode.identifier_type { continue_add: "-" }
+              js_name => !unicode.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
               handlers => { slug => text }
               bindings => { js_name => text }
               labels => { text => text }
@@ -187,8 +187,8 @@ class IdentifierValueHygieneTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  slug => !meta.identifier_type { continue_add: "-" }
-                  js_name => !meta.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+                  slug => !unicode.identifier_type { continue_add: "-" }
+                  js_name => !unicode.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
                   %s
                 }
                 """.formatted(declaration);

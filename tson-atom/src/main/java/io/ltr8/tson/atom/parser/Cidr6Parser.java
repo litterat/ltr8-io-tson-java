@@ -58,10 +58,10 @@ public record Cidr6Parser(Cidr6Type constraints) implements AtomTypeParser<CidrI
      * §5.5's {@code within}/{@code excluding} for a <em>network</em> value, which are not the address
      * family's rules. {@code within}: the value must be a <b>subnet</b> of at least one listed network.
      * {@code excluding}: the value must not <b>overlap</b> any -- overlap rather than containment, so a value
-     * wider than an excluded block cannot smuggle it through, which is what net.tn's own {@code @meta.doc} asks
+     * wider than an excluded block cannot smuggle it through, which is what net.tn's own {@code @doc} asks
      * for.
      *
-     * <p>The lists are text here because the facets are typed {@code [value]}; every entry has already been
+     * <p>The lists are text here because the facets are typed {@code [meta.value]}; every entry has already been
      * checked to be a network at schema load ({@code Cidr6Type.coherenceCheck}), so a null from {@code parse}
      * is unreachable rather than an author error.
      */

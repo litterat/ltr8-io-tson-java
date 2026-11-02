@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 
 /**
  * Finds the {@link ValueReaderFactory} registered for a constructor name (e.g. {@code "meta.record"}, {@code
- * "meta.array"}, {@code "meta.integer_type"}). {@link ValueReaderFactoryRegistry} is the one real implementation -- a
+ * "meta.array"}, {@code "numeric.integer_type"}). {@link ValueReaderFactoryRegistry} is the one real implementation -- a
  * fixed table covering the kernel's own closed constructor vocabulary, one instance per mode ({@link
  * ValueReaderFactoryRegistry#tree}/{@link ValueReaderFactoryRegistry#bind}). A compile dispatches each entry's own
  * resolved body to the right factory by its constructor name, through one such set; {@link TsonCompiledMetaSchema}

@@ -11,7 +11,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * A reference ({@code ref<T>}, the kernel's {@code reference}) is declared in any schema: one namespace per schema
+ * A reference ({@code meta.ref<T>}, the kernel's {@code reference}) is declared in any schema: one namespace per schema
  * (SPEC-FEEDBACK.md #7) puts the kernel's {@code ref} in every closure reaching core.tn or meta.tn, a schema a meta
  * layer governs among them, and the constructor applied directly is no different from the template that spells it.
  * What a reference may name is still judged: a type, never a constructor, whose types a kind names.
@@ -34,11 +34,11 @@ class ReferenceDeclarationTest {
 
     private static final String PICKS = """
               order => { id: text }
-              rpick => { m: ref<order> }""";
+              rpick => { m: meta.ref<order> }""";
 
     /** The same, importing the kernel alone: its entries are named by their paths. */
     private static final String KERNEL_PICKS = """
-              order => { id: meta.text }
+              order => { id: text }
               rpick => { m: meta.ref<order> }""";
 
     @Test
@@ -77,12 +77,12 @@ class ReferenceDeclarationTest {
     }
 
     /**
-     * {@code ref<record>} is {@code kind<record>}: one reference whose {@code of} is a constructor, so the slot holds a
-     * type's name. Which template spelled it makes no difference.
+     * {@code meta.ref<record>} is {@code meta.kind<record>}: one reference whose {@code of} is a constructor, so the
+     * slot holds a type's name. Which template spelled it makes no difference.
      */
     @Test
     void aReferenceToAConstructorNamesTypes() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/ref-to-constructor.tn",
-                META, CORE, "  pick => { m: ref<meta.record> }")));
+                META, CORE, "  pick => { m: meta.ref<meta.record> }")));
     }
 }

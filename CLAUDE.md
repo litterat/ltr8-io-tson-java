@@ -20,7 +20,7 @@ Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the 
 |---|---|
 | **Lexing and data parsing** | `lexer-and-data-parsing.md` (lexer, Tier 2 stream, Tier 3 AST) · `base-types-and-atom-vocabulary.md` (§4 resolution, `tson-atom`) |
 | **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, lifts) · `desugaring-open-forms-and-templates.md` |
-| **Resolution** | `references.md` (the forms a name takes, an application's argument list; which slot is typed `type_kind` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@synthetic`, meta-kernel bootstrap) |
+| **Resolution** | `references.md` (the forms a name takes, an application's argument list; which slot is typed `meta.type_kind` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.synthetic`, meta-kernel bootstrap) |
 | **Templates (§5.10)** | `held-template-bodies.md` (`TemplateBody`, parameter kinds) · `template-materialisation.md` (`TemplateMaterialiser`, `SyntheticMerge`, regularity) |
 | **Linking** | `linking-and-compilation.md` (registry, identity, import merge, link order, values by name) · `kinds-and-name-types.md` (`KindMembers`, `name_type`) · `inhabitance-and-record-extension.md` · `choice-disjointness.md` · `meta-layer-namespaces.md` (namespace types, value entries, `ValueEntry`) · `name-hygiene-and-minted-names.md` (`checkNames`, `InternalName`) |
 | **Compilation** | `class2-compilation.md` (`TsonSchemaCompiler`, `CompiledReaders`, `ErrorReader`, untagged choices) · `compiled-registries.md` (the two registries, concurrency) |
@@ -48,14 +48,14 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
 and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 38, not
-edited here) with **two exceptions that are live**: `spec/m/{meta,core,net,policy}.tn` are packaged from here at
-build time, and `spec/tson-part3-json.md` is edited in place.
+edited here) with **two exceptions that are live**: `spec/m/{meta,numeric,temporal,net,core,policy}.tn` are packaged
+from here at build time, and `spec/tson-part3-json.md` is edited in place.
 
 **Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
 `TsonBundledSchemas`' digests on every load, so one stale constant fails `Tson.standard()` and most of the suite.
 `scripts/restamp-bundled-schemas.sh` re-pins everything in dependency order (`--check` reports only); Part 2 §13.2's
-table in `spec/` is the one pin it does not write. Keep `spec/m/*-resolved.tn` in step — `ResolvedFixtureTest` checks
-them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
+table in `spec/` is the one pin it does not write. Keep `spec/fixtures/*-resolved.tn` in step — `ResolvedFixtureTest`
+checks them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
 
 **Branches.** `main` is the reference implementation of the *published* revision (38): identities `/2026/38/m/`,
 version `0.38.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`,

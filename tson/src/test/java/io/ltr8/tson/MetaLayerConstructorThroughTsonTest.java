@@ -50,14 +50,14 @@ class MetaLayerConstructorThroughTsonTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               operation => {
-                path:     meta.text
-                method:   meta.text
+                path:     text
+                method:   text
                 request:  meta.type_kind
                 response: meta.type_kind
               }
               operations => !meta.namespace { key_type: meta.identifier  value_type: operation }
               webhook => {
-                path:     meta.text
+                path:     text
                 delivers?: [meta.type_kind]?
               }
             }

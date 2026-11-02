@@ -49,7 +49,7 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
   not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in one
   document both get reported. No construct the bundled schemas declare reaches one; what still can is
-  a value's qualified name at a reference-typed position of a data document (`ref<T>` over a type that is no
+  a value's qualified name at a reference-typed position of a data document (`meta.ref<T>` over a type that is no
   constructor), and, in a schema, an instance of a constructor of types
   the schema declares itself (`c => meta.product & { … }`, `x => !c { … }`). A constructor, a type or an annotation type
   declared in the same document is otherwise read in wait order, whichever is written first. A data tag
@@ -137,7 +137,7 @@ a location this really emits. `schemaId`/`expected`/`actual` use `""` and offer 
 in code points, the offset counting UTF-8 bytes from 0. Rendered `line:column:byteOffset`.
 
 **The schema end is the path taken through your schema**, accumulated as the read descends, never the
-leaf it resolves to: `/person/age`, not `/int32` in core.tn. The leaf names a file the author did not
+leaf it resolves to: `/person/age`, not `/int32` in numeric.tn. The leaf names a file the author did not
 write and never mentions the field they can edit. A record re-anchors id + position on itself.
 
 ## Receivers

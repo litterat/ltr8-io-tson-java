@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code identifier_type} end to end: a UAX #31 profile whose text facets apply inside it, so a naming convention is a
  * {@code pattern} and a closed vocabulary of names is {@code members} -- each refused as a facet, where a name outside
  * the profile is refused as the profile. Reached both by refining a family the schema declares ({@code slug}, under a
- * name of its own: the kernel's {@code identifier} is in every closure reaching core) and by constructing the family
+ * name of its own: the kernel's {@code meta.identifier} is in every closure reaching core) and by constructing the family
  * directly, with the kernel's profile or another. A refinement narrows the text facets and restates the profile, never
  * moves it.
  */
@@ -28,13 +28,13 @@ class IdentifierFamilyTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              slug => !meta.identifier_type { continue_add: "-" }
+              slug => !unicode.identifier_type { continue_add: "-" }
               snake_name => !slug ^ { pattern: "[a-z][a-z0-9_]*" }
-              direction => !meta.identifier_type { members: [north south] }
+              direction => !unicode.identifier_type { members: [north south] }
               route => { name: snake_name  heading: direction }
               handlers => { slug => text }
-              kebab_name => !meta.identifier_type { medial: "-" }
-              js_name => !meta.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+              kebab_name => !unicode.identifier_type { medial: "-" }
+              js_name => !unicode.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
               short_kebab => !kebab_name ^ { max_length: 12  medial: "-" }
               header => { name: kebab_name  binding: js_name }
             }
@@ -82,7 +82,7 @@ class IdentifierFamilyTest {
         assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, refused.getFirst().code());
     }
 
-    /** An {@code identifier} types a map key as a name, so a key outside the grammar is refused. */
+    /** A {@code meta.identifier} types a map key as a name, so a key outside the grammar is refused. */
     @Test
     void anIdentifierKeyedMapRefusesAKeyOutsideTheGrammar() {
         assertEquals(List.of(), validate("!handlers { create => a  delete-all => b }"));
@@ -117,7 +117,7 @@ class IdentifierFamilyTest {
     @Test
     void anIncoherentProfileIsRefused() {
         List<Diagnostic> refused = tson().validateSchema(
-                schemaWith("both => !meta.identifier_type { continue_add: \"-\"  medial: \"-\" }"));
+                schemaWith("both => !unicode.identifier_type { continue_add: \"-\"  medial: \"-\" }"));
         assertEquals(1, refused.size(), refused.toString());
         assertTrue(refused.getFirst().message().contains("medial and also Start or Continue"),
                 refused.getFirst().toString());
@@ -129,7 +129,7 @@ class IdentifierFamilyTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  slug => !meta.identifier_type { continue_add: "-" }
+                  slug => !unicode.identifier_type { continue_add: "-" }
                   %s
                 }
                 """.formatted(declaration);

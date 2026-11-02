@@ -26,13 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies {@code !!import} merging against a real bundled document importing the kernel: net.tn, resolved via {@link
  * SchemaResolver#resolveSchema} over a registered kernel, whose own constructors under {@code net} compose the
- * kernel's {@code meta.atom} and {@code meta.atom_specification} -- names visible only through the merge.
+ * kernel's {@code meta.atom} and {@code atom.specification} -- names visible only through the merge.
  */
 class MetaSchemaImportTest {
 
     /**
-     * The kernel resolved the ordinary way and registered (the registry refuses the raw bootstrap output, {@code
-     * bootstrap() == true}), then net.tn's own document resolved over it -- its raw, unregistered, local-only result,
+     * The kernel resolved the ordinary way and registered (the registry refuses the raw bootstrap output,
+     * {@code bootstrap() == true}), then net.tn's own document resolved over it -- its raw, unregistered, local-only result,
      * so {@code TsonSchemaRegistry#register}'s import merge runs one stage later, in the test.
      */
     private static TsonSchema parseNet(TsonSchemaRegistry registry) {
@@ -40,11 +40,12 @@ class MetaSchemaImportTest {
         TsonCompiledMetaRegistry compiledRegistry = new TsonCompiledMetaRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
-        SchemaDocument kernelDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID))
-                .parseSchemaDocument();
-        TsonSchema kernel = new SchemaResolver(loader).resolveSchema(kernelDocument);
-        TsonLinkedSchema registeredKernel = registry.register(TsonSchemaLinker.link(kernel, registry));
-        compiledRegistry.register(registeredKernel.schema());
+        for (String id : List.of(TsonBundledSchemas.META_ID)) {
+            SchemaDocument document = new TsonSchemaParser(TsonBundledSchemas.fetch(id)).parseSchemaDocument();
+            TsonSchema resolved = new SchemaResolver(loader).resolveSchema(document);
+            registry.register(TsonSchemaLinker.link(resolved, registry));
+            compiledRegistry.register(resolved);
+        }
 
         SchemaDocument netDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.NET_ID))
                 .parseSchemaDocument();
@@ -56,15 +57,15 @@ class MetaSchemaImportTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
         TsonSchema net = parseNet(registry);
-        // `net`, its eight constructors, the eight instances at the root, and the two arrays the desugar phase
-        // lifts at the root: `within`/`excluding` are `[meta.value]` and `types`/`suffixes` `[meta.text]`.
-        assertEquals(19, net.entries().size(), "expected every net.tn declaration to resolve");
+        // `net`, its eleven constructors, the twelve instances at the root, and the two arrays the desugar phase
+        // lifts at the root: `within`/`excluding` are `[meta.value]` and `types`/`suffixes` `[text]`.
+        assertEquals(26, net.entries().size(), "expected every net.tn declaration to resolve");
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(net, registry));
 
         // The kernel's imported entries are visible in the merged, validated namespace.
         assertTrue(registered.schema().entries().containsKey("meta.atom"));
-        assertTrue(registered.schema().entries().containsKey("meta.atom_specification"));
+        assertTrue(registered.schema().entries().containsKey("atom.specification"));
         // net.tn's own composition against an imported supertype resolved and validated correctly.
         assertTrue(registered.schema().entries().containsKey("net.ipv4_type"));
         assertEquals(Ipv4Type.UNCONSTRAINED, registered.schema().entries().get("ipv4"));

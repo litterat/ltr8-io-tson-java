@@ -32,7 +32,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * TsonCompiledSchemaLoader} that fills it. It pairs with a {@link TsonSchemaRegistry}'s store of resolved schemas,
  * adding the compiled half a resolution reads through: a schema whose constructors or annotation types another
  * schema's closure reaches is compiled here, in object-binding mode, once per identity ({@link #loadMeta}). In
- * practice that is the kernel, plus any library declaring constructors of its own. Every schema is
+ * practice that is the kernel, meta.tn, and numeric.tn, temporal.tn and net.tn, plus any library declaring
+ * constructors of its own. Every schema is
  * <i>resolved</i> here -- registered into the paired {@link TsonSchemaRegistry} via {@link #resolveLinked} -- and
  * compiled per mode for reading data in a {@link TsonCompiledSchemaRegistry}.
  *
@@ -47,8 +48,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Content hashes are recorded and verified per identity along the way ([TSON-DATA] §2.2.1, [TSON-SCHEMA]
  * §10.2).
  *
- * <p><b>{@link #withStandardLibrary} is the ordinary entry point</b>: it builds a registry with the five
- * bundled schemas (meta, core, net, policy) already loaded -- fetched straight from {@link
+ * <p><b>{@link #withStandardLibrary} is the ordinary entry point</b>: it builds a registry with the six
+ * bundled schemas ({@link TsonBundledSchemas#IDS}) already loaded -- fetched straight from {@link
  * TsonBundledSchemas}, so it works whatever the configured source. The plain constructors leave the
  * registry empty, for a caller that populates it itself. Any schema governed by (or importing) the
  * bundled schemas then reuses what's already in {@link #get} rather than recompiling its chain.
@@ -74,7 +75,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader {
 
-    private static final String KERNEL_IDENTITY = CanonicalIdentity.canonicalize(TsonBundledSchemas.META_ID);
+    private static final String KERNEL_IDENTITY =
+            CanonicalIdentity.canonicalize(TsonBundledSchemas.META_ID);
 
     private final TsonSchemaRegistry schemaRegistry;
     private final ValueReaderFactoryResolver resolver;
@@ -84,7 +86,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private final Map<String, TsonCompiledMetaSchema> compiled = new LinkedHashMap<>();
     private final Map<String, TsonCompiledSchema> trees = new ConcurrentHashMap<>();
     /**
-     * The kernel's bootstrap stand-in, compiled on the first lookup of its identity and reused until the
+     * Meta-kernel's bootstrap stand-in, compiled on the first lookup of its identity and reused until the
      * ordinarily resolved kernel is registered. The bootstrap is a function of the bundled bytes and this
      * registry's resolver alone, so two threads racing here build equal values and either may win.
      */
@@ -166,7 +168,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /**
      * @param context the object-binding context this registry compiles vocabulary with -- always
-     *     object-binding mode (a DOM resolver can't resolve the {@code !meta.enum}/{@code !integer} instances a
+     *     object-binding mode (a DOM resolver can't resolve the {@code !enum}/{@code !integer} instances a
      *     schema declares), so it is taken as a {@link DataBindContext} and the bind-mode {@code
      *     ValueReaderFactoryResolver} is built from it here rather than accepted directly and possibly wrong.
      * @param source where {@link #loadMeta}/{@link #resolveLinked} fetch a not-yet-registered schema's
@@ -193,7 +195,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     /**
      * Compiles {@code linked} against this registry's own object-binding resolver as vocabulary ({@link
      * TsonCompiledMetaSchema#compile}), without registering or caching it. The one-off/bootstrap path: it is how
-     * kernel itself is first compiled, pre-loaded ([TSON-SCHEMA] §3.4). {@code linked} is expected to come from
+     * the kernel itself is first compiled, pre-loaded ([TSON-SCHEMA] §3.4). {@code linked} is expected to come from
      * {@code TsonSchemaLinker#linkBootstrap} for that case. Also compiles an already-resolved entry set that never went
      * through this registry's own fetch/resolve pipeline.
      */
@@ -202,7 +204,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /**
-     * A registry with this library's four bundled schemas -- meta, core, net, policy -- already loaded,
+     * A registry with this library's six bundled schemas ({@link TsonBundledSchemas#IDS}) already loaded,
      * plus {@code source} for any other, non-bundled URIs a caller later resolves. This is the ordinary
      * way to get a working registry; the plain constructors leave it empty (for a caller that populates
      * it itself, e.g. a test bootstrapping in isolation).
@@ -248,17 +250,16 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /**
-     * Loads this library's four bundled schema documents into this registry in dependency order, so any
+     * Loads this library's six bundled schema documents into this registry in dependency order, so any
      * schema importing them resolves. Each is fetched straight from {@link TsonBundledSchemas} (never the
      * configured {@code source}) and registered; its own {@code !!import} targets are cache hits
-     * by the time they're needed (the kernel, meta.tn, is resolved ordinarily against its pre-loaded stand-in and registered
+     * by the time they're needed (the kernel is resolved ordinarily against its pre-loaded stand-in and registered
      * explicitly -- see {@link #loadMeta}).
      */
     private void loadStandardLibrary() {
-        registerBundled(TsonBundledSchemas.META_ID);
-        registerBundled(TsonBundledSchemas.CORE_ID);
-        registerBundled(TsonBundledSchemas.NET_ID);
-        registerBundled(TsonBundledSchemas.POLICY_ID);
+        for (String id : TsonBundledSchemas.IDS) {
+            registerBundled(id);
+        }
     }
 
     /**
@@ -350,13 +351,13 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * {@link #schemaRegistry} on demand, but <b>not</b> compiling it or caching a compiled result. This is
      * what a per-mode {@link TsonCompiledSchemaRegistry} reads a user schema through, and what an {@code
      * !!import} target is resolved through: the schema is resolved once here (bind-anchored, so its own
-     * {@code !meta.enum}/{@code !integer} instances bind correctly), and each read registry compiles the
+     * {@code !enum}/{@code !integer} instances bind correctly), and each read registry compiles the
      * returned linked form itself, in its own mode -- so a non-meta schema is never compiled and cached in
      * this core just to be read or imported. Idempotent via {@link #schemaRegistry} (a second call is a
      * cache hit); this reference's own {@code ?sha256=} pin is verified each call (§10.2).
      *
      * <p>For ordinary schemas only -- not the kernel's pre-loaded bootstrap, which {@link
-     * #loadMeta} owns (the kernel is never registered, so it has no linked form here to hand back).
+     * #loadMeta} owns (the kernel's stand-in is never registered, so it has no linked form here to hand back).
      */
     @Override
     public TsonLinkedSchema resolveLinked(String uri) {

@@ -39,7 +39,8 @@ public final class Tson {
 }
 ```
 
-`Tson.standard()` bootstraps the four bundled schemas — meta.tn (the kernel), core.tn, net.tn and policy.tn — and returns
+`Tson.standard()` bootstraps the six bundled schemas — meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn
+and policy.tn — and returns
 an immutable instance.
 Resolution is **always bind-anchored** (meta instances bind to `schema.meta.Top`), so `resolve` takes no
 mode; only the final compile picks one, which is why **the read mode is which registry you hold**.
@@ -282,7 +283,7 @@ public sealed abstract class AtomTypeException extends RuntimeException
         permits AtomParseException, AtomValidationException { public String expected(); }
 ```
 
-`IdentifierGrammar` is §7.7's name grammar: `PROFILE` (the kernel `identifier`'s `IdentifierProfile`),
+`IdentifierGrammar` is §7.7's name grammar: `PROFILE` (the kernel `meta.identifier`'s `IdentifierProfile`),
 `validate(text)` and §8.2's `hygiene(text)`, each the violation or empty.
 
 `AtomParseException` is a token outside the atom's grammar (`ATOM_FORM_INVALID`); `AtomValidationException`
@@ -478,9 +479,10 @@ everything, are fail-fast by design.
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`: the schema
   pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`, `contextExtendedWith(binder)`,
-  `extendedWith(binder)`, `over(context)`: the names under the kernel's `meta` and net.tn's `net` bound to the schema
-  model, each by its last segment, every other name to the consumer's — `over` is what `Tson.of` builds its one context
-  with), and `SourcePositionStringBridge`.
+  `extendedWith(binder)`, `over(context)`: every entry of meta.tn (its root names and its members of `meta`, `atom`,
+  `numeric`, `unicode`, `net` and `binary`) and each library's members under its map (`numeric`, `temporal`, `net`) bound to
+  the schema model, each by its last segment, every other name to the consumer's — `over` is what `Tson.of` builds its one
+  context with), and `SourcePositionStringBridge`.
 
 ---
 
@@ -553,10 +555,10 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
                                Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
     public String originOf(String entryName);       // which document declared it, transitively
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
-    public Optional<Top> nameType(String entryName); // a record's name_type, where not field_name
-    public boolean isKernel(String entryName);      // the kernel's own entry, judged by origin
+    public Optional<Top> nameType(String entryName); // a record's name_type, where not meta.field_name
+    public boolean isKernel(String entryName);      // declared by meta.tn, judged by origin
     public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
-    public boolean isConstructor(String name, Top value); // IS-A the kernel's top
+    public boolean isConstructor(String name, Top value); // IS-A the kernel's meta.top
     public Optional<NamespaceBody> namespace(String entryName); // the namespace type it is, if it is one
 }
 
@@ -569,9 +571,11 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
 }
 
 public final class TsonBundledSchemas {
-    public static final String META_ID / CORE_ID / NET_ID / POLICY_ID;   // META_ID is the kernel
-    public static final String META_SHA256 / CORE_SHA256 / NET_SHA256 / POLICY_SHA256;
-    public static boolean isKernel(String identity);
+    public static final String META_ID / NUMERIC_ID / TEMPORAL_ID / NET_ID / CORE_ID / POLICY_ID; // META_ID: kernel
+    public static final String META_SHA256 / NUMERIC_SHA256 / TEMPORAL_SHA256 / NET_SHA256 / CORE_SHA256 / POLICY_SHA256;
+    public static final List<String> IDS;               // all six, in dependency order
+    public static final List<String> LIBRARY_IDS;       // numeric, temporal, net: each imports the kernel alone
+    public static boolean isKernel(String identity);    // meta.tn, the one kernel document, pre-loaded
     public static Optional<String> declaredSha256(String uri);
     public static String fetch(String uri);
 }
@@ -604,21 +608,21 @@ value annotations, its constructor tag, the entry a refinement names — is in `
 host values the atoms read to
 are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`,
 `Alias`, `TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a
-map of them, a namespace type (`operations => !meta.namespace { key_type: identifier  value_type: operation }`, a
+map of them, a namespace type (`operations => !meta.namespace { key_type: meta.identifier  value_type: operation }`, a
 `NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search =>
 { … } }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a
 member of no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind
 context binds one (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its
 references. A slot
-typed by a reference (`ReferenceBody`, spelled `kind<T>` or `ref<T>` alike) holds what its `T` decides: over a
-constructor (`request: kind<record>`) it binds a `TypeRef` holding a type's name (its path from the root,
+typed by a reference (`ReferenceBody`, spelled `meta.kind<T>` or `meta.ref<T>` alike) holds what its `T` decides: over a
+constructor (`request: meta.kind<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root,
 `geo.address` for a member of a nested `!schema` map) or an application the schema
 closes (`set<text>`, written unquoted), whose `referent()` is the value of the entry it names — a tree read
 delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type
-(`method: ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and then
-a key of its namespace value, or a field of a record value) and, once the schema has linked, the value it names
-(`method().get()`), or a `TypeRef` for the name alone. The resolver records each with its slot as it reads the value,
-and the linker judges it there.
+(`method: meta.ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and
+then a key of its namespace value, or a field of a record value) and, once the schema has linked, the value it names
+(`method().get()`), or a `TypeRef` for the name alone. The resolver records each with its slot as it reads the value, and the
+linker judges it there.
 
 ---
 

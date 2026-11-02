@@ -80,10 +80,10 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
-              port_label  => !meta.text_type { members: ["80" "443"] }
+              port_label  => !unicode.text_type { members: ["80" "443"] }
               port_slot   => ( port_label | int32 )
               ported      => { p: port_slot }
-              answer      => !meta.text_type { members: ["true" "false"] }
+              answer      => !unicode.text_type { members: ["true" "false"] }
               answer_slot => ( answer | boolean )
               answered    => { a: answer_slot }
               port_text   => ( port_label | text )
@@ -113,26 +113,26 @@ class CrossEncodingParityTest {
               int_box    => box<int32>
               text_box   => box<text>
               crate      => { b: box }
-              local_box  => { v: declared }
+              local_box  => { v: meta.declared }
               fragment   => { ( include: text | name?: text  type?: text ) }
               endpoint   => { ( host: text  port: int32 | socket: text )? }
               contact    => { ( email: text | phone: text )+ }
-              header_name => !meta.identifier_type { start: NONE  continue: NONE
+              header_name => !unicode.identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: NFKC_CASEFOLD }
               headers     => { header_name => text }
-              folded_name  => !meta.identifier_type { start: NONE  continue: NONE
+              folded_name  => !unicode.identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: ASCII_CASEFOLD }
               fields      => { folded_name => text }
               pinned      => { h: header_name = Idempotency-Key }
-              charset     => !meta.text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
+              charset     => !unicode.text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
               encoded     => { c: charset }
               safe_header => !meta.enum_type { name_type: header_name  members: [Accept content-type] }
               screened    => { h: safe_header }
-              stock_id    => !meta.uuid_type {}
-              customer_id => !meta.uuid_type {}
-              ided        => { id: kind<meta.uuid_type> }
+              stock_id    => !net.uuid_type {}
+              customer_id => !net.uuid_type {}
+              ided        => { id: meta.kind<net.uuid_type> }
               typed       => { t: meta.type_kind }
               marks      => {
                 nickname?: text

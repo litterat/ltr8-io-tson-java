@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta.tn's {@code uri_type} constructor (§5.5's {@code uri} and
+ * Parses and validates against net.tn's {@code net.uri_type} constructor (§5.5's {@code uri} and
  * {@code uri_reference} atoms). Holds a {@link UriType} -- the pure constraint values -- rather than
  * declaring those fields itself.
  *
@@ -38,7 +38,7 @@ public record UriParser(UriType constraints) implements AtomTypeParser<Iri> {
     /** {@code uri => !uri_reference ^ { allow_relative: false }} -- §5.5's {@code !uri}, which has a scheme. */
     public static final UriParser UNCONSTRAINED = new UriParser(UriType.URI);
 
-    /** {@code uri_reference => !meta.uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
+    /** {@code uri_reference => !net.uri_type {}} -- §5.5's {@code !uri_reference}, a URI or a relative reference. */
     public static final UriParser REFERENCE = new UriParser(UriType.REFERENCE);
 
     /**

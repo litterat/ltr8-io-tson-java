@@ -17,8 +17,8 @@ import io.ltr8.tson.base.SchemaValidationException;
  *
  * <p>Without that, exporting a template is exporting a trap: any consumer applying it with an argument the
  * exporting schema also used fails to link, with a name-collision diagnostic naming a synthetic entry the
- * author never wrote. meta.tn applies {@code set<value>} for {@code decimal_member_set}, so the reachable
- * case is a schema importing meta.tn and writing {@code set<value>} of its own.
+ * author never wrote. numeric.tn applies {@code set<meta.value>} for {@code numeric.decimal_member_set}, so the reachable
+ * case is a schema importing meta.tn and writing {@code set<meta.value>} of its own.
  *
  * <p>The negative half is the same rule from the other side and is what keeps the unification honest: name
  * equality is not the test, entry equality is. Two <em>different</em> types under one name still collide.
@@ -30,7 +30,7 @@ class SharedInstantiationTest {
     private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
 
     /**
-     * meta.tn closes {@code set<value>} itself; this schema imports meta.tn and closes it again. Both mint
+     * meta.tn closes {@code set<meta.value>} itself; this schema imports meta.tn and closes it again. Both mint
      * the same derived name for the same body, so linking unifies them rather than reporting a collision.
      */
     @Test
@@ -40,7 +40,7 @@ class SharedInstantiationTest {
                 !!import:"%s"
                 !!import:"%s"
                 !schema {
-                  mine => meta.set<meta.value>
+                  mine => set<meta.value>
                 }
                 """.formatted(KERNEL, META)));
     }

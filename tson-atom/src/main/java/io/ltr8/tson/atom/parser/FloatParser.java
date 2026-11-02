@@ -40,7 +40,7 @@ import java.util.Optional;
  */
 public record FloatParser(FloatType constraints) implements AtomTypeParser<Number> {
 
-    /** {@code float32 => !meta.float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin. */
+    /** {@code float32 => !numeric.float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin. */
     public static final FloatParser FLOAT32 = new FloatParser(FloatType.FLOAT32);
     public static final FloatParser FLOAT64 = new FloatParser(FloatType.FLOAT64);
 

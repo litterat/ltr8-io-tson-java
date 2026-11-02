@@ -42,7 +42,7 @@ import java.util.List;
  *
  * <p>That determinism is load-bearing, not cosmetic. An entry name is part of the resolved form, and an
  * importing schema reaches an <em>imported</em> entry by deriving the same name for the same form --
- * a schema writing the kernel's own {@code [meta.text; 1..]} landing on the entry the kernel already produced.
+ * a schema writing the kernel's own {@code [text; 1..]} landing on the entry the kernel already produced.
  *
  * <p><b>The canonical renderings are separate from the names</b> so each is stated once: a rendering decides
  * whether two forms are the same form, which {@link MintedNames} asks with it, and a second copy free to

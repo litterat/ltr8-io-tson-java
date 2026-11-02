@@ -19,7 +19,7 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
   record template's normalised `!meta.record { … }` payload is bound by the resolver into the open record it denotes
   (`DefinitionResolver.openRecord`).
 - Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
-  facts at their `record_field` defaults.
+  facts at their `meta.record_field` defaults.
 - §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
 
 Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived names, reporting),
@@ -51,8 +51,8 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     `DerivedName.ofBinding` hashes) and the reference *as written*, which is what an open binding holds. Only
     `element_type`/`key_type`/`value_type` are reached this way, a named slot being the one an open binding
     can address; `tuple` and `choice` put their positions inside a collection, so they keep only the first
-    rendering — written through the same `WireForm.refValue` producer, since a `[type_kind]` holds what a
-    `type_kind` holds, and rewritten a pass later by `MetaRefs.mapBodyRefs`, which maps a choice's variants
+    rendering — written through the same `WireForm.refValue` producer, since a `[meta.type_kind]` holds what a
+    `meta.type_kind` holds, and rewritten a pass later by `MetaRefs.mapBodyRefs`, which maps a choice's variants
     and a tuple's elements like any other reference.
     - **No slot refuses an application, because a slot that did would not fail where it decided.** A
       `choiceBinding` requiring a bare name per variant would leave `( box<text> | int32 )` unlifted *whole*, to
@@ -105,7 +105,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     table (`FieldModifiers`) so the spellings and the errors around them cannot drift apart between a template and
     the closed record beside it.
   - **Only what the author wrote is written.** `access_pattern` and `size_type` are fixed on the `record`
-    constructor, and an unmarked field's facts are `record_field`'s own defaults, so none of them is stated —
+    constructor, and an unmarked field's facts are `meta.record_field`'s own defaults, so none of them is stated —
     the same economy `arrayBinding` makes with an unmarked element's `state`, and what keeps the held form the
     one the author would recognise.
   - **The rewrite has to be here rather than in the resolver.** Resolving the body and writing the resolved
@@ -118,7 +118,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
   - **A composition or refinement template is built one phase later**, as the *flattened* open record
     (`DefinitionResolver.parameterised`), and every open record's held tree is written by `WireForm.heldRecord`
     (through `HeldBody.of`). Both absorb fields from a source, and a §5.7 tightening entry states a modifier and no
-    type-ref, so it is not a `record_field` at all until the inherited field supplies one. That needs a namespace
+    type-ref, so it is not a `meta.record_field` at all until the inherited field supplies one. That needs a namespace
     this phase does not have, so the flattening happens in the resolver; the **spelling** is `WireForm`'s, which is
     the whole point. `WireForm.heldRecord` and this phase's `recordBinding` are two producers of the wire form and one
     producer of its spelling — both going through `WireForm.refValue` and `WireForm.nameField` is what makes

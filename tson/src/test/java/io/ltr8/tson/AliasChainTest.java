@@ -45,7 +45,7 @@ class AliasChainTest {
                 .resolveLinked(TsonBundledSchemas.META_ID).schema().entries().get(name);
     }
 
-    /** The kernel's own case: {@code template_param.name} is declared {@code param_name} and stays it. */
+    /** The kernel's own case: {@code meta.template_param.name} is declared {@code meta.param_name} and stays it. */
     @Test
     void aKernelAliasAtAFieldTypeNamesWhatWasWritten() {
         TypeRef name = fieldType(kernelEntry("meta.template_param"), "name");

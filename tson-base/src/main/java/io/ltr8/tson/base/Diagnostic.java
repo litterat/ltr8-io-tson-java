@@ -25,7 +25,7 @@ import java.util.Optional;
  *   led to it. See {@code SchemaLocation} for how a read accumulates one.</li>
  *   <li>{@code schemaId} -- the canonical identity ([TSON-DATA] §2.2.1) of the schema
  *   {@code schemaPointer}/{@code schemaPosition} refer to. Without it a schema position is ambiguous
- *   across schemas: {@code 110:3:4858} is core.tn's line for {@code int32}, and nothing else says so.</li>
+ *   across schemas: {@code 110:3:4858} is numeric.tn's line for {@code int32}, and nothing else says so.</li>
  *   <li>{@code dataPosition}/{@code schemaPosition} -- line/column/byte-offset in the *submitted
  *   document* and in the *schema source*. Either may be absent (a synthesized/materialized schema
  *   entry has no source position of its own, and not every data value's own position is tracked yet,
@@ -56,7 +56,7 @@ import java.util.Optional;
  * <b>which rule fired, which is the code</b> ({@link Code#CONFUSABLE_NAMES}, {@link
  * Code#RESTRICTED_CHARACTER}, {@link Code#RESTRICTED_SCRIPT}, one each).
  *
- * <p>The two ends are not alternatives: a value violating {@code int32} as core.tn declares it
+ * <p>The two ends are not alternatives: a value violating {@code int32} as numeric.tn declares it
  * populates both, which is why this is one record with a richer location model rather than separate
  * data- and schema-diagnostic types. That also matches every comparable system -- {@code
  * javax.tools.Diagnostic}, LSP's {@code Diagnostic}, rustc's {@code DiagInner} -- none of which

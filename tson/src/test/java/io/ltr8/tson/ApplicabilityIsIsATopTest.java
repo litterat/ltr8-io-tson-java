@@ -147,14 +147,14 @@ class ApplicabilityIsIsATopTest {
     void aComponentOfATypeBuildsAValueOfIt() {
         for (String component : List.of("meta.record_field { name: x  type: text }",
                 "meta.tuple_element { label: text }", "meta.field_group { members: g }",
-                "meta.integer_size { bits: 32  sign: true }")) {
+                "numeric.integer_size { bits: 32  sign: true }")) {
             List<Diagnostic> problems = problems("  bad => !" + component);
 
             assertEquals(1, problems.size(), problems::toString);
             assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
             assertTrue(problems.getFirst().message().contains("the body is no value of the type"), problems::toString);
         }
-        assertEquals(List.of(), problems("  good => !meta.integer_size { bits: 32  signed: true }"));
+        assertEquals(List.of(), problems("  good => !numeric.integer_size { bits: 32  signed: true }"));
     }
 
     /**

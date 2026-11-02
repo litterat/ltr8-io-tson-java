@@ -181,8 +181,8 @@ class UriParserTest {
      */
     @Test
     void citesRfc3986NotRegexTypesRfc9485() {
-        // uri_type => text_type & atom_specification & { spec: = "https://.../rfc3986" ... } --
-        // the same atom_specification mixin regex_type composes, but a different cited RFC.
+        // uri_type => text_type & atom.specification & { spec: = "https://.../rfc3986" ... } --
+        // the same atom.specification mixin regex_type composes, but a different cited RFC.
         assertEquals("https://www.rfc-editor.org/rfc/rfc3986", UriParser.UNCONSTRAINED.constraints().spec());
     }
 }

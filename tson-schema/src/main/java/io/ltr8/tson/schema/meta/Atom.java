@@ -62,10 +62,10 @@ public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody,
      * every value for reasons the author never sees stated. Part 2 §7.2 puts both the rule and its
      * home in one sentence: "family coherence between bindings (e.g. {@code min <= max}) is a
      * compilation and ingest concern (§8), not data validation" -- which is why this is a resolver
-     * question and not something an atom parser may decide. {@code meta.tn}'s own header {@code @doc}
+     * question and not something an atom parser may decide. {@code numeric.tn}'s own header {@code @doc}
      * states the same obligation from the other side: bounds are field groups so that an
      * inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
-     * lower bound not exceeding the upper) remains a schema-load check".
+     * lower bound not exceeding the upper) is a schema-load check".
      *
      * <p>A family also reports a facet outside the range the family itself fixes, where it has one:
      * {@code cidr4_type}'s {@code @doc} says prefix bounds narrow "within the family range 0-32" and

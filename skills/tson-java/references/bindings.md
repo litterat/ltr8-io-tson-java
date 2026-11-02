@@ -61,7 +61,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `float32` / `float64`                           | `Float` / `Double`                              |
 | `rational`                                      | `io.ltr8.tson.base.atom.Rational`               |
 | `complex`                                       | `io.ltr8.tson.base.atom.Complex`                |
-| `text`, `identifier`, `mac`, `email`, `regex`, an enum member | `String`                         |
+| `text`, `meta.identifier`, `mac`, `email`, `regex`, an enum member | `String`                         |
 | `uuid`                                          | `UUID`                                          |
 | `date` / `time` / `datetime`                    | `LocalDate` / `OffsetTime` / `OffsetDateTime`   |
 | `duration` / `period`                           | `java.time.Duration` / `java.time.Period`       |
@@ -71,7 +71,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `hostname`                                      | `io.ltr8.net.HostName`, or `String` (lowercase U-labels) |
 | `host`                                          | `io.ltr8.net.Host`, or `String` (the member's canonical text) |
 | `media_type`                                    | `io.ltr8.net.MediaType`, or `String` (lowercase, parameters sorted) |
-| `bytes` (and any `!meta.bytes_type { encoding: … }` instance) | `byte[]`                               |
+| `bytes` (and any `!binary.bytes_type { encoding: … }` instance) | `byte[]`                               |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
 | `_` (the only no-value spelling)                | a `TsonVoid` node / `null`                    |
 
@@ -88,8 +88,8 @@ by RFC 2396 and cannot hold every reference these atoms admit (an IRI's non-ASCI
 it cannot hold is refused at a `URI` component; declare `Iri` to take every one. A component typed `Iri` or `URI`
 with no schema reads as `iri_reference`, the widest of the four.
 
-**`bytes` is one type with a spelling.** core.tn's `bytes` is base64 (RFC 4648 §4); another alphabet is
-another type, declared as its own instance — `hexdigest => !meta.bytes_type { encoding: HEX }`, with `BASE64`,
+**`bytes` is one type with a spelling.** The kernel's `bytes` is base64 (RFC 4648 §4); another alphabet is
+another type, declared as its own instance — `hexdigest => !binary.bytes_type { encoding: HEX }`, with `BASE64`,
 `BASE64URL`, `BASE32` and `HEX` to choose from — and every one binds to `byte[]`.
 
 **`declared` chooses its type from the data** (§7.8): the value names, by its `!type` (`$type` in JSON), a
@@ -120,15 +120,16 @@ whatever was consulted last: `orElse` composes the caller's binder over the kern
 the one that authors the failure, because a name neither knows is a missing line of *their* configuration.
 
 `withDataBindContext` is **the one bind context**, for the data a schema describes and for a schema's own **value
-entries** alike: a schema declaring an `operation` record and a namespace type of it (`operations => !namespace {
-key_type: identifier  value_type: operation }`), and a schema importing it that holds a value, `api => !operations {
+entries** alike: a schema declaring an `operation` record and a namespace type of it (`operations => !meta.namespace {
+key_type: meta.identifier  value_type: operation }`), and a schema importing it that holds a value, `api => !operations {
 search => { … } }`, binds `operation` to the class this context names, exactly as a data document's `!operation { … }`
-would. `Tson.of` composes the library's own binder with yours: the names the kernel declares under `meta` and net.tn
-under `net` (`meta.record`, `meta.enum`, `net.ipv4_type`, …) always bind to the schema model and yours cannot shadow
-them, and every other name is yours; `tson.dataBindContext()` returns that composed context. A value entry whose type
-your context binds no class for is held as a `TsonValue`: the schema still resolves, validates and reads in tree mode,
-and `bindRegistry()` refuses it with `BIND_MISMATCH` at the entry (`MissingBindingException` where no receiver is
-given).
+would. `Tson.of` composes the library's own binder with yours: every entry of meta.tn (`text`, `enum`,
+`meta.record`, `unicode.text_type`, …) and each library's members under its map (`numeric.decimal_type`,
+`temporal.date_type`, `net.uuid_type`) always bind to the schema model and
+yours cannot shadow them, and every other name is yours, a member your schema contributes to an open map included;
+`tson.dataBindContext()` returns that composed context. A value entry whose type your context binds no class for is held as a
+`TsonValue`: the schema still resolves, validates and reads in tree mode, and `bindRegistry()` refuses it with
+`BIND_MISMATCH` at the entry (`MissingBindingException` where no receiver is given).
 
 A **profile** is fixed when the context is built (`DataBindContext.Builder.profile`), never afterwards, so
 one `Tson` is one profile — a server speaking two schema versions builds one instance per version.

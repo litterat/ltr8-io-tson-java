@@ -1,277 +1,71 @@
-!!id:"https://tson.io/2026/39/m/core.tn?sha256=6d57f04f65608aab13769156208c59087b7a3ab3fab695f9b10c0e7a3659f8e0"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=0335e318a8ea9b3a9e108ac6b0ef6cf930def8353ce3cafbb241d4c037cacd54"
-@meta.doc:"""
-  TSON Core Type Library — canonical types for data interchange
-  (2026 Revision 39 draft).
+!!id:"https://tson.io/2026/39/m/core.tn?sha256=4ac202cad2f2a6c2903050043e411c1161c92dfcf7f570d530c8f8109d1141e3"
+!!import:"https://tson.io/2026/39/m/numeric.tn?sha256=05cdc90d827b98132fe24fa36597e3fd58670678827d2cec578cb2635cd498e1"
+!!import:"https://tson.io/2026/39/m/temporal.tn?sha256=cd009d945ced685234626c30e98bccc2dec38e9c2a8037e530bcd3c05606eee2"
+!!import:"https://tson.io/2026/39/m/net.tn?sha256=fa2d2ddead277bdba71ee76c0f764bffe65b8235f454d71a2ea8436b0fd02330"
+@doc:"""
+  TSON core — every bundled type in one import (2026 Revision 39 draft).
 
-  Every type in core comes from a constructor meta.tn declares under `meta`.
-  Atoms are defined as empty instances:
+  core.tn imports the three data-format libraries, numeric.tn, temporal.tn
+  and net.tn, each of which imports the kernel, meta.tn, alone. A schema
+  importing core therefore has the whole bundled vocabulary, each type under
+  one identity ([TSON-SCHEMA] §2.2.3): the common types at the roots of the
+  kernel and the libraries (`text`, `integer`, `bytes`, `enum`, `set`, `doc`,
+  `number`, `int32`, `date`, `datetime`, `uuid`, `uri`), and the machinery
+  under the maps those documents declare, by path (`meta.record`,
+  `meta.type_kind`, `unicode.text_type`, `numeric.decimal_type`,
+  `temporal.date_type`, `net.uuid_type`). It reserves the map names `meta`,
+  `atom`, `numeric`, `unicode`, `net`, `binary` and `temporal` and every root
+  name of those documents and of this one. A schema that wants only some of
+  the libraries imports those instead.
 
-      number => !meta.decimal_type {}
-      date   => !meta.date_type {}
-      uuid   => !meta.uuid_type {}
-      ...
-
-  except where an instance states a constructor field: `float32` and `float64`
-  select a `format`.
-
-  Refinements overlay literal values via the ^ operator:
-
-      uint8 => !meta.integer ^ { size: { bits: 8  signed: false } }
+  Its own root holds the author annotations, which describe a declaration or
+  a field for its readers and tools and never change what it admits:
+  `@deprecated`, `@title`, `@comment`, `@examples`, `@read_only` and
+  `@write_only`. It declares no namespace of its own.
 
   Hash pins here are real digests over the bytes of this copy; see meta.tn's
   note.
 
-  Core imports meta.tn, so a schema importing core has the whole vocabulary in
-  one namespace, each type under one identity: `meta` and every entry under
-  it, by its path (`meta.integer_type`, `meta.record`), and core's own entries
-  below. Core names at its root, by alias, what a data schema writes bare: the
-  instances `void`, `boolean`, `integer`, `text`, `identifier`, `iri` and
-  `regex`; the references `kind` and `ref`, the open sum `declared`, the
-  `set` template and the `enum` constructor, so a schema writes `!enum [A B]`;
-  and the annotation types `@doc`, `@annotation`, `@disjoint`, `@deprecated`,
-  `@title`, `@comment`, `@examples`, `@read_only` and `@write_only`. An alias
-  is a hop to the entry it names and no second type, so `text` and
-  `meta.text` are one type ([TSON-SCHEMA] §8.3). Every root name of core,
-  and `meta`, is reserved in such a schema ([TSON-SCHEMA] §2.2.3). Core's
-  own entries name the kernel's by path, `@meta.doc`, `!meta.uuid_type`.
-
   References:
-    ISO/IEC 11404:2007    General Purpose Datatypes
-    W3C XSD Part 2        Facet model and constraint vocabulary
-    JSON Schema 2020-12   Modern constraint vocabulary
-    IEEE 754-2019         Floating-point semantics
-    RFC 3339              Internet date/time profile; Appendix A is
-                          the duration/period grammar (ISO 8601-1:2019
-                          is the informative source behind it)
-    RFC 9562              UUID format
-    RFC 4648              Base encodings (text spellings of `bytes`)
-    RFC 3986              URI syntax
-    RFC 3987              Internationalized Resource Identifiers (IRIs)
-    RFC 9485              I-Regexp, the interoperable regular expression
-    RFC 5322              Email address format
+    JSON Schema 2020-12   Meta-data and annotation vocabulary (`title`,
+                          `deprecated`, `readOnly`, `writeOnly`,
+                          `examples`, `$comment`)
   """
 !schema {
-  void       => meta.void
-  boolean    => meta.boolean
-  integer    => meta.integer
-  text       => meta.text
-  identifier => meta.identifier
-  iri        => meta.iri
-  regex      => meta.regex
-  kind       => meta.kind
-  ref        => meta.ref
-  declared   => meta.declared
-  set        => meta.set
-  enum       => meta.enum
-  doc        => meta.doc
-  annotation => meta.annotation
-  disjoint   => meta.disjoint
-  deprecated => meta.deprecated
-  title      => meta.title
-  comment    => meta.comment
-  examples   => meta.examples
-  read_only  => meta.read_only
-  write_only => meta.write_only
-
-  @meta.doc:"""
-    Exact number of arbitrary magnitude and precision, finite, with no special
-    values (SQL exact tier; ISO/IEC 11404 `scaled`, radix 10). The canonical
-    numeric type and the JSON Schema `number` mapping: a bare JSON number is a
-    TSON `number`. Exact, so equality is safe and ordering is TOTAL; scale is
-    not part of the value (`1`, `1.0` and `1.00` are one value). Lossiness
-    enters only when a consumer narrows to an approximate type
-    (`float32`/`float64`), where the value is rounded onto an IEEE grid. A value
-    needing `.inf`/`.nan` is not a `number` — those belong to the approximate
-    tier.
+  @doc:"""
+    Marks a definition or field as deprecated. A bare presence marker like
+    `@atom.numeric`; the reason, where there is one, is `@doc`'s to give.
     """
-  @meta.ordering:TOTAL @meta.bounded:false @meta.exact:true @meta.numeric
-  number => !meta.decimal_type {}
+  deprecated => @meta.annotation void
 
-  @meta.doc:"""
-    Exact fraction a/b with a positive nonzero denominator. The value is the
-    fraction: 2/4 and 1/2 are one value, and equality, ordering and constraints
-    are over it; receivers reduce if their representation needs it. Whether a
-    spelling survives a round trip is an encoding's promise, not the type's
-    (TSON text preserves the token as written, and quotes it, since it contains
-    `/`).
+  @doc:"Short human-readable name for a definition or field."
+  title => @meta.annotation text
+
+  @doc:"""
+    A note for a schema's maintainers rather than its readers (JSON Schema's
+    `$comment`): where `@doc` is what a documentation tool shows, `@comment`
+    is what it leaves out.
     """
-  @meta.ordering:TOTAL @meta.bounded:false @meta.exact:true @meta.numeric
-  rational => !meta.rational_type {}
+  comment => @meta.annotation text
 
-  @meta.doc:"""
-    Complex number, a pair of components (real and imaginary parts). Components
-    default to `NUMBER` (exact). A refinement may move `component` only to a
-    member whose value set is a subset of the source's:
-    `!complex ^ { component: INTEGER }` is Gaussian integers, ℤ+ℤi sitting
-    inside the exact-decimal complexes, while floating-point complex,
-    `!meta.complex_type { component: FLOAT64 }`, is its own type rather than a
-    refinement and is not a `complex`. Exactness follows the component type, so
-    `complex` carries no `@exact` marker. Spellings are the text class's concern
-    (TSON text accepts a+bi and a+bj); component representation is host-defined.
+  @doc:"""
+    Example values for a definition or field, each the text a reader is shown:
+    conventionally the value written in TSON notation, so a record's example
+    is a string such as `"{ x: 1 }"`. Nothing parses or checks an example
+    against the type it illustrates; the annotation is documentation only.
     """
-  @meta.ordering:NONE @meta.bounded:false @meta.numeric
-  complex => !meta.complex_type {}
+  examples => @meta.annotation [text]
 
-  @meta.doc:"Signed 8-bit integer (-128 to 127)."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  int8 => !meta.integer ^ { size: { bits: 8  signed: true } }
-
-  @meta.doc:"Signed 16-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  int16 => !meta.integer ^ { size: { bits: 16  signed: true } }
-
-  @meta.doc:"Signed 32-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  int32 => !meta.integer ^ { size: { bits: 32  signed: true } }
-
-  @meta.doc:"Signed 64-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  int64 => !meta.integer ^ { size: { bits: 64  signed: true } }
-
-  @meta.doc:"Signed 128-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  int128 => !meta.integer ^ { size: { bits: 128  signed: true } }
-
-  @meta.doc:"Signed 256-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  int256 => !meta.integer ^ { size: { bits: 256  signed: true } }
-
-  @meta.doc:"Unsigned 8-bit integer (0 to 255)."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  uint8 => !meta.integer ^ { size: { bits: 8  signed: false } }
-
-  @meta.doc:"Unsigned 16-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  uint16 => !meta.integer ^ { size: { bits: 16  signed: false } }
-
-  @meta.doc:"Unsigned 32-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  uint32 => !meta.integer ^ { size: { bits: 32  signed: false } }
-
-  @meta.doc:"Unsigned 64-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  uint64 => !meta.integer ^ { size: { bits: 64  signed: false } }
-
-  @meta.doc:"Unsigned 128-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  uint128 => !meta.integer ^ { size: { bits: 128  signed: false } }
-
-  @meta.doc:"Unsigned 256-bit integer."
-  @meta.ordering:TOTAL @meta.bounded:true @meta.exact:true @meta.numeric
-  uint256 => !meta.integer ^ { size: { bits: 256  signed: false } }
-
-  @meta.doc:"""
-    IEEE 754 binary32. Value set is the binary32 grid plus signed zeros,
-    subnormals, both infinities, and quiet NaN.
+  @doc:"""
+    Marks a field an encoding's consumers may read but not write. A bare
+    presence marker like `@atom.numeric`: absence is the default, so there is no
+    false to write (JSON Schema's `readOnly: false` maps to no annotation).
     """
-  @meta.ordering:PARTIAL @meta.bounded:false @meta.exact:false @meta.numeric
-  float32 => !meta.float_type { format: BINARY32 }
+  read_only => @meta.annotation void
 
-  @meta.doc:"""
-    IEEE 754 binary64. Value set is the binary64 grid plus signed zeros,
-    subnormals, both infinities, and quiet NaN.
+  @doc:"""
+    Marks a field an encoding's consumers may write but not read. A bare
+    presence marker, on `@read_only`'s terms.
     """
-  @meta.ordering:PARTIAL @meta.bounded:false @meta.exact:false @meta.numeric
-  float64 => !meta.float_type { format: BINARY64 }
-
-  @meta.doc:"A URI-reference (RFC 3986 §4.1): a URI or a relative reference."
-  @meta.ordering:NONE @meta.bounded:false
-  uri_reference => !meta.uri_type {}
-
-  @meta.doc:"A URI (RFC 3986 §3): the scheme is required."
-  @meta.ordering:NONE @meta.bounded:false
-  uri => !uri_reference ^ { allow_relative: false }
-
-  @meta.doc:"""
-    An IRI-reference (RFC 3987 §2.2): an IRI or a relative reference, its
-    characters drawn from RFC 3987's grammar, beyond US-ASCII included.
-    """
-  @meta.ordering:NONE @meta.bounded:false
-  iri_reference => !meta.iri_type {}
-
-  @meta.doc:"""
-    Octet sequence. The universal binary type, and the only one: a field is
-    `avatar: bytes`, a digest `sha256 => !bytes ^ { length: 32 }`. Equality and
-    the length facets are over octets; the type says nothing about spelling. The
-    text class of encodings spells `bytes` in base64 (RFC 4648 §4). Another
-    alphabet is another type, declared as its own instance of the constructor
-    (`hexdigest => !meta.bytes_type { encoding: HEX  length: 4 }`) — never as a
-    refinement of this one. An encoding whose values are octets writes them raw.
-    """
-  @meta.ordering:NONE @meta.bounded:false
-  bytes => !meta.bytes_type {}
-
-  @meta.doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
-  @meta.ordering:TOTAL @meta.bounded:true
-  date => !meta.date_type {}
-
-  @meta.doc:"""
-    Time of day. RFC 3339 full-time HH:MM:SS[.s…] with a mandatory offset. The
-    value is the time of day in UTC, on the finite interval [00:00:00,
-    24:00:00), so `10:00:00+01:00` and `09:00:00Z` are one value, and ordering
-    is TOTAL. Normalising to UTC wraps at midnight (`23:30:00-02:00` is
-    `01:30:00Z`): a local time of day — "09:00 wherever you are" — is not this
-    type. Equality and bounds compare the value. The offset is a spelling: TSON
-    text preserves it as written, an encoding that stores the instant may drop
-    it. A leap second, `23:59:60`, which RFC 3339's grammar admits, lies outside
-    the interval and is refused.
-    """
-  @meta.ordering:TOTAL @meta.bounded:true
-  time => !meta.time_type {}
-
-  @meta.doc:"""
-    Date and time. RFC 3339 date-time with a mandatory offset. The value is the
-    instant on the UTC timeline, so `2026-01-01T10:00:00+01:00` and
-    `2026-01-01T09:00:00Z` are one value, and ordering is TOTAL. An offset of
-    `-00:00` (offset unknown, RFC 3339 §4.3) is the same instant as `Z` and
-    compares as such. A local datetime — a wall clock with no offset — is not
-    this type. Equality and bounds compare the value. The offset is a spelling:
-    TSON text preserves it as written, an encoding that stores the instant may
-    drop it, and a value for which the offset is data — an appointment shown in
-    its booked zone — is a different value space, not this type. A leap second,
-    second 60, which RFC 3339's grammar admits, is not an instant on that
-    timeline and is refused.
-    """
-  @meta.ordering:TOTAL @meta.bounded:true
-  datetime => !meta.datetime_type {}
-
-  @meta.doc:"""
-    Elapsed time — a signed exact decimal number of seconds, within the range
-    `duration_type` fixes. No Y or month-M component, so every value has a fixed
-    length and ordering is TOTAL. `P1M` is a month and belongs to `period`; a
-    minute is `PT1M`. A day is exactly 86400 s and a week 7 days, so `PT90M`,
-    `PT1H30M` and `P0DT5400S` are one value.
-    """
-  @meta.ordering:TOTAL @meta.bounded:true
-  duration => !meta.duration_type {}
-
-  @meta.doc:"""
-    Calendar span — a signed integer number of months. `P1Y` and `P12M` are one
-    value. A span that is genuinely both is a record with a field of each.
-    """
-  @meta.ordering:TOTAL @meta.bounded:false
-  period => !meta.period_type {}
-
-  @meta.doc:"128-bit identifier per RFC 9562."
-  @meta.ordering:NONE @meta.bounded:false
-  uuid => !meta.uuid_type {}
-
-  @meta.doc:"Email address per RFC 5322."
-  @meta.ordering:NONE @meta.bounded:false
-  email => !meta.email_type {}
-
-  @meta.doc:"""
-    A tuple of exactly one element: `tuple1<text>` admits `[a]` and
-    refuses `[]`, `[a b]` and `[_]`. `[T]` is an array, and the tuple sugar
-    takes two or more positions.
-    """
-  tuple1 => <T> !meta.tuple { elements: [{ element_type: T }] }
-
-  @meta.doc:"""
-    A tuple of exactly one voidable element: as `tuple1`, and the element may
-    be void, so `voidable_tuple1<text>` admits `[a]` and `[_]`.
-    """
-  voidable_tuple1 => <T> !meta.tuple { elements: [{ element_type: T  voidable: true }] }
-
+  write_only => @meta.annotation void
 }

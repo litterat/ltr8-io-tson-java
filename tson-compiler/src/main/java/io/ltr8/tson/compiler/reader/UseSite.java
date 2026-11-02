@@ -20,7 +20,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
  * the reference compile applies it through.
  *
  * <p>This is the naming twin of the rule {@code SchemaLocation} already follows for pointers: the pointer is
- * the path taken ({@code /person/age}), never the leaf it resolves to ({@code /int32} in core.tn), "because
+ * the path taken ({@code /person/age}), never the leaf it resolves to ({@code /int32} in numeric.tn), "because
  * the leaf names a file the author didn't write and never mentions the field they can edit". The name in the
  * message takes the same route.
  *

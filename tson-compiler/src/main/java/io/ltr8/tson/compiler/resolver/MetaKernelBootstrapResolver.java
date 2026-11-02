@@ -90,28 +90,26 @@ import java.util.Set;
  * never {@code TsonSchemaRegistry#register}, which refuses a bootstrap schema -- and compiles it. {@link
  * SchemaDesugarer} runs first, as for every schema: the desugar table is fixed by the sugar forms (§5.3), so it
  * consults no governing meta. The class is locked down to one public method taking no arguments: it bootstraps
- * the bundled kernel, meta.tn ({@link TsonBundledSchemas#META_ID}), fetched from the classpath so the bootstrap
- * works from a built jar, and nothing else.
+ * the bundled kernel, meta.tn ({@link TsonBundledSchemas#META_ID}), fetched from the classpath so the
+ * bootstrap works from a built jar, and nothing else.
  */
 public final class MetaKernelBootstrapResolver {
 
     /**
      * The kernel's named instances and refinements on its one wait cycle, built by hand: {@code value}, the
-     * {@code boolean} and {@code field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text}
-     * atoms, {@code type_kind}, {@code field_map}, the namespace type a record's fields are a value of, and {@code
-     * non_negative_integer}, the one refinement.
+     * {@code boolean} and {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text}
+     * atoms, {@code meta.type_kind}, {@code field_map}, the namespace type a record's fields are a value of, and {@code
+     * numeric.non_negative_integer}, the one refinement.
      */
-    private static final Set<String> PRE_LOADED = Set.of("meta.value", "meta.boolean", "meta.field_role",
-            "meta.enum_set", "meta.integer", "meta.non_negative_integer", "meta.text", "meta.type_kind",
-            "meta.field_map");
+    private static final Set<String> PRE_LOADED = Set.of("meta.value", "boolean", "meta.field_role", "meta.enum_set",
+            "integer", "numeric.non_negative_integer", "text", "meta.type_kind", "meta.field_map");
 
     /**
-     * The element types whose lifted arrays are on the cycle: {@code [type_kind]}, {@code [field_group]} and {@code
-     * [text; 1..]}, and an array of one of those ({@code [[text; 1..]; 1..]}). A lifted array is named by its
+     * The element types whose lifted arrays are on the cycle: {@code [meta.type_kind]}, {@code [meta.field_group]} and
+     * {@code [text; 1..]}, and an array of one of those ({@code [[text; 1..]; 1..]}). A lifted array is named by its
      * content (§8.2), so it is designated by what it holds rather than by its name.
      */
-    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("meta.type_kind", "meta.field_group",
-            "meta.text");
+    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("meta.type_kind", "meta.field_group", "text");
 
     private MetaKernelBootstrapResolver() {
     }
@@ -169,7 +167,7 @@ public final class MetaKernelBootstrapResolver {
      * Whether {@code declaration} is one of the pre-loaded set's, {@code lifted} collecting the lifted arrays already
      * found to be: a lifted array's element is declared before it, its lift being depth first. A lifted array is one
      * the kernel's source does not declare ({@code declared}), so an entry whose own body is a sugar form ({@code
-     * meta.examples => @meta.annotation [meta.text]}) is no lift.
+     * examples => @meta.annotation [text]}) is no lift.
      */
     private static boolean isPreLoaded(SchemaMap.Declaration declaration, Set<String> declared, Set<String> lifted) {
         if (!WaitOrder.reads(declaration)) {
@@ -323,7 +321,7 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * The hand-written merge for the pre-loaded set's one atom refinement, {@code non_negative_integer}, bounded as
+     * The hand-written merge for the pre-loaded set's one atom refinement, {@code numeric.non_negative_integer}, bounded as
      * {@link #instanceBody} is: it covers the integer family's {@code min} and {@code max} and refuses the rest by
      * name rather than pretending to be general. Ordinary resolution merges through a {@code DataClassObjectWriter}
      * round trip and the governing meta's compiled reader ({@code DefinitionResolver.resolveAtomRefinement}), which
@@ -381,19 +379,19 @@ public final class MetaKernelBootstrapResolver {
                 requireEmptyBody(instance);
                 yield new ValueType();
             }
-            case "meta.integer_type" -> {
+            case "numeric.integer_type" -> {
                 requireEmptyBody(instance);
                 yield IntegerType.UNCONSTRAINED;
             }
-            case "meta.text_type" -> {
+            case "unicode.text_type" -> {
                 requireEmptyBody(instance);
                 yield TextType.UNCONSTRAINED;
             }
-            case "meta.enum" -> toEnumBody(instance.value());
+            case "enum" -> toEnumBody(instance.value());
             // `!meta.reference { of: type }`: `of` is the one authored field, and the index is derived when the kernel
             // links, as every reference's is.
             case "meta.reference" -> new ReferenceBody(bindingField(instance.value(), "of"));
-            // `field_map => !meta.namespace { value_type: record_field  ordered: true }`: keys of the host's family.
+            // `field_map => !meta.namespace { value_type: meta.record_field  ordered: true }`: keys of the host's family.
             case "meta.namespace" -> new NamespaceBody(fieldToken(instance.value(), "key_type").map(TypeRef::of),
                     TypeRef.of(bindingField(instance.value(), "value_type")),
                     fieldToken(instance.value(), "ordered").map(Boolean::parseBoolean).orElse(false));
@@ -449,7 +447,7 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * {@code !meta.enum [true false]}'s value is a bare array (§5.6's positional form for a
+     * {@code !enum [true false]}'s value is a bare array (§5.6's positional form for a
      * single-field constructor), not {@code { members: [...] } }.
      */
     private static EnumBody toEnumBody(DataValue value) {

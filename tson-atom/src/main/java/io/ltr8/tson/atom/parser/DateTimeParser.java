@@ -29,7 +29,7 @@ public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser
     /** §5.4's built-in annotation name -- {@code !datetime}. */
     public static final String TYPENAME = "datetime";
 
-    /** {@code datetime => !meta.datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
+    /** {@code datetime => !temporal.datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
     public static final DateTimeParser UNCONSTRAINED = new DateTimeParser(DateTimeType.UNCONSTRAINED);
 
     public DateTimeParser(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max) {

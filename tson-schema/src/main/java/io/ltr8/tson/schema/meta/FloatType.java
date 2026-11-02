@@ -15,11 +15,11 @@ import java.util.Optional;
  * -- {@code tson-compiler}'s {@code FloatParser} holds one of these and does the actual
  * reading/writing.
  *
- * <p>Also an {@link Atom} variant: {@code float32 => !meta.float_type { format: BINARY32 } }/{@code
+ * <p>Also an {@link Atom} variant: {@code float32 => !numeric.float_type { format: BINARY32 } }/{@code
  * float64} are constructor-application instances (§5.5) whose resolved bodies are exactly {@link
  * #FLOAT32}/{@link #FLOAT64}.
  */
-@Typename(name = "meta.float_type")
+@Typename(name = "numeric.float_type")
 public record FloatType(TypeChain chain,
         Format format,
         Optional<BigDecimal> min,
@@ -31,7 +31,11 @@ public record FloatType(TypeChain chain,
         @Field("allow_subnormal") boolean allowSubnormal,
         @Field("allow_negative_zero") boolean allowNegativeZero) implements Atom {
 
-    /** {@code ieee_format}'s two members §5.6 actually promotes to built-in annotations; meta.tn also defines BINARY16/128/256 and the decimal128-family formats, unused until a schema (Part 2) refines float_type with one of them. */
+    /**
+     * {@code numeric.ieee_format}'s two members §5.6 actually promotes to built-in annotations; numeric.tn also defines
+     * BINARY16/128/256 and the decimal128-family formats, unused until a schema (Part 2) refines float_type with one
+     * of them.
+     */
     public enum Format {
         BINARY32("float32"), BINARY64("float64");
 
@@ -48,7 +52,7 @@ public record FloatType(TypeChain chain,
     }
 
     /**
-     * {@code float32 => !meta.float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin -- every other
+     * {@code float32 => !numeric.float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin -- every other
      * field left at its default ({@code ~ true} / absent).
      */
     public static final FloatType FLOAT32 = unconstrained(Format.BINARY32);
@@ -73,7 +77,7 @@ public record FloatType(TypeChain chain,
      *
      * <p>{@link #format} is left unchecked, as a selector rather than an ordered facet -- see {@link
      * ComplexType} for the reasoning and the spec citation. It is also the one facet a refinement is
-     * least able to reach in practice: core.tn declares no unformatted {@code float} instance to
+     * least able to reach in practice: numeric.tn declares no unformatted {@code float} instance to
      * refine, only {@code float32}/{@code float64}, each already carrying its own format.
      */
     @Override
@@ -125,7 +129,7 @@ public record FloatType(TypeChain chain,
      * <p>Only the bounds. The four {@code allow_*} flags are independent permissions rather than a
      * range -- withdrawing all of them still leaves every ordinary finite value -- and {@link #format}
      * is a selector. Bounds are compared as written, before rounding to the format's grid, which is
-     * the same basis meta.tn's own {@code @doc} states they are validated on.
+     * the same basis numeric.tn's own {@code @doc} states they are validated on.
      */
     @Override
     public List<String> coherenceCheck() {

@@ -14,10 +14,10 @@ import java.util.Optional;
  * full-date}). Pure constraint values, no parsing/validation behavior -- {@code tson-compiler}'s
  * {@code DateParser} holds one of these and does the actual reading/writing.
  *
- * <p>Also an {@link Atom} variant: {@code date => !meta.date_type {}} is a constructor-application
+ * <p>Also an {@link Atom} variant: {@code date => !temporal.date_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "meta.date_type")
+@Typename(name = "temporal.date_type")
 public record DateType(TypeChain chain,
         Optional<LocalDate> min, @Field("exclusive_min") Optional<LocalDate> exclusiveMin,
                        Optional<LocalDate> max, @Field("exclusive_max") Optional<LocalDate> exclusiveMax)
@@ -57,7 +57,7 @@ public record DateType(TypeChain chain,
         this(min, Optional.empty(), max, Optional.empty());
     }
 
-    /** {@code date => !meta.date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
+    /** {@code date => !temporal.date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
     public static final DateType UNCONSTRAINED = new DateType(Optional.empty(), Optional.empty());
 
     /**

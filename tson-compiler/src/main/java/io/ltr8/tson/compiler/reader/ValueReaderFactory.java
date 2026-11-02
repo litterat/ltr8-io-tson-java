@@ -6,10 +6,10 @@ import io.ltr8.tson.schema.meta.Top;
 /**
  * Builds the {@link TsonTypeReader} for one resolved schema entry -- the unit of work {@link
  * ValueReaderFactoryRegistry} dispatches to, keyed by the entry's own resolved body's constructor
- * name (e.g. {@code "meta.record"}, {@code "meta.array"}, {@code "meta.integer_type"}). {@code name} is the
+ * name (e.g. {@code "meta.record"}, {@code "meta.array"}, {@code "numeric.integer_type"}). {@code name} is the
  * *declaration's* own name, not necessarily the constructor's -- they coincide only for a
  * meta-schema's own declarations (e.g. {@code "meta.record"} itself); every other real declaration's own
- * name differs from its constructor (e.g. {@code "float32"} constructed via {@code "meta.float_type"}).
+ * name differs from its constructor (e.g. {@code "float32"} constructed via {@code "numeric.float_type"}).
  * {@code typeDefinition} is that declaration's own fully-resolved {@link Top}; {@code context}
  * carries the compilation environment beyond this one entry -- the whole schema (for reaching sibling
  * entries) and the reader resolution a composite implementation calls for its own child readers.

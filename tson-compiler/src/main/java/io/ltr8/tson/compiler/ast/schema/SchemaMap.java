@@ -18,7 +18,7 @@ import java.util.Optional;
  * <p>{@code declarations} is keyed by declaration name (insertion order preserved, a {@link
  * LinkedHashMap} under the hood) rather than a plain list, so a resolver can look an entry up by
  * name directly -- exactly the shape §3.4.1's Pass 1 needs (an entry per name) and the document's own target
- * type, <code>{type_name =&gt; top}</code> (§9). It holds the document's every declaration at every depth: a member
+ * type, <code>{meta.type_name =&gt; top}</code> (§9). It holds the document's every declaration at every depth: a member
  * of a schema map nested as an entry ({@link SchemaMapDef}) is keyed by its path from the root, {@code geo.address},
  * which is its {@link Declaration#name} too. Two declarations sharing a name are not rejected here: the
  * later one simply overwrites the earlier one's map entry, the same "detection is a resolver-layer
@@ -38,7 +38,7 @@ public record SchemaMap(List<Annotation> annotations, Map<String, Declaration> d
 
     /**
      * {@code schema-map-entry = *(annotation ws) type-name ws "=>" ws *(annotation ws)
-     * [definition-mark ws] type-def} -- {@code nameAnnotations} bind to the key (the {@code type_name} token
+     * [definition-mark ws] type-def} -- {@code nameAnnotations} bind to the key (the {@code meta.type_name} token
      * itself, §2.1: "the resolver does not hoist annotations from key to value"); {@code typeDefAnnotations}
      * bind to the type definition; {@code mark} is the optional {@link DefinitionMark}, empty where the
      * declaration writes none and the type is OPEN.

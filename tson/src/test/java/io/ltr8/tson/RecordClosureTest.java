@@ -38,7 +38,7 @@ class RecordClosureTest {
      * and park it in the author-annotation channel, where it changes nothing -- leaving a schema that reads
      * as though it had asked for a flatten no encoding performs, which is the outcome this pins against.
      *
-     * <p>Asserted against meta.tn rather than the meta-kernel, whose bootstrap resolves no annotation at all:
+     * <p>Asserted against meta.tn rather than the kernel, whose bootstrap resolves no annotation at all:
      * a kernel-governed schema would ignore the name instead of refusing it.
      */
     @Test

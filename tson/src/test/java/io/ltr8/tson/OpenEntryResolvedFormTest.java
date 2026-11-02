@@ -61,14 +61,14 @@ class OpenEntryResolvedFormTest {
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
-    /** {@code spec/m}, found by walking up rather than assumed relative to a working directory. */
+    /** {@code spec/fixtures}, found by walking up rather than assumed relative to a working directory. */
     private static Path specDirectory() {
         Path directory = Path.of("").toAbsolutePath();
-        while (directory != null && !Files.isDirectory(directory.resolve("spec/m"))) {
+        while (directory != null && !Files.isDirectory(directory.resolve("spec/fixtures"))) {
             directory = directory.getParent();
         }
-        assertNotNull(directory, "no spec/m above " + Path.of("").toAbsolutePath());
-        return directory.resolve("spec/m");
+        assertNotNull(directory, "no spec/fixtures above " + Path.of("").toAbsolutePath());
+        return directory.resolve("spec/fixtures");
     }
 
     // ── What holds today, and must go on holding ─────────────────────────
@@ -80,17 +80,26 @@ class OpenEntryResolvedFormTest {
      * implementation's.
      *
      * <p>It passes because the only templates the bundled schemas declare put every parameter in a {@code
-     * type_kind} slot ({@code set<T>}, {@code kind<T>}, {@code tuple1<T>}), which is exactly the
+     * meta.type_kind} slot ({@code set<T>}, {@code meta.kind<T>}, {@code meta.tuple1<T>}), which is exactly the
      * case §8.1's premise covers. It is a regression guard, not evidence that the premise is sound; the next
      * test is the counterexample.
      */
     @Test
     void everyPublishedResolvedFixtureValidatesAgainstItsGoverningSchema() throws Exception {
         Tson tson = tson();
-        for (String fixture : List.of("meta-resolved.tn", "core-resolved.tn")) {
-            List<Diagnostic> diagnostics =
-                    ResolvedForm.validateResolved(tson, Files.readString(specDirectory().resolve(fixture)));
-            assertEquals(List.of(), diagnostics, () -> fixture + " does not validate against the schema it names");
+        // A library's form holds instances of constructors its source declares, and a resolved form is read under its
+        // source's imports, not over its own entries (SPEC-FEEDBACK.md #4): each is read beside its source.
+        Map<String, String[]> fixtures = new LinkedHashMap<>();
+        fixtures.put("meta-resolved.tn", new String[0]);
+        fixtures.put("numeric-resolved.tn", new String[] {TsonBundledSchemas.NUMERIC_ID});
+        fixtures.put("temporal-resolved.tn", new String[] {TsonBundledSchemas.TEMPORAL_ID});
+        fixtures.put("net-resolved.tn", new String[] {TsonBundledSchemas.NET_ID});
+        fixtures.put("core-resolved.tn", new String[] {TsonBundledSchemas.CORE_ID});
+        for (Map.Entry<String, String[]> fixture : fixtures.entrySet()) {
+            List<Diagnostic> diagnostics = ResolvedForm.validateResolved(tson,
+                    Files.readString(specDirectory().resolve(fixture.getKey())), fixture.getValue());
+            assertEquals(List.of(), diagnostics,
+                    () -> fixture.getKey() + " does not validate against the schema it names");
         }
     }
 
@@ -107,7 +116,7 @@ class OpenEntryResolvedFormTest {
      * against and the entry's value is a {@code top} like any other.
      *
      * <p>Read as the {@code !array} it names, the body would fail with two {@code ATOM_CONSTRAINT_VIOLATION}s
-     * -- {@code N} is not a {@code non_negative_integer} -- which is the case §8.1 names when it says a body
+     * -- {@code N} is not a {@code numeric.non_negative_integer} -- which is the case §8.1 names when it says a body
      * carrying a parameter in a value slot "is not a value of any constructor's record shape".
      *
      * <p>The document is hand-authored in §8.1's form rather than produced by this library's writer,
@@ -121,7 +130,7 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   vector => !meta.template {
-                    parameters: [ { name: T  type: meta.type_kind } { name: N  type: meta.non_negative_integer } ]
+                    parameters: [ { name: T  type: meta.type_kind } { name: N  type: numeric.non_negative_integer } ]
                     template: "!meta.array { element_type: T  min_items: N  max_items: N }"
                   }
                 }
@@ -141,8 +150,8 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   e => !meta.template {
-                    parameters: [ { name: M  type: meta.text } ]
-                    template: "!meta.enum { members: [a b M] }"
+                    parameters: [ { name: M  type: text } ]
+                    template: "!enum { members: [a b M] }"
                   }
                 }
                 """;
@@ -151,9 +160,9 @@ class OpenEntryResolvedFormTest {
         Map<String, Object> read = ResolvedForm.readResolved(tson, resolved);
 
         TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e"));
-        assertEquals("!meta.enum { members: [a b M] }", e.template(),
+        assertEquals("!enum { members: [a b M] }", e.template(),
                 "the application as written -- no third enum member spelled 'M'");
-        assertEquals(List.of(new TemplateParam("M", TypeRef.of("meta.text"))), e.parameters());
+        assertEquals(List.of(new TemplateParam("M", TypeRef.of("text"))), e.parameters());
     }
 
     // ── The biconditional an entry's parameters rest on ─────────────────
@@ -183,8 +192,9 @@ class OpenEntryResolvedFormTest {
                   holder         => { p: pair<text, int32>  q: vec<int32, 3> }
                 }
                 """);
-        List<String> ids = List.of(TsonBundledSchemas.META_ID,
-                TsonBundledSchemas.CORE_ID, "https://example.com/shapes.tn");
+        List<String> ids = List.of(TsonBundledSchemas.META_ID, TsonBundledSchemas.NUMERIC_ID,
+                TsonBundledSchemas.TEMPORAL_ID, TsonBundledSchemas.NET_ID, TsonBundledSchemas.CORE_ID,
+                "https://example.com/shapes.tn");
 
         List<String> broken = new ArrayList<>();
         int open = 0;
@@ -237,10 +247,10 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  port   => !meta.integer_type { min: 0  max: 65535 }
+                  port   => !numeric.integer_type { min: 0  max: 65535 }
                   age    => !int32 ^ { min: 0  max: 150 }
                   renamed => port
-                  colour => !meta.enum [RED GREEN BLUE]
+                  colour => !enum [RED GREEN BLUE]
                   point  => { x: int32  y: int32 }
                   named  => point & { label: text }
                   boxes  => [point]
@@ -258,14 +268,14 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   listed      => <T> meta.atom & { members: [T] }
-                  listed_text => listed<meta.text>
+                  listed_text => listed<text>
                   payloads     => <T> !meta.namespace { key_type: meta.identifier  value_type: T }
-                  iri_payloads => payloads<meta.iri>
+                  iri_payloads => payloads<iri>
                 }
                 """);
-        List<String> ids = List.of(TsonBundledSchemas.META_ID,
-                TsonBundledSchemas.CORE_ID, "https://example.com/kinds.tn",
-                "https://example.com/kind-constructors.tn");
+        List<String> ids = List.of(TsonBundledSchemas.META_ID, TsonBundledSchemas.NUMERIC_ID,
+                TsonBundledSchemas.TEMPORAL_ID, TsonBundledSchemas.NET_ID, TsonBundledSchemas.CORE_ID,
+                "https://example.com/kinds.tn", "https://example.com/kind-constructors.tn");
 
         Map<String, Top> universe = new LinkedHashMap<>();
         Map<String, Map<String, Top>> perSchema = new LinkedHashMap<>();
@@ -314,10 +324,11 @@ class OpenEntryResolvedFormTest {
         int openEntries = open;
         int outsideOwnSchema = neededTheGoverningMeta;
         assertEquals(List.of(), mismatches, "kind restates what supertypes and body already determine");
-        assertTrue(closedEntries > 150, () -> "not enough entries for this to mean anything: " + closedEntries);
+        assertTrue(closedEntries > 140, () -> "not enough entries for this to mean anything: " + closedEntries);
         assertTrue(openEntries > 0, () -> "no open entry exercised the TEMPLATE branch: " + openEntries);
-        assertTrue(outsideOwnSchema > 40, () -> "the lookup should reach outside the entry's own schema for "
-                + "most of core.tn -- that is why the field stays: " + outsideOwnSchema + " of " + closedEntries);
+        assertTrue(outsideOwnSchema > 25, () -> "the lookup should reach outside the entry's own schema for "
+                + "most of core.tn's instances -- that is why the field stays: " + outsideOwnSchema + " of "
+                + closedEntries);
     }
 
     /** §4.1's rule, read off what the entry already states. Four branches; see the test's own note. */
@@ -329,7 +340,7 @@ class OpenEntryResolvedFormTest {
             return EntryKind.TEMPLATE;
         }
         if (definition instanceof Alias) {
-            // §4.1 gives an alias the kind ALIAS, a type_kind and not a base kind -- and the kernel's `alias`
+            // §4.1 gives an alias the kind ALIAS, a meta.type_kind and not a base kind -- and the kernel's `alias`
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
             return EntryKind.ALIAS;
         }

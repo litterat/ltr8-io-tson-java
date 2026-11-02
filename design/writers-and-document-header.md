@@ -22,7 +22,7 @@ keeps the rest of the document. Current form only; history lives in git.
   `TsonDataEmitter.reference(TypeRef)` writes the qualified name and, where it carries arguments, an adjacent `<`,
   the arguments one space apart and `>`, the canonical text `map<text list<int32>>`, a value argument keeping its
   token form. `AstWriter` writes a `ReferenceValue` through it, `TreeValueWriter` a `TsonReference`, and
-  `DataClassObjectWriter` a `schema.meta.TypeRef` (a `type_kind` value): a name as its one token, as a value written
+  `DataClassObjectWriter` a `schema.meta.TypeRef` (a `meta.type_kind` value): a name as its one token, as a value written
   by name has only that spelling ([TSON-SCHEMA] §5.12), and an application as `!meta.alias { target: result<T> }` or
   `@meta.application:response<order 201>` writes it. A reference some name in which is no qualified name is written as a
   quoted string, never as bare text that would not read back.
@@ -32,7 +32,7 @@ keeps the rest of the document. Current form only; history lives in git.
   the tag, `!api { key => value … }`, then its value: a `Namespace`'s map, a bound object through its descriptor, a
   tree through the tree writer. A bare `Namespace` where the position admits more than one type carries its `type` as
   the tag; at a slot whose host types it as a `Namespace` the slot's type already names it, and the map is written
-  untagged (`fields: { name => … }`). A `Namespace` of `schema` skips its path keys (`SchemaPaths.isPath`): a nested
+  untagged (`fields: { name => … }`). A `Namespace` of `meta.schema` skips its path keys (`SchemaPaths.isPath`): a nested
   map's members are written inside it, nested, in resolved form, never again under `geo.address` at the root.
 - `TsonDocumentPeek` performs no second header scan and rewinds nothing; a continuing reader whose lexical
   policy (token policy, limits) disagrees with the peek's is refused.

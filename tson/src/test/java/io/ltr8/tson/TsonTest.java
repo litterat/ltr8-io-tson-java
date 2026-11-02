@@ -121,7 +121,7 @@ class TsonTest {
 
         TsonCompiledMetaSchema meta = tson.loader().loadMeta(TsonBundledSchemas.META_ID);
 
-        assertTrue(meta.schema().entries().containsKey("meta.text_type"));
+        assertTrue(meta.schema().entries().containsKey("unicode.text_type"));
     }
 
     /**
@@ -139,12 +139,12 @@ class TsonTest {
         assertEquals(io.ltr8.tson.schema.meta.RecordBody.class,
                 tson.dataBindContext().nameBinder().resolve("meta.record"),
                 "the kernel's name binds to the schema model whatever the consumer's binder says");
-        assertTrue(tson.loader().loadMeta(TsonBundledSchemas.META_ID).schema().entries().containsKey("meta.text_type"),
+        assertTrue(tson.loader().loadMeta(TsonBundledSchemas.META_ID).schema().entries().containsKey("unicode.text_type"),
                 "and the standard library resolves through the same context");
     }
 
     /**
-     * Only a name the kernel declares under {@code meta} is fixed. {@code token} and {@code entry_kind} mangle to classes of
+     * Only a name the kernel declares is fixed. {@code token} and {@code entry_kind} mangle to classes of
      * the schema model ({@code Token}, {@code EntryKind}) and are entries of no bundled schema, so a consumer's schema
      * declaring them binds them through the consumer's binder like any other name it declares.
      */

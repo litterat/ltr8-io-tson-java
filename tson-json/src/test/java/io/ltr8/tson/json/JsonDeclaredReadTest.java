@@ -34,8 +34,8 @@ class JsonDeclaredReadTest {
               note     => { body: text }
               memo     => { body: text  urgent: boolean }
               count    => !integer ^ { min: 0  max: 9 }
-              envelope => { local: declared }
-              inbox    => { items: [declared] }
+              envelope => { local: meta.declared }
+              inbox    => { items: [meta.declared] }
             }
             """;
 
@@ -122,7 +122,7 @@ class JsonDeclaredReadTest {
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, refusal.code());
     }
 
-    /** Each element of {@code [declared]} names its own type. */
+    /** Each element of {@code [meta.declared]} names its own type. */
     @Test
     void eachArrayElementNamesItsOwnType() {
         assertEquals(List.of(), problems("inbox", """

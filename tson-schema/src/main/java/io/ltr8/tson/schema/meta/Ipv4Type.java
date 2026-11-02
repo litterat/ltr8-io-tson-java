@@ -38,7 +38,7 @@ public record Ipv4Type(TypeChain chain,
         return new Ipv4Type(chain, spec, within, excluding);
     }
 
-    /** {@code ipv4 => !net.ipv4_type {}} -- the unconstrained IPv4 address, core.tn's own {@code !ipv4}. */
+    /** {@code ipv4 => !net.ipv4_type {}} -- the unconstrained IPv4 address, net.tn's own {@code !ipv4}. */
     public static final Ipv4Type UNCONSTRAINED =
             new Ipv4Type("https://www.rfc-editor.org/rfc/rfc3986", List.of(), List.of());
 

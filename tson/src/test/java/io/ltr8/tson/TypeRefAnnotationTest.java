@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A reference keeps the wire annotations written on the reference itself.
  *
  * <p>§6 lets an annotation precede any value, and a reference at a field's type position is one:
- * {@code type: @meta.doc:"..." token} annotates the <em>reference</em>, not the field around it, so {@link
+ * {@code type: @doc:"..." token} annotates the <em>reference</em>, not the field around it, so {@link
  * TypeRef} is where it has to live, and a read keeps it and a write produces it.
  */
 class TypeRefAnnotationTest {
@@ -36,11 +36,11 @@ class TypeRefAnnotationTest {
     void anAnnotationOnATypeRefIsKept() {
         TypeRef type = fieldType(read("""
                 !meta.record { fields: {
-                  n => !meta.record_field { type: @meta.doc:"the token itself" meta.text }
+                  n => !meta.record_field { type: @doc:"the token itself" text }
                 } }"""));
 
-        assertEquals("meta.text", type.name());
-        assertEquals("the token itself", type.annotations().get("meta.doc").orElseThrow().value().orElseThrow());
+        assertEquals("text", type.name());
+        assertEquals("the token itself", type.annotations().get("doc").orElseThrow().value().orElseThrow());
     }
 
     /** A reference with nothing written on it carries an empty carrier, not null. */
@@ -48,7 +48,7 @@ class TypeRefAnnotationTest {
     void anUnannotatedTypeRefCarriesNothing() {
         assertTrue(fieldType(read("""
                 !meta.record { fields: {
-                  n => !meta.record_field { type: meta.text }
+                  n => !meta.record_field { type: text }
                 } }""")).annotations().values().isEmpty());
     }
 
@@ -57,12 +57,12 @@ class TypeRefAnnotationTest {
     void anAnnotatedTypeRefWritesBackAsOne() {
         TypeRef type = fieldType(read("""
                 !meta.record { fields: {
-                  n => !meta.record_field { type: @meta.doc:"the token itself" meta.text }
+                  n => !meta.record_field { type: @doc:"the token itself" text }
                 } }"""));
 
         String written = new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(type);
 
-        assertTrue(written.contains("@meta.doc"), written);
+        assertTrue(written.contains("@doc"), written);
         assertTrue(written.contains("the token itself"), written);
     }
 

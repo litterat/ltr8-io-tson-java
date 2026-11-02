@@ -27,18 +27,26 @@ class MetaTn1CompiledEndToEndTest {
 
     /**
      * The kernel resolved through {@code resolveSchema}/{@code bindAtomInstance}, whose instance declarations
-     * ({@code meta.bytes_encoding => !meta.enum [...]}) read through the loader's object-binding-mode stand-in,
-     * then registered; the outer compile this test exercises stays tree mode.
+     * ({@code boolean => !enum [...]}) read through the loader's object-binding-mode stand-in, then registered;
+     * then numeric.tn resolved over it and registered. The outer compile this test exercises stays tree mode.
      */
     private static TsonLinkedSchema registerMeta() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledSchemaLoader loader = new TsonCompiledMetaRegistry(context);
+        TsonCompiledMetaRegistry compiledRegistry = new TsonCompiledMetaRegistry(context);
+        TsonCompiledSchemaLoader loader = compiledRegistry;
 
-        SchemaDocument kernelDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID))
-                .parseSchemaDocument();
+        SchemaDocument kernelDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(
+                TsonBundledSchemas.META_ID)).parseSchemaDocument();
         TsonSchema kernel = new SchemaResolver(loader).resolveSchema(kernelDocument);
-        return registry.register(TsonSchemaLinker.link(kernel, registry));
+        TsonLinkedSchema linkedKernel = registry.register(TsonSchemaLinker.link(kernel, registry));
+        // Registered with the compiled registry too, which compiles it as the kernel's vocabulary.
+        compiledRegistry.register(linkedKernel.schema());
+
+        SchemaDocument metaDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.NUMERIC_ID))
+                .parseSchemaDocument();
+        TsonSchema meta = new SchemaResolver(loader).resolveSchema(metaDocument);
+        return registry.register(TsonSchemaLinker.link(meta, registry));
     }
 
     /**
@@ -52,7 +60,7 @@ class MetaTn1CompiledEndToEndTest {
     }
 
     /**
-     * The registered kernel's entries -- {@code meta}, its 96 members and the 6 synthetics its sugar lifts -- each
+     * numeric.tn's registered entries -- its own, the kernel's it imports, and the synthetics their sugar lifts -- each
      * compile cleanly with the same factory set {@link MetaKernelEndToEndTest} proves against the bootstrap's output.
      */
     @Test
@@ -63,17 +71,17 @@ class MetaTn1CompiledEndToEndTest {
         for (String name : meta.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(103, meta.schema().entries().size());
+        assertEquals(115, meta.schema().entries().size());
     }
 
     @Test
-    void readsBytesEncodingEnumMembersAgainstRealData() {
+    void readsTheOrderingEnumsMembersAgainstRealData() {
         TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = rawCompile(meta);
 
-        Object result = Dom.of((TsonValue) compiled.get("meta.bytes_encoding")
-                .read(TestDocuments.document("BASE64")));
+        Object result = Dom.of((TsonValue) compiled.get("atom.ordering")
+                .read(TestDocuments.document("TOTAL")));
 
-        assertEquals("BASE64", result);
+        assertEquals("TOTAL", result);
     }
 }

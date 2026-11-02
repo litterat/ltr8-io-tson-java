@@ -564,7 +564,7 @@ final class DefinitionResolver {
     /**
      * A composition or refinement template: the <em>flattened</em> record, with its parameters stated. Both absorb
      * fields from a source (§5.8's supertypes, §5.7's refinement source), and a §5.7 tightening entry states a
-     * modifier and no type-ref, which is not a {@code record_field} until the inherited field supplies one -- so
+     * modifier and no type-ref, which is not a {@code meta.record_field} until the inherited field supplies one -- so
      * the open record is the one resolution builds, where a namespace is in hand.
      *
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom body
@@ -682,7 +682,7 @@ final class DefinitionResolver {
         Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
         if (body instanceof io.ltr8.tson.schema.meta.Alias) {
             // `!meta.alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
-            // denotes the same entry: `kind: ALIAS` (§4.1 -- a type_kind, not one the supertype chain
+            // denotes the same entry: `kind: ALIAS` (§4.1 -- a meta.type_kind, not one the supertype chain
             // could give). Dispatched on the *body* rather than on the head's name because this path has
             // already read it; `resolveInstanceTemplate` holds its body unread and so has only the name.
             return body;
@@ -779,7 +779,7 @@ final class DefinitionResolver {
     private void refuseWrittenApplication(String name, String annotation) {
         if (TsonSchema.APPLICATION.equals(annotation) && metaDefinitions.definition(annotation) != null
                 && metaKernel.test(annotation)) {
-            throw new SchemaValidationException("'" + name + "': '@application' is written, which a declaration "
+            throw new SchemaValidationException("'" + name + "': '@meta.application' is written, which a declaration "
                     + "never writes -- it is the application an entry is the instantiation of, which the resolver "
                     + "states on the key of every entry that closes one (§8.2). Write the application itself: '"
                     + name + " => template<arguments>'");
@@ -820,9 +820,9 @@ final class DefinitionResolver {
 
     /**
      * Whether two records' name types are one type: the same entry at the end of each one's alias chain, not
-     * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code field_name} is
-     * {@code identifier}. Both resolve in the schema's one namespace, the absent default being the kernel's {@code
-     * field_name}, and two that resolve to nothing are compared as written, the linker refusing each on its own.
+     * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code meta.field_name} is
+     * {@code meta.identifier}. Both resolve in the schema's one namespace, the absent default being the kernel's {@code
+     * meta.field_name}, and two that resolve to nothing are compared as written, the linker refusing each on its own.
      */
     private boolean sameNameType(Optional<String> a, Optional<String> b) {
         String ka = nameTypeIdentity(a);
@@ -994,12 +994,12 @@ final class DefinitionResolver {
      * {@code I}'s own value.
      *
      * <p>Per §5.5's own text (not the general composition/refinement induction of §5.7/§5.8): the value's
-     * constructor is {@code I}'s own (e.g. {@code meta.integer_type} for {@code I = meta.integer}), and its chain is
+     * constructor is {@code I}'s own (e.g. {@code numeric.integer_type} for {@code I = integer}), and its chain is
      * the literal single-element {@code [I]} -- not transitively chained with {@code I}'s own supertypes (empty for
      * every fresh {@code Instance}). {@code I} written as an alias names the instance at the end of its chain.
      */
     private Top resolveAtomRefinement(String name, AtomRefinement refinement) {
-        // An alias is a hop, not a supertype (§8.3): `!integer ^ { ... }` through core's `integer => meta.integer`
+        // An alias is a hop, not a supertype (§8.3): `!integer ^ { ... }` through core's `integer => integer`
         // refines the instance at the end of the chain, which is what the refinement IS-A.
         String sourceName = AliasChain.terminal(refinement.target(), namespaceDefinitions::definition);
         Top source = namespaceDefinitions.definition(sourceName);
@@ -1008,7 +1008,7 @@ final class DefinitionResolver {
                     + "' names no entry of this schema's namespace (§3.3.1)");
         }
         // §5.5's question, asked of the body: is this an atom *instance*? An instance's body IS an atom
-        // (`integer` carries an `!meta.integer_type {}`), where its constructor's body is the vocabulary record
+        // (`integer` carries an `!numeric.integer_type {}`), where its constructor's body is the vocabulary record
         // describing one (`integer_type` carries a `!meta.record { ... }`). So one test separates the pair and
         // establishes atom-ness at once, where neither half does alone -- a plain record has no supertypes
         // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
@@ -2118,7 +2118,7 @@ final class DefinitionResolver {
      * already-inherited field: resolved the same way as any field ({@link #resolveField}), except
      * an elided type-ref (a modifier-only entry, {@code field: = value}) inherits {@code
      * inherited.type()} and its voidability rather than failing, and the result MUST refine the inherited
-     * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: product_access_type =
+     * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: meta.product_access_type =
      * INDEX} pins {@code product}'s required field, which refines it. The identity-diagonal rule (a FIXED
      * restatement MUST NOT change the pinned value) is not checked here: the two values are never compared.
      *
@@ -2319,7 +2319,7 @@ final class DefinitionResolver {
 
     /**
      * §6 adds one annotation position to the type-definition grammar: "in {@code field-def}, annotations
-     * precede the field name and annotate the field itself, mapping to the {@code record_field} in resolver
+     * precede the field name and annotate the field itself, mapping to the {@code meta.record_field} in resolver
      * output". Unlike a declaration, there is no before/after ambiguity here -- a field has one annotation
      * position and it is the field's own.
      */

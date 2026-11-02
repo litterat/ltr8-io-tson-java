@@ -30,8 +30,8 @@ class JsonNamespaceTypeTest {
             !!id:"https://example.test/meta-headers.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              header_name => !meta.identifier_type { continue_add: "-" }
-              headers     => !meta.namespace { key_type: header_name  value_type: meta.text }
+              header_name => !unicode.identifier_type { continue_add: "-" }
+              headers     => !meta.namespace { key_type: header_name  value_type: text }
             }
             """;
 

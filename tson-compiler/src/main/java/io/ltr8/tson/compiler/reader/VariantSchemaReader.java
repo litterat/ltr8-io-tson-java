@@ -30,7 +30,7 @@ import java.util.Set;
  * value with no type-ref, or one naming this declaration itself, reads via {@code ownParser}
  * unconditionally; only a value naming something else dispatches by resolving that name against
  * {@code resolver}, the same compiled-schema path every other dispatch in this codebase uses (e.g.
- * an explicit {@code !meta.uri_type {...}} value at a {@code text_type}-typed position dispatches straight
+ * an explicit {@code !net.uri_type {...}} value at a {@code text_type}-typed position dispatches straight
  * to {@code uri_type}'s own already-compiled reader, producing a real {@code UriType}, not a
  * {@code TextType}).
  *

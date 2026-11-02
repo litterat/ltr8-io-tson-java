@@ -42,7 +42,7 @@ public record Cidr6Type(TypeChain chain,
         return new Cidr6Type(chain, spec, minPrefix, maxPrefix, within, excluding);
     }
 
-    /** {@code cidr6 => !net.cidr6_type {}} -- the unconstrained IPv6 network, core.tn's own {@code !cidr6}. */
+    /** {@code cidr6 => !net.cidr6_type {}} -- the unconstrained IPv6 network, net.tn's own {@code !cidr6}. */
     public static final Cidr6Type UNCONSTRAINED = new Cidr6Type(
             "https://www.rfc-editor.org/rfc/rfc4291", Optional.empty(), Optional.empty(), List.of(), List.of());
 
@@ -64,7 +64,7 @@ public record Cidr6Type(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>The IPv6 twin of {@link Cidr4Type#coherenceCheck} -- same two judgements, same {@code
-     * within}/{@code excluding} rules, over the 128 bits net.tn's own {@code @meta.doc} names as this
+     * within}/{@code excluding} rules, over the 128 bits net.tn's own {@code @doc} names as this
      * family's range.
      */
     @Override

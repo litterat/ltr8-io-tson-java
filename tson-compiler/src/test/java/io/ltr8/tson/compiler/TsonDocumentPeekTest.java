@@ -175,7 +175,7 @@ class TsonDocumentPeekTest {
     @Test
     void aRetiredDirectiveYieldsNothing() {
         TsonDocumentPeek schema = TsonDocumentPeek.of("!!sch" + "ema:\"https://example.com/order.tn\"\n{ id: 1 }");
-        TsonDocumentPeek meta = TsonDocumentPeek.of("!!me" + "ta:\"https://example.com/meta.tn\"\n{ a => {} }");
+        TsonDocumentPeek meta = TsonDocumentPeek.of("!!me" + "ta:\"https://example.com/meta-core.tn\"\n{ a => {} }");
 
         assertEquals(TsonDocumentHeader.NONE, schema.header());
         assertTrue(schema.failure().getMessage().contains("'!!schema' directive is retired"), schema.failure()::getMessage);

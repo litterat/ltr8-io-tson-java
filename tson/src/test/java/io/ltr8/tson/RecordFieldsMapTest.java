@@ -52,7 +52,7 @@ class RecordFieldsMapTest {
     void aNameWrittenTwiceInTheExplicitFormIsTheMapsDuplicateKey() {
         Diagnostic read = only(Tson.standard().validate("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
-                !meta.record { fields: { x => { type: meta.integer }  x => { type: meta.text } } }
+                !meta.record { fields: { x => { type: integer }  x => { type: text } } }
                 """));
         assertEquals(Diagnostic.Code.DUPLICATE_MAP_KEY, read.code(), read.toString());
 
@@ -70,7 +70,7 @@ class RecordFieldsMapTest {
     @Test
     void twoSpellingsOfOneNameAreTheLinkersToRefuse() {
         Diagnostic problem = only(validateSchema("folded", """
-                  folded => !meta.identifier_type { normalization: NFKC_CASEFOLD }
+                  folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }
                   row => !meta.record { name_type: folded  fields: { name => { type: text }  NAME => { type: text } } }
                 """));
         assertTrue(problem.code() != Diagnostic.Code.DUPLICATE_MAP_KEY, problem.toString());

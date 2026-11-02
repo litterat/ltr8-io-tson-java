@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code template_param.type} end to end: each parameter of an open entry records the type an argument for it is
+ * {@code meta.template_param.type} end to end: each parameter of an open entry records the type an argument for it is
  * read as, derived from the positions it stands in ([TSON-SCHEMA] §5.10), and the kind follows from it.
  */
 class TemplateParamTypeTest {
@@ -33,7 +33,7 @@ class TemplateParamTypeTest {
               counted  => <C> { c?: percent ~ C }
               outer    => <X> counted<X>
               typed_by => <T, N> { w?: T ~ N }
-              names    => <M> !meta.enum [a b M]
+              names    => <M> !enum [a b M]
               named    => names<c>
               holder   => { n: named }
             }
@@ -53,14 +53,14 @@ class TemplateParamTypeTest {
         return new TemplateParam(name, TypeRef.of(type));
     }
 
-    /** A type slot gives {@code type_kind}; a scalar slot of the applied constructor gives that slot's type. */
+    /** A type slot gives {@code meta.type_kind}; a scalar slot of the applied constructor gives that slot's type. */
     @Test
     void aSlotGivesItsDeclaredType() {
-        assertEquals(List.of(param("T", "meta.type_kind"), param("N", "meta.non_negative_integer")),
+        assertEquals(List.of(param("T", "meta.type_kind"), param("N", "numeric.non_negative_integer")),
                 parameters().get("vector"));
     }
 
-    /** A routed default is read as the field's own declared type, not as {@code record_field.value}'s. */
+    /** A routed default is read as the field's own declared type, not as {@code meta.record_field.value}'s. */
     @Test
     void aRoutedDefaultGivesTheFieldsType() {
         assertEquals(List.of(param("C", "percent")), parameters().get("counted"));
@@ -84,7 +84,7 @@ class TemplateParamTypeTest {
      */
     @Test
     void thePositionalFormIsWalkedLikeTheRecordItSpells() {
-        assertEquals(List.of(param("M", "meta.text")), parameters().get("names"));
+        assertEquals(List.of(param("M", "text")), parameters().get("names"));
 
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, SCHEMA)))));
@@ -114,7 +114,7 @@ class TemplateParamTypeTest {
     @Test
     void coresTemplatesRecordTheirTypes() {
         Map<String, List<TemplateParam>> core = parameters();
-        assertEquals(List.of(param("T", "meta.type_kind")), core.get("meta.set"));
+        assertEquals(List.of(param("T", "meta.type_kind")), core.get("set"));
     }
 
     // ── A template over a meta constructor is the meta's ─────────────────────────────
@@ -129,9 +129,9 @@ class TemplateParamTypeTest {
     }
 
     /**
-     * {@code N} stands in {@code array.min_items}, so its type is the kernel's {@code non_negative_integer}, the slot's
-     * own (§5.10): {@code vec<0>} is a valid application, and a text argument is refused. A schema may declare its own
-     * entry under the kernel member's name, the kernel's being {@code meta.non_negative_integer} (§2.2.3).
+     * {@code N} stands in {@code array.min_items}, so its type is the kernel's {@code numeric.non_negative_integer}, the
+     * slot's own (§5.10): {@code vec<0>} is a valid application, and a text argument is refused. A schema may declare its
+     * own entry under the kernel member's name, the kernel's being {@code numeric.non_negative_integer} (§2.2.3).
      */
     @Test
     void aConstructorTemplatesValueIsTheSlotsType() {
@@ -154,7 +154,7 @@ class TemplateParamTypeTest {
     @Test
     void aConstructorTemplatesWrittenTypeNarrowsTheSlotsType() {
         assertEquals(List.of(), load("""
-                  vec => <N: meta.non_negative_integer> !meta.array { element_type: text  max_items: N }
+                  vec => <N: numeric.non_negative_integer> !meta.array { element_type: text  max_items: N }
                   v3  => vec<3>
                 """));
         List<Diagnostic> core = load("""

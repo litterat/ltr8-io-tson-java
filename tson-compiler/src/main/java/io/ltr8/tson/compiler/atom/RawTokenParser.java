@@ -13,7 +13,7 @@ import io.ltr8.tson.schema.meta.Token;
  * <p><b>The counterpart of {@link ValueParser}, for the slot that parser cannot fill.</b> The kernel's
  * {@code value} primitive decodes ([TSON-DATA] §4) -- {@code 3} to an integer, {@code "3"} to a string --
  * which is what a document's data wants and what a {@code value}-typed slot bound to a decoded host gets.
- * {@code record_field.value}, a field's fixed or default value, is bound to a {@link Token}: it is read later
+ * {@code meta.record_field.value}, a field's fixed or default value, is bound to a {@link Token}: it is read later
  * by the field's declared type, and resolved output records it as written, so a decoded host object cannot
  * fill it.
  *

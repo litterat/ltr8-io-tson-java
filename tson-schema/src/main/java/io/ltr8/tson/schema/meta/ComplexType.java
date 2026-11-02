@@ -6,8 +6,8 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 
 /**
- * meta.tn's {@code complex_type} constructor ({@code complex_type => ~atom & { component:
- * complex_component ~ NUMBER } }): {@code component} narrows the numeric family used for the
+ * numeric.tn's {@code numeric.complex_type} constructor ({@code complex_type => ~atom & { component:
+ * numeric.complex_component ~ NUMBER } }): {@code component} narrows the numeric family used for the
  * real/imaginary parts, defaulting to {@code NUMBER} (the exact-decimal tier). Pure constraint
  * value, no parsing/validation behavior -- {@code tson-compiler}'s {@code ComplexParser} does the
  * actual reading/writing (it takes no configuration from here: {@code component} is fixed, not
@@ -19,13 +19,13 @@ import java.util.List;
  * binds from the resulting bare token by ordinary name matching, the same way {@link
  * FloatType#format} already does.
  *
- * <p>{@link Component} mirrors {@code complex_component}'s own five members (meta.tn: {@code
- * complex_component => !meta.enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]}) -- a plain nested enum,
+ * <p>{@link Component} mirrors {@code numeric.complex_component}'s own five members (numeric.tn: {@code
+ * complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]}) -- a plain nested enum,
  * not a {@code typeName()}-mapped one like {@link FloatType.Format}, since nothing here multiplexes a
  * single Java class across several built-in annotation names the way that one does. {@link
  * BytesType.Encoding} is the third of these plain nested enums and is mirrored the same way.
  */
-@Typename(name = "meta.complex_type")
+@Typename(name = "numeric.complex_type")
 public record ComplexType(TypeChain chain,
         Component component) implements Atom {
     /** The chain normalised: absent and empty are one list. */
@@ -58,7 +58,7 @@ public record ComplexType(TypeChain chain,
         }
     }
 
-    /** {@code complex => !meta.complex_type {}} -- the unconstrained complex number, core.tn's own {@code !complex}. */
+    /** {@code complex => !numeric.complex_type {}} -- the unconstrained complex number, numeric.tn's {@code !complex}. */
     public static final ComplexType UNCONSTRAINED = new ComplexType(Component.NUMBER);
 
     /**
@@ -78,7 +78,7 @@ public record ComplexType(TypeChain chain,
      * <p>So {@code !complex ^ { component: INTEGER }} is a real narrowing -- Gaussian integers
      * &#8484;+&#8484;i sit inside the exact-decimal complexes -- and its IS-A holds. {@code !complex ^
      * { component: FLOAT64 }} is not: binary64 carries &#177;inf and NaN that no exact decimal represents,
-     * so a float64 complex is not a {@code complex}, and the IS-A the refinement claims is false. core.tn's
+     * so a float64 complex is not a {@code complex}, and the IS-A the refinement claims is false. numeric.tn's
      * {@code @doc} documents both spellings side by side, and only the first of them is a refinement.
      *
      * <p><b>Stated over effective values, which is what makes it enforceable.</b> §5.7's own selector clause

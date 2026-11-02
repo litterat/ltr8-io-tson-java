@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -25,14 +26,15 @@ class ChoiceConstructionResolutionTest {
 
     /** Governed by the kernel, which defines the {@code choice} constructor; its compiled form bootstraps on demand. */
     private static SchemaResolver metaKernelGovernedResolver() {
-        return new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
+        return new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(),
+                TsonBundledSchemas::fetch));
     }
 
     private static final String CHOICE_DOCUMENT = """
             !!id:"https://example.test/choice.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              contact => !meta.choice { variants: [meta.text meta.integer] }
+              contact => !meta.choice { variants: [text integer] }
             }
             """;
 
@@ -45,7 +47,7 @@ class ChoiceConstructionResolutionTest {
 
         Top contact = resolved.entries().get("contact");
         ChoiceBody body = assertInstanceOf(ChoiceBody.class, contact);
-        assertEquals(List.of("meta.text", "meta.integer"), body.variants().stream().map(TypeRef::name).toList());
+        assertEquals(List.of("text", "integer"), body.variants().stream().map(TypeRef::name).toList());
         // Each variant is a bare reference -- empty arguments, never null.
         assertTrue(body.variants().stream().allMatch(variant -> variant.arguments().isEmpty()));
     }

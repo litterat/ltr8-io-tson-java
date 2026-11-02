@@ -60,19 +60,19 @@ class MetaLayerVocabularyTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               operation => {
-                path:     meta.text
-                method:   meta.text
+                path:     text
+                method:   text
                 request:  meta.type_kind
                 response: meta.type_kind
               }
               operations => !meta.namespace { key_type: meta.identifier  value_type: operation }
               webhook => {
-                path:     meta.text
+                path:     text
                 delivers?: [meta.type_kind]?
               }
               webhooks    => !meta.namespace { key_type: meta.identifier  value_type: webhook }
-              status_code => meta.text
-              plain       => { a: meta.text }
+              status_code => text
+              plain       => { a: text }
               envelope    => <T> { body: T }
               pair        => <A, B> { a: A  b: B }
             }
@@ -157,9 +157,9 @@ class MetaLayerVocabularyTest {
     }
 
     /**
-     * The other side of the same predicate: a record type that is no constructor ({@code record_field}, {@code
-     * template_param}, {@code integer_size}, …) builds no type, and {@code !record_field { ... }} is a value of it, read
-     * against it as a data value is -- so a field it does not declare is refused there.
+     * The other side of the same predicate: a record type that is no constructor ({@code meta.record_field},
+     * {@code meta.template_param}, {@code numeric.integer_size}, …) builds no type, and {@code !meta.record_field { ... }}
+     * is a value of it, read against it as a data value is -- so a field it does not declare is refused there.
      */
     @Test
     void aComponentOfATypeBuildsAValueOfIt() {
@@ -190,9 +190,9 @@ class MetaLayerVocabularyTest {
         Object read = core(consumerContext()).loadMeta(META_HTTP).compiledSchema().find("operation")
                 .orElseThrow()
                 .read(TestDocuments.document(
-                        "{ path: \"/p\"  method: \"GET\"  request: meta.text  response: meta.integer }"));
+                        "{ path: \"/p\"  method: \"GET\"  request: text  response: integer }"));
 
-        assertEquals(new Operation("/p", "GET", TypeRef.of("meta.text"), TypeRef.of("meta.integer")), read);
+        assertEquals(new Operation("/p", "GET", TypeRef.of("text"), TypeRef.of("integer")), read);
     }
 
     /**
@@ -265,7 +265,7 @@ class MetaLayerVocabularyTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("badtype", SEARCH.replace("method: \"GET\"", "method: [1 2 3]")));
 
-        assertTrue(thrown.getMessage().contains("expected a token for 'meta.text'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("expected a token for 'text'"), thrown.getMessage());
     }
 
     /** A value whose optional list of names is written links: the class declares nothing, so there is nothing to guard. */

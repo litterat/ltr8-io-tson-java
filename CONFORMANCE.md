@@ -57,7 +57,7 @@ followed exactly: a token that isn't CIDR-shaped is a parse error, while a prefi
 range and an address with nonzero host bits are validation errors. `min_prefix`/`max_prefix` are applied;
 `within`/`excluding` are not, on the same deferral as `ipv4_type`'s (deciding subnet-of and non-overlap
 against a list of networks is a materially bigger piece of work than a scalar bound). Whether a *declared*
-bound itself falls inside the family range — "invalid at the schema level", per meta.tn — is a
+bound itself falls inside the family range — "invalid at the schema level", per net.tn — is a
 constraint-family coherence rule tracked in `BACKLOG.md`, not enforced by the parser; an out-of-range
 bound is inert, since the family range is enforced regardless.
 
@@ -76,8 +76,8 @@ holding the handful of `ucschar` characters it reads as spaces (U+00A0, U+2000�
 
 **The vocabulary is the published one.** §5.6 lists the full `int8`..`int256`/`uint8`..`uint256` ladder plus
 the four bound-only refinements, and §5.5 carries `!email` beside its "Network Types" siblings, so what is
-seeded here matches both the tables and core.tn — the two read paths agree by construction rather than by
-this implementation choosing core.tn over a shorter table.
+seeded here matches both the tables and numeric.tn and net.tn — the two read paths agree by construction rather
+than by this implementation choosing the libraries over a shorter table.
 
 **`!email` implements a subset of RFC 5322, not the whole grammar.** `email_type`'s `spec` is
 fixed to RFC 5322, but `EmailParser` accepts only the `dot-atom "@" dot-atom` core; quoted local

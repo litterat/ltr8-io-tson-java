@@ -5,7 +5,7 @@ import io.ltr8.annotation.Record;
 import java.math.BigInteger;
 
 /**
- * The kernel's {@code integer_size} record (Part 2 §8.1, §9): a fixed-width integer
+ * The kernel's {@code numeric.integer_size} record (Part 2 §8.1, §9): a fixed-width integer
  * representation, bit width paired with two's-complement signedness -- {@code integer_type.size}'s
  * field type. {@code bits} is the kernel's arbitrary-precision {@code integer}, hence {@link
  * BigInteger} rather than a Java primitive width, even though every built-in width in practice

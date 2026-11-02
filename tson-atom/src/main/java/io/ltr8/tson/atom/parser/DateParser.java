@@ -25,7 +25,7 @@ public record DateParser(DateType constraints) implements AtomTypeParser<LocalDa
     /** §5.4's built-in annotation name -- {@code !date}. */
     public static final String TYPENAME = "date";
 
-    /** {@code date => !meta.date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
+    /** {@code date => !temporal.date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
     public static final DateParser UNCONSTRAINED = new DateParser(DateType.UNCONSTRAINED);
 
     public DateParser(Optional<LocalDate> min, Optional<LocalDate> max) {

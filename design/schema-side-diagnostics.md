@@ -220,10 +220,10 @@ declares.** `RecordBindReader` refuses four disagreements; `BindTargets` carries
   diagnostics).
 - **An atom field** is refused when its component binds structurally, or when its family cannot produce the class the
   component binds.
-- **The rule bites the library first**: `datetime_type` and `time_type` declare `precision`, so `DateTimeType` and
-  `TimeType` carry it and their parsers enforce it. §5.5 makes it a constraint on the value — a whole number of 10⁻ᴺ
-  seconds — not on the spelling, so `12:00:00.500` is admitted at `precision: 1`; nothing is truncated to satisfy it
-  (`FractionalSeconds`).
+- **The rule bites the library first**: `temporal.datetime_type` and `temporal.time_type` declare `precision`, so
+  `DateTimeType` and `TimeType` carry it and their parsers enforce it. §5.5 makes it a constraint on the value — a whole
+  number of 10⁻ᴺ seconds — not on the spelling, so `12:00:00.500` is admitted at `precision: 1`; nothing is truncated to
+  satisfy it (`FractionalSeconds`).
 - **The class is the target at every depth.** A collection's element, a map's key and value and a tuple's position are
   bound to what the component's class declares there, recursively (`reader.BindTargets`, the rule `tson-json`'s class
   of that name states too): an atom narrowed to the element's wire class, a nested container rebuilt for its declared

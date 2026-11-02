@@ -60,7 +60,7 @@ class ChoiceReadTest {
     void anUntaggedValueIsRecoveredWhereTheVariantsAreDisjoint() {
         TsonValue person = read(personReader("(text | integer)"), "\"ada@example.com\"");
 
-        assertEquals(Optional.of("meta.text"), person.get("reach").typeRef());
+        assertEquals(Optional.of("text"), person.get("reach").typeRef());
         assertEquals(Optional.of("ada@example.com"), person.get("reach").asString());
     }
 
@@ -69,7 +69,7 @@ class ChoiceReadTest {
     void eachDisjointVariantIsRecoveredAsItself() {
         TsonValue person = read(personReader("(text | integer)"), "42");
 
-        assertEquals(Optional.of("meta.integer"), person.get("reach").typeRef());
+        assertEquals(Optional.of("integer"), person.get("reach").typeRef());
     }
 
     /** An explicit tag dispatches by variant name, whether or not the choice could have gone untagged. */
@@ -77,7 +77,7 @@ class ChoiceReadTest {
     void anExplicitTagSelectsTheVariant() {
         TsonValue person = read(personReader("(text | integer)"), "!integer 42");
 
-        assertEquals(Optional.of("meta.integer"), person.get("reach").typeRef());
+        assertEquals(Optional.of("integer"), person.get("reach").typeRef());
     }
 
     /** Untagged recovery fails closed: no variant matches the boolean class, and the diagnostic names the set. */
@@ -117,7 +117,7 @@ class ChoiceReadTest {
     void anInlineChoiceReadsLikeADeclaredOne() {
         TsonValue person = read(personReader("(text | integer)"), "42");
 
-        assertEquals(Optional.of("meta.boolean"), person.get("inline").typeRef());
+        assertEquals(Optional.of("boolean"), person.get("inline").typeRef());
     }
 
     /**
@@ -144,7 +144,7 @@ class ChoiceReadTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               loose => ( float64 | text )
-              strict => !meta.float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
+              strict => !numeric.float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
               tight => ( strict | text )
               holder => { loose: loose  tight: tight }
             }""";
@@ -203,7 +203,7 @@ class ChoiceReadTest {
     void aQuotedNanAtTheDisjointChoiceIsText() {
         TsonValue tight = readHolder("!float64 1.5", "\".nan\"").get("tight");
 
-        assertEquals(Optional.of("meta.text"), tight.typeRef());
+        assertEquals(Optional.of("text"), tight.typeRef());
         assertEquals(Optional.of(".nan"), tight.asString());
     }
 

@@ -751,8 +751,8 @@ class TsonDataParserTest {
     /** A qualified annotation name, a member of a schema map nested as an entry, is kept as written. */
     @Test
     void aQualifiedAnnotationNameParses() {
-        DataValue value = root("@meta.doc:\"a value\" !geo.address 7");
-        assertEquals("meta.doc", value.annotations().get(0).name());
+        DataValue value = root("@doc:\"a value\" !geo.address 7");
+        assertEquals("doc", value.annotations().get(0).name());
         assertEquals("geo.address", value.typeRef().orElseThrow());
     }
 

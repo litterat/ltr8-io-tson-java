@@ -2123,10 +2123,12 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/38/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/38/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/38/tson-guide |
-| meta.tn | TSON Meta-Schema, the pre-loaded kernel (companion artifact) | https://tson.io/2026/39/m/meta.tn?sha256=0335e318a8ea9b3a9e108ac6b0ef6cf930def8353ce3cafbb241d4c037cacd54 |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/39/m/core.tn?sha256=6d57f04f65608aab13769156208c59087b7a3ab3fab695f9b10c0e7a3659f8e0 |
-| net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/39/m/net.tn?sha256=b78221075ed3dbb9411d3d90a39d09f759d98a08dba15f5252dc333cb70d0322 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/39/m/policy.tn?sha256=36c6d94a3423c62d0d963c84020a794567d3d471b344ea6b4652c959e695db6b |
+| meta.tn | TSON Meta Kernel (companion artifact) | https://tson.io/2026/39/m/meta.tn?sha256=42525fb6ede3f8252c61606d2da0e5abb1086015acce1b2c0ccf3ce038749681 |
+| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/39/m/numeric.tn?sha256=05cdc90d827b98132fe24fa36597e3fd58670678827d2cec578cb2635cd498e1 |
+| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/39/m/temporal.tn?sha256=cd009d945ced685234626c30e98bccc2dec38e9c2a8037e530bcd3c05606eee2 |
+| net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/39/m/net.tn?sha256=fa2d2ddead277bdba71ee76c0f764bffe65b8235f454d71a2ea8436b0fd02330 |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/39/m/core.tn?sha256=4ac202cad2f2a6c2903050043e411c1161c92dfcf7f570d530c8f8109d1141e3 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/39/m/policy.tn?sha256=c933a060cd78183d5c8bae76c6fd500c5d28bf3c0ef69e2e830827856f8c5897 |
 
 ### 13.3 Informative References
 
@@ -2137,5 +2139,5 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | ISO 8601-1:2019 | Date and time — Representations for information interchange (the informative source behind RFC 3339 Appendix A) | https://www.iso.org/standard/70907.html |
 | JSON Schema 2020-12 | JSON Schema: A Media Type for Describing JSON Documents | https://json-schema.org/specification |
 | W3C XSD Part 2 | XML Schema Part 2: Datatypes Second Edition | https://www.w3.org/TR/xmlschema-2/ |
-| Resolver Output Fixtures | meta-resolved.tn, core-resolved.tn, net-resolved.tn (non-normative) | &lt;published alongside this document&gt; |
+| Resolver Output Fixtures | meta-resolved.tn, numeric-resolved.tn, temporal-resolved.tn, net-resolved.tn, core-resolved.tn (non-normative) | &lt;published alongside this document&gt; |
 

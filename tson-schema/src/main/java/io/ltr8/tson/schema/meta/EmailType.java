@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn's {@code email_type} constructor (RFC 5322), composing {@code text_type}'s {@code
+ * net.tn's {@code net.email_type} constructor (RFC 5322), composing {@code text_type}'s {@code
  * min_length}/{@code max_length}/{@code length}/{@code pattern}. Pure constraint values, no
  * parsing/validation behavior -- {@code tson-compiler}'s {@code EmailParser} holds one of these and does
  * the actual reading/writing.
@@ -19,7 +19,7 @@ import java.util.Optional;
  * {@code regex_type} is declared by the identical composition and differs only in the document {@code
  * spec} is fixed to.
  */
-@Typename(name = "meta.email_type")
+@Typename(name = "net.email_type")
 public record EmailType(TypeChain chain,
         String spec, @Field("min_length") Optional<Integer> minLength,
                          @Field("max_length") Optional<Integer> maxLength,
@@ -42,7 +42,7 @@ public record EmailType(TypeChain chain,
         return new EmailType(chain, spec, minLength, maxLength, length, pattern, members, normalization);
     }
 
-    /** {@code email => !meta.email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */
+    /** {@code email => !net.email_type {}} -- the unconstrained email address, net.tn's own {@code !email}. */
     public static final EmailType UNCONSTRAINED = new EmailType(
             "https://www.rfc-editor.org/rfc/rfc5322", Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE);

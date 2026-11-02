@@ -90,7 +90,7 @@ class ContainerBoundCoherenceTest {
      *
      * <p><b>No name leads the message</b>, and that is the rule rather than an omission: the only entries
      * reaching this check are ones resolution never produced, whose names are content-derived
-     * ({@code integer_type_10_3_0794a6fb}) and appear nowhere in the author's file. The diagnostic's own
+     * ({@code numeric_integer_type_10_3_0794a6fb}) and appear nowhere in the author's file. The diagnostic's own
      * location names the declaration that wrote the application, which is the line they can edit.
      */
     @Test
@@ -115,11 +115,11 @@ class ContainerBoundCoherenceTest {
     @Test
     void everyFamilysOwnCoherenceRuleReachesMaterialisationToo() {
         assertTrue(refused("""
-                  b => <N> !meta.integer_type { min: N  max: 3 }
+                  b => <N> !numeric.integer_type { min: N  max: 3 }
                   r => { x: b<10> }""").getMessage().contains("min 10 is above max 3"));
 
         assertTrue(refused("""
-                  b => <N> !meta.text_type { min_length: N  max_length: 3 }
+                  b => <N> !unicode.text_type { min_length: N  max_length: 3 }
                   r => { x: b<10> }""").getMessage().contains("min_length 10 is above max_length 3"));
 
         assertTrue(refused("""
@@ -131,7 +131,7 @@ class ContainerBoundCoherenceTest {
     @Test
     void aCoherentParametricAtomApplicationIsUntouched() {
         assertNotNull(compile("""
-                  b => <N> !meta.integer_type { min: N  max: 30 }
+                  b => <N> !numeric.integer_type { min: N  max: 30 }
                   r => { x: b<10> }"""));
     }
 

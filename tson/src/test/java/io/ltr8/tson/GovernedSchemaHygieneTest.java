@@ -36,15 +36,15 @@ class GovernedSchemaHygieneTest {
     /** {@code аdmin}, its first letter U+0430: a mixed-script name. */
     private static final String MIXED = "аdmin";
 
-    private static final String META_ID = "https://example.test/2026/39/iface-meta-1.tn";
+    private static final String IFACE_META_ID = "https://example.test/2026/39/iface-meta-1.tn";
     private static final String META = """
             !!id:"https://example.test/2026/39/iface-meta-1.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               method_name => meta.identifier
-              iface       => { methods: {method_name => meta.text} }
+              iface       => { methods: {method_name => text} }
               ifaces      => !meta.namespace { key_type: meta.identifier  value_type: iface }
-              routes      => @meta.annotation {method_name => meta.text}
+              routes      => @meta.annotation {method_name => text}
             }""";
 
     private static final String DATA_ID = "https://example.test/2026/39/iface-data-1.tn";
@@ -53,7 +53,7 @@ class GovernedSchemaHygieneTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              slug  => !meta.identifier_type { continue_add: "-" }
+              slug  => !unicode.identifier_type { continue_add: "-" }
               method_name => slug
               iface       => { methods: {method_name => text} }
             }""";
@@ -68,7 +68,7 @@ class GovernedSchemaHygieneTest {
     }
 
     private static Tson tson(IdentifierPolicy identifiers) {
-        SchemaSource source = SchemaSource.ofMap(Map.of(META_ID, META, DATA_ID, DATA_SCHEMA));
+        SchemaSource source = SchemaSource.ofMap(Map.of(IFACE_META_ID, META, DATA_ID, DATA_SCHEMA));
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withIdentifierPolicy(identifiers)
                 .withDataBindContext(io.ltr8.bind.DataBindContext.builder()
@@ -90,7 +90,7 @@ class GovernedSchemaHygieneTest {
                 !!import:"%s"
                 !schema {
                   apis => %s!ifaces { orders => { methods: { %s } } }
-                }""".formatted(META_ID, annotation, methods);
+                }""".formatted(IFACE_META_ID, annotation, methods);
     }
 
     /** The control: in a data document, the map's keys are names. */

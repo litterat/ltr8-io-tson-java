@@ -21,10 +21,10 @@ import java.util.Optional;
  * refines the same way. The family carries no timezone facet -- RFC 3339 {@code full-time}, which {@code spec}
  * pins, already makes the offset mandatory.
  *
- * <p>Also an {@link Atom} variant: {@code time => !meta.time_type {}} is a constructor-application
+ * <p>Also an {@link Atom} variant: {@code time => !temporal.time_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
-@Typename(name = "meta.time_type")
+@Typename(name = "temporal.time_type")
 public record TimeType(TypeChain chain,
         Optional<OffsetTime> min, @Field("exclusive_min") Optional<OffsetTime> exclusiveMin,
                      Optional<OffsetTime> max, @Field("exclusive_max") Optional<OffsetTime> exclusiveMax,
@@ -66,7 +66,7 @@ public record TimeType(TypeChain chain,
         this(min, Optional.empty(), max, Optional.empty(), precision);
     }
 
-    /** {@code time => !meta.time_type {}} -- the unconstrained time, §5.4's {@code !time}. */
+    /** {@code time => !temporal.time_type {}} -- the unconstrained time, §5.4's {@code !time}. */
     public static final TimeType UNCONSTRAINED = new TimeType(Optional.empty(), Optional.empty(), Optional.empty());
 
     /**

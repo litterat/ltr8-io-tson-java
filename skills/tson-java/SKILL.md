@@ -56,8 +56,8 @@ with no compatibility guarantee between revisions — so a schema `!!id` pinned 
 ## Workflow
 
 1. **Decide whether you need a schema at all.** Reading one document with no schema is one
-   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the four
-   bundled schemas (meta, core, net, policy) and is what you need only once a *schema* is in play.
+   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the six
+   bundled schemas (meta, numeric, temporal, net, core, policy) and is what you need only once a *schema* is in play.
 2. **Pick the reader from the matrix below** — the two questions are *what drives the interpretation*
    (the wire alone, your Java class, or a TSON schema) and *what you want out* (a `TsonValue` tree, or
    a bound Java object).
@@ -108,7 +108,7 @@ import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetchi
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
 
-Tson tson = Tson.standard();   // bootstraps meta.tn (the kernel), core.tn, net.tn and policy.tn
+Tson tson = Tson.standard();   // bootstraps meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn, policy.tn
 
 String schema = """
         !!id:"https://example.com/2026/39/app/order-1.tn"
@@ -199,10 +199,9 @@ The token `null` is not absence — §4 resolves it to the string `null`, so it 
 [TSON-DATA] §7.4). A schemaless read keeps one as a `TsonReference` — `segments()`, `arguments()` (each read by the
 ordinary rule: `201` a number, `text` a string, a nested application another `TsonReference`), `text()` for the
 canonical spelling — and resolves nothing, so it has no referent. Under a schema, a value at a kind-typed position
-(`kind<T>`, `meta.type_kind`) arrives in tree mode as an atom holding a `schema.meta.TypeRef` (`as(TypeRef.class)`), never
-a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names in the schema it was
-read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text, a type
-mismatch.
+(`meta.kind<T>`, `meta.type_kind`) arrives in tree mode as an atom holding a `schema.meta.TypeRef` (`as(TypeRef.class)`),
+never a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names in the schema it was
+read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text, a type mismatch.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever
 cast (`isInstance`), so a test asserting *which host type a reader produced* must use `as(Class)`.
@@ -304,7 +303,7 @@ project shipped exactly that bug.
 
 ## Fetching schemas
 
-Out of the box a `Tson` serves only the four bundled schemas (meta, core, net, policy):
+Out of the box a `Tson` serves only the six bundled schemas (meta, numeric, temporal, net, core, policy):
 `SchemaAccess.registeredOnly()` is the default, so anything else must be registered first or reachable through a
 configured source. Two fetching sources ship, plus a non-fetching third:
 
@@ -372,7 +371,7 @@ remembering which convention each component uses.
 parse `message`. The type's name leads `message` instead.
 
 The **schema end is the path taken through *your* schema**: an `age: int32` field that violates its
-bound reports `/person/age`, not `/int32` in core.tn, because a pointer into a library file you did not
+bound reports `/person/age`, not `/int32` in numeric.tn, because a pointer into a library file you did not
 write is not where you go to fix it.
 
 `Diagnostic.Code` is a **closed enum** — switch on it exhaustively. Eleven of its members are not verdicts
@@ -414,7 +413,7 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
 ```
 
 `identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names, and every
-value whose type is an `identifier_type` family — with all three §8.2 mechanisms on and Highly Restrictive over
+value whose type is a `unicode.identifier_type` family — with all three §8.2 mechanisms on and Highly Restrictive over
 the whole name (§8.2's SHOULD). Reach for `perSegment()`, or `permitting(scripts…)` on the level, before
 loosening the level: both keep the rule everywhere else. A segment ends at `_`, and at whatever a name's profile
 adds that is not a letter or digit (`-` for core names, a `$` or a medial `.` for a family that adds one).
@@ -443,7 +442,7 @@ tson compile person.tn                  # does the schema itself resolve and com
 tson policy                             # the §8.2 Unicode policy and §9.1 limits this run would apply
 tson hash person.tn                     # stamp ?sha256=… onto its own !!id, in place
 tson strip person.tn                    # print a token-lean reading form for a prompt (not loadable)
-tson strip --keep-docs person.tn        # the same, keeping @doc, @title and @examples
+tson strip --keep-docs person.tn        # the same, keeping @doc
 tson validate --schema order.tn --type order data.json        # JSON data, bound out of band
 ```
 
@@ -470,11 +469,11 @@ meaning nothing, the `--output json`/`tson` shapes field by field, and the CLI's
 
 A record's field names are identifiers by default. A schema translated from JSON-LD, JSON Schema or OpenAPI
 has members such as `@id`, `@type` or `$ref`, and a record can declare them as written by naming a **name
-type**: an `identifier_type` whose profile admits the extra characters. State it once, on a fieldless abstract
+type**: a `unicode.identifier_type` whose profile admits the extra characters. State it once, on a fieldless abstract
 base, and compose that base; a composition takes its supertypes' one name type (Part 2 §5.2):
 
 ```
-json_name   => !meta.identifier_type { start_add: "@$" }
+json_name   => !unicode.identifier_type { start_add: "@$" }
 json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
 node        => json_record & { "@id": text  "$ref"?: text  label: text }
 ```
@@ -484,7 +483,7 @@ node        => json_record & { "@id": text  "$ref"?: text  label: text }
   `$import`, `$type` and `$value` mean anything to the encoding, so a record should not declare those three.
 - **Bind it through the component that states it**: `public record Node(@Field("@id") String id,
   @Field("$ref") String ref, String label) {}`.
-- **Other name types**: words with a space (`!meta.identifier_type { continue_add: "-"  medial: " " }`), names compared
+- **Other name types**: words with a space (`!unicode.identifier_type { continue_add: "-"  medial: " " }`), names compared
   without case (`normalization: NFKC_CASEFOLD`, so `NAME` is the field `name`), HTTP-style header names (`start:
   ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD`). A name type's normalization must imply NFC.
 - **Records that inherit share one name type**, the default included: a plain record composed into a `json_record`

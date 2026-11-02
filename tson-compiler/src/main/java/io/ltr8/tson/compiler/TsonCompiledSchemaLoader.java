@@ -18,7 +18,7 @@ import java.util.Set;
  *       <i>resolved</i> form, merged into the importer's namespace, or compiled per-mode by a {@code
  *       TsonCompiledSchemaRegistry}.
  *   <li>{@link #loadMeta} -- the <i>compiled</i> vocabulary of the schema that declared a constructor or an
- *       annotation type the importer applies: its {@code !meta.enum}/{@code !integer} instances are read into {@code
+ *       annotation type the importer applies: its {@code !enum}/{@code !integer} instances are read into {@code
  *       schema.meta} objects during the importer's own resolution.
  * </ul>
  *

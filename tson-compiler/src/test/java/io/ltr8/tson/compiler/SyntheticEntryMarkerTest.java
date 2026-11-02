@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §8.2's derived {@code @synthetic} marker: every entry the resolver materialised from a sugar
+ * [TSON-SCHEMA] §8.2's derived {@code @meta.synthetic} marker: every entry the resolver materialised from a sugar
  * form carries it at its schema-map key, and nothing else does.
  *
  * <p><b>Why the marker, when the names are already distinctive.</b> A synthetic entry is named by derivation
@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * pattern-matching the name is not a way to recognise one. The marker is, and it is what lets a consumer of
  * resolver output fold these entries back into the nested form the author actually wrote.
  *
- * <p><b>Two families, one marked.</b> §8.2: "The instantiation entry carries no {@code @synthetic} marker:
+ * <p><b>Two families, one marked.</b> §8.2: "The instantiation entry carries no {@code @meta.synthetic} marker:
  * the two families are distinguishable (an instantiation closes an application; a synthetic is a bare
  * constructor's instance), and only synthetics are the fold-back-into-display case the marker serves." Both
  * halves are asserted here, because marking too much is as wrong as marking too little.
@@ -183,7 +183,7 @@ class SyntheticEntryMarkerTest {
     @Test
     void theDefinitionValueNeverCarriesTheMarker() {
         localEntries().forEach((name, definition) -> assertFalse(factsOf(ID, name).annotations().has(TsonSchema.SYNTHETIC),
-                name + " carries @synthetic on its definition, where §6 puts declaration metadata on the key"));
+                name + " carries @meta.synthetic on its definition, where §6 puts declaration metadata on the key"));
     }
 
     /**

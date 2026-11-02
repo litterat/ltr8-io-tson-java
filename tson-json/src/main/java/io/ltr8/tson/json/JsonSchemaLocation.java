@@ -11,7 +11,7 @@ import java.util.Optional;
  * because a read that reports one has always established all three at once.
  *
  * <p><b>The pointer is the path taken, never the leaf it resolves to.</b> A member failing at
- * {@code /person/age} carries person.tn's {@code /person/age}, not core.tn's {@code /int32}: the leaf names a
+ * {@code /person/age} carries person.tn's {@code /person/age}, not numeric.tn's {@code /int32}: the leaf names a
  * file the author did not write, where the pointer names the field they can edit. So a record re-anchors the
  * identity and position on itself as the read descends, and every other declaration offers its own only as a
  * seed for a value nothing encloses. {@link JsonReadContext} does the descending, stepping the pointer rather

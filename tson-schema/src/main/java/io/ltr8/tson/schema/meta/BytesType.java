@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn's {@code bytes_type} constructor: an octet sequence, and the only binary type there is.
- * Instance is {@code bytes} in core.
+ * The kernel's {@code binary.bytes_type} constructor: an octet sequence, and the only binary type there is.
+ * Instance is {@code bytes}, at the kernel's root.
  *
  * <p><b>The value is the octets, and the facets are over octets.</b> Equality, identity, content
  * addressing and the length bounds all are -- {@code length: 32} is a 32-byte digest whether it arrives
@@ -23,7 +23,7 @@ import java.util.Optional;
  * encoding writes it in. It is a **selector** facet ([TSON-SCHEMA] §5.7): a refinement may neither set nor
  * change it, since an alphabet narrows nothing and an IS-A carrying no narrowing would claim a subtype at
  * positions no base64 reader could honour. Another alphabet is another **instance** --
- * {@code hexdigest => !meta.bytes_type { encoding: HEX  length: 4 }} -- and refining for length inherits the
+ * {@code hexdigest => !binary.bytes_type { encoding: HEX  length: 4 }} -- and refining for length inherits the
  * alphabet. An encoding whose values are octets ignores the selector entirely and writes them raw.
  *
  * <p><b>Why the type rather than an annotation</b> ([TSON-SCHEMA] §5.5): a container element has no
@@ -34,7 +34,7 @@ import java.util.Optional;
  * <p>Pure constraint values, no parsing or validation behaviour: {@code tson-compiler}'s {@code
  * BytesParser} holds one of these and does the work, reading the alphabet off it.
  */
-@Typename(name = "meta.bytes_type")
+@Typename(name = "binary.bytes_type")
 public record BytesType(TypeChain chain,
         Encoding encoding, Optional<Integer> length,
                          @Field("min_length") Optional<Integer> minLength,
@@ -57,8 +57,8 @@ public record BytesType(TypeChain chain,
 
     /**
      * The RFC 4648 base encodings the text class of encodings may spell a {@code bytes} value in --
-     * meta.tn's {@code bytes_encoding}, mirrored as a nested enum the way {@link ComplexType.Component}
-     * mirrors {@code complex_component}.
+     * The kernel's {@code binary.bytes_encoding}, mirrored as a nested enum the way {@link ComplexType.Component}
+     * mirrors {@code numeric.complex_component}.
      *
      * <p><b>A selector, and part of the type</b> ([TSON-SCHEMA] §5.7). It picks a spelling and never
      * changes what two values compare as: the value is the octets, and {@code "3q2+7w=="} and
@@ -71,7 +71,7 @@ public record BytesType(TypeChain chain,
         BASE64, BASE64URL, BASE32, HEX
     }
 
-    /** The unconstrained octet sequence -- {@code bytes => !meta.bytes_type {}}, base64 by the selector's default. */
+    /** The unconstrained octet sequence -- {@code bytes => !binary.bytes_type {}}, base64 by the selector's default. */
     public static final BytesType UNCONSTRAINED =
             new BytesType(Encoding.BASE64, Optional.empty(), Optional.empty(), Optional.empty());
 
@@ -94,7 +94,7 @@ public record BytesType(TypeChain chain,
      * refinement would let an author rebuild it by hand.
      *
      * <p>The remedy names itself in the message: a different alphabet is a different type, declared as a
-     * fresh instance of this constructor ({@code hexbytes => !meta.bytes_type { encoding: HEX }}) rather than as a
+     * fresh instance of this constructor ({@code hexbytes => !binary.bytes_type { encoding: HEX }}) rather than as a
      * refinement of one.
      */
     @Override

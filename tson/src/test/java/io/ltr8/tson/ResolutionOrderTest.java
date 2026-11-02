@@ -49,11 +49,11 @@ class ResolutionOrderTest {
               counts  => !counted { element_type: int32  min_items: 1 }
               names   => !counted { element_type: label }
               label   => @kind_note:"a name" !text ^ { max_length: 32 }
-              kind_note => @annotation text
+              kind_note => @meta.annotation text
               point   => { x: int32  y: int32  next?: point }
               line    => { from: point  to: point }
               origin  => !line { from: { x: 1  y: 2 }  to: { x: 3  y: 4  next: { x: 5  y: 6 } } }
-              @kind_note:"steps" steps => !meta.namespace { key_type: identifier  value_type: label }
+              @kind_note:"steps" steps => !meta.namespace { key_type: meta.identifier  value_type: label }
               plan    => !steps { first => "a"  second => "b" }
               base    => { id: int32 }
               derived => base & { extra?: counts }
@@ -135,8 +135,7 @@ class ResolutionOrderTest {
     @Test
     void eachBundledSchemaResolvesTheSameInAnyOrder() {
         Tson tson = tson();
-        for (String id : List.of(TsonBundledSchemas.META_ID,
-                TsonBundledSchemas.CORE_ID, TsonBundledSchemas.NET_ID, TsonBundledSchemas.POLICY_ID)) {
+        for (String id : TsonBundledSchemas.IDS) {
             assertOrderIndependent(tson, id, TsonBundledSchemas.fetch(id));
         }
     }

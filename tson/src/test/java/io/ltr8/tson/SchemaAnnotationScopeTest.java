@@ -34,7 +34,7 @@ class SchemaAnnotationScopeTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              status => @annotation int32
+              status => @meta.annotation int32
             }
             """;
 
@@ -44,7 +44,7 @@ class SchemaAnnotationScopeTest {
             !!id:"https://example.test/meta-http.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              method => @meta.annotation meta.text
+              method => @meta.annotation text
             }
             """;
 
@@ -76,13 +76,13 @@ class SchemaAnnotationScopeTest {
     @Test
     void aLocallyDeclaredAnnotationTypeBindsItsValueAtEveryUseSite() {
         for (String body : List.of("""
-                  method => @annotation text
+                  method => @meta.annotation text
                   @method:"POST" order => { id: int32 }
                   item => @method:"GET" { id: int32 }
                 """, """
                   @method:"POST" order => { id: int32 }
                   item => @method:"GET" { id: int32 }
-                  method => @annotation text
+                  method => @meta.annotation text
                 """)) {
             Tson tson = tson();
             assertEquals(List.of(), tson.validateSchema("""
@@ -107,7 +107,7 @@ class SchemaAnnotationScopeTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  status => @annotation int32
+                  status => @meta.annotation int32
                   order => @status:"created" { id: int32 }
                 }
                 """);
@@ -165,7 +165,7 @@ class SchemaAnnotationScopeTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
-                  reviewed => @annotation %s
+                  reviewed => @meta.annotation %s
                   order => @reviewed { id: int32 }
                 }
                 """;

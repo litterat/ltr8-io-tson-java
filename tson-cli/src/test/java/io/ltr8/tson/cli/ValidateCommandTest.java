@@ -358,7 +358,7 @@ class ValidateCommandTest {
 
     @Test
     void aFileClaimingABundledSchemaIdIsIgnoredWithANotice(@TempDir Path dir) throws IOException {
-        // Overriding meta-kernel/meta/core isn't supported -- the file is skipped, not used, and a
+        // Overriding a bundled schema isn't supported -- the file is skipped, not used, and a
         // note goes to stderr so it isn't silently dropped.
         Path fake = writeFile(dir, "core.tn", """
                 !!id:"https://tson.io/2026/39/m/core.tn"

@@ -72,10 +72,10 @@ class TypeChainTest {
                 .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_KIND, Optional.empty())))
                 .withSupertypes(List.of("meta.namespace", "meta.top"));
 
-        assertTrue(EntryKind.isConstructor("meta.integer_type", constructor, n -> true));
+        assertTrue(EntryKind.isConstructor("numeric.integer_type", constructor, n -> true));
         assertTrue(EntryKind.isConstructor("op", templated, n -> true), "a template answers as its closed form");
         assertTrue(EntryKind.isConstructor("meta.top", RecordBody.of(RecordBody.fieldMap()), n -> true));
-        assertFalse(EntryKind.isConstructor("meta.integer_type", constructor, n -> false), "a schema's own top");
+        assertFalse(EntryKind.isConstructor("numeric.integer_type", constructor, n -> false), "a schema's own top");
         assertFalse(EntryKind.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
     }
 

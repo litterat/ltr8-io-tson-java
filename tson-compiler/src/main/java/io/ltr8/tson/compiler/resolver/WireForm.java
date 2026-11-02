@@ -60,7 +60,7 @@ final class WireForm {
 
     // ── The vocabulary's own member names ────────────────────────────────────────────────────────
 
-    /** {@code record_field.value}: §8.1's literal channel. */
+    /** {@code meta.record_field.value}: §8.1's literal channel. */
     static final String VALUE = "value";
 
     /** The constructor an open record's held tree applies. */
@@ -107,7 +107,7 @@ final class WireForm {
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * A {@code field_group} as a held body writes it: {@code optional_members} only where it names a member, and
+     * A {@code meta.field_group} as a held body writes it: {@code optional_members} only where it names a member, and
      * {@code optional} only where it is set.
      */
     static DataValue group(FieldGroup group, List<Annotation> annotations) {
@@ -130,7 +130,7 @@ final class WireForm {
 
     /**
      * {@code record.fields} as a held body writes it: a map from each field's declared name ({@link
-     * #declaredName}) to its {@code record_field}, in declaration order. An empty one is the empty brace, which
+     * #declaredName}) to its {@code meta.record_field}, in declaration order. An empty one is the empty brace, which
      * is what the text parses back to.
      */
     static CoreValue fieldMap(List<MapValue.MapEntry> entries) {
@@ -149,7 +149,7 @@ final class WireForm {
 
     /**
      * The same, carrying the annotations written on the construct it stands for. §6 puts a field's own
-     * annotations on the {@code record_field} in resolver output, and a held body reaches that through the
+     * annotations on the {@code meta.record_field} in resolver output, and a held body reaches that through the
      * wire value, so they travel here rather than being re-attached after the fact.
      */
     static DataValue plain(CoreValue value, List<Annotation> annotations) {
@@ -157,7 +157,7 @@ final class WireForm {
     }
 
     /**
-     * A {@code record_field}'s presence and role, each written only where it leaves the kernel's own default
+     * A {@code meta.record_field}'s presence and role, each written only where it leaves the kernel's own default
      * ({@code optional: false}, {@code voidable: false}, {@code role: FREE}) -- the one spelling both producers
      * of a held record share, so a template body and the closed record beside it state a field alike.
      */

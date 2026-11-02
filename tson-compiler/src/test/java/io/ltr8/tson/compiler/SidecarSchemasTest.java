@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Loads and resolves every {@code schemas/*.tn} file in the shared {@code ltr8-io-tson-test-suite}
- * checkout against the real bundled meta.tn/core.tn chain -- those are the real TSON schemas that
+ * checkout against the real bundled bundled chain -- those are the real TSON schemas that
  * repo's own README uses to formally describe its sidecar format (replacing ad hoc BNF), so this is
  * exactly the kind of drift this whole exercise exists to catch: if a spec revision bump or a
  * resolver change ever breaks one of them, this fails loudly instead of the schema silently going
@@ -85,7 +85,7 @@ class SidecarSchemasTest {
 
     /**
      * Serves the suite's own schemas beside the bundled ones. The layer schemas {@code !!import}
-     * {@code sidecar-common.tn}, so a fetcher that only knows meta.tn/core.tn cannot resolve any of
+     * {@code sidecar-common.tn}, so a fetcher that only knows the bundled schemas cannot resolve any of
      * them -- and the shared declarations they used to duplicate are exactly what that import
      * exists to stop.
      *

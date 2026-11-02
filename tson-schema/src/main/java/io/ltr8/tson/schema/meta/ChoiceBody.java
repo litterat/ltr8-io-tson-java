@@ -8,7 +8,7 @@ import java.util.Optional;
 
 /**
  * The kernel's {@code choice} constructor's own vocabulary, resolved (Part 2 §4.1, §5.4,
- * §8.1): {@code variants: [type_kind]} -- a SUM-kind body backing every declared choice type
+ * §8.1): {@code variants: [meta.type_kind]} -- a SUM-kind body backing every declared choice type
  * (`contact_method => (email | phone | address)` and similar).
  */
 @Typename(name = "meta.choice")

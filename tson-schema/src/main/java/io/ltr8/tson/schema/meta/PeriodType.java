@@ -12,7 +12,7 @@ import java.util.Optional;
 
 /**
  * meta's {@code period_type} constructor: a calendar span, as a signed integer number of months
- * ([TSON-SCHEMA] §5.5). Instance is {@code period} in core.
+ * ([TSON-SCHEMA] §5.5). Instance is {@code period}, in temporal.tn.
  *
  * <p>The calendar half of what one duration used to carry, and the reason {@link DurationType} can be
  * totally ordered: a month has no fixed length, so months and seconds are two value spaces rather than one
@@ -26,7 +26,7 @@ import java.util.Optional;
  * for the general shape it cannot be, months and days having no common length -- so every comparison here
  * goes through {@link #months}, which is the value this family is defined on.
  */
-@Typename(name = "meta.period_type")
+@Typename(name = "temporal.period_type")
 public record PeriodType(TypeChain chain,
         Optional<Period> min,
         @Field("exclusive_min") Optional<Period> exclusiveMin,
@@ -34,7 +34,7 @@ public record PeriodType(TypeChain chain,
         @Field("exclusive_max") Optional<Period> exclusiveMax,
         @Field("multiple_of") Optional<Period> multipleOf) implements Atom {
 
-    /** {@code period => !meta.period_type {}} -- the unconstrained period. */
+    /** {@code period => !temporal.period_type {}} -- the unconstrained period. */
     public static final PeriodType UNCONSTRAINED = new PeriodType(Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty(), Optional.empty());
 

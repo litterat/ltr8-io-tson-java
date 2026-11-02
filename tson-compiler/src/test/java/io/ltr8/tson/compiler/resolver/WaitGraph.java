@@ -36,8 +36,8 @@ import java.util.TreeSet;
  * <ul>
  *   <li>An alias ({@code !alias { target: X }}) is ready when its target is: an edge alias → {@code X}, beside
  *       what reading its own declaration reaches.</li>
- *   <li><b>A reference orders nothing.</b> A token at a slot typed by a kind ({@code type_kind},
- *       {@code identifier_kind}, any {@code !reference} instance)
+ *   <li><b>A reference orders nothing.</b> A token at a slot typed by a kind ({@code meta.type_kind},
+ *       {@code meta.identifier_kind}, any {@code !reference} instance)
  *       waits on the slot's own type and what reading that reaches, never on the entry the name names. This falls
  *       out of the walk: a kind is an atom, so reading against one reaches nothing further.</li>
  *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only, and a template's
@@ -57,7 +57,7 @@ import java.util.TreeSet;
  *
  * <p><b>Where the rule as written is silent</b>, this implements: an entry's value is read against its head tag,
  * not against the enclosing schema's {@code value_type} (the document read waits on that, see
- * {@link #documentWaits()}); a schema-map key's annotations ({@code @synthetic}) belong to the schema map, so
+ * {@link #documentWaits()}); a schema-map key's annotations ({@code @meta.synthetic}) belong to the schema map, so
  * they too are waits of the document read and not of the entry they mark; a bare token at a record position is
  * that record's shorthand for its one required field; a namespace type stating no
  * {@code key_type} has its keys read by their spelling, as {@code text}, the host judging them later.
@@ -152,6 +152,41 @@ final class WaitGraph {
 
     List<Overapproximation> overapproximations() {
         return overapproximations;
+    }
+
+    /**
+     * Every entry {@code entry}'s declaration names, wait or not: a tag, an annotation, a token that is an entry's
+     * name (a field's type, a reference's {@code of}, a supertype), its key's annotations. A chain's {@code subtypes}
+     * are left out, being the inverse the linker derives over whatever entries the document holds, never an input.
+     */
+    Set<String> references(String entry) {
+        Set<String> names = new TreeSet<>();
+        names(declarations.get(entry), null, names);
+        keyAnnotations.get(entry).forEach(annotation -> names.add(annotation.name()));
+        names.retainAll(declarations.keySet());
+        return names;
+    }
+
+    private static void names(DataValue value, String field, Set<String> into) {
+        if ("subtypes".equals(field)) {
+            return;
+        }
+        value.typeRef().ifPresent(into::add);
+        for (Annotation annotation : value.annotations()) {
+            into.add(annotation.name());
+            annotation.value().ifPresent(v -> names(v, null, into));
+        }
+        switch (value.coreValue()) {
+            case TokenValue token -> into.add(token.text());
+            case RecordValue record -> record.fields().forEach(f -> names(f.value(), f.name(), into));
+            case ArrayValue array -> array.elements().forEach(e -> names(e, null, into));
+            case MapValue map -> map.entries().forEach(e -> {
+                names(e.key(), null, into);
+                names(e.value(), null, into);
+            });
+            default -> {
+            }
+        }
     }
 
     /** Anything the walk could not decide from the document: a name with no entry, a value of the wrong form. */
@@ -489,7 +524,7 @@ final class WaitGraph {
     private Optional<String> namespaceType(Shape shape, String slot, Read read, String path) {
         String type = token(field(shape.declaration(), slot));
         if (type == null && slot.equals("key_type")) {
-            return Optional.of("meta.text");
+            return Optional.of("text");
         }
         if (type == null) {
             problems.add(read.entry + ": namespace " + shape.terminal() + " carries no " + slot + " (" + path + ")");

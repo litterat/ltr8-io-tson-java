@@ -122,7 +122,7 @@ class ConfusableNameScopesTest {
                 "  " + bad + " => text",
                 "  rec => { " + bad + ": text }",
                 "  grp => { ( " + bad + ": text | ok: integer ) }",
-                "  st => !meta.enum [" + bad + "]",
+                "  st => !enum [" + bad + "]",
                 "  box => <" + bad + "> { v: " + bad + " }"}) {
             assertTrue(refused(declaration).contains("Identifier_Status=Restricted"), declaration);
         }
@@ -139,7 +139,7 @@ class ConfusableNameScopesTest {
     /** The members of one enum — distinct strings, so the set's own uniqueness rule cannot see them. */
     @Test
     void twoEnumMembersThatReadAlikeAreRefused() {
-        assertTrue(refused("  st => !meta.enum [ACTIVE " + CYR_CAP_A + "CTIVE]")
+        assertTrue(refused("  st => !enum [ACTIVE " + CYR_CAP_A + "CTIVE]")
                 .contains("has members that read alike"));
     }
 
@@ -150,7 +150,7 @@ class ConfusableNameScopesTest {
      */
     @Test
     void anEnumsMembersAreJudgedUnderItsNameTypesProfile() {
-        String words = "  words => !meta.identifier_type { medial: \" \" }\n";
+        String words = "  words => !unicode.identifier_type { medial: \" \" }\n";
         assertNotNull(compile(words + "  st => !meta.enum_type { name_type: words  members: [\"lightly active\"] }"));
 
         String restricted = "a" + new String(Character.toChars(0x0132)) + "b";
@@ -196,7 +196,7 @@ class ConfusableNameScopesTest {
         assertNotNull(compile("""
                   order    => { id: text  total: text  created_at: text }
                   customer => { id: text  name: text  email_address: text }
-                  status   => !meta.enum [OPEN ACTIVE DONE]"""));
+                  status   => !enum [OPEN ACTIVE DONE]"""));
     }
 
     /**

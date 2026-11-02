@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A value by name reached through a record value's field: a namespace type declares only its facets, so a construct
- * with fields of its own and a map of members is a record holding both under a namespace key, and a {@code ref<T>}
+ * with fields of its own and a map of members is a record holding both under a namespace key, and a {@code meta.ref<T>}
  * names a member through the record's field ({@code shop.orders.endpoints.place_order}). The walk reads the field of
  * the host object the read bound, through the binding's own descriptor, and delivers the value it reaches into the
  * {@code Ref}; a field the record does not declare, a key the map lacks, a member no value has, and an optional
@@ -46,7 +46,7 @@ class ValueThroughFieldTest {
               endpoint_map => !meta.namespace { key_type: meta.identifier  value_type: endpoint }
               service      => { extends?: [meta.identifier]  fallback?: endpoint  endpoints: endpoint_map }
               services     => !meta.namespace { key_type: meta.identifier  value_type: service }
-              route        => { endpoint: meta.ref<endpoint>  verb: meta.text }
+              route        => { endpoint: meta.ref<endpoint>  verb: text }
               routes       => !meta.namespace { key_type: meta.identifier  value_type: route }
               shape        => { fields: meta.field_map }
               shapes       => !meta.namespace { key_type: meta.identifier  value_type: shape }
