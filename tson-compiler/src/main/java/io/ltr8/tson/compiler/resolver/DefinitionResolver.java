@@ -1090,11 +1090,16 @@ final class DefinitionResolver {
      */
     private DataValue mergeWithSource(String name, Top sourceBody, DataValue newBindings, String constructorName) {
         Map<String, RecordValue.Field> merged = new LinkedHashMap<>();
+        RecordBody constructor = namespaceDefinitions.definition(constructorName) instanceof RecordBody record
+                ? record : null;
         if (sourceSerializedFields(name, sourceBody) instanceof RecordValue sourceRecord) {
             for (RecordValue.Field field : sourceRecord.fields()) {
                 // The source's chain is where the source sits, not a facet the refinement inherits: the
-                // refinement's own chain is set once it is bound.
-                if (!CHAIN.equals(field.name())) {
+                // refinement's own chain is set once it is bound. A field the constructor fixes is the
+                // constructor's, supplied by its reader: copying it would read its value again, against a
+                // type that may be this very entry -- `iri => !iri_reference ^ {...}` reading `spec` as an iri.
+                RecordField declared = constructor == null ? null : constructor.fields().get(field.name());
+                if (!CHAIN.equals(field.name()) && (declared == null || declared.role() != FieldRole.FIXED)) {
                     merged.put(field.name(), field);
                 }
             }

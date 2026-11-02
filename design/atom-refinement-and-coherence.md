@@ -8,6 +8,8 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 
 - Atom refinement merges with its source on the **wire record, before binding** (`mergeWithSource`); the text
   round-trip has no cheaper substitute, or `REQUIRED`-no-default constructor fields fail `FIELD_REQUIRED`.
+- The merge copies no field the constructor fixes: its reader supplies it, and re-reading the copy would wait on the
+  field's type, which can be the refinement itself (`iri => !iri_reference ^ { ... }`, `spec` typed `iri`).
 - `DefinitionResolver` holds the engine (`DataClassObjectWriter`), never the `TsonObjectWriter` facade.
 - `checkNarrows` compares the **merged** result against the source's **effective** range; the refinement side is
   deliberately not folded first, or every widening compares vacuously equal.

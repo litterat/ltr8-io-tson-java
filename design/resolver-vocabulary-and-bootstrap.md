@@ -309,7 +309,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 85 entries (68
   members of the six maps, 11 at the root and 6 synthetics; the maps themselves make the kernel's 91 resolved entries), one
   cycle of 25, longest wait chain 4 — and `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel
-  contains the cycle's closure (64 entries) and the related concepts, pinning all three. Of the 25, 13 are hand-built (the 9
+  contains the cycle's closure (65 entries) and the related concepts, pinning all three. Of the 25, 13 are hand-built (the 9
   of `PRE_LOADED` and 4 lifted arrays); the other 12 are records and compositions resolved from their grammar, and the 60
   entries beyond the cycle are made ready in wait order.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,

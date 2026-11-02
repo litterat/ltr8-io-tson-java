@@ -360,8 +360,9 @@ importer applies, unexpressible. Each is a rule about levels, which the dependen
   sibling allowance. Two same-named entries in one closure are §2.2.3's collision, decided by identity.
 - **core.tn imports numeric.tn, temporal.tn and net.tn**, each importing the kernel alone, and declares none of `void`,
   `boolean`, `integer`, `text`, `bytes`, `regex`, `iri`, `iri_reference`, `doc` or `set` (the kernel's root vocabulary)
-  or `meta.kind` (the kernel's), each where the kernel places it (#15). Revision 38's core `iri` is IS-A its
-  `iri_reference`; the kernel's two are instances of `net.iri_type`, neither IS-A the other. The descriptive
+  or `meta.kind` (the kernel's), each where the kernel places it (#15). The kernel's `iri` refines its
+  `iri_reference` (`iri => !iri_reference ^ { allow_relative: false }`), so `iri` IS-A `iri_reference` as `uri` IS-A
+  `uri_reference`. The descriptive
   annotations Revision 38's core puts on its copies (`@ordering`, `@bounded`, …) go with them.
 - **A same-document read waits:** applying a constructor declared in the same document (`!C { … }` with `C` local),
   reading a value of a type declared there, and reading an annotation value against one each wait on that
@@ -902,19 +903,20 @@ data format made a schema that wants dates reserve every network and numeric nam
   `meta.field_group`, `meta.field_role`, `meta.enum_set` and four lifted arrays. Closing it under every name its
   declarations reference — every rule-1 wait, every field type and `of`, every annotation type its entries carry, and
   what reading the document itself waits on, its root tag's `meta.schema` with that map's key and value types and the
-  annotations on its keys — gives 64 entries, adding the base kinds, `meta.alias`, `meta.declared_type`, the
+  annotations on its keys — gives 65 entries, adding the base kinds, `meta.alias`, `meta.declared_type`, the
   identifier, iri and regex families with `atom.specification`, `meta.template_param`, `meta.declared`,
   `meta.type_name`, `doc`, `meta.annotation`, `meta.synthetic`, `[meta.template_param]`, and `atom.ordering` and
-  `atom.bounded`, the annotations `bytes` and `iri_reference` carry on their keys. The iri and regex families are
+  `atom.bounded`, the annotations `bytes` and `iri_reference` carry on their keys, and `iri_reference`, the source `iri`
+  refines. The iri and regex families are
   there because `text_type.pattern` is typed `regex` and `identifier_type`, `iri_type` and `regex_type` compose
   `atom.specification`, whose `spec` is an `iri`. The kernel is that closure and the concepts that belong with
   it, which nothing in the closure names: `meta.map`, `meta.tuple`, `meta.choice`, `meta.tuple_element` (with its
   lifted array), `meta.template`, `meta.application`, `meta.kind`, `meta.ref`, `meta.atom_kind`, `meta.field_name`,
   `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet sequence (`binary.bytes_type`,
-  `binary.bytes_encoding`, `bytes`), `iri_reference`, and the classifying annotations `atom.exact` and `atom.numeric` —
+  `binary.bytes_encoding`, `bytes`) and the classifying annotations `atom.exact` and `atom.numeric` —
   85 entries, 68 under its six maps, 11 at the root and six synthetics, with the six maps themselves the 86th to
   91st. A test holds the kernel
-  to containing the closure, pins the cycle at 25 and the closure at 64, and pins the related set, so an entry that
+  to containing the closure, pins the cycle at 25 and the closure at 65, and pins the related set, so an entry that
   drifts in either direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` →
   `meta.void_type` → `[meta.type_kind]`). A schema importing meta.tn alone has every elided construction,
   `meta.kind<T>` and `meta.ref<T>`.

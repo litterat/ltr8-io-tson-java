@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=42525fb6ede3f8252c61606d2da0e5abb1086015acce1b2c0ccf3ce038749681"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=e00fca6dbcd46ae7d2fcacadfed1d82895114c5fe4ce9d2479205e0d52f32135"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -1098,15 +1098,16 @@
   @atom.ordering:NONE @atom.bounded:false
   bytes => !binary.bytes_type {}
 
-  @doc:"An IRI (RFC 3987 §2.2): the scheme is required."
-  iri => !net.iri_type { allow_relative: false }
-
   @doc:"""
     An IRI-reference (RFC 3987 §2.2): an IRI or a relative reference, its
     characters drawn from RFC 3987's grammar, beyond US-ASCII included.
     """
   @atom.ordering:NONE @atom.bounded:false
   iri_reference => !net.iri_type {}
+
+  @doc:"An IRI (RFC 3987 §2.2): the scheme is required."
+  @atom.ordering:NONE @atom.bounded:false
+  iri => !iri_reference ^ { allow_relative: false }
 
   regex => !unicode.regex_type {}
 

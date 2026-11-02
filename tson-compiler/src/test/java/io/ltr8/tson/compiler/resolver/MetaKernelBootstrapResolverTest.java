@@ -138,7 +138,8 @@ class MetaKernelBootstrapResolverTest {
 
         Top iri = schema.entries().get("iri");
         assertEquals(EntryKind.ATOM, EntryKind.of(iri, n -> true));
-        assertEquals(IriType.IRI, iri);
+        assertEquals(IriType.IRI, TypeChain.withoutChain(iri));
+        assertEquals(List.of("iri_reference"), ((IriType) iri).chain().supertypes(), "an iri IS-A iri_reference");
 
         Top regex = schema.entries().get("regex");
         assertEquals(EntryKind.ATOM, EntryKind.of(regex, n -> true));

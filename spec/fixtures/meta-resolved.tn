@@ -467,10 +467,11 @@
   @atom.ordering:NONE @atom.bounded:false
   bytes => !binary.bytes_type {}
 
-  iri => !net.iri_type { allow_relative: false }
+  @atom.ordering:NONE @atom.bounded:false
+  iri_reference => !net.iri_type { chain: { subtypes: [iri] } }
 
   @atom.ordering:NONE @atom.bounded:false
-  iri_reference => !net.iri_type {}
+  iri => !net.iri_type { chain: { supertypes: [iri_reference] }  allow_relative: false }
 
   regex => !unicode.regex_type {}
 
