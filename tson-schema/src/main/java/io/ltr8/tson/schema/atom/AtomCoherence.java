@@ -107,7 +107,7 @@ public final class AtomCoherence {
      * is the family's, not something the author wrote, so a single out-of-range value is already a
      * contradiction of the type it claims to constrain.
      */
-    public static void checkWithin(List<String> out, String facet, Optional<Integer> value, int low, int high) {
+    public static void checkWithin(List<String> out, String facet, Optional<Long> value, int low, int high) {
         value.filter(v -> v < low || v > high)
                 .ifPresent(v -> out.add(facet + " " + v + " is outside the family range " + low + "-" + high));
     }
@@ -117,7 +117,7 @@ public final class AtomCoherence {
      * value. Kept separate from {@link #checkWithin} because the ceiling is the family's business and
      * the floor is not: every count shares zero, and no family has a meaningful maximum.
      */
-    public static void checkNonNegative(List<String> out, String facet, Optional<Integer> value) {
+    public static void checkNonNegative(List<String> out, String facet, Optional<Long> value) {
         value.filter(v -> v < 0).ifPresent(v -> out.add(facet + " " + v + " is negative"));
     }
 
@@ -189,12 +189,14 @@ public final class AtomCoherence {
 
     /** {@link #checkAdmitsAValue(List, String, List, List, int)} for a family that also bounds the prefix length. */
     public static void checkAdmitsAValue(List<String> out, String noun, List<String> within, List<String> excluding,
-            Optional<Integer> minPrefix, Optional<Integer> maxPrefix, int familyBits) {
-        int floor = minPrefix.orElse(0);
-        int ceiling = maxPrefix.orElse(familyBits);
-        if (floor < 0 || ceiling > familyBits || floor > ceiling) {
+            Optional<Long> minPrefix, Optional<Long> maxPrefix, int familyBits) {
+        long floorBound = minPrefix.orElse(0L);
+        long ceilingBound = maxPrefix.orElse((long) familyBits);
+        if (floorBound < 0 || ceilingBound > familyBits || floorBound > ceilingBound) {
             return; // an inverted or out-of-range bound is its own check's to report, and explains the body
         }
+        int floor = (int) floorBound;
+        int ceiling = (int) ceilingBound;
         List<CidrNetwork> permitted = networks(within, familyBits);
         List<CidrNetwork> excluded = networks(excluding, familyBits);
         if (permitted == null || excluded == null) {

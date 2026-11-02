@@ -30,7 +30,7 @@
       exclusive_min => !meta.record_field { type: meta.value    optional: true }
       max           => !meta.record_field { type: meta.value    optional: true }
       exclusive_max => !meta.record_field { type: meta.value    optional: true }
-      precision     => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      precision     => !meta.record_field { type: numeric.count  optional: true }
     }
     groups: [
       !meta.field_group { members: [[min] [exclusive_min]]  optional: true }
@@ -44,7 +44,7 @@
       exclusive_min => !meta.record_field { type: meta.value    optional: true }
       max           => !meta.record_field { type: meta.value    optional: true }
       exclusive_max => !meta.record_field { type: meta.value    optional: true }
-      precision     => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      precision     => !meta.record_field { type: numeric.count  optional: true }
     }
     groups: [
       !meta.field_group { members: [[min] [exclusive_min]]  optional: true }
@@ -58,7 +58,7 @@
       exclusive_min => !meta.record_field { type: meta.value    optional: true }
       max           => !meta.record_field { type: meta.value    optional: true }
       exclusive_max => !meta.record_field { type: meta.value    optional: true }
-      precision     => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      precision     => !meta.record_field { type: numeric.count  optional: true }
       multiple_of   => !meta.record_field { type: meta.value    optional: true }
     }
     groups: [

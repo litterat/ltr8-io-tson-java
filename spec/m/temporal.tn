@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/temporal.tn?sha256=3efd69fcd8e60411edf1772261079512012b1e1b9fb59f810261a317131576f3"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=f13d1d1c5354cb0c546fdbde5c54a9afd0172b7828c0f12aba749d2aec119180"
+!!id:"https://tson.io/2026/39/m/temporal.tn?sha256=7f82e5402fad07d205aa53a08c0952dfc17dc88a0f9aa0d03c8cf92562008e41"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=249f7b0de7d79716f642b42166b274a2b4414b08c91e6d638557b7bbe7264a6c"
 @doc:"""
   TSON temporal — the temporal type library (2026 Revision 39 draft).
 
@@ -10,8 +10,8 @@
   `temporal.duration_type` and `temporal.period_type`.
 
   It imports the kernel, meta.tn, alone: the kernel's constructors,
-  `meta.value`, `numeric.non_negative_integer` and classifying annotations are
-  what it builds on, and it needs nothing of numeric.tn or net.tn. A schema
+  `meta.value`, `numeric.count` and classifying annotations are what it
+  builds on, and it needs nothing of numeric.tn or net.tn. A schema
   importing it reserves `temporal` and its root names beside the kernel's
   ([TSON-SCHEMA] §2.2.3), and sees none of numeric.tn's: importing temporal.tn
   gives `date` and no `int32`. core.tn imports it with numeric.tn and net.tn,
@@ -34,11 +34,11 @@
   declares before any instance of it exists, so they use the kernel's
   `meta.value` escape hatch; the resolver reads each such token under the
   atom it stands for once that atom is in scope. A precision counts digits
-  and is typed by the kernel's `numeric.non_negative_integer`. The bounds are
-  field groups ([TSON-SCHEMA] §5.11): one inclusive-or-exclusive group per
-  side, so an inclusive and an exclusive bound on the same side is
-  unrepresentable. Value-level coherence (the lower bound not exceeding the
-  upper) is a schema-load check.
+  and is typed by the kernel's `numeric.count`. The bounds are field groups
+  ([TSON-SCHEMA] §5.11): one inclusive-or-exclusive group per side, so an
+  inclusive and an exclusive bound on the same side is unrepresentable.
+  Value-level coherence (the lower bound not exceeding the upper) is a
+  schema-load check.
 
   `multiple_of`, on `temporal.duration_type` and `temporal.period_type`,
   follows the one rule numeric.tn states for every step: strictly positive,
@@ -76,7 +76,7 @@
       spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
       ( min: meta.value | exclusive_min: meta.value )?
       ( max: meta.value | exclusive_max: meta.value )?
-      precision?: numeric.non_negative_integer
+      precision?: numeric.count
     }
 
     @doc:"""
@@ -88,7 +88,7 @@
       spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
       ( min: meta.value | exclusive_min: meta.value )?
       ( max: meta.value | exclusive_max: meta.value )?
-      precision?: numeric.non_negative_integer
+      precision?: numeric.count
     }
 
     @doc:"""
@@ -126,7 +126,7 @@
       spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
       ( min: meta.value | exclusive_min: meta.value )?
       ( max: meta.value | exclusive_max: meta.value )?
-      precision?:  numeric.non_negative_integer
+      precision?:  numeric.count
       multiple_of?: meta.value
     }
 

@@ -112,7 +112,7 @@
 !schema {
   numeric => !meta.schema {
     integer_size => !meta.record { fields: {
-      bits   => !meta.record_field { type: numeric.non_negative_integer }
+      bits   => !meta.record_field { type: integer }
       signed => !meta.record_field { type: boolean }
     } }
 
@@ -125,7 +125,7 @@
       exclusive_min => !meta.record_field { type: integer  optional: true }
       max           => !meta.record_field { type: integer  optional: true }
       exclusive_max => !meta.record_field { type: integer  optional: true }
-      multiple_of   => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      multiple_of   => !meta.record_field { type: integer  optional: true }
       members       => !meta.record_field { type: numeric.integer_member_set  optional: true }
     }
     groups: [
@@ -133,7 +133,9 @@
       !meta.field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
 
-    non_negative_integer => !numeric.integer_type { chain: { supertypes: [integer] }  min: 0 }
+    count => !numeric.integer_type {
+      chain: { supertypes: [int64 integer] }  size: { bits: 64  signed: true }  min: 0
+    }
   }
 
   unicode => !meta.schema {
@@ -143,9 +145,9 @@
       chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [net.iri_type unicode.identifier_type unicode.regex_type] }
       fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      min_length    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_length    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      length        => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_length    => !meta.record_field { type: numeric.count  optional: true }
+      max_length    => !meta.record_field { type: numeric.count  optional: true }
+      length        => !meta.record_field { type: numeric.count  optional: true }
       pattern       => !meta.record_field { type: regex    optional: true }
       members       => !meta.record_field { type: unicode.text_member_set  optional: true }
       normalization => !meta.record_field { type: unicode.normalization  optional: true  role: DEFAULT  value: NONE }
@@ -157,9 +159,9 @@
 
     identifier_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      min_length    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_length    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      length        => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_length    => !meta.record_field { type: numeric.count  optional: true }
+      max_length    => !meta.record_field { type: numeric.count  optional: true }
+      length        => !meta.record_field { type: numeric.count  optional: true }
       pattern       => !meta.record_field { type: regex    optional: true }
       members       => !meta.record_field { type: unicode.text_member_set  optional: true }
       normalization => !meta.record_field { type: unicode.normalization  optional: true  role: DEFAULT  value: NFC }
@@ -174,9 +176,9 @@
 
     regex_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      min_length    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_length    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      length        => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_length    => !meta.record_field { type: numeric.count  optional: true }
+      max_length    => !meta.record_field { type: numeric.count  optional: true }
+      length        => !meta.record_field { type: numeric.count  optional: true }
       pattern       => !meta.record_field { type: regex  optional: true }
       members       => !meta.record_field { type: unicode.text_member_set  optional: true }
       normalization => !meta.record_field { type: unicode.normalization  optional: true  role: FIXED  value: NONE }
@@ -191,9 +193,9 @@
 
     iri_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
-      min_length     => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_length     => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      length         => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_length     => !meta.record_field { type: numeric.count  optional: true }
+      max_length     => !meta.record_field { type: numeric.count  optional: true }
+      length         => !meta.record_field { type: numeric.count  optional: true }
       pattern        => !meta.record_field { type: regex    optional: true }
       members        => !meta.record_field { type: unicode.text_member_set  optional: true }
       normalization  => !meta.record_field { type: unicode.normalization  optional: true  role: FIXED  value: NONE }
@@ -357,8 +359,8 @@
       voidable       => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
       unique_items   => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
-      min_items      => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_items      => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_items      => !meta.record_field { type: numeric.count  optional: true }
+      max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
     set_type => !meta.record { chain: { supertypes: [meta.array meta.product meta.top meta.type] }  fields: {
@@ -369,8 +371,8 @@
       voidable       => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
       ordered        => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
       unique_items   => !meta.record_field { type: boolean  optional: true  role: FIXED  value: true }
-      min_items      => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_items      => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_items      => !meta.record_field { type: numeric.count  optional: true }
+      max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
     map => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
@@ -381,8 +383,8 @@
       value_type     => !meta.record_field { type: meta.type_kind }
       voidable       => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
-      min_items      => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_items      => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_items      => !meta.record_field { type: numeric.count  optional: true }
+      max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
     tuple_element => !meta.record { fields: {
@@ -450,9 +452,9 @@
     bytes_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
       chain      => !meta.record_field { type: meta.type_chain  optional: true }
       encoding   => !meta.record_field { type: binary.bytes_encoding  optional: true  role: DEFAULT  value: BASE64 }
-      length     => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      min_length => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_length => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      length     => !meta.record_field { type: numeric.count  optional: true }
+      min_length => !meta.record_field { type: numeric.count  optional: true }
+      max_length => !meta.record_field { type: numeric.count  optional: true }
     } }
   }
 
@@ -461,7 +463,12 @@
   boolean => !enum { members: [true false] }
 
   @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
-  integer => !numeric.integer_type { chain: { subtypes: [numeric.non_negative_integer] } }
+  integer => !numeric.integer_type { chain: { subtypes: [int64 numeric.count] } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int64 => !numeric.integer_type {
+    chain: { supertypes: [integer]  subtypes: [numeric.count] }  size: { bits: 64  signed: true }
+  }
 
   @atom.ordering:NONE @atom.bounded:false
   text => !unicode.text_type {}

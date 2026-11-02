@@ -147,7 +147,9 @@ document either way.
 `--output json` writes the same keys by hand. Nothing in §8.1 fixes a CLI's wire shape, so the schema settles it.
 `diagnostics.tn` holds two hand-written enum copies, `diagnostic_code` and `outcome`, which `DiagnosticsSchemaTest`
 checks against `Diagnostic.Code` and `Outcome` in both directions; it imports the spec's `core.tn`, and its
-`policy.tn` for `policy`, whose `restriction_level` `PolicySchemaTest` checks against `RestrictionLevel`.
+`policy.tn` for `policy.processor`, whose `policy.restriction_level` `PolicySchemaTest` checks against
+`RestrictionLevel`. `DiagnosticsSchema`'s binder names policy.tn's entries by their paths (`policy.limits` to
+`CliPolicy.CliLimits`).
 
 ## Exit codes
 
@@ -191,7 +193,7 @@ name the way to write the thing today, and a trace and a bug-report banner would
 (`CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT`), so the wire carries no second discriminator.
 
 **What §8.2 requires a refusal to name rides on the envelope**, as `policy` on both `validation_run` and
-`validation_report`: `CliPolicy`, the shape of `policy.tn`'s `policy` — `identifier_policy` (level, `per_segment`,
+`validation_report`: `CliPolicy`, the shape of `policy.tn`'s `policy.processor` — `identifier_policy` (level, `per_segment`,
 `skeleton_distinctness`, `permitting` combinations with each script by its UAX #24 alias), `token_policy` (level,
 `permitting`), `unicode_data_version`, and `limits` (all seventeen of §9.1's and §11.5's, `max_depth` and
 `max_wait_depth` among them). It is on the envelope rather than each

@@ -8,7 +8,6 @@ import io.ltr8.tson.schema.atom.AtomNarrowing;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.TypeChain;
 
-import java.math.BigInteger;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +42,7 @@ public record DurationType(TypeChain chain,
         @Field("exclusive_min") Optional<Duration> exclusiveMin,
         Optional<Duration> max,
         @Field("exclusive_max") Optional<Duration> exclusiveMax,
-        Optional<BigInteger> precision,
+        Optional<Long> precision,
         @Field("multiple_of") Optional<Duration> multipleOf) implements Atom {
 
     /** {@code duration => !temporal.duration_type {}} -- the unconstrained duration. */
@@ -63,7 +62,7 @@ public record DurationType(TypeChain chain,
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public DurationType(Optional<Duration> min, Optional<Duration> exclusiveMin, Optional<Duration> max,
-            Optional<Duration> exclusiveMax, Optional<BigInteger> precision, Optional<Duration> multipleOf) {
+            Optional<Duration> exclusiveMax, Optional<Long> precision, Optional<Duration> multipleOf) {
         this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision, multipleOf);
     }
 
@@ -124,8 +123,8 @@ public record DurationType(TypeChain chain,
         List<String> violations = new ArrayList<>();
         AtomCoherence.checkRange(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
                 AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
-        AtomCoherence.checkNonNegative(violations, "precision", precision.map(BigInteger::intValueExact));
-        precision.filter(digits -> digits.compareTo(BigInteger.valueOf(MAX_FRACTION_DIGITS)) > 0)
+        AtomCoherence.checkNonNegative(violations, "precision", precision);
+        precision.filter(digits -> digits > MAX_FRACTION_DIGITS)
                 .ifPresent(digits -> violations.add("precision " + digits + " is finer than the "
                         + MAX_FRACTION_DIGITS + " fractional-second digits a duration carries"));
         multipleOf.filter(step -> step.isZero() || step.isNegative()).ifPresent(step ->

@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/net.tn?sha256=73c10f4a6560ad282a7ee135d020849bfbca8c0ff0a59e75cfa63ef3873c9bd5"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=f13d1d1c5354cb0c546fdbde5c54a9afd0172b7828c0f12aba749d2aec119180"
+!!id:"https://tson.io/2026/39/m/net.tn?sha256=8a3dcd14157d133529a0b654c08f1d06e84eb2879da0f8d51edc4de46bedea7f"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=249f7b0de7d79716f642b42166b274a2b4414b08c91e6d638557b7bbe7264a6c"
 @doc:"""
   TSON net — the network and identifier type library (2026 Revision 39
   draft).
@@ -90,8 +90,8 @@
       """
     cidr4_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc4632"
-      min_prefix?: numeric.non_negative_integer
-      max_prefix?: numeric.non_negative_integer
+      min_prefix?: numeric.count
+      max_prefix?: numeric.count
       within?:     [meta.value]
       excluding?:  [meta.value]
     }
@@ -105,8 +105,8 @@
       """
     cidr6_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc4291"
-      min_prefix?: numeric.non_negative_integer
-      max_prefix?: numeric.non_negative_integer
+      min_prefix?: numeric.count
+      max_prefix?: numeric.count
       within?:     [meta.value]
       excluding?:  [meta.value]
     }
@@ -197,7 +197,7 @@
     @doc:"UUID constraint vocabulary. Instance is `uuid`."
     uuid_type => meta.atom & atom.specification & {
       spec?:    = "https://www.rfc-editor.org/rfc/rfc9562"
-      version?: numeric.non_negative_integer
+      version?: numeric.count
     }
   }
 

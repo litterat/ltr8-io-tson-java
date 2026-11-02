@@ -40,7 +40,7 @@ public record UuidParser(UuidType constraints) implements AtomTypeParser<UUID> {
     /** {@code uuid => !net.uuid_type {}} -- the unconstrained UUID, §5.5's {@code !uuid}. */
     public static final UuidParser UNCONSTRAINED = new UuidParser(UuidType.UNCONSTRAINED);
 
-    public UuidParser(Optional<Integer> version) {
+    public UuidParser(Optional<Long> version) {
         this(new UuidType(version));
     }
 

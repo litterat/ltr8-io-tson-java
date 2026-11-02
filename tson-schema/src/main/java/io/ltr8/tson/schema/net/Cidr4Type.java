@@ -42,8 +42,8 @@ import java.util.Optional;
  */
 @Typename(name = "net.cidr4_type")
 public record Cidr4Type(TypeChain chain,
-        String spec, @Field("min_prefix") Optional<Integer> minPrefix,
-                         @Field("max_prefix") Optional<Integer> maxPrefix,
+        String spec, @Field("min_prefix") Optional<Long> minPrefix,
+                         @Field("max_prefix") Optional<Long> maxPrefix,
                          List<String> within, List<String> excluding) implements Atom {
 
     @Record
@@ -55,7 +55,7 @@ public record Cidr4Type(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public Cidr4Type(String spec, Optional<Integer> minPrefix, Optional<Integer> maxPrefix, List<String> within,
+    public Cidr4Type(String spec, Optional<Long> minPrefix, Optional<Long> maxPrefix, List<String> within,
             List<String> excluding) {
         this(TypeChain.EMPTY, spec, minPrefix, maxPrefix, within, excluding);
     }

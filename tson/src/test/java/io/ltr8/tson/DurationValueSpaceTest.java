@@ -4,7 +4,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.temporal.DurationType;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigInteger;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -122,7 +121,7 @@ class DurationValueSpaceTest {
                 overlong.coherenceCheck().toString());
 
         DurationType finer = new DurationType(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(BigInteger.valueOf(12)), Optional.empty());
+                Optional.empty(), Optional.of(12L), Optional.empty());
         assertTrue(finer.coherenceCheck().stream().anyMatch(v -> v.contains("precision 12")),
                 finer.coherenceCheck().toString());
     }

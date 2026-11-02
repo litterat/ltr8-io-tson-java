@@ -66,7 +66,7 @@ class EmailParserTest {
 
     // ── The text_type facets email_type composes ─────────────────────────
 
-    private static EmailParser withMaxLength(int max) {
+    private static EmailParser withMaxLength(long max) {
         return new EmailParser(new EmailType(EmailType.UNCONSTRAINED.spec(), Optional.empty(),
                 Optional.of(max), Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE));
     }

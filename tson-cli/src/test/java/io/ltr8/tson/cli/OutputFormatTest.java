@@ -369,7 +369,7 @@ class OutputFormatTest {
                 "max materialisation depth:  64",
                 "max wait depth:             64"), text);
 
-        Object reread = DiagnosticsSchema.compiled().get("policy")
+        Object reread = DiagnosticsSchema.compiled().get("policy.processor")
                 .read(TestDocuments.document(OutputFormat.TSON.render(POLICY)));
         assertEquals(POLICY, reread);
     }

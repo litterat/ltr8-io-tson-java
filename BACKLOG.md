@@ -455,7 +455,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   [TSON-DATA] §8.1 gives to the layer that detects them -- the resolver, following the reference.
 
 - [ ] **Counting the rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** The whole table is
-  stated: `spec/m/policy.tn`'s `limits` declares all seventeen, optional with the spec's defaults, and `LimitsPolicy`
+  stated: `spec/m/policy.tn`'s `policy.limits` declares all seventeen, optional with the spec's defaults, and `LimitsPolicy`
   and `CliPolicy.CliLimits` carry each one, so every limit is configured and reported. Nesting depth and wait depth
   are counted.
   What is left, per limit, is the counter, a `LIMIT_EXCEEDED` refusal naming the limit and the configured threshold,

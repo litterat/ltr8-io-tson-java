@@ -47,8 +47,8 @@
       max             => !meta.record_field { type: meta.value    optional: true }
       exclusive_max   => !meta.record_field { type: meta.value    optional: true }
       multiple_of     => !meta.record_field { type: meta.value    optional: true }
-      total_digits    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      fraction_digits => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      total_digits    => !meta.record_field { type: numeric.count  optional: true }
+      fraction_digits => !meta.record_field { type: numeric.count  optional: true }
       members         => !meta.record_field { type: numeric.decimal_member_set  optional: true }
     }
     groups: [
@@ -94,9 +94,6 @@
 
   @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
   int32 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 32  signed: true } }
-
-  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
-  int64 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 64  signed: true } }
 
   @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
   int128 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 128  signed: true } }

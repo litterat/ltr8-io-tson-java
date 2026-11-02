@@ -4,7 +4,6 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.schema.temporal.DateTimeType;
 import org.junit.jupiter.api.Test;
-import java.math.BigInteger;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -87,7 +86,7 @@ class DateTimeParserTest {
     @Test
     void precisionConstrainsTheValueNotTheSpelling() {
         DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
-                Optional.of(BigInteger.valueOf(3))));
+                Optional.of(3L)));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30.100Z"),
                 type.read(token("2025-03-13T10:15:30.100Z")));
@@ -113,7 +112,7 @@ class DateTimeParserTest {
     @Test
     void precisionZeroAdmitsNoFraction() {
         DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
-                Optional.of(BigInteger.ZERO)));
+                Optional.of(0L)));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));
         assertThrows(AtomValidationException.class, () -> type.read(token("2025-03-13T10:15:30.1Z")));
     }

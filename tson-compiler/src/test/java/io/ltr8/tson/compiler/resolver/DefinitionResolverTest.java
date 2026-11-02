@@ -107,15 +107,6 @@ class DefinitionResolverTest {
                     + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] "
                     + "parameters: [] }";
 
-    /**
-     * The same shape as the real fixture resolves it. The kernel types {@code bits} as a count rather than
-     * a bare integer, where the hand-written schemas above -- which are about resolution mechanics, not
-     * about the kernel's own field types -- keep the plainer spelling.
-     */
-    private static final String EXPECTED_FIXTURE_INTEGER_SIZE =
-            EXPECTED_INTEGER_SIZE.replace("bits => { type: integer ",
-                    "bits => { type: numeric.non_negative_integer ");
-
     /** Throws if ever actually invoked -- most tests below never reach {@code Instance}/{@code AtomRefinement} binding at all; the ones that do build their own {@link DefinitionResolver} wrapping a real compiled reader instead of using this field. */
     private static final DefinitionMetaReader NEVER_CALLED = (type, value) -> {
         throw new UnsupportedOperationException("'" + type + "': not exercised by this test");
@@ -186,7 +177,7 @@ class DefinitionResolverTest {
 
         Top resolved = resolver.resolve(declaration);
 
-        assertEquals(EXPECTED_FIXTURE_INTEGER_SIZE, write(resolved));
+        assertEquals(EXPECTED_INTEGER_SIZE, write(resolved));
     }
 
     @Test
@@ -396,7 +387,7 @@ class DefinitionResolverTest {
                         + "integer optional: true voidable: false role: \"FREE\" } max => { type: integer "
                         + "optional: "
                         + "true voidable: false role: \"FREE\" } exclusive_max => { type: integer optional: true "
-                        + "voidable: false role: \"FREE\" } multiple_of => { type: numeric.non_negative_integer optional: "
+                        + "voidable: false role: \"FREE\" } multiple_of => { type: integer optional: "
                         + "true voidable: false role: \"FREE\" } members => { type: numeric.integer_member_set optional: "
                         + "true voidable: false role: \"FREE\" } } groups: [ { members: [ [ \"min\" ] [ "
                         + "\"exclusive_min\" ] ] optional_members: [] optional: true } { members: [ [ \"max\" ] [ "
@@ -490,20 +481,20 @@ class DefinitionResolverTest {
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, frame);
         assertEquals(TypeRef.of("text"), body.elementType());
-        assertEquals(Optional.of(new BigInteger("1920")), body.minItems());
-        assertEquals(Optional.of(new BigInteger("1920")), body.maxItems());
+        assertEquals(Optional.of(1920L), body.minItems());
+        assertEquals(Optional.of(1920L), body.maxItems());
     }
 
     /** The three spellings all land on the same shape -- only which bound each supplies differs (§5.3). */
     @Test
     void theOpenEndedSpellingsRouteToArrayMinAndArrayMax() {
         ArrayBody atLeast = assertInstanceOf(ArrayBody.class, resolveSnippet("score_list => [integer; 1..]"));
-        assertEquals(Optional.of(BigInteger.ONE), atLeast.minItems());
+        assertEquals(Optional.of(1L), atLeast.minItems());
         assertEquals(Optional.empty(), atLeast.maxItems());
 
         ArrayBody atMost = assertInstanceOf(ArrayBody.class, resolveSnippet("recent => [text; ..5]"));
         assertEquals(Optional.empty(), atMost.minItems());
-        assertEquals(Optional.of(new BigInteger("5")), atMost.maxItems());
+        assertEquals(Optional.of(5L), atMost.maxItems());
     }
 
     /**
@@ -754,8 +745,8 @@ class DefinitionResolverTest {
                         + "false role: \"DEFAULT\" value: false } ordered => { type: boolean optional: true "
                         + "voidable: false role: \"DEFAULT\" value: true } unique_items => { type: boolean optional: "
                         + "true voidable: false role: \"DEFAULT\" value: false } min_items => { type: "
-                        + "numeric.non_negative_integer optional: true voidable: false role: \"FREE\" } max_items => { "
-                        + "type: numeric.non_negative_integer optional: true voidable: false role: \"FREE\" } } groups: [] "
+                        + "numeric.count optional: true voidable: false role: \"FREE\" } max_items => { "
+                        + "type: numeric.count optional: true voidable: false role: \"FREE\" } } groups: [] "
                         + "extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(array));
@@ -783,8 +774,8 @@ class DefinitionResolverTest {
                         + "voidable: false role: \"FREE\" } value_type => { type: meta.type_kind optional: false voidable: "
                         + "false role: \"FREE\" } voidable => { type: boolean optional: true voidable: false role: "
                         + "\"DEFAULT\" value: false } ordered => { type: boolean optional: true voidable: false "
-                        + "role: \"DEFAULT\" value: false } min_items => { type: numeric.non_negative_integer optional: "
-                        + "true voidable: false role: \"FREE\" } max_items => { type: numeric.non_negative_integer "
+                        + "role: \"DEFAULT\" value: false } min_items => { type: numeric.count optional: "
+                        + "true voidable: false role: \"FREE\" } max_items => { type: numeric.count "
                         + "optional: true voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" "
                         + "discriminators: [] parameters: [] }",
                 write(map));
@@ -881,8 +872,8 @@ class DefinitionResolverTest {
                         + "true voidable: false role: \"FIXED\" value: false } ordered => { type: boolean optional: "
                         + "true voidable: false role: \"FIXED\" value: false } unique_items => { type: boolean "
                         + "optional: true voidable: false role: \"FIXED\" value: true } min_items => { type: "
-                        + "numeric.non_negative_integer optional: true voidable: false role: \"FREE\" } max_items => { "
-                        + "type: numeric.non_negative_integer optional: true voidable: false role: \"FREE\" } } groups: [] "
+                        + "numeric.count optional: true voidable: false role: \"FREE\" } max_items => { "
+                        + "type: numeric.count optional: true voidable: false role: \"FREE\" } } groups: [] "
                         + "extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(set));
@@ -1086,14 +1077,14 @@ class DefinitionResolverTest {
 
         RegexType bounded = (RegexType) resolver.resolve(schemaMap.declarations().get("bounded_regex"));
         assertEquals("https://www.rfc-editor.org/rfc/rfc9485", bounded.spec());
-        assertEquals(Optional.of(40), bounded.maxLength());
+        assertEquals(Optional.of(40L), bounded.maxLength());
 
         // length is the facet IriType declared no component for at all, so it had nowhere to bind.
         IriType https = (IriType) resolver.resolve(schemaMap.declarations().get("https_uri"));
         assertEquals("https://www.rfc-editor.org/rfc/rfc3987", https.spec());
         assertEquals(Optional.of(List.of("https")), https.schemes());
         assertFalse(https.allowFragment());
-        assertEquals(Optional.of(19), https.length());
+        assertEquals(Optional.of(19L), https.length());
     }
 
     @Test
@@ -1455,7 +1446,7 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument().body();
         chainNamespace.put("short_text", instanceResolver.resolve(schemaMap.declarations().get("short_text")));
 
-        assertEquals(new TextType(Optional.of(1), Optional.of(5), Optional.empty(), Optional.empty()),
+        assertEquals(new TextType(Optional.of(1L), Optional.of(5L), Optional.empty(), Optional.empty()),
                 TypeChain.withoutChain(instanceResolver.resolve(schemaMap.declarations().get("shorter"))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,

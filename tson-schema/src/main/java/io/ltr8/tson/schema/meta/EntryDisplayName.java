@@ -2,7 +2,6 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.tson.schema.TsonSchema;
 
-import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -169,13 +168,13 @@ public final class EntryDisplayName {
     }
 
     /** §5.3's size specifier, in the shortest form that says the same thing -- and empty when unbounded. */
-    private static String size(Optional<BigInteger> min, Optional<BigInteger> max) {
+    private static String size(Optional<Long> min, Optional<Long> max) {
         if (min.isEmpty() && max.isEmpty()) {
             return "";
         }
         if (min.isPresent() && min.equals(max)) {
             return "; " + min.get();
         }
-        return "; " + min.map(BigInteger::toString).orElse("") + ".." + max.map(BigInteger::toString).orElse("");
+        return "; " + min.map(String::valueOf).orElse("") + ".." + max.map(String::valueOf).orElse("");
     }
 }

@@ -75,7 +75,7 @@ class ArrayTreeReaderTest {
     @Test
     void minItemsRejectsAShorterArray() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
-                Optional.of(BigInteger.TWO), Optional.empty());
+                Optional.of(2L), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
@@ -85,7 +85,7 @@ class ArrayTreeReaderTest {
     @Test
     void maxItemsRejectsALongerArray() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
-                Optional.empty(), Optional.of(BigInteger.TWO));
+                Optional.empty(), Optional.of(2L));
         TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));

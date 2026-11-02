@@ -80,7 +80,7 @@ class IriParserTest {
     @Test
     void anIrisLengthCountsCodePoints() {
         String iri = "https://a.example/\uD83D\uDE00";
-        IriParser upTo19 = new IriParser(new IriType(IriType.SPEC, Optional.empty(), Optional.of(19),
+        IriParser upTo19 = new IriParser(new IriType(IriType.SPEC, Optional.empty(), Optional.of(19L),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true,
                 Normalization.NONE));
         assertEquals(19, iri.codePointCount(0, iri.length()));

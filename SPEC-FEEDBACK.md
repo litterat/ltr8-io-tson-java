@@ -160,19 +160,19 @@ within one document's resolution. A chain past the limit (default 64) refuses it
 refusal and not a verdict, whichever order the chain is reached in; the bundled schemas resolve under the default
 whatever a deployment sets.
 
-The kernel, meta.tn (#15), measured from `meta-resolved.tn`'s own declarations, no compiled reader
-consulted, has one wait cycle, holding `meta.record` and 24 more of its 85 entries (`boolean`, `integer`, `text`,
-`numeric.non_negative_integer`, the enum and set machinery, `meta.field_group`, `meta.record_field`, `meta.type_chain`,
-`meta.namespace` and `meta.field_map`, `meta.type_kind`, and the synthetics they name), every other entry ordered
-after it, the longest chain 4; the kernel holds that cycle's closure and the concepts that go with it (#15). The
-kernel declares `meta.annotation => void`: annotating itself with `@meta.annotation` would be a second cycle, and the
-marker changes no value (§6). The bootstrap builds by hand exactly the instances and the one refinement on that cycle
-(a test holds the set to the measurement), and makes every other entry ready by the algorithm above. A pin reached
-through an entry not yet ready binds as written (rule 3), which is what lets `iri` be read against `iri_type`, whose
-`spec` pin is typed by `iri`. The output equals the kernel's ordinary resolution against it, entry for entry.
-Compilation follows rule 3: a record's reader holds its pins and defaults as written while it is built and decodes
-them through their types once every reader of the schema exists, before the schema is handed out. Link remains the
-one place a pin is judged, and a bad pin or default still fails the load (rule 6).
+The kernel, meta.tn (#15), measured from `meta-resolved.tn`'s own declarations, no compiled reader consulted, has one
+wait cycle, holding `meta.record` and 25 more of its 86 entries (`boolean`, `integer`, `text`, `numeric.count` and
+`numeric.integer_size` (#16), the enum and set machinery, `meta.field_group`, `meta.record_field`, `meta.type_chain`,
+`meta.namespace` and `meta.field_map`, `meta.type_kind`, and the synthetics they name), every other entry ordered after
+it, the longest chain 4; the kernel holds that cycle's closure and the concepts that go with it (#15). The kernel
+declares `meta.annotation => void`: annotating itself with `@meta.annotation` would be a second cycle, and the marker
+changes no value (§6). The bootstrap builds by hand exactly the instances and the one refinement on that cycle (a test
+holds the set to the measurement), and makes every other entry ready by the algorithm above. A pin reached through an
+entry not yet ready binds as written (rule 3), which is what lets `iri` be read against `iri_type`, whose `spec` pin is
+typed by `iri`. The output equals the kernel's ordinary resolution against it, entry for entry. Compilation follows rule
+3: a record's reader holds its pins and defaults as written while it is built and decodes them through their types once
+every reader of the schema exists, before the schema is handed out. Link remains the one place a pin is judged, and a
+bad pin or default still fails the load (rule 6).
 
 What is not running: a resolved form is still read under its source's imports rather than by this algorithm over its own
 entries (§8.1, "Resolved forms" in the proposal), so a fixture holding an instance of a constructor it declares does not read
@@ -490,7 +490,7 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   under the kernel and any schema importing it directly: a data document importing temporal.tn that writes
   `!meta.record_field { type: int32 }` is refused, `int32` being no member of `meta.type_kind` in temporal.tn's closure.
 - **The kernel's wait cycle** (#4) gains `namespace`, `field_map` being its instance, and loses `meta.field_name`,
-  `field_map`'s keys being read by their spelling: 25 of the kernel's 85 entries, longest chain 4 (#4). The bootstrap
+  `field_map`'s keys being read by their spelling: 26 of the kernel's 86 entries, longest chain 4 (#4). The bootstrap
   builds `field_map` by hand with the rest of the pre-loaded set.
 - **Hosts.** One bind context serves schemas and data; the names the kernel declares and the libraries' members of `numeric`,
   `temporal` and `net` always bind to the schema model (#15), and every other name binds through the consumer's binder. A
@@ -567,7 +567,7 @@ constructor's declaration is a record (`uuid_type => atom & { … }`) and a reco
 - **One atom.** The kernel declares `reference => atom & { of: meta.type_kind }` (`of` a qualified name, #14), with
   `kind => <T> !reference { of: T }` and `ref => <T> !reference { of: T }` its two spellings; `meta.identifier_kind`,
   `meta.atom_kind` and `meta.type_kind` are `!reference { of: … }`. `kind_type` and `ref_type` are gone, and with
-  #12's removal of `type_ref` and `type_argument` the kernel holds 85 entries (79 declarations, #15).
+  #12's removal of `type_ref` and `type_argument` the kernel holds 86 entries (80 declarations, #15).
   `meta.kind<order>` and `meta.ref<order>` expand to one content and mint one entry.
 - **The slot's meaning comes from `of`, never from the spelling.** Where `of` is a constructor, `top` or IS-A it, the
   values it admits are types: the slot holds a type's name, judged a member over the governing closure and delivered
@@ -626,7 +626,7 @@ binds.
 - **One value.** The `reference` atom's values are the reference #13 makes data grammar: a qualified name with an
   optional argument list, `geo.address<T>`, each argument a reference or a token. `type_ref` and `type_argument` are
   gone; `alias.target`, `meta.type_chain.parents` and the `application` annotation are typed `meta.type_kind`. The kernel
-  holds 85 entries (79 declarations, #15).
+  holds 86 entries (80 declarations, #15).
 - **Written unquoted, canonically.** Resolved output and held text write an open application as source does, one
   space between arguments and no comma: `!alias { target: pair<uuid B> }`, `chain: { parents: [result<T>] }`.
 - **The value is an object, in every mode.** A reference read at a reference-typed position, in a tree read and a
@@ -862,12 +862,12 @@ data format made a schema that wants dates reserve every network and numeric nam
 
   | Document | Imports | At the root | Under its maps |
   |---|---|---|---|
-  | meta.tn | nothing (pre-loaded) | `void`, `boolean`, `integer`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set` | the other 68. `meta`, the type system (48): the kinds and constructors, `meta.schema` and `meta.field_map`, the map, tuple and choice constructors, `meta.template`, `meta.identifier` and its aliases (`meta.type_name`, `meta.field_name`, `meta.param_name`), the supporting records, sets and enums (`meta.type_chain`, `meta.record_field`, `meta.field_role`, …), the references (`meta.type_kind`, `meta.kind`, `meta.ref`, …), `meta.value`, `meta.declared`, the annotation machinery (`meta.annotation`, `meta.synthetic`, `meta.application`), the checked assertion `meta.disjoint` and the one-element tuple templates. `atom` (5): the ISO/IEC 11404 datatype properties `atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric` and the mixin `atom.specification`. `numeric` (4): `numeric.integer_type`, `numeric.integer_size`, `numeric.integer_member_set`, `numeric.non_negative_integer`. `unicode` (6): `unicode.text_type`, `unicode.text_member_set`, `unicode.normalization`, `unicode.identifier_type`, `unicode.identifier_base`, `unicode.regex_type`. `net` (3): `net.iri_type`, `net.scheme_set`, `net.scheme_name`. `binary` (2): `binary.bytes_type`, `binary.bytes_encoding` |
-  | numeric.tn | meta.tn | `number`, `rational`, `complex`, `int8`…`int256`, `uint8`…`uint256`, `float32`, `float64` | `numeric`, beside the kernel's members: `numeric.decimal_type`, `numeric.float_type`, `numeric.rational_type`, `numeric.complex_type`, `numeric.ieee_format`, `numeric.complex_component`, `numeric.decimal_member_set` |
+  | meta.tn | nothing (pre-loaded) | `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set` | the other 68. `meta`, the type system (48): the kinds and constructors, `meta.schema` and `meta.field_map`, the map, tuple and choice constructors, `meta.template`, `meta.identifier` and its aliases (`meta.type_name`, `meta.field_name`, `meta.param_name`), the supporting records, sets and enums (`meta.type_chain`, `meta.record_field`, `meta.field_role`, …), the references (`meta.type_kind`, `meta.kind`, `meta.ref`, …), `meta.value`, `meta.declared`, the annotation machinery (`meta.annotation`, `meta.synthetic`, `meta.application`), the checked assertion `meta.disjoint` and the one-element tuple templates. `atom` (5): the ISO/IEC 11404 datatype properties `atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric` and the mixin `atom.specification`. `numeric` (4): `numeric.integer_type`, `numeric.integer_size`, `numeric.integer_member_set`, `numeric.count` (#16). `unicode` (6): `unicode.text_type`, `unicode.text_member_set`, `unicode.normalization`, `unicode.identifier_type`, `unicode.identifier_base`, `unicode.regex_type`. `net` (3): `net.iri_type`, `net.scheme_set`, `net.scheme_name`. `binary` (2): `binary.bytes_type`, `binary.bytes_encoding` |
+  | numeric.tn | meta.tn | `number`, `rational`, `complex`, `int8`…`int256` but `int64`, `uint8`…`uint256`, `float32`, `float64` | `numeric`, beside the kernel's members: `numeric.decimal_type`, `numeric.float_type`, `numeric.rational_type`, `numeric.complex_type`, `numeric.ieee_format`, `numeric.complex_component`, `numeric.decimal_member_set` |
   | temporal.tn | meta.tn | `date`, `time`, `datetime`, `duration`, `period` | `temporal`: their five `*_type` constructors |
   | net.tn | meta.tn | `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `hostname`, `host`, `media_type`, `uri_reference`, `uri`, `uuid` | `net`, beside the kernel's members: their eleven `*_type` constructors |
   | core.tn | numeric.tn, temporal.tn, net.tn | the author annotations `deprecated`, `title`, `comment`, `examples`, `read_only`, `write_only` | nothing: it declares no map of its own |
-  | policy.tn | meta.tn | the processor policy's records and `restriction_level` | nothing |
+  | policy.tn | meta.tn | nothing | `policy`: the processor policy's records (`policy.processor` and its parts), `policy.restriction_level` and `policy.limit` (#16) |
 
   So an author writes `text`, `!enum [A B]`, `set<text>`, `@doc`, `bytes`, `int32`, `date` and `uuid` bare, and
   `meta.record`, `meta.identifier`, `meta.type_kind`, `meta.kind<meta.record>`, `meta.ref<method>`,
@@ -900,30 +900,31 @@ data format made a schema that wants dates reserve every network and numeric nam
   every name its declarations reference, and the concepts that belong with them. A kind and a constructor are the
   kernel's by declaring document (§4.1), which is meta.tn alone, so the libraries' constructors are ordinary
   constructors of the documents that declare them.
-- **The kernel, measured.** Over `meta-resolved.tn`'s own declarations (no compiled reader consulted), the cycle is 25
+- **The kernel, measured.** Over `meta-resolved.tn`'s own declarations (no compiled reader consulted), the cycle is 26
   entries: `meta.record`, `meta.array`, `meta.set_type`, `enum`, `meta.namespace`, `meta.field_map`, `meta.reference`,
-  `numeric.integer_type`, `unicode.text_type`, `meta.value_type`, `boolean`, `integer`, `text`,
-  `numeric.non_negative_integer`, `meta.value`, `meta.type_kind`, `meta.type_chain`, `meta.record_field`, `meta.field_group`,
-  `meta.field_role`, `meta.enum_set` and four lifted arrays. Closing it under every name its declarations reference — every
-  rule-1 wait, every field type and `of`, every annotation type its entries carry, and what reading the document itself waits
-  on, its root tag's `meta.schema` with that map's key and value types and the annotations on its keys — gives 67 entries,
-  adding the base kinds, `meta.alias`, `meta.declared_type`, the identifier, iri and regex families with
-  `atom.specification`, `meta.template_param`, `meta.declared`, `meta.type_name`, `doc`, `meta.annotation`, `meta.synthetic`,
+  `numeric.integer_type`, `unicode.text_type`, `meta.value_type`, `boolean`, `integer`, `text`, `numeric.count`,
+  `numeric.integer_size` (`count`'s resolved `size` is read against it, #16), `meta.value`, `meta.type_kind`,
+  `meta.type_chain`, `meta.record_field`, `meta.field_group`, `meta.field_role`, `meta.enum_set` and four lifted arrays.
+  Closing it under every name its declarations reference — every rule-1 wait, every field type and `of`, every
+  annotation type its entries carry, and what reading the document itself waits on, its root tag's `meta.schema` with
+  that map's key and value types and the annotations on its keys — gives 68 entries, adding the base kinds,
+  `meta.alias`, `meta.declared_type`, the identifier, iri and regex families with `atom.specification`,
+  `meta.template_param`, `meta.declared`, `meta.type_name`, `doc`, `meta.annotation`, `meta.synthetic`,
   `[meta.template_param]`, the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric`,
-  which the root atoms carry on their keys, and `iri_reference`, the source `iri` refines. The iri and regex families are
-  there because `text_type.pattern` is typed `regex` and `identifier_type`, `iri_type` and `regex_type` compose
-  `atom.specification`, whose `spec` is an `iri`. The kernel is that closure and the concepts that belong with it, which
-  nothing in the closure names: `meta.map`, `meta.tuple`, `meta.choice`, `meta.tuple_element` (with its lifted array),
-  `meta.template`, `meta.application`, `meta.kind`, `meta.ref`, `meta.atom_kind`, `meta.field_name`, `meta.disjoint`,
-  `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet sequence (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) —
-  85 entries, 68 under its six maps, 11 at the root and six synthetics, with the six maps themselves the 86th to 91st. A test
-  holds the kernel to containing the closure, pins the cycle at 25 and the closure at 67, and pins the related set, so an
-  entry that drifts in either direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` →
-  `meta.void_type` → `[meta.type_kind]`). A schema importing meta.tn alone has every elided construction, `meta.kind<T>` and
-  `meta.ref<T>`.
-- **The bootstrap** builds by hand 13 of the cycle's 25 entries — its instances and its one refinement (`meta.value`,
-  `boolean`, `meta.field_role`, `meta.enum_set`, `integer`, `numeric.non_negative_integer`, `text`, `meta.type_kind`,
-  `meta.field_map`) and the four lifted arrays — resolves the other twelve, records and compositions that read
+  which the root atoms carry on their keys, `iri_reference`, the source `iri` refines, and `int64`, the source
+  `numeric.count` refines. The iri and regex families are there because `text_type.pattern` is typed `regex` and
+  `identifier_type`, `iri_type` and `regex_type` compose `atom.specification`, whose `spec` is an `iri`. The kernel is
+  that closure and the concepts that belong with it, which nothing in the closure names: `meta.map`, `meta.tuple`,
+  `meta.choice`, `meta.tuple_element` (with its lifted array), `meta.template`, `meta.application`, `meta.kind`,
+  `meta.ref`, `meta.atom_kind`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the
+  octet sequence (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) — 86 entries, 68 under its six maps, 12 at the
+  root and six synthetics, with the six maps themselves the 87th to 92nd. A test holds the kernel to containing the
+  closure, pins the cycle at 26 and the closure at 68, and pins the related set, so an entry that drifts in either
+  direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` → `meta.void_type` →
+  `[meta.type_kind]`). A schema importing meta.tn alone has every elided construction, `meta.kind<T>` and `meta.ref<T>`.
+- **The bootstrap** builds by hand 13 of the cycle's 26 entries — its instances and its one refinement (`meta.value`,
+  `boolean`, `meta.field_role`, `meta.enum_set`, `integer`, `numeric.count`, `text`, `meta.type_kind`,
+  `meta.field_map`) and the four lifted arrays — resolves the other thirteen, records and compositions that read
   nothing, from their grammar, and reads the 60 entries beyond the cycle in wait order (#4).
 - **Each library declares `<name> => !schema { … }`** and its instances at its root (`uuid => !net.uuid_type {}`,
   `int32 => !integer ^ { size: { bits: 32  signed: true } }`). The schema model binds the kernel's entries and each
@@ -956,7 +957,7 @@ data format made a schema that wants dates reserve every network and numeric nam
 - **Resolved output** tags a body by its constructor's name (`!meta.record`, `!enum`, `!numeric.decimal_type`,
   `!net.uuid_type`) and names each entry as its document does (`!meta.record_field { type: text }`, `@meta.synthetic`,
   `@meta.application`). The kernel's form is `!schema { numeric => !meta.schema { … } … meta => !meta.schema { … }
-  … }`, its 68 members in its six maps and its eleven root entries and six synthetics at the root; each library's is
+  … }`, its 68 members in its six maps and its twelve root entries and six synthetics at the root; each library's is
   `!schema { numeric => !meta.schema { … } number => !numeric.decimal_type {} … }`, its map holding its own members
   and none of the kernel's; core's holds its six annotations. The five fixtures this implementation
   holds itself to are `meta-resolved.tn`, `numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn` and
@@ -978,7 +979,7 @@ data format made a schema that wants dates reserve every network and numeric nam
   concepts that go with them; numeric.tn, temporal.tn and net.tn each import it alone and declare a data-format
   family; core.tn imports the three and declares the author annotations; policy.tn imports the kernel alone. §2.2.3's
   reservation of a closure's names covers each root and the map names `meta`, `atom`, `numeric`, `unicode`, `net`,
-  `binary` and `temporal`.
+  `binary` and `temporal`, and `policy` for a closure holding policy.tn.
 - §4.1, §9: the bundled documents' convention, stated once with the table above: the root holds the vocabulary an
   author writes, the machinery sits under maps named for concepts: the kernel's `meta` (the type system), `atom`
   (datatype properties), `numeric`, `unicode`, `net` and `binary` (the atom constructors by family), and a
@@ -1005,3 +1006,53 @@ data format made a schema that wants dates reserve every network and numeric nam
 - **Who may contribute to `meta`** (#14's open item): any schema may, the collision rule guarding the kernel's own
   members only by their being declared first. The same holds for every bundled map; numeric.tn and net.tn contributing
   to the kernel's `numeric` and `net` is that rule used by the bundled documents themselves.
+
+## 16. [TSON-DATA] §9.1; [TSON-SCHEMA] §5.3, §5.10, §5.11, §9, §11.5, §13.2 — a count is a fixed 64-bit range
+
+**Problem.** Every facet that counts something — `min_items`/`max_items`, the text and bytes lengths,
+`total_digits`/`fraction_digits`, a temporal `precision`, a network's `min_prefix`/`max_prefix`, a UUID's `version` —
+is typed `non_negative_integer`, `!integer ^ { min: 0 }`, which is unbounded. So a conforming processor must accept
+`max_length: 10^40` and must hold it, which forces an arbitrary-precision integer into every implementation's schema
+model for a value no string, array or digit count reaches. And §5.11's `integer_type` types `multiple_of` the same
+way, though a step is not a count but a value of the constrained integer's domain: a `uint128` stepping by 2^64 is
+refused. The resource limits of §9.1 and §11.5 carry the same type and the same problem, and the spec states no
+range for any of them.
+
+**What is running.**
+
+- **The count type has a fixed range.** `int64` is declared at the kernel's root, beside `integer`, and numeric.tn
+  declares the rest of the sized ladder. The kernel's `numeric.count => !int64 ^ { min: 0 }` is `int64`'s
+  non-negative half, 0 to 2^63-1, a refinement rather than an alias so that it keeps its minimum and is an `int64` by
+  its chain, as `iri` is an `iri_reference`: every implementation holds a count in a native type (JavaScript in a
+  BigInt). It stands where Revision 38 writes `non_negative_integer`, which the bundled documents do not declare, and
+  types every count facet of the six. `max_length: 9223372036854775807` resolves;
+  `max_length: 9223372036854775808` is outside the facet's type, a resolver error.
+- **A facet holding a value of the constrained type is typed by that type's family.** `integer_type`'s bounds and
+  `members` were `integer` already; `multiple_of` is now `integer` too, its strictly-positive rule the load-time
+  coherence check it was, so a `uint128` steps by 2^64.
+- **`integer_size.bits` is `integer`, not a count.** `int64`'s `size` is read against `integer_size`, and `count`
+  refines `int64`, so `bits: numeric.count` makes `count` wait on itself and the kernel never becomes ready (§3.4.1).
+  That `bits` is above zero is a schema-load coherence check, as `multiple_of`'s sign is: `bits: 0` is a resolver error.
+- **A count beyond what a host holds is not an error.** A `max_*` past the most a host's strings or collections hold
+  is never reached and admits every value; a `min_*` past it is met by no value, so every value fails validation.
+  Neither is a schema error or a refusal to bind.
+- **policy.tn's limits are `policy.limit`**, `!int64 ^ { min: 1 }`, and its entries
+  are members of a `policy` schema map: the record a deployment writes is `policy.processor`, beside
+  `policy.identifier_policy`, `policy.script_policy`, `policy.restriction_level` and `policy.limits`. A processor
+  holding a limit in a narrower type than the range caps a larger value at the widest it holds (this library holds a
+  count or depth in a 32-bit `int`).
+- The corpus pins the edges (`a-count-facet-holds-the-largest-signed-64-bit-value`,
+  `a-count-facet-past-the-signed-64-bit-range`, `a-multiple-of-above-the-count-range`, `an-integer-width-of-zero`,
+  `a-minimum-length-no-value-reaches`, `a-maximum-item-count-every-value-meets`,
+  `a-schema-importing-the-kernel-declares-int64`, `a-schema-importing-policy-declares-the-policy-map-name`,
+  `a-deployments-policy-document-is-a-policy-processor`, `a-policy-limit-of-zero`).
+
+**Resolution, a proposal.**
+
+- §9, §13.2: the kernel declares `int64` and `count => !int64 ^ { min: 0 }`, and every count facet of the bundled
+  vocabulary is typed by `count`; §5.10's derived parameter type for a count slot (`min_items: N`) is `count`.
+- §5.11: `integer_type.multiple_of` is `integer`, strictly positive by coherence; `integer_size.bits` is `integer`,
+  above zero by coherence.
+- §5.3 and the facet descriptions: a count facet admits any value of `count`; a bound past what a processor's values
+  can reach is met or never reached, never a schema error.
+- [TSON-DATA] §9.1, §11.5: a limit is a positive `int64`, and a processor holding one in a narrower type caps it.

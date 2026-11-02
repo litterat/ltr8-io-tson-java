@@ -29,7 +29,7 @@ class BuiltinTypeVocabularyTest {
 
     /** A sign bound is a refinement written where it is wanted ({@code !integer ^ { min: 1 }}), not a name. */
     @ParameterizedTest
-    @ValueSource(strings = {"positive_integer", "numeric.non_negative_integer", "negative_integer", "non_positive_integer"})
+    @ValueSource(strings = {"positive_integer", "non_negative_integer", "negative_integer", "non_positive_integer"})
     void signBoundsAreNotBuiltInNames(String name) {
         assertTrue(BuiltinTypeVocabulary.lookup(name).isEmpty());
     }

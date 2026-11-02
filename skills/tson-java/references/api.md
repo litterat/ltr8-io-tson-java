@@ -583,10 +583,10 @@ public final class TsonBundledSchemas {
 }
 ```
 
-`policy.tn` is the processor policy's vocabulary — `restriction_level`, `script_policy`, `identifier_policy`
-(`level`, `per_segment`, `skeleton_distinctness`, `permitting`), `limits` and `policy` — so a policy is stated in one
-shape; the CLI's `diagnostics.tn` imports it for its report's `policy` field. No document selects the policy it is
-judged under.
+`policy.tn` is the processor policy's vocabulary, every entry a member of its `policy` map — `policy.restriction_level`,
+`policy.script_policy`, `policy.identifier_policy` (`level`, `per_segment`, `skeleton_distinctness`, `permitting`),
+`policy.limit` (a positive `int64`), `policy.limits` and `policy.processor` — so a policy is stated in one shape; the
+CLI's `diagnostics.tn` imports it for its report's `policy` field. No document selects the policy it is judged under.
 
 `enumForms` and `nameTypes` are what linking alone knows about the closure's names: the form each enum matches its
 members in, and the identifier type each record with a `name_type` of its own judges its field names by.

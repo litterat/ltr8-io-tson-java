@@ -22,8 +22,8 @@ import java.nio.file.Path;
 final class InitCommand {
 
     private static final String SCHEMA = """
-            !!id:"https://example.com/2026/39/getting-started/person.tn?sha256=4d1d6fd22c8d5abbc356be7f9796197d6098c780d2279aae585193182ee66903"
-            !!import:"https://tson.io/2026/39/m/core.tn?sha256=8634e2f67744b7f88bf1aad347fe20971d6ed7e6b52764501698cdaf9f7fc691"
+            !!id:"https://example.com/2026/39/getting-started/person.tn?sha256=8906cd2306a63eb035ad3165311f5fd7bd657e15529ec0b95645175e749021d6"
+            !!import:"https://tson.io/2026/39/m/core.tn?sha256=ac77e8b431329f0201986651a89a1b5a391a785964d26c525d92727305522ce0"
             @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
             !schema {
               role => !enum [admin member guest]

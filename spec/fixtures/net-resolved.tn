@@ -13,9 +13,9 @@
   net => !meta.schema {
     email_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      min_length    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_length    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      length        => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_length    => !meta.record_field { type: numeric.count  optional: true }
+      max_length    => !meta.record_field { type: numeric.count  optional: true }
+      length        => !meta.record_field { type: numeric.count  optional: true }
       pattern       => !meta.record_field { type: regex  optional: true }
       members       => !meta.record_field { type: unicode.text_member_set  optional: true }
       normalization => !meta.record_field { type: unicode.normalization  optional: true  role: FIXED  value: NONE }
@@ -39,8 +39,8 @@
     cidr4_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
       chain      => !meta.record_field { type: meta.type_chain  optional: true }
       spec       => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
-      min_prefix => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_prefix => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_prefix => !meta.record_field { type: numeric.count  optional: true }
+      max_prefix => !meta.record_field { type: numeric.count  optional: true }
       within     => !meta.record_field { type: array_value_xxhash  optional: true }
       excluding  => !meta.record_field { type: array_value_xxhash  optional: true }
     } }
@@ -48,8 +48,8 @@
     cidr6_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
       chain      => !meta.record_field { type: meta.type_chain  optional: true }
       spec       => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
-      min_prefix => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_prefix => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_prefix => !meta.record_field { type: numeric.count  optional: true }
+      max_prefix => !meta.record_field { type: numeric.count  optional: true }
       within     => !meta.record_field { type: array_value_xxhash  optional: true }
       excluding  => !meta.record_field { type: array_value_xxhash  optional: true }
     } }
@@ -80,9 +80,9 @@
 
     uri_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
-      min_length     => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      max_length     => !meta.record_field { type: numeric.non_negative_integer  optional: true }
-      length         => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      min_length     => !meta.record_field { type: numeric.count  optional: true }
+      max_length     => !meta.record_field { type: numeric.count  optional: true }
+      length         => !meta.record_field { type: numeric.count  optional: true }
       pattern        => !meta.record_field { type: regex       optional: true }
       members        => !meta.record_field { type: unicode.text_member_set  optional: true }
       normalization  => !meta.record_field { type: unicode.normalization  optional: true  role: FIXED  value: NONE }
@@ -95,7 +95,7 @@
     uuid_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
       chain   => !meta.record_field { type: meta.type_chain  optional: true }
       spec    => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
-      version => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      version => !meta.record_field { type: numeric.count  optional: true }
     } }
   }
 

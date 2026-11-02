@@ -53,7 +53,7 @@ class RecordBindReaderTest {
     @Test
     void textTypeNarrowsTheSchemasArbitraryPrecisionIntegerDownToTheRealFieldsIntWidth() {
         // min_length/max_length are the schema's own unconstrained `integer` atom (natural host
-        // type BigInteger), but TextType.minLength/maxLength are Optional<Integer> -- this is
+        // type BigInteger), but TextType.minLength/maxLength are Optional<Long> -- this is
         // exactly the narrowing path NumberNarrowing exists for.
         //
         // A standalone schema with "text_type"'s own real field shape but no subtypes -- the real
@@ -83,7 +83,7 @@ class RecordBindReaderTest {
         Object result = compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 3 max_length: 10 }"));
 
         TextType textType = assertInstanceOf(TextType.class, result);
-        assertEquals(new TextType(Optional.of(3), Optional.of(10), Optional.empty(), Optional.empty()), textType);
+        assertEquals(new TextType(Optional.of(3L), Optional.of(10L), Optional.empty(), Optional.empty()), textType);
     }
 
     /**
@@ -119,11 +119,11 @@ class RecordBindReaderTest {
         // stating the fixed value is fine, and the bound field still gets the narrowed Integer
         TextType stated = assertInstanceOf(TextType.class,
                 compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 3 }")));
-        assertEquals(Optional.of(3), stated.minLength());
+        assertEquals(Optional.of(3L), stated.minLength());
         // omitting it injects the same thing
         TextType omitted = assertInstanceOf(TextType.class,
                 compiled.get("unicode.text_type").read(TestDocuments.document("{}")));
-        assertEquals(Optional.of(3), omitted.minLength());
+        assertEquals(Optional.of(3L), omitted.minLength());
         // and contradicting it is still caught
         ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 4 }")));
@@ -163,7 +163,7 @@ class RecordBindReaderTest {
         for (String name : linked.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(91, linked.schema().entries().size());
+        assertEquals(92, linked.schema().entries().size());
     }
 
     @Test

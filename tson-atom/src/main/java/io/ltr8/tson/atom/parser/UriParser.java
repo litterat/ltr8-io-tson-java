@@ -45,7 +45,7 @@ public record UriParser(UriType constraints) implements AtomTypeParser<Iri> {
      * Every facet {@code uri_type} carries except {@code spec}, which §5.5 fixes per constructor --
      * every {@link UriParser} cites RFC 3986.
      */
-    public UriParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+    public UriParser(Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
                       Optional<String> pattern, Optional<List<String>> schemes, boolean allowRelative,
                       boolean allowFragment) {
         this(new UriType(UriType.SPEC, minLength, maxLength, length, pattern,

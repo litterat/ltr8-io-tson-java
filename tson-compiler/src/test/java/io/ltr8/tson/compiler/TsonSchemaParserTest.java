@@ -932,8 +932,8 @@ class TsonSchemaParserTest {
     @Test
     void theKernelParses() throws IOException {
         SchemaDocument doc = parse(readFixture("meta.tn"));
-        // The six maps, their 68 members, and the 11 entries at the root.
-        assertEquals(85, doc.body().declarations().size());
+        // The six maps, their 68 members, and the 12 entries at the root.
+        assertEquals(86, doc.body().declarations().size());
         assertTrue(doc.body().declarations().containsKey("meta.record"));
         assertTrue(doc.body().declarations().containsKey("text"));
     }
@@ -941,8 +941,8 @@ class TsonSchemaParserTest {
     @Test
     void theLibrariesParse() throws IOException {
         SchemaDocument numeric = parse(readFixture("numeric.tn"));
-        // The map `numeric` and its 7 members, and the 17 instances at the root.
-        assertEquals(25, numeric.body().declarations().size());
+        // The map `numeric` and its 7 members, and the 16 instances at the root.
+        assertEquals(24, numeric.body().declarations().size());
         assertTrue(numeric.body().declarations().containsKey("numeric.decimal_type"));
         assertTrue(numeric.body().declarations().containsKey("int32"));
         SchemaDocument temporal = parse(readFixture("temporal.tn"));

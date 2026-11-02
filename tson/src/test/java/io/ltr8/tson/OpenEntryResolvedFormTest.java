@@ -116,7 +116,7 @@ class OpenEntryResolvedFormTest {
      * against and the entry's value is a {@code top} like any other.
      *
      * <p>Read as the {@code !array} it names, the body would fail with two {@code ATOM_CONSTRAINT_VIOLATION}s
-     * -- {@code N} is not a {@code numeric.non_negative_integer} -- which is the case §8.1 names when it says a body
+     * -- {@code N} is not a {@code numeric.count} -- which is the case §8.1 names when it says a body
      * carrying a parameter in a value slot "is not a value of any constructor's record shape".
      *
      * <p>The document is hand-authored in §8.1's form rather than produced by this library's writer,
@@ -130,7 +130,7 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   vector => !meta.template {
-                    parameters: [ { name: T  type: meta.type_kind } { name: N  type: numeric.non_negative_integer } ]
+                    parameters: [ { name: T  type: meta.type_kind } { name: N  type: numeric.count } ]
                     template: "!meta.array { element_type: T  min_items: N  max_items: N }"
                   }
                 }

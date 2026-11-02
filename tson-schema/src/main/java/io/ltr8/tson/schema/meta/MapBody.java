@@ -5,7 +5,6 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.atom.AtomCoherence;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -28,8 +27,8 @@ import java.util.Optional;
 public record MapBody(TypeChain chain,
         @Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
                        @Field("voidable") boolean voidable, @Field("ordered") boolean ordered,
-                       @Field("min_items") Optional<BigInteger> minItems,
-                       @Field("max_items") Optional<BigInteger> maxItems) implements Product {
+                       @Field("min_items") Optional<Long> minItems,
+                       @Field("max_items") Optional<Long> maxItems) implements Product {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public MapBody {
@@ -37,8 +36,8 @@ public record MapBody(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public MapBody(TypeRef keyType, TypeRef valueType, boolean voidable, boolean ordered, Optional<BigInteger> minItems,
-            Optional<BigInteger> maxItems) {
+    public MapBody(TypeRef keyType, TypeRef valueType, boolean voidable, boolean ordered, Optional<Long> minItems,
+            Optional<Long> maxItems) {
         this(TypeChain.EMPTY, keyType, valueType, voidable, ordered, minItems, maxItems);
     }
 

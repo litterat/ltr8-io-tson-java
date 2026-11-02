@@ -47,9 +47,9 @@ import java.util.Optional;
  */
 @Typename(name = "net.uri_type")
 public record UriType(TypeChain chain,
-        String spec, @Field("min_length") Optional<Integer> minLength,
-                      @Field("max_length") Optional<Integer> maxLength,
-                      Optional<Integer> length, Optional<String> pattern,
+        String spec, @Field("min_length") Optional<Long> minLength,
+                      @Field("max_length") Optional<Long> maxLength,
+                      Optional<Long> length, Optional<String> pattern,
                       Optional<List<String>> members, Optional<List<String>> schemes,
                       @Field("allow_relative") boolean allowRelative,
                       @Field("allow_fragment") boolean allowFragment,
@@ -61,7 +61,7 @@ public record UriType(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public UriType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+    public UriType(String spec, Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
             Optional<String> pattern, Optional<List<String>> members, Optional<List<String>> schemes, boolean allowRelative,
             boolean allowFragment, Normalization normalization) {
         this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, schemes, allowRelative,

@@ -4,7 +4,6 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.schema.temporal.TimeType;
 import org.junit.jupiter.api.Test;
-import java.math.BigInteger;
 import java.time.OffsetTime;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -89,7 +88,7 @@ class TimeParserTest {
     @Test
     void precisionConstrainsTheValueNotTheSpelling() {
         TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
-                Optional.of(BigInteger.valueOf(3))));
+                Optional.of(3L)));
         assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));
         assertEquals(OffsetTime.parse("10:15:30.123Z"), type.read(token("10:15:30.123Z")));
         // Six written digits and a millisecond value: the grid is what is tested, not the digit count.
@@ -101,7 +100,7 @@ class TimeParserTest {
     @Test
     void aTrailingZeroSpellingOfAnAdmittedValueIsAdmitted() {
         TimeParser tenths = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
-                Optional.of(BigInteger.ONE)));
+                Optional.of(1L)));
         assertEquals(OffsetTime.parse("12:00:00.5Z"), tenths.read(token("12:00:00.500Z")));
         assertThrows(AtomValidationException.class, () -> tenths.read(token("12:00:00.51Z")));
     }
@@ -123,7 +122,7 @@ class TimeParserTest {
     @Test
     void precisionZeroAdmitsNoFraction() {
         TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
-                Optional.of(BigInteger.ZERO)));
+                Optional.of(0L)));
         assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));
         assertThrows(AtomValidationException.class, () -> type.read(token("10:15:30.1Z")));
     }

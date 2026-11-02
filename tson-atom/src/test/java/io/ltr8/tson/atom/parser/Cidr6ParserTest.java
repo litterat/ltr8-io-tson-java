@@ -25,7 +25,8 @@ class Cidr6ParserTest {
 
     private static Cidr6Parser withPrefixBounds(Integer min, Integer max) {
         return new Cidr6Parser(new Cidr6Type("https://www.rfc-editor.org/rfc/rfc4291",
-                Optional.ofNullable(min), Optional.ofNullable(max), List.of(), List.of()));
+                Optional.ofNullable(min).map(Integer::longValue), Optional.ofNullable(max).map(Integer::longValue),
+                List.of(), List.of()));
     }
 
     @ParameterizedTest

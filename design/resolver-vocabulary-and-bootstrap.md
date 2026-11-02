@@ -297,20 +297,21 @@ constructor, positions included (the bootstrap resolves with the parser's positi
 
 - **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the kernel's
   one wait cycle, the one holding `meta.record`: `meta.value`, `boolean`, `meta.field_role`, `meta.enum_set`,
-  `integer`, `numeric.non_negative_integer`, `text`, `meta.type_kind`, `meta.field_map` (`PRE_LOADED`), and the
+  `integer`, `numeric.count`, `text`, `meta.type_kind`, `meta.field_map` (`PRE_LOADED`), and the
   arrays lifted over `meta.type_kind`, `meta.field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a
   lifted array is named by its content, so it is designated by what it holds; an entry the source declares is no lift,
   so a declaration whose body is `[text]` is read, not built). `instanceBody` covers the shapes those apply —
   a bare `{}` (each target's unconstrained constant), a bare token array (`enum`, the kernel's own enumeration constructor),
   and a record of tokens (`meta.reference`, `meta.namespace` for `meta.field_map`, the `meta.array`/`meta.set_type` binding
   records the desugar phase lifts, with their `min_items`/`max_items`) — and refuses any other target; `refinedBody` merges
-  the integer family's `min` and `max`. `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from
+  the integer family's `min`, `max` and `size` (`numeric.count`'s `size: { bits: 64  signed: true }`).
+  `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from
   `spec/fixtures/meta-resolved.tn` (the six maps read as their members under their paths) and asserts the hand-built names
-  equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 85 entries (68
-  members of the six maps, 11 at the root and 6 synthetics; the maps themselves make the kernel's 91 resolved entries), one
-  cycle of 25, longest wait chain 4 — and `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel
-  contains the cycle's closure (67 entries) and the related concepts, pinning all three. Of the 25, 13 are hand-built (the 9
-  of `PRE_LOADED` and 4 lifted arrays); the other 12 are records and compositions resolved from their grammar, and the 60
+  equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 86 entries (68
+  members of the six maps, 12 at the root and 6 synthetics; the maps themselves make the kernel's 92 resolved entries), one
+  cycle of 26, longest wait chain 4 — and `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel
+  contains the cycle's closure (68 entries) and the related concepts, pinning all three. Of the 26, 13 are hand-built (the 9
+  of `PRE_LOADED` and 4 lifted arrays); the other 13 are records and compositions resolved from their grammar, and the 60
   entries beyond the cycle are made ready in wait order.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and

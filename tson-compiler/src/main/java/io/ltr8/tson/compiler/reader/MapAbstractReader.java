@@ -11,7 +11,6 @@ import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
 
-import java.math.BigInteger;
 import java.util.Optional;
 import java.util.HashSet;
 import java.util.Set;
@@ -241,25 +240,22 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * <p>Tested rather than {@code ifPresent}-ed: this runs on every map a document
      * carries, and a lambda capturing {@code size}, {@code ctx} and this reader allocates whether or not
      * the bound is set -- which for the overwhelming majority of positions, whose type states neither
-     * bound, is pure cost. The {@code BigInteger} both comparisons need is built once for the same reason,
-     * and only where a bound exists at all.
+     * bound, is pure cost. A bound above what a Java collection can hold compares as any other: a {@code
+     * max_items} past {@link Integer#MAX_VALUE} is never reached, and a {@code min_items} past it is met by no
+     * value read.
      */
     private void validateSize(int size, TsonReadContext ctx) {
-        Optional<BigInteger> minItems = body.minItems();
-        Optional<BigInteger> maxItems = body.maxItems();
-        if (minItems.isEmpty() && maxItems.isEmpty()) {
-            return;
-        }
-        BigInteger actual = BigInteger.valueOf(size);
+        Optional<Long> minItems = body.minItems();
+        Optional<Long> maxItems = body.maxItems();
         if (minItems.isPresent()) {
-            BigInteger min = minItems.get();
-            if (actual.compareTo(min) < 0) {
+            long min = minItems.get();
+            if (size < min) {
                 ctx.report(rules.tooFewEntries(min, size));
             }
         }
         if (maxItems.isPresent()) {
-            BigInteger max = maxItems.get();
-            if (actual.compareTo(max) > 0) {
+            long max = maxItems.get();
+            if (size > max) {
                 ctx.report(rules.tooManyEntries(max, size));
             }
         }

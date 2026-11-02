@@ -80,7 +80,7 @@ its base), and an application nothing declares is its expansion.
   - **Why text, not a value of the constructor's vocabulary.** A parameter stands wherever a token stands —
     `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a collection — so a
     body carrying one is typed by no constructor's record shape until it closes. Read as one, `min_items: N` fails
-    against `numeric.non_negative_integer`, and `!enum { members: [a b M] }` reads *cleanly*, binding `M` as a third member
+    against `numeric.count`, and `!enum { members: [a b M] }` reads *cleanly*, binding `M` as a third member
     spelled `M`. `OpenEntryResolvedFormTest` pins that it reads back as held text.
   - **The tree is built, not held.** `HeldBody.held` writes the tree it is given (`DataClassObjectWriter`,
     vocabulary-free, token forms preserved) and keeps none of it; `HeldBody.of` parses the text back. Handing back the
@@ -189,12 +189,12 @@ schema's own constructors classify by the same walk. The class Javadoc lists the
 - **The template's form decides where value types are read** (`ParameterTypes.readsInStructure`, §5.10). A template
   whose held head is a constructor other than `meta.record` reads its value parameters' types, written ones included,
   among the schema's imported entries: the constructor's compiled reader reads the argument, and its slot types are
-  in the closure that declared it, so `min_items: N` makes `N` the kernel's `numeric.non_negative_integer`. A record template
+  in the closure that declared it, so `min_items: N` makes `N` the kernel's `numeric.count`. A record template
   reads in the schema's whole namespace. A template whose head is
   another open template takes that template's form; a deferred use takes its callee's. An alias's head is
   `meta.alias`, a constructor, so a written value type on an alias must name an imported type too. A written type
   must also IS-A the derived one: `<N: int8> !meta.array { … max_items: N }` is refused, numeric.tn's `int8` not being a
-  `numeric.non_negative_integer` (`TemplateParamTypeTest`). A type parameter's bound is the schema's in every form.
+  `numeric.count` (`TemplateParamTypeTest`). A type parameter's bound is the schema's in every form.
 - **A written type narrows, read by the derived kind** (`<T: text, N: int8>`, from
   `SchemaMap.Declaration.parameterTypes`): on a value parameter it replaces `type` and must IS-A the derived one; on a
   type parameter it is `meta.template_param.bound` and must IS-A every bound the uses inherit (`rebox => <T> boxed<T>`

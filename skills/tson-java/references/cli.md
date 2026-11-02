@@ -188,7 +188,7 @@ deployment, which the `policy` beside it explains.
 
 `--output tson` is the same record through the library's own writer — the shape `tson-cli`'s own
 `diagnostics.tn` (`https://tson.io/2026/39/io/ltr8/cli/diagnostics.tn`) declares, which that output is validated
-against, and which `--output json` matches key for key. Its `policy` field is the spec's own `policy` type,
+against, and which `--output json` matches key for key. Its `policy` field is the spec's own `policy.processor` type,
 imported from the bundled `policy.tn`. A position is `line:column:byteOffset`, the first two 1-based, the offset
 counting UTF-8 bytes from 0. The top-level `errors` carries only what
 stopped the run before any document was read.

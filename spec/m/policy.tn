@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/policy.tn?sha256=950abf1c343fc16268d8d965968373af4519efacee869e0390b8bf907a845b6e"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=f13d1d1c5354cb0c546fdbde5c54a9afd0172b7828c0f12aba749d2aec119180"
+!!id:"https://tson.io/2026/39/m/policy.tn?sha256=a272c752a9ce569ef64e5bce08472ca99e75055aca77793fc05b1f982edf27a9"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=249f7b0de7d79716f642b42166b274a2b4414b08c91e6d638557b7bbe7264a6c"
 @doc:"""
   TSON processor policy — what a processor admits and spends (2026 Revision 39
   draft).
@@ -8,96 +8,109 @@
   ([TSON-DATA] §8.2): a schema that declared its own strictness would choose
   its own check. This document declares the policy's vocabulary, so a
   processor states the policy it judged under in one shape, and a deployment
-  that writes its policy down writes a data document of type `policy`. Such a
-  document is named at the call site and never resolved by identity, and no
-  document may name, import or otherwise select the policy it is judged under.
+  that writes its policy down writes a data document of type
+  `policy.processor`. Such a document is named at the call site and never
+  resolved by identity, and no document may name, import or otherwise select
+  the policy it is judged under.
 
-  `identifier_policy` and `token_policy` are §8.2's two policies, and `limits`
-  is §9.1's and [TSON-SCHEMA] §11.5's. A script is named by its Unicode Script
-  property value alias (UAX #24), `Latin`, `Cyrillic`, `Han`.
+  `policy.identifier_policy` and `policy.script_policy` are §8.2's two
+  policies, and `policy.limits` is §9.1's and [TSON-SCHEMA] §11.5's. A script
+  is named by its Unicode Script property value alias (UAX #24), `Latin`,
+  `Cyrillic`, `Han`.
 
   It imports meta.tn alone, every field typed by the kernel's vocabulary or by
-  an entry of its own. Its entries sit at its root, and it declares no
-  namespace of its own.
+  an entry of its own. Its entries are members of the schema map `policy`
+  nested in its root, each named by its path from the root, and a schema
+  whose import closure holds this document reserves that map name.
   """
 !schema {
-  @doc:"UTS #39 §5.2's restriction levels, strictest first."
-  restriction_level => !enum [
-    ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
-  ]
+  policy => !schema {
+    @doc:"UTS #39 §5.2's restriction levels, strictest first."
+    restriction_level => !enum [
+      ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
+    ]
 
-  @doc:"""
-    [TSON-DATA] §8.2's token policy: the restriction level over each whole
-    token, and any script combinations admitted over the level (UTS #39 §5.2's
-    own device for Latn+Jpan and its siblings), each entry in `permitting` one
-    such combination.
-    """
-  script_policy => { level: restriction_level  permitting: [[text]] }
+    @doc:"""
+      [TSON-DATA] §8.2's token policy: the restriction level over each whole
+      token, and any script combinations admitted over the level (UTS #39
+      §5.2's own device for Latn+Jpan and its siblings), each entry in
+      `permitting` one such combination.
+      """
+    script_policy => { level: policy.restriction_level  permitting: [[text]] }
 
-  @doc:"""
-    [TSON-DATA] §8.2's identifier policy: the restriction level, whether it
-    applies to each segment of a name rather than to the whole of it, whether
-    no two names in one scope may share a UTS #39 skeleton, and any script
-    combinations admitted over the level, as `script_policy` states them.
-    """
-  identifier_policy => {
-    level: restriction_level
-    per_segment: boolean
-    skeleton_distinctness: boolean
-    permitting: [[text]]
-  }
+    @doc:"""
+      [TSON-DATA] §8.2's identifier policy: the restriction level, whether it
+      applies to each segment of a name rather than to the whole of it,
+      whether no two names in one scope may share a UTS #39 skeleton, and any
+      script combinations admitted over the level, as `policy.script_policy`
+      states them.
+      """
+    identifier_policy => {
+      level: policy.restriction_level
+      per_segment: boolean
+      skeleton_distinctness: boolean
+      permitting: [[text]]
+    }
 
-  @doc:"""
-    [TSON-DATA] §9.1's resource limits and [TSON-SCHEMA] §11.5's: what a
-    processor will spend reading one document, and resolving one schema, as
-    against what it admits as a name. Every limit defaults to the spec's own
-    value, set at the tight end so that a document fitting it fits every
-    processor above, and a deployment writes only what it raises. A limit
-    refusal names the limit and the threshold, and is not a verdict on the
-    document.
+    @doc:"""
+      One resource limit: a count, a depth, or a size in code points, octets
+      or bytes, a positive `int64`, 1 to 2^63-1. A processor that holds a
+      limit in a narrower type than this range caps a larger value at the
+      widest it holds.
+      """
+    limit => !int64 ^ { min: 1 }
 
-    The §9.1 limits bound a document, a schema document among them. Every
-    limit is a `numeric.non_negative_integer`: a count, a depth, or a size in
-    code points, octets or bytes.
-    The §11.5 limits bound the work resolution adds over a schema: the
-    schemas one header reaches through `!!import`, the
-    declarations in one schema map (synthetic and instantiation entries
-    included), the hops from a use site to a terminal entry, the length of
-    one type's supertype chain, the nested open synthetics closed for one
-    application, and the longest chain of waits one schema's resolution
-    runs, an entry waiting on the next being ready.
-    """
-  limits => {
-    max_depth?:                  numeric.non_negative_integer ~ 64
-    max_token_length?:           numeric.non_negative_integer ~ 1048576
-    max_text_length?:            numeric.non_negative_integer ~ 1048576
-    max_numeric_literal_length?: numeric.non_negative_integer ~ 4096
-    max_binary_size?:            numeric.non_negative_integer ~ 16777216
-    max_document_size?:          numeric.non_negative_integer ~ 16777216
-    max_elements?:               numeric.non_negative_integer ~ 1048576
-    max_entries?:                numeric.non_negative_integer ~ 1048576
-    max_fields?:                 numeric.non_negative_integer ~ 65536
-    max_annotations?:            numeric.non_negative_integer ~ 64
-    max_values?:                 numeric.non_negative_integer ~ 16777216
-    max_import_closure?:         numeric.non_negative_integer ~ 64
-    max_schema_entries?:         numeric.non_negative_integer ~ 65536
-    max_alias_chain?:            numeric.non_negative_integer ~ 64
-    max_supertype_chain?:        numeric.non_negative_integer ~ 64
-    max_materialisation_depth?:  numeric.non_negative_integer ~ 64
-    max_wait_depth?:             numeric.non_negative_integer ~ 64
-  }
+    @doc:"""
+      [TSON-DATA] §9.1's resource limits and [TSON-SCHEMA] §11.5's: what a
+      processor will spend reading one document, and resolving one schema, as
+      against what it admits as a name. Every limit defaults to the spec's own
+      value, set at the tight end so that a document fitting it fits every
+      processor above, and a deployment writes only what it raises. A limit
+      refusal names the limit and the threshold, and is not a verdict on the
+      document.
 
-  @doc:"""
-    The policy a processor judges a document under: §8.2's identifier and
-    token policies and §9.1's limits. `unicode_data_version` is the UCD release
-    whose tables the §8.2 rules read, which a report states beside the policy
-    (§8.2) and a deployment's own policy document leaves out, the tables being
-    the processor's rather than the deployment's choice.
-    """
-  policy => {
-    identifier_policy: identifier_policy
-    token_policy: script_policy
-    unicode_data_version?: text
-    limits: limits
+      The §9.1 limits bound a document, a schema document among them. Every
+      limit is a `policy.limit`.
+      The §11.5 limits bound the work resolution adds over a schema: the
+      schemas one header reaches through `!!import`, the
+      declarations in one schema map (synthetic and instantiation entries
+      included), the hops from a use site to a terminal entry, the length of
+      one type's supertype chain, the nested open synthetics closed for one
+      application, and the longest chain of waits one schema's resolution
+      runs, an entry waiting on the next being ready.
+      """
+    limits => {
+      max_depth?:                  policy.limit ~ 64
+      max_token_length?:           policy.limit ~ 1048576
+      max_text_length?:            policy.limit ~ 1048576
+      max_numeric_literal_length?: policy.limit ~ 4096
+      max_binary_size?:            policy.limit ~ 16777216
+      max_document_size?:          policy.limit ~ 16777216
+      max_elements?:               policy.limit ~ 1048576
+      max_entries?:                policy.limit ~ 1048576
+      max_fields?:                 policy.limit ~ 65536
+      max_annotations?:            policy.limit ~ 64
+      max_values?:                 policy.limit ~ 16777216
+      max_import_closure?:         policy.limit ~ 64
+      max_schema_entries?:         policy.limit ~ 65536
+      max_alias_chain?:            policy.limit ~ 64
+      max_supertype_chain?:        policy.limit ~ 64
+      max_materialisation_depth?:  policy.limit ~ 64
+      max_wait_depth?:             policy.limit ~ 64
+    }
+
+    @doc:"""
+      The policy a processor judges a document under: §8.2's identifier and
+      token policies and §9.1's limits. `unicode_data_version` is the UCD
+      release whose tables the §8.2 rules read, which a report states beside
+      the policy (§8.2) and a deployment's own policy document leaves out, the
+      tables being the processor's rather than the deployment's choice.
+      """
+    processor => {
+      identifier_policy: policy.identifier_policy
+      token_policy: policy.script_policy
+      unicode_data_version?: text
+      limits: policy.limits
+    }
   }
 }

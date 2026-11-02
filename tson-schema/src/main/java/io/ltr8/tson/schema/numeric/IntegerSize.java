@@ -9,7 +9,10 @@ import java.math.BigInteger;
  * representation, bit width paired with two's-complement signedness -- {@code integer_type.size}'s
  * field type. {@code bits} is the kernel's arbitrary-precision {@code integer}, hence {@link
  * BigInteger} rather than a Java primitive width, even though every built-in width in practice
- * (8..256) fits comfortably in an {@code int}. Pure data -- range/host-type behavior derived from a
+ * (8..256) fits comfortably in an {@code int}: it is not a {@code numeric.count}, which refines {@code
+ * int64}, whose width is stated through this record, and its above-zero rule is {@link
+ * IntegerType#coherenceCheck}'s. Pure
+ * data -- range/host-type behavior derived from a
  * width (minValue/maxValue/hostType) lives on {@code tson-compiler}'s {@code IntegerParser}, which
  * consumes this, not here.
  *

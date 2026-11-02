@@ -43,7 +43,7 @@ import java.util.function.Function;
  * <p><b>The slot's declared type is what says which.</b> A held body is the constructor application as written,
  * so the body alone cannot tell a parameter naming a type from one standing for an enum member -- both are bare
  * tokens. What separates them is the constructor's own vocabulary: {@code array.element_type} is typed
- * {@code meta.type_kind}, {@code array.min_items} {@code numeric.non_negative_integer}, {@code enum.members} a set of
+ * {@code meta.type_kind}, {@code array.min_items} {@code numeric.count}, {@code enum.members} a set of
  * {@code text}. §4.2 makes that reading general rather than a table of kernel names -- every slot that names the
  * type of a value is typed {@code meta.type_kind}, its value a name or an application -- so an extension
  * meta-schema's own constructors classify by the same walk with nothing added here.
@@ -132,7 +132,7 @@ final class ParameterTypes {
      * Whether {@code template}'s value parameters are typed by the applied constructor's slots, read and checked among
      * the schema's imports (§5.10): a template whose body applies a constructor other than {@code record} -- {@code vec
      * => <N> !meta.array { element_type: text  min_items: N }} -- binds its values into the constructor's own structure, so
-     * {@code N} is the kernel's {@code numeric.non_negative_integer}, and a written narrowing names an imported type too,
+     * {@code N} is the kernel's {@code numeric.count}, and a written narrowing names an imported type too,
      * the constructor's reader being the one that reads the argument. A record template's fields are typed by the schema,
      * so its parameters read in the schema's namespace. A template whose body applies another template takes that
      * template's form. A type parameter's bound is the schema's either way: its argument names a schema type, the way

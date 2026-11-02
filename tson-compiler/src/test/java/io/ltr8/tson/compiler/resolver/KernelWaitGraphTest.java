@@ -57,8 +57,8 @@ class KernelWaitGraphTest {
      * the closure names: the map, tuple and choice constructors, the tuple's element and the one-element tuple
      * templates, held template bodies and the {@code application} annotation, the {@code kind} and {@code ref}
      * references with {@code atom_kind}, {@code field_name}, the {@code set} template, the {@code disjoint} assertion,
-     * and the octet-sequence constructor with its encodings and instance. The measurement: a cycle of 25, a closure of
-     * 67.
+     * and the octet-sequence constructor with its encodings and instance. The measurement: a cycle of 26, a closure of
+     * 68.
      */
     @Test
     void theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts() throws Exception {
@@ -84,8 +84,8 @@ class KernelWaitGraphTest {
         System.out.println("  related concepts beyond the closure: " + related);
 
         assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
-        assertEquals(25, cycle.size(), "the cycle");
-        assertEquals(67, closure.size(), "the cycle's closure");
+        assertEquals(26, cycle.size(), "the cycle");
+        assertEquals(68, closure.size(), "the cycle's closure");
         assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application", "meta.atom_kind",
                 "binary.bytes_encoding", "binary.bytes_type", "meta.choice", "meta.disjoint",
                 "meta.field_name", "meta.kind", "meta.map", "meta.ref", "meta.template", "meta.tuple",
