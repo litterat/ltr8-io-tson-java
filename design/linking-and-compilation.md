@@ -16,7 +16,8 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds unless it is equal to the entry already there. A nested `!schema` map is the
   exception that is no collision: several documents declaring one map path contribute to one map, the union of their
-  members (`SPEC-FEEDBACK.md #14`).
+  members (`SPEC-FEEDBACK.md #14`). A synthetic is the other: its identity is its form (§8.2), so two documents minting
+  one are one entry, and two bodies under one minted name are an `IllegalStateException`.
 - One namespace per schema (SPEC-FEEDBACK.md #7): its own entries and the whole closure of its `!!import`s
   (`TsonSchema.namespaceSources`, header order, deduplicated by identity). Every name the schema writes resolves
   there; no rule ties what a schema may declare to what it imports, so any schema declares a constructor, a namespace
@@ -107,6 +108,16 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
   closure reaching both `/2026/37/m/core.tn` and `/2026/39/m/core.tn` is refused here rather than surfacing later as a
   field conflict between two identically spelled types. Listing one schema twice, or under two spellings of one
   identity, is redundant rather than an error. An unregistered import is a `SchemaValidationException`.
+- **A synthetic's identity is its form, not its origin** (`resolver.ImportedSynthetics`, called by both merges). Its
+  name is derived from the form alone, so two documents writing `[text]` without importing each other each mint
+  `array_text_…`, and a closure holding both reaches one entry by two routes: the first arrival is kept with its
+  origin, every use in either document names it, and its `closes` facts take the union, since a form one document
+  lifts and another reaches by closing a template's open synthetic close different applications. Both keys must carry
+  `@meta.synthetic`; a minted name meeting a declared one is the collision above. The two bodies are compared, their
+  `subtypes` left out, and a disagreement is an `IllegalStateException`, the cross-document form of the broken naming
+  function `MintedNames.claim` refuses within one phase. A document that writes a form an import already minted lifts
+  nothing of its own (`SchemaDesugarer`'s `imported` set), and materialisation closing to an imported synthetic reuses
+  it, so the merge is the one place two mints of one form meet.
 - **A local entry equal to the closure's is the same entry.** §8.2 names a minted instantiation by its resolved form
   alone, so an application this schema closed and one an import closed agree by construction; any other local reuse
   of a closure name is refused and the local entry dropped, keeping the import's, which is already-linked material.

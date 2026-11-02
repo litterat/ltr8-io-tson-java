@@ -40,8 +40,8 @@ import java.util.List;
  * configured and reported by the same surfaces as depth, and not yet counted, so a document or schema past one
  * of them is not refused for it. {@code BACKLOG.md} carries where each is counted.
  *
- * <p>Every limit is at least 1. A size in code points, octets or bytes is a {@code long}, the schema's
- * {@code int64}; a count or depth is an {@code int}, its {@code int32}.
+ * <p>Every limit is at least 1. The schema types each a {@code numeric.non_negative_integer}; here a size in code
+ * points, octets or bytes is a {@code long}, and a count or depth an {@code int}.
  *
  * @param maxDepth                the deepest a container may nest before the read is refused -- see {@link
  *                                #maxDepth()}
