@@ -246,8 +246,8 @@ class ContainerSugarEndToEndTest {
         // vocabulary's own defaults (state/ordered/unique_items) stay out of the binding record (§5.6).
         ArrayBody body = assertInstanceOf(ArrayBody.class, entry);
         assertEquals(TypeRef.of("text"), body.elementType());
-        assertEquals(Optional.of(BigInteger.ONE), body.minItems());
-        assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
+        assertEquals(Optional.of(1L), body.minItems());
+        assertEquals(Optional.of(2L), body.maxItems());
     }
 
     /** The map tier takes the same specifier, binding the same two fields on {@code map} instead. */
@@ -258,8 +258,8 @@ class ContainerSugarEndToEndTest {
 
         assertEquals(Optional.of("meta.map"), compiled.schema().constructorOf("index"));
         MapBody body = assertInstanceOf(MapBody.class, entry);
-        assertEquals(Optional.of(BigInteger.ONE), body.minItems());
-        assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
+        assertEquals(Optional.of(1L), body.minItems());
+        assertEquals(Optional.of(2L), body.maxItems());
     }
 
     /**

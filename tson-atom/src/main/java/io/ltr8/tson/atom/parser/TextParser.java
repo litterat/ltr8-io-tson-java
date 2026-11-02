@@ -37,7 +37,7 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
     /** {@code text => !unicode.text_type {}} -- the unconstrained text type. */
     public static final TextParser UNCONSTRAINED = new TextParser(TextType.UNCONSTRAINED);
 
-    public TextParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+    public TextParser(Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
                        Optional<String> pattern) {
         this(new TextType(minLength, maxLength, length, pattern));
     }
@@ -107,8 +107,8 @@ public record TextParser(TextType constraints) implements AtomTypeParser<String>
      * outside the Basic Multilingual Plane is one character and not the two UTF-16 units {@link String#length}
      * would count.
      */
-    static void checkLengths(String text, String subject, Optional<Integer> length, Optional<Integer> minLength,
-                             Optional<Integer> maxLength) {
+    static void checkLengths(String text, String subject, Optional<Long> length, Optional<Long> minLength,
+                             Optional<Long> maxLength) {
         if (length.isEmpty() && minLength.isEmpty() && maxLength.isEmpty()) {
             return;
         }

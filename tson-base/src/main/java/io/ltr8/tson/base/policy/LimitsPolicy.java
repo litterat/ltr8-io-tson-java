@@ -34,14 +34,16 @@ import java.util.List;
  *
  * <p><b>The whole table, two limits counted.</b> The components are §9.1's eleven document-side limits and
  * §11.5's six schema-side ones, in that order, each defaulting to the spec's value -- the same table, names
- * and defaults as {@code policy.tn}'s {@code limits} record. Nesting depth is counted, as containers open in
+ * and defaults as {@code policy.tn}'s {@code policy.limits} record. Nesting depth is counted, as containers open in
  * the token stream ({@code TsonDataStream.advance}, {@code JsonStream}), and wait depth as a schema's resolution
  * makes its entries ready ({@code SchemaResolver}). The other fifteen are this policy's stated thresholds:
  * configured and reported by the same surfaces as depth, and not yet counted, so a document or schema past one
  * of them is not refused for it. {@code BACKLOG.md} carries where each is counted.
  *
- * <p>Every limit is at least 1. The schema types each a {@code numeric.non_negative_integer}; here a size in code
- * points, octets or bytes is a {@code long}, and a count or depth an {@code int}.
+ * <p>Every limit is at least 1. The schema types each a {@code policy.limit}, 1 to 2<sup>63</sup>-1; here a size in
+ * code points, octets or bytes is a {@code long}, and a count or depth an {@code int}. A policy document's limit
+ * above {@link Integer#MAX_VALUE} for an {@code int} component is held as {@link Integer#MAX_VALUE}, the widest
+ * this processor counts that limit in: a processor holding a limit beyond its own reach caps it.
  *
  * @param maxDepth                the deepest a container may nest before the read is refused -- see {@link
  *                                #maxDepth()}

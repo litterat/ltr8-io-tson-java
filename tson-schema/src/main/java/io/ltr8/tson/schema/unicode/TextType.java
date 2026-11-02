@@ -49,9 +49,9 @@ import java.util.stream.Stream;
  */
 @Typename(name = "unicode.text_type")
 public record TextType(TypeChain chain,
-        @Field("min_length") Optional<Integer> minLength,
-        @Field("max_length") Optional<Integer> maxLength,
-        Optional<Integer> length,
+        @Field("min_length") Optional<Long> minLength,
+        @Field("max_length") Optional<Long> maxLength,
+        Optional<Long> length,
         Optional<String> pattern,
         Optional<List<String>> members,
         Normalization normalization) implements Atom, TextFamily {
@@ -63,7 +63,7 @@ public record TextType(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+    public TextType(Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
             Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
         this(TypeChain.EMPTY, minLength, maxLength, length, pattern, members, normalization);
     }
@@ -74,13 +74,13 @@ public record TextType(TypeChain chain,
     }
 
     /** These facets with no normalization: the value is the text as written. */
-    public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+    public TextType(Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
             Optional<String> pattern, Optional<List<String>> members) {
         this(minLength, maxLength, length, pattern, members, Normalization.NONE);
     }
 
     /** These facets with no member set and no normalization. */
-    public TextType(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+    public TextType(Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
             Optional<String> pattern) {
         this(minLength, maxLength, length, pattern, Optional.empty());
     }
@@ -210,12 +210,12 @@ public record TextType(TypeChain chain,
     }
 
     /** The tightest floor this type's own length facets impose -- {@link #length} pins both ends, so it counts here too. */
-    private Optional<Integer> effectiveMinLength() {
-        return Stream.of(minLength, length).flatMap(Optional::stream).max(Integer::compareTo);
+    private Optional<Long> effectiveMinLength() {
+        return Stream.of(minLength, length).flatMap(Optional::stream).max(Long::compareTo);
     }
 
     /** The {@link #effectiveMinLength} twin. */
-    private Optional<Integer> effectiveMaxLength() {
-        return Stream.of(maxLength, length).flatMap(Optional::stream).min(Integer::compareTo);
+    private Optional<Long> effectiveMaxLength() {
+        return Stream.of(maxLength, length).flatMap(Optional::stream).min(Long::compareTo);
     }
 }

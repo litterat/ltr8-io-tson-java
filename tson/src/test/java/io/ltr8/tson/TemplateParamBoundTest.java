@@ -36,7 +36,7 @@ class TemplateParamBoundTest {
               vec        => <T: text, N> !meta.array { element_type: T  min_items: N }
               rebox      => <T> boxed<T>
               narrower   => <T: non_empty_text> boxed<T>
-              counted    => <N: numeric.non_negative_integer> !meta.array { element_type: text  min_items: N }
+              counted    => <N: numeric.count> !meta.array { element_type: text  min_items: N }
               typed_by   => <T, N> { w?: T ~ N }
             }
             """;
@@ -74,7 +74,7 @@ class TemplateParamBoundTest {
 
     @Test
     void anInstanceConstructionNarrowsOneParameterAndKeepsTheOthersDerivedType() {
-        assertEquals(List.of(bounded("T", "text"), new TemplateParam("N", TypeRef.of("numeric.non_negative_integer"))),
+        assertEquals(List.of(bounded("T", "text"), new TemplateParam("N", TypeRef.of("numeric.count"))),
                 parameters().get("vec"));
     }
 
@@ -88,10 +88,10 @@ class TemplateParamBoundTest {
         assertEquals(List.of(bounded("T", "non_empty_text")), parameters().get("narrower"));
     }
 
-    /** The kernel's numeric.non_negative_integer, which the slot is typed by: the same type, so it narrows. */
+    /** The kernel's numeric.count, which the slot is typed by: the same type, so it narrows. */
     @Test
     void aValueParametersWrittenTypeNarrowsItsType() {
-        assertEquals(List.of(new TemplateParam("N", TypeRef.of("numeric.non_negative_integer"))),
+        assertEquals(List.of(new TemplateParam("N", TypeRef.of("numeric.count"))),
                 parameters().get("counted"));
     }
 
@@ -107,7 +107,7 @@ class TemplateParamBoundTest {
     @Test
     void aWrittenValueTypeThePositionsDoNotReadAsIsRefused() {
         assertRefused("  bad => <N: text> !meta.array { element_type: text  min_items: N }",
-                "read it as numeric.non_negative_integer");
+                "read it as numeric.count");
     }
 
     @Test
@@ -167,7 +167,7 @@ class TemplateParamBoundTest {
         assertRefused("""
                   vec    => <T, N> !meta.array { element_type: T  min_items: N }
                   holder => { v: vec<text, "two"> }""", "binds 'N' to 'two', which is not a value of "
-                + "numeric.non_negative_integer");
+                + "numeric.count");
     }
 
     @Test

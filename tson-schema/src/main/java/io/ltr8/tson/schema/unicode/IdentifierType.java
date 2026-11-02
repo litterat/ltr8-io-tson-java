@@ -38,9 +38,9 @@ import java.util.Optional;
 @Typename(name = "unicode.identifier_type")
 public record IdentifierType(TypeChain chain,
         String spec,
-        @Field("min_length") Optional<Integer> minLength,
-        @Field("max_length") Optional<Integer> maxLength,
-        Optional<Integer> length,
+        @Field("min_length") Optional<Long> minLength,
+        @Field("max_length") Optional<Long> maxLength,
+        Optional<Long> length,
         Optional<String> pattern,
         Optional<List<String>> members,
         Base start,
@@ -58,7 +58,7 @@ public record IdentifierType(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public IdentifierType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+    public IdentifierType(String spec, Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
             Optional<String> pattern, Optional<List<String>> members, Base start, Base continueBase,
             Optional<String> startAdd, Optional<String> continueAdd, Optional<String> medial, Optional<String> exclude,
             Normalization normalization) {

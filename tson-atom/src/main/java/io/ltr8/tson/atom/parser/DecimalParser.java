@@ -37,7 +37,7 @@ public record DecimalParser(DecimalType constraints) implements AtomTypeParser<B
 
     public DecimalParser(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
                           Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf,
-                          Optional<Integer> totalDigits, Optional<Integer> fractionDigits) {
+                          Optional<Long> totalDigits, Optional<Long> fractionDigits) {
         this(new DecimalType(min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits,
                 Optional.empty()));
     }

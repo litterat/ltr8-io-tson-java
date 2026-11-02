@@ -30,6 +30,7 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
@@ -99,10 +100,10 @@ public final class MetaKernelBootstrapResolver {
      * The kernel's named instances and refinements on its one wait cycle, built by hand: {@code value}, the
      * {@code boolean} and {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text}
      * atoms, {@code meta.type_kind}, {@code field_map}, the namespace type a record's fields are a value of, and {@code
-     * numeric.non_negative_integer}, the one refinement.
+     * numeric.count}, the one refinement.
      */
     private static final Set<String> PRE_LOADED = Set.of("meta.value", "boolean", "meta.field_role", "meta.enum_set",
-            "integer", "numeric.non_negative_integer", "text", "meta.type_kind", "meta.field_map");
+            "integer", "numeric.count", "text", "meta.type_kind", "meta.field_map");
 
     /**
      * The element types whose lifted arrays are on the cycle: {@code [meta.type_kind]}, {@code [meta.field_group]} and
@@ -261,7 +262,11 @@ public final class MetaKernelBootstrapResolver {
                 Top source = order.definition(refinement.target());
                 facts.put(name, facts.getOrDefault(refinement.target(), TsonSchema.EntryFacts.NONE)
                         .withPosition(position));
-                return refinedBody(name, refinement, source).withSupertypes(List.of(refinement.target()));
+                List<String> supertypes = new ArrayList<>(List.of(refinement.target()));
+                if (source instanceof Type sourceType) {
+                    supertypes.addAll(sourceType.chain().supertypes());
+                }
+                return refinedBody(name, refinement, source).withSupertypes(List.copyOf(supertypes));
             }
             Instance instance = (Instance) declaration.typeDef();
             facts.put(name, TsonSchema.EntryFacts.constructedBy(instance.target()).withPosition(position));
@@ -321,9 +326,9 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * The hand-written merge for the pre-loaded set's one atom refinement, {@code numeric.non_negative_integer}, bounded as
-     * {@link #instanceBody} is: it covers the integer family's {@code min} and {@code max} and refuses the rest by
-     * name rather than pretending to be general. Ordinary resolution merges through a {@code DataClassObjectWriter}
+     * The hand-written merge for the pre-loaded set's one atom refinement, {@code numeric.count}, bounded as {@link
+     * #instanceBody} is: it covers the integer family's {@code min}, {@code max} and {@code size} and refuses the rest
+     * by name rather than pretending to be general. Ordinary resolution merges through a {@code DataClassObjectWriter}
      * round trip and the governing meta's compiled reader ({@code DefinitionResolver.resolveAtomRefinement}), which
      * is the reader being produced.
      */
@@ -335,17 +340,39 @@ public final class MetaKernelBootstrapResolver {
         }
         Optional<BigInteger> min = source.min();
         Optional<BigInteger> max = source.max();
+        Optional<IntegerSize> size = source.size();
         for (RecordValue.Field binding : bindingFields(name, refinement)) {
-            BigInteger value = new BigInteger(bindingText(name, binding));
             switch (binding.name()) {
-                case "min" -> min = Optional.of(value);
-                case "max" -> max = Optional.of(value);
+                case "min" -> min = Optional.of(new BigInteger(bindingText(name, binding)));
+                case "max" -> max = Optional.of(new BigInteger(bindingText(name, binding)));
+                case "size" -> size = Optional.of(integerSize(name, binding));
                 default -> throw new IllegalStateException("'" + name + "' refines '" + refinement.target()
-                        + "' with '" + binding.name() + "'; the bootstrap merges min and max only");
+                        + "' with '" + binding.name() + "'; the bootstrap merges min, max and size only");
             }
         }
-        return new IntegerType(source.size(), min, source.exclusiveMin(), max, source.exclusiveMax(),
+        return new IntegerType(size, min, source.exclusiveMin(), max, source.exclusiveMax(),
                 source.multipleOf(), source.members());
+    }
+
+    /** A {@code size} binding, {@code { bits: N  signed: B }}: a record of two tokens, as {@code integer_size} reads. */
+    private static IntegerSize integerSize(String name, RecordValue.Field binding) {
+        if (!(binding.value().coreValue() instanceof RecordValue record)) {
+            throw new IllegalStateException("'" + name + "': 'size' takes a record in a pre-loaded refinement");
+        }
+        BigInteger bits = null;
+        Boolean signed = null;
+        for (RecordValue.Field field : record.fields()) {
+            switch (field.name()) {
+                case "bits" -> bits = new BigInteger(bindingText(name, field));
+                case "signed" -> signed = Boolean.valueOf(bindingText(name, field));
+                default -> throw new IllegalStateException("'" + name + "': 'size' has no field '" + field.name()
+                        + "'");
+            }
+        }
+        if (bits == null || signed == null) {
+            throw new IllegalStateException("'" + name + "': 'size' states both 'bits' and 'signed'");
+        }
+        return new IntegerSize(bits, signed);
     }
 
     private static List<RecordValue.Field> bindingFields(String name, AtomRefinement refinement) {
@@ -424,8 +451,8 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /** An optional count field of a desugared instance's binding record, a bare integer token where written. */
-    private static Optional<BigInteger> optionalCount(DataValue value, String name) {
-        return fieldToken(value, name).map(BigInteger::new);
+    private static Optional<Long> optionalCount(DataValue value, String name) {
+        return fieldToken(value, name).map(Long::parseLong);
     }
 
     /** One field of a desugared instance's binding record -- always a bare token naming a type. */

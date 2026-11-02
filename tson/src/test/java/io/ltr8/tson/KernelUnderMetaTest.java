@@ -64,9 +64,9 @@ class KernelUnderMetaTest {
      */
     @Test
     void theRootsHoldTheCommonVocabulary() {
-        assertEquals(Set.of("void", "boolean", "integer", "text", "bytes", "iri", "iri_reference", "regex", "doc",
+        assertEquals(Set.of("void", "boolean", "integer", "int64", "text", "bytes", "iri", "iri_reference", "regex", "doc",
                 "enum", "set"), rootNames(TsonBundledSchemas.META_ID));
-        assertEquals(Set.of("number", "rational", "complex", "int8", "int16", "int32", "int64", "int128", "int256",
+        assertEquals(Set.of("number", "rational", "complex", "int8", "int16", "int32", "int128", "int256",
                 "uint8", "uint16", "uint32", "uint64", "uint128", "uint256", "float32", "float64"),
                 rootNames(TsonBundledSchemas.NUMERIC_ID));
         assertEquals(Set.of("date", "time", "datetime", "duration", "period"), rootNames(TsonBundledSchemas.TEMPORAL_ID));
@@ -205,7 +205,7 @@ class KernelUnderMetaTest {
                 name => !meta.short_text_type {}
                 """));
         assertEquals(List.of(), problems("""
-                meta => !schema { pick_type => meta.atom & atom.specification & { picks?: numeric.non_negative_integer } }
+                meta => !schema { pick_type => meta.atom & atom.specification & { picks?: numeric.count } }
                 """));
     }
 
@@ -252,7 +252,7 @@ class KernelUnderMetaTest {
     /** A constructor composing the kernel declares; an instance of it is a new form this library does not back. */
     @Test
     void aKernelExtensionDeclaresAndItsInstanceIsAGap() {
-        String extension = "uuid2_type => meta.atom & atom.specification & { version?: numeric.non_negative_integer }";
+        String extension = "uuid2_type => meta.atom & atom.specification & { version?: numeric.count }";
         assertEquals(List.of(), problems(extension));
         List<Diagnostic> instance = problems(extension + "\n  id2 => !uuid2_type {}");
         assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), instance.stream().map(Diagnostic::code).toList(),

@@ -78,8 +78,8 @@ final class CidrParsing {
      * not here: a value failing either is not a network at all, so {@code CidrNetwork.parse} refuses it and
      * the caller reports a malformed value rather than a violated constraint.
      */
-    static void checkPrefixBounds(String text, int prefixLength, Optional<Integer> minPrefix,
-            Optional<Integer> maxPrefix) {
+    static void checkPrefixBounds(String text, int prefixLength, Optional<Long> minPrefix,
+            Optional<Long> maxPrefix) {
         minPrefix.ifPresent(min -> {
             if (prefixLength < min) {
                 throw new AtomValidationException("'" + text + "' has prefix length " + prefixLength

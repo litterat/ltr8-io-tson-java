@@ -28,6 +28,15 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   the form, and two that are one value are refused.
 - `members` against `pattern` is checked on the family with the length facets — one rule, one place. `tson-schema`
   depends on `ltr8-regex` for it; the engine is an internal library like any other.
+- Every count facet is the kernel's `numeric.count`, `!int64 ^ { min: 0 }` (0 to 2^63-1), and a Java `long` in the
+  model (`Optional<Long>`);
+  a facet holding a value of the constrained type keeps that family's type (`integer_type`'s bounds, `members` and
+  `multiple_of` are `integer`, `BigInteger`). A count past what a Java string or collection holds compares as any
+  other: a `max_*` past `Integer.MAX_VALUE` is never reached, a `min_*` past it is met by no value, and neither is a
+  bind failure or a schema error.
+- `numeric.integer_size.bits` is `integer`, not a count: `int64`'s `size` is read against `integer_size` and `count`
+  refines `int64`, so typing `bits` by `count` makes `count` wait on itself. That `bits` is above zero is
+  `IntegerType.coherenceCheck`'s.
 
 Related: `design/schema-resolution.md` (the resolution phase and its exception boundary),
 `design/constructor-application.md` (what makes an entry an atom instance), `design/template-materialisation.md`
@@ -104,7 +113,8 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   - **`multiple_of: 0` is the one case where the check buys soundness rather than a diagnosis.** `IntegerParser`
     and `DecimalParser` validate with `value.remainder(m)`, which throws on a zero divisor — so without the
     check a valid *data* document read against such a type would fail on the library's own fault code, an
-    author error reported against the wrong document. `RationalParser` guards its own divisor.
+    author error reported against the wrong document. `RationalParser` guards its own divisor. A `size.bits` of
+    zero or below is refused on the same footing: `IntegerParser` derives the width's range from it.
   - **`unicode.text_type.members` answers to every facet beside it, in one place.** `TextType.coherenceCheck` judges
     every member against the length facets and against the `pattern` — one rule ("every member satisfies the
     other facets on the same body"), not split by which engine each half needs, which is why `tson-schema`

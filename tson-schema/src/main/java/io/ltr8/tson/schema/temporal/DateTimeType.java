@@ -9,7 +9,6 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 
-import java.math.BigInteger;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +31,7 @@ import java.util.Optional;
 public record DateTimeType(TypeChain chain,
         Optional<OffsetDateTime> min, @Field("exclusive_min") Optional<OffsetDateTime> exclusiveMin,
                      Optional<OffsetDateTime> max, @Field("exclusive_max") Optional<OffsetDateTime> exclusiveMax,
-                     Optional<BigInteger> precision) implements Atom {
+                     Optional<Long> precision) implements Atom {
 
     /**
      * Carries {@code @Record} because a second constructor exists below, and {@code ltr8-bind}'s own
@@ -51,7 +50,7 @@ public record DateTimeType(TypeChain chain,
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> exclusiveMin, Optional<OffsetDateTime> max,
-            Optional<OffsetDateTime> exclusiveMax, Optional<BigInteger> precision) {
+            Optional<OffsetDateTime> exclusiveMax, Optional<Long> precision) {
         this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision);
     }
 
@@ -66,7 +65,7 @@ public record DateTimeType(TypeChain chain,
     }
 
     /** The inclusive bounds and a precision. */
-    public DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max, Optional<BigInteger> precision) {
+    public DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max, Optional<Long> precision) {
         this(min, Optional.empty(), max, Optional.empty(), precision);
     }
 

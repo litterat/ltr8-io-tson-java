@@ -71,14 +71,14 @@ class UuidParserTest {
     void versionConstraintAcceptsMatchingVersion() {
         // A real version-4 (random) UUID: the version nibble (13th hex digit) is '4'.
         String v4 = "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09";
-        UuidParser type = new UuidParser(Optional.of(4));
+        UuidParser type = new UuidParser(Optional.of(4L));
         assertEquals(UUID.fromString(v4), type.read(token(v4)));
     }
 
     @Test
     void versionConstraintRejectsMismatchedVersion() {
         String v4 = "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09";
-        UuidParser type = new UuidParser(Optional.of(1));
+        UuidParser type = new UuidParser(Optional.of(1L));
         assertThrows(AtomValidationException.class, () -> type.read(token(v4)));
     }
 

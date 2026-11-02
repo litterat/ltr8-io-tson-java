@@ -19,7 +19,7 @@ import java.util.Optional;
  */
 @Typename(name = "net.uuid_type")
 public record UuidType(TypeChain chain,
-        Optional<Integer> version) implements Atom {
+        Optional<Long> version) implements Atom {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public UuidType {
@@ -27,7 +27,7 @@ public record UuidType(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public UuidType(Optional<Integer> version) {
+    public UuidType(Optional<Long> version) {
         this(TypeChain.EMPTY, version);
     }
 

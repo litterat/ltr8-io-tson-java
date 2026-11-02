@@ -158,7 +158,7 @@ public record DurationParser(DurationType constraints) implements AtomTypeParser
         // not on the spelling -- so PT0.50S is a whole number of tenths and `precision: 1` admits it, the
         // same rule and the same wording time_type's own @doc already carries.
         constraints.precision().ifPresent(precision -> {
-            if (BigInteger.valueOf(Math.max(seconds.stripTrailingZeros().scale(), 0)).compareTo(precision) > 0) {
+            if (Math.max(seconds.stripTrailingZeros().scale(), 0) > precision) {
                 throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + precision
                         + " seconds, which is the resolution this duration admits",
                         "a whole number of 10^-" + precision + " seconds");

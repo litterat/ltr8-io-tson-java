@@ -8,7 +8,6 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
 
-import java.math.BigInteger;
 import java.util.Optional;
 
 /**
@@ -27,7 +26,7 @@ import java.util.Optional;
  * ({@link #elementsAreNames}), no two may read alike ([TSON-SCHEMA] §11.4), as an identifier-keyed map's keys.
  */
 record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean voidableElements, boolean unique,
-                 Optional<BigInteger> minItems, Optional<BigInteger> maxItems, JsonTypeReader<?> schemaElement,
+                 Optional<Long> minItems, Optional<Long> maxItems, JsonTypeReader<?> schemaElement,
                  ArrayDiagnostics rules, boolean elementsAreNames) {
 
     static ArrayPlan of(String name, Top definition, ValueReaderContext context) {

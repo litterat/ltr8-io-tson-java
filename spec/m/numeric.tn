@@ -1,11 +1,12 @@
-!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=60dc8685daea875c40af4b5788106432fbe4105b39f1b71939052e957263d277"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=f13d1d1c5354cb0c546fdbde5c54a9afd0172b7828c0f12aba749d2aec119180"
+!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=b7a779ed557d1ccfa6a1c8c0c5ae9cbced4490f0eab929eee2d09f682dc41ccd"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=249f7b0de7d79716f642b42166b274a2b4414b08c91e6d638557b7bbe7264a6c"
 @doc:"""
   TSON numeric — the numeric type library (2026 Revision 39 draft).
 
   Its root holds the numbers a data schema writes: the exact `number` and
-  `rational`, `complex`, the sized integers `int8` to `int256` and `uint8` to
-  `uint256`, and the approximate `float32` and `float64`. Their constructors
+  `rational`, `complex`, the sized integers `int8` to `int256` (but `int64`,
+  the kernel's) and `uint8` to `uint256`, and the approximate `float32` and
+  `float64`. Their constructors
   and facet vocabulary are machinery, members of `numeric`, a schema map
   nested in its root, each named by its path: `numeric.decimal_type`,
   `numeric.float_type`, `numeric.rational_type` and `numeric.complex_type`,
@@ -13,11 +14,11 @@
   the member set `numeric.decimal_member_set`. The kernel contributes to the
   same map: `numeric.integer_type`, the constructor of the kernel's
   `integer`, which the sized integers refine, its facet vocabulary, and
-  `numeric.non_negative_integer`.
+  `numeric.count`.
 
   It imports the kernel, meta.tn, alone: the kernel's constructors,
-  `meta.value`, `numeric.non_negative_integer` and classifying annotations are
-  what it builds on, and it needs nothing of temporal.tn or net.tn. A schema
+  `meta.value`, `numeric.count` and classifying annotations are what it
+  builds on, and it needs nothing of temporal.tn or net.tn. A schema
   importing it reserves its root names beside the kernel's, `numeric` among
   those ([TSON-SCHEMA] §2.2.3). core.tn imports it with temporal.tn and
   net.tn, for a schema that wants every bundled type.
@@ -40,8 +41,7 @@
   bound, which a constructor declares before any instance of it exists — use
   the kernel's `meta.value` escape hatch; the resolver reads each such token
   under the atom it stands for once that atom is in scope. A field that
-  counts something — a digit count — is typed by the kernel's
-  `numeric.non_negative_integer`.
+  counts something — a digit count — is typed by the kernel's `numeric.count`.
 
   The ordered families state their bounds as field groups ([TSON-SCHEMA]
   §5.11): one inclusive-or-exclusive group per side, so an inclusive and an
@@ -144,8 +144,8 @@
       ( min: meta.value | exclusive_min: meta.value )?
       ( max: meta.value | exclusive_max: meta.value )?
       multiple_of?:     meta.value
-      total_digits?:    numeric.non_negative_integer
-      fraction_digits?: numeric.non_negative_integer
+      total_digits?:    numeric.count
+      fraction_digits?: numeric.count
       members?:         numeric.decimal_member_set
     }
 
@@ -247,10 +247,6 @@
   @doc:"Signed 32-bit integer."
   @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
   int32 => !integer ^ { size: { bits: 32  signed: true } }
-
-  @doc:"Signed 64-bit integer."
-  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
-  int64 => !integer ^ { size: { bits: 64  signed: true } }
 
   @doc:"Signed 128-bit integer."
   @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric

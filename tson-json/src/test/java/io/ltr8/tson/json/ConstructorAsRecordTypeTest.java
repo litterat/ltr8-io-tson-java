@@ -70,7 +70,7 @@ class ConstructorAsRecordTypeTest {
         ConstructorHolder held = assertInstanceOf(ConstructorHolder.class, tson().objectReader().withSchema(ID)
                 .readAs("{ spec: { version: 4 } }", "holder", Object.class));
 
-        assertEquals(Optional.of(4), held.spec().version());
+        assertEquals(Optional.of(4L), held.spec().version());
         assertInstanceOf(UuidType.class, held.spec());
     }
 

@@ -94,8 +94,8 @@ class NestedContainerTest {
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
                 entry(compiled, outer.elements().get(0).elementType().name()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
-        assertEquals(Optional.of(BigInteger.TWO), inner.minItems());
-        assertEquals(Optional.of(BigInteger.TWO), inner.maxItems());
+        assertEquals(Optional.of(2L), inner.minItems());
+        assertEquals(Optional.of(2L), inner.maxItems());
 
         assertNotNull((TsonValue) compiled.get("grid").read(TestDocuments.document("[ [1 2] \"a\" ]")));
     }
@@ -119,7 +119,7 @@ class NestedContainerTest {
         TsonCompiledSchema compiled = compile("  rows => [[integer]; 3]");
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
-        assertEquals(Optional.of(new BigInteger("3")), outer.minItems());
+        assertEquals(Optional.of(3L), outer.minItems());
         ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().name()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
         assertEquals(Optional.empty(), inner.maxItems(), "the inner array is unconstrained");
@@ -164,7 +164,7 @@ class NestedContainerTest {
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, entry(compiled, "triple"));
         assertTrue(body.voidable());
-        assertEquals(Optional.of(new BigInteger("3")), body.minItems());
+        assertEquals(Optional.of(3L), body.minItems());
 
         assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[1 _ 3]")));
         assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[_ _ _]")));

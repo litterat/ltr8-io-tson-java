@@ -174,7 +174,7 @@ class RecordClosureTest {
         assertNull(bound);
 
         // The same schema, the same reader, nothing unknown: the binding itself still works.
-        assertEquals(Optional.of(1), assertInstanceOf(TextType.class,
+        assertEquals(Optional.of(1L), assertInstanceOf(TextType.class,
                 compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 1 }"))).minLength());
     }
 }

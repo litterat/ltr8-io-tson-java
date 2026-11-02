@@ -129,7 +129,7 @@ class ApplicationInContainerPositionTest {
                 compiled.schema().entries().get(synthetic));
 
         assertEquals(TypeRef.of(instantiation), children.elementType(), "the knot");
-        assertEquals(Optional.of(BigInteger.ONE), children.minItems());
+        assertEquals(Optional.of(1L), children.minItems());
         assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries().get(instantiation))
                 .fields().values().stream().toList().get(0).type(), "T bound at the value field too");
     }
@@ -214,7 +214,7 @@ class ApplicationInContainerPositionTest {
         // grid<pixel, 3> -> { x: [[pixel; 1..3]; 2..3] }, outermost entry inwards.
         String outer = fieldType(compiled, fieldType(compiled, "a", "g"), "x");
         ArrayBody rows = assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(outer));
-        assertEquals(Optional.of(BigInteger.TWO), rows.minItems());
+        assertEquals(Optional.of(2L), rows.minItems());
         assertEquals(fieldType(compiled, "direct", "d"), rows.elementType().name(),
                 "the row the grid builds is the row written directly");
     }
@@ -309,7 +309,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "a", "g"));
         assertEquals(fieldType(compiled, "direct", "d"), outer.elementType().name(),
                 "the row the grid builds is the row written directly");
-        assertEquals(Optional.of(BigInteger.valueOf(3)), outer.minItems());
+        assertEquals(Optional.of(3L), outer.minItems());
     }
 
     /**
@@ -451,7 +451,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody vector = assertInstanceOf(ArrayBody.class, inner instanceof Alias r
                 ? compiled.schema().entries().get(r.target().name()) : inner);
 
-        assertEquals(Optional.of(BigInteger.valueOf(3)), vector.minItems());
+        assertEquals(Optional.of(3L), vector.minItems());
         assertNotNull(compiled.get("holder")
                 .read(TestDocuments.document("{ p: [ [ 1.0 2.0 3.0 ] ] }")));
         assertThrows(ReadException.class, () -> compiled.get("holder")
@@ -503,7 +503,7 @@ class ApplicationInContainerPositionTest {
 
         ArrayBody closed = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "u"));
 
-        assertEquals(Optional.of(BigInteger.TWO), closed.minItems());
+        assertEquals(Optional.of(2L), closed.minItems());
         assertInstanceOf(RecordBody.class,
                 compiled.schema().entries().get(closed.elementType().name()), "box<text>, closed");
     }

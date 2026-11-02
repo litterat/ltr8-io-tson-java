@@ -42,9 +42,9 @@ import java.util.Optional;
  */
 @Typename(name = "binary.bytes_type")
 public record BytesType(TypeChain chain,
-        Encoding encoding, Optional<Integer> length,
-                         @Field("min_length") Optional<Integer> minLength,
-                         @Field("max_length") Optional<Integer> maxLength) implements Atom {
+        Encoding encoding, Optional<Long> length,
+                         @Field("min_length") Optional<Long> minLength,
+                         @Field("max_length") Optional<Long> maxLength) implements Atom {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public BytesType {
@@ -52,7 +52,7 @@ public record BytesType(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public BytesType(Encoding encoding, Optional<Integer> length, Optional<Integer> minLength, Optional<Integer> maxLength) {
+    public BytesType(Encoding encoding, Optional<Long> length, Optional<Long> minLength, Optional<Long> maxLength) {
         this(TypeChain.EMPTY, encoding, length, minLength, maxLength);
     }
 

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@code policy.tn}, the processor policy's vocabulary ([TSON-DATA] §8.2, §9.1), against the code that applies it:
- * {@code restriction_level} is UTS #39 §5.2's six levels, which {@link RestrictionLevel} also states, and the
+ * {@code policy.restriction_level} is UTS #39 §5.2's six levels, which {@link RestrictionLevel} also states, and the
  * two must list the same members in the same order, so a report and the configuration that produced it agree.
  */
 class PolicySchemaTest {
@@ -27,19 +27,19 @@ class PolicySchemaTest {
     @Test
     void restrictionLevelMirrorsScriptPolicyLevel() {
         EnumBody declared = assertInstanceOf(EnumBody.class, Tson.standard().bindRegistry().core()
-                .resolveLinked(TsonBundledSchemas.POLICY_ID).schema().entries().get("restriction_level"));
+                .resolveLinked(TsonBundledSchemas.POLICY_ID).schema().entries().get("policy.restriction_level"));
 
         assertEquals(Arrays.stream(RestrictionLevel.values()).map(Enum::name).toList(), declared.members());
     }
 
     /**
-     * {@code limits} declares the whole of [TSON-DATA] §9.1's table and [TSON-SCHEMA] §11.5's, each field optional
+     * {@code policy.limits} declares the whole of [TSON-DATA] §9.1's table and [TSON-SCHEMA] §11.5's, each field optional
      * with the spec's default, so a deployment's document states only what it raises and reads back complete.
      */
     @Test
     void theLimitsTableIsCompleteAndDefaultsToTheSpecsValues() {
         var limits = (TsonRecord) Tson.standard().treeReader().withSchema(TsonBundledSchemas.POLICY_ID)
-                .readAs("{ max_document_size: 33554432 }", "limits");
+                .readAs("{ max_document_size: 33554432 }", "policy.limits");
         Map<String, Long> expected = new LinkedHashMap<>();
         expected.put("max_depth", 64L);
         expected.put("max_token_length", 1_048_576L);
@@ -64,13 +64,13 @@ class PolicySchemaTest {
     }
 
     /**
-     * {@link LimitsPolicy} carries the same table as {@code limits}, component for field in the same order and
+     * {@link LimitsPolicy} carries the same table as {@code policy.limits}, component for field in the same order and
      * each default the schema's, so the policy a processor reports reads back as the record it states.
      */
     @Test
     void limitsPolicyMirrorsTheLimitsRecord() throws ReflectiveOperationException {
         var declared = (TsonRecord) Tson.standard().treeReader().withSchema(TsonBundledSchemas.POLICY_ID)
-                .readAs("{}", "limits");
+                .readAs("{}", "policy.limits");
         Map<String, Long> schema = new LinkedHashMap<>();
         declared.fields().forEach((name, value) -> schema.put(name, ((Number) ((TsonAtom) value).value()).longValue()));
         Map<String, Long> policy = new LinkedHashMap<>();
@@ -86,7 +86,7 @@ class PolicySchemaTest {
     void aDeploymentsPolicyDocumentValidates() {
         assertEquals(List.of(), Tson.standard().validate("""
                 !!import:"https://tson.io/2026/39/m/policy.tn"
-                !policy {
+                !policy.processor {
                   identifier_policy: { level: HIGHLY_RESTRICTIVE  per_segment: false
                                        skeleton_distinctness: true  permitting: [] }
                   token_policy: { level: UNRESTRICTED  permitting: [] }

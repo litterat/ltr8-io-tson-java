@@ -64,9 +64,9 @@ class FacetNarrowingGapsTest {
     /** A version names a layout, not a bound: no v7 UUID is a v4 UUID, so a change claims a false IS-A. */
     @Test
     void aUuidVersionIsSettableOnceAndThenFixed() {
-        assertEquals(List.of(), refine(new UuidType(Optional.empty()), new UuidType(Optional.of(4))));
-        assertEquals(List.of(), refine(new UuidType(Optional.of(4)), new UuidType(Optional.of(4))));
-        assertFalse(refine(new UuidType(Optional.of(4)), new UuidType(Optional.of(7))).isEmpty());
+        assertEquals(List.of(), refine(new UuidType(Optional.empty()), new UuidType(Optional.of(4L))));
+        assertEquals(List.of(), refine(new UuidType(Optional.of(4L)), new UuidType(Optional.of(4L))));
+        assertFalse(refine(new UuidType(Optional.of(4L)), new UuidType(Optional.of(7L))).isEmpty());
     }
 
     private static Ipv4Type ipv4(List<String> within, List<String> excluding) {

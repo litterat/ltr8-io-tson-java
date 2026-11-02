@@ -415,8 +415,8 @@ class RecordTemplateTest {
         ArrayBody closed = (ArrayBody) compiled.schema().entries()
                 .get(fieldType(compiled, fieldType(compiled, "holder", "t"), "xs"));
 
-        assertEquals(Optional.of(BigInteger.TWO), closed.minItems());
-        assertEquals(Optional.of(BigInteger.TWO), closed.maxItems());
+        assertEquals(Optional.of(2L), closed.minItems());
+        assertEquals(Optional.of(2L), closed.maxItems());
     }
 
     /** A declaration's own body is the construction, not a reference to a lifted one -- unchanged by R2. */
@@ -670,8 +670,8 @@ class RecordTemplateTest {
         ArrayBody array = assertInstanceOf(ArrayBody.class,
                 compiled.schema().entries().get(synthetic));
         assertEquals(TypeRef.of("int32"), array.elementType());
-        assertEquals(Optional.of(BigInteger.valueOf(3)), array.minItems());
-        assertEquals(Optional.of(BigInteger.valueOf(3)), array.maxItems());
+        assertEquals(Optional.of(3L), array.minItems());
+        assertEquals(Optional.of(3L), array.maxItems());
     }
 
     /** Arity is the <b>alias's</b> own parameter list, not the arity of the application it names. */

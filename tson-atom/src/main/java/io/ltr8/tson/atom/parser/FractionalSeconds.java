@@ -2,7 +2,6 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
-import java.math.BigInteger;
 import java.util.Optional;
 
 /**
@@ -72,13 +71,13 @@ final class FractionalSeconds {
      * @param text      the token as written, for the diagnostic
      * @param atom      the atom's name, for the diagnostic
      */
-    static void check(Optional<BigInteger> precision, int nanoOfSecond, String text, String atom) {
+    static void check(Optional<Long> precision, int nanoOfSecond, String text, String atom) {
         precision.ifPresent(allowed -> {
             // At nine digits and beyond the grid is finer than the value can be, so everything is on it.
-            if (allowed.compareTo(BigInteger.valueOf(NANOS_PER_SECOND_DIGITS)) >= 0) {
+            if (allowed >= NANOS_PER_SECOND_DIGITS) {
                 return;
             }
-            int step = (int) Math.pow(10, NANOS_PER_SECOND_DIGITS - allowed.intValueExact());
+            int step = (int) Math.pow(10, NANOS_PER_SECOND_DIGITS - allowed.intValue());
             if (nanoOfSecond % step != 0) {
                 throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + allowed
                         + " seconds, which is the resolution this " + atom + " admits",

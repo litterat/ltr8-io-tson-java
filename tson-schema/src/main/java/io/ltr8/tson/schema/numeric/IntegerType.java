@@ -164,15 +164,18 @@ public record IntegerType(TypeChain chain,
      *
      * <p>{@code multiple_of: 0} is rejected outright rather than treated as vacuous: see {@link
      * AtomCoherence#checkPositiveStep} for why it is the one incoherence here that is actively
-     * unsound rather than merely undiagnosed. A zero {@link IntegerSize#bits} needs no rule of its
-     * own -- it contributes no derived range (below {@code MAX_DERIVED_BITS}'s positive floor), and a
-     * width-zero integer is already unrepresentable rather than incoherent.
+     * unsound rather than merely undiagnosed. A {@link IntegerSize#bits} of zero or below is refused on
+     * the same terms: {@code bits} is typed {@code integer}, since {@code numeric.count} refines {@code int64},
+     * whose width is stated through it, and a width that is no width leaves {@code IntegerParser} no range to
+     * derive.
      */
     @Override
     public List<String> coherenceCheck() {
         List<String> violations = new ArrayList<>();
         AtomCoherence.checkRange(violations, effectiveLower(), effectiveUpper());
         AtomCoherence.checkPositiveStep(violations, "multiple_of", multipleOf, BigInteger::signum);
+        size.map(IntegerSize::bits).filter(bits -> bits.signum() <= 0)
+                .ifPresent(bits -> violations.add("size.bits " + bits + " is not a width above zero"));
         AtomCoherence.checkMembers(violations, members.orElse(List.of()), effectiveLower(), effectiveUpper());
         return List.copyOf(violations);
     }

@@ -3,7 +3,6 @@ package io.ltr8.tson.base.diagnostics;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.unicode.ConfusableNames;
 
-import java.math.BigInteger;
 
 /**
  * What a map's rules say when a document breaks one -- stated once, for every encoding. See
@@ -66,14 +65,14 @@ public record MapDiagnostics(String typeName) {
     }
 
     /** §5.3's {@code min_items}, counted over entries -- an entry with a void value is an entry. */
-    public Refusal tooFewEntries(BigInteger min, int size) {
+    public Refusal tooFewEntries(long min, int size) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "'%s' has %d entries, fewer than the minimum %s".formatted(typeName, size, min),
                 ">= " + min, String.valueOf(size));
     }
 
     /** §5.3's {@code max_items}, on the same terms. */
-    public Refusal tooManyEntries(BigInteger max, int size) {
+    public Refusal tooManyEntries(long max, int size) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "'%s' has %d entries, more than the maximum %s".formatted(typeName, size, max),
                 "<= " + max, String.valueOf(size));

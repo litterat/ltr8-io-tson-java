@@ -56,7 +56,7 @@ class TemplateParamTypeTest {
     /** A type slot gives {@code meta.type_kind}; a scalar slot of the applied constructor gives that slot's type. */
     @Test
     void aSlotGivesItsDeclaredType() {
-        assertEquals(List.of(param("T", "meta.type_kind"), param("N", "numeric.non_negative_integer")),
+        assertEquals(List.of(param("T", "meta.type_kind"), param("N", "numeric.count")),
                 parameters().get("vector"));
     }
 
@@ -129,9 +129,9 @@ class TemplateParamTypeTest {
     }
 
     /**
-     * {@code N} stands in {@code array.min_items}, so its type is the kernel's {@code numeric.non_negative_integer}, the
+     * {@code N} stands in {@code array.min_items}, so its type is the kernel's {@code numeric.count}, the
      * slot's own (§5.10): {@code vec<0>} is a valid application, and a text argument is refused. A schema may declare its
-     * own entry under the kernel member's name, the kernel's being {@code numeric.non_negative_integer} (§2.2.3).
+     * own entry under the kernel member's name, the kernel's being {@code numeric.count} (§2.2.3).
      */
     @Test
     void aConstructorTemplatesValueIsTheSlotsType() {
@@ -146,7 +146,7 @@ class TemplateParamTypeTest {
         assertEquals(1, wide.size(), wide::toString);
         assertTrue(wide.getFirst().message().contains("binds 'N' to 'abc'"), wide::toString);
         assertEquals(List.of(), load("""
-                  non_negative_integer => !integer ^ { min: 1 }
+                  count => !integer ^ { min: 1 }
                 """));
     }
 
@@ -154,7 +154,7 @@ class TemplateParamTypeTest {
     @Test
     void aConstructorTemplatesWrittenTypeNarrowsTheSlotsType() {
         assertEquals(List.of(), load("""
-                  vec => <N: numeric.non_negative_integer> !meta.array { element_type: text  max_items: N }
+                  vec => <N: numeric.count> !meta.array { element_type: text  max_items: N }
                   v3  => vec<3>
                 """));
         List<Diagnostic> core = load("""

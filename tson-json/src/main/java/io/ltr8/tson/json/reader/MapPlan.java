@@ -14,7 +14,6 @@ import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Top;
 
-import java.math.BigInteger;
 import java.util.Optional;
 
 /**
@@ -41,7 +40,7 @@ import java.util.Optional;
  * belongs to the choice reader.
  */
 record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean voidableValues, boolean ordered,
-               Optional<BigInteger> minItems, Optional<BigInteger> maxItems, AtomType<?> keyParser,
+               Optional<Long> minItems, Optional<Long> maxItems, AtomType<?> keyParser,
                JsonTypeReader<?> schemaKey, JsonTypeReader<?> schemaValue, MapDiagnostics rules,
                IdentifierProfile keyProfile) {
 

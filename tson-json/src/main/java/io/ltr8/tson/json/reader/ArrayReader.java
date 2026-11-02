@@ -6,7 +6,6 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -115,10 +114,9 @@ final class ArrayReader implements JsonTypeReader<Object> {
      * [TSON-JSON] §9.4 gives both encodings one closed vocabulary.
      */
     private void checkSize(JsonReadContext ctx, int count) {
-        BigInteger size = BigInteger.valueOf(count);
-        plan.minItems().filter(min -> size.compareTo(min) < 0)
+        plan.minItems().filter(min -> count < min)
                 .ifPresent(min -> ctx.report(plan.rules().tooFewElements(min, count)));
-        plan.maxItems().filter(max -> size.compareTo(max) > 0)
+        plan.maxItems().filter(max -> count > max)
                 .ifPresent(max -> ctx.report(plan.rules().tooManyElements(max, count)));
     }
 }

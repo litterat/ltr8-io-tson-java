@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=f13d1d1c5354cb0c546fdbde5c54a9afd0172b7828c0f12aba749d2aec119180"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=249f7b0de7d79716f642b42166b274a2b4414b08c91e6d638557b7bbe7264a6c"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -13,10 +13,10 @@
   `atom.numeric`).
 
   Its root holds the vocabulary an author writes: `void`, `boolean`,
-  `integer`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, the
-  `enum` constructor and the `set<T>` template. Everything else is machinery,
-  a member of one of six schema maps nested in this document's root, each
-  member named by its path from the root:
+  `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`,
+  `doc`, the `enum` constructor and the `set<T>` template. Everything else
+  is machinery, a member of one of six schema maps nested in this document's
+  root, each member named by its path from the root:
 
     meta      the type system: the kinds and constructors, fields,
               collections, references, templates, aliases, `meta.schema`,
@@ -27,7 +27,7 @@
               `@atom.bounded`, `@atom.exact`, `@atom.numeric`) and the
               `atom.specification` mixin
     numeric   the integer constructor `numeric.integer_type`, its facet
-              vocabulary, and `numeric.non_negative_integer`
+              vocabulary, and `numeric.count`
     unicode   the text constructors `unicode.text_type`,
               `unicode.identifier_type` and `unicode.regex_type`, and their
               facet vocabulary
@@ -36,7 +36,7 @@
               encodings
 
   A schema whose import closure holds this document reserves those six map
-  names and the eleven root names ([TSON-SCHEMA] §2.2.3). Every name resolves
+  names and the twelve root names ([TSON-SCHEMA] §2.2.3). Every name resolves
   from the root, so an entry here naming a member of a map writes its path,
   as an importer does.
 
@@ -80,10 +80,11 @@
   numeric => !schema {
     @doc:"""
       Fixed-width integer representation: a bit width paired with its
-      two's-complement signedness.
+      two's-complement signedness. A width above zero is a schema-load
+      coherence check: zero or a negative `bits` is a schema-load error.
       """
     integer_size => {
-      bits:    numeric.non_negative_integer
+      bits:    integer
       signed:  boolean
     }
 
@@ -137,17 +138,17 @@
       size?: numeric.integer_size
       ( min: integer | exclusive_min: integer )?
       ( max: integer | exclusive_max: integer )?
-      multiple_of?: numeric.non_negative_integer
+      multiple_of?: integer
       members?:     numeric.integer_member_set
     }
 
     @doc:"""
-      Non-negative integer — the type of every facet that counts something:
-      lengths, item counts, digit counts, bit widths, prefix lengths,
-      fractional-second precision. That `bits` wants more than zero is a
-      coherence check, not a type.
+      The type of every facet that counts something: lengths, item counts,
+      digit counts, prefix lengths, fractional-second precision. It is the
+      non-negative half of `int64`, 0 to 2^63-1, so every implementation holds
+      a count in a native type (JavaScript in a BigInt).
       """
-    non_negative_integer => !integer ^ { min: 0 }
+    count => !int64 ^ { min: 0 }
   }
 
   unicode => !schema {
@@ -178,9 +179,9 @@
       means rather than narrow the values admitted.
       """
     text_type => meta.atom & {
-      min_length?:    numeric.non_negative_integer
-      max_length?:    numeric.non_negative_integer
-      length?:        numeric.non_negative_integer
+      min_length?:    numeric.count
+      max_length?:    numeric.count
+      length?:        numeric.count
       pattern?:       regex
       members?:       unicode.text_member_set
       normalization?: unicode.normalization ~ NONE
@@ -472,7 +473,7 @@
       of the constructor the held body applies. It is derived from the body and
       never required of the author: a type slot gives `meta.type_kind`; a scalar
       slot of the applied constructor gives that slot's declared type
-      (`min_items: N` gives `numeric.non_negative_integer`); a routed default or
+      (`min_items: N` gives `numeric.count`); a routed default or
       fixed value gives the field's own declared type (`w?: int32 ~ N` gives
       `int32`); and a parameter passed to another template takes that template's
       recorded type for the position, with `meta.type_kind` where nothing
@@ -801,8 +802,8 @@
       voidable?:       boolean ~ false
       ordered?:        boolean ~ true
       unique_items?:   boolean ~ false
-      min_items?:      numeric.non_negative_integer
-      max_items?:      numeric.non_negative_integer
+      min_items?:      numeric.count
+      max_items?:      numeric.count
     }
 
     @doc:"""
@@ -838,8 +839,8 @@
       value_type:      meta.type_kind
       voidable?:       boolean ~ false
       ordered?:        boolean ~ false
-      min_items?:      numeric.non_negative_integer
-      max_items?:      numeric.non_negative_integer
+      min_items?:      numeric.count
+      max_items?:      numeric.count
     }
 
     @doc:"""
@@ -1070,9 +1071,9 @@
       """
     bytes_type => meta.atom & {
       encoding?:   binary.bytes_encoding ~ BASE64
-      length?:     numeric.non_negative_integer
-      min_length?: numeric.non_negative_integer
-      max_length?: numeric.non_negative_integer
+      length?:     numeric.count
+      min_length?: numeric.count
+      max_length?: numeric.count
     }
   }
 
@@ -1083,6 +1084,10 @@
 
   @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
   integer => !numeric.integer_type {}
+
+  @doc:"Signed 64-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int64 => !integer ^ { size: { bits: 64  signed: true } }
 
   @atom.ordering:NONE @atom.bounded:false
   text => !unicode.text_type {}

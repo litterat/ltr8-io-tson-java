@@ -19,7 +19,6 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -212,8 +211,8 @@ final class TypeInhabitance {
      * is satisfied by {@code []} whatever {@code tree} turns out to be; {@code [tree; 1..]} is satisfied only
      * if {@code tree} is. That single distinction is what separates ordinary recursion from the runaway kind.
      */
-    private static boolean isEmptyAllowed(Optional<BigInteger> minItems) {
-        return minItems.isEmpty() || minItems.get().signum() <= 0;
+    private static boolean isEmptyAllowed(Optional<Long> minItems) {
+        return minItems.isEmpty() || minItems.get() <= 0;
     }
 
     /**

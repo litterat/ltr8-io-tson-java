@@ -166,7 +166,7 @@ class BytesParserTest {
 
     @Test
     void minLengthRejectsShorterDecodedValue() {
-        BytesParser type = new BytesParser(new BytesType(BytesType.Encoding.HEX, Optional.empty(), Optional.of(4),
+        BytesParser type = new BytesParser(new BytesType(BytesType.Encoding.HEX, Optional.empty(), Optional.of(4L),
                 Optional.empty()));
         assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}, type.read(token("deadbeef")));
         assertThrows(AtomValidationException.class, () -> type.read(token("dead")));
@@ -175,7 +175,7 @@ class BytesParserTest {
     @Test
     void maxLengthRejectsLongerDecodedValue() {
         BytesParser type = new BytesParser(new BytesType(BytesType.Encoding.HEX, Optional.empty(), Optional.empty(),
-                Optional.of(2)));
+                Optional.of(2L)));
         assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD}, type.read(token("dead")));
         assertThrows(AtomValidationException.class, () -> type.read(token("deadbeef")));
     }

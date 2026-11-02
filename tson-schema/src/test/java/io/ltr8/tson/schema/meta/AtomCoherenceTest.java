@@ -54,11 +54,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AtomCoherenceTest {
 
-    private static Optional<Integer> some(int value) {
+    private static Optional<Long> some(long value) {
         return Optional.of(value);
     }
 
-    private static final Optional<Integer> NONE = Optional.empty();
+    private static final Optional<Long> NONE = Optional.empty();
 
     private static void assertCoherent(Atom atom) {
         assertEquals(List.of(), atom.coherenceCheck(), atom + " should be coherent");
@@ -234,6 +234,21 @@ class AtomCoherenceTest {
         IntegerType usable = new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(BigInteger.TWO));
         assertCoherent(usable);
+
+        IntegerType wideStep = new IntegerType(Optional.of(new IntegerSize(128, false)), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(BigInteger.ONE.shiftLeft(64)));
+        assertCoherent(wideStep);
+    }
+
+    /**
+     * {@code integer_size.bits} is an {@code integer}, not a count, so its type admits zero and below; a width that
+     * is no width is refused here, where {@code IntegerParser} would otherwise derive a range from it.
+     */
+    @Test
+    void aWidthMustBeAboveZero() {
+        assertViolation(new IntegerType(new IntegerSize(0, true)), "size.bits 0 is not a width above zero");
+        assertViolation(new IntegerType(new IntegerSize(-8, false)), "size.bits -8 is not a width above zero");
+        assertCoherent(new IntegerType(new IntegerSize(1, false)));
     }
 
     @Test

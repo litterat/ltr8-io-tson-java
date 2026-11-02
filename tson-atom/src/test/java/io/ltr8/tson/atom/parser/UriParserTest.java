@@ -95,7 +95,7 @@ class UriParserTest {
 
     @Test
     void minLengthRejectsShorterUri() {
-        UriParser type = new UriParser(Optional.of(20), Optional.empty(), Optional.empty(),
+        UriParser type = new UriParser(Optional.of(20L), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), true, true);
         assertEquals(uri("https://example.com/"), type.read(token("https://example.com/")));
         assertThrows(AtomValidationException.class, () -> type.read(token("urn:x")));
@@ -103,7 +103,7 @@ class UriParserTest {
 
     @Test
     void maxLengthRejectsLongerUri() {
-        UriParser type = new UriParser(Optional.empty(), Optional.of(6), Optional.empty(),
+        UriParser type = new UriParser(Optional.empty(), Optional.of(6L), Optional.empty(),
                 Optional.empty(), Optional.empty(), true, true);
         assertEquals(uri("urn:x"), type.read(token("urn:x")));
         assertThrows(AtomValidationException.class, () -> type.read(token("https://example.com/")));
@@ -166,7 +166,7 @@ class UriParserTest {
     void exactLengthConstraintRejectsAnythingElse() {
         // The facet text_type composes into uri_type that had no component here at all to bind into,
         // so it was silently unenforceable however a schema declared it.
-        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.of(19),
+        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.of(19L),
                 Optional.empty(), Optional.empty(), true, true);
 
         assertEquals(uri("https://example.com"), type.read(token("https://example.com")));

@@ -7,13 +7,13 @@
   the spec revision it is written against, io/ltr8 the publisher, cli this
   module's schema group.
 
-  The policy a report states is the spec's own `policy` (policy.tn), imported
-  rather than restated, so this report and any other processor's state one
-  shape. What is this library's own is the rest: diagnostic_code and outcome
-  are hand-written copies of Diagnostic.Code and Outcome, and
-  DiagnosticsSchemaTest checks both against the Java enum in both directions,
-  which is what catches a member added to one and forgotten here
-  (PolicySchemaTest does the same for policy.tn's restriction_level).
+  The policy a report states is the spec's own `policy.processor`
+  (policy.tn), imported rather than restated, so this report and any other
+  processor's state one shape. What is this library's own is the rest:
+  diagnostic_code and outcome are hand-written copies of Diagnostic.Code and
+  Outcome, and DiagnosticsSchemaTest checks both against the Java enum in both
+  directions, which is what catches a member added to one and forgotten here
+  (PolicySchemaTest does the same for policy.tn's `policy.restriction_level`).
 
   This enum copies Diagnostic.Code whole, not the subset one consumer happens to emit -- the same
   reason DUPLICATE_FIELD's absence was a defect rather than an economy.
@@ -72,7 +72,7 @@
     data_position?: text?
     schema_position?: text?
   }
-  validation_report => { outcome: outcome  policy: policy  errors: [diagnostic] }
+  validation_report => { outcome: outcome  policy: policy.processor  errors: [diagnostic] }
   file_report => { file: text  outcome: outcome  errors: [diagnostic] }
-  validation_run => { outcome: outcome  policy: policy  files: [file_report]  errors: [diagnostic] }
+  validation_run => { outcome: outcome  policy: policy.processor  files: [file_report]  errors: [diagnostic] }
 }

@@ -41,9 +41,9 @@ import java.util.Optional;
  */
 @Typename(name = "unicode.regex_type")
 public record RegexType(TypeChain chain,
-        String spec, @Field("min_length") Optional<Integer> minLength,
-                        @Field("max_length") Optional<Integer> maxLength,
-                        Optional<Integer> length, Optional<String> pattern,
+        String spec, @Field("min_length") Optional<Long> minLength,
+                        @Field("max_length") Optional<Long> maxLength,
+                        Optional<Long> length, Optional<String> pattern,
                         Optional<List<String>> members, Normalization normalization) implements Atom, TextFamily {
     /** The chain normalised: absent and empty are one list. */
     @Record
@@ -52,7 +52,7 @@ public record RegexType(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public RegexType(String spec, Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+    public RegexType(String spec, Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
             Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
         this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, normalization);
     }

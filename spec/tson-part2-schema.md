@@ -2123,12 +2123,12 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/38/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/38/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/38/tson-guide |
-| meta.tn | TSON Meta Kernel (companion artifact) | https://tson.io/2026/39/m/meta.tn?sha256=42525fb6ede3f8252c61606d2da0e5abb1086015acce1b2c0ccf3ce038749681 |
-| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/39/m/numeric.tn?sha256=05cdc90d827b98132fe24fa36597e3fd58670678827d2cec578cb2635cd498e1 |
-| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/39/m/temporal.tn?sha256=cd009d945ced685234626c30e98bccc2dec38e9c2a8037e530bcd3c05606eee2 |
-| net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/39/m/net.tn?sha256=fa2d2ddead277bdba71ee76c0f764bffe65b8235f454d71a2ea8436b0fd02330 |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/39/m/core.tn?sha256=4ac202cad2f2a6c2903050043e411c1161c92dfcf7f570d530c8f8109d1141e3 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/39/m/policy.tn?sha256=c933a060cd78183d5c8bae76c6fd500c5d28bf3c0ef69e2e830827856f8c5897 |
+| meta.tn | TSON Meta Kernel (companion artifact) | https://tson.io/2026/39/m/meta.tn?sha256=249f7b0de7d79716f642b42166b274a2b4414b08c91e6d638557b7bbe7264a6c |
+| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/39/m/numeric.tn?sha256=b7a779ed557d1ccfa6a1c8c0c5ae9cbced4490f0eab929eee2d09f682dc41ccd |
+| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/39/m/temporal.tn?sha256=7f82e5402fad07d205aa53a08c0952dfc17dc88a0f9aa0d03c8cf92562008e41 |
+| net.tn | TSON Network Library (companion artifact) | https://tson.io/2026/39/m/net.tn?sha256=8a3dcd14157d133529a0b654c08f1d06e84eb2879da0f8d51edc4de46bedea7f |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/39/m/core.tn?sha256=ac77e8b431329f0201986651a89a1b5a391a785964d26c525d92727305522ce0 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/39/m/policy.tn?sha256=a272c752a9ce569ef64e5bce08472ca99e75055aca77793fc05b1f982edf27a9 |
 
 ### 13.3 Informative References
 

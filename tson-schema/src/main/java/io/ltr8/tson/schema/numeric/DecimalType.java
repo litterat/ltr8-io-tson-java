@@ -31,8 +31,8 @@ public record DecimalType(TypeChain chain,
         Optional<BigDecimal> max,
         @Field("exclusive_max") Optional<BigDecimal> exclusiveMax,
         @Field("multiple_of") Optional<BigDecimal> multipleOf,
-        @Field("total_digits") Optional<Integer> totalDigits,
-        @Field("fraction_digits") Optional<Integer> fractionDigits,
+        @Field("total_digits") Optional<Long> totalDigits,
+        @Field("fraction_digits") Optional<Long> fractionDigits,
         Optional<List<BigDecimal>> members) implements Atom {
 
     /** {@code number => !numeric.decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
@@ -45,8 +45,8 @@ public record DecimalType(TypeChain chain,
      * {@link IntegerType} carries the matching constructor.
      */
     public DecimalType(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
-            Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf, Optional<Integer> totalDigits,
-            Optional<Integer> fractionDigits) {
+            Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf, Optional<Long> totalDigits,
+            Optional<Long> fractionDigits) {
         this(min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits, Optional.empty());
     }
 
@@ -64,8 +64,8 @@ public record DecimalType(TypeChain chain,
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public DecimalType(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
-            Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf, Optional<Integer> totalDigits,
-            Optional<Integer> fractionDigits, Optional<List<BigDecimal>> members) {
+            Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf, Optional<Long> totalDigits,
+            Optional<Long> fractionDigits, Optional<List<BigDecimal>> members) {
         this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits, members);
     }
 
