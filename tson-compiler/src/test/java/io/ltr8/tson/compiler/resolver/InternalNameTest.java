@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
- * [TSON-SCHEMA] §8.2's freshness MUST — an internal name is a valid {@code identifier} — over the content
+ * [TSON-SCHEMA] §8.2's freshness MUST — an internal name is a valid {@code meta.identifier} — over the content
  * both minting sites splice into one.
  *
  * <p>The case that found it was an HTTP operation, the motivating case for a meta layer's own vocabulary, and

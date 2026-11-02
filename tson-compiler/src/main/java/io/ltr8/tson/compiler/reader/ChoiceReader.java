@@ -13,7 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The {@link ValueReaderFactory} for meta-kernel's {@code choice} constructor. Dispatches by the value's own
+ * The {@link ValueReaderFactory} for the kernel's {@code choice} constructor. Dispatches by the value's own
  * {@code !typeName} annotation against {@link ChoiceBody#variants}' fixed, declared list, via {@link
  * NamedDispatchReader}. Same for both {@link ValueReaderFactoryRegistry#tree} and {@link
  * ValueReaderFactoryRegistry#bind} (a single shared entry, not per mode).

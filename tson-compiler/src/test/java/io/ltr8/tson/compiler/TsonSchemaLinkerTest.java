@@ -8,13 +8,13 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Hand-built schemas only -- {@code tson-schema} has no dependency on {@code tson-compiler}, so it
  * can't reach {@code MetaKernelBootstrapResolver} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
- * in {@code tson-compiler} for the real end-to-end check against meta-kernel.tn itself).
+ * in {@code tson-compiler} for the real end-to-end check against meta.tn itself).
  *
  */
 class TsonSchemaLinkerTest {
@@ -66,11 +66,11 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * {@code !!meta} is {@link TsonBundledSchemas#META_KERNEL_ID} itself -- every caller passes {@code
+     * {@code !!meta} is {@link TsonBundledSchemas#META_ID} itself -- every caller passes {@code
      * null} for {@code loader}, so the structure namespace this would otherwise supply is always
-     * empty regardless of what URI it names; using the real meta-kernel identity instead lets a
+     * empty regardless of what URI it names; using the real kernel identity instead lets a
      * hand-built local entry declare its own {@code constructor: true} vocabulary without tripping
-     * {@code TsonSchemaLinker}'s own "only the meta-kernel may declare constructors" check, which
+     * {@code TsonSchemaLinker}'s own "only the kernel may declare constructors" check, which
      * compares against that exact identity, not merely "is this schema self-referencing."
      */
     private static TsonSchema schemaOf(Map<String, Top> entries) {
@@ -82,7 +82,7 @@ class TsonSchemaLinkerTest {
         return new TsonSchema("https://example.test/s.tn", List.of(), AnnotatedMap.of(entries), false, Map.of(), facts);
     }
 
-    /** {@code @disjoint} written after {@code =>}, on {@code name}'s value -- the entry's facts. */
+    /** {@code @meta.disjoint} written after {@code =>}, on {@code name}'s value -- the entry's facts. */
     private static Map<String, TsonSchema.EntryFacts> disjointOn(String name) {
         return Map.of(name, TsonSchema.EntryFacts.NONE.withAnnotations(disjointMarker()));
     }
@@ -270,11 +270,11 @@ class TsonSchemaLinkerTest {
     }
 
     private static Annotations disjointMarker() {
-        return Annotations.of(List.of(Annotation.of("disjoint")));
+        return Annotations.of(List.of(Annotation.of("meta.disjoint")));
     }
 
     /**
-     * §5.4's `@disjoint` assertion refuted: the author asserts disjointness the resolver can disprove.
+     * §5.4's `@meta.disjoint` assertion refuted: the author asserts disjointness the resolver can disprove.
      * Written after {@code =>}, so the marker rides on the value, among the entry's facts.
      */
     @Test
@@ -639,9 +639,9 @@ class TsonSchemaLinkerTest {
      */
     @Test
     void anImportLinksWhateverEitherSchemasMeta() {
-        for (List<String> metas : List.of(List.of("https://example.test/meta.tn", TsonBundledSchemas.META_KERNEL_ID),
-                List.of(TsonBundledSchemas.META_KERNEL_ID, "https://example.test/meta.tn"),
-                List.of("https://example.test/meta-api.tn", "https://example.test/meta.tn"))) {
+        for (List<String> metas : List.of(List.of("https://example.test/meta-core.tn", TsonBundledSchemas.META_ID),
+                List.of(TsonBundledSchemas.META_ID, "https://example.test/meta-core.tn"),
+                List.of("https://example.test/meta-api.tn", "https://example.test/meta-core.tn"))) {
             TsonLinkedSchema linked = linkImporting(metas.get(0), metas.get(1));
 
             assertEquals(Set.of("imported_a", "local_a"), linked.schema().entries().keySet(), metas::toString);

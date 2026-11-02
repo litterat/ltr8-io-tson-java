@@ -107,8 +107,8 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>A collection-valued slot holds an application like every other {@code type_kind}-typed slot.</b>
-     * {@code variants} is a {@code [type_kind]}, so a §5.10 application standing in one is spelled as its
+     * <b>A collection-valued slot holds an application like every other {@code meta.type_kind}-typed slot.</b>
+     * {@code variants} is a {@code [meta.type_kind]}, so a §5.10 application standing in one is spelled as its
      * reference and rewritten to the entry it denotes one pass later -- the same route a field
      * type, an {@code element_type} and a map's {@code key_type}/{@code value_type} already took. Refusing the
      * variant in {@code choiceBinding} instead would leave the <em>whole</em> choice unlifted, and an unlifted
@@ -128,7 +128,7 @@ class ContainerSugarEndToEndTest {
         assertInstanceOf(RecordBody.class, compiled.schema().entries().get(variant));
     }
 
-    /** The tuple half of the same rule: {@code elements} is a collection of {@code tuple_element} records. */
+    /** The tuple half of the same rule: {@code elements} is a collection of {@code meta.tuple_element} records. */
     @Test
     void anApplicationIsATupleElementLikeAnyOtherReference() {
         TsonCompiledSchema compiled = compile("""
@@ -199,7 +199,7 @@ class ContainerSugarEndToEndTest {
         assertNotNull(compile("  holder => { xs: [text] }"));
         assertNotNull(compile("  ids => [text]"));
         assertNotNull(compile("""
-                  text_set => !set_type { element_type: text }
+                  text_set => !meta.set_type { element_type: text }
                   holder => { xs: text_set }"""));
     }
 
@@ -212,7 +212,7 @@ class ContainerSugarEndToEndTest {
     @Test
     void aSetCarriesItsOwnTightenedDefaultsNotArrays() {
         ArrayBody asSet = assertInstanceOf(ArrayBody.class,
-                compile("  xs => !set_type { element_type: text }").schema().entries().get("xs"));
+                compile("  xs => !meta.set_type { element_type: text }").schema().entries().get("xs"));
         assertFalse(asSet.ordered());
         assertTrue(asSet.uniqueItems());
 
@@ -239,7 +239,7 @@ class ContainerSugarEndToEndTest {
         assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
         assertEquals(List.of(), TypeChain.supertypesOf(entry),
                 "empty: this is a construction of `array`, and a constructor is not a supertype");
-        assertEquals(Optional.of("array"), compiled.schema().constructorOf("tag_list"),
+        assertEquals(Optional.of("meta.array"), compiled.schema().constructorOf("tag_list"),
                 "the constructor the sugar names");
 
         // !array { element_type: text  min_items: 1  max_items: 2 } -- only the fields the form binds; the
@@ -256,7 +256,7 @@ class ContainerSugarEndToEndTest {
         TsonCompiledSchema compiled = compile("  index => {text => text; 1..2}");
         Top entry = compiled.schema().entries().get("index");
 
-        assertEquals(Optional.of("map"), compiled.schema().constructorOf("index"));
+        assertEquals(Optional.of("meta.map"), compiled.schema().constructorOf("index"));
         MapBody body = assertInstanceOf(MapBody.class, entry);
         assertEquals(Optional.of(BigInteger.ONE), body.minItems());
         assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
@@ -386,7 +386,7 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * `enum.members` is typed through `enum_set`, so members reach the contract by the other route — the
+     * `enum.members` is typed through `meta.enum_set`, so members reach the contract by the other route — the
      * constructor body read back against the kernel's own vocabulary — and pick up `min_items: 1` and the
      * set's uniqueness with it. That each member is an identifier is `enum`'s `type`, checked at linking.
      */
@@ -534,16 +534,16 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * A container constructor's own name at an application head resolves -- the kernel's {@code map} is in every
-     * closure reaching core -- and is refused as what it is: a constructor, closed, taking no type arguments. An
-     * author writing {@code map<text, text>} out of habit is told to drop the arguments, and the sugar
+     * A container constructor's own name at an application head resolves -- the kernel's {@code meta.map} is in
+     * every closure reaching core -- and is refused as what it is: a constructor, closed, taking no type arguments.
+     * An author writing {@code meta.map<text, text>} is told to drop the arguments, and the sugar
      * {@code {text => text}} is the spelling.
      */
     @Test
     void aContainerConstructorsNameAtAHeadTakesNoArguments() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("  holder => { entries: map<text, text> }"));
+                () -> compile("  holder => { entries: meta.map<text, text> }"));
 
-        assertTrue(thrown.getMessage().contains("'map' declares no type parameters"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'meta.map' declares no type parameters"), thrown.getMessage());
     }
 }

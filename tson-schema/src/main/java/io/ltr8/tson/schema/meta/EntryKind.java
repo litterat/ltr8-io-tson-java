@@ -20,7 +20,7 @@ public enum EntryKind {
      * A held template -- [TSON-SCHEMA] §5.10's open entry over any constructor but {@code record}, whose body is a
      * {@link TemplateBody}. It is not a type: it cannot validate data, and naming one where a type is expected is
      * a resolver error. A record template is a type, the family base, and takes a record's kind. Like {@link
-     * #ALIAS} it is a {@code type_kind} and not a base kind (§4.1), and it says nothing about what an
+     * #ALIAS} it is a {@code meta.type_kind} and not a base kind (§4.1), and it says nothing about what an
      * application of the template will produce -- that is the kind of the entry materialisation mints, derived
      * from the constructor its closed body applies.
      */
@@ -32,7 +32,7 @@ public enum EntryKind {
      * reaches ({@link #ofChain}): {@code integer_type => atom & { ... }} is a record describing atoms, and the kind
      * of a constructor is what its instances are.
      *
-     * @param kernel whether a chain's name denotes the meta-kernel's own entry of that name -- a kind is judged by
+     * @param kernel whether a chain's name denotes the kernel's own entry of that name -- a kind is judged by
      *               where a base kind is defined, never by its spelling, so a schema's own {@code atom => { ... }}
      *               composed into {@code payload => atom & { ... }} leaves {@code payload} a PRODUCT
      */
@@ -62,13 +62,13 @@ public enum EntryKind {
                 continue;
             }
             switch (supertype) {
-                case "atom" -> {
+                case "meta.atom" -> {
                     return ATOM;
                 }
-                case "product" -> {
+                case "meta.product" -> {
                     return PRODUCT;
                 }
-                case "sum" -> {
+                case "meta.sum" -> {
                     return SUM;
                 }
                 default -> {
@@ -79,18 +79,18 @@ public enum EntryKind {
     }
 
     /**
-     * Whether {@code value} IS-A the meta-kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
+     * Whether {@code value} IS-A the kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
      * {@code alias} or {@code template} -- what a construction may apply, and what a compiled
      * schema builds an instance reader for. Read off the chain, so a
      * template composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would; and
      * judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:
      * it is what every other answer IS-A, and as abstract as the base kinds beneath it, so its own reader is what
      * refuses a direct application of it. That is applicability, not kind membership: by the chain {@code top} is
-     * a type, and a member of {@code type_kind}.
+     * a type, and a member of {@code meta.type_kind}.
      *
      * @param name the entry whose value {@code value} is
      */
     public static boolean isConstructor(String name, Top value, Predicate<String> kernel) {
-        return (TypeChain.supertypesOf(value).contains("top") || "top".equals(name)) && kernel.test("top");
+        return (TypeChain.supertypesOf(value).contains("meta.top") || "meta.top".equals(name)) && kernel.test("meta.top");
     }
 }

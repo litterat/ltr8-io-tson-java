@@ -36,6 +36,7 @@ class ContainerBoundCoherenceTest {
                 !!id:"https://example.test/bounds.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/net.tn"
                 !schema {
                 %s
                 }
@@ -64,7 +65,7 @@ class ContainerBoundCoherenceTest {
     void aSizeSpecifierAndTheBodyItDenotesAreRefusedAlike() {
         for (String declaration : List.of(
                 "  bad => [text; 5..3]",
-                "  bad => !array { element_type: text  min_items: 5  max_items: 3 }")) {
+                "  bad => !meta.array { element_type: text  min_items: 5  max_items: 3 }")) {
             assertTrue(refused(declaration).getMessage().contains("min_items 5 is above max_items 3"),
                     declaration);
         }
@@ -75,7 +76,7 @@ class ContainerBoundCoherenceTest {
     void aMapIsJudgedByTheSameRuleAsAnArray() {
         for (String declaration : List.of(
                 "  bad => {text => integer; 5..3}",
-                "  bad => !map { key_type: text  value_type: integer  min_items: 5  max_items: 3 }")) {
+                "  bad => !meta.map { key_type: text  value_type: integer  min_items: 5  max_items: 3 }")) {
             assertTrue(refused(declaration).getMessage().contains("min_items 5 is above max_items 3"),
                     declaration);
         }
@@ -89,13 +90,13 @@ class ContainerBoundCoherenceTest {
      *
      * <p><b>No name leads the message</b>, and that is the rule rather than an omission: the only entries
      * reaching this check are ones resolution never produced, whose names are content-derived
-     * ({@code integer_type_10_3_0794a6fb}) and appear nowhere in the author's file. The diagnostic's own
+     * ({@code numeric_integer_type_10_3_0794a6fb}) and appear nowhere in the author's file. The diagnostic's own
      * location names the declaration that wrote the application, which is the line they can edit.
      */
     @Test
     void boundsThatOnlyBecomeConcreteAtMaterialisationAreJudgedToo() {
         SchemaValidationException thrown = refused("""
-                  sized => <MIN, MAX> !array { element_type: text  min_items: MIN  max_items: MAX }
+                  sized => <MIN, MAX> !meta.array { element_type: text  min_items: MIN  max_items: MAX }
                   bad   => { b: sized<10, 3> }""");
 
         assertTrue(thrown.getMessage().contains("min_items 10 is above max_items 3"), thrown.getMessage());
@@ -114,15 +115,15 @@ class ContainerBoundCoherenceTest {
     @Test
     void everyFamilysOwnCoherenceRuleReachesMaterialisationToo() {
         assertTrue(refused("""
-                  b => <N> !integer_type { min: N  max: 3 }
+                  b => <N> !numeric.integer_type { min: N  max: 3 }
                   r => { x: b<10> }""").getMessage().contains("min 10 is above max 3"));
 
         assertTrue(refused("""
-                  b => <N> !text_type { min_length: N  max_length: 3 }
+                  b => <N> !unicode.text_type { min_length: N  max_length: 3 }
                   r => { x: b<10> }""").getMessage().contains("min_length 10 is above max_length 3"));
 
         assertTrue(refused("""
-                  b => <N> !cidr4_type { min_prefix: N  max_prefix: 8 }
+                  b => <N> !net.cidr4_type { min_prefix: N  max_prefix: 8 }
                   r => { x: b<40> }""").getMessage().contains("min_prefix 40 is above max_prefix 8"));
     }
 
@@ -130,7 +131,7 @@ class ContainerBoundCoherenceTest {
     @Test
     void aCoherentParametricAtomApplicationIsUntouched() {
         assertNotNull(compile("""
-                  b => <N> !integer_type { min: N  max: 30 }
+                  b => <N> !numeric.integer_type { min: N  max: 30 }
                   r => { x: b<10> }"""));
     }
 
@@ -138,7 +139,7 @@ class ContainerBoundCoherenceTest {
     @Test
     void aCoherentApplicationOfTheSameTemplateIsUntouched() {
         assertNotNull(compile("""
-                  sized => <MIN, MAX> !array { element_type: text  min_items: MIN  max_items: MAX }
+                  sized => <MIN, MAX> !meta.array { element_type: text  min_items: MIN  max_items: MAX }
                   ok    => { a: sized<1, 5> }"""));
     }
 
@@ -151,14 +152,14 @@ class ContainerBoundCoherenceTest {
     void equalBoundsPinALengthAndAreCoherent() {
         assertNotNull(compile("""
                   triple => [text; 3]
-                  pinned_pair  => !map { key_type: text  value_type: integer  min_items: 2  max_items: 2 }"""));
+                  pinned_pair  => !meta.map { key_type: text  value_type: integer  min_items: 2  max_items: 2 }"""));
     }
 
     /** One bound alone is unbounded on the other side and contradicts nothing. */
     @Test
     void aSingleBoundIsAlwaysCoherent() {
         assertNotNull(compile("""
-                  atLeast => !array { element_type: text  min_items: 5 }
-                  atMost  => !map { key_type: text  value_type: integer  max_items: 2 }"""));
+                  atLeast => !meta.array { element_type: text  min_items: 5 }
+                  atMost  => !meta.map { key_type: text  value_type: integer  max_items: 2 }"""));
     }
 }

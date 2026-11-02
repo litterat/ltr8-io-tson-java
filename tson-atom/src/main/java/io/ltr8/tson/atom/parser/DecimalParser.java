@@ -7,14 +7,14 @@ import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.atom.number.NumberNarrowing;
-import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.numeric.DecimalType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Parses and validates against meta-kernel's {@code decimal_type} constructor (§5.6's {@code
+ * Parses and validates against the kernel's {@code decimal_type} constructor (§5.6's {@code
  * number} atom -- SQL's exact tier, ISO/IEC 11404 {@code scaled}). Accepts only {@code
  * integer}/{@code float} forms (§7.6) -- unlike {@link IntegerParser}, no {@code based-integer}
  * either, and unlike {@link FloatParser}, no {@code hex-float} or {@code special-value}: "{@code
@@ -32,7 +32,7 @@ public record DecimalParser(DecimalType constraints) implements AtomTypeParser<B
     /** §5.6's built-in annotation name -- {@code !number}. */
     public static final String TYPENAME = "number";
 
-    /** {@code number => !decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
+    /** {@code number => !numeric.decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
     public static final DecimalParser UNCONSTRAINED = new DecimalParser(DecimalType.UNCONSTRAINED);
 
     public DecimalParser(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
@@ -97,7 +97,7 @@ public record DecimalParser(DecimalType constraints) implements AtomTypeParser<B
                 throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
             }
         });
-        // Both digit-count facets measure the value, never the spelling: meta.tn's own @doc says "scale is
+        // Both digit-count facets measure the value, never the spelling: numeric.tn's own @doc says "scale is
         // not part of the value -- 1, 1.0 and 1.00 are one value", so 1.230 has three significant digits and
         // two after the point, and `fraction_digits: 2` admits "any hundredth" whatever the author typed.
         // The value handed back is still exactly as written; only the measurement strips.

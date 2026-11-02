@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -8,7 +9,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.stream.FieldName;
@@ -54,7 +55,7 @@ import java.util.function.BiConsumer;
  * SchemaLocation} explains: a record re-anchors the identity and position on itself because it declares the
  * field the pointer ends with, while an atom's or container's own declaration is only a seed, taken when
  * nothing encloses it. So a diagnostic from inside the {@code int32} reader for {@code person}'s {@code age}
- * field carries person.tn's {@code /person/age}, not core.tn's {@code int32}; the same atom read at the root
+ * field carries person.tn's {@code /person/age}, not numeric.tn's {@code int32}; the same atom read at the root
  * of a document still carries its own.
  *
  * <p>The pointer itself is accumulated on descent, not claimed: {@link #schemaField} steps both the data path
@@ -204,8 +205,8 @@ public interface TsonReadContext {
      */
     record FieldNameRule(String typeName, AtomType<?> type, IdentifierProfile profile, Normalization form) {
 
-        /** The kernel's {@code field_name}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
-        public static final FieldNameRule FIELD_NAME = new FieldNameRule("field_name",
+        /** The kernel's {@code meta.field_name}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
+        public static final FieldNameRule FIELD_NAME = new FieldNameRule("meta.field_name",
                 AtomParsers.forType(IdentifierType.IDENTIFIER).orElseThrow(), IdentifierGrammar.PROFILE,
                 Normalization.NFC);
 

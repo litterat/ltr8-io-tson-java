@@ -86,20 +86,20 @@ class RecordTemplateSlotTest {
     @Test
     void aParameterAnywhereElseInARecordBodyIsRefusedAtTheDeclaration() {
         Map<String, String> refused = Map.of(
-                "  keyed => <K> { K: text }", "parameter 'K' stands at a key of record.fields",
-                "  grouped => <A> { ( A: text | b: text ) }", "parameter 'A' stands at a key of record.fields",
-                "  maybe => <B> !record { fields: { v => { type: text  optional: B } } }",
-                "parameter 'B' stands at record_field.optional",
-                "  nulls => <V> !record { fields: { v => { type: text  voidable: V } } }",
-                "parameter 'V' stands at record_field.voidable",
-                "  roled => <R> !record { fields: { v => { type: text  role: R  value: \"x\" } } }",
-                "parameter 'R' stands at record_field.role",
-                "  realised => <E> !record { fields: { v => { type: text } }  extension: E }",
-                "parameter 'E' stands at record.extension",
-                "  named => <I> !record { fields: { v => { type: text } }  name_type: I }",
-                "parameter 'I' stands at record.name_type",
-                "  fam => <D> !record { fields: { kind => { type: text } }  extension: ABSTRACT  discriminators: [D] }",
-                "parameter 'D' stands at record.discriminators");
+                "  keyed => <K> { K: text }", "parameter 'K' stands at a key of meta.record.fields",
+                "  grouped => <A> { ( A: text | b: text ) }", "parameter 'A' stands at a key of meta.record.fields",
+                "  maybe => <B> !meta.record { fields: { v => { type: text  optional: B } } }",
+                "parameter 'B' stands at meta.record_field.optional",
+                "  nulls => <V> !meta.record { fields: { v => { type: text  voidable: V } } }",
+                "parameter 'V' stands at meta.record_field.voidable",
+                "  roled => <R> !meta.record { fields: { v => { type: text  role: R  value: \"x\" } } }",
+                "parameter 'R' stands at meta.record_field.role",
+                "  realised => <E> !meta.record { fields: { v => { type: text } }  extension: E }",
+                "parameter 'E' stands at meta.record.extension",
+                "  named => <I> !meta.record { fields: { v => { type: text } }  name_type: I }",
+                "parameter 'I' stands at meta.record.name_type",
+                "  fam => <D> !meta.record { fields: { kind => { type: text } }  extension: ABSTRACT  discriminators: [D] }",
+                "parameter 'D' stands at meta.record.discriminators");
         refused.forEach((declaration, expected) -> {
             String message = rejected(declaration);
 
@@ -112,9 +112,9 @@ class RecordTemplateSlotTest {
     @Test
     void aTemplateOverAnotherConstructorKeepsItsScalarSlots() {
         assertDoesNotThrow(() -> compile("""
-                  pair => <V> !tuple { elements: [{ element_type: text  voidable: V } { element_type: int32 }] }
+                  pair => <V> !meta.tuple { elements: [{ element_type: text  voidable: V } { element_type: int32 }] }
                   p => pair<true>
-                  capped => <N> !array { element_type: text  min_items: N }
+                  capped => <N> !meta.array { element_type: text  min_items: N }
                   b => capped<2>
                 """));
     }

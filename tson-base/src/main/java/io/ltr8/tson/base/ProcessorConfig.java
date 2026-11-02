@@ -27,7 +27,7 @@ import java.util.Objects;
  * <p><b>One binding serves schemas and data.</b> The context binds a data document's values ({@code order} ->
  * {@code Order}) and a schema's value entries ({@code create_order => !operation { ... }}, {@code operation} ->
  * {@code Operation}) alike: within one closure a name means one thing, so one binder is coherent. The kernel's own
- * vocabulary ({@code record}, {@code integer_type}, ...) always binds to {@code io.ltr8.tson.schema.meta}, composed
+ * vocabulary ({@code meta.record}, {@code numeric.integer_type}, ...) always binds to the schema model, composed
  * under the context's binder by {@code Tson.of}, so a consumer's binder cannot rebind it.
  *
  * <p><b>It lives here, and construction does not.</b> A configuration is a value: it names what a

@@ -263,7 +263,7 @@ class OpenOperandCompositionTest {
 
     /**
      * The one position a bound reference cannot be written into: a reference's own head, which is a
-     * {@code type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
+     * {@code meta.type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
      * at the template's declaration, before substitution has anything to say about it.
      */
     @Test

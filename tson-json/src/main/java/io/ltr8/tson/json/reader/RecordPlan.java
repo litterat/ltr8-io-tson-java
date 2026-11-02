@@ -16,7 +16,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -79,7 +79,7 @@ final class RecordPlan {
 
     /**
      * The record's name type, by name for messages, and its reader -- {@code null} for the kernel's
-     * {@code field_name}, which §7.7's grammar answers without allocating -- and the profile a member name it
+     * {@code meta.field_name}, which §7.7's grammar answers without allocating -- and the profile a member name it
      * admits is judged under ({@link #unmatched}).
      */
     private final String nameType;

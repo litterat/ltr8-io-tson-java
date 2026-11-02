@@ -1,5 +1,8 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
+import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
+import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
@@ -56,7 +59,7 @@ import java.util.function.Function;
  * ({@code !!id}/{@code !!import}), merging every {@code !!import}'s entries into the
  * schema's one namespace (SPEC-FEEDBACK.md #7) through this resolver's own {@link TsonCompiledSchemaLoader}, and
  * handing each local declaration off to a {@link DefinitionResolver} for the actual, per-declaration
- * resolution work (Part 2 §4, §8's <code>{type_name =&gt; top}</code> shape, an entry being its value). A
+ * resolution work (Part 2 §4, §8's <code>{meta.type_name =&gt; top}</code> shape, an entry being its value). A
  * construction head and an annotation type are read through the compiled form of the schema that declared them
  * ({@link Vocabulary}).
  *
@@ -81,7 +84,7 @@ public final class SchemaResolver {
      * is: there is no author to resolve against, and §8.1 makes it derived, discarded and recomputed on
      * ingest rather than read from a document.
      */
-    private static final Annotations SYNTHETIC = Annotations.of(List.of(Annotation.of("synthetic")));
+    private static final Annotations SYNTHETIC = Annotations.of(List.of(Annotation.of(TsonSchema.SYNTHETIC)));
 
     private final TsonCompiledSchemaLoader loader;
 
@@ -137,9 +140,9 @@ public final class SchemaResolver {
      * then resolved via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped on demand) and
      * its entries merged in, *before* any local declaration is resolved. That map ({@code namespace}, exposed to
      * {@link DefinitionResolver} through a {@link WaitOrder}) is where every name resolves: a construction head, a
-     * composition supertype, a refinement source, an annotation type. meta.tn's own {@code date_type => atom &
-     * atom_specification & {...}}, composing with two meta-kernel entries it only has via its own imports, would
-     * fail to resolve at all without this. Collision
+     * composition supertype, a refinement source, an annotation type. net.tn's own {@code net.ipv4_type =>
+     * meta.atom & atom.specification & {...}}, composing with two kernel entries it has only through its
+     * import of meta.tn, would fail to resolve at all without this. Collision
      * handling mirrors {@code TsonSchemaLinker.mergeImports}'s own rule exactly: a name declared by
      * more than one import, or by an import *and* a local declaration, is a {@link
      * SchemaValidationException} -- checked as each import is merged in, and again as each local
@@ -231,12 +234,12 @@ public final class SchemaResolver {
         // them -- one map the resolver and the materialiser both write, so a constructor's tag is found
         // wherever the entry came from.
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
-        // Which names denote the meta-kernel's own entries: a kind and a constructor are judged by where a base
+        // Which names denote the kernel's own entries: a kind and a constructor are judged by where a base
         // kind is defined, never by its spelling (§4.1), so a schema's own `namespace` stays an ordinary record.
         Set<String> kernelNames = new LinkedHashSet<>();
         // Which application each entry is the instantiation of (§8.2): an import's as its key states it, a local
         // one's as materialisation closes it. Keyed on the entry, whatever its kind; written on the local keys as
-        // `@application` where the entry map is assembled.
+        // `@meta.application` where the entry map is assembled.
         Map<String, io.ltr8.tson.schema.meta.TypeRef> applications = new LinkedHashMap<>();
         // Which schema declared each imported entry: the compiled reader a construction head or an annotation is read
         // through is that schema's.
@@ -244,7 +247,9 @@ public final class SchemaResolver {
         Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames, origins);
         nameAnnotations.forEach((name, annotations) -> TsonSchema.applicationOf(annotations)
                 .ifPresent(application -> applications.put(name, application)));
-        boolean isKernel = TsonBundledSchemas.isMetaKernel(id);
+        // The kernel's own entries are the kernel's, kinds and constructors judged by origin, and its resolution reads
+        // every head through its pre-loaded stand-in (§3.4).
+        boolean isKernel = TsonBundledSchemas.isKernel(id);
         Predicate<String> kernel = name -> isKernel || kernelNames.contains(name);
 
         // Expand the sugar forms before anything reads a declaration, so resolution below only ever sees a
@@ -265,17 +270,28 @@ public final class SchemaResolver {
                 namespace.keySet(), problems.collecting() ? problems::report : null, positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
         // The names desugaring generated, as opposed to the ones the author wrote. These are the schema's
-        // synthetic entries (§5.3's lift rule), so they are both what carries the derived @synthetic marker
+        // synthetic entries (§5.3's lift rule), so they are both what carries the derived @meta.synthetic marker
         // at its key below (§8.2) and what tells a generated head closing its own intermediate form from an
         // authored one: an application of a generated name is machinery, an application of an authored one
         // is a use site worth recording.
         Set<String> generated = SchemaDesugarer.lifted(document, desugared);
 
-        // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
-        for (String name : declarations.keySet()) {
-            if (namespace.containsKey(name)) {
+        // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them). A schema
+        // map of one path is open: this document's contribution to an imported one is no collision, its members
+        // colliding by path as any name does.
+        for (Map.Entry<String, SchemaMap.Declaration> local : declarations.entrySet()) {
+            String name = local.getKey();
+            if (namespace.containsKey(name) && !(local.getValue().typeDef() instanceof SchemaMapDef
+                    && SchemaPaths.isNestedMap(namespace.get(name)))) {
                 throw new SchemaValidationException("'" + name
                         + "' collides with an entry of the same name brought in by !!import");
+            }
+            if (local.getValue().typeDef() instanceof SchemaMapDef) {
+                // This document's own map is resolved here, holding its own members; the imports' members stay
+                // keyed under their paths.
+                namespace.remove(name);
+                origins.remove(name);
+                facts.remove(name);
             }
         }
 
@@ -317,7 +333,14 @@ public final class SchemaResolver {
         DefinitionMetaReader reads = new DefinitionMetaReader() {
 
             @Override
-            public Top read(String type, io.ltr8.tson.compiler.ast.DataValue value) {
+            public Top read(String written, io.ltr8.tson.compiler.ast.DataValue value) {
+                // An alias of a constructor is applied as its target is (§3.3.1), a held body's head included.
+                String type = heads.definition(written) == null ? written
+                        : AliasChain.terminal(written, heads::definition);
+                if (!type.equals(written) && value.typeRef().filter(written::equals).isPresent()) {
+                    value = new io.ltr8.tson.compiler.ast.DataValue(value.annotations(), Optional.of(type),
+                            value.coreValue());
+                }
                 Top head = heads.definition(type);
                 if (head != null && !EntryKind.isConstructor(type, head, kernel)) {
                     return new ValueEntry(type, readValue(type, value));
@@ -327,7 +350,7 @@ public final class SchemaResolver {
 
             /**
              * An instance of the constructor {@code type}: the schema model's body where the head is the kernel's
-             * or meta.tn's, whose names always bind to it. Any other constructor's instance builds no body this
+             * or net.tn's, whose names always bind to it. Any other constructor's instance builds no body this
              * library models, so it is held as the value it is, as a value entry's payload is ([TSON-SCHEMA] §4.1):
              * as the object the bind context binds the head to, or, where none does, as a tree, so the schema loads
              * and validates without host classes and a schema obtained to bind refuses it. A constructor whose
@@ -553,7 +576,7 @@ public final class SchemaResolver {
             if (!resolvedLocals.containsKey(key)) {
                 continue;
             }
-            // §8.2: a synthetic entry's key carries the derived @synthetic marker, and a lifted declaration
+            // §8.2: a synthetic entry's key carries the derived @meta.synthetic marker, and a lifted declaration
             // has nothing else at its key -- there is no source text in front of a name nobody wrote.
             localOnly.put(key, resolvedLocals.get(key), generated.contains(key)
                     ? SYNTHETIC : nameAnnotations.getOrDefault(key, Annotations.empty()));
@@ -572,7 +595,7 @@ public final class SchemaResolver {
         });
         // §8.2's second derived key annotation: every entry that closes an application, whatever its kind -- a
         // record template's member, a namespace entry, the hop a non-record template's application closes to --
-        // carries `@application` on its key, which is where resolved output states an instantiation's identity
+        // carries `@meta.application` on its key, which is where resolved output states an instantiation's identity
         // and where ingest reads it back as stated.
         // The application is stated as written, its nested arguments unreduced: a reader and a message see the
         // reference the author wrote, and each level resolves structurally to the entry it closed to.
@@ -978,16 +1001,17 @@ public final class SchemaResolver {
     /** Whether {@code head}'s instances are types: it composes the kernel's {@code type} ([TSON-SCHEMA] §4.1). */
     private static boolean buildsTypes(Top head, Predicate<String> kernel) {
         return head != null && TypeChain.supertypesOf(head).stream().anyMatch(
-                name -> name.equals("type") && kernel.test(name));
+                name -> name.equals(KernelNames.of("type")) && kernel.test(name));
     }
 
     /**
-     * An instance of {@code type}, a constructor of types the kernel and meta.tn do not declare: an entry it builds
-     * is a type, a type's body is one of the kernel's, and this library has no factory for the bodies it describes.
+     * An instance of {@code type}, a constructor of types the kernel and the bundled libraries do not declare: an entry
+     * it builds is a type, a type's body is one of the kernel's, and this library has no factory for the bodies it
+     * describes.
      */
     private static UnsupportedOperationException unmodelledType(String type, RuntimeException cause) {
         return new UnsupportedOperationException("'!" + type + "' builds types, and this library models the body of "
-                + "a type built only by the kernel's and meta.tn's constructors -- an instance of a constructor of "
+                + "a type built only by the bundled schemas' constructors -- an instance of a constructor of "
                 + "types no reader factory backs cannot be held as a type", cause);
     }
 
@@ -998,7 +1022,7 @@ public final class SchemaResolver {
      *
      * <p><b>It cannot wait for the linker</b>, which checks the rest of §5.10's arity rule off the same
      * accessor: materialisation runs first, and by then the parameter has been substituted away. What
-     * arrives at the {@code type_name} head is then whatever bound it -- a bare entry name if the argument
+     * arrives at the {@code meta.type_name} head is then whatever bound it -- a bare entry name if the argument
      * was closed, reported as an arity error against a content-derived name nobody typed, or an application if
      * it was not. Neither names what the author did.
      */
@@ -1099,12 +1123,12 @@ public final class SchemaResolver {
      * SPEC-FEEDBACK.md #7) puts every construction head and annotation type in the closure, and the closure is the
      * union of the imported schemas' own, so an entry's reader, compiled over its declaring schema's closure, reads
      * everything its body can name. Nothing is compiled per closure for those -- each declaring schema is compiled
-     * once and cached by identity, and a schema that applies only the kernel's and meta.tn's constructors reaches
-     * exactly those two.
+     * once and cached by identity, and a schema that applies only the kernel's constructors reaches exactly the
+     * kernel's.
      *
      * <p>For an entry of this document, readers compiled from the entries ready so far ({@link WaitOrder#read}): the
      * entry is made ready before the value read against it, and a read reaching another not yet ready makes that one
-     * ready first. The meta-kernel's own resolution reads through its pre-loaded stand-in for every name, its one
+     * ready first. The kernel's own resolution reads through its pre-loaded stand-in for every name, its one
      * cycle being closed by pre-loading (§3.4).
      */
     private final class Vocabulary {
@@ -1251,6 +1275,13 @@ public final class SchemaResolver {
                 String name = entry.getKey();
                 String origin = imported.originOf(name);
                 String incumbent = origins.get(name);
+                // A schema map of one path declared by several documents is one map, the union of their members,
+                // each merged under its path; the map's entry is derived from them and carries no annotations of
+                // its own.
+                if (incumbent != null && SchemaPaths.isNestedMap(merged.get(name))
+                        && SchemaPaths.isNestedMap(entry.getValue())) {
+                    continue;
+                }
                 if (incumbent != null) {
                     if (!incumbent.equals(origin)) {
                         throw new SchemaValidationException("'" + name + "' is declared by two different "
@@ -1268,8 +1299,11 @@ public final class SchemaResolver {
                 }
                 // §8.3's walk carries a dropped hop's declaration annotations to the use site, and an alias
                 // is as often imported as local -- so the key annotations travel with the entry rather than
-                // being dropped at the import boundary, where the hop would lose them for a second reason.
-                importedNameAnnotations.put(name, imported.schema().entries().getAnnotations(name));
+                // being dropped at the import boundary, where the hop would lose them for a second reason. A
+                // schema map's are its declaring document's contribution, and travel nowhere.
+                if (!SchemaPaths.isNestedMap(entry.getValue())) {
+                    importedNameAnnotations.put(name, imported.schema().entries().getAnnotations(name));
+                }
                 origins.put(name, origin);
             }
         }

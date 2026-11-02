@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-SCHEMA] §5.2's dependency between a field's two halves: a {@code ~} default or {@code =} fixed value
- * must be a value of the field's own declared type. meta-kernel states the rule on {@code record_field.value}
+ * must be a value of the field's own declared type. The kernel states the rule on {@code meta.record_field.value}
  * and calls it "a dependency the schema language does not express directly", which is what leaves it to
  * {@code TsonSchemaLinker} to check.
  *

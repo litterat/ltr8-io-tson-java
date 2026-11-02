@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * A field group inside a template body (§5.10, §5.11). The body is held as text until an application
- * materialises it, so the group travels through the held wire form and back into {@code field_group} -- options,
+ * materialises it, so the group travels through the held wire form and back into {@code meta.field_group} -- options,
  * optional members and state intact.
  */
 class FieldGroupInTemplateTest {

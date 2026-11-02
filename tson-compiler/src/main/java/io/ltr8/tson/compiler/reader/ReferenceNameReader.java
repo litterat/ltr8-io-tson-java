@@ -14,7 +14,7 @@ import io.ltr8.tson.compiler.stream.TypeRef;
 import java.util.Optional;
 
 /**
- * A reference-typed position ({@code ref<T>}) whose bound component is a {@link io.ltr8.tson.schema.meta.TypeRef}
+ * A reference-typed position ({@code meta.ref<T>}) whose bound component is a {@link io.ltr8.tson.schema.meta.TypeRef}
  * or a {@link io.ltr8.tson.schema.meta.Ref}: the value is a value's qualified name ([TSON-SCHEMA] §5.12), such as
  * {@code orders.place_order}, read as written into a {@code TypeRef} whose {@code name} is the token and whose
  * arguments are none, or into a {@code Ref} the linker delivers the value into.
@@ -30,7 +30,7 @@ import java.util.Optional;
  * positional form loses the token in a schema document, so the readers cannot disagree about which tokens are names.
  *
  * <p><b>Names only.</b> The slot holds a reference and nothing else, so a braced value, a quoted token and a framed
- * name ({@code @doc:"x" orders}, {@code !record x}) are refused: a name's type is its referent's, and an annotation
+ * name ({@code @doc:"x" orders}, {@code !meta.record x}) are refused: a name's type is its referent's, and an annotation
  * would have nowhere to go.
  */
 final class ReferenceNameReader implements TsonTypeReader<Object> {
@@ -41,7 +41,7 @@ final class ReferenceNameReader implements TsonTypeReader<Object> {
     /** Whether the host component is a {@link io.ltr8.tson.schema.meta.Ref}, delivered at link, not a {@code TypeRef}. */
     private final boolean toCell;
 
-    /** The slot's declared type, {@code ref<T>}, which each name read here is recorded with. */
+    /** The slot's declared type, {@code meta.ref<T>}, which each name read here is recorded with. */
     private final TsonSchema.SlotType type;
 
     ReferenceNameReader(String expected, boolean toCell, TsonSchema.SlotType type) {

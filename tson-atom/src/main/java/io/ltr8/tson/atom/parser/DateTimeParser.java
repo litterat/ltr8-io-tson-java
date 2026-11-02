@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.DateTimeType;
+import io.ltr8.tson.schema.temporal.DateTimeType;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
@@ -29,7 +29,7 @@ public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser
     /** §5.4's built-in annotation name -- {@code !datetime}. */
     public static final String TYPENAME = "datetime";
 
-    /** {@code datetime => !datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
+    /** {@code datetime => !temporal.datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
     public static final DateTimeParser UNCONSTRAINED = new DateTimeParser(DateTimeType.UNCONSTRAINED);
 
     public DateTimeParser(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max) {

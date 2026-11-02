@@ -24,10 +24,9 @@ class NamespaceFacetsTest {
     private static List<Diagnostic> link(String declarations) {
         String text = """
                 !!id:"https://example.test/meta-facets.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  method => { request?: kind<record> }
+                  method => { request?: meta.kind<meta.record> }
                   %s
                 }
                 """.formatted(declarations);
@@ -56,23 +55,23 @@ class NamespaceFacetsTest {
     @Test
     void theFacetsAlonePass() {
         assertEquals(List.of(), link("""
-                api     => !namespace { key_type: identifier  value_type: method }
-                ordered => !namespace { key_type: identifier  value_type: method  ordered: true }
+                api     => !meta.namespace { key_type: meta.identifier  value_type: method }
+                ordered => !meta.namespace { key_type: meta.identifier  value_type: method  ordered: true }
                 """));
     }
 
     @Test
     void aFieldBesideTheFacetsIsRefused() {
         refused(link("""
-                api => !namespace { key_type: identifier  value_type: method  extends: [x] }
-                """), "'api'", "unknown field 'extends' on 'namespace'");
+                api => !meta.namespace { key_type: meta.identifier  value_type: method  extends: [x] }
+                """), "'api'", "unknown field 'extends' on 'meta.namespace'");
     }
 
     /** {@code key_type} is optional: absent, the host of a value supplies the family, as a record's fields are keyed. */
     @Test
     void theKeyFamilyMayBeLeftToTheHost() {
         assertEquals(List.of(), link("""
-                hosted => !namespace { value_type: method }
+                hosted => !meta.namespace { value_type: method }
                 """));
     }
 }

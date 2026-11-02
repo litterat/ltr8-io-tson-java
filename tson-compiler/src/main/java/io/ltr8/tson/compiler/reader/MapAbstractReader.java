@@ -8,7 +8,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.compiler.resolver.AliasChain;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
 
 import java.math.BigInteger;
@@ -107,7 +107,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * Whether {@code body}'s key type is an identifier family: its alias chain ends at an entry whose body
-     * the {@code identifier_type} constructor made, the kernel's {@code identifier}, a schema's own, or a
+     * the {@code identifier_type} constructor made, the kernel's {@code meta.identifier}, a schema's own, or a
      * refinement of either.
      */
     static boolean keysAreNames(MapBody body, ValueReaderContext context) {

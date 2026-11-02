@@ -40,11 +40,10 @@ class BindMismatchClassificationTest {
     /** A meta layer declaring a record held in a namespace type of its own -- and no Java class for it. */
     private static final String META_SCHEMA = """
             !!id:"https://example.test/meta-bindmismatch.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               notification  => { path: text }
-              notifications => !namespace { key_type: identifier  value_type: notification }
+              notifications => !meta.namespace { key_type: meta.identifier  value_type: notification }
             }
             """;
 
@@ -82,15 +81,15 @@ class BindMismatchClassificationTest {
      */
     @Test
     void anAnnotationTypedByAnAbstractBaseKindIsTheSameProblemInEitherPosition() {
-        Diagnostic beforeTheName = only(ORDINARY_HEADER + "{\n@sum:_ foo => text\n}\n");
-        Diagnostic afterTheArrow = only(ORDINARY_HEADER + "{\nfoo => @sum:_ text\n}\n");
+        Diagnostic beforeTheName = only(ORDINARY_HEADER + "{\n@meta.sum:_ foo => text\n}\n");
+        Diagnostic afterTheArrow = only(ORDINARY_HEADER + "{\nfoo => @meta.sum:_ text\n}\n");
 
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, beforeTheName.code(), beforeTheName::message);
         assertEquals(beforeTheName.code(), afterTheArrow.code(),
                 "the same annotation, moved across the arrow, is the same problem");
         for (Diagnostic d : List.of(beforeTheName, afterTheArrow)) {
             assertEquals("/foo", d.schemaPointer().orElseThrow(), "located at the declaration");
-            assertTrue(d.message().contains("'sum' is abstract and has no direct instances, so a value here must name "
+            assertTrue(d.message().contains("'meta.sum' is abstract and has no direct instances, so a value here must name "
                     + "its type"), d::message);
         }
     }

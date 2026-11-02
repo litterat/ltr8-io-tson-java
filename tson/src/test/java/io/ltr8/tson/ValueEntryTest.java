@@ -40,7 +40,7 @@ class ValueEntryTest {
             !!id:"https://example.test/ops.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              operation => { path: text  request: kind<record>  response: type_kind }
+              operation => { path: text  request: meta.kind<meta.record>  response: meta.type_kind }
             }
             """, API, """
             !!id:"https://example.test/ops-api.tn"

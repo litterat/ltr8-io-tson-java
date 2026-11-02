@@ -40,7 +40,7 @@ class EntryKindHierarchyTest {
 
     @Test
     void aNamespaceTypeIsAProductLikeAMapType() {
-        NamespaceBody api = new NamespaceBody(Optional.of(TypeRef.of("identifier")), TypeRef.of("method"), false);
+        NamespaceBody api = new NamespaceBody(Optional.of(TypeRef.of("meta.identifier")), TypeRef.of("method"), false);
         assertEquals(EntryKind.PRODUCT, EntryKind.of(api, name -> true));
         assertInstanceOf(Product.class, api);
     }

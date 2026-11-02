@@ -8,10 +8,10 @@ import io.ltr8.tson.atom.AtomValidationException;
 import java.util.List;
 import io.ltr8.net.CidrInet6Network;
 import io.ltr8.net.CidrNetwork;
-import io.ltr8.tson.schema.meta.Cidr6Type;
+import io.ltr8.tson.schema.net.Cidr6Type;
 
 /**
- * Parses and validates against meta.tn's {@code cidr6_type} constructor (§5.5's {@code cidr6} atom, RFC
+ * Parses and validates against net.tn's {@code net.cidr6_type} constructor (§5.5's {@code cidr6} atom, RFC
  * 4632): an IPv6 address, {@code /}, and a prefix length of 0-128.
  *
  * <p><b>Host type is {@link CidrInet6Network}</b>, a value type in {@code io.ltr8.net} ({@code ltr8-net}).
@@ -33,7 +33,7 @@ public record Cidr6Parser(Cidr6Type constraints) implements AtomTypeParser<CidrI
     /** §5.5's built-in annotation name -- {@code !cidr6}. */
     public static final String TYPENAME = "cidr6";
 
-    /** {@code cidr6 => !cidr6_type {}} -- the unconstrained IPv6 network, §5.5's {@code !cidr6}. */
+    /** {@code cidr6 => !net.cidr6_type {}} -- the unconstrained IPv6 network, §5.5's {@code !cidr6}. */
     public static final Cidr6Parser UNCONSTRAINED = new Cidr6Parser(Cidr6Type.UNCONSTRAINED);
 
     @Override
@@ -58,10 +58,10 @@ public record Cidr6Parser(Cidr6Type constraints) implements AtomTypeParser<CidrI
      * §5.5's {@code within}/{@code excluding} for a <em>network</em> value, which are not the address
      * family's rules. {@code within}: the value must be a <b>subnet</b> of at least one listed network.
      * {@code excluding}: the value must not <b>overlap</b> any -- overlap rather than containment, so a value
-     * wider than an excluded block cannot smuggle it through, which is what meta.tn's own {@code @doc} asks
+     * wider than an excluded block cannot smuggle it through, which is what net.tn's own {@code @doc} asks
      * for.
      *
-     * <p>The lists are text here because the facets are typed {@code [value]}; every entry has already been
+     * <p>The lists are text here because the facets are typed {@code [meta.value]}; every entry has already been
      * checked to be a network at schema load ({@code Cidr6Type.coherenceCheck}), so a null from {@code parse}
      * is unreachable rather than an author error.
      */

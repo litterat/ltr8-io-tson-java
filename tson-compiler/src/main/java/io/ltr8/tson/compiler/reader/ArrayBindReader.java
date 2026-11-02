@@ -148,7 +148,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
      * making a real effort to get the *element* type right: the schema's own {@code element_type}
      * name is resolved to a real bound Java class the same way any other schema type name is,
      * falling back to {@link String} only when that name has no real bound class at all -- {@code
-     * ipv4_type}'s own {@code [value]}-sugared field is a real fixture example (materializes to a
+     * ipv4_type}'s own {@code [meta.value]}-sugared field is a real fixture example (materializes to a
      * synthesized array entry whose own {@code element_type} is {@code value}, and {@code
      * schema.meta} has no {@code Value} class for {@link io.ltr8.tson.compiler.config.SchemaMetaNameBinder}
      * to find by that name).

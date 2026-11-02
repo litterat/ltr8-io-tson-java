@@ -90,7 +90,7 @@ final class RecordExtension {
                                  Map<String, TypeRef> applications, Set<String> localNames,
                                  Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
-        Predicate<String> kernel = name -> TsonBundledSchemas.isMetaKernel(origins.get(name));
+        Predicate<String> kernel = name -> TsonBundledSchemas.isKernel(origins.get(name));
         for (String name : localNames) {
             Top def = merged.get(name);
             if (def != null && isUndeclaredMember(name, def, facts, applications, kernel)) {
@@ -244,7 +244,7 @@ final class RecordExtension {
             // A record template IS-A the base is no member: its applications are, each pinned once closed.
             if (!(sub instanceof RecordBody record) || OpenEntry.isOpen(sub)
                     || isUndeclaredMember(subtype, sub, facts, applications,
-                    name -> TsonBundledSchemas.isMetaKernel(origins.get(name)))) {
+                    name -> TsonBundledSchemas.isKernel(origins.get(name)))) {
                 continue;
             }
             List<Object> pins = pinsOf(base, subtype, selectors, record, merged, facts, localNames, enumForms, violations);

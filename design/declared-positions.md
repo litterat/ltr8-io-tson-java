@@ -5,12 +5,13 @@ position is refused. Current form only; history lives in git.
 
 **Invariants**
 
-- The kernel's `declared_type => sum & {}` has one instance, the kernel's `declared`, and one reader per encoding:
+- The kernel's `meta.declared_type => meta.sum & {}` has one instance, the kernel's `declared`, and one reader per encoding:
   `DeclaredReader` (TSON text) and `DispatchDeclaredReader` (JSON). Both select a reader and build nothing, so one
   factory serves every mode.
-- The schema map's values are `declared` (`schema => !namespace { key_type: type_name  value_type: declared }`): a
-  type entry's tag names its constructor, a value entry's its type. Where the tag selects a namespace type, the TSON
-  reader delivers the map as the `Namespace` it is (`NamespaceInstanceReader`, `design/meta-layer-namespaces.md`).
+- The schema map's values are `declared` (`meta.schema => !meta.namespace { key_type: meta.type_name value_type:
+  meta.declared }`): a type entry's tag names its constructor, a value entry's its type. Where the tag selects a namespace
+  type, the TSON reader delivers the map as the `Namespace` it is (`NamespaceInstanceReader`,
+  `design/meta-layer-namespaces.md`).
 - The closure is fixed at compile time: the entry belongs to one schema, and every name it holds is resolved through
   the same reader resolver every other dispatch uses.
 - A value naming no type is a **validation** error (`VALIDATION_ERROR`) in every mode; a tag naming no type of the
@@ -24,13 +25,13 @@ Related: `design/readers-and-diagnostics.md`, `design/record-dispatch.md`, `desi
 
 ## The open sum over the closure
 
-`declared_type` is the open sum: where a `choice` enumerates its variants, a `declared` position draws them from the
-closure of the schema that declares it — its own declarations and its imports — and the value names which one by its
-tag. The value is then read in full by that type's own reader, so everything below it is validated exactly as at a
-position typed by the named type, and every mode hands back what that reader built. The body carries no field: what a
-position admits is the closure, which the entry's schema fixes, so the constructor alone tells `declared` apart from
-every other sum. `disjoint` is absent, as on every non-choice sum (§8.1), and the discrimination predicate gives a
-`declared` instance no class, so a choice listing one is not disjoint and its values reach it only tagged.
+`meta.declared_type` is the open sum: where a `meta.choice` enumerates its variants, a `declared` position draws them from
+the closure of the schema that declares it — its own declarations and its imports — and the value names which one by its tag.
+The value is then read in full by that type's own reader, so everything below it is validated exactly as at a position typed
+by the named type, and every mode hands back what that reader built. The body carries no field: what a position admits is the
+closure, which the entry's schema fixes, so the constructor alone tells `declared` apart from every other sum. `disjoint` is
+absent, as on every non-choice sum (§8.1), and the discrimination predicate gives a `declared` instance no class, so a choice
+listing one is not disjoint and its values reach it only tagged.
 
 **The tag is the whole of what the value says about its type.** A position that is open has nothing to infer a type
 from, so an untagged value is refused rather than read by base type resolution: nothing failed to resolve, which is

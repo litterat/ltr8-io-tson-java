@@ -7,11 +7,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code choice} constructor's own vocabulary, resolved (Part 2 §4.1, §5.4,
- * §8.1): {@code variants: [type_kind]} -- a SUM-kind body backing every declared choice type
+ * The kernel's {@code choice} constructor's own vocabulary, resolved (Part 2 §4.1, §5.4,
+ * §8.1): {@code variants: [meta.type_kind]} -- a SUM-kind body backing every declared choice type
  * (`contact_method => (email | phone | address)` and similar).
  */
-@Typename(name = "choice")
+@Typename(name = "meta.choice")
 public record ChoiceBody(TypeChain chain,
         List<TypeRef> variants, Optional<Boolean> disjoint) implements Sum {
 

@@ -1,0 +1,130 @@
+!!id:"https://tson.io/2026/39/m/numeric-resolved.tn"
+!!import:"https://tson.io/2026/39/m/meta.tn"
+@doc:"""
+  Resolver-output fixture for numeric.tn (2026 Revision 39 draft).
+  Parse the source schema, run the resolver, canonicalise, compare.
+  Conventions as in meta-resolved.tn.
+
+  Its header is its source's: it imports meta.tn alone, through which the
+  kernel's vocabulary reaches it at the root (`text`, `integer`, `enum`,
+  ...) and the kernel's machinery and classifying annotations under its
+  six maps (`meta.record`, `atom.ordering`, `numeric.integer_type`, ...).
+  Nothing in the document marks it resolved; a processor reads it as a
+  resolved form because its caller says so ([TSON-SCHEMA] Section 8.1).
+  numeric.tn's constructors and facet vocabulary are members of the schema
+  map nested as its entry `numeric`, written nested and tagged
+  `!meta.schema`, which holds this document's members only and none of
+  the kernel's, and its instances are at its root. `subtypes` lists entries of this document only.
+  """
+!schema {
+  numeric => !meta.schema {
+    ieee_format => !enum { members: [BINARY16 BINARY32 BINARY64 BINARY128 BINARY256 DECIMAL32 DECIMAL64 DECIMAL128] }
+
+    float_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain               => !meta.record_field { type: meta.type_chain  optional: true }
+      spec                => !meta.record_field { type: iri      optional: true  role: FIXED  value: "https://ieeexplore.ieee.org/document/8766229" }
+      format              => !meta.record_field { type: numeric.ieee_format }
+      min                 => !meta.record_field { type: meta.value    optional: true }
+      exclusive_min       => !meta.record_field { type: meta.value    optional: true }
+      max                 => !meta.record_field { type: meta.value    optional: true }
+      exclusive_max       => !meta.record_field { type: meta.value    optional: true }
+      allow_nan           => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+      allow_infinity      => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+      allow_subnormal     => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+      allow_negative_zero => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+    }
+    groups: [
+      !meta.field_group { members: [[min] [exclusive_min]]  optional: true }
+      !meta.field_group { members: [[max] [exclusive_max]]  optional: true }
+    ] }
+
+    decimal_member_set => !meta.set_type { element_type: meta.value  min_items: 1 }
+
+    decimal_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
+      chain           => !meta.record_field { type: meta.type_chain  optional: true }
+      min             => !meta.record_field { type: meta.value    optional: true }
+      exclusive_min   => !meta.record_field { type: meta.value    optional: true }
+      max             => !meta.record_field { type: meta.value    optional: true }
+      exclusive_max   => !meta.record_field { type: meta.value    optional: true }
+      multiple_of     => !meta.record_field { type: meta.value    optional: true }
+      total_digits    => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      fraction_digits => !meta.record_field { type: numeric.non_negative_integer  optional: true }
+      members         => !meta.record_field { type: numeric.decimal_member_set  optional: true }
+    }
+    groups: [
+      !meta.field_group { members: [[min] [exclusive_min]]  optional: true }
+      !meta.field_group { members: [[max] [exclusive_max]]  optional: true }
+    ] }
+
+    rational_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
+      chain         => !meta.record_field { type: meta.type_chain  optional: true }
+      min           => !meta.record_field { type: meta.value  optional: true }
+      exclusive_min => !meta.record_field { type: meta.value  optional: true }
+      max           => !meta.record_field { type: meta.value  optional: true }
+      exclusive_max => !meta.record_field { type: meta.value  optional: true }
+      multiple_of   => !meta.record_field { type: meta.value  optional: true }
+    }
+    groups: [
+      !meta.field_group { members: [[min] [exclusive_min]]  optional: true }
+      !meta.field_group { members: [[max] [exclusive_max]]  optional: true }
+    ] }
+
+    complex_component => !enum { members: [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64] }
+
+    complex_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
+      chain     => !meta.record_field { type: meta.type_chain  optional: true }
+      component => !meta.record_field { type: numeric.complex_component  optional: true  role: DEFAULT  value: NUMBER }
+    } }
+  }
+
+  @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
+  number => !numeric.decimal_type {}
+
+  @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
+  rational => !numeric.rational_type {}
+
+  @atom.ordering:NONE @atom.bounded:false @atom.numeric
+  complex => !numeric.complex_type {}
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int8 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 8  signed: true } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int16 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 16  signed: true } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int32 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 32  signed: true } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int64 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 64  signed: true } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int128 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 128  signed: true } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int256 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 256  signed: true } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint8 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 8  signed: false } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint16 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 16  signed: false } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint32 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 32  signed: false } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint64 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 64  signed: false } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint128 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 128  signed: false } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint256 => !numeric.integer_type { chain: { supertypes: [integer] }  size: { bits: 256  signed: false } }
+
+  @atom.ordering:PARTIAL @atom.bounded:false @atom.exact:false @atom.numeric
+  float32 => !numeric.float_type { format: BINARY32 }
+
+  @atom.ordering:PARTIAL @atom.bounded:false @atom.exact:false @atom.numeric
+  float64 => !numeric.float_type { format: BINARY64 }
+}

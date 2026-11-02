@@ -24,14 +24,12 @@ import java.util.regex.Pattern;
  *       document whose bytes it does not have would be a second document under one published name.</li>
  *   <li><b>A header reference's {@code ?sha256=} pin</b> goes. A pin is verification metadata ([TSON-DATA]
  *       §2.2.1), and the query of an identifying URI holds nothing else.</li>
- *   <li><b>A header reference to the spec's own library</b> -- meta-kernel, meta and core at any revision -- is
- *       shortened to its revision and name ({@code "39/meta"}). Any other reference keeps its URL, which is
- *       the only thing that tells a reader which schema it names.</li>
- *   <li><b>The documentary annotations</b> go, wherever they are written: {@code @doc}, {@code @title} and
- *       {@code @examples}, which are for the schema's readers, and {@code @comment}, which is for its
- *       maintainers. {@link #stripKeepingDocs} keeps the first three and drops only {@code @comment}, for a
- *       reader the documentation is written for. Every other annotation stays: several are checked and change
- *       what the schema means.</li>
+ *   <li><b>A header reference to the spec's own library</b> -- meta, numeric, temporal, net and core at any
+ *       revision -- is shortened to its revision and name ({@code "39/numeric"}). Any other reference keeps its
+ *       URL, which is the only thing that tells a reader which schema it names.</li>
+ *   <li><b>The documentary annotation</b>, {@code @doc}, goes wherever it is written; {@link #stripKeepingDocs}
+ *       keeps it, for a reader the documentation is written for. Every other annotation stays: several are checked
+ *       and change what the schema means.</li>
  * </ul>
  *
  * <p><b>Whitespace is collapsed, never removed.</b> TSON has no comments, so the token stream is the whole
@@ -50,13 +48,11 @@ import java.util.regex.Pattern;
 public final class TsonSchemaStripper {
 
     /** The annotations {@link #strip} removes: everything written for a person rather than a processor. */
-    private static final Set<String> DOCUMENTARY = Set.of("doc", "title", "examples", "comment");
-
-    /** The annotations {@link #stripKeepingDocs} removes: the maintainers' notes alone. */
-    private static final Set<String> MAINTAINERS = Set.of("comment");
+    private static final Set<String> DOCUMENTARY = Set.of("doc");
 
     /** A canonical identity in the spec's library: {@code tson.io/<year>/<revision>/m/<name>.tn}. */
-    private static final Pattern SPEC_LIBRARY = Pattern.compile("tson\\.io/\\d{4}/(\\d+)/m/(meta-kernel|meta|core)\\.tn");
+    private static final Pattern SPEC_LIBRARY =
+            Pattern.compile("tson\\.io/\\d{4}/(\\d+)/m/(meta|numeric|temporal|net|core)\\.tn");
 
     private TsonSchemaStripper() {
     }
@@ -79,7 +75,7 @@ public final class TsonSchemaStripper {
      * @throws io.ltr8.tson.base.ParseException as {@link #strip(String)} does
      */
     public static String stripKeepingDocs(String source) {
-        return strip(source, MAINTAINERS);
+        return strip(source, Set.of());
     }
 
     private static String strip(String source, Set<String> removedAnnotations) {

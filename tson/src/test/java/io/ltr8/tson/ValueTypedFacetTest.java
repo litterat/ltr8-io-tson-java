@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>[TSON-SCHEMA] §7.4 types a constructor's constraint fields {@code value}, and the bootstrap ordering
  * behind it leaves no alternative: {@code duration_type} is what defines a duration, and {@code duration =>
- * !duration_type {}} lives a layer up in core.tn, so meta.tn cannot write {@code min: duration}. A {@code
+ * !duration_type {}} lives a layer up in core.tn, so temporal.tn cannot write {@code min: duration}. A {@code
  * value} slot is decoded by [TSON-DATA] §4 and by nothing else, which resolves boolean, number and string --
  * so every non-numeric bound in the meta layer arrives as a {@code String}, and without this it reaches a
  * component that cannot hold one.

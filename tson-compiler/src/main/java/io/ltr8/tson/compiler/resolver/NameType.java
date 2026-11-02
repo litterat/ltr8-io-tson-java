@@ -1,17 +1,18 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TextFamily;
+import io.ltr8.tson.schema.unicode.TextFamily;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.HashSet;
@@ -25,25 +26,25 @@ import java.util.stream.Stream;
  * Where an entry's {@code name_type} resolves, and whether what it resolves to may stand there: an enum's, which its
  * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of ([TSON-SCHEMA] §5.2).
  * A value the entry's constructor wrote resolves where that constructor is declared, whose closure is in the schema's
- * -- so {@code !enum [A B]} names the kernel's {@code identifier}, and a record that says nothing the kernel's {@code
- * field_name}, names no schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own
+ * -- so {@code !enum [A B]} names the kernel's {@code meta.identifier}, and a record that says nothing the kernel's {@code
+ * meta.field_name}, names no schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own
  * namespace first. Shared by the linker's enum and field name checks and by materialisation, which checks a template's
  * value argument of an enum type before linking has run.
  *
  * <p><b>What may stand there is the slot's kind's to say</b> ([TSON-SCHEMA] §4.2). The kernel types both slots
- * {@code identifier_kind}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
+ * {@code meta.identifier_kind}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
  * kind off the constructor the entry is built with -- the {@code name_type} field's own type -- and asks {@link
  * KindMembers} whether the referent is a member. The resolution above is the store and the kind the judgment: the
  * referent is found first, and the kind refuses the one found. Where the slot's kind is out of reach -- a schema
- * assembled by hand whose closure holds no kernel -- the kernel's {@code identifier_kind} is what the slot is typed
+ * assembled by hand whose closure holds no kernel -- the kernel's {@code meta.identifier_kind} is what the slot is typed
  * by in every schema this library loads, and its {@code of} is used.
  */
 public final class NameType {
 
     private static final String NAME_TYPE = "name_type";
 
-    /** The {@code of} of the kernel's {@code identifier_kind}, for a slot whose own kind is out of reach. */
-    private static final String IDENTIFIER_TYPE = "identifier_type";
+    /** The {@code of} of the kernel's {@code meta.identifier_kind}, for a slot whose own kind is out of reach. */
+    private static final String IDENTIFIER_TYPE = KernelNames.of(KernelNames.UNICODE, "identifier_type");
 
     private NameType() {
     }
@@ -81,7 +82,7 @@ public final class NameType {
 
     /**
      * Whether {@code type}, {@code entry}'s resolved name type, is a member of the kind its {@code name_type} slot
-     * is typed by -- read off {@code constructor}, the one {@code entry}'s value applies: {@code identifier_kind}
+     * is typed by -- read off {@code constructor}, the one {@code entry}'s value applies: {@code meta.identifier_kind}
      * for both of the kernel's slots. A referent that resolved to nothing is no member. The referent's own
      * constructor is its body's ({@link TsonSchema#constructorOf}), the resolved value being all a name type is
      * resolved to here.
@@ -146,8 +147,9 @@ public final class NameType {
     }
 
     /**
-     * Whether {@code type} is the kernel's {@code identifier} -- an enum's default, and through {@code field_name} a
-     * record's -- whose names a refusal calls identifiers, where it names any other type, the author's own.
+     * Whether {@code type} is the kernel's {@code meta.identifier} -- an enum's default, and through
+     * {@code meta.field_name} a record's -- whose names a refusal calls identifiers, where it names any other type, the
+     * author's own.
      */
     public static boolean isIdentifier(Resolved type, Function<String, Top> structure) {
         return type.definition() != null
@@ -200,7 +202,7 @@ public final class NameType {
 
     /**
      * A name type the record states was written by its author, so it resolves in the schema's own namespace first,
-     * as an enum's does; the absent default is the kernel's {@code field_name}, resolved in the structure first.
+     * as an enum's does; the absent default is the kernel's {@code meta.field_name}, resolved in the structure first.
      */
     private static Optional<Resolved> ofRecord(RecordBody body, Function<String, Top> local,
                                                Function<String, Top> structure) {

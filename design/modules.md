@@ -46,20 +46,26 @@ module has a real `module-info.java`; module names mirror each module's root exp
   described at (`TypeArguments`, `DefaultRecordBinder.resolveRecord(context, class, parameterizedType)`), so
   `Namespace<RecordField>` binds `entries` as a map of `RecordField`; a type variable left in place has no
   descriptor, so a raw generic record is still not describable.
-- **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
-  records/sealed interfaces/enums, §8's `Top` and its bodies, `TsonSchema`; `Top` is sealed all the way down, a schema's
-  value entry arriving as a `ValueEntry` whose value binds to the consumer's classes or is held as a tree). **The host
+- **`tson-schema`** — the resolved-schema *value* model — pure records/sealed interfaces/enums, §8's `Top` and its
+  bodies, `TsonSchema`; `Top` is sealed all the way down, a schema's value entry arriving as a `ValueEntry` whose value
+  binds to the consumer's classes or is held as a tree. One package per namespace its entries are declared in, so a
+  kernel name binds by its path (`numeric.integer_type` to `schema.numeric.IntegerType`): `schema.meta` (`Top`, the
+  constructor bodies, `TypeRef`, `Namespace`, the resolver's own model), `schema.unicode`, `schema.numeric`,
+  `schema.net`, `schema.binary` and `schema.temporal` (the atom families), and the unexported `schema.atom` (the
+  facet-comparison mechanics every family shares, `AtomNarrowing` and `AtomCoherence`). **The host
   value types are not here**: `Rational` and `Complex` are `base.atom`'s and the `CidrNetwork` pair `ltr8-net`'s,
   because *what do I get back from `!rational`?* is a question about the type system rather than about §8's model, and
-  they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
+  they depend on nothing. The model reads them structurally — `RationalType`'s
   `min`/`max`/`multiple_of` are `Rational` values — a pull from above rather than a reason to live above. Plus the schema
   registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`),
-  `TsonBundledSchemas`, and `SchemaPaths`, which keeps a nested schema map's value in step with its members' path
-  entries wherever a `TsonSchema` is built, the writer and the test side included. **The linker is not here** — it is an
+  `TsonBundledSchemas`, `KernelNames` (the kernel's machinery is named by its path under one of six maps,
+  `meta.record`, `unicode.text_type`; its root holds the eleven names an author writes), and
+  `SchemaPaths`, which keeps a nested schema map's value in step with its members' path entries wherever a
+  `TsonSchema` is built, the writer and the test side included. **The linker is not here** — it is an
   engine, not a value model, so `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the
   pipeline; what stays is storage and the identity algorithm lookups compare by. Depends on `ltr8-annotation`, `tson-base`
-  (`requires transitive`) and `ltr8-regex` — the last so that `text_type`'s member-against-pattern coherence sits on the
-  family with the length checks it shares a rule with, rather than being split across modules by which engine each half
+  (`requires transitive`) and `ltr8-regex` — the last so that `unicode.text_type`'s member-against-pattern coherence sits on
+  the family with the length checks it shares a rule with, rather than being split across modules by which engine each half
   needs. The engine is an internal library like any other; the boundary worth keeping is the one that stops a value model
   depending on the *pipeline*, and `ltr8-regex` is a leaf. **`tson-compiler` depends on `tson-schema`, not the reverse** —
   the opposite of what the names suggest, deliberately so the compiler's resolver can hold and consult `schema.meta` types
@@ -72,7 +78,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   which families a reader binds, and what they read to, is a property of the type system and not of the encoding that carried
   them. Three packages, split by who touches them: `io.ltr8.tson.atom` is what a caller names — `AtomType`, the two indices
   over it (`BuiltinTypeVocabulary` by name, `HostAtoms` by host class), `AtomParsers` from a resolved body, `VocabularyAtoms`
-  for the write direction, `IdentifierGrammar` (§7.7's name grammar, built from the kernel's `identifier`), and the
+  for the write direction, `IdentifierGrammar` (§7.7's name grammar, built from the kernel's `meta.identifier`), and the
   exceptions a refusal arrives as; `io.ltr8.tson.atom.number` is §4's number production and
   the narrowing over it, exported because base type resolution stays with the text encoding and reads it;
   `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the same terms as `tson-compiler`'s
@@ -95,7 +101,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   emptiness check over a `CodePointSet` interval algebra; §5.4 decides choice disjointness by class, never by pattern).
   A true leaf — depends on **nothing**, I-Regexp being an external standard, not TSON-specific. The
   *engine* counterpart to `ltr8-bind` (a general dependency-free engine), not a value model like
-  `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s fixed `spec = rfc9485`), so
+  `tson-tree`; TSON pins its `regex` atom to I-Regexp (`unicode.regex_type`'s fixed `spec = rfc9485`), so
   this owns I-Regexp semantics rather than delegating to `java.util.regex` (a laxer superset).
   `tson-schema`, `tson-atom` and `tson-compiler` require it; it names no TSON type.
 - **`ltr8-net`** — **only** `io.ltr8.net`: native recognizers for network text formats, each to its RFC. `Iri.parse`

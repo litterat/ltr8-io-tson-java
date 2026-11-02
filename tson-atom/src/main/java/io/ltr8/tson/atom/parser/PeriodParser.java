@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.PeriodType;
+import io.ltr8.tson.schema.temporal.PeriodType;
 import java.math.BigInteger;
 import java.time.Period;
 import java.util.Optional;
@@ -29,7 +29,7 @@ public record PeriodParser(PeriodType constraints) implements AtomTypeParser<Per
     /** §5.5's built-in annotation name -- {@code !period}. */
     public static final String TYPENAME = "period";
 
-    /** {@code period => !period_type {}} -- the unconstrained period. */
+    /** {@code period => !temporal.period_type {}} -- the unconstrained period. */
     public static final PeriodParser UNCONSTRAINED = new PeriodParser(PeriodType.UNCONSTRAINED);
 
     public PeriodParser(Optional<Period> min, Optional<Period> max) {

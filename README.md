@@ -57,8 +57,8 @@ including records, record groups, enums and some in-built types. The `2026/39` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=75b5eb0d41b26b1c6eef6af71e404a1dfb9db7ce1d33a9514df9b06051d9f2ed"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=53ded46a759a3906f536adec3fd90444734944f04e34533ede786f12a3189e1b"
+!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=4d1d6fd22c8d5abbc356be7f9796197d6098c780d2279aae585193182ee66903"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=8634e2f67744b7f88bf1aad347fe20971d6ed7e6b52764501698cdaf9f7fc691"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 !schema {
   role => !enum [admin member guest]
@@ -571,18 +571,27 @@ vocabulary — parse → resolve → link → register → compile → read:
 `Tson.standard()` wires all of this together for the standard library and hands you a `Tson` whose `resolve`/`compile`
 run the pipeline for you (as shown in the [reader table](#reading-and-writing-tson-choosing-an-entry-point)'s schema
 example) — so you rarely touch the individual stages directly. Under the hood, resolving a schema reads each constructor
-it applies (`!enum`, `!integer_type`) through the compiled form of the schema in its import closure that declares it,
-or, for one the schema declares itself, through readers compiled from its entries ready so far: every declaration is
-made ready in wait order, whatever order it is written in, so a constructor and its instances, or a type and a value of
-it, may share a document either way round. Every name a schema writes resolves in that one namespace — its own entries
-and its imports, transitively — and every name of the kernel reaches it only by import (core.tn imports meta.tn, which
-imports meta-kernel). The kernel itself imports nothing and applies only its own constructors, a cycle closed by
-pre-loading a hand-written bootstrap (`MetaKernelBootstrapResolver`) rather than resolving it from a document. See
+it applies (`!enum`, `!numeric.integer_type`) through the compiled form of the schema in its import closure that
+declares it, or, for one the schema declares itself, through readers compiled from its entries ready so far: every
+declaration is made ready in wait order, whatever order it is written in, so a constructor and its instances, or a type
+and a value of it, may share a document either way round. Every name a schema writes resolves in that one namespace —
+its own entries and its imports, transitively. A bundled document's root holds only what an author writes, bare
+(`text`, `integer`, `boolean`, `enum`, `set`, `@doc`, `uuid`, `int32`, …); its machinery sits under a prefix and is
+written by its path (`meta.record`, `meta.identifier`, `meta.type_kind`, `meta.kind<meta.record>`, `@atom.ordering`,
+`net.uuid_type`). The kernel, meta.tn, holds the structural vocabulary; the data-format libraries numeric.tn,
+temporal.tn and net.tn each import it alone, with their instances at their root (`int32`, `date`, `uuid`) and their
+constructors under a map of their own (`numeric.decimal_type`, `temporal.date_type`, `net.uuid_type`); core.tn imports
+the three and adds the author annotations (`@title`, `@deprecated`, …). Import core.tn to get everything, or only the
+libraries you want: a schema importing temporal.tn alone sees `date` and no `int32`. A schema importing core reserves
+`meta`, `atom`, `numeric`, `unicode`, `net`, `binary`, `temporal` and every root name of those documents and of core, leaving
+`record`, `identifier`, `type_kind` and `kind` free. The
+kernel imports nothing and applies only its own constructors, a cycle closed by pre-loading a hand-written bootstrap
+(`MetaKernelBootstrapResolver`) rather than resolving it from a document. See
 [design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
-including how meta-kernel/meta.tn/core.tn are loaded and registered together.
+including how meta.tn, numeric.tn, temporal.tn, net.tn, core.tn and policy.tn are loaded and registered together.
 
 Vocabulary of your own — a schema declaring record types or namespace types
-(`api => !namespace { key_type: identifier  value_type: method }`) whose values other schemas hold as entries
+(`api => !meta.namespace { key_type: meta.identifier  value_type: method }`) whose values other schemas hold as entries
 (`orders => !api { … }`) — is a schema like any other, reached by `!!import` through the configured `SchemaAccess`.
 Those values bind through the same `ProcessorConfig.withDataBindContext` as data does; where no class binds a value's
 type it is held as a tree, so the schema still loads and validates, and only a schema obtained to bind refuses it.
@@ -700,10 +709,9 @@ pinned reference and a plain one still resolve to the same schema).
 
 **`tson strip`** prints a schema's reading form to standard output — the same declarations in as few tokens
 as the syntax allows, for a language model to read in a prompt. It drops the `!!id`, every header pin and the
-documentary annotations (`@doc`, `@title`, `@examples` and `@comment`), shortens the spec's own library to its
-revision and name (`!!import:"39/core"`), and puts each directive and each declaration on one line with its
-whitespace collapsed; other annotations and other references stay. `--keep-docs` keeps `@doc`, `@title` and
-`@examples`, for a model that should read the documentation too; `@comment`, a note for maintainers, still goes.
+documentary annotation `@doc`, shortens the spec's own library to its revision and name (`!!import:"39/core"`), and
+puts each directive and each declaration on one line with its whitespace collapsed; other annotations and other
+references stay. `--keep-docs` keeps `@doc`, for a model that should read the documentation too.
 The output is valid syntax but not loadable, so the file is never rewritten.
 
 **`validate` takes a flat list of files** and auto-classifies each as a schema (its root is tagged
@@ -772,7 +780,7 @@ OK
 - **A diagnostic locates a problem at up to two ends** — the value in the data (`path`, `data_position`) and the
   rule in the schema (`schema_id`, `schema_pointer`, `schema_position`) — and either end may be absent. The
   schema end is the path taken through *your* schema — an `age: int32` field that violates its bound reports
-  `/person/age`, not `/int32` in core.tn, because a pointer into a library file you didn't write and can't edit
+  `/person/age`, not `/int32` in numeric.tn, because a pointer into a library file you didn't write and can't edit
   is not where you go to fix it (the constraint is still in `message` and `expected`). A field with nothing to
   say is omitted, never `""`, the two RFC 6901 pointers included: for a pointer `""` is the *root*, a real
   location a document-level problem genuinely carries, so a present `""` and an absent key stay apart there. A

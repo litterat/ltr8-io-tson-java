@@ -99,7 +99,7 @@ class TextMemberSetTest {
     void aMemberSetAlreadySetMayNotBeShrunk() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("shrink", """
                 { country_code => !text ^ { members: ["SE" "NO" "DK"] }
-                  core => !country_code ^ { members: ["SE"] } }"""));
+                  sweden => !country_code ^ { members: ["SE"] } }"""));
 
         assertTrue(messages(diagnostics).contains("may be restated but not changed"), messages(diagnostics));
     }

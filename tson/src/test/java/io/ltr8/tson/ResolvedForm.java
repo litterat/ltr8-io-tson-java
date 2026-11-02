@@ -2,6 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -104,7 +105,7 @@ final class ResolvedForm {
         if (SchemaPaths.isNestedMap(value)) {
             // A nested map's members are entries under their paths, each compared on its own; the map is its names.
             Object members = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
-            return "!schema " + ((io.ltr8.tson.schema.meta.Namespace<?>) members).keySet();
+            return "!meta.schema " + ((io.ltr8.tson.schema.meta.Namespace<?>) members).keySet();
         }
         Object entry = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
         Object compared = entry instanceof TemplateBody held ? parsedForComparison(held) : entry;
@@ -123,10 +124,32 @@ final class ResolvedForm {
         Map<String, Top> own = new LinkedHashMap<>();
         linked.schema().entries().forEach((name, definition) -> {
             if (linked.originOf(name).equals(canonical)) {
-                own.put(withoutHash(name), definition);
+                own.put(withoutHash(name), contribution(name, definition, linked, canonical));
             }
         });
         return own;
+    }
+
+    /**
+     * A schema map as the document declares it: an open map is the union of what each document of the closure
+     * contributes, and a document's resolved output writes its own members alone.
+     */
+    private static Top contribution(String name, Top definition, io.ltr8.tson.schema.TsonLinkedSchema linked,
+                                    String canonical) {
+        if (!(definition instanceof io.ltr8.tson.schema.meta.ValueEntry entry) || !SchemaPaths.isNestedMap(entry)
+                || !(entry.value() instanceof io.ltr8.tson.schema.meta.Namespace<?> members)) {
+            return definition;
+        }
+        io.ltr8.annotation.AnnotatedMap<String, Top> own = new io.ltr8.annotation.AnnotatedMap<>();
+        members.annotatedEntrySet().forEach(member -> {
+            String path = name + "." + member.getKey().value();
+            if (linked.originOf(path).equals(canonical)) {
+                own.put(member.getKey().value(), contribution(path, (Top) member.getValue(), linked, canonical),
+                        member.getKey().annotations());
+            }
+        });
+        return new io.ltr8.tson.schema.meta.ValueEntry(entry.type(),
+                new io.ltr8.tson.schema.meta.Namespace<>(members.type(), own));
     }
 
     /**
@@ -144,7 +167,7 @@ final class ResolvedForm {
     }
 
     /**
-     * The names a §8 resolved-schema document marks {@code @synthetic} at its schema-map keys, hashes
+     * The names a §8 resolved-schema document marks {@code @meta.synthetic} at its schema-map keys, hashes
      * normalised -- read from the document's own <em>text</em>.
      *
      * <p>Text, and not the bound document every other comparison here uses, because a key-position
@@ -154,7 +177,7 @@ final class ResolvedForm {
      */
     static Set<String> markedSynthetics(String resolvedText) {
         Set<String> marked = new TreeSet<>();
-        Matcher matcher = Pattern.compile("@synthetic\\s+([A-Za-z0-9_]+)\\s*=>").matcher(resolvedText);
+        Matcher matcher = Pattern.compile("@meta.synthetic\\s+([A-Za-z0-9_]+)\\s*=>").matcher(resolvedText);
         while (matcher.find()) {
             marked.add(withoutHash(matcher.group(1)));
         }
@@ -168,7 +191,7 @@ final class ResolvedForm {
         String canonical = CanonicalIdentity.canonicalize(id);
         Set<String> marked = new TreeSet<>();
         entries.forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical) && entries.getAnnotations(name).has("synthetic")) {
+            if (linked.originOf(name).equals(canonical) && entries.getAnnotations(name).has(TsonSchema.SYNTHETIC)) {
                 marked.add(withoutHash(name));
             }
         });
@@ -180,10 +203,11 @@ final class ResolvedForm {
      * a fixture leaves out of its entries, being compared rather than read, and {@code synthetic}, which
      * {@link #markedSynthetics} compares on its own terms.
      */
-    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", "synthetic", "application");
+    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", TsonSchema.SYNTHETIC,
+            TsonSchema.APPLICATION);
 
     /**
-     * Each schema-map key's {@code @application} in a §8 resolved-schema document, as the reference's canonical text,
+     * Each schema-map key's {@code @meta.application} in a §8 resolved-schema document, as the reference's canonical text,
      * hashes normalised -- the instantiation each entry is (§8.2), read from the text parsed as data, a key
      * annotation being dropped when the document is bound. Compared as its parsed form, so whitespace inside the
      * argument list is free.
@@ -194,14 +218,14 @@ final class ResolvedForm {
             String name = keyed.getKey();
             MapValue.MapEntry entry = keyed.getValue();
             entry.key().annotations().stream()
-                    .filter(annotation -> annotation.name().equals("application"))
+                    .filter(annotation -> annotation.name().equals(TsonSchema.APPLICATION))
                     .forEach(annotation -> marked.put(withoutHash(name),
                             withoutHashes(writtenApplication(annotation.value().orElseThrow().coreValue()))));
         }
         return marked;
     }
 
-    /** The same, from this resolver: the {@code @application} on the keys of the schema's own entries. */
+    /** The same, from this resolver: the {@code @meta.application} on the keys of the schema's own entries. */
     static Map<String, String> ourApplications(Tson tson, String id) {
         var linked = tson.bindRegistry().core().resolveLinked(id);
         String canonical = CanonicalIdentity.canonicalize(id);
@@ -269,7 +293,7 @@ final class ResolvedForm {
 
     /**
      * Each entry's <em>value</em> annotations in a §8 resolved-schema document -- those written after {@code =>},
-     * {@code doc => @annotation !alias { ... }} -- as {@code @name} or {@code @name:value}, hashes normalised,
+     * {@code doc => @meta.annotation !alias { ... }} -- as {@code @name} or {@code @name:value}, hashes normalised,
      * read from the document's text parsed as data. An entry's value is its body, whose Java shape has no slot for
      * them, so binding the document drops them as it drops a key's; the resolver keeps them among the entry's
      * facts.
@@ -327,7 +351,7 @@ final class ResolvedForm {
         for (MapValue.MapEntry entry : map.entries()) {
             String path = prefix + ((TokenValue) entry.key().coreValue()).text();
             entries.put(path, entry);
-            if (entry.value().typeRef().filter("schema"::equals).isPresent()
+            if (entry.value().typeRef().filter(t -> t.equals("schema") || t.equals(TsonSchema.SCHEMA)).isPresent()
                     && entry.value().coreValue() instanceof MapValue nested) {
                 addEntries(entries, path + ".", nested);
             }
@@ -337,7 +361,7 @@ final class ResolvedForm {
     /**
      * A §8 resolved-schema document, bound back into the value model, read under its own header's imports -- a
      * resolved form's header is its source's ([TSON-SCHEMA] §8.1) -- and as a resolved form because this caller says
-     * so: its root, tagged {@code !schema}, is read as a value of {@code schema}.
+     * so: its root, tagged {@code !schema}, is read as a value of {@code meta.schema}.
      */
     static Map<String, Object> readResolved(Tson tson, String resolvedText) {
         return readResolved(tson, resolvedText, io.ltr8.tson.compiler.TsonDocumentPeek.of(resolvedText).header().imports());
@@ -351,21 +375,23 @@ final class ResolvedForm {
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> readResolved(Tson tson, String resolvedText, List<String> imports) {
-        List<String> under = imports.isEmpty() ? List.of(TsonBundledSchemas.META_KERNEL_ID) : imports;
+        List<String> under = imports.isEmpty() ? List.of(TsonBundledSchemas.META_ID) : imports;
         return SchemaPaths.withPaths((Map<String, Object>) tson.objectReader()
                 .withImports(under)
-                .readAs(resolvedText, "schema", Object.class));
+                .readAs(resolvedText, TsonSchema.SCHEMA, Object.class));
     }
 
     /**
      * Every problem a resolved form's read reports -- {@link #readResolved(Tson, String)} as a validation, in tree
-     * mode: the form validated as the value of {@code schema} it is, under its own header's imports.
+     * mode: the form validated as the value of {@code meta.schema} it is, under its own header's imports.
      */
-    static List<io.ltr8.tson.base.Diagnostic> validateResolved(Tson tson, String resolvedText) {
-        List<String> imports = io.ltr8.tson.compiler.TsonDocumentPeek.of(resolvedText).header().imports();
+    static List<io.ltr8.tson.base.Diagnostic> validateResolved(Tson tson, String resolvedText, String... beside) {
+        List<String> imports = new java.util.ArrayList<>(
+                io.ltr8.tson.compiler.TsonDocumentPeek.of(resolvedText).header().imports());
+        imports.addAll(List.of(beside));
         List<io.ltr8.tson.base.Diagnostic> problems = new java.util.ArrayList<>();
-        tson.treeReader().withImports(imports.isEmpty() ? List.of(TsonBundledSchemas.META_KERNEL_ID) : imports)
-                .withDiagnostics(problems::add).readAs(resolvedText, "schema");
+        tson.treeReader().withImports(imports.isEmpty() ? List.of(TsonBundledSchemas.META_ID) : imports)
+                .withDiagnostics(problems::add).readAs(resolvedText, TsonSchema.SCHEMA);
         return problems;
     }
 }

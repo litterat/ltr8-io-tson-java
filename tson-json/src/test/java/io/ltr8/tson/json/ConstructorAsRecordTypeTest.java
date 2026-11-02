@@ -6,7 +6,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.net.UuidType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
  * A constructor is an ordinary record type ([TSON-SCHEMA] §4.1, §4.2; SPEC-FEEDBACK.md #11): a name slot over {@code
  * T} admits a name exactly when the type of the named entry's value IS-A {@code T}, and a constructor whose
  * declaration is a record, {@code uuid_type => atom & { ... }}, holds a value of {@code record}. So it is a type a
- * field may be typed by, its instances being declarations read as data, and a name {@code kind<record>} admits.
+ * field may be typed by, its instances being declarations read as data, and a name {@code meta.kind<record>} admits.
  * Pinned in both encodings and both read modes.
  */
 class ConstructorAsRecordTypeTest {
@@ -33,12 +33,12 @@ class ConstructorAsRecordTypeTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              holder   => { spec: uuid_type }
-              pick     => { t: kind<record> }
-              tpick    => { t: type_kind }
+              holder   => { spec: net.uuid_type }
+              pick     => { t: meta.kind<meta.record> }
+              tpick    => { t: meta.type_kind }
               boxed    => <T> { v: T }
-              box_spec => boxed<uuid_type>
-              specs    => [uuid_type]
+              box_spec => boxed<net.uuid_type>
+              specs    => [net.uuid_type]
             }
             """;
 
@@ -56,7 +56,7 @@ class ConstructorAsRecordTypeTest {
     void aConstructorTypedFieldHoldsADeclarationInTheTree() {
         Tson tson = tson();
         assertEquals(List.of(), tson.validate(HEAD + "!holder { spec: { version: 4 } }"));
-        assertEquals(List.of(), tson.validate(HEAD + "!holder { spec: !uuid_type { version: 4 } }"));
+        assertEquals(List.of(), tson.validate(HEAD + "!holder { spec: !net.uuid_type { version: 4 } }"));
         assertEquals(List.of(), tson.validate(HEAD + "!specs [{ version: 4 } {}]"));
         assertEquals(List.of(), tson.validate(HEAD + "!box_spec { v: { version: 4 } }"));
 
@@ -77,13 +77,13 @@ class ConstructorAsRecordTypeTest {
     @Test
     void aKindOfRecordHoldsAConstructorsName() {
         Tson tson = tson();
-        assertEquals(List.of(), tson.validate(HEAD + "!pick { t: uuid_type }"));
-        assertEquals(List.of(), tson.validate(HEAD + "!pick { t: record }"));
-        assertEquals(List.of(), tson.validate(HEAD + "!tpick { t: uuid_type }"));
+        assertEquals(List.of(), tson.validate(HEAD + "!pick { t: net.uuid_type }"));
+        assertEquals(List.of(), tson.validate(HEAD + "!pick { t: meta.record }"));
+        assertEquals(List.of(), tson.validate(HEAD + "!tpick { t: net.uuid_type }"));
 
         ConstructorPick pick = assertInstanceOf(ConstructorPick.class, tson.objectReader().withSchema(ID)
-                .readAs("{ t: uuid_type }", "pick", Object.class));
-        assertEquals(TypeRef.of("uuid_type"), pick.t());
+                .readAs("{ t: net.uuid_type }", "pick", Object.class));
+        assertEquals(TypeRef.of("net.uuid_type"), pick.t());
     }
 
     @Test
@@ -92,7 +92,7 @@ class ConstructorAsRecordTypeTest {
         Json json = Json.standard().withSchemas(tson.schemaRegistry());
 
         assertEquals(List.of(), json.validate("{\"spec\": {\"version\": 4}}", ID, "holder"));
-        assertEquals(List.of(), json.validate("{\"t\": \"uuid_type\"}", ID, "pick"));
+        assertEquals(List.of(), json.validate("{\"t\": \"net.uuid_type\"}", ID, "pick"));
         List<Diagnostic> problems = json.validate("{\"spec\": {\"nope\": 4}}", ID, "holder");
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, problems.getFirst().code(), problems::toString);
     }

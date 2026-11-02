@@ -36,8 +36,8 @@ import java.util.TreeSet;
  * <ul>
  *   <li>An alias ({@code !alias { target: X }}) is ready when its target is: an edge alias → {@code X}, beside
  *       what reading its own declaration reaches.</li>
- *   <li><b>A reference orders nothing.</b> A token at a slot typed by a kind ({@code type_kind},
- *       {@code identifier_kind}, any {@code !reference} instance)
+ *   <li><b>A reference orders nothing.</b> A token at a slot typed by a kind ({@code meta.type_kind},
+ *       {@code meta.identifier_kind}, any {@code !reference} instance)
  *       waits on the slot's own type and what reading that reaches, never on the entry the name names. This falls
  *       out of the walk: a kind is an atom, so reading against one reaches nothing further.</li>
  *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only, and a template's
@@ -57,7 +57,7 @@ import java.util.TreeSet;
  *
  * <p><b>Where the rule as written is silent</b>, this implements: an entry's value is read against its head tag,
  * not against the enclosing schema's {@code value_type} (the document read waits on that, see
- * {@link #documentWaits()}); a schema-map key's annotations ({@code @synthetic}) belong to the schema map, so
+ * {@link #documentWaits()}); a schema-map key's annotations ({@code @meta.synthetic}) belong to the schema map, so
  * they too are waits of the document read and not of the entry they mark; a bare token at a record position is
  * that record's shorthand for its one required field; a namespace type stating no
  * {@code key_type} has its keys read by their spelling, as {@code text}, the host judging them later.
@@ -82,6 +82,9 @@ final class WaitGraph {
     private record Shape(String terminal, DataValue declaration, Form form) {
     }
 
+    private static final String SCHEMA = "meta.schema";
+    private static final String ALIAS = "meta.alias";
+
     private final Map<String, DataValue> declarations = new LinkedHashMap<>();
     private final Map<String, List<Annotation>> keyAnnotations = new LinkedHashMap<>();
     private final Map<String, Map<String, Wait>> waits = new LinkedHashMap<>();
@@ -99,16 +102,32 @@ final class WaitGraph {
         if (!(root.coreValue() instanceof MapValue map)) {
             throw new IllegalArgumentException("the document root is not a schema map: " + root.coreValue());
         }
-        for (MapValue.MapEntry entry : map.entries()) {
-            String name = text(entry.key().coreValue());
-            graph.declarations.put(name, entry.value());
-            graph.keyAnnotations.put(name, entry.key().annotations());
-        }
+        graph.declare("", map);
         for (Map.Entry<String, DataValue> entry : graph.declarations.entrySet()) {
             graph.readEntry(entry.getKey(), entry.getValue());
         }
         graph.readDocument(root);
         return graph;
+    }
+
+    /**
+     * The entries of a schema map, a nested map's members under their paths ({@code meta.record}): a schema map
+     * nested as an entry declares as the root does, and is itself no entry a read waits on.
+     */
+    private void declare(String prefix, MapValue map) {
+        for (MapValue.MapEntry entry : map.entries()) {
+            String name = prefix + text(entry.key().coreValue());
+            if (isSchemaMap(entry.value()) && entry.value().coreValue() instanceof MapValue members) {
+                declare(name + ".", members);
+                continue;
+            }
+            declarations.put(name, entry.value());
+            keyAnnotations.put(name, entry.key().annotations());
+        }
+    }
+
+    private static boolean isSchemaMap(DataValue value) {
+        return value.typeRef().filter(t -> t.equals("schema") || t.equals(SCHEMA)).isPresent();
     }
 
     /** Every entry, in document order. */
@@ -133,6 +152,41 @@ final class WaitGraph {
 
     List<Overapproximation> overapproximations() {
         return overapproximations;
+    }
+
+    /**
+     * Every entry {@code entry}'s declaration names, wait or not: a tag, an annotation, a token that is an entry's
+     * name (a field's type, a reference's {@code of}, a supertype), its key's annotations. A chain's {@code subtypes}
+     * are left out, being the inverse the linker derives over whatever entries the document holds, never an input.
+     */
+    Set<String> references(String entry) {
+        Set<String> names = new TreeSet<>();
+        names(declarations.get(entry), null, names);
+        keyAnnotations.get(entry).forEach(annotation -> names.add(annotation.name()));
+        names.retainAll(declarations.keySet());
+        return names;
+    }
+
+    private static void names(DataValue value, String field, Set<String> into) {
+        if ("subtypes".equals(field)) {
+            return;
+        }
+        value.typeRef().ifPresent(into::add);
+        for (Annotation annotation : value.annotations()) {
+            into.add(annotation.name());
+            annotation.value().ifPresent(v -> names(v, null, into));
+        }
+        switch (value.coreValue()) {
+            case TokenValue token -> into.add(token.text());
+            case RecordValue record -> record.fields().forEach(f -> names(f.value(), f.name(), into));
+            case ArrayValue array -> array.elements().forEach(e -> names(e, null, into));
+            case MapValue map -> map.entries().forEach(e -> {
+                names(e.key(), null, into);
+                names(e.value(), null, into);
+            });
+            default -> {
+            }
+        }
     }
 
     /** Anything the walk could not decide from the document: a name with no entry, a value of the wrong form. */
@@ -204,7 +258,7 @@ final class WaitGraph {
             return;
         }
         read.read(declaration, head.get(), "head", "");
-        if (head.get().equals("alias")) {
+        if (head.get().equals(ALIAS)) {
             targetName(declaration).ifPresentOrElse(
                     target -> read.waitOn(target, "alias target", "target"),
                     () -> problems.add(name + ": an alias with no target name"));
@@ -213,7 +267,7 @@ final class WaitGraph {
 
     private void readDocument(DataValue root) {
         Read read = new Read("<document>");
-        String rootType = root.typeRef().orElse("schema");
+        String rootType = root.typeRef().filter(t -> !t.equals("schema")).orElse(SCHEMA);
         read.waitOn(rootType, "head", "");
         read.annotations(root.annotations(), "");
         Shape shape = shape(rootType, read, "");
@@ -417,27 +471,27 @@ final class WaitGraph {
         }
         Set<String> constructorSupertypes = new HashSet<>(supertypes(declarations.get(constructor)));
         Form form;
-        if (constructor.equals("record")) {
+        if (constructor.equals("meta.record")) {
             if ("ABSTRACT".equals(token(field(declaration, "extension")))) {
                 form = Form.ABSTRACT;
             } else {
                 form = Form.RECORD;
             }
-        } else if (constructor.equals("array") || constructorSupertypes.contains("array")) {
+        } else if (constructor.equals("meta.array") || constructorSupertypes.contains("meta.array")) {
             form = Form.ARRAY;
-        } else if (constructor.equals("map")) {
+        } else if (constructor.equals("meta.map")) {
             form = Form.MAP;
-        } else if (constructor.equals("namespace")) {
+        } else if (constructor.equals("meta.namespace")) {
             form = Form.NAMESPACE;
-        } else if (constructor.equals("declared_type")) {
+        } else if (constructor.equals("meta.declared_type")) {
             form = Form.DECLARED;
-        } else if (constructor.equals("tuple")) {
+        } else if (constructor.equals("meta.tuple")) {
             form = Form.TUPLE;
-        } else if (constructor.equals("choice")) {
+        } else if (constructor.equals("meta.choice")) {
             form = Form.CHOICE;
-        } else if (constructor.equals("template")) {
+        } else if (constructor.equals("meta.template")) {
             form = Form.TEMPLATE;
-        } else if (constructorSupertypes.contains("atom")) {
+        } else if (constructorSupertypes.contains("meta.atom")) {
             form = Form.ATOM;
         } else {
             problems.add(terminal + ": no form for its constructor " + constructor);
@@ -455,7 +509,7 @@ final class WaitGraph {
             if (declaration == null) {
                 return null;
             }
-            if (!"alias".equals(declaration.typeRef().orElse(""))) {
+            if (!ALIAS.equals(declaration.typeRef().orElse(""))) {
                 return current;
             }
             current = targetName(declaration).orElse(null);

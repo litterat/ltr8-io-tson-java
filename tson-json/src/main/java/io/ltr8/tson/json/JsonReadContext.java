@@ -297,7 +297,7 @@ public final class JsonReadContext {
      * <p>The asymmetry with {@link #underDeclaration} is the one that keeps a schema pointer useful. A record
      * <em>declares</em> the member the pointer ends with, so it owns the identity and the line; an atom or a
      * container reached from that member does not, and offering its own would name the file the type came
-     * from -- core.tn -- rather than the line the author can edit.
+     * from -- numeric.tn -- rather than the line the author can edit.
      */
     public JsonReadContext inRecord(JsonSchemaLocation declaration) {
         return new JsonReadContext(cursor, tail,

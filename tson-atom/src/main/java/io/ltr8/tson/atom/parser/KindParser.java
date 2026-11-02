@@ -11,12 +11,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses and validates against a reference that names types -- an instance of the meta-kernel's {@code reference}
- * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, spelled {@code kind<record>} or {@code ref<record>} alike.
- * A value is a type's name or an application, read by {@link ReferenceGrammar} into the {@link TypeRef} it is, and
- * then judged a member: the entry it denotes must be one of the reference's linked members. The value is the
- * reference, never a value of the type it names; a reader rolls a name token or a reference's tree into the one
- * text this reads.
+ * Parses and validates against a reference that names types -- an instance of the kernel's {@code reference}
+ * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, spelled {@code meta.kind<record>} or {@code meta.ref<record>}
+ * alike. A value is a type's name or an application, read by {@link ReferenceGrammar} into the {@link TypeRef} it is,
+ * and then judged a member: the entry it denotes must be one of the reference's linked members. The value is the
+ * reference, never a value of the type it names; a reader rolls a name token or a reference's tree into the one text
+ * this reads.
  *
  * <p><b>The value finds what it names.</b> A reference read here carries the closure the members were computed over
  * ({@link ReferenceBody#closure}), so {@link TypeRef#referent} answers with the entry it denotes.
@@ -52,7 +52,7 @@ public record KindParser(ReferenceBody kind, boolean judgesMembers) implements A
     public TypeRef read(String text) {
         TypeRef reference = ReferenceGrammar.parse(text);
         if (reference.arguments().isEmpty()) {
-            // A name is read as the kernel's type_name reads each segment, into its normalization form.
+            // A name is read as the kernel's meta.type_name reads each segment, into its normalization form.
             List<String> segments = new ArrayList<>(reference.segments().size());
             for (String segment : reference.segments()) {
                 segments.add(IdentifierParser.IDENTIFIER.read(segment));

@@ -172,7 +172,7 @@ admit UTS #39's own `Toys-Я-Us`.
   built-in names stay checked — and is what round-tripping through `TsonTreeWriter`, or reading the wire of a
   document whose `!!import` is deliberately out of scope, wants. The two controls compose, as
   `ignoringUnknownFields()` does with both.
-- **A reference is a `TypeRef` in both modes.** Under a schema a reference-typed position (a kind or a `ref<…>`)
+- **A reference is a `TypeRef` in both modes.** Under a schema a reference-typed position (a kind or a `meta.ref<…>`)
   reads to a `schema.meta.TypeRef`, so a tree read hands back a `TsonAtom` holding one (`node.as(TypeRef.class)`)
   and a bind delivers the same object, a `String` host receiving its canonical text. Read in data under a kind, it
   carries its closure, so `referent()` is the value of the entry it names (`design/references.md`). A schemaless read

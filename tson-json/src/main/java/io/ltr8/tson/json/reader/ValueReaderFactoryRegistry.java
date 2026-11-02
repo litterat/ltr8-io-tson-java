@@ -30,15 +30,19 @@ import java.util.function.UnaryOperator;
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
-    /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
+    /** The atom constructors the kernel and the three libraries declare, by path. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
-            // meta-kernel.tn
-            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type", "reference",
-            // meta.tn
-            "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
-            "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
-            "iri_type", "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type",
-            "hostname_type", "host_type", "media_type_type");
+            // meta.tn, under meta
+            "numeric.integer_type", "unicode.text_type", "unicode.identifier_type", "unicode.regex_type", "net.iri_type",
+            "meta.reference", "binary.bytes_type",
+            // numeric.tn, under numeric
+            "numeric.float_type", "numeric.decimal_type", "numeric.rational_type", "numeric.complex_type",
+            // temporal.tn, under temporal
+            "temporal.date_type", "temporal.time_type", "temporal.datetime_type", "temporal.duration_type",
+            "temporal.period_type",
+            // net.tn, under net
+            "net.uri_type", "net.uuid_type", "net.email_type", "net.mac_type", "net.ipv4_type", "net.ipv6_type",
+            "net.cidr4_type", "net.cidr6_type", "net.hostname_type", "net.host_type", "net.media_type_type");
 
     private final Map<String, ValueReaderFactory> factories;
 
@@ -57,7 +61,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry atoms() {
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
-        factories.put("template", DispatchFactories.TEMPLATE);
+        factories.put("meta.template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -71,16 +75,16 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry tree() {
         Map<String, ValueReaderFactory> factories = vocabulary(TreeAtomReader::over);
-        factories.put("record", DispatchFactories.over(TreeRecordBuilder.FACTORY));
-        factories.put("array", TreeArrayBuilder.FACTORY);
+        factories.put("meta.record", DispatchFactories.over(TreeRecordBuilder.FACTORY));
+        factories.put("meta.array", TreeArrayBuilder.FACTORY);
         // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
         // so the same factory serves it and the body's own `unique_items` is what separates them.
-        factories.put("set_type", TreeArrayBuilder.FACTORY);
-        factories.put("tuple", TreeTupleBuilder.FACTORY);
-        factories.put("map", TreeMapBuilder.FACTORY);
-        factories.put("choice", DispatchChoiceReader.FACTORY);
-        factories.put("declared_type", DispatchDeclaredReader.FACTORY);
-        factories.put("template", DispatchFactories.TEMPLATE);
+        factories.put("meta.set_type", TreeArrayBuilder.FACTORY);
+        factories.put("meta.tuple", TreeTupleBuilder.FACTORY);
+        factories.put("meta.map", TreeMapBuilder.FACTORY);
+        factories.put("meta.choice", DispatchChoiceReader.FACTORY);
+        factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
+        factories.put("meta.template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -96,22 +100,22 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry bind(DataBindContext binding) {
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
-        factories.put("record", DispatchFactories.over(BindRecordBuilder.factory(binding)));
-        factories.put("array", BindArrayBuilder.FACTORY);
-        factories.put("set_type", BindArrayBuilder.FACTORY);
-        factories.put("tuple", BindTupleBuilder.FACTORY);
-        factories.put("map", BindMapBuilder.FACTORY);
-        factories.put("choice", DispatchChoiceReader.FACTORY);
-        factories.put("declared_type", DispatchDeclaredReader.FACTORY);
-        factories.put("template", DispatchFactories.TEMPLATE);
+        factories.put("meta.record", DispatchFactories.over(BindRecordBuilder.factory(binding)));
+        factories.put("meta.array", BindArrayBuilder.FACTORY);
+        factories.put("meta.set_type", BindArrayBuilder.FACTORY);
+        factories.put("meta.tuple", BindTupleBuilder.FACTORY);
+        factories.put("meta.map", BindMapBuilder.FACTORY);
+        factories.put("meta.choice", DispatchChoiceReader.FACTORY);
+        factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
+        factories.put("meta.template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
     /** §5's atom constructors, each leaf passed through {@code leaf} so a mode can wrap what it produces. */
     private static Map<String, ValueReaderFactory> vocabulary(UnaryOperator<ValueReaderFactory> leaf) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
-        factories.put("value_type", leaf.apply(AtomReader.VALUE));
-        factories.put("void_type", leaf.apply(AtomReader.VOID));
+        factories.put("meta.value_type", leaf.apply(AtomReader.VALUE));
+        factories.put("meta.void_type", leaf.apply(AtomReader.VOID));
         factories.put("enum", leaf.apply(AtomReader.ENUM));
         for (String constructor : ATOM_CONSTRUCTORS) {
             factories.put(constructor, leaf.apply(AtomReader.ATOM));

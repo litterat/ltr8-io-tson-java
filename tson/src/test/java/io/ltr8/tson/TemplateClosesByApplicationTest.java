@@ -44,12 +44,11 @@ class TemplateClosesByApplicationTest {
     private static String meta(String extraDeclarations) {
         return """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   base       => {}
-                  my_bounded => <N> array ^ { max_items?: = N }
-                  my_set     => <T> array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }
+                  my_bounded => <N> meta.array ^ { max_items?: = N }
+                  my_set     => <T> meta.array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }
                   box        => <T> base & { value: T }
                   %s
                 }
@@ -129,7 +128,7 @@ class TemplateClosesByApplicationTest {
     }
 
     /**
-     * And the type-channel spelling closes the same way: {@code element_type} is typed {@code type_kind}, an atom, so
+     * And the type-channel spelling closes the same way: {@code element_type} is typed {@code meta.type_kind}, an atom, so
      * §5.2 admits a fixed value there, and the pin {@code text} is judged a member of the kind where it is written --
      * a constructor template may pin its element type as {@code set_type} pins {@code unique_items}.
      */

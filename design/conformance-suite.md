@@ -106,7 +106,7 @@ including a key. `design/json-unicode-policies.md` has the worked comparison.
 author-written content into its readable half, so `InternalName` restricts that half to **ASCII**: what §7.7
 admits is spliced, other ASCII keeps its admitted characters and gains a hash (`"/x"` → `x_h00000f2f`), and
 anything else is the hash alone. That satisfies §8.2's freshness MUST — an internal name is a valid
-`identifier` — and, because an ASCII name is single-script and inside the identifier profile, it also passes
+`meta.identifier` — and, because an ASCII name is single-script and inside the identifier profile, it also passes
 all three hygiene rules at every level. Admitting `XID_Continue` instead would keep the name legal while
 letting a document's own text shape a namespace name, and would refuse any schema written outside Latin
 script; exempting minted names from the walk would answer that by leaving the hole open.
@@ -138,11 +138,11 @@ and handed to the front door as the one context schemas and data bind through
 binding. A new fixture record is a new host record beside them; the fixture's `@doc` lists the records its value entries
 hold, which is the corpus's half of the contract (`RUNNER.md`).
 **A `schema/` vector's expected side is read under the subject's first `!!import`** (`ResolvedForm.readResolved`, a
-`withImports(…).readAs(text, "schema")` read; the pre-loaded kernel where the subject imports nothing), and the object
-reader binds through `SuiteBindings` too: a fixture imports meta.tn and adds its own types, and a value entry in
-resolved output is typed by that fixture alone, so a vector showing a value by name written back as written
-reads only there. Only the first: `SuiteBindings` binds by name across the corpus, and reading under every import
-would bind a second fixture's same-named record to the first's class.
+`withImports(…).readAs(text, "meta.schema")` read, its root tag `!schema` the spelling of `meta.schema`; the pre-loaded
+kernel where the subject imports nothing), and the object reader binds through `SuiteBindings` too: a fixture imports the
+bundled schemas it builds on and adds its own types, and a value entry in resolved output is typed by that fixture alone, so
+a vector showing a value by name written back as written reads only there. Only the first: `SuiteBindings` binds by name
+across the corpus, and reading under every import would bind a second fixture's same-named record to the first's class.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist
@@ -170,16 +170,15 @@ cannot fail on `{ a: 1  a: 2 }`; the parser accepts it by design. An error vecto
 `category: resolver` and its subject must parse, which `checkReaderVector` asserts before asking the reader
 for a verdict.
 
-**The `class2/` layers are the three answers a Class 2 processor gives.** `schema/` needs no invented
-expectation format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a
-valid vector's subject is a schema document and its expected side is that document's resolved output in §8's
-own form, read back through `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question
-of `spec/m/*-resolved.tn`) and compared entry for entry, `@synthetic` key markers included. A nested schema map is
-walked into: `ResolvedForm.entries` keys each member under its path, `readResolved` adds the path keys a schema holds
-(`SchemaPaths.withPaths`), and the nested map's own entry compares as its member names. `link/` states
-individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived disjointness, §8.2's
-`subtypes` index, a kind's derived `members` (compared as a set, minted names normalised). `validate/` is a data
-document against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901
+**The `class2/` layers are the three answers a Class 2 processor gives.** `schema/` needs no invented expectation format:
+§1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a valid vector's subject is a schema
+document and its expected side is that document's resolved output in §8's own form, read back through `ResolvedForm` (shared
+with `ResolvedFixtureTest`, which asks the same question of `spec/fixtures/*-resolved.tn`) and compared entry for entry,
+`@meta.synthetic` key markers included. A nested schema map is walked into: `ResolvedForm.entries` keys each member under its
+path, `readResolved` adds the path keys a schema holds (`SchemaPaths.withPaths`), and the nested map's own entry compares as
+its member names. `link/` states individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived
+disjointness, §8.2's `subtypes` index, a kind's derived `members` (compared as a set, minted names normalised). `validate/`
+is a data document against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901
 pointer into the data and nothing else.
 
 **At the schema and link layers the category is the phase's, not the diagnostic code's.** §8.1 says every
@@ -190,7 +189,7 @@ a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch code
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
 **No `class2/schema/` subject declares a template yet, and nothing stops one now.** An open entry's body is
-the kernel's `template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
+the kernel's `meta.template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
 schema-map value like any other and reads back as ordinary data — where §8.1's older shape wrote the
 application as though it were a value of the constructor's own vocabulary, which no reader could apply
 (§8.1). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one

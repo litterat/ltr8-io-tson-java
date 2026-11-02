@@ -19,20 +19,16 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * The same proof {@link MetaKernelEndToEndTest} gives for meta-kernel.tn, one rung up the schema
- * ladder: compiles the ENTIRE real, registered {@code meta.tn} (meta-kernel + meta.tn, chained
- * the way {@code io.ltr8.tson.compiler.resolver.MetaSchemaImportTest} registers them) and
- * reads real TSON data text against one of meta.tn's own genuinely useful record types.
+ * The same proof {@link MetaKernelEndToEndTest} gives for the bootstrap's output, for the kernel as it is
+ * registered: meta.tn resolved the ordinary way through {@code SchemaResolver} against the pre-loaded stand-in,
+ * linked, registered and compiled whole, then read with real TSON data text against one of its record types.
  */
 class MetaTn1CompiledEndToEndTest {
 
     /**
-     * Resolving meta.tn itself now goes through {@code resolveSchema}/{@code bindAtomInstance}, which
-     * needs an object-binding-mode compiled reader for meta-kernel (its own Instance declarations,
-     * e.g. {@code bytes_encoding => !enum [...]}, go through it) -- so meta.tn's own resolution
-     * step below is object mode internally, even though the *outer* compile this test itself
-     * exercises stays DOM mode (a separate, fresh compilation of the final, already-resolved {@code
-     * TsonSchema}, unrelated to how it got resolved).
+     * The kernel resolved through {@code resolveSchema}/{@code bindAtomInstance}, whose instance declarations
+     * ({@code boolean => !enum [...]}) read through the loader's object-binding-mode stand-in, then registered;
+     * then numeric.tn resolved over it and registered. The outer compile this test exercises stays tree mode.
      */
     private static TsonLinkedSchema registerMeta() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
@@ -40,17 +36,16 @@ class MetaTn1CompiledEndToEndTest {
         TsonCompiledMetaRegistry compiledRegistry = new TsonCompiledMetaRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
-        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
-        SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
+        SchemaDocument kernelDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(
+                TsonBundledSchemas.META_ID)).parseSchemaDocument();
+        TsonSchema kernel = new SchemaResolver(loader).resolveSchema(kernelDocument);
+        TsonLinkedSchema linkedKernel = registry.register(TsonSchemaLinker.link(kernel, registry));
         // Registered with the compiled registry too, which compiles it as the kernel's vocabulary.
-        compiledRegistry.register(metaKernelMaterialized.schema());
+        compiledRegistry.register(linkedKernel.schema());
 
-        String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
-        SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
+        SchemaDocument metaDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.NUMERIC_ID))
+                .parseSchemaDocument();
         TsonSchema meta = new SchemaResolver(loader).resolveSchema(metaDocument);
-
         return registry.register(TsonSchemaLinker.link(meta, registry));
     }
 
@@ -65,13 +60,8 @@ class MetaTn1CompiledEndToEndTest {
     }
 
     /**
-     * {@code meta.tn} declares 31 entries of its own, but the *registered* schema this compiles --
-     * the one a real reader actually needs, since it's what {@link TsonSchemaCompiler#compile} accepts
-     * -- also carries meta-kernel's own entries (merged in via meta.tn's real {@code !!import}) plus
-     * whatever array-sugar materialization synthesized, matching {@code MetaSchemaImportTest}'s own
-     * counts. Every one of them still compiles cleanly with the same registry this whole atom-family
-     * + composite factory set already proves against meta-kernel.tn in {@link
-     * MetaKernelEndToEndTest}.
+     * numeric.tn's registered entries -- its own, the kernel's it imports, and the synthetics their sugar lifts -- each
+     * compile cleanly with the same factory set {@link MetaKernelEndToEndTest} proves against the bootstrap's output.
      */
     @Test
     void everyRealMetaEntryCompilesCleanly() {
@@ -81,17 +71,17 @@ class MetaTn1CompiledEndToEndTest {
         for (String name : meta.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(112, meta.schema().entries().size());
+        assertEquals(115, meta.schema().entries().size());
     }
 
     @Test
-    void readsBytesEncodingEnumMembersAgainstRealData() {
+    void readsTheOrderingEnumsMembersAgainstRealData() {
         TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = rawCompile(meta);
 
-        Object result = Dom.of((TsonValue) compiled.get("bytes_encoding")
-                .read(TestDocuments.document("BASE64")));
+        Object result = Dom.of((TsonValue) compiled.get("atom.ordering")
+                .read(TestDocuments.document("TOTAL")));
 
-        assertEquals("BASE64", result);
+        assertEquals("TOTAL", result);
     }
 }

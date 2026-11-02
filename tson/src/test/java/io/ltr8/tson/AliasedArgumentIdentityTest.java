@@ -46,7 +46,7 @@ class AliasedArgumentIdentityTest {
                   chained  => user_id
 
                   narrowed => !uuid ^ {}
-                  fresh    => !uuid_type {}
+                  fresh    => !net.uuid_type {}
 
                   box => <T> { value: T }
 

@@ -57,7 +57,7 @@ class DirectDefinitionShapeTest {
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(textList, n -> true),
                 "the declaration is the array entry, not a hop to one");
-        assertEquals(java.util.Optional.of("array"), schema.constructorOf("text_list"));
+        assertEquals(java.util.Optional.of("meta.array"), schema.constructorOf("text_list"));
     }
 
     /**

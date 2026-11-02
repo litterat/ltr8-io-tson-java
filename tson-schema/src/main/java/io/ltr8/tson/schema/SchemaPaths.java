@@ -65,15 +65,20 @@ public final class SchemaPaths {
 
     /**
      * {@code entries} with every nested map and its members in step: a member a nested map holds and no path keys
-     * (a schema built from a resolved form read back) is added under its path, and each nested map's value is then
-     * rebuilt from the entries at its members' paths, with their key annotations, in their order, innermost first.
+     * (a schema built from a resolved form read back) is added under its path, an entry keyed under its path being
+     * the one held where both are present, and each nested map's value is then rebuilt from the entries at its
+     * members' paths, with their key annotations, in their order, innermost first.
      * Returns {@code entries} itself where it holds no nested map.
      */
     public static Namespace<Top> synced(Namespace<Top> entries) {
         if (entries.values().stream().noneMatch(SchemaPaths::isNestedMap)) {
             return entries;
         }
+        // Every keyed entry first, so a member keyed under its path is the one held, whichever comes first: the
+        // nested map's own copy may predate it (a schema rebuilt from a linked or partly ready namespace).
         AnnotatedMap<String, Object> flat = new AnnotatedMap<>();
+        entries.annotatedEntrySet().forEach(entry ->
+                flat.put(entry.getKey().value(), entry.getValue(), entry.getKey().annotations()));
         entries.annotatedEntrySet().forEach(entry ->
                 addWithMembers(flat, entry.getKey().value(), entry.getValue(), entry.getKey().annotations()));
         List<String> maps = new ArrayList<>();

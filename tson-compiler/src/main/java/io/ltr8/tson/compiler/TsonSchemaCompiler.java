@@ -42,7 +42,7 @@ import java.util.function.Function;
  * Compilation#resolve} catches it and substitutes an {@link ErrorReader}, so the schema as a whole
  * still compiles; only actually reading a value against that one entry fails, at that point. This
  * covers both a constructor with no {@link ValueReaderFactory} to dispatch to, and a factory that exists
- * but rejects this particular entry. Every constructor meta-kernel.tn and meta.tn declare has a factory,
+ * but rejects this particular entry. Every constructor the kernel and the three libraries declare has a factory,
  * so the first case is a constructor a schema declared itself that this library has never seen.
  *
  * <p><b>An entry declaring type parameters never reaches a factory at all</b>, and compiles to one of two
@@ -77,7 +77,7 @@ public final class TsonSchemaCompiler {
     /**
      * Compiles {@code linkedSchema} against a factory set -- every body's constructor is dispatched through
      * {@code factories} alone. A read registry compiles a schema in its mode this way, and {@link
-     * TsonCompiledMetaSchema#compile} compiles vocabulary in object-binding mode, meta-kernel's pre-loaded
+     * TsonCompiledMetaSchema#compile} compiles vocabulary in object-binding mode, the kernel's pre-loaded
      * stand-in ({@link TsonSchema#bootstrap()}) among it.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -59,13 +60,13 @@ final class WireForm {
 
     // ── The vocabulary's own member names ────────────────────────────────────────────────────────
 
-    /** {@code record_field.value}: §8.1's literal channel. */
+    /** {@code meta.record_field.value}: §8.1's literal channel. */
     static final String VALUE = "value";
 
     /** The constructor an open record's held tree applies. */
-    static final String RECORD = "record";
+    static final String RECORD = KernelNames.of("record");
 
-    static final String ALIAS = "alias";
+    static final String ALIAS = KernelNames.of("alias");
 
     static final String TARGET = "target";
 
@@ -106,7 +107,7 @@ final class WireForm {
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * A {@code field_group} as a held body writes it: {@code optional_members} only where it names a member, and
+     * A {@code meta.field_group} as a held body writes it: {@code optional_members} only where it names a member, and
      * {@code optional} only where it is set.
      */
     static DataValue group(FieldGroup group, List<Annotation> annotations) {
@@ -129,7 +130,7 @@ final class WireForm {
 
     /**
      * {@code record.fields} as a held body writes it: a map from each field's declared name ({@link
-     * #declaredName}) to its {@code record_field}, in declaration order. An empty one is the empty brace, which
+     * #declaredName}) to its {@code meta.record_field}, in declaration order. An empty one is the empty brace, which
      * is what the text parses back to.
      */
     static CoreValue fieldMap(List<MapValue.MapEntry> entries) {
@@ -148,7 +149,7 @@ final class WireForm {
 
     /**
      * The same, carrying the annotations written on the construct it stands for. §6 puts a field's own
-     * annotations on the {@code record_field} in resolver output, and a held body reaches that through the
+     * annotations on the {@code meta.record_field} in resolver output, and a held body reaches that through the
      * wire value, so they travel here rather than being re-attached after the fact.
      */
     static DataValue plain(CoreValue value, List<Annotation> annotations) {
@@ -156,7 +157,7 @@ final class WireForm {
     }
 
     /**
-     * A {@code record_field}'s presence and role, each written only where it leaves the kernel's own default
+     * A {@code meta.record_field}'s presence and role, each written only where it leaves the kernel's own default
      * ({@code optional: false}, {@code voidable: false}, {@code role: FREE}) -- the one spelling both producers
      * of a held record share, so a template body and the closed record beside it state a field alike.
      */
@@ -199,7 +200,7 @@ final class WireForm {
     // ── Writing: a resolved value as the wire form it was written in ───────────────────────────
 
     /**
-     * The held body of an <b>open alias</b> -- {@code <B> !alias { target: pair<uuid B> }}, the form
+     * The held body of an <b>open alias</b> -- {@code <B> !meta.alias { target: pair<uuid B> }}, the form
      * [TSON-SCHEMA] §8.1 says a partial application denotes: {@code alias.target} is a reference, and a reference
      * may carry the arguments the alias already binds.
      *
@@ -213,7 +214,7 @@ final class WireForm {
     }
 
     /**
-     * An open record's held tree ({@code HeldBody.of}): the {@code !record { … }} application closing substitutes
+     * An open record's held tree ({@code HeldBody.of}): the {@code !meta.record { … }} application closing substitutes
      * into and reads back through {@code record}'s own reader, written from the record value -- its parents as
      * written, its fields, groups, selectors, a non-default {@code name_type}, and its own {@code extension} where
      * it is not OPEN, the constructor's default. Through {@link #refValue} and {@link #nameField}, the spelling
@@ -348,7 +349,7 @@ final class WireForm {
     }
 
     /**
-     * The parents a held {@code !record { chain: { parents: [...] } ... }} tree writes, as references -- empty for a
+     * The parents a held {@code !meta.record { chain: { parents: [...] } ... }} tree writes, as references -- empty for a
      * held body that is no record or writes none. They are the parents as written ([TSON-SCHEMA] §5.10), a bare
      * name or an application, which is what closing a record template completes into a chain.
      */

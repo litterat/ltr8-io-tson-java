@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A value by name reached through a record value's field: a namespace type declares only its facets, so a construct
- * with fields of its own and a map of members is a record holding both under a namespace key, and a {@code ref<T>}
+ * with fields of its own and a map of members is a record holding both under a namespace key, and a {@code meta.ref<T>}
  * names a member through the record's field ({@code shop.orders.endpoints.place_order}). The walk reads the field of
  * the host object the read bound, through the binding's own descriptor, and delivers the value it reaches into the
  * {@code Ref}; a field the record does not declare, a key the map lacks, a member no value has, and an optional
@@ -40,21 +40,20 @@ class ValueThroughFieldTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-shop.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              endpoint     => { request?: kind<record>  response?: type_kind }
-              endpoint_map => !namespace { key_type: identifier  value_type: endpoint }
-              service      => { extends?: [identifier]  fallback?: endpoint  endpoints: endpoint_map }
-              services     => !namespace { key_type: identifier  value_type: service }
-              route        => { endpoint: ref<endpoint>  verb: text }
-              routes       => !namespace { key_type: identifier  value_type: route }
-              shape        => { fields: field_map }
-              shapes       => !namespace { key_type: identifier  value_type: shape }
-              pick         => { field: ref<record_field> }
-              picks        => !namespace { key_type: identifier  value_type: pick }
+              endpoint     => { request?: meta.kind<meta.record>  response?: meta.type_kind }
+              endpoint_map => !meta.namespace { key_type: meta.identifier  value_type: endpoint }
+              service      => { extends?: [meta.identifier]  fallback?: endpoint  endpoints: endpoint_map }
+              services     => !meta.namespace { key_type: meta.identifier  value_type: service }
+              route        => { endpoint: meta.ref<endpoint>  verb: text }
+              routes       => !meta.namespace { key_type: meta.identifier  value_type: route }
+              shape        => { fields: meta.field_map }
+              shapes       => !meta.namespace { key_type: meta.identifier  value_type: shape }
+              pick         => { field: meta.ref<meta.record_field> }
+              picks        => !meta.namespace { key_type: meta.identifier  value_type: pick }
               unbound      => { endpoints: endpoint_map }
-              unbounds     => !namespace { key_type: identifier  value_type: unbound }
+              unbounds     => !meta.namespace { key_type: meta.identifier  value_type: unbound }
             }
             """;
 

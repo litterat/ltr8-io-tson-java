@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -23,16 +24,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ChoiceConstructionResolutionTest {
 
-    /** Governed by meta-kernel, which defines the {@code choice} constructor; its compiled form bootstraps on demand. */
+    /** Governed by the kernel, which defines the {@code choice} constructor; its compiled form bootstraps on demand. */
     private static SchemaResolver metaKernelGovernedResolver() {
-        return new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
+        return new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(),
+                TsonBundledSchemas::fetch));
     }
 
     private static final String CHOICE_DOCUMENT = """
             !!id:"https://example.test/choice.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              contact => !choice { variants: [text integer] }
+              contact => !meta.choice { variants: [text integer] }
             }
             """;
 

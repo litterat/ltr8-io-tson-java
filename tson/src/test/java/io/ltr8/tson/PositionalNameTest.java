@@ -12,12 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * §5.6's positional form in a data document, which values by name ([TSON-SCHEMA] §5.12) do not reach: a data
- * document has no namespace to resolve a name in, so a bare token at a record position fills the one positional
- * field whatever that field's type. A kind-typed field reaches a data document through core.tn's own {@code kind};
- * a field typed by a kernel record ({@code record_field}, {@code template_param}) does not, since an ordinary schema
- * imports only ordinary ones (§2.2.3). The one schema-document case here is the contrast: there a bare token fills
- * the positional field only where that field is atom-typed, which {@code record_field}'s {@code type_kind} is.
+ * §5.6's positional form in a data document, which values by name ([TSON-SCHEMA] §5.12) do not reach: a data document
+ * has no namespace to resolve a name in, so a bare token at a record position fills the one positional field whatever
+ * that field's type. A kind-typed field reaches a data document through core.tn's own {@code kind}; a field typed by a
+ * kernel record ({@code meta.record_field}, {@code meta.template_param}) does not, since an ordinary schema imports
+ * only ordinary ones (§2.2.3). The one schema-document case here is the contrast: there a bare token fills the
+ * positional field only where that field is atom-typed, which {@code meta.record_field}'s {@code meta.type_kind} is.
  */
 class PositionalNameTest {
 
@@ -27,8 +27,8 @@ class PositionalNameTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               named  => { v: text }
-              slot   => { type: kind<record> }
-              holder => { c?: named  p?: slot  q?: kind<record> }
+              slot   => { type: meta.kind<meta.record> }
+              holder => { c?: named  p?: slot  q?: meta.kind<meta.record> }
             }""";
 
     private static List<Diagnostic> read(String data) {
@@ -49,7 +49,7 @@ class PositionalNameTest {
     }
 
     /**
-     * {@code slot}'s one field is {@code type}, a {@code kind<record>}: in a data document a name fills it, and is
+     * {@code slot}'s one field is {@code type}, a {@code meta.kind<record>}: in a data document a name fills it, and is
      * judged a member of the kind in the governing schema's namespace.
      */
     @Test
@@ -71,7 +71,7 @@ class PositionalNameTest {
     }
 
     /**
-     * In a schema document the same fill: {@code record_field}'s positional field is {@code type}, an atom, so
+     * In a schema document the same fill: {@code meta.record_field}'s positional field is {@code type}, an atom, so
      * {@code p => text} is {@code p => { type: text }}, which is what the sugar {@code p: text} desugars to.
      */
     @Test
@@ -82,7 +82,7 @@ class PositionalNameTest {
                     !!import:"https://tson.io/2026/39/m/meta.tn"
                     !!import:"https://tson.io/2026/39/m/core.tn"
                     !schema {
-                      r => !record { fields: %s }
+                      r => !meta.record { fields: %s }
                     }""".formatted(fields)), fields);
         }
     }

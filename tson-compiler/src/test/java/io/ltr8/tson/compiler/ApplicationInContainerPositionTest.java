@@ -234,7 +234,7 @@ class ApplicationInContainerPositionTest {
 
         String form = fieldType(compiled, "a", "g");
         assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(form));
-        assertEquals(Optional.of("array"), compiled.schema().constructorOf(form),
+        assertEquals(Optional.of("meta.array"), compiled.schema().constructorOf(form),
                 "the form stays an instance of the constructor it builds");
         assertEquals(form, fieldType(compiled, "direct", "d"), "the grid is the form written out");
         assertTrue(compiled.schema().applicationOf(form).isEmpty(), "no entry records the application");
@@ -254,7 +254,7 @@ class ApplicationInContainerPositionTest {
         String instantiation = fieldType(compiled, "use", "n");
         Alias hop = assertInstanceOf(Alias.class, compiled.schema().entries().get(instantiation));
         assertEquals("nested", compiled.schema().applicationOf(instantiation).orElseThrow().name());
-        assertEquals(Optional.of("choice"), compiled.schema().constructorOf(hop.target().name()));
+        assertEquals(Optional.of("meta.choice"), compiled.schema().constructorOf(hop.target().name()));
     }
 
     /**
@@ -443,7 +443,7 @@ class ApplicationInContainerPositionTest {
     @Test
     void aValueArgumentInAClosedContainerKeepsItsToken() {
         TsonCompiledSchema compiled = compile("""
-                  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
                   holder => { p: [vector<float32, 3>] }""");
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "holder", "p"));
@@ -465,7 +465,7 @@ class ApplicationInContainerPositionTest {
      */
     @Test
     void aQuotedValueArgumentIsADifferentApplicationFromABareOne() {
-        String vector = "  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }\n";
+        String vector = "  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }\n";
         TsonCompiledSchema bare = compile(vector + "  holder => { p: [vector<float32, 3>] }");
         TsonCompiledSchema quoted = compile(vector + "  holder => { p: [vector<float32, \"3\">] }");
 

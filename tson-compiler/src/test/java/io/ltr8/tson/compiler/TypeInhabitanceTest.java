@@ -230,7 +230,7 @@ class TypeInhabitanceTest {
         assertTrue(!thrown.getMessage().contains("can never be satisfied"), thrown.getMessage());
     }
 
-    /** Every bundled schema is inhabited -- the check runs over meta-kernel, meta.tn and core.tn on every link. */
+    /** Every bundled schema is inhabited -- the check runs over every bundled schema on every link. */
     @Test
     void theBundledSchemasAllPass() {
         assertNotNull(compile("  ok => { v: text }"));

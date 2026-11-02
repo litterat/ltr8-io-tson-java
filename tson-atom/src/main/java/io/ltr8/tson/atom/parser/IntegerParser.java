@@ -9,8 +9,8 @@ import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.atom.number.NumberNarrowing;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.List;
@@ -18,15 +18,15 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Parses and validates against meta-kernel's {@code integer_type} constructor (§5.6's integer
+ * Parses and validates against the kernel's {@code integer_type} constructor (§5.6's integer
  * atoms; not yet {@code number}, {@code float32}/{@code float64}, {@code rational}, or {@code
  * complex} -- those are backed by different constructors, {@code decimal_type}/{@code float_type}/
  * {@code rational_type}/{@code complex_type}, and are separate work). Holds a {@link
- * io.ltr8.tson.schema.meta.IntegerType} -- the pure constraint *values* {@code integer_type}
+ * io.ltr8.tson.schema.numeric.IntegerType} -- the pure constraint *values* {@code integer_type}
  * declares in the schema ({@code size}/{@code min}/{@code exclusive_min}/{@code max}/{@code
  * exclusive_max}/{@code multiple_of}/{@code members}), unchanged by this split -- rather than declaring
  * those fields itself; this class contributes only the parsing/validation *behavior* that consumes them.
- * Every other built-in vocabulary constructor to come follows the same split (a {@code schema.meta}
+ * Every other built-in vocabulary constructor to come follows the same split (a schema-model
  * values class plus a {@code vocab} compiler holding it), not a one-off for the integer family.
  *
  * <p>Accepts only the {@code integer}/{@code based-integer} grammar forms (§7.6) -- §5.6's table is
@@ -157,7 +157,7 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
     /**
      * The width bounds precomputed, because they are constants of the type and were being rebuilt on every
      * value validated: {@code BigInteger.TWO.pow(bits)} per bound per integer read, which profiling put at
-     * 5% of everything a bind read allocated. Keyed by {@link IntegerSize} and covering the ladder core.tn
+     * 5% of everything a bind read allocated. Keyed by {@link IntegerSize} and covering the ladder numeric.tn
      * declares; an exotic width falls through to {@link #bounds} computing its own, so nothing here grows
      * with what a schema declares.
      */
@@ -198,7 +198,7 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
     }
 
     /**
-     * {@link #hostType} for the ladder core.tn declares, computed once: {@link #read} asks it for every value,
+     * {@link #hostType} for the ladder numeric.tn declares, computed once: {@link #read} asks it for every value,
      * and deriving it means both width bounds, which is what {@link #STANDARD_BOUNDS} exists to avoid.
      */
     private static final Map<IntegerSize, Class<?>> STANDARD_HOSTS = standardHosts();

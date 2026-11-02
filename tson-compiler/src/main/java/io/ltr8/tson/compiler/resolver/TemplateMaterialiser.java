@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
@@ -50,8 +51,8 @@ import java.util.function.Supplier;
  * SchemaDesugarer}'s injection machinery and put type-level work back into a phase that is purely syntactic.
  *
  * <p><b>A held body closes by one process, whatever wrote it.</b> {@code <T> [T]} and {@code <T> { x: T }}
- * are both an application with a parameter standing in a slot -- {@code !array { element_type: T }} and
- * {@code !record { fields: [ { name: x  type: T } ] }} -- so both substitute by the same walk and are read
+ * are both an application with a parameter standing in a slot -- {@code !meta.array { element_type: T }} and
+ * {@code !meta.record { fields: [ { name: x  type: T } ] }} -- so both substitute by the same walk and are read
  * back through their own constructor's reader. See {@link #closeHeld}. <b>An application nothing declares is
  * its expansion</b> (§5.10): the closure is a closed <em>synthetic</em> named for its binding record, a record
  * ({@link #mintedRecord}) like any other form ({@link #closeHeldTemplate}), so two applications closing to one
@@ -59,7 +60,7 @@ import java.util.function.Supplier;
  * #closeApplicationInto}).
  *
  * <p><b>An alias closes by a third path and mints nothing.</b> §5.10's partial application,
- * {@code uuid_pair => <B> pair<uuid, B>}, holds {@code !alias { target: pair<uuid, B> }} like any other
+ * {@code uuid_pair => <B> pair<uuid, B>}, holds {@code !meta.alias { target: pair<uuid, B> }} like any other
  * open entry, but it <em>is</em> the application it names with some arguments still open -- so closing it
  * composes the two argument lists and hands back what that denotes, minting no entry of its own (§5.10: "no
  * intermediate entry per alias hop"). See {@link #closeHeldAlias}.
@@ -75,7 +76,7 @@ import java.util.function.Supplier;
  * {@code tree<text>} once {@code T} is bound) finds the entry under construction and references it by name
  * rather than recursing forever. Such an expansion names itself, so its content cannot be written without a
  * name: it keeps the instantiation entry the knot was tied on, keyed on the application and recording it
- * ({@code @application}, §8.2) -- the record itself, or a reference to the synthetic for any other form.
+ * ({@code @meta.application}, §8.2) -- the record itself, or a reference to the synthetic for any other form.
  */
 final class TemplateMaterialiser {
 
@@ -90,10 +91,10 @@ final class TemplateMaterialiser {
 
 
     /** The constructor a record template's tree applies. */
-    private static final String RECORD = "record";
+    private static final String RECORD = KernelNames.of("record");
 
     /** The constructor a held alias carries -- §5.10's partial application, which mints no entry. */
-    private static final String ALIAS = "alias";
+    private static final String ALIAS = KernelNames.of("alias");
 
     /** {@code alias}'s own member, the one an alias closes through. */
     private static final String TARGET = "target";
@@ -128,7 +129,7 @@ final class TemplateMaterialiser {
      * closed forms {@link #closeHeldTemplate} mints, which are indistinguishable from the entry a
      * directly-written {@code [pixel; 1920]} lifts to and are the same entry when both appear (§8.2).
      *
-     * <p>§8.2 marks only these: an instantiation entry carries no {@code @synthetic}, it being the closure of
+     * <p>§8.2 marks only these: an instantiation entry carries no {@code @meta.synthetic}, it being the closure of
      * an application where a synthetic is a constructor's instance. The caller reads this set to put the
      * marker on the right keys.
      */
@@ -176,14 +177,14 @@ final class TemplateMaterialiser {
 
     /**
      * The same, keyed on §8.2's canonical application, for the applications no entry records: a minted
-     * expansion carries no {@code @application}, so the applied-parent fold reads the edge {@code & box<int32>}
+     * expansion carries no {@code @meta.application}, so the applied-parent fold reads the edge {@code & box<int32>}
      * reaches from here ({@link #expansionsByApplication}).
      */
     private final Map<String, String> expansionsByApplication = new LinkedHashMap<>();
 
     /**
      * Every application this pass closed, as it was met and with its arguments closed, to the entry it closed to --
-     * an expansion's included, which records no {@code @application}. Held beside the entries, never written: it is
+     * an expansion's included, which records no {@code @meta.application}. Held beside the entries, never written: it is
      * what lets a data read resolve an application to the entry by structural identity ({@link
      * #closedApplications}).
      */
@@ -191,7 +192,7 @@ final class TemplateMaterialiser {
 
     /**
      * Each instantiation entry's application as it was written, its nested arguments unreduced ({@code foo<bar<text>>}
-     * where {@link #applications} holds {@code foo<bar_text_…>}): what {@code @application} states on the entry's key,
+     * where {@link #applications} holds {@code foo<bar_text_…>}): what {@code @meta.application} states on the entry's key,
      * so a reader and a message see the reference the author wrote.
      */
     private final Map<String, TypeRef> writtenApplications = new LinkedHashMap<>();
@@ -235,7 +236,7 @@ final class TemplateMaterialiser {
 
     /**
      * How a closed held body becomes an ordinary constructor body -- the constructor's own
-     * compiled reader, the same one a written {@code !array { ... }} binds through. Using it is what makes
+     * compiled reader, the same one a written {@code !meta.array { ... }} binds through. Using it is what makes
      * {@code min_items: "two"} an ordinary read error rather than a check this class would have to grow: the
      * bindings a template defers are exactly the ones a closed instance has always had checked for it.
      */
@@ -267,7 +268,7 @@ final class TemplateMaterialiser {
      */
     private final Map<String, Map<String, ParameterTypes.Kind>> kindsOnDemand = new LinkedHashMap<>();
 
-    /** Whether a name is the meta-kernel's own, for telling a constructor from a family member. */
+    /** Whether a name is the kernel's own, for telling a constructor from a family member. */
     private final Predicate<String> kernel;
 
     /** The imported entries, where a constructor and the type its slot declares are read from. */
@@ -369,7 +370,7 @@ final class TemplateMaterialiser {
 
     /**
      * The subset of what {@link #materialise} returned that is a synthetic entry, whose key carries the
-     * derived {@code @synthetic} marker (§8.2). Everything else it returned is an instantiation entry, which
+     * derived {@code @meta.synthetic} marker (§8.2). Everything else it returned is an instantiation entry, which
      * deliberately carries none.
      */
     Set<String> syntheticNames() {
@@ -400,12 +401,12 @@ final class TemplateMaterialiser {
      *
      * <p>Every shape but two closes here. A <b>record</b> template's closure is a record, so {@link
      * #closeHeldRecord} answers directly. Every other held form -- an open instance such as {@code arr
-     * => <T> !array { element_type: T }} -- substitutes to a construction the declaration simply <em>is</em>,
+     * => <T> !meta.array { element_type: T }} -- substitutes to a construction the declaration simply <em>is</em>,
      * with no synthetic standing between them. §5.10's partial application
      * and an unresolvable or mis-applied head return {@code null} for the caller to handle.
      */
     Top closeApplicationInto(String declaredName, TypeRef application) {
-        String head = application.name();
+        String head = templateHead(application.name());
         Top template = namespace.definition(head);
         if (!OpenEntry.isOpen(template)) {
             return null; // unresolved, or a head taking no parameters -- reported through the ordinary path
@@ -467,13 +468,24 @@ final class TemplateMaterialiser {
                     ? new TypeArgument.Ref(dereferenced(close(nested.ref())))
                     : argument);
         }
-        String entry = instantiate(ref.name(), arguments, ref);
+        String entry = instantiate(templateHead(ref.name()), arguments, ref);
         // A generated head's application is an open synthetic closing its own intermediate form: nobody wrote it.
         if (entry != null && !generated.contains(ref.name())) {
             closedApplications.putIfAbsent(plain(ref), entry);
             closedApplications.putIfAbsent(new TypeRef(ref.name(), arguments), entry);
         }
         return entry == null ? new TypeRef(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
+    }
+
+    /**
+     * The template an application's head names: the head itself, or, where it is an alias of a template ({@code
+     * kind_of => kind}), the template at the end of its alias chain, the alias being the same entry under
+     * another name ([TSON-SCHEMA] §8.3). Identity is the template's, so {@code kind_of<order>} and {@code
+     * meta.kind<order>} close to one entry.
+     */
+    private String templateHead(String head) {
+        String terminal = AliasChain.terminal(head, namespace::definition);
+        return !terminal.equals(head) && OpenEntry.isOpen(namespace.definition(terminal)) ? terminal : head;
     }
 
     /**
@@ -489,7 +501,7 @@ final class TemplateMaterialiser {
      *
      * <p><b>An author who wants two boxes told apart has two spellings that say so</b>, and this is what
      * makes them mean something: {@code user_id => !uuid ^ {}} is a refinement, IS-A {@code uuid} and not its
-     * siblings, and {@code user_id => !uuid_type {}} is a fresh type related to neither. Both are ordinary
+     * siblings, and {@code user_id => !net.uuid_type {}} is a fresh type related to neither. Both are ordinary
      * entries rather than references, so neither is dereferenced here.
      *
      * <p><b>What this normalises is identity, not provenance.</b> The minted entry is keyed on the canonical
@@ -817,7 +829,7 @@ final class TemplateMaterialiser {
      * {@code value} as the instantiation of {@code application} (§8.2), whatever kind of entry it is: a record
      * template's member, a namespace entry, the hop to the synthetic a non-record template closes to. Recorded in
      * {@link #applications}, with {@code written}, the application as written, which {@code SchemaResolver} writes
-     * onto the entry's key as {@code @application}.
+     * onto the entry's key as {@code @meta.application}.
      */
     private Top instantiation(String name, Top value, TypeRef application, TypeRef written) {
         applications.put(name, application);
@@ -826,7 +838,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * {@code reference} as {@code @application} states it: as written, a nested application unreduced and itself
+     * {@code reference} as {@code @meta.application} states it: as written, a nested application unreduced and itself
      * stated this way, each argument a value where its parameter binds one, and a bare name followed through its
      * alias chain, since §8.2 compares arguments after alias flattening.
      */
@@ -834,11 +846,12 @@ final class TemplateMaterialiser {
         if (reference.arguments().isEmpty()) {
             return plain(dereferenced(reference));
         }
-        Top template = namespace.definition(reference.name());
+        String head = templateHead(reference.name());
+        Top template = namespace.definition(head);
         List<String> parameters = template == null ? List.of() : OpenEntry.parameterNames(template);
         Map<String, ParameterTypes.Kind> kinds = parameters.isEmpty() ? null
-                : Optional.ofNullable(parameterKinds.get(reference.name())).orElseGet(() -> kindsOnDemand
-                        .computeIfAbsent(reference.name(), ignored -> ParameterTypes.inferOne(template, metaTypes)));
+                : Optional.ofNullable(parameterKinds.get(head)).orElseGet(() -> kindsOnDemand
+                        .computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, metaTypes)));
         List<TypeArgument> arguments = new ArrayList<>(reference.arguments().size());
         for (int i = 0; i < reference.arguments().size(); i++) {
             TypeArgument argument = reference.arguments().get(i);
@@ -1056,7 +1069,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * Each argument against the parameter it binds ({@code template_param}, [TSON-SCHEMA] §5.10): a type argument
+     * Each argument against the parameter it binds ({@code meta.template_param}, [TSON-SCHEMA] §5.10): a type argument
      * must name a type that IS-A the parameter's {@code bound}, and a value argument must be a value of the
      * parameter's {@code type} -- or of the type an earlier parameter's argument names, where the type is that
      * parameter.

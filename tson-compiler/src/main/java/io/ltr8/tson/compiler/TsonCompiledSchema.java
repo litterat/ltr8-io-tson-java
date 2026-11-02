@@ -48,7 +48,7 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
         return linkedSchema.kindOf(name);
     }
 
-    /** Whether {@code name} denotes the meta-kernel's own entry of that name ({@link TsonLinkedSchema#isKernel}). */
+    /** Whether {@code name} denotes the kernel's own entry of that name ({@link TsonLinkedSchema#isKernel}). */
     public boolean isKernel(String name) {
         return linkedSchema.isKernel(name);
     }

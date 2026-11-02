@@ -5,7 +5,7 @@ import java.util.Optional;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.Ipv4Type;
+import io.ltr8.tson.schema.net.Ipv4Type;
 import java.util.List;
 import io.ltr8.net.CidrInet4Network;
 import io.ltr8.net.InternetAddress;
@@ -13,8 +13,8 @@ import java.net.Inet4Address;
 import java.net.UnknownHostException;
 
 /**
- * meta-kernel's {@code ipv4_type} constructor (§5.5's {@code ipv4} atom, RFC 3986's {@code
- * IPv4address} production -- core.tn: "dotted-quad per the RFC 3986 IPv4address production").
+ * the kernel's {@code ipv4_type} constructor (§5.5's {@code ipv4} atom, RFC 3986's {@code
+ * IPv4address} production -- net.tn: "dotted-quad per the RFC 3986 IPv4address production").
  *
  * <p><b>Deliberately does not delegate parsing to {@link java.net.InetAddress}.</b> Confirmed
  * empirically before writing this: {@code InetAddress.ofLiteral} -- the no-DNS, literal-only entry
@@ -30,7 +30,7 @@ import java.net.UnknownHostException;
  * java.net.InetAddress#getByAddress(byte[])} -- a pure bytes-to-object call with no parsing, no
  * reinterpretation, and (per its own Javadoc) no name-service lookup.
  *
- * <p>{@code within}/{@code excluding} (meta.tn's {@code ipv4_type}) are not modeled -- no built-in
+ * <p>{@code within}/{@code excluding} (net.tn's {@code net.ipv4_type}) are not modeled -- no built-in
  * instance sets either, and set-membership/non-overlap against an array of other addresses or CIDR
  * blocks is a materially bigger piece of work than a scalar constraint, left for later.
  */
@@ -40,7 +40,7 @@ public record Ipv4Parser(List<CidrInet4Network> within, List<CidrInet4Network> e
     /** §5.5's built-in annotation name -- {@code !ipv4}. */
     public static final String TYPENAME = "ipv4";
 
-    /** {@code ipv4 => !ipv4_type {}} -- the unconstrained IPv4 address, §5.5's {@code !ipv4}. */
+    /** {@code ipv4 => !net.ipv4_type {}} -- the unconstrained IPv4 address, §5.5's {@code !ipv4}. */
     public static final Ipv4Parser UNCONSTRAINED = new Ipv4Parser(List.of(), List.of());
 
     /**
@@ -80,7 +80,7 @@ public record Ipv4Parser(List<CidrInet4Network> within, List<CidrInet4Network> e
 
     /**
      * §5.5's {@code within}/{@code excluding}: the address must lie inside at least one {@code within}
-     * network when the list is non-empty, and inside none of {@code excluding}. As meta.tn puts it,
+     * network when the list is non-empty, and inside none of {@code excluding}. As net.tn puts it,
      * "{@code excluding} carves holes out of {@code within}".
      *
      * <p>The lists are parsed once, when the reader is compiled, so a read is bit comparisons over the octets

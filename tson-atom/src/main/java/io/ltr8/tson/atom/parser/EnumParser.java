@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import java.util.List;
 
 /**
- * Parses and validates against an enum -- an instance of meta-kernel's {@code enum_type} or a tightening of it
+ * Parses and validates against an enum -- an instance of the kernel's {@code enum_type} or a tightening of it
  * such as {@code enum} (§7.4). Holds an {@link EnumBody} -- the pure constraint values --
  * rather than declaring those fields itself.
  *
@@ -28,7 +28,7 @@ import java.util.List;
  * token's text against {@link EnumBody#members} directly never invokes identification at all, so the
  * collision simply doesn't arise. It matches by text alone and <b>cannot do otherwise</b> -- an
  * {@link AtomType} is handed a {@code String} and never sees which form carried it, which is the same
- * form-agnostic behavior the meta-kernel bootstrap's hand-built enums rely on, "correct for every enum member
+ * form-agnostic behavior the kernel bootstrap's hand-built enums rely on, "correct for every enum member
  * regardless of what it happens to look like".
  *
  * <p><b>The match is in the name type's form</b> ({@link #form}): an enum over a case-folding identifier admits

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.schema.KernelNames;
 import java.util.Optional;
 
 import io.ltr8.tson.base.Diagnostic;
@@ -23,7 +24,7 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
 
 /**
@@ -128,12 +129,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     private final IdentifierProfile names;
 
     /**
-     * The {@code of} of a reference that names types, a constructor ({@code kind<record>}'s {@code record}), or {@code
+     * The {@code of} of a reference that names types, a constructor ({@code meta.kind<record>}'s {@code record}), or {@code
      * null} for every other atom.
      */
     private final String kindOf;
 
-    /** The {@code of} of a reference that names values, a type ({@code ref<method>}'s {@code method}), or null. */
+    /** The {@code of} of a reference that names values, a type ({@code meta.ref<method>}'s {@code method}), or null. */
     private final String refOf;
 
     /**
@@ -230,7 +231,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      *
      * <p><b>The name is kept, where {@link #overAtom}'s caller replaces it.</b> Binding a target changes
      * what the position produces and not what the author wrote, so a diagnostic still names the declaration
-     * it came from -- {@code type_name}, not the field that happens to hold one. A {@code value} slot is the
+     * it came from -- {@code meta.type_name}, not the field that happens to hold one. A {@code value} slot is the
      * case that does rename, its entry naming the escape hatch rather than anything in the schema.
      */
     Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
@@ -283,7 +284,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         }
         if (refOf != null && !ctx.readsSchemaNames()) {
             // What a reference's name reaches is judged where a schema links, and a data document never links.
-            ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, "a value at a reference-typed position ('ref<" + refOf
+            ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, "a value at a reference-typed position ('meta.ref<" + refOf
                     + ">') in a data document is not yet read: what its name reaches is judged when a schema links, "
                     + "and a data document is not linked", "a position this library can read", text);
             ctx.next();

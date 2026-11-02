@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A value of a namespace type standing as an entry: {@code myapi => !api { get_orders => { ... } }} under a meta
- * layer declaring {@code api => !namespace { key_type: identifier  value_type: method }}. The payload reads as
+ * layer declaring {@code api => !namespace { key_type: meta.identifier  value_type: method }}. The payload reads as
  * the map {@code api} describes, each key under its key family and each value under its value type, and the entry is
  * a {@link Namespace} built by {@code api}: a value, never a type, and what a qualified name's segment selects a key
  * of ({@code handler: myapi.get_orders}).
@@ -44,16 +44,16 @@ class NamespaceEntryTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/meta-api.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  status_name => identifier
-                  method    => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
-                                 replies?: {status_name => kind<record>} }
-                  api       => !namespace { key_type: identifier  value_type: method }
+                  status_name => meta.identifier
+                  method    => { request?: meta.kind<meta.record>  response?: meta.type_kind
+                                 errors?: [meta.kind<meta.record>]
+                                 replies?: {status_name => meta.kind<meta.record>} }
+                  api       => !meta.namespace { key_type: meta.identifier  value_type: method }
                   http_verb => !enum [GET POST]
-                  route     => { verb: http_verb  path: text  handler: ref<method> }
-                  router    => !namespace { key_type: identifier  value_type: route }
+                  route     => { verb: http_verb  path: text  handler: meta.ref<method> }
+                  router    => !meta.namespace { key_type: meta.identifier  value_type: route }
                 }
                 """);
     }
@@ -223,7 +223,7 @@ class NamespaceEntryTest {
     /** The kernel's {@code namespace} is a constructor: an application of it declares a namespace type. */
     @Test
     void theNamespaceConstructorBuildsANamespaceType() {
-        String id = schema("constructed", "more => !namespace { key_type: identifier  value_type: text }");
+        String id = schema("constructed", "more => !meta.namespace { key_type: meta.identifier  value_type: text }");
         assertEquals(List.of(), problems(id));
         TsonLinkedSchema linked = registry().resolveLinked(id);
         assertEquals(EntryKind.PRODUCT, linked.kindOf("more"));
@@ -232,7 +232,7 @@ class NamespaceEntryTest {
 
     // ── The entry is no type ──────────────────────────────────────────────────────────────────────────
 
-    /** {@code type_kind} holds the names of types; a namespace value is a value, so a value body's slot refuses it. */
+    /** {@code meta.type_kind} holds the names of types; a namespace value is a value, so a value body's slot refuses it. */
     @Test
     void aNamespaceEntryAtATypeKindSlotIsRefused() {
         refused(schema("type-slot", "other => !api { m => { response: myapi } }"),
@@ -245,7 +245,7 @@ class NamespaceEntryTest {
                 "'other' at /m/request", "'myapi' is a value of the type 'api'", "not a type");
     }
 
-    /** A field of a type declaration is a {@code type_kind} slot too, judged by the linker. */
+    /** A field of a type declaration is a {@code meta.type_kind} slot too, judged by the linker. */
     @Test
     void aNamespaceEntryTypesNoField() {
         refused(schema("field", "holder => { s: myapi }"), "'myapi'", "a value of the type 'api'", "not a type");
@@ -266,16 +266,16 @@ class NamespaceEntryTest {
     // ── Kinds ─────────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Construction is the walk a kind's members take: {@code api} is built with {@code namespace}, so {@code
-     * kind<namespace>} and {@code type_kind} hold it. {@code myapi} is a value of {@code api}, built by no constructor,
-     * so no kind holds it; a reference names it ({@code ref<api>}).
+     * Construction is the walk a kind's members take: {@code api} is built with {@code namespace}, so
+     * {@code meta.kind<namespace>} and {@code meta.type_kind} hold it. {@code myapi} is a value of {@code api}, built
+     * by no constructor, so no kind holds it; a reference names it ({@code meta.ref<api>}).
      */
     @Test
     void aNamespaceTypeIsAMemberOfItsKindsAndANamespaceEntryOfNone() {
         TsonLinkedSchema linked = registry().resolveLinked(schema("kinds", """
-                namespaces => kind<namespace>
-                types      => kind<type>
-                records    => kind<record>"""));
+                namespaces => meta.kind<meta.namespace>
+                types      => meta.kind<meta.type>
+                records    => meta.kind<meta.record>"""));
 
         assertTrue(members(linked, "namespaces").contains("api"), members(linked, "namespaces").toString());
         assertTrue(members(linked, "types").contains("api"), members(linked, "types").toString());
@@ -285,12 +285,12 @@ class NamespaceEntryTest {
     }
 
     /**
-     * {@code api} is a type and no constructor, so a reference over it names values: {@code kind<api>} is {@code
-     * ref<api>}, and the names it admits are the entries holding a value of {@code api}, judged where one is written.
+     * {@code api} is a type and no constructor, so a reference over it names values: {@code meta.kind<api>} is {@code
+     * meta.ref<api>}, and the names it admits are the entries holding a value of {@code api}, judged where one is written.
      */
     @Test
     void aKindOfANamespaceTypeNamesItsValues() {
-        assertEquals(List.of(), problems(schema("kind-of-api", "apis => kind<api>")));
+        assertEquals(List.of(), problems(schema("kind-of-api", "apis => meta.kind<api>")));
     }
 
     private static List<String> members(TsonLinkedSchema linked, String kind) {
@@ -317,7 +317,7 @@ class NamespaceEntryTest {
         assertTrue(flat.contains("place_order => { request: order response: order }"), written);
 
         // Read as a schema map, a value of the kernel's `schema`, whose names resolve in the map itself.
-        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META).compiledSchema().find("schema").orElseThrow()
+        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META).compiledSchema().find("meta.schema").orElseThrow()
                 .read(TestDocuments.document("!schema { myapi => " + written + " }"));
         assertEquals(((ValueEntry) myapi).value(), read.get("myapi"));
     }

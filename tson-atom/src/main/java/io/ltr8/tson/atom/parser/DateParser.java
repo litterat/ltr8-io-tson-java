@@ -3,14 +3,14 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.DateType;
+import io.ltr8.tson.schema.temporal.DateType;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * Parses and validates against meta-kernel's {@code date_type} constructor (§5.4's {@code date}
+ * Parses and validates against the kernel's {@code date_type} constructor (§5.4's {@code date}
  * atom, RFC 3339 {@code full-date}). Validates the token's shape itself before calling {@link
  * LocalDate#parse} -- confirmed empirically that {@code LocalDate.parse} alone is more lenient than
  * RFC 3339's {@code full-date = date-fullyear "-" date-month "-" date-mday} (exactly 4-digit year,
@@ -25,7 +25,7 @@ public record DateParser(DateType constraints) implements AtomTypeParser<LocalDa
     /** §5.4's built-in annotation name -- {@code !date}. */
     public static final String TYPENAME = "date";
 
-    /** {@code date => !date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
+    /** {@code date => !temporal.date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
     public static final DateParser UNCONSTRAINED = new DateParser(DateType.UNCONSTRAINED);
 
     public DateParser(Optional<LocalDate> min, Optional<LocalDate> max) {

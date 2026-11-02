@@ -544,7 +544,7 @@ class RecordTemplateTest {
     /**
      * <b>The converse is caught at the application.</b> A type name applied where the body routes the parameter
      * into a field's <em>value</em> binds {@code N}, whose recorded type is the field's own {@code int32}
-     * ({@code template_param.type}, §5.10), so {@code text} is refused as an argument that is not an
+     * ({@code meta.template_param.type}, §5.10), so {@code text} is refused as an argument that is not an
      * {@code int32} value -- at {@code retry<text>}, before substitution puts it in the {@code value} slot where
      * §5.2's value conformance would otherwise be the first rule to see it.
      */

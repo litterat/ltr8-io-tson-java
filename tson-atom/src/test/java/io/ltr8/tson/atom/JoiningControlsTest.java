@@ -21,7 +21,7 @@ class JoiningControlsTest {
         return new String(codePoints, 0, codePoints.length);
     }
 
-    /** {@code identifier} itself where §7.7 admits it -- so an assertion reads as an equality. */
+    /** {@code meta.identifier} itself where §7.7 admits it -- so an assertion reads as an equality. */
     private static String parse(String identifier) {
         assertTrue(IdentifierGrammar.validate(identifier).isEmpty(),
                 () -> "should accept: " + IdentifierGrammar.validate(identifier).orElse(""));

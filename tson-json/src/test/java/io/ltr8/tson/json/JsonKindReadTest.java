@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A kind-typed position in JSON ([TSON-SCHEMA] §4.2, [TSON-JSON] §5): a kind is an atom whose values are type
  * names, so its JSON form is a string naming a member of the kind in the governing schema's closure, read as the
- * same token in TSON text is. It is never a discrimination case: {@code kind<uuid_type>} takes {@code "stock_id"}
+ * same token in TSON text is. It is never a discrimination case: {@code meta.kind<uuid_type>} takes {@code "stock_id"}
  * and refuses a uuid.
  */
 class JsonKindReadTest {
@@ -35,10 +35,10 @@ class JsonKindReadTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              stock_id    => !uuid_type {}
-              customer_id => !uuid_type {}
+              stock_id    => !net.uuid_type {}
+              customer_id => !net.uuid_type {}
               sku         => text
-              ledger      => { named: kind<uuid_type> }
+              ledger      => { named: meta.kind<net.uuid_type> }
             }
             """;
 

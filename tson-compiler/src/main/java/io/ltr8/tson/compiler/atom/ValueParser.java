@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 /**
- * Parses meta-kernel's {@code value}, the instance of the {@code value_type} constructor (§4.2, §8.1) --
+ * Parses the kernel's {@code value}, the instance of the {@code value_type} constructor (§4.2, §8.1) --
  * the "escape hatch primitive": per its own kernel doc, "the result of base type resolution
  * ([TSON-DATA] §4) applied to a source token, with no further interpretation... the host runtime is
  * responsible for type-checking values at use site." It runs {@link BaseTypeResolver} -- boolean/number/string, §4.5's
@@ -53,7 +53,7 @@ public final class ValueParser implements TokenAtomType<Object> {
      * them, so {@code min: PT30M} on {@code duration_type} arrives here as the string {@code PT30M} and the
      * position's own host type is the only thing left that says what it was. Where the natural resolution
      * cannot be what the position holds, the token is re-read under the built-in atom that produces that host
-     * type ({@link HostAtoms}) -- which is what meta.tn already describes the resolver as doing, and the same
+     * type ({@link HostAtoms}) -- which is what the libraries' headers already describe the resolver as doing, and the same
      * rule {@code DecimalType} applies to a member of a {@code set<value>}.
      *
      * <p><b>The natural reading wins wherever it fits.</b> A value the position can already hold is returned

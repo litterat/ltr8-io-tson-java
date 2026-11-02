@@ -19,13 +19,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The meta-kernel's resolved form, measured under {@code SPEC-FEEDBACK.md #4}'s resolution-order rule ({@link
+ * The kernel's resolved form, meta.tn's, measured under {@code SPEC-FEEDBACK.md #4}'s resolution-order rule ({@link
  * WaitGraph} states it).
  *
  * <p>Rule 4 makes the pre-loaded set a measurement rather than a list: it is exactly the one cycle the kernel must
- * close, {@code record} and what reading a {@code !record} waits on. So this reads {@code
- * spec/m/meta-kernel-resolved.tn} schemalessly, builds the wait graph from the fixture's own declarations, and
- * asserts that the graph has exactly one cycle, that it holds {@code record}, and that every other entry reads in
+ * close, {@code meta.record} and what reading a {@code !meta.record} waits on. So this reads {@code
+ * spec/fixtures/meta-resolved.tn} schemalessly, builds the wait graph from the fixture's own declarations, and
+ * asserts that the graph has exactly one cycle, that it holds {@code meta.record}, and that every other entry reads in
  * an order whose longest wait chain is within rule 6's default bound of 64. The measurements go to stdout.
  */
 class KernelWaitGraphTest {
@@ -37,16 +37,61 @@ class KernelWaitGraphTest {
         WaitGraph graph = WaitGraph.of(fixture());
         List<Set<String>> components = graph.components();
         List<Set<String>> cycles = components.stream().filter(graph::isCycle).toList();
-        Set<String> preloaded = cycles.stream().filter(c -> c.contains("record")).findFirst().orElse(Set.of());
+        Set<String> preloaded = cycles.stream().filter(c -> c.contains("meta.record")).findFirst().orElse(Set.of());
         Map<String, Integer> depth = depths(graph, components, preloaded);
 
         report(graph, components, cycles, preloaded, depth);
 
         assertEquals(List.of(), graph.problems(), "the walk could not decide everything from the fixture");
-        assertTrue(preloaded.contains("record"), "no cycle holds record");
+        assertTrue(preloaded.contains("meta.record"), "no cycle holds record");
         assertEquals(List.of(preloaded), cycles, "the wait graph has a cycle other than record's");
         int longest = depth.values().stream().mapToInt(Integer::intValue).max().orElse(0);
         assertTrue(longest <= WAIT_DEPTH_LIMIT, "the longest wait chain is " + longest);
+    }
+
+    /**
+     * The kernel holds what its one cycle needs to resolve and link on its own -- the cycle, what reading the document
+     * itself waits on (its root tag's {@code meta.schema}, the key and value types that reads, the annotations on its
+     * header and on its keys, {@code @atom.ordering} and {@code @atom.bounded} among them), and every entry a
+     * declaration of that set names, closed to a fixed point -- and the concepts that belong with them, which nothing in
+     * the closure names: the map, tuple and choice constructors, the tuple's element and the one-element tuple
+     * templates, held template bodies and the {@code application} annotation, the {@code kind} and {@code ref}
+     * references with {@code atom_kind}, {@code field_name}, the {@code set} template, the {@code disjoint} assertion,
+     * and the octet-sequence constructor with its encodings and instance. The measurement: a cycle of 25, a closure of
+     * 67.
+     */
+    @Test
+    void theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts() throws Exception {
+        WaitGraph graph = WaitGraph.of(fixture());
+        Set<String> cycle = graph.components().stream().filter(graph::isCycle).filter(c -> c.contains("meta.record"))
+                .findFirst().orElseThrow();
+        Set<String> closure = new java.util.TreeSet<>(cycle);
+        java.util.Deque<String> work = new java.util.ArrayDeque<>(cycle);
+        graph.documentWaits().keySet().stream().filter(graph.entries()::contains).filter(closure::add)
+                .forEach(work::add);
+        while (!work.isEmpty()) {
+            graph.references(work.pop()).stream().filter(closure::add).forEach(work::add);
+        }
+        Set<String> related = new java.util.TreeSet<>(graph.entries());
+        related.removeAll(closure);
+        Set<String> beyond = new java.util.TreeSet<>(closure);
+        beyond.removeAll(cycle);
+        long nested = graph.entries().stream().filter(name -> name.indexOf('.') >= 0).count();
+        System.out.println("kernel: " + graph.entries().size() + " entries, " + nested + " under its maps and "
+                + (graph.entries().size() - nested) + " at the root; the cycle's closure " + closure.size()
+                + " (the cycle's " + cycle.size() + " and " + beyond.size() + " more)");
+        System.out.println("  closure beyond the cycle: " + beyond);
+        System.out.println("  related concepts beyond the closure: " + related);
+
+        assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
+        assertEquals(25, cycle.size(), "the cycle");
+        assertEquals(67, closure.size(), "the cycle's closure");
+        assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application", "meta.atom_kind",
+                "binary.bytes_encoding", "binary.bytes_type", "meta.choice", "meta.disjoint",
+                "meta.field_name", "meta.kind", "meta.map", "meta.ref", "meta.template", "meta.tuple",
+                "meta.tuple1", "meta.tuple_element", "meta.voidable_tuple1", "set")),
+                new java.util.TreeSet<>(related.stream().filter(name -> !name.startsWith("array_")).toList()),
+                "the related concepts");
     }
 
     // ── Measuring ────────────────────────────────────────────────────────
@@ -97,7 +142,7 @@ class KernelWaitGraphTest {
 
     private static void report(WaitGraph graph, List<Set<String>> components, List<Set<String>> cycles,
                                Set<String> preloaded, Map<String, Integer> depth) {
-        System.out.println("== Kernel wait graph (SPEC-FEEDBACK #4), meta-kernel-resolved.tn ==");
+        System.out.println("== Kernel wait graph (SPEC-FEEDBACK #4), meta-resolved.tn ==");
         int edges = graph.entries().stream().mapToInt(e -> graph.waits(e).size()).sum();
         System.out.println("entries: " + graph.entries().size() + ", wait edges: " + edges);
         Map<String, Long> heads = graph.entries().stream()
@@ -156,18 +201,18 @@ class KernelWaitGraphTest {
 
     // ── The fixture ──────────────────────────────────────────────────────
 
-    /** {@code meta-kernel-resolved.tn}, read schemalessly as the resolved form it is. */
+    /** {@code meta-resolved.tn}, read schemalessly as the resolved form it is. */
     static Document fixture() throws Exception {
-        return new TsonDataParser(Files.readString(specDirectory().resolve("meta-kernel-resolved.tn"))).parseResolvedForm();
+        return new TsonDataParser(Files.readString(specDirectory().resolve("meta-resolved.tn"))).parseResolvedForm();
     }
 
-    /** {@code spec/m}, found by walking up rather than assumed relative to a working directory. */
+    /** {@code spec/fixtures}, found by walking up rather than assumed relative to a working directory. */
     private static Path specDirectory() {
         Path directory = Path.of("").toAbsolutePath();
-        while (directory != null && !Files.isDirectory(directory.resolve("spec/m"))) {
+        while (directory != null && !Files.isDirectory(directory.resolve("spec/fixtures"))) {
             directory = directory.getParent();
         }
-        assertNotNull(directory, "no spec/m above " + Path.of("").toAbsolutePath());
-        return directory.resolve("spec/m");
+        assertNotNull(directory, "no spec/fixtures above " + Path.of("").toAbsolutePath());
+        return directory.resolve("spec/fixtures");
     }
 }

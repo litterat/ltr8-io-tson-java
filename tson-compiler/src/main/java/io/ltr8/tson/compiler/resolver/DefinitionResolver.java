@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
@@ -202,13 +203,13 @@ final class DefinitionResolver {
 
     /**
      * The kernel's alias constructor -- §5.10's partial application, {@code <B> pair<uuid, B>}, whose held
-     * body is a {@code !alias { target: ... }} and whose entry is {@link EntryKind#ALIAS} rather than
+     * body is a {@code !meta.alias { target: ... }} and whose entry is {@link EntryKind#ALIAS} rather than
      * the constructor's own kind.
      */
-    private static final String ALIAS = "alias";
+    private static final String ALIAS = KernelNames.of("alias");
 
     /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
-    private static final String TEMPLATE = "template";
+    private static final String TEMPLATE = KernelNames.of("template");
 
     /** {@code type}'s one field ([TSON-SCHEMA] §4.1): a type's IS-A chain, which no declaration writes. */
     private static final String CHAIN = "chain";
@@ -229,7 +230,7 @@ final class DefinitionResolver {
     private final DefinitionGetter namespaceDefinitions;
 
     /**
-     * Whether a name in this namespace denotes the meta-kernel's own entry -- what a kind and a constructor are
+     * Whether a name in this namespace denotes the kernel's own entry -- what a kind and a constructor are
      * judged by ([TSON-SCHEMA] §4.1), so a schema's own {@code namespace} or {@code top} is an ordinary type whatever
      * it is spelled.
      */
@@ -240,7 +241,7 @@ final class DefinitionResolver {
 
     /**
      * Whether this resolver can bind annotation values at all -- false only for a caller with no compiled
-     * reader to read one through (the meta-kernel bootstrap, which is producing the very entries such
+     * reader to read one through (the kernel bootstrap, which is producing the very entries such
      * a reader would need). It is what separates "this annotation's type is out of reach here" from "this
      * annotation's type does not resolve", the second of which is the author's error; see
      * {@link #bindAnnotationValue}.
@@ -255,7 +256,7 @@ final class DefinitionResolver {
      * closed later.
      *
      * <p>Defaults to refusing, for the callers that resolve a declaration outside a whole-schema pass (the
-     * meta-kernel bootstrap, and unit tests) -- there is no materialiser in those, and no schema for an
+     * kernel bootstrap, and unit tests) -- there is no materialiser in those, and no schema for an
      * instantiation entry to land in.
      */
     private final ApplicationCloser applicationCloser;
@@ -421,7 +422,7 @@ final class DefinitionResolver {
      * written <em>after</em> {@code =>} annotate the value and ride the entry's facts; those
      * written before the name annotate the <em>name</em>, and a resolver "does not hoist annotations from key
      * to value", so {@link SchemaResolver} binds them through this same method and places them on the output
-     * schema-map <em>key</em> (§8.1), beside the derived {@code @synthetic} marker.
+     * schema-map <em>key</em> (§8.1), beside the derived {@code @meta.synthetic} marker.
      *
      * <p>A value is bound the same way §6 describes reading one: the annotation's name resolves in the schema's one
      * namespace (§3.3.3, SPEC-FEEDBACK.md #7), and its value is read by that type's own compiled reader -- so {@code
@@ -431,7 +432,7 @@ final class DefinitionResolver {
      * value is read against it, in wait order.
      *
      * <p>The check is skipped entirely by a resolver constructed with no {@link AnnotationValueReader}: there
-     * is no compiled reader to resolve against, so every name would fail it. That is the meta-kernel
+     * is no compiled reader to resolve against, so every name would fail it. That is the kernel
      * bootstrap, which is producing the very entries such a reader would read through; there the annotation's
      * name is kept and its value dropped, {@code schema.meta} being a pure value model with no unbound form
      * to hold one in, and dropping the name too would lose more ([TSON-DATA] §1.5).
@@ -510,7 +511,7 @@ final class DefinitionResolver {
                 List<String> parameters = structural.typeParams();
                 yield parameterised(parameters, switch (structural.body()) {
                     // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
-                    // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
+                    // desugar phase rewrote every real record template into the `!meta.record { ... }` §5.2 says it
                     // denotes, which `openRecord` binds.
                     case RecordDef recordDef -> resolveRecordBody(recordDef.entries());
                     case ConstructionDef construction -> resolveComposition(name, construction, parameters);
@@ -527,9 +528,9 @@ final class DefinitionResolver {
                     case SimpleRef simple -> openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
                     case GenericRef generic -> resolveTemplateApplication(name, generic, parameters);
                     // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a
-                    // sized array into the `!array { ... }` construction it denotes with min_items/max_items bound
+                    // sized array into the `!meta.array { ... }` construction it denotes with min_items/max_items bound
                     // directly (§5.3), a size-less one into the same without them (§5.6), a voidable element as
-                    // `voidable: true`, and a tuple into `!tuple { ... }` -- so one here is that phase not having run.
+                    // `voidable: true`, and a tuple into `!meta.tuple { ... }` -- so one here is that phase not having run.
                     case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _ ->
                             throw unlifted("'" + name + "'", referenceTypeDef.ref());
                 };
@@ -563,7 +564,7 @@ final class DefinitionResolver {
     /**
      * A composition or refinement template: the <em>flattened</em> record, with its parameters stated. Both absorb
      * fields from a source (§5.8's supertypes, §5.7's refinement source), and a §5.7 tightening entry states a
-     * modifier and no type-ref, which is not a {@code record_field} until the inherited field supplies one -- so
+     * modifier and no type-ref, which is not a {@code meta.record_field} until the inherited field supplies one -- so
      * the open record is the one resolution builds, where a namespace is in hand.
      *
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom body
@@ -646,7 +647,7 @@ final class DefinitionResolver {
      * uniformly by the compiled {@code Record*Reader} itself (see {@code RecordAbstractReader}'s own
      * Javadoc), not by a separate normalization step here. Construction transfers only {@code C}'s {@code
      * kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on the result -- except for an
-     * alias, where the result is the entry {@code name => X} denotes, since {@code !alias { target: X }}
+     * alias, where the result is the entry {@code name => X} denotes, since {@code !meta.alias { target: X }}
      * is that alias written out (§8.3).
      *
      * <p>Binds against {@link Top}, not the narrower {@code Atom} -- some constructors (e.g. {@code
@@ -680,8 +681,8 @@ final class DefinitionResolver {
         // Parameters empty and IS-A `top` therefore imply a record body.
         Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
         if (body instanceof io.ltr8.tson.schema.meta.Alias) {
-            // `!alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
-            // denotes the same entry: `kind: ALIAS` (§4.1 -- a type_kind, not one the supertype chain
+            // `!meta.alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
+            // denotes the same entry: `kind: ALIAS` (§4.1 -- a meta.type_kind, not one the supertype chain
             // could give). Dispatched on the *body* rather than on the head's name because this path has
             // already read it; `resolveInstanceTemplate` holds its body unread and so has only the name.
             return body;
@@ -757,7 +758,7 @@ final class DefinitionResolver {
      * instance writes, and the collision would otherwise surface only at an instance that used the field.
      */
     private void refuseDeclaredChain(String name, List<RecordEntry> entries, List<String> chain) {
-        if (!chain.contains("type") || !kernel.test("type")) {
+        if (!chain.contains(KernelNames.of("type")) || !kernel.test(KernelNames.of("type"))) {
             return;
         }
         for (RecordEntry entry : entries) {
@@ -770,7 +771,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * Refuses an author-written {@code @application}: the kernel's annotation is the resolver's, stating on an
+     * Refuses an author-written {@code @meta.application}: the kernel's annotation is the resolver's, stating on an
      * entry's key the application it is the instantiation of (§8.2), as {@code chain} states where it sits -- so
      * a declaration writing it makes a claim no declaration can make. Judged by where the name is defined, so a
      * meta layer's own annotation of that name is its own.
@@ -778,7 +779,7 @@ final class DefinitionResolver {
     private void refuseWrittenApplication(String name, String annotation) {
         if (TsonSchema.APPLICATION.equals(annotation) && metaDefinitions.definition(annotation) != null
                 && metaKernel.test(annotation)) {
-            throw new SchemaValidationException("'" + name + "': '@application' is written, which a declaration "
+            throw new SchemaValidationException("'" + name + "': '@meta.application' is written, which a declaration "
                     + "never writes -- it is the application an entry is the instantiation of, which the resolver "
                     + "states on the key of every entry that closes one (§8.2). Write the application itself: '"
                     + name + " => template<arguments>'");
@@ -819,9 +820,9 @@ final class DefinitionResolver {
 
     /**
      * Whether two records' name types are one type: the same entry at the end of each one's alias chain, not
-     * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code field_name} is
-     * {@code identifier}. Both resolve in the schema's one namespace, the absent default being the kernel's {@code
-     * field_name}, and two that resolve to nothing are compared as written, the linker refusing each on its own.
+     * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code meta.field_name} is
+     * {@code meta.identifier}. Both resolve in the schema's one namespace, the absent default being the kernel's {@code
+     * meta.field_name}, and two that resolve to nothing are compared as written, the linker refusing each on its own.
      */
     private boolean sameNameType(Optional<String> a, Optional<String> b) {
         String ka = nameTypeIdentity(a);
@@ -837,14 +838,14 @@ final class DefinitionResolver {
     }
 
     /**
-     * {@code <T, N> !array { element_type: T  min_items: N }} -- the open counterpart of {@link
+     * {@code <T, N> !meta.array { element_type: T  min_items: N }} -- the open counterpart of {@link
      * #resolveInstance}. The target resolves the same way and must be a constructor for the same reason; what
      * differs is that the payload is <b>not read through that constructor's reader at all</b>. At least one
      * binding stands for a parameter and no parameter is an {@code integer}, so the body is held as written
      * ({@link HeldBody}) and bound once, at materialisation, when substitution has left no parameter in it.
      *
      * <p><b>Holding is what removes the collection boundary.</b> A typed open vocabulary has to spell a
-     * parameter per slot kind, and has no spelling for one inside a collection -- so {@code <T> !choice
+     * parameter per slot kind, and has no spelling for one inside a collection -- so {@code <T> !meta.choice
      * { variants: [T error] }} would have no representation. Held, the parameter is a token inside an array,
      * and no phase has to classify it.
      *
@@ -993,20 +994,22 @@ final class DefinitionResolver {
      * {@code I}'s own value.
      *
      * <p>Per §5.5's own text (not the general composition/refinement induction of §5.7/§5.8): the value's
-     * constructor is {@code I}'s own (e.g. {@code integer_type} for {@code I = integer}), and its chain is the
-     * literal single-element {@code [I]} -- not transitively chained with {@code I}'s own supertypes (empty for
-     * every fresh {@code Instance}).
+     * constructor is {@code I}'s own (e.g. {@code numeric.integer_type} for {@code I = integer}), and its chain is
+     * the literal single-element {@code [I]} -- not transitively chained with {@code I}'s own supertypes (empty for
+     * every fresh {@code Instance}). {@code I} written as an alias names the instance at the end of its chain.
      */
     private Top resolveAtomRefinement(String name, AtomRefinement refinement) {
-        String sourceName = refinement.target();
+        // An alias is a hop, not a supertype (§8.3): `!integer ^ { ... }` through core's `integer => integer`
+        // refines the instance at the end of the chain, which is what the refinement IS-A.
+        String sourceName = AliasChain.terminal(refinement.target(), namespaceDefinitions::definition);
         Top source = namespaceDefinitions.definition(sourceName);
         if (source == null) {
             throw new SchemaValidationException("'" + name + "': '!" + sourceName
                     + "' names no entry of this schema's namespace (§3.3.1)");
         }
         // §5.5's question, asked of the body: is this an atom *instance*? An instance's body IS an atom
-        // (`integer` carries an `!integer_type {}`), where its constructor's body is the vocabulary record
-        // describing one (`integer_type` carries a `!record { ... }`). So one test separates the pair and
+        // (`integer` carries an `!numeric.integer_type {}`), where its constructor's body is the vocabulary record
+        // describing one (`integer_type` carries a `!meta.record { ... }`). So one test separates the pair and
         // establishes atom-ness at once, where neither half does alone -- a plain record has no supertypes
         // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
         // stack decides everything of this shape (`Subsumption`), rather than trusting a stated kind.
@@ -1087,11 +1090,16 @@ final class DefinitionResolver {
      */
     private DataValue mergeWithSource(String name, Top sourceBody, DataValue newBindings, String constructorName) {
         Map<String, RecordValue.Field> merged = new LinkedHashMap<>();
+        RecordBody constructor = namespaceDefinitions.definition(constructorName) instanceof RecordBody record
+                ? record : null;
         if (sourceSerializedFields(name, sourceBody) instanceof RecordValue sourceRecord) {
             for (RecordValue.Field field : sourceRecord.fields()) {
                 // The source's chain is where the source sits, not a facet the refinement inherits: the
-                // refinement's own chain is set once it is bound.
-                if (!CHAIN.equals(field.name())) {
+                // refinement's own chain is set once it is bound. A field the constructor fixes is the
+                // constructor's, supplied by its reader: copying it would read its value again, against a
+                // type that may be this very entry -- `iri => !iri_reference ^ {...}` reading `spec` as an iri.
+                RecordField declared = constructor == null ? null : constructor.fields().get(field.name());
+                if (!CHAIN.equals(field.name()) && (declared == null || declared.role() != FieldRole.FIXED)) {
                     merged.put(field.name(), field);
                 }
             }
@@ -1329,7 +1337,7 @@ final class DefinitionResolver {
 
     /**
      * An alias entry: closed, with an {@code Alias} body naming its target, or -- §5.10's partial
-     * application -- <b>open</b>, with that same {@code !alias { target: ... }} held as its body.
+     * application -- <b>open</b>, with that same {@code !meta.alias { target: ... }} held as its body.
      *
      * <p>An open entry's body is held whatever shape it takes, with no exception for the alias form: that is
      * what lets materialisation dispatch on the constructor head, and what makes "declares parameters" and
@@ -1480,8 +1488,8 @@ final class DefinitionResolver {
             Top terminalSupertype = supertypeHops
                     ? namespaceDefinitions.definition(supertypeTerminal) : supertypeDef;
             // §4.3's rule is the body test and nothing beside it: an operand MUST be a definition whose body
-            // is a `!record`. A record template's instantiation satisfies that -- `box<text>` closes to a
-            // `!record` carrying fields -- so it composes exactly as the hand-written record of the same
+            // is a `!meta.record`. A record template's instantiation satisfies that -- `box<text>` closes to a
+            // `!meta.record` carrying fields -- so it composes exactly as the hand-written record of the same
             // shape does, and how the author spelled it is no part of the question (§8.2: what is
             // canonicalised is identity, not provenance). Every other instantiation fails this same test on
             // its own body: an array, a map or a choice has no fields to contribute (§4.3).
@@ -1695,7 +1703,8 @@ final class DefinitionResolver {
         return EntryKind.ofChain(baseKindsFound, kernel);
     }
 
-    private static final Set<String> BASE_KINDS = Set.of("atom", "product", "sum", "namespace");
+    private static final Set<String> BASE_KINDS = Set.of(KernelNames.of("atom"), KernelNames.of("product"),
+            KernelNames.of("sum"), KernelNames.of("namespace"));
 
     // ── Refinement (§5.7): T ^ { ... } ─────────────────────────────────────
 
@@ -1746,8 +1755,8 @@ final class DefinitionResolver {
         Top terminalSource = sourceHops
                 ? namespaceDefinitions.definition(sourceTerminal) : sourceDef;
         // §4.3's test is the body and nothing beside it, and §5.7 states the same of its own source: a
-        // definition whose body is a `!record` has a vocabulary to tighten. A record template's
-        // instantiation has one -- `box<text>` closes to a `!record` carrying fields -- so it refines like
+        // definition whose body is a `!meta.record` has a vocabulary to tighten. A record template's
+        // instantiation has one -- `box<text>` closes to a `!meta.record` carrying fields -- so it refines like
         // the hand-written record of the same shape, and what polices a value the substitution already fixed
         // is §5.7's own per-field rule, which refuses re-fixing a FIXED field to a different value
         // whoever wrote it. Every other instantiation fails on its own body (§4.3).
@@ -2114,7 +2123,7 @@ final class DefinitionResolver {
      * already-inherited field: resolved the same way as any field ({@link #resolveField}), except
      * an elided type-ref (a modifier-only entry, {@code field: = value}) inherits {@code
      * inherited.type()} and its voidability rather than failing, and the result MUST refine the inherited
-     * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: product_access_type =
+     * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: meta.product_access_type =
      * INDEX} pins {@code product}'s required field, which refines it. The identity-diagonal rule (a FIXED
      * restatement MUST NOT change the pinned value) is not checked here: the two values are never compared.
      *
@@ -2315,7 +2324,7 @@ final class DefinitionResolver {
 
     /**
      * §6 adds one annotation position to the type-definition grammar: "in {@code field-def}, annotations
-     * precede the field name and annotate the field itself, mapping to the {@code record_field} in resolver
+     * precede the field name and annotate the field itself, mapping to the {@code meta.record_field} in resolver
      * output". Unlike a declaration, there is no before/after ambiguity here -- a field has one annotation
      * position and it is the field's own.
      */

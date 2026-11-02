@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * meta.tn's {@code bytes_type.encoding} selector: which RFC 4648 alphabet the text class of encodings spells
+ * core.tn's {@code binary.bytes_type.encoding} selector: which RFC 4648 alphabet the text class of encodings spells
  * a {@code bytes} value in.
  *
  * <p><b>It is a facet, and that is a claim about types rather than about values.</b> The value is the octets
@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * declared as its own instance of the constructor. Refining for length is unaffected and inherits the
  * alphabet.
  *
- * <p>This is what tells {@code encoding} from {@link io.ltr8.tson.schema.meta.ComplexType}'s {@code
+ * <p>This is what tells {@code encoding} from {@link io.ltr8.tson.schema.numeric.ComplexType}'s {@code
  * component}, also a selector and refinable: {@code component} narrows the value space, and this does not.
  */
 class BytesEncodingSelectorTest {
@@ -49,8 +49,8 @@ class BytesEncodingSelectorTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              hexdigest => !bytes_type { encoding: HEX  length: 4 }
-              b32       => !bytes_type { encoding: BASE32 }
+              hexdigest => !binary.bytes_type { encoding: HEX  length: 4 }
+              b32       => !binary.bytes_type { encoding: BASE32 }
               aliased   => hexdigest
               box => <T> { value: T }
 

@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.atom.AtomParsers;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -92,8 +92,8 @@ import java.util.stream.Collectors;
  * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
  * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
  * ReferenceNameReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
- * positional field is <b>atom</b>-typed -- {@code record_field}'s {@code type}, a {@code type_kind}, so {@code
- * !record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,
+ * positional field is <b>atom</b>-typed -- {@code meta.record_field}'s {@code type}, a {@code meta.type_kind}, so {@code
+ * !meta.record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,
  * where the explicit record is the only spelling. The record reader refuses a name it does not take as no record,
  * since a component that holds the name is read by {@link ReferenceNameReader} instead and never reaches this
  * class. A data document has no namespace to resolve a name in,
@@ -182,7 +182,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * What this record's field names are judged by as they are read ({@link TsonReadContext#nextFieldName}):
-     * its name type, the kernel's {@code field_name} where it states none.
+     * its name type, the kernel's {@code meta.field_name} where it states none.
      */
     private final TsonReadContext.FieldNameRule fieldNames;
     /**

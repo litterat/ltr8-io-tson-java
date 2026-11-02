@@ -55,9 +55,9 @@ class ApplicabilityIsIsATopTest {
      */
     @Test
     void aliasAppliesClosedAndOpenAlike() {
-        assertEquals(List.of(), problems("  r => !alias { target: int32 }"));
+        assertEquals(List.of(), problems("  r => !meta.alias { target: int32 }"));
         assertEquals(List.of(), problems("""
-                  r => <T> !alias { target: T }
+                  r => <T> !meta.alias { target: T }
                   c => r<int32>
                 """));
     }
@@ -79,8 +79,8 @@ class ApplicabilityIsIsATopTest {
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
                   bare    => int32
-                  closed  => !alias { target: int32 }
-                  open    => <T> !alias { target: T }
+                  closed  => !meta.alias { target: int32 }
+                  open    => <T> !meta.alias { target: T }
                   applied => open<int32>
                 }
                 """;
@@ -111,14 +111,13 @@ class ApplicabilityIsIsATopTest {
     void applicationFollowsAnAliasToItsTarget() {
         String meta = """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  alias_array => array
+                  alias_array => meta.array
                   two_hops    => alias_array
                 }
                 """;
-        for (String head : List.of("array", "alias_array", "two_hops")) {
+        for (String head : List.of("meta.array", "alias_array", "two_hops")) {
             String user = """
                     !!id:"https://example.test/u.tn"
                     !!import:"https://example.test/m.tn"
@@ -136,7 +135,7 @@ class ApplicabilityIsIsATopTest {
     /** Every ordinary constructor is IS-A top, so each applies. */
     @Test
     void anOrdinaryConstructorStillApplies() {
-        assertEquals(List.of(), problems("  tags => !array { element_type: text }"));
+        assertEquals(List.of(), problems("  tags => !meta.array { element_type: text }"));
     }
 
     /**
@@ -146,15 +145,16 @@ class ApplicabilityIsIsATopTest {
      */
     @Test
     void aComponentOfATypeBuildsAValueOfIt() {
-        for (String component : List.of("record_field { name: x  type: text }", "tuple_element { label: text }",
-                "field_group { members: g }", "integer_size { bits: 32  sign: true }")) {
+        for (String component : List.of("meta.record_field { name: x  type: text }",
+                "meta.tuple_element { label: text }", "meta.field_group { members: g }",
+                "numeric.integer_size { bits: 32  sign: true }")) {
             List<Diagnostic> problems = problems("  bad => !" + component);
 
             assertEquals(1, problems.size(), problems::toString);
             assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
             assertTrue(problems.getFirst().message().contains("the body is no value of the type"), problems::toString);
         }
-        assertEquals(List.of(), problems("  good => !integer_size { bits: 32  signed: true }"));
+        assertEquals(List.of(), problems("  good => !numeric.integer_size { bits: 32  signed: true }"));
     }
 
     /**
@@ -164,12 +164,12 @@ class ApplicabilityIsIsATopTest {
      */
     @Test
     void aBaseKindIsAdmittedAndThenRefusesItself() {
-        List<Diagnostic> problems = problems("  bad => !product {}");
+        List<Diagnostic> problems = problems("  bad => !meta.product {}");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("'!product' names an abstract entry"), problems::toString);
-        assertTrue(problems.getFirst().message().contains("(namespace | record | array | set_type | map | tuple)"),
-                problems::toString);
+        assertTrue(problems.getFirst().message().contains("'!meta.product' names an abstract entry"), problems::toString);
+        assertTrue(problems.getFirst().message().contains(
+                "(meta.namespace | meta.record | meta.array | meta.set_type | meta.map | meta.tuple)"), problems::toString);
         assertFalse(problems.getFirst().message().contains("constraint vocabulary"),
                 "one sentence, not the applicability clause beside the abstract one: " + problems);
     }
@@ -177,7 +177,7 @@ class ApplicabilityIsIsATopTest {
     /** {@code top}'s refusal names only what can be constructed: {@code type} and the base kinds are abstract too. */
     @Test
     void topNamesOnlyItsInstantiableSubtypes() {
-        String message = problems("  bad => !top {}").getFirst().message();
+        String message = problems("  bad => !meta.top {}").getFirst().message();
 
         assertTrue(message.contains("record"), message);
         for (String abstractKind : List.of("type", "atom", "product", "sum", "template")) {
@@ -195,10 +195,9 @@ class ApplicabilityIsIsATopTest {
     void anAbstractConstructorWithNothingComposingItSaysSo() {
         String meta = """
                 !!id:"https://example.test/marker-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  marker => abstract top & {}
+                  marker => abstract meta.top & {}
                 }
                 """;
         String user = """

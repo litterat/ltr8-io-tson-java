@@ -27,7 +27,7 @@ import java.util.Optional;
  * naming values carries {@link Closure#NONE}, and names nothing.
  *
  * <p>An argument-carrying reference survives only where an application is still open: a record template's
- * {@code chain.parents} and field types, held text, and the {@code @application} annotation. A closed application
+ * {@code chain.parents} and field types, held text, and the {@code @meta.application} annotation. A closed application
  * lifts to an entry and is named bare where it stands (§5.3).
  *
  * <p>{@code arguments} normalises {@code null} to empty: absent and empty are one state, and there is no spelling of
@@ -35,7 +35,7 @@ import java.util.Optional;
  *
  * <p><b>{@code annotations} carries the annotations written on the reference itself</b>: [TSON-SCHEMA] §8.3 attaches
  * {@code @alias:name} to the type value when a use site is flattened past an alias entry, so
- * {@code type: @alias:field_name token} records both where the reference points and what the author wrote. Excluded
+ * {@code type: @alias:meta.field_name token} records both where the reference points and what the author wrote. Excluded
  * from {@link #equals}, as {@code closure} is: both are about where a reference came from, and §8.2 keys identity on
  * where it points.
  */

@@ -24,7 +24,7 @@ import java.util.Set;
  * choice disjoint) or less".
  *
  * <p><b>The fact is load-bearing twice, so the class table is pinned.</b> {@code
- * TsonSchemaLinker.checkDisjointAssertions} rejects {@code @disjoint} on a {@code false} choice, and
+ * TsonSchemaLinker.checkDisjointAssertions} rejects {@code @meta.disjoint} on a {@code false} choice, and
  * {@code ChoiceReader} offers untagged recovery exactly where the fact is {@code true} and every class is
  * scalar -- dispatching through the same {@link DiscriminationClass#of} this derivation classifies with,
  * so the two can never disagree. Changing what classifies therefore changes both which schemas load and

@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.schema.atom.AtomCoherence;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -10,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code map} constructor's own vocabulary, resolved (Part 2 §4.2, §8.1) --
+ * The kernel's {@code map} constructor's own vocabulary, resolved (Part 2 §4.2, §8.1) --
  * {@code access_pattern}/{@code size_type} are fixed ({@code NAMED}/{@code VARIABLE}) and never
  * appear in output. {@code @Field} renames each component to the kernel's own snake_case wire
  * name -- {@code ltr8-bind} otherwise writes the bare Java component name verbatim (camelCase).
@@ -23,7 +24,7 @@ import java.util.Optional;
  * <p>{@code ordered} says whether entry order is part of the value, and is false unless a schema says so, as
  * a JSON object's is; output keeps the order written either way ([TSON-SCHEMA] §7.5).
  */
-@Typename(name = "map")
+@Typename(name = "meta.map")
 public record MapBody(TypeChain chain,
         @Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
                        @Field("voidable") boolean voidable, @Field("ordered") boolean ordered,

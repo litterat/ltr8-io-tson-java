@@ -38,7 +38,7 @@ import java.util.function.Function;
 
 /**
  * The names a value entry holds ({@link ValueEntry}) resolved and judged by their slots
- * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the
+ * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code meta.ref<T>}, held as a {@link Ref} the
  * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
  * judged a member ({@link #judgeMember}).
  *
@@ -66,7 +66,7 @@ import java.util.function.Function;
  *
  * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor, and
  * otherwise the kernel constructor its body mirrors ({@code @Typename}): a record declaration or a composition is
- * built by {@code record}, and {@code uuid => !uuid_type {}} by {@code uuid_type}. An imported referent's constructor
+ * built by {@code record}, and {@code uuid => !net.uuid_type {}} by {@code uuid_type}. An imported referent's constructor
  * is in the closure that declared it, which this schema's closure contains, so every type is looked up in the one
  * namespace and compared by identity, declaring schema and name.
  *
@@ -106,7 +106,7 @@ final class ValuesByName {
 
         /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link EntryKind#isConstructor}). */
         boolean isConstructor(String name, Top value) {
-            return EntryKind.isConstructor(name, value, entry -> TsonBundledSchemas.isMetaKernel(originOf.apply(entry)));
+            return EntryKind.isConstructor(name, value, entry -> TsonBundledSchemas.isKernel(originOf.apply(entry)));
         }
     }
 

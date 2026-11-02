@@ -211,7 +211,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      *
      * <p><b>Why a slot can want the raw token.</b> The kernel types every such slot {@code value}, whose
      * reader decodes ([TSON-DATA] §4) -- {@code 3} to an integer, {@code "3"} to a string. A component
-     * declared {@code Token} wants what was written: {@code record_field}'s own fixed and default values are
+     * declared {@code Token} wants what was written: {@code meta.record_field}'s own fixed and default values are
      * read later by the field's declared type and compared against what a document writes. A decoded host
      * object cannot fill one, and §8.2 wants the spelling kept.
      *
@@ -346,7 +346,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * real Java object "just {@code top}" could construct, so every genuine value at such a position
      * must carry an explicit subtype type-ref. A {@link DataClassRecord} instead -- {@code text_type}
      * is the one real fixture case, directly instantiable as a plain {@link
-     * io.ltr8.tson.schema.meta.TextType} *and* composed on top of by {@code uri_type}/{@code
+     * io.ltr8.tson.schema.unicode.TextType} *and* composed on top of by {@code uri_type}/{@code
      * regex_type}/{@code email_type} -- means {@code ownParser} is a real, reachable {@link
      * RecordBindReader} for the declaration's own body; dispatch to a named subtype is bounded by the
      * schema's own {@code subtypes()} list, not by any Java type, via {@link VariantSchemaReader} (see

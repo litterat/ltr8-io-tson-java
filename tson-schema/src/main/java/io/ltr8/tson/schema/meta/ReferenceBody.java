@@ -11,10 +11,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * An instance of the meta-kernel's {@code reference} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom
- * whose values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link #of}. {@code
- * kind<record>}, {@code ref<record>} and {@code !reference { of: record }} are one instance; the two templates are
- * spellings, and the slot's meaning comes from {@link #of} and never from which one was written.
+ * An instance of the kernel's {@code reference} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom whose
+ * values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link #of}.
+ * {@code meta.kind<record>}, {@code meta.ref<record>} and {@code !meta.reference { of: record }} are one instance; the
+ * two templates are spellings, and the slot's meaning comes from {@link #of} and never from which one was written.
  *
  * <p><b>What {@link #of} names decides what the slot holds.</b> Where it is a constructor ({@code top} or IS-A it),
  * the values it admits are types, and the slot holds a type's name, delivered to a host as a {@link TypeRef} that
@@ -26,11 +26,11 @@ import java.util.Optional;
  * the governing schema's closure: whether {@code of} names a constructor, and, for one that does, the names it admits,
  * sorted. Membership is the linker's judgement, so resolved output carries {@code of} alone.
  *
- * <p><b>Equality is {@link #of} and the chain, never the index.</b> Two schemas that both apply {@code kind<uuid_type>}
+ * <p><b>Equality is {@link #of} and the chain, never the index.</b> Two schemas that both apply {@code meta.kind<uuid_type>}
  * hold one instance with different members, and an importer that re-derives an entry an import already minted unifies
  * with it rather than colliding (§8.2).
  */
-@Typename(name = "reference")
+@Typename(name = "meta.reference")
 public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index> index) implements Atom {
 
     /**

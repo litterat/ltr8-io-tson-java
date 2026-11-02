@@ -38,7 +38,7 @@ class MapBindReaderTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               catalogue => { entries: {text => text?} }
-              ranked    => !map { key_type: text  value_type: int32  ordered: true }
+              ranked    => !meta.map { key_type: text  value_type: int32  ordered: true }
               league    => { table: ranked }
             }
             """;

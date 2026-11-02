@@ -30,10 +30,9 @@ class UnregisteredMetaConstructorTest {
     static {
         DOCUMENTS.put("https://example.test/meta-unreg.tn", """
                 !!id:"https://example.test/meta-unreg.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  operation => top & { path: text }
+                  operation => meta.top & { path: text }
                 }
                 """);
         DOCUMENTS.put("https://example.test/api-unreg.tn", """

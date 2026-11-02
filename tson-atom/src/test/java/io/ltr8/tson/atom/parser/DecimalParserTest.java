@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
 import org.junit.jupiter.api.Test;
-import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.numeric.DecimalType;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -130,7 +130,7 @@ class DecimalParserTest {
 
     @Test
     void aTrailingZeroChangesNeitherMembershipNorTheDigitCounts() {
-        // meta.tn: "scale is not part of the value -- 1, 1.0 and 1.00 are one value", so no facet may see
+        // numeric.tn: "scale is not part of the value -- 1, 1.0 and 1.00 are one value", so no facet may see
         // the difference. 2.500 is the member 2.50, is a whole number of tenths, and has three significant
         // digits rather than four.
         DecimalParser type = new DecimalParser(new DecimalType(Optional.empty(), Optional.empty(), Optional.empty(),

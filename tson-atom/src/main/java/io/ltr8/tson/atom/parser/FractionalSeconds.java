@@ -9,7 +9,7 @@ import java.util.Optional;
  * The {@code precision} facet of the temporal atom families (§5.5), shared by {@link TimeParser} and
  * {@link DateTimeParser} because it is one rule stated once for both.
  *
- * <p><b>It is a constraint on the value, not on the spelling</b>, which meta.tn's own {@code @doc} for
+ * <p><b>It is a constraint on the value, not on the spelling</b>, which temporal.tn's own {@code @doc} for
  * {@code time_type} states and gives the example for: {@code precision: N} admits a value that is a whole
  * number of 10⁻ᴺ seconds, and reading "admits any spelling of an admitted value, trailing zeros included, so
  * {@code 12:00:00.500} is admitted under {@code precision: 1}". So the test is on the

@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>The wiring, in full, is three things</b> -- there is nothing else to register:
  * <ol>
- *   <li>a meta-layer schema chaining {@code !!meta} to meta-kernel and declaring a record
+ *   <li>a meta-layer schema chaining {@code !!meta} to the kernel and declaring a record
  *       {@code operation => { ... }} and a namespace of it, {@code operations => !namespace { ... }}
  *       ({@link #META_HTTP_SCHEMA});</li>
  *   <li>a Java class for {@code operation} ({@link Operation}), a plain record;</li>
@@ -57,21 +57,20 @@ class MetaLayerVocabularyTest {
     /** (1) The meta-layer schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               operation => {
                 path:     text
                 method:   text
-                request:  type_kind
-                response: type_kind
+                request:  meta.type_kind
+                response: meta.type_kind
               }
-              operations => !namespace { key_type: identifier  value_type: operation }
+              operations => !meta.namespace { key_type: meta.identifier  value_type: operation }
               webhook => {
                 path:     text
-                delivers?: [type_kind]?
+                delivers?: [meta.type_kind]?
               }
-              webhooks    => !namespace { key_type: identifier  value_type: webhook }
+              webhooks    => !meta.namespace { key_type: meta.identifier  value_type: webhook }
               status_code => text
               plain       => { a: text }
               envelope    => <T> { body: T }
@@ -158,18 +157,18 @@ class MetaLayerVocabularyTest {
     }
 
     /**
-     * The other side of the same predicate: a record type that is no constructor ({@code record_field}, {@code
-     * template_param}, {@code integer_size}, …) builds no type, and {@code !record_field { ... }} is a value of it, read
-     * against it as a data value is -- so a field it does not declare is refused there.
+     * The other side of the same predicate: a record type that is no constructor ({@code meta.record_field},
+     * {@code meta.template_param}, {@code numeric.integer_size}, …) builds no type, and {@code !meta.record_field { ... }}
+     * is a value of it, read against it as a data value is -- so a field it does not declare is refused there.
      */
     @Test
     void aComponentOfATypeBuildsAValueOfIt() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> linked("component", "  bad => !record_field { name: x  type: text }"));
+                () -> linked("component", "  bad => !meta.record_field { name: x  type: text }"));
 
-        assertTrue(thrown.getMessage().contains("the body is no value of the type 'record_field'")
+        assertTrue(thrown.getMessage().contains("the body is no value of the type 'meta.record_field'")
                 && thrown.getMessage().contains("unknown field 'name'"), thrown.getMessage());
-        assertEquals(EntryKind.VALUE, linked("component-value", "  good => !record_field { type: text }")
+        assertEquals(EntryKind.VALUE, linked("component-value", "  good => !meta.record_field { type: text }")
                 .kindOf("good"));
     }
 
@@ -185,12 +184,13 @@ class MetaLayerVocabularyTest {
         DataNameBinder binder = SchemaMetaNameBinder.extendedWith(CONSUMER_NAMES);
         assertEquals(Operation.class, binder.resolve("operation"),
                 "the name binder is the whole of the registration");
-        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("record"),
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("meta.record"),
                 "and the library's own vocabulary still resolves through it");
 
         Object read = core(consumerContext()).loadMeta(META_HTTP).compiledSchema().find("operation")
                 .orElseThrow()
-                .read(TestDocuments.document("{ path: \"/p\"  method: \"GET\"  request: text  response: integer }"));
+                .read(TestDocuments.document(
+                        "{ path: \"/p\"  method: \"GET\"  request: text  response: integer }"));
 
         assertEquals(new Operation("/p", "GET", TypeRef.of("text"), TypeRef.of("integer")), read);
     }

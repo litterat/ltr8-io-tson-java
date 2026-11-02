@@ -33,10 +33,10 @@ class TemplateParamBoundTest {
             {
               non_empty_text       => !text ^ { min_length: 1 }
               boxed      => <T: text> { a: T }
-              vec        => <T: text, N> !array { element_type: T  min_items: N }
+              vec        => <T: text, N> !meta.array { element_type: T  min_items: N }
               rebox      => <T> boxed<T>
               narrower   => <T: non_empty_text> boxed<T>
-              counted    => <N: non_negative_integer> !array { element_type: text  min_items: N }
+              counted    => <N: numeric.non_negative_integer> !meta.array { element_type: text  min_items: N }
               typed_by   => <T, N> { w?: T ~ N }
             }
             """;
@@ -74,7 +74,7 @@ class TemplateParamBoundTest {
 
     @Test
     void anInstanceConstructionNarrowsOneParameterAndKeepsTheOthersDerivedType() {
-        assertEquals(List.of(bounded("T", "text"), new TemplateParam("N", TypeRef.of("non_negative_integer"))),
+        assertEquals(List.of(bounded("T", "text"), new TemplateParam("N", TypeRef.of("numeric.non_negative_integer"))),
                 parameters().get("vec"));
     }
 
@@ -88,10 +88,11 @@ class TemplateParamBoundTest {
         assertEquals(List.of(bounded("T", "non_empty_text")), parameters().get("narrower"));
     }
 
-    /** The kernel's non_negative_integer, which the slot is typed by: the same type, so it narrows. */
+    /** The kernel's numeric.non_negative_integer, which the slot is typed by: the same type, so it narrows. */
     @Test
     void aValueParametersWrittenTypeNarrowsItsType() {
-        assertEquals(List.of(new TemplateParam("N", TypeRef.of("non_negative_integer"))), parameters().get("counted"));
+        assertEquals(List.of(new TemplateParam("N", TypeRef.of("numeric.non_negative_integer"))),
+                parameters().get("counted"));
     }
 
     // ── Refused at the declaration ─────────────────────────────────────────
@@ -105,8 +106,8 @@ class TemplateParamBoundTest {
 
     @Test
     void aWrittenValueTypeThePositionsDoNotReadAsIsRefused() {
-        assertRefused("  bad => <N: text> !array { element_type: text  min_items: N }",
-                "read it as non_negative_integer");
+        assertRefused("  bad => <N: text> !meta.array { element_type: text  min_items: N }",
+                "read it as numeric.non_negative_integer");
     }
 
     @Test
@@ -120,7 +121,7 @@ class TemplateParamBoundTest {
      */
     @Test
     void aWrittenBoundNamesAType() {
-        assertRefused("  boxed => <T: text_type> { a: T }", "'text_type' is a constructor, not a type");
+        assertRefused("  boxed => <T: unicode.text_type> { a: T }", "'unicode.text_type' is a constructor, not a type");
         assertRefused("  boxed => <T: no_such_type> { a: T }", "'no_such_type' names no type");
         assertRefused("  boxed => <T: no_such<text>> { a: T }", "'no_such' names no type");
     }
@@ -164,9 +165,9 @@ class TemplateParamBoundTest {
     @Test
     void aValueArgumentMustBeAValueOfTheParametersType() {
         assertRefused("""
-                  vec    => <T, N> !array { element_type: T  min_items: N }
+                  vec    => <T, N> !meta.array { element_type: T  min_items: N }
                   holder => { v: vec<text, "two"> }""", "binds 'N' to 'two', which is not a value of "
-                + "non_negative_integer");
+                + "numeric.non_negative_integer");
     }
 
     @Test

@@ -154,17 +154,17 @@ class Class2ConformanceSuiteTest {
                 expected.forEach((name, definition) -> assertEquals(
                         ResolvedForm.rendered(definition), ResolvedForm.rendered(ours.get(name)),
                         name + " does not resolve to what the vector states"));
-                // §8.2 puts the derived @synthetic marker on the key of every entry the resolver
+                // §8.2 puts the derived @meta.synthetic marker on the key of every entry the resolver
                 // materialised from a sugar form and on no other, so the marked set is a claim in its own
                 // right -- and one a bound comparison cannot make, a key-position annotation being dropped
                 // when a resolved-form document is read back.
                 assertEquals(ResolvedForm.markedSynthetics(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourSynthetics(tson, identityOf(source)),
-                        "the entries marked @synthetic are not the ones the vector marks");
+                        "the entries marked @meta.synthetic are not the ones the vector marks");
                 // §8.2's second key annotation: each instantiation states, on its key, the application it is.
                 assertEquals(ResolvedForm.markedApplications(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourApplications(tson, identityOf(source)),
-                        "the entries' @application are not the ones the vector states");
+                        "the entries' @meta.application are not the ones the vector states");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
             case "refused" -> assertRefused(sidecar, problems, "schema");

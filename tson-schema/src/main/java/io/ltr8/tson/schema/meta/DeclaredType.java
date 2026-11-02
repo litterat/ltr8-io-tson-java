@@ -16,7 +16,7 @@ import io.ltr8.annotation.Typename;
  * <p>The body carries nothing: what the position admits is the closure the entry belongs to, known when the
  * schema compiles, so the constructor alone is what tells {@code declared} apart from every other sum.
  */
-@Typename(name = "declared_type")
+@Typename(name = "meta.declared_type")
 public record DeclaredType(TypeChain chain) implements Sum {
 
     /** The chain normalised: absent and empty are one list. */

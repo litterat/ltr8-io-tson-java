@@ -6,7 +6,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -21,7 +21,7 @@ import java.util.function.Function;
 
 /**
  * What a record's {@code name_type} obliges ([TSON-SCHEMA] §5.2): that it names an identifier family, a member of
- * {@code identifier_kind} ({@link NameType#admits}, [TSON-SCHEMA] §4.2), that every field name the record states
+ * {@code meta.identifier_kind} ({@link NameType#admits}, [TSON-SCHEMA] §4.2), that every field name the record states
  * -- in {@code fields}, {@code discriminators} and its groups -- is a value of it, and that no two of its fields are
  * one value under its equality. The peer of {@link EnumLabels}, on the same terms: a
  * checker over the linked closure that hands back violations and leaves reporting to the linker.
@@ -98,7 +98,7 @@ final class FieldNames {
         if (parser.isEmpty()) {
             return Optional.empty();
         }
-        // Under the default, field_name, a refusal speaks of identifiers as any name's would; only an author's own name
+        // Under the default, meta.field_name, a refusal speaks of identifiers as any name's would; only an author's own name
         // type is named, since its rules are the ones the author has to look up.
         boolean identifier = NameType.isIdentifier(type, structure);
         String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameTypeName() + "'";

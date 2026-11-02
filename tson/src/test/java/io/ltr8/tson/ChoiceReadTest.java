@@ -144,7 +144,7 @@ class ChoiceReadTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               loose => ( float64 | text )
-              strict => !float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
+              strict => !numeric.float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
               tight => ( strict | text )
               holder => { loose: loose  tight: tight }
             }""";

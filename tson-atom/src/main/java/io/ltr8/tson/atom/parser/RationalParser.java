@@ -7,12 +7,12 @@ import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.atom.number.RationalForm;
 import io.ltr8.tson.base.atom.Rational;
-import io.ltr8.tson.schema.meta.RationalType;
+import io.ltr8.tson.schema.numeric.RationalType;
 import java.math.BigInteger;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta-kernel's {@code rational_type} constructor (§5.6's {@code
+ * Parses and validates against the kernel's {@code rational_type} constructor (§5.6's {@code
  * rational} atom). Accepts only the {@code rational} grammar form (§7.6) -- {@code "2/3"}, always
  * quoted in practice since {@code /} is outside the unquoted token profile (§5.6), though {@link
  * #read} never sees which form carried it -- an {@link AtomType} is handed a {@code String} -- matching
@@ -33,7 +33,7 @@ public record RationalParser(RationalType constraints) implements AtomTypeParser
     /** §5.6's built-in annotation name -- {@code !rational}. */
     public static final String TYPENAME = "rational";
 
-    /** {@code rational => !rational_type {}} -- the unconstrained rational, §5.6's {@code !rational}. */
+    /** {@code rational => !numeric.rational_type {}} -- the unconstrained rational, §5.6's {@code !rational}. */
     public static final RationalParser UNCONSTRAINED = new RationalParser(RationalType.UNCONSTRAINED);
 
     public RationalParser(Optional<Rational> min, Optional<Rational> exclusiveMin, Optional<Rational> max,

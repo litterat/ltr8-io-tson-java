@@ -3,7 +3,7 @@ package io.ltr8.tson.schema;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.EntryKind;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.unicode.Normalization;
@@ -33,7 +33,7 @@ import java.util.Optional;
  * Merging an {@code !!import} flattens another schema's entries into this one's {@link TsonSchema#entries()},
  * which is what makes every reference resolvable in one namespace -- and also what erases which document each
  * entry was written in. A diagnostic against an imported entry needs that back: {@code /int32} at line 110 is
- * core.tn's, not the four-line schema a document named, and pairing the pointer with the importing schema's
+ * numeric.tn's, not the four-line schema a document named, and pairing the pointer with the importing schema's
  * identity would send a consumer to the wrong file. So the map is name -&gt; the canonical identity ([TSON-DATA]
  * §2.2.1) of the schema that declared it, populated as the merge happens and carried transitively (an entry
  * reached through two levels of import keeps its original author, not the intermediary).
@@ -44,14 +44,14 @@ import java.util.Optional;
  * phase that still knows it.
  *
  * <p><b>{@code enumForms} is the second</b>: each enum whose name type's {@code normalization} is not {@code NONE}
- * ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's {@code identifier} is
+ * ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's {@code meta.identifier} is
  * NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed matches its members as
  * written. No reader can derive it: a {@code name_type} the enum's constructor pinned names an entry of the
  * closure, which the resolved {@link TsonSchema#entries()} do not hold and which linking is the last phase to see.
  * Like {@code entryOrigins} it is carried through {@code !!import}, each enum judged in the schema that declared it.
  *
  * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record whose {@code
- * name_type} is not the kernel's {@code field_name} ([TSON-SCHEMA] §5.2), with the value that type
+ * name_type} is not the kernel's {@code meta.field_name} ([TSON-SCHEMA] §5.2), with the value that type
  * resolves to, by which its readers judge the field names a document writes. A record not listed has
  * identifiers for field names.
 
@@ -108,7 +108,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      * The form record {@code entryName}'s field names are matched in: its name type's {@code normalization}
      * ([TSON-SCHEMA] §5.5), so a document's name and a declared one that are one value of the type are one field --
      * the equality the linker judged the declared names distinct under. {@code NFC} for one {@link #nameTypes}
-     * omits, the kernel's {@code field_name} being NFC; no form compares lower than NFC.
+     * omits, the kernel's {@code meta.field_name} being NFC; no form compares lower than NFC.
      */
     public Normalization nameForm(String entryName) {
         return nameType(entryName)
@@ -128,12 +128,13 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /**
-     * Whether {@code entryName} denotes the meta-kernel's own entry of that name: declared by meta-kernel.tn, or
-     * merged in from it. What a kind and a constructor are judged by ([TSON-SCHEMA] §4.1), so a schema's own
-     * {@code namespace} or {@code top} is an ordinary declaration whatever it is spelled.
+     * Whether {@code entryName} denotes the kernel's own entry of that name: declared by the kernel, meta.tn,
+     * or merged in from it. What a kind and a constructor are judged by
+     * ([TSON-SCHEMA] §4.1), so a schema's own {@code namespace} or {@code top} is an ordinary declaration, the
+     * kernel's being {@code meta.namespace} and {@code meta.top}.
      */
     public boolean isKernel(String entryName) {
-        return schema.entries().containsKey(entryName) && TsonBundledSchemas.isMetaKernel(originOf(entryName));
+        return schema.entries().containsKey(entryName) && TsonBundledSchemas.isKernel(originOf(entryName));
     }
 
     /** {@code entryName}'s kind ({@link EntryKind#of}), judged by origin; {@code null} for a name it lacks. */

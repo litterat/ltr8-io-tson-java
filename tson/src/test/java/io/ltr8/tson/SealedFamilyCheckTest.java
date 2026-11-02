@@ -53,7 +53,7 @@ class SealedFamilyCheckTest {
      * @discriminator} are already on, and the reason there is no name left to reserve once the mark is a word
      * the grammar reads.
      *
-     * <p>Asserted here rather than against the meta-kernel, whose bootstrap resolves no annotation at all: a
+     * <p>Asserted here rather than against the kernel, whose bootstrap resolves no annotation at all: a
      * schema governed by the kernel would ignore the name instead, and the kernel governs only the three
      * bundled schemas.
      */

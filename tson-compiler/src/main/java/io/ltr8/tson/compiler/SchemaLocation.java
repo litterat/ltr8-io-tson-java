@@ -13,7 +13,7 @@ import java.util.Optional;
  * <p><b>The pointer is the path taken, not the leaf reached.</b> {@code /person/age} is where an author looks:
  * read the schema document as written, {@code { person =&gt; { age: int32 } }}, and that is a literal RFC 6901
  * pointer into it. The leaf {@code int32} is <em>not</em> what belongs here -- naming it sends a reader to
- * core.tn, a file they did not write and cannot change, and never mentions the field they can. This is JSON
+ * numeric.tn, a file they did not write and cannot change, and never mentions the field they can. This is JSON
  * Schema 2020-12 §12.3's {@code keywordLocation}, which likewise follows the validation path rather than
  * naming the dereferenced target, and it crosses a declaration boundary the same way {@code keywordLocation}
  * crosses a {@code $ref}: a field of a record declared elsewhere still extends the path
@@ -28,7 +28,7 @@ import java.util.Optional;
  *   is what declares the field name the pointer now ends with -- and seeds the pointer with its own name only
  *   if nothing has yet, which is what makes the outermost record the root of the path.</li>
  *   <li>Everything else ({@link TsonReadContext#underDeclaration}) offers its own declaration only as a seed,
- *   taken when nothing encloses it. So a root-level {@code !int32} still locates itself in core.tn, while the
+ *   taken when nothing encloses it. So a root-level {@code !int32} still locates itself in numeric.tn, while the
  *   same atom inside {@code person} leaves person.tn's anchor alone.</li>
  * </ul>
  *

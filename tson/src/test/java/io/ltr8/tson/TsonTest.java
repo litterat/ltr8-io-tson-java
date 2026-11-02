@@ -63,7 +63,7 @@ class TsonTest {
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(linked.schema().id());
         assertEquals(2, linked.schema().entries().keySet().stream().filter(n -> linked.originOf(n).equals(own))
                 .count());
-        assertTrue(linked.schema().entries().containsKey("record_field"));
+        assertTrue(linked.schema().entries().containsKey("meta.record_field"));
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 
@@ -121,7 +121,7 @@ class TsonTest {
 
         TsonCompiledMetaSchema meta = tson.loader().loadMeta(TsonBundledSchemas.META_ID);
 
-        assertTrue(meta.schema().entries().containsKey("text_type"));
+        assertTrue(meta.schema().entries().containsKey("unicode.text_type"));
     }
 
     /**
@@ -131,19 +131,20 @@ class TsonTest {
     @Test
     void theConfiguredContextBindsAndTheKernelsNamesAreFixed() throws Exception {
         DataBindContext context = DataBindContext.builder()
-                .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(Map.of("point", Point.class, "record", Point.class)))
+                .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(Map.of("point", Point.class, "meta.record", Point.class)))
                 .build();
         Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(context));
 
         assertEquals(Point.class, tson.dataBindContext().nameBinder().resolve("point"));
-        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, tson.dataBindContext().nameBinder().resolve("record"),
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class,
+                tson.dataBindContext().nameBinder().resolve("meta.record"),
                 "the kernel's name binds to the schema model whatever the consumer's binder says");
-        assertTrue(tson.loader().loadMeta(TsonBundledSchemas.META_ID).schema().entries().containsKey("text_type"),
+        assertTrue(tson.loader().loadMeta(TsonBundledSchemas.META_ID).schema().entries().containsKey("unicode.text_type"),
                 "and the standard library resolves through the same context");
     }
 
     /**
-     * Only a name the kernel or meta.tn declares is fixed. {@code token} and {@code entry_kind} mangle to classes of
+     * Only a name the kernel declares is fixed. {@code token} and {@code entry_kind} mangle to classes of
      * the schema model ({@code Token}, {@code EntryKind}) and are entries of no bundled schema, so a consumer's schema
      * declaring them binds them through the consumer's binder like any other name it declares.
      */
@@ -160,7 +161,7 @@ class TsonTest {
                 """;
         DataBindContext context = DataBindContext.builder()
                 .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(Map.of(
-                        "token", Token.class, "entry_kind", EntryKind.class, "record", Point.class)))
+                        "token", Token.class, "entry_kind", EntryKind.class, "meta.record", Point.class)))
                 .build();
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(io.ltr8.tson.base.source.SchemaAccess.of(uri -> schema))
@@ -169,7 +170,7 @@ class TsonTest {
 
         assertEquals(Token.class, binder.resolve("token"));
         assertEquals(EntryKind.class, binder.resolve("entry_kind"));
-        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("record"),
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("meta.record"),
                 "a name the kernel declares still binds to the schema model");
 
         assertEquals(new Token("a"), tson.objectReader().read("""

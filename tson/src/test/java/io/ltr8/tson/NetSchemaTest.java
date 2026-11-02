@@ -10,15 +10,15 @@ import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.HostType;
-import io.ltr8.tson.schema.meta.HostnameType;
+import io.ltr8.tson.schema.net.HostType;
+import io.ltr8.tson.schema.net.HostnameType;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
  * {@code net.tn}, the network type library: the address and network families, {@code hostname} and {@code host},
- * in a library a schema imports when it wants them, so a schema importing core alone may declare those names
- * itself. Characters beyond ASCII are escapes.
+ * in a library a schema imports when it wants them, so a schema importing the other libraries alone may declare
+ * those names itself. Characters beyond ASCII are escapes.
  */
 class NetSchemaTest {
 
@@ -127,12 +127,12 @@ class NetSchemaTest {
 
     /** Core claims none of the network names, so a schema importing it alone may declare them. */
     @Test
-    void aSchemaImportingCoreAloneMayDeclareTheNetworkNames() {
+    void aSchemaImportingTheOtherLibrariesMayDeclareTheNetworkNames() {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/own-mac.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/numeric.tn"
+                !!import:"https://tson.io/2026/39/m/temporal.tn"
                 !schema {
                   mac => { vendor: text  model: text }
                   hostname => text
@@ -145,11 +145,11 @@ class NetSchemaTest {
     }
 
     @Test
-    void aSchemaImportingCoreAloneDoesNotSeeTheNetworkTypes() {
+    void aSchemaImportingTheOtherLibrariesDoesNotSeeTheNetworkTypes() {
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/no-net.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/numeric.tn"
+                !!import:"https://tson.io/2026/39/m/temporal.tn"
                 !schema { server => { address: ipv4 } }
                 """));
     }

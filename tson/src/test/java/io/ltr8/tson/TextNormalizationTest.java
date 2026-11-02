@@ -26,25 +26,25 @@ class TextNormalizationTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              header_name => !identifier_type { start: NONE  continue: NONE
+              header_name => !unicode.identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: NFKC_CASEFOLD }
-              host => !text_type { pattern: "[a-z0-9.-]+"  normalization: NFKC_CASEFOLD }
-              charset => !text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
-              name => !identifier_type { continue_add: "-" }
-              request => { headers?: {header_name => text}  host?: host  charset?: charset  label?: name }
+              domain => !unicode.text_type { pattern: "[a-z0-9.-]+"  normalization: NFKC_CASEFOLD }
+              charset => !unicode.text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
+              name => !unicode.identifier_type { continue_add: "-" }
+              request => { headers?: {header_name => text}  host?: domain  charset?: charset  label?: name }
               idempotent => { header: header_name = Idempotency-Key }
-              safe_header => !enum_type { name_type: header_name  members: [Accept content-type] }
+              safe_header => !meta.enum_type { name_type: header_name  members: [Accept content-type] }
               allowed => { h: safe_header }
               chosen => { h: safe_header = Content-Type }
               typed_by => <T, N> { w?: T ~ N }
               picked => { p: typed_by<safe_header, Content-Type> }
               web => !uri ^ { schemes: [HTTP https] }
               link => { to: web }
-              folded_name => !identifier_type { start: NONE  continue: NONE
+              folded_name => !unicode.identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: ASCII_CASEFOLD }
-              accent => !text_type { members: ["\u00e9"]  normalization: ASCII_CASEFOLD }
+              accent => !unicode.text_type { members: ["\u00e9"]  normalization: ASCII_CASEFOLD }
               message => { fields?: {folded_name => text}  accent?: accent }
             }
             """;
@@ -127,8 +127,9 @@ class TextNormalizationTest {
     @Test
     void aRefinementCannotSetANormalization() {
         List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace(
-                "name => !identifier_type { continue_add: \"-\" }",
-                "name => !identifier_type { continue_add: \"-\" }\n  folded => !text ^ { normalization: NFKC_CASEFOLD }"));
+                "name => !unicode.identifier_type { continue_add: \"-\" }",
+                "name => !unicode.identifier_type { continue_add: \"-\" }\n"
+                        + "  folded => !text ^ { normalization: NFKC_CASEFOLD }"));
         assertEquals(1, refused.size(), refused.toString());
         assertTrue(refused.getFirst().message().contains("fixed where it is constructed"), refused.toString());
     }
@@ -136,18 +137,19 @@ class TextNormalizationTest {
     @Test
     void aRegexIsAlwaysItsTextAsWritten() {
         List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace(
-                "name => !identifier_type { continue_add: \"-\" }",
-                "name => !identifier_type { continue_add: \"-\" }\n  folded => !regex_type { normalization: NFKC }"));
+                "name => !unicode.identifier_type { continue_add: \"-\" }",
+                "name => !unicode.identifier_type { continue_add: \"-\" }\n"
+                        + "  folded => !unicode.regex_type { normalization: NFKC }"));
         assertEquals(1, refused.size(), refused.toString());
     }
 
     /** A fold over a whole URI, IRI or address would fold a path or a local part that compares with case. */
     @Test
     void aUriAnIriAndAnEmailAreAlwaysTheirTextAsWritten() {
-        for (String constructor : List.of("uri_type", "iri_type", "email_type")) {
+        for (String constructor : List.of("net.uri_type", "net.iri_type", "net.email_type")) {
             List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace(
-                    "name => !identifier_type { continue_add: \"-\" }",
-                    "name => !identifier_type { continue_add: \"-\" }\n  folded => !" + constructor
+                    "name => !unicode.identifier_type { continue_add: \"-\" }",
+                    "name => !unicode.identifier_type { continue_add: \"-\" }\n  folded => !" + constructor
                             + " { normalization: NFKC_CASEFOLD }"));
             assertEquals(1, refused.size(), constructor + ": " + refused);
             assertTrue(refused.getFirst().message().contains("'normalization' is fixed on '" + constructor + "'"),
@@ -263,7 +265,7 @@ class TextNormalizationTest {
         assertEquals(List.of(), codes("!message { accent: \"e\u0301\" }"));
     }
 
-    /** {@code scheme_name} folds ASCII only, so a full-width scheme is not a scheme at all. */
+    /** {@code net.scheme_name} folds ASCII only, so a full-width scheme is not a scheme at all. */
     @Test
     void aSchemeSetRefusesAFullWidthScheme() {
         List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]",

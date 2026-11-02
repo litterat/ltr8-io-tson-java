@@ -43,15 +43,15 @@ import java.util.Optional;
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt.</li>
  *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
- *       to judge, whatever the target holds. A {@code Ref} or {@code TypeRef} target at a reference-typed slot
- *       ({@code ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives
- *       the value when the schema links, a {@code TypeRef} the name alone. A {@code TypeRef} target at a kind-typed
- *       slot ({@code record_field.type} is {@code type_kind}, a meta's {@code request: kind<record>}) reads through
- *       a {@link KindSlotReader}: a type's name, or in a kernel body an application still to close, written unquoted.
- *       Any other target there is bound as at an atom and wrapped in a {@link RecordedNameReader}, which records the
- *       name it read. The slot declares the spelling, so a {@code TypeRef} or {@code Ref} target is a mismatch at a
- *       record-typed slot, which holds the record's value inline, and at any other atom, where a token is a literal
- *       and never a reference.</li>
+ * to judge, whatever the target holds. A {@code Ref} or {@code TypeRef} target at a reference-typed slot
+ * ({@code meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives the
+ * value when the schema links, a {@code TypeRef} the name alone. A {@code TypeRef} target at a kind-typed slot
+ * ({@code meta.record_field.type} is {@code meta.type_kind}, a meta's {@code request: meta.kind<record>}) reads through
+ * a {@link KindSlotReader}: a type's name, or in a kernel body an application still to close, written unquoted. Any
+ * other target there is bound as at an atom and wrapped in a {@link RecordedNameReader}, which records the name it
+ * read. The slot declares the spelling, so a {@code TypeRef} or {@code Ref} target is a mismatch at a record-typed
+ * slot, which holds the record's value inline, and at any other atom, where a token is a literal and never a
+ * reference.</li>
  * </ul>
  * The target's bridge, then its {@code Annotated} box, wrap whatever comes out. Anything else -- a dispatcher, a
  * choice, a gap -- is read as it is.
@@ -98,7 +98,7 @@ final class BindTargets {
         } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
             site.mismatches().add(what + " is not a reference, and " + where + " holds a "
                     + payload.typeClass().getSimpleName() + " -- a value stands by name only at a position typed "
-                    + "ref<T> (and a type's name at one typed by a kind); a position typed by a record holds the "
+                    + "meta.ref<T> (and a type's name at one typed by a kind); a position typed by a record holds the "
                     + "record's value inline, so declare that record's class");
             bound = reader;
         } else {
@@ -116,7 +116,7 @@ final class BindTargets {
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
     }
 
-    /** Whether {@code reader} reads a reference ({@code ref<T>}): a token there is a value's qualified name. */
+    /** Whether {@code reader} reads a reference ({@code meta.ref<T>}): a token there is a value's qualified name. */
     private static boolean readsARef(TsonTypeReader<?> reader) {
         return RecordAbstractReader.unwrapped(reader) instanceof AtomTypeReader<?> atom && atom.readsARef();
     }

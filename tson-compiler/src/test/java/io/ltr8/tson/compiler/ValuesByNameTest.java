@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A value written by name at a slot typed {@code ref<T>} ([TSON-SCHEMA] §5.12), end to end: a meta layer declaring an
+ * A value written by name at a slot typed {@code meta.ref<T>} ([TSON-SCHEMA] §5.12), end to end: a meta layer declaring an
  * interface, a namespace of methods, and a namespace of HTTP bindings each naming the method it serves, a schema
  * under it declaring an interface, and a schema importing that one binding a method -- the read that keeps the name,
  * the linker that resolves it and judges its referent, and each refusal with the step it names.
@@ -45,23 +45,23 @@ class ValuesByNameTest {
     static {
         DOCUMENTS.put(META_SERVICE, """
                 !!id:"https://example.test/meta-service.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  method_name => identifier
-                  status_name => identifier
-                  method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
-                                   replies?: {status_name => kind<record>} }
-                  interface   => !namespace { key_type: method_name  value_type: method }
+                  method_name => meta.identifier
+                  status_name => meta.identifier
+                  method      => { request?: meta.kind<meta.record>  response?: meta.type_kind
+                                   errors?: [meta.kind<meta.record>]
+                                   replies?: {status_name => meta.kind<meta.record>} }
+                  interface   => !meta.namespace { key_type: method_name  value_type: method }
                   http_verb   => !enum [GET POST]
-                  binding     => { method: ref<method>  verb: http_verb  route: text }
-                  bindings    => !namespace { key_type: identifier  value_type: binding }
-                  filed_in_references => { request: kind<record>  method?: ref<method> }
-                  filed_nowhere       => { request: kind<record> }
-                  refs        => !namespace { key_type: identifier  value_type: filed_in_references }
-                  nowheres    => !namespace { key_type: identifier  value_type: filed_nowhere }
+                  binding     => { method: meta.ref<method>  verb: http_verb  route: text }
+                  bindings    => !meta.namespace { key_type: meta.identifier  value_type: binding }
+                  filed_in_references => { request: meta.kind<meta.record>  method?: meta.ref<method> }
+                  filed_nowhere       => { request: meta.kind<meta.record> }
+                  refs        => !meta.namespace { key_type: meta.identifier  value_type: filed_in_references }
+                  nowheres    => !meta.namespace { key_type: meta.identifier  value_type: filed_nowhere }
                   pairing     => { primary: method }
-                  pairings    => !namespace { key_type: identifier  value_type: pairing }
+                  pairings    => !meta.namespace { key_type: meta.identifier  value_type: pairing }
                 }
                 """);
         DOCUMENTS.put("https://example.test/orders.tn", orders("https://example.test/orders.tn", ""));
@@ -186,7 +186,7 @@ class ValuesByNameTest {
                 api => !interface { m => { errors: [not_found place_order_request] } }""")));
         refused(api("errors-refused", """
                 api => !interface { m => { errors: [order uuid] } }"""),
-                "/m/errors/1", "'uuid' is an entry whose body is built by 'uuid_type'", "no 'record'");
+                "/m/errors/1", "'uuid' is an entry whose body is built by 'net.uuid_type'", "no 'meta.record'");
     }
 
     // ── Refusals, each naming its step ──────────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ class ValuesByNameTest {
         refused(api("uuid", """
                 user_id => uuid
                 api => !interface { m => { request: user_id } }"""),
-                "/m/request", "'user_id' (an alias of 'uuid')", "built by 'uuid_type'", "no 'record'");
+                "/m/request", "'user_id' (an alias of 'uuid')", "built by 'net.uuid_type'", "no 'meta.record'");
     }
 
     /**
@@ -261,7 +261,7 @@ class ValuesByNameTest {
     void aRecordIsNoMethod() {
         refused(api("record-as-method", """
                 routes => !bindings { b => { method: place_order_request  verb: POST  route: "/" } }"""),
-                "wants a 'method'", "built by 'record'", "no 'method'");
+                "wants a 'method'", "built by 'meta.record'", "no 'method'");
     }
 
     @Test
@@ -278,7 +278,7 @@ class ValuesByNameTest {
                 api => !interface { m => { replies: { ok => order  missing => not_found } } }""")));
         refused(api("replies-refused", """
                 api => !interface { m => { replies: { ok => uuid } } }"""),
-                "/m/replies/ok", "built by 'uuid_type'");
+                "/m/replies/ok", "built by 'net.uuid_type'");
     }
 
     @Test
@@ -340,7 +340,6 @@ class ValuesByNameTest {
         String id = "https://example.test/meta-" + constructor.replace('_', '-') + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   %s => { a: %s }
@@ -370,7 +369,7 @@ class ValuesByNameTest {
         String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body);
         assertTrue(written.replaceAll("\\s+", " ").contains("method: orders.place_order"), written);
 
-        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META_SERVICE).compiledSchema().find("schema").orElseThrow()
+        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META_SERVICE).compiledSchema().find("meta.schema").orElseThrow()
                 .read(TestDocuments.document("!schema { routes => " + written + " }"));
         assertEquals(((ValueEntry) body).value(), read.get("routes"));
     }
@@ -384,10 +383,10 @@ class ValuesByNameTest {
     @Test
     void aReferenceByNameFiledInReferencesIsStillJudgedBySlot() {
         refused(api("filed-text", """
-                a => !refs { x => { request: text } }"""), "'a' at /x/request", "built by 'text_type'");
+                a => !refs { x => { request: text } }"""), "'a' at /x/request", "built by 'unicode.text_type'");
         refused(api("filed-alias", """
                 user_id => uuid
-                a => !refs { x => { request: user_id } }"""), "'a' at /x/request", "built by 'uuid_type'");
+                a => !refs { x => { request: user_id } }"""), "'a' at /x/request", "built by 'net.uuid_type'");
         assertEquals(List.of(), problems(api("filed-right", """
                 a => !refs { x => { request: order  method: orders.place_order } }""")));
     }
@@ -413,10 +412,10 @@ class ValuesByNameTest {
     @Test
     void aReferenceByNameDeclaredNowhereIsStillJudgedBySlot() {
         refused(api("nowhere-text", """
-                a => !nowheres { x => { request: text } }"""), "'a' at /x/request", "built by 'text_type'");
+                a => !nowheres { x => { request: text } }"""), "'a' at /x/request", "built by 'unicode.text_type'");
         refused(api("nowhere-alias", """
                 user_id => uuid
-                a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'uuid_type'");
+                a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'net.uuid_type'");
         assertEquals(List.of(), problems(api("nowhere-right", """
                 a => !nowheres { x => { request: order } }""")));
     }

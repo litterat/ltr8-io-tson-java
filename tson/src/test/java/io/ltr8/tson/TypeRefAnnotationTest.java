@@ -24,7 +24,7 @@ class TypeRefAnnotationTest {
     private static Top read(String document) {
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
                 .objectReader().withSchema(TsonBundledSchemas.META_ID)
-                .readAs(document, "top", Top.class);
+                .readAs(document, "meta.top", Top.class);
     }
 
     private static TypeRef fieldType(Top definition) {
@@ -35,8 +35,8 @@ class TypeRefAnnotationTest {
     @Test
     void anAnnotationOnATypeRefIsKept() {
         TypeRef type = fieldType(read("""
-                !record { fields: {
-                  n => !record_field { type: @doc:"the token itself" text }
+                !meta.record { fields: {
+                  n => !meta.record_field { type: @doc:"the token itself" text }
                 } }"""));
 
         assertEquals("text", type.name());
@@ -47,8 +47,8 @@ class TypeRefAnnotationTest {
     @Test
     void anUnannotatedTypeRefCarriesNothing() {
         assertTrue(fieldType(read("""
-                !record { fields: {
-                  n => !record_field { type: text }
+                !meta.record { fields: {
+                  n => !meta.record_field { type: text }
                 } }""")).annotations().values().isEmpty());
     }
 
@@ -56,8 +56,8 @@ class TypeRefAnnotationTest {
     @Test
     void anAnnotatedTypeRefWritesBackAsOne() {
         TypeRef type = fieldType(read("""
-                !record { fields: {
-                  n => !record_field { type: @doc:"the token itself" text }
+                !meta.record { fields: {
+                  n => !meta.record_field { type: @doc:"the token itself" text }
                 } }"""));
 
         String written = new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(type);

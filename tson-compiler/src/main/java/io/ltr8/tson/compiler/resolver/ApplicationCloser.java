@@ -31,7 +31,7 @@ interface ApplicationCloser {
      * {@code t => <M> { a: st ~ M }} writes a type reference into a value slot.
      *
      * <p>A {@code default} rather than a second abstract method, so this stays a functional interface: the
-     * resolvers built without a materialiser -- the meta-kernel bootstrap, and unit tests over hand-built
+     * resolvers built without a materialiser -- the kernel bootstrap, and unit tests over hand-built
      * namespaces -- pass a lambda, and an operand there classifies as §12.1 spelled it.
      */
     default List<TypeArgument> byParameterKind(String head, Top template,
@@ -57,7 +57,7 @@ interface ApplicationCloser {
      * application's entry belongs to whoever names it.
      *
      * <p>A {@code default} for {@link #byParameterKind}'s reason: this stays a functional interface, so the
-     * meta-kernel bootstrap and the tests over hand-built namespaces keep passing a lambda and keep the
+     * kernel bootstrap and the tests over hand-built namespaces keep passing a lambda and keep the
      * reference shape.
      */
     default Top closeApplicationInto(String declaredName, TypeRef application) {

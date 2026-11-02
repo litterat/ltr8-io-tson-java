@@ -208,7 +208,7 @@ class TsonValidateSchemaTest {
      *
      * <p>The literal case is refused for a sharper reason than the typo in {@link
      * #anUnresolvedArgumentStaysWithTheApplier}: {@code 3} is not an unresolved <em>name</em>, it is not a
-     * name at all, and {@code record_field.type} is typed {@code type_kind}, so it fails where the substituted
+     * name at all, and {@code meta.record_field.type} is typed {@code meta.type_kind}, so it fails where the substituted
      * body is read against the kernel's own vocabulary rather than later at reference resolution. The verdict
      * is the same and the explanation is better — "an identifier never begins with a digit or a sign" is
      * actionable where "unresolved reference '3'" implies an author could go and declare one.
@@ -216,8 +216,8 @@ class TsonValidateSchemaTest {
     @Test
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
         assertStaysWithTheApplier("box<3>",
-                "'box<...>' substitutes into a body that is not valid data for 'record', the constructor's "
-                        + "own constraint vocabulary -- 'type_kind': '3' is no reference -- '3' is no name: '3': "
+                "'box<...>' substitutes into a body that is not valid data for 'meta.record', the constructor's "
+                        + "own constraint vocabulary -- 'meta.type_kind': '3' is no reference -- '3' is no name: '3': "
                         + "U+0033 at index 0 cannot start an identifier -- an identifier never begins with a digit or "
                         + "a sign");
     }
@@ -231,14 +231,14 @@ class TsonValidateSchemaTest {
 
     /**
      * A refusal of an application nothing declares names the application as written, never the entry minted for it:
-     * {@code kind<nope>}'s expansion is a reference over a name nothing declares.
+     * {@code meta.kind<nope>}'s expansion is a reference over a name nothing declares.
      */
     @Test
     void anUnresolvedReferenceApplicationIsNamedAsWritten() {
-        List<Diagnostic> problems = check("{\n  r => { f: kind<nope> }\n}");
+        List<Diagnostic> problems = check("{\n  r => { f: meta.kind<nope> }\n}");
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("'kind<nope>'"), problems.getFirst().message());
+        assertTrue(problems.getFirst().message().contains("'meta.kind<nope>'"), problems.getFirst().message());
         assertFalse(problems.getFirst().message().contains("reference_nope"), problems.getFirst().message());
     }
 

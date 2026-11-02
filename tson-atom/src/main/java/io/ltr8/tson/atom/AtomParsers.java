@@ -30,42 +30,42 @@ import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.schema.meta.BytesType;
-import io.ltr8.tson.schema.meta.Cidr4Type;
-import io.ltr8.tson.schema.meta.Cidr6Type;
-import io.ltr8.tson.schema.meta.ComplexType;
-import io.ltr8.tson.schema.meta.DateTimeType;
-import io.ltr8.tson.schema.meta.DateType;
-import io.ltr8.tson.schema.meta.DecimalType;
-import io.ltr8.tson.schema.meta.DurationType;
-import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.binary.BytesType;
+import io.ltr8.tson.schema.net.Cidr4Type;
+import io.ltr8.tson.schema.net.Cidr6Type;
+import io.ltr8.tson.schema.numeric.ComplexType;
+import io.ltr8.tson.schema.temporal.DateTimeType;
+import io.ltr8.tson.schema.temporal.DateType;
+import io.ltr8.tson.schema.numeric.DecimalType;
+import io.ltr8.tson.schema.temporal.DurationType;
+import io.ltr8.tson.schema.net.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.ReferenceBody;
-import io.ltr8.tson.schema.meta.HostType;
-import io.ltr8.tson.schema.meta.HostnameType;
-import io.ltr8.tson.schema.meta.MediaTypeType;
-import io.ltr8.tson.schema.meta.Ipv4Type;
-import io.ltr8.tson.schema.meta.Ipv6Type;
-import io.ltr8.tson.schema.meta.MacType;
-import io.ltr8.tson.schema.meta.PeriodType;
-import io.ltr8.tson.schema.meta.RationalType;
-import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.TextType;
-import io.ltr8.tson.schema.meta.TimeType;
+import io.ltr8.tson.schema.net.HostType;
+import io.ltr8.tson.schema.net.HostnameType;
+import io.ltr8.tson.schema.net.MediaTypeType;
+import io.ltr8.tson.schema.net.Ipv4Type;
+import io.ltr8.tson.schema.net.Ipv6Type;
+import io.ltr8.tson.schema.net.MacType;
+import io.ltr8.tson.schema.temporal.PeriodType;
+import io.ltr8.tson.schema.numeric.RationalType;
+import io.ltr8.tson.schema.unicode.RegexType;
+import io.ltr8.tson.schema.unicode.TextType;
+import io.ltr8.tson.schema.temporal.TimeType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.IriType;
-import io.ltr8.tson.schema.meta.UriType;
-import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.net.IriType;
+import io.ltr8.tson.schema.net.UriType;
+import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 import java.util.Optional;
 
 /**
  * A resolved atom body to the {@link AtomType} that parses tokens against it -- the answer to "does this
- * token satisfy this type?" for a caller that holds a {@code schema.meta} body and nothing else.
+ * token satisfy this type?" for a caller that holds a schema-model body and nothing else.
  *
  * <p><b>Distinct from {@link BuiltinTypeVocabulary}, which answers a different question.</b> That maps a
  * built-in <em>name</em> ({@code int32}) to a parser with the constraints §5 fixes for it; this maps a
@@ -117,7 +117,7 @@ public final class AtomParsers {
      */
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
         if (body instanceof ReferenceBody reference && !reference.namesTypes()) {
-            throw new UnsupportedOperationException("a value a schema writes at a reference-typed position ('ref<"
+            throw new UnsupportedOperationException("a value a schema writes at a reference-typed position ('meta.ref<"
                     + reference.of() + ">') is not yet judged: a reference's value is judged by what its name reaches");
         }
         return forRead(body, enumForm);

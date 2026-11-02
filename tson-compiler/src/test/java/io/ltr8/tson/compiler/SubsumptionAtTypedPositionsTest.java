@@ -62,10 +62,10 @@ class SubsumptionAtTypedPositionsTest {
     /** An atom position: the case that reported this, and the one no dispatcher ever guarded. */
     @Test
     void anUnrelatedTypeIsRefusedAtAnAtomPosition() {
-        // `text` does carry a subtype here (core's `non_empty_text`), so this takes the wording that names
-        // them -- the point is that an atom position now refuses at all, which it never did.
-        assertTrue(refused("{ t: !uuid \"x\" " + REST + " }")
-                .contains("'uuid' is not admissible at a 'text' position"));
+        // `text` is core's alias of `text`, the type the position's reader reports -- the point is that an atom
+        // position refuses at all.
+        String message = refused("{ t: !uuid \"x\" " + REST + " }");
+        assertTrue(message.contains("'uuid' is not admissible at a 'text' position"), message);
         assertTrue(refused("{ t: !nosuch \"x\" " + REST + " }").contains("'nosuch'"));
     }
 

@@ -30,7 +30,7 @@ class JsonMapReadTest {
               by_date   => { date => number }
               by_number => { number => text }
               optional  => { text => int32? }
-              sized     => !map { key_type: text  value_type: int32  min_items: 1  max_items: 2 }
+              sized     => !meta.map { key_type: text  value_type: int32  min_items: 1  max_items: 2 }
               point     => { x: int32  y: int32 }
               by_point  => { point => text }
               pair      => [text, int32]

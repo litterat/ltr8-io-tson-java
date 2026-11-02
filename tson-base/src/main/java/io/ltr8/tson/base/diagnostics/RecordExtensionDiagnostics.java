@@ -8,7 +8,7 @@ import io.ltr8.tson.base.Diagnostic;
  *
  * <p>Named for the kernel field rather than for the shape it produces. "Family" is the design's word for what
  * an ABSTRACT or SEALED record and its subtypes amount to, and it reads well in prose, but nothing in the
- * vocabulary is called that: an author arriving from {@code record_extension_type} would not find these rules
+ * vocabulary is called that: an author arriving from {@code meta.record_extension_type} would not find these rules
  * under it, and the checker that enforces the same fact at schema load already carries the field's own name.
  *
  * <p>A record states how it may be realised ([TSON-SCHEMA] §5.2), and two of the four members change how a

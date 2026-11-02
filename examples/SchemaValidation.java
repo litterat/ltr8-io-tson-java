@@ -6,11 +6,11 @@
 ///   ./gradlew :tson:modules
 ///   java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java
 ///
-/// `Tson.standard()` bootstraps the standard library (meta-kernel/meta.tn/core.tn); `resolve`
-/// registers a schema under its own `!!id`. This data isn't self-describing, so the reader is told which
-/// schema and type apply -- `withSchema(uri).readAs(source, type)`. Tree mode returns an immutable,
-/// queryable TsonValue -- no Java class involved, the TSON schema is the source of truth -- that preserves
-/// structure and types and is navigable with get/at.
+/// `Tson.standard()` bootstraps the standard library (meta.tn, numeric.tn, temporal.tn, net.tn, core.tn and policy.tn);
+//`resolve` / registers a schema under its own `!!id`. This data isn't self-describing, so the reader is told which /
+//schema and type apply -- `withSchema(uri).readAs(source, type)`. Tree mode returns an immutable, / queryable TsonValue
+//-- no Java class involved, the TSON schema is the source of truth -- that preserves / structure and types and is
+//navigable with get/at.
 import module io.ltr8.tson;
 
 void main() {

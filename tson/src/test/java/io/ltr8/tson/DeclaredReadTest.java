@@ -35,8 +35,8 @@ class DeclaredReadTest {
                     !schema {
                       note     => { body: text }
                       memo     => { body: text  urgent: boolean }
-                      envelope => { local: declared }
-                      inbox    => { items: [declared] }
+                      envelope => { local: meta.declared }
+                      inbox    => { items: [meta.declared] }
                       closed   => { n: int32 }
                     }
                     """,
@@ -116,7 +116,7 @@ class DeclaredReadTest {
         assertEquals(Optional.of("/local"), problems.getFirst().path());
     }
 
-    /** Each element of {@code [declared]} names its own type. */
+    /** Each element of {@code [meta.declared]} names its own type. */
     @Test
     void anArrayOfDeclaredTakesATypePerElement() {
         TsonValue value = read("!inbox { items: [ !note { body: a }, !memo { body: b  urgent: false } ] }");

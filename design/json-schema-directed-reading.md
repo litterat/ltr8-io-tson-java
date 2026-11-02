@@ -20,7 +20,7 @@ JSON inputs are in `design/cli-config-hashing.md`.
   inspecting a value.
 - A choice value may omit its tag only when the choice is disjoint; no member-shape matching, no trying variants in
   order. A missing required tag is `TYPE_MISMATCH`.
-- A kind (a `reference` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and never
+- A kind (a `meta.reference` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and never
   a discrimination case ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the
   reading document's closure, whatever it imports (`AtomParsers.forType`). JSON has no unquoted form, so an
   application is a JSON string holding the TSON reference text, `"set<text>"`, parsed by `atom.ReferenceGrammar`
@@ -290,7 +290,7 @@ compiles, so a read is one lookup and a route, as at a tagged record position. A
 
 ## An unknown root type names the author's declarations first
 
-An `!!import` merges the imported entries first, so a list in namespace order would show core's names and none of the
+An `!!import` merges the imported entries first, so a list in namespace order would show the bundled names and none of the
 author's. `JsonCompiledSchema.unknownTypeMessage` (the CLI's `--type` refusal, and `UNKNOWN_TYPE` at the facades)
 leads with the entries this schema declares and the author wrote — by the origin index and by having a source
 position, the test that tells a minted entry from an authored one. Imported and minted names remain usable root

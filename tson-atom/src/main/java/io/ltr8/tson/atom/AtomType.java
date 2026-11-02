@@ -4,12 +4,12 @@ import java.util.Optional;
 
 /**
  * A built-in vocabulary atom's parsing contract (§5.2): "which tokens it accepts, and what host
- * value results." One implementation per meta-kernel/meta type constructor that the built-in
+ * value results." One implementation per kernel type constructor that the built-in
  * vocabulary (§5) actually surfaces as a schemaless annotation -- e.g. {@code integer_type} backs
  * {@code IntegerParser}. A single instance is a fully-parameterized *instance* of that constructor,
  * exactly mirroring the schema's own constructor/instance split: {@code int32}'s entry in the
  * built-in map is one {@code IntegerParser} constructed with {@code size = {bits: 32, signed: true}},
- * the same way {@code core.tn} writes {@code int32 => !integer ^ { size: { bits: 32 signed: true
+ * the same way {@code numeric.tn} writes {@code int32 => !integer ^ { size: { bits: 32 signed: true
  * } } }.
  *
  * <p><b>It reads text, not a token.</b> Every family but two is a function of the content alone, which is

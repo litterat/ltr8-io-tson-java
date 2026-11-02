@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * lands in", and once the parameter's kind is inferred that position is known at the application. The kind
  * comes from the declared type of the slot the parameter stands in, read from the constructor's own
  * vocabulary -- which §9 makes general rather than a table of kernel names, since a slot holding a type's
- * name is typed {@code type_kind}.
+ * name is typed {@code meta.type_kind}.
  */
 class ParameterKindTest {
 
@@ -72,7 +72,7 @@ class ParameterKindTest {
      * §5.10's own example, verbatim: "in an enum's member list it is a member -- {@code e => <M> !enum [a b
      * M]} applied as {@code e<c>} admits {@code c} without any special spelling".
      *
-     * <p>{@code enum.members} is a set of {@code identifier}, an atom, so {@code M} is a value parameter and
+     * <p>{@code enum.members} is a set of {@code meta.identifier}, an atom, so {@code M} is a value parameter and
      * {@code c} is the token it always was. Before the kinds existed the argument stayed on the reference
      * channel and the linker asked the namespace for a type called {@code c}.
      */
@@ -108,11 +108,11 @@ class ParameterKindTest {
         assertEquals("c", assertInstanceOf(TypeArgument.Value.class, argument).value().text());
     }
 
-    /** A parameter at a {@code type_kind} slot stays a type parameter, and its argument stays a reference. */
+    /** A parameter at a {@code meta.type_kind} slot stays a type parameter, and its argument stays a reference. */
     @Test
     void anArgumentBindingATypeParameterIsStillAReference() {
         TsonCompiledSchema compiled = compile("""
-                  arr => <T> !array { element_type: T }
+                  arr => <T> !meta.array { element_type: T }
                   use => arr<int32>""");
 
         // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose facts
@@ -136,7 +136,7 @@ class ParameterKindTest {
     @Test
     void aParameterStandingForACollectionIsRefusedAtTheDeclaration() {
         for (String declaration : List.of("  bad => <T> !enum { members: T }",
-                                           "  bad => <T> !record { fields: T }")) {
+                                           "  bad => <T> !meta.record { fields: T }")) {
             String message = rejected(declaration);
 
             assertTrue(message.contains("parameter 'T' stands where"), message);

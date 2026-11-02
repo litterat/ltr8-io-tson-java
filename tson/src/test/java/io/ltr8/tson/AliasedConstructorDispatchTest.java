@@ -26,21 +26,21 @@ class AliasedConstructorDispatchTest {
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
-    /** An entry's value, written with {@code constructor}'s own name, read at a {@code top} position. */
+    /** An entry's value, written with {@code constructor}'s own name, read at a {@code meta.top} position. */
     private static Top read(String body) {
-        return tson().objectReader().withSchema(TsonBundledSchemas.META_ID).readAs(body, "top", Top.class);
+        return tson().objectReader().withSchema(TsonBundledSchemas.META_ID).readAs(body, "meta.top", Top.class);
     }
 
     /** The name the class carries itself still works -- the fallback passes are untouched. */
     @Test
     void aBodyNamedForItsOwnClassDispatches() {
-        assertInstanceOf(ArrayBody.class, read("!array { element_type: text }"));
+        assertInstanceOf(ArrayBody.class, read("!meta.array { element_type: text }"));
     }
 
     /** And the one that is only a name in the binder, which is the case that failed. */
     @Test
     void aBodyNamedByAnAliasOfItsClassDispatchesToo() {
-        Top definition = read("!set_type { element_type: text }");
+        Top definition = read("!meta.set_type { element_type: text }");
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, definition);
         assertEquals("text", body.elementType().name());
@@ -58,6 +58,6 @@ class AliasedConstructorDispatchTest {
     /** A record body still dispatches to its own class, not to whatever the binder last resolved. */
     @Test
     void anUnaliasedBodyIsUnaffected() {
-        assertInstanceOf(RecordBody.class, read("!record { fields: {} }"));
+        assertInstanceOf(RecordBody.class, read("!meta.record { fields: {} }"));
     }
 }

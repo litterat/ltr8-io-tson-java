@@ -1,6 +1,6 @@
 package io.ltr8.tson.atom;
 
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
 
 import java.util.Optional;
@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * [TSON-DATA] §7.7's identifier grammar -- the {@link IdentifierProfile} every naming position of the series uses
  * ({@link #PROFILE}) -- and §8.2's restricted-character rule over it. Type names, field names, parameter names and
- * enum members are all judged here; other profiles are what the meta-kernel's {@code identifier_type} constructs,
+ * enum members are all judged here; other profiles are what the kernel's {@code identifier_type} constructs,
  * for naming positions of an outside system.
  *
  * <p><b>The profile is</b>
@@ -37,7 +37,7 @@ import java.util.Optional;
  * <p><b>It is not a parser.</b> Nothing here turns a token into a host value: it answers <em>is this a legal
  * name</em> over text a caller already holds. The callers of {@link #validate} are both encodings' readers, the
  * schema parser, the resolver and the linker -- none of them reading a value. Reading a value of the kernel's
- * {@code identifier} is {@link io.ltr8.tson.atom.parser.IdentifierParser#IDENTIFIER}'s, which puts the text into
+ * {@code meta.identifier} is {@link io.ltr8.tson.atom.parser.IdentifierParser#IDENTIFIER}'s, which puts the text into
  * NFC first where this refuses text not in it.
  *
  * <p><b>§8.2 and the profile's own characters.</b> A character a profile adds -- this one's {@code -}, another's
@@ -49,8 +49,8 @@ import java.util.Optional;
 public final class IdentifierGrammar {
 
     /**
-     * [TSON-DATA] §7.7's profile: {@code XID_Start}, {@code XID_Continue ∪ { - }}, NFC. Built from the meta-kernel's
-     * {@code identifier} ({@link IdentifierType#IDENTIFIER}), which declares it, so the series names with one
+     * [TSON-DATA] §7.7's profile: {@code XID_Start}, {@code XID_Continue ∪ { - }}, NFC. Built from the kernel's
+     * {@code meta.identifier} ({@link IdentifierType#IDENTIFIER}), which declares it, so the series names with one
      * definition.
      */
     public static final IdentifierProfile PROFILE = IdentifierType.IDENTIFIER.profile();

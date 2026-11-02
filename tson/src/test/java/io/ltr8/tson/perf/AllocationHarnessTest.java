@@ -65,7 +65,7 @@ class AllocationHarnessTest {
             !schema {
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
               line => { sku: text  quantity: int32  price: float64 }
-              slug => !identifier_type { continue_add: "-" }
+              slug => !unicode.identifier_type { continue_add: "-" }
               named => { names: { slug => text } }
               labelled => { names: { text => text } }
             }

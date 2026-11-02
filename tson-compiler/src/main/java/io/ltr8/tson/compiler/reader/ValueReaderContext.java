@@ -145,7 +145,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * an alias naming it must never redirect its binding.
      *
      * <p><b>A tightened constructor binds as the one it tightens.</b> {@code set_type => array ^ { ... }} and
-     * {@code enum => enum_type ^ { name_type?: = identifier }} restate fields and add none (§5.7), so their
+     * {@code enum => enum_type ^ { name_type?: = meta.identifier }} restate fields and add none (§5.7), so their
      * instances have the shape of the source's, and a class for the source is a class for them. Without the
      * fallback every such constructor -- a meta layer's {@code kebab_enum => enum_type ^ { name_type?: = kebab }}
      * included -- would need a class of its own for a shape it does not change. It is tried last, so a class

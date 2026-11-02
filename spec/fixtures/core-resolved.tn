@@ -1,0 +1,30 @@
+!!id:"https://tson.io/2026/39/m/core-resolved.tn"
+!!import:"https://tson.io/2026/39/m/numeric.tn"
+!!import:"https://tson.io/2026/39/m/temporal.tn"
+!!import:"https://tson.io/2026/39/m/net.tn"
+@doc:"""
+  Resolver-output fixture for core.tn (2026 Revision 39 draft).
+  Parse the source schema, run the resolver, canonicalise, compare.
+  Conventions as in meta-resolved.tn.
+
+  Its header is its source's: it imports numeric.tn, temporal.tn and
+  net.tn, each importing meta.tn, so the kernel's vocabulary and the
+  libraries' instances reach it at the roots (`text`, `int32`, `date`,
+  `uuid`, ...) and their machinery under `meta`, `atom`, `numeric`,
+  `unicode`, `net`, `binary` and `temporal`. Nothing in the document marks it resolved; a processor reads it
+  as a resolved form because its caller says so ([TSON-SCHEMA] Section
+  8.1). Core's entries are the author annotations, at its root.
+  """
+!schema {
+  deprecated => @meta.annotation !meta.alias { target: void }
+
+  title => @meta.annotation !meta.alias { target: text }
+
+  comment => @meta.annotation !meta.alias { target: text }
+
+  examples => @meta.annotation !meta.array { element_type: text }
+
+  read_only => @meta.annotation !meta.alias { target: void }
+
+  write_only => @meta.annotation !meta.alias { target: void }
+}

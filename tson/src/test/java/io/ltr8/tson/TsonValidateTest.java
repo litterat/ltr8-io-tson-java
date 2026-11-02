@@ -372,7 +372,7 @@ class TsonValidateTest {
 
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
         assertEquals(Optional.of("/int32"), problem.schemaPointer());
-        assertEquals("tson.io/2026/39/m/core.tn", problem.schemaId(), "where int32 is actually declared");
+        assertEquals("tson.io/2026/39/m/numeric.tn", problem.schemaId(), "where int32 is actually declared");
     }
 
     /**

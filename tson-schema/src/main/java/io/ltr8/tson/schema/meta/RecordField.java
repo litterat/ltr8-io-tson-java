@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code record_field} record (Part 2 §5.2, §8.1): a field as the four facts a reader
+ * The kernel's {@code meta.record_field} record (Part 2 §5.2, §8.1): a field as the four facts a reader
  * consults. {@code optional} says the key may be omitted, {@code voidable} that a written {@code _} is
  * admitted, {@code role} what the schema's {@code value} is for, and {@code value} is that value. Each
  * reader decision reads its own: a written {@code _} reads {@code voidable}; a written value reads {@code
@@ -37,14 +37,12 @@ import java.util.Optional;
  * simply states none. What the linker checks of a named field -- required, not voidable, no group member, an
  * atom or enum type, no value of its own, and every subtype pinning it distinctly -- is §5.2's and §5.7's.
  *
- * <p><b>{@code position} is {@code @Unbound}</b>: §8.1's {@code record_field} declares no such field, so nothing fills it
- * and the strict binding check would call
- * it a mismatch. It is this implementation's own, kept for diagnostics -- a read reporting against a field
- * locates the pointer at the field ({@code /person/age}) and, without this, could pair it only with the
- * enclosing declaration's line, so six broken fields of one record all pointed at the record. It is
- * deliberately <em>not</em> carried in the annotation channel: that channel is schema data, resolves in the
- * schema's namespace (§6) and round-trips into resolver output, none of which is true of a
- * source position.
+ * <p><b>{@code position} is {@code @Unbound}</b>: §8.1's {@code meta.record_field} declares no such field, so nothing
+ * fills it and the strict binding check would call it a mismatch. It is this implementation's own, kept for diagnostics
+ * -- a read reporting against a field locates the pointer at the field ({@code /person/age}) and, without this, could
+ * pair it only with the enclosing declaration's line, so six broken fields of one record all pointed at the record. It
+ * is deliberately <em>not</em> carried in the annotation channel: that channel is schema data, resolves in the schema's
+ * namespace (§6) and round-trips into resolver output, none of which is true of a source position.
  *
  * <p>Excluded from {@link #equals}/{@link #hashCode} on the same footing as {@code annotations}, and for
  * the same reason an entry's own position is kept apart from its value ({@code TsonSchema.EntryFacts}): the

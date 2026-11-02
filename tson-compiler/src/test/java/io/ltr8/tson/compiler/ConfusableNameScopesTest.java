@@ -150,14 +150,14 @@ class ConfusableNameScopesTest {
      */
     @Test
     void anEnumsMembersAreJudgedUnderItsNameTypesProfile() {
-        String words = "  words => !identifier_type { medial: \" \" }\n";
-        assertNotNull(compile(words + "  st => !enum_type { name_type: words  members: [\"lightly active\"] }"));
+        String words = "  words => !unicode.identifier_type { medial: \" \" }\n";
+        assertNotNull(compile(words + "  st => !meta.enum_type { name_type: words  members: [\"lightly active\"] }"));
 
         String restricted = "a" + new String(Character.toChars(0x0132)) + "b";
-        String message = refused(words + "  st => !enum_type { name_type: words  members: [\"" + restricted + "\"] }");
+        String message = refused(words + "  st => !meta.enum_type { name_type: words  members: [\"" + restricted + "\"] }");
         assertTrue(message.contains("Restricted"), message);
 
-        assertTrue(refused(words + "  st => !enum_type { name_type: words  members: [ACTIVE \"" + CYR_CAP_A
+        assertTrue(refused(words + "  st => !meta.enum_type { name_type: words  members: [ACTIVE \"" + CYR_CAP_A
                 + "CTIVE\"] }").contains("has members that read alike"));
     }
 

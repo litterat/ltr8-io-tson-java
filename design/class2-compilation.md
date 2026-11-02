@@ -18,7 +18,7 @@ choices. Current form only; history lives in git.
   `AbstractTemplateReader`, every other template to an `OpenTemplateReader`. A value entry (`ValueEntry`) never
   reaches one either: it compiles to a `ValueEntryReader`, which refuses a data tag naming it as `TYPE_MISMATCH`.
 - A namespace type compiles through the `map` factory with the map `NamespaceBody.read()` states; the kernel's
-  `schema` entry's reader marks its read as a schema document's (`readsSchemaNames`), so a resolved form read as data
+  `meta.schema` entry's reader marks its read as a schema document's (`readsSchemaNames`), so a resolved form read as data
   reads its kind and reference names by grammar alone.
 - The read mode is which factory registry you hold; `ValueReaderFactoryResolver` stays in the unexported `reader` package.
 - The subsumption guard follows the body, not `kind()`, admits an entry's aliases as the entry itself, and is transparent
@@ -74,7 +74,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   entry is caught and substituted with an `ErrorReader` wrapping it — the schema still compiles, only
   *reading* that entry fails, with the original message preserved. Real causes: a constructor with no
   registered factory — which only a schema's own constructor this library has never seen can be, every
-  constructor meta-kernel.tn and meta.tn declare having a factory — or a factory that rejects one entry.
+  constructor meta.tn, numeric.tn, temporal.tn and net.tn declare having a factory — or a factory that rejects one entry.
     - **It reports `NOT_IMPLEMENTED` and skips the value**, the same report-then-skip shape `OpenTemplateReader` uses
       (with `TYPE_MISMATCH`) for the entry it refuses — report before consuming so the position names the value, then
       `EventSkip.dataValue` so the stream stays in step. The code, not the channel, is what says this is a gap rather
@@ -135,8 +135,8 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
   an `ALIAS` body, in declaration order, then the entry's own name, then — for a constructor tightening
   another — that constructor's, up its chain — and `RecordBindReader` and `TupleBindReader` try them in that
-  order, so `ping => msg_of<"ping", ping_body>` binds under `ping`, and `set_type`, `enum` and a meta
-  layer's `kebab_enum => enum_type ^ { name_type?: = kebab }` bind as the constructor they tighten: a tightening
+  order, so `ping => msg_of<"ping", ping_body>` binds under `ping`, and `meta.set_type`, `enum` and a meta
+  layer's `kebab_enum => meta.enum_type ^ { name_type?: = kebab }` bind as the constructor they tighten: a tightening
   restates fields and adds none (§5.7), so the source's class is theirs. It is tried last, and confined to
   constructors — an ordinary record refining another may be bound to a narrower class, and falling back to
   its parent's would lose that silently.

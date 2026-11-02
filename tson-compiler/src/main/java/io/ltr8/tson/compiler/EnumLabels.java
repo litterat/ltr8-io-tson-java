@@ -7,7 +7,7 @@ import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Top;
@@ -23,7 +23,7 @@ import java.util.function.Function;
 
 /**
  * What an enum's {@code name_type} obliges ([TSON-SCHEMA] §7.4): that it names an identifier family -- a member of
- * {@code identifier_kind}, the kind the slot is typed by ({@link NameType#admits}) -- that each member is a value of
+ * {@code meta.identifier_kind}, the kind the slot is typed by ({@link NameType#admits}) -- that each member is a value of
  * it, and that no two members are one value under its equality. {@link FieldNames} holds a
  * record's field names to the same three; the peer of {@link RecordExtension} in shape: a checker over the linked
  * closure that hands back violations and leaves reporting to the linker.
@@ -31,11 +31,11 @@ import java.util.function.Function;
  * <p><b>Why the linker and not the body.</b> {@link EnumBody} holds {@code name_type} as a name, and what the name
  * denotes -- which family, which parser, which equality -- lives in a namespace the body cannot see: the
  * schema's one namespace, where an author-written {@code name_type} resolves and where the schema declaring the
- * constructor that pinned one ({@code enum}'s {@code name_type: identifier}) sits in the closure. The linked closure
+ * constructor that pinned one ({@code enum}'s {@code name_type: meta.identifier}) sits in the closure. The linked closure
  * is the first place it is whole.
  *
  * <p><b>An identifier family is a type built with {@code identifier_type}</b>, which is what membership of the
- * kernel's {@code identifier_kind} walks: an instance, a refinement of one, an instantiation of a template over the
+ * kernel's {@code meta.identifier_kind} walks: an instance, a refinement of one, an instantiation of a template over the
  * constructor, and an alias of any of them. An enum's members are names under a naming vocabulary's equality, and
  * carry §8.2's per-name rules under its profile; a closed set of values on any other family, {@code text} included,
  * is that family's own {@code members} facet.

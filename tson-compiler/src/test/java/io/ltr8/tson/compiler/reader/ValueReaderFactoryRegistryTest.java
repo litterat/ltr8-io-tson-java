@@ -52,7 +52,7 @@ class ValueReaderFactoryRegistryTest {
     void resolveReturnsTheSameRegisteredFactoryEveryTime() {
         ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.tree();
 
-        assertSame(registry.resolve("record"), registry.resolve("record"));
+        assertSame(registry.resolve("meta.record"), registry.resolve("meta.record"));
     }
 
     /**
@@ -72,7 +72,7 @@ class ValueReaderFactoryRegistryTest {
 
         for (ValueReaderFactoryRegistry registry : List.of(ValueReaderFactoryRegistry.tree(),
                 ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()))) {
-            TsonTypeReader<?> reader = registry.resolve("declared_type").create("declared", declared, CONTEXT);
+            TsonTypeReader<?> reader = registry.resolve("meta.declared_type").create("declared", declared, CONTEXT);
             assertFalse(reader instanceof ErrorReader, () -> "declared_type errors: " + reader);
         }
     }

@@ -13,9 +13,9 @@ and why the same table is what untagged reading dispatches on. Current form only
   `value` and `void` (enums included). A classed type's every value lands in its class in every encoding.
 - A variant classifies through its §8.3 alias chain; no class at all makes the choice `false`.
 - An enum's class is its members' shared class, read off each member's spelling; every enum is over an identifier
-  family, so no fact beyond the body is needed. A closed set of text values is `text_type`'s `members` facet and is
+  family, so no fact beyond the body is needed. A closed set of text values is `unicode.text_type`'s `members` facet and is
   string-class as every text atom is, whatever its members spell.
-- A reference (`reference`, spelled `kind<T>` or `ref<T>`) is an atom whose values are names, type names or
+- A reference (`reference`, spelled `meta.kind<T>` or `meta.ref<T>`) is an atom whose values are names, type names or
   qualified value names as its `of` decides, string-class as an identifier family is. It is no sum and carries no
   `disjoint`; a choice may list one as a variant like any other atom.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
@@ -52,7 +52,7 @@ discrimination the wire can't deliver) and `bracket` (arrays and tuples). A vari
 membership is a closure, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
 conservative side. §5.4 adds two kinds to that list by the same straddling, judged across encodings: an approximate
 atom whose `allow_nan` or `allow_infinity` is true (a NaN is a number token in TSON text and a string in JSON, so
-core's `float32`/`float64` as declared have no class, and narrowing both facets to false restores `number`), and a
+numeric.tn's `float32`/`float64` as declared have no class, and narrowing both facets to false restores `number`), and a
 map whose key type is not "a type a single scalar token denotes by its content — an atom-family instance or an enum,
 `value` and `void` excepted" (a compound key has no single-token spelling, so JSON writes the map in pairs form, an
 array). This is what makes `disjoint` class-stable: every classed type's values land in its class in every encoding,
@@ -69,5 +69,5 @@ so the derived fact and the reader's separability can never disagree — one fac
 dispatch rule held carefully in step. Recovery still engages only when every class is *scalar* —
 a `brace`/`bracket` variant is honestly disjoint from a scalar, but recovery dispatches on a token's
 resolved class and structural recovery from an opening delimiter isn't attempted yet. **The class table is
-pinned twice over**: it decides which schemas load (`@disjoint` on a `false` choice is an error) and which
+pinned twice over**: it decides which schemas load (`@meta.disjoint` on a `false` choice is an error) and which
 documents read untagged, so any change to it is a compatibility decision, not a free improvement.

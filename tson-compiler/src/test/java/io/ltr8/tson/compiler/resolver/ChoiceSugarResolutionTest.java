@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.EntryKind;
@@ -31,16 +32,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ChoiceSugarResolutionTest {
 
-    /** Governed by meta-kernel, which declares the {@code choice} constructor; its compiled form bootstraps on demand. */
+    /** Governed by the kernel, which declares the {@code choice} constructor; its compiled form bootstraps on demand. */
     private static TsonSchema resolve(String body) {
         String document = """
                 !!id:"https://example.test/choice-sugar.tn"
-                !!import:"https://tson.io/2026/39/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                 %s
                 }
                 """.formatted(body);
-        SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
+        SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(),
+                TsonBundledSchemas::fetch));
         return resolver.resolveSchema(new TsonSchemaParser(document).parseSchemaDocument());
     }
 
@@ -71,7 +73,7 @@ class ChoiceSugarResolutionTest {
         Top contact = schema.entries().get("contact");
         assertEquals(EntryKind.SUM, EntryKind.of(contact, n -> true));
         assertEquals(List.of("text", "integer"), variantNames(contact));
-        assertEquals(java.util.Optional.of("choice"), schema.constructorOf("contact"));
+        assertEquals(java.util.Optional.of("meta.choice"), schema.constructorOf("contact"));
         assertTrue(TypeChain.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got "
                 + TypeChain.supertypesOf(contact));
     }

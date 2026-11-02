@@ -51,7 +51,7 @@ RFC 6901 pointer into the data), `schemaPointer` is `keywordLocation` (the path 
 validated against, `/person/age`), `schemaId` plus `schemaPointer` are `absoluteKeywordLocation`, and
 `dataPosition`/`schemaPosition` add the line/column/byte-offset TSON needs and
 JSON Schema has no equivalent of. **One record rather than separate data- and schema-diagnostic types,
-because the variation is locational, not categorical** — a value violating `int32` as core.tn declares it
+because the variation is locational, not categorical** — a value violating `int32` as numeric.tn declares it
 populates both ends at once, and `javax.tools.Diagnostic`, LSP's `Diagnostic` and rustc's `DiagInner` all
 model it the same way (rustc's `MultiSpan` being the mature form of the same idea).
 

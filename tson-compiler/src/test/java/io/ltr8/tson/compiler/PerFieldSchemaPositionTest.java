@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * to jump to, while the pointer beside it had already said which field.
  *
  * <p>{@code RecordField.position} is {@code @Unbound}, on {@code Top.position}'s precedent:
- * §8.1's {@code record_field} declares no such field, so nothing fills it and strict binding would call it a
+ * §8.1's {@code meta.record_field} declares no such field, so nothing fills it and strict binding would call it a
  * mismatch. It is not carried in the annotation channel, which is schema data -- it resolves one hop against
  * the governing meta (§6) and round-trips into resolver output, none of which is true of a source position.
  */

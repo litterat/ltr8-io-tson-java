@@ -5,7 +5,7 @@ import io.ltr8.annotation.Field;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code field_group} record (Part 2 §5.11, §8.1): a resolved field group. {@code members} holds
+ * The kernel's {@code meta.field_group} record (Part 2 §5.11, §8.1): a resolved field group. {@code members} holds
  * the group's options in source order, each the fields it holds; {@code optionalMembers} names the members that may
  * be left out once their option is chosen. An option is chosen when any of its members is present, and a chosen
  * option holds every member {@code optionalMembers} does not name. Without {@code optional} exactly one option is

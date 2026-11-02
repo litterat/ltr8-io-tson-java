@@ -790,7 +790,7 @@ class TsonSchemaParserTest {
     }
 
     /**
-     * {@code type-name = identifier} (§12.1 under the kernel's {@code type_name} role): every name the schema
+     * {@code type-name = identifier} (§12.1 under the kernel's {@code meta.type_name} role): every name the schema
      * grammar reads is matched against the profile in full, not merely required to be an unquoted token.
      * §12.1's own "numbers are not declarable names" is one consequence of identifier-Start dropping {@code Nd},
      * {@code -}, {@code +} and {@code .}, and no longer a separate rule -- so a name that begins with a digit but
@@ -835,7 +835,7 @@ class TsonSchemaParserTest {
         assertTrue(field.getMessage().contains("quote it, \"_id\""), field.getMessage());
     }
 
-    /** A type parameter is a name through the same {@code param_name} role, and reaches the same check. */
+    /** A type parameter is a name through the same {@code meta.param_name} role, and reaches the same check. */
     @Test
     void aTypeParameterOutsideTheIdentifierProfileIsAParseError() {
         assertThrows(ParseException.class, () -> parse("""
@@ -928,16 +928,31 @@ class TsonSchemaParserTest {
 
     // ── Real spec fixtures parse end-to-end (grammar layer only) ─────────
 
+    /** The kernel's root declares its six maps, whose members the parser keys by their paths, and its own. */
     @Test
-    void metaKernelParses() throws IOException {
-        SchemaDocument doc = parse(readFixture("meta-kernel.tn"));
-        assertEquals(67, doc.body().declarations().size());
+    void theKernelParses() throws IOException {
+        SchemaDocument doc = parse(readFixture("meta.tn"));
+        // The six maps, their 68 members, and the 11 entries at the root.
+        assertEquals(85, doc.body().declarations().size());
+        assertTrue(doc.body().declarations().containsKey("meta.record"));
+        assertTrue(doc.body().declarations().containsKey("text"));
     }
 
     @Test
-    void metaSchemaParses() throws IOException {
-        SchemaDocument doc = parse(readFixture("meta.tn"));
-        assertFalse(doc.body().declarations().isEmpty());
+    void theLibrariesParse() throws IOException {
+        SchemaDocument numeric = parse(readFixture("numeric.tn"));
+        // The map `numeric` and its 7 members, and the 17 instances at the root.
+        assertEquals(25, numeric.body().declarations().size());
+        assertTrue(numeric.body().declarations().containsKey("numeric.decimal_type"));
+        assertTrue(numeric.body().declarations().containsKey("int32"));
+        SchemaDocument temporal = parse(readFixture("temporal.tn"));
+        // The map `temporal` and its 5 members, and the 5 instances at the root.
+        assertEquals(11, temporal.body().declarations().size());
+        assertTrue(temporal.body().declarations().containsKey("temporal.date_type"));
+        SchemaDocument net = parse(readFixture("net.tn"));
+        // The map `net` and its 11 members, and the 12 instances at the root.
+        assertEquals(24, net.body().declarations().size());
+        assertTrue(net.body().declarations().containsKey("net.uuid_type"));
     }
 
     @Test

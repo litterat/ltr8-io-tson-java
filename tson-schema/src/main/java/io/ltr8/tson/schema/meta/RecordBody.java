@@ -36,7 +36,7 @@ import java.util.function.UnaryOperator;
  * name is the key and nowhere else, so the map's own key uniqueness refuses a name written twice by its
  * spelling; two spellings that are one name under the record's {@code name_type} are the linker's to refuse,
  * since only it can resolve the type. Declaration order is part of the value, and every reader, writer and
- * message follows it. The key is {@code text} rather than {@code field_name} because {@code name_type} decides
+ * message follows it. The key is {@code text} rather than {@code meta.field_name} because {@code name_type} decides
  * which names a record may declare.
  *
  * <p><b>{@code extension} states how the record may be realised</b> ({@link RecordExtensionType}) and is
@@ -49,22 +49,22 @@ import java.util.function.UnaryOperator;
  * called {@code record}, but a Java class named {@code Record} would collide, confusingly, with
  * {@code java.lang.Record} (the very language feature every type in this model is built from).
  */
-@Typename(name = "record")
+@Typename(name = "meta.record")
 public record RecordBody(TypeChain chain, Namespace<RecordField> fields,
                           List<FieldGroup> groups, RecordExtensionType extension, List<String> discriminators,
                           @Field("name_type") Optional<String> nameType,
                           List<TemplateParam> parameters) implements Product {
 
     /**
-     * The kernel's {@code field_name}, an identifier: a record's name type where neither it nor a supertype states
-     * one ([TSON-SCHEMA] §5.2). {@link #nameType} keeps the difference between stating {@code field_name} and
+     * The kernel's {@code meta.field_name}, an identifier: a record's name type where neither it nor a supertype states
+     * one ([TSON-SCHEMA] §5.2). {@link #nameType} keeps the difference between stating {@code meta.field_name} and
      * stating nothing, because the two resolve in different namespaces: a name an author wrote resolves in the
      * author's own schema first, as an enum's does, and the absent default is the kernel's.
      */
-    public static final String FIELD_NAME = "field_name";
+    public static final String FIELD_NAME = "meta.field_name";
 
     /** The kernel's {@code field_map}, the namespace type a record's {@link #fields} are a value of. */
-    public static final String FIELD_MAP = "field_map";
+    public static final String FIELD_MAP = "meta.field_map";
 
     /**
      * <b>Absent and empty are the same value</b> for the three the kernel makes optional ({@code chain}, {@code

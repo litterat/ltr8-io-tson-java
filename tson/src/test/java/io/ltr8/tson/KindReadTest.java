@@ -12,7 +12,7 @@ import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.net.UuidType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A value at a kind position ([TSON-SCHEMA] §4.2), read in TSON text: a kind is an atom whose values are the
  * names of the types built with its constructor, so a value is a type name ([TSON-DATA] §7.7) that resolves, in
- * the governing schema's type-name namespace, to a member. {@code kind<uuid_type>} holds {@code stock_id}, never a
+ * the governing schema's type-name namespace, to a member. {@code meta.kind<uuid_type>} holds {@code stock_id}, never a
  * uuid.
  */
 class KindReadTest {
@@ -39,15 +39,15 @@ class KindReadTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
-              stock_id    => !uuid_type {}
-              customer_id => !uuid_type {}
+              stock_id    => !net.uuid_type {}
+              customer_id => !net.uuid_type {}
               sku         => text
-              ledger      => { named: kind<uuid_type>  fallback?: kind<uuid_type> ~ customer_id }
+              ledger      => { named: meta.kind<net.uuid_type>  fallback?: meta.kind<net.uuid_type> ~ customer_id }
               box         => <T> { v: T }
               pair        => <A, B> { a: A  b: B }
               inner       => box<text>
               outer       => pair<box<text> int32>
-              typed       => { t: type_kind }
+              typed       => { t: meta.type_kind }
             }""";
 
     private static final SchemaSource SOURCE = uri -> IDS_SCHEMA;
@@ -101,15 +101,15 @@ class KindReadTest {
     }
 
     /**
-     * A refusal lists the kind's members as an author can write them: the entry {@code kind<uuid_type>} closed to is
-     * minted under a name nobody wrote, and the list names it by its application.
+     * A refusal lists the kind's members as an author can write them: the entry {@code meta.kind<net.uuid_type>}
+     * closed to is minted under a name nobody wrote, and the list names it by its application.
      */
     @Test
     void aRefusalNamesAMintedMemberByItsApplication() {
         List<Diagnostic> problems = problems("!typed { t: nope }");
         assertEquals(1, problems.size(), problems.toString());
         String message = problems.getFirst().message();
-        assertTrue(message.contains("kind<uuid_type>"), message);
+        assertTrue(message.contains("meta.kind<net.uuid_type>"), message);
         assertFalse(message.contains("reference_uuid_type"), message);
         assertFalse(problems.getFirst().expected().contains("reference_uuid_type"), problems.getFirst().expected());
     }

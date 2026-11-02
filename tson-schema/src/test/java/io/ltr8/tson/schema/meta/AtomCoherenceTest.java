@@ -1,6 +1,29 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.tson.base.atom.Rational;
+import io.ltr8.tson.schema.binary.BytesType;
+import io.ltr8.tson.schema.net.Cidr4Type;
+import io.ltr8.tson.schema.net.Cidr6Type;
+import io.ltr8.tson.schema.net.EmailType;
+import io.ltr8.tson.schema.net.Ipv4Type;
+import io.ltr8.tson.schema.net.Ipv6Type;
+import io.ltr8.tson.schema.net.MacType;
+import io.ltr8.tson.schema.net.UriType;
+import io.ltr8.tson.schema.net.UuidType;
+import io.ltr8.tson.schema.numeric.ComplexType;
+import io.ltr8.tson.schema.numeric.DecimalType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
+import io.ltr8.tson.schema.numeric.RationalType;
+import io.ltr8.tson.schema.temporal.DateTimeType;
+import io.ltr8.tson.schema.temporal.DateType;
+import io.ltr8.tson.schema.temporal.DurationType;
+import io.ltr8.tson.schema.temporal.PeriodType;
+import io.ltr8.tson.schema.temporal.TimeType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.unicode.RegexType;
+import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.unicode.Normalization;
 import org.junit.jupiter.api.Test;
 
@@ -223,7 +246,7 @@ class AtomCoherenceTest {
     }
 
     /**
-     * SQL's own {@code DECIMAL(precision, scale)} rule, which meta.tn names this pair after: the
+     * SQL's own {@code DECIMAL(precision, scale)} rule, which numeric.tn names this pair after: the
      * scale fits inside the precision.
      */
     @Test
@@ -266,7 +289,7 @@ class AtomCoherenceTest {
     /**
      * Reached by direct construction rather than through a resolved schema, and that is not merely a
      * unit-test convenience: no temporal bound can be written in schema text today. {@code
-     * date_type.min}/{@code max} are declared {@code value?} in meta.tn, so a bound binds as a {@code
+     * date_type.min}/{@code max} are declared {@code value?} in temporal.tn, so a bound binds as a {@code
      * String} into an {@code Optional<LocalDate>} and throws before any coherence check runs -- a
      * separate, pre-existing defect. These rules go live at the resolver when that is fixed.
      */
@@ -324,7 +347,7 @@ class AtomCoherenceTest {
     // ── CIDR families ────────────────────────────────────────────────────────
 
     /**
-     * meta.tn's own {@code @doc} states this rule outright -- prefix bounds narrow "within the family
+     * net.tn's own {@code @doc} states this rule outright -- prefix bounds narrow "within the family
      * range 0-32" and "bounds outside that range are invalid at the schema level" -- so {@code 40} is
      * reported twice over: outside the family's own width, and above its own ceiling.
      */

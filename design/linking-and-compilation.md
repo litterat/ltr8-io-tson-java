@@ -14,18 +14,20 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
 - `CanonicalIdentity.canonicalize` (`tson-base`) reads a *reference* in any spelling of its identity; `validate` judges
   a document's own `!!id`, which must already be written canonically. Neither rewrites an identity into validity.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
-  name the closure already binds unless it is equal to the entry already there.
+  name the closure already binds unless it is equal to the entry already there. A nested `!schema` map is the
+  exception that is no collision: several documents declaring one map path contribute to one map, the union of their
+  members (`SPEC-FEEDBACK.md #14`).
 - One namespace per schema (SPEC-FEEDBACK.md #7): its own entries and the whole closure of its `!!import`s
   (`TsonSchema.namespaceSources`, header order, deduplicated by identity). Every name the schema writes resolves
   there; no rule ties what a schema may declare to what it imports, so any schema declares a constructor, a namespace
   type or a reference, and imports any schema document.
 - A reference to a value entry (a `ValueEntry`, `myapi => !api { … }`) is refused at every position a type-ref
   occupies: it is a value, and nothing is typed by it.
-- A kernel slot typed `type_kind` (`record_field.type`, the element and container type slots, `choice.variants`) is
-  judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor whose declaration is a record is a
-  member, its value being of `record`, and a value entry is refused there. An alias's target (`Alias`), which may name
-  a constructor, is judged by resolution and arity alone (`constructors == null`). `design/references.md` has the
-  account of every slot.
+- A kernel slot typed `meta.type_kind` (`meta.record_field.type`, the element and container type slots,
+  `meta.choice.variants`) is judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor whose declaration
+  is a record is a member, its value being of `meta.record`, and a value entry is refused there. An alias's target (`Alias`),
+  which may name a constructor, is judged by resolution and arity alone (`constructors == null`). `design/references.md` has
+  the account of every slot.
 - A value by name (`TsonSchema.valuesByName`) resolves its first segment in the schema's merged namespace, alias
   hops followed; its referent's declared type must IS-A the slot's, compared by canonical identity.
   Local entries only, after `validateEntry`.
@@ -84,7 +86,7 @@ load-bearing, each step reading what an earlier one wrote:
 8. **`checkNames`**, §8.2 over scopes (`design/name-hygiene-and-minted-names.md`).
 9. **Validate** every entry (`validateEntry`).
 10. **`checkValuesByName`**, **`checkEveryEntryIsInhabited`**, **`checkRecordExtension`**.
-11. **`withNameAnnotations`**, then **`checkDisjointAssertions`**: an author's `@disjoint` is read from both places §6
+11. **`withNameAnnotations`**, then **`checkDisjointAssertions`**: an author's `@meta.disjoint` is read from both places §6
     puts it, the definition and the map key, so it runs last.
 
 ## Import merge (`mergeImports`, §2.2.3)
@@ -100,7 +102,7 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
   importer fails to load before linking is reached.
 - **Collisions are decided by origin.** One schema reached by several routes unifies (the diamond every schema
   importing core.tn forms; the copies differ only in the `subtypes` each route credited, so they union, `unified`).
-  Two *different* schemas declaring one name is an error naming both, an entry of the kernel or meta.tn included:
+  Two *different* schemas declaring one name is an error naming both, the bundled documents' root names included:
   every closure reaching them reserves their names. Because identities carry the spec revision, a
   closure reaching both `/2026/37/m/core.tn` and `/2026/39/m/core.tn` is refused here rather than surfacing later as a
   field conflict between two identically spelled types. Listing one schema twice, or under two spellings of one
@@ -108,9 +110,16 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
 - **A local entry equal to the closure's is the same entry.** §8.2 names a minted instantiation by its resolved form
   alone, so an application this schema closed and one an import closed agree by construction; any other local reuse
   of a closure name is refused and the local entry dropped, keeping the import's, which is already-linked material.
-- **A nested schema map is closed.** `geo => !schema { … }` is an entry like any other, its members entries under
-  their paths: two imports each declaring `geo` collide on `geo` whatever members they declare, and nothing merges
-  two maps of one name. No grammar declares a dotted name, so an importer cannot add to an imported map.
+- **A nested schema map is open** (`SPEC-FEEDBACK.md #14`). `geo => !schema { … }` declared by several documents of
+  one closure is one map, merged exactly as the root namespace merges across imports: its members are the union, each
+  merged under its path, and a member path two different documents declare is the ordinary collision above. A
+  member's identity is its declaring document plus its path, so its origin is recorded per path. Both the import loop
+  and the local loop pass over a nested map met twice (`SchemaPaths.isNestedMap`), the map's entry being derived from
+  its members, and `carryOver` takes no import's annotations onto it: the annotations written on a `geo => !schema
+  { … }` entry are that document's contribution alone. This is how
+  any schema contributes a member (`meta => !schema { code_type => unicode.text_type ^ { max_length?: = 4 } }`, then
+  `code => !meta.code_type {}`); a contributed member is the contributor's, never a kernel entry
+  (`TsonBundledSchemas.isKernel` judges by origin).
 
 ## Reference validation (`validateEntry`, `validateBody`, `validateTypeRef`)
 
@@ -120,18 +129,18 @@ are worth their place here, each catching what would otherwise link, compile, an
 - **A value entry is refused at every type-ref position** (a field type, a variant, an element, a map key or
   value), naming the type it is a value of. A value entry's payload was judged by the read against its type and its
   names by `ValuesByName`, so `validateBody` asks nothing of it.
-- **A `type_kind` slot is judged by membership** of `type_kind` (`KindMembers.isMember`), where `type` is in reach:
+- **A `meta.type_kind` slot is judged by membership** of `meta.type_kind` (`KindMembers.isMember`), where `type` is in reach:
   an alias stopping at an application, an open entry and a value entry are no type a value can have. A constructor
-  is one, its declaration a record (`spec: uuid_type` holds a declaration body as data; SPEC-FEEDBACK.md #11).
+  is one, its declaration a record (`spec: net.uuid_type` holds a declaration body as data; SPEC-FEEDBACK.md #11).
 - **A choice's variants are distinct at the end of each §8.3 alias chain** (`AliasChain.terminal`), since an
   alias and its target are one type: `(text | my_text)` with `my_text => text` is caught, the only spelling an author
   cannot see. No variant may resolve to `void` (`checkVariantsAreNotVoid`).
 
-**A chain's names resolve in the same namespace.** A refinement of a kernel constructor reaches one (`set_type =>
-array ^ {...}` carries `[array, product, top, type]`), and the defining schema's closure is inside the importer's, so
-every name on it is there. A `reference` body's `of` names any type or constructor, never a value entry or an open
-entry (`KindMembers.ofRefusal`); what it names decides whether the slot holds a type's name or a value's. A namespace
-type's stated `key_type` must be a member of `identifier_kind`: its keys are names.
+**A chain's names resolve in the same namespace.** A refinement of a kernel constructor reaches one (`meta.set_type =>
+meta.array ^ {...}` carries `[meta.array, meta.product, meta.top, meta.type]`), and the defining schema's closure is inside
+the importer's, so every name on it is there. A `reference` body's `of` names any type or constructor, never a value entry or
+an open entry (`KindMembers.ofRefusal`); what it names decides whether the slot holds a type's name or a value's. A namespace
+type's stated `key_type` must be a member of `meta.identifier_kind`: its keys are names.
 
 **Every body is asked its family's coherence rule** (`checkCoherent`), which catches the bounds an application closed
 onto parameters (`sized<10, 3>`); a declared body was already asked at resolution, and one refused there never reaches
@@ -167,7 +176,7 @@ merged through imports with the import's entries.
 
 - **`entryOrigins`**: name to the canonical identity of the schema that declared it. It keeps a declaration's identity
   and its line answerable from the same document however many schemas merged it in: the pair a non-record reader
-  offers as its location (`ValueReaderContext.locationOf`), which locates a root-level `!int32` in core.tn rather than
+  offers as its location (`ValueReaderContext.locationOf`), which locates a root-level `!int32` in numeric.tn rather than
   in the schema that imported it. The registry stores `TsonLinkedSchema`, so the map survives every later `load`.
 - **`enumForms`** and **`nameTypes`**: what an enum's and a record's name type decide, which a reader holding only
   `TsonSchema.entries()` cannot resolve (`design/kinds-and-name-types.md`).
@@ -181,23 +190,24 @@ overwrite) and any `bootstrap() == true` schema, the kernel's pre-loaded form. `
 form for the on-demand resolve path, where two threads resolving one document both arrive with equivalent results;
 it overwrites nothing either. `get(uri)` canonicalizes; `getByCanonicalIdentity` trusts its caller to have.
 `TsonSchemaLoader` is the pluggable import lookup, registered-only by default (nothing fetched).
-`TsonSchemaLinker.linkBootstrap` is the one sanctioned way to link meta-kernel's raw bootstrap output without
+`TsonSchemaLinker.linkBootstrap` is the one sanctioned way to link the kernel's raw bootstrap output without
 registering it. `linkReady(ready, loader, pending)` is the one partial link: a resolution in progress links its
 document's entries ready so far to compile readers for the next read (`WaitOrder`), a reference to a pending
 declaration is passed over there and nowhere else, and it reports nothing, each entry being judged when the whole
 schema links. In a partial link every pending name is a member of each reference naming types (`computeKinds`), so a
-pin naming a declaration not yet ready (enum's `name_type: = identifier` mid-bootstrap) is judged then too;
+pin naming a declaration not yet ready (enum's `name_type: = meta.identifier` mid-bootstrap) is judged then too;
 `design/resolver-vocabulary-and-bootstrap.md` has the mode.
 
 ## Namespace types (§4.1)
 
-A namespace type is an instance of the kernel's `namespace` constructor, `!namespace { key_type: …  value_type: …
-ordered: … }` (`field_map` and `schema` in the kernel, `headers => !namespace { key_type: header_name  value_type:
-text }` in any schema), and resolves to a `NamespaceBody`. A value of it is a map from `key_type` to `value_type`.
+A namespace type is an instance of the kernel's `meta.namespace` constructor, `!meta.namespace { key_type: …  value_type:
+… ordered: … }` (`meta.field_map` and `meta.schema` in the kernel, `headers => !meta.namespace { key_type: header_name
+value_type: text }` in any schema), and resolves to a `NamespaceBody`. A value of it is a map from `key_type` to
+`value_type`.
 
 - **The map is what the facets state.** `NamespaceBody.read()` gives the `MapBody`: keys of `key_type`, values of
   `value_type`, ordered where `ordered` is `true`, values never void, no size bounds. A stated `key_type` is the family
-  every key is read and judged under, and must be a member of `identifier_kind` (`validateBody`). An absent one is the
+  every key is read and judged under, and must be a member of `meta.identifier_kind` (`validateBody`). An absent one is the
   host's (`field_map`'s host is the record), so `read()` reads keys by spelling (`NamespaceBody.HOST_KEYS`, `text`) and
   the host's family judges them once resolved (`FieldNames`).
 - **Nothing beside the facets.** `namespace`'s own record reader refuses any other field at the construction, so the
@@ -207,13 +217,13 @@ text }` in any schema), and resolves to a `NamespaceBody`. A value of it is a ma
   it is delivered as a `Namespace` is `design/meta-layer-namespaces.md`'s.
 - **Any schema's vocabulary.** Any schema declares a namespace type or types a field by it, and a schema importing the
   declaring one holds values of it as entries. Such an entry (`myapi => !api { … }`) is a `ValueEntry`: refused at
-  every type position (above), a member of no kind, named by `ref<api>` (one entry with `kind<api>`, `api` being no
+  every type position (above), a member of no kind, named by `meta.ref<api>` (one entry with `meta.kind<api>`, `api` being no
   constructor), and compiled to a `ValueEntryReader`.
 
 ## Values by name (`ValuesByName`, §5.12)
 
-A value entry's payload may hold a name, `request: place_order_request` at a slot typed `kind<record>` or
-`method: orders.place_order` at a slot typed `ref<method>`. The read keeps the name as written with its path and the
+A value entry's payload may hold a name, `request: place_order_request` at a slot typed `meta.kind<meta.record>` or
+`method: orders.place_order` at a slot typed `meta.ref<method>`. The read keeps the name as written with its path and the
 slot's declared type (`TsonSchema.SlotType`), and `checkValuesByName` judges each one over local entries after
 `validateEntry`, by what the slot's `of` names over `merged` (`KindMembers.namesTypes`), whatever the read guessed:
 over a constructor the name as a member (`judgeMember`), over any other type by the walk, the value it reaches

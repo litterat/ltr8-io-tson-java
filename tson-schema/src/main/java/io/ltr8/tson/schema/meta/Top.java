@@ -1,18 +1,18 @@
 package io.ltr8.tson.schema.meta;
 
 /**
- * The meta-kernel's structural root, {@code top => abstract {}} (Part 2 §4.1) -- every constructor IS-A it -- and
+ * The kernel's structural root, {@code top => abstract {}} (Part 2 §4.1) -- every constructor IS-A it -- and
  * in Java what a schema map's entries are: {@code schema => {type_name => declared}}, an entry being its value
  * (Part 2 §8.1), a body a constructor built or a {@link ValueEntry}. A marker interface, not a
  * class (Java records can't extend a class, only implement interfaces), added purely to replicate
  * the kernel's own composition chain as real Java subtyping: {@code type => top & {}} becomes
  * {@link Type}, and {@code atom => type & {}}, {@code product => type & { ... }} and
  * {@code sum => type & {}} become {@link Atom}/{@link Product}/{@link Sum} each {@code extends Type};
- * {@code alias => top & { target: type_kind } } (which composes with {@code top} directly, not
+ * {@code alias => top & { target: meta.type_kind } } (which composes with {@code top} directly, not
  * through {@code type}) becomes {@link Alias} implementing this interface directly. Lets a consumer
  * test kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product} rather than
  * switching on {@link EntryKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same
- * sealed hierarchy directly for {@code !record}/{@code !array}/etc. type-refs -- {@code
+ * sealed hierarchy directly for {@code !meta.record}/{@code !meta.array}/etc. type-refs -- {@code
  * DefaultUnionBinder} recurses through a multi-level sealed hierarchy like this one (a permitted
  * subclass that's itself sealed is flattened, not left as an unusable "member"), which is what
  * makes binding straight against {@code Top}/{@link Atom} practical at all (see {@code ltr8-bind}'s

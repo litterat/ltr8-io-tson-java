@@ -27,10 +27,10 @@ derived — and the static check that runs before any of it.
   the synthetic.
 - Every instantiation — a declared one, a self-reaching one — records its application in the map `SchemaResolver`
   shares with the materialiser, in its reduced form (each argument closed to the entry it names), which §8.2's
-  identity and the applied-parent fold key on. The entry's key carries it as `@application` **as written**
+  identity and the applied-parent fold key on. The entry's key carries it as `@meta.application` **as written**
   (`asWritten`, `writtenApplications`): nested arguments unreduced and each stated the same way,
-  `@application:pair<box<text> int32>`, a bare-name argument followed through its alias chain (§8.2), and an
-  argument at a value parameter a value token. An expansion carries no `@application`.
+  `@meta.application:pair<box<text> int32>`, a bare-name argument followed through its alias chain (§8.2), and an
+  argument at a value parameter a value token. An expansion carries no `@meta.application`.
 - Every application the pass closes, an expansion's included, is recorded against the entry it closed to
   (`closedApplications`, as met and with its arguments closed; a generated head's own intermediate form skipped), and
   `SchemaResolver` stores the list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written.
@@ -49,7 +49,7 @@ derived — and the static check that runs before any of it.
 
 Related: `design/held-template-bodies.md` (what a held body is, how each shape closes, the synthetic merge, parameter
 kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEdges`, the two family edges),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `MetaRefs`, `@synthetic`),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `MetaRefs`, `@meta.synthetic`),
 `design/constructor-application.md`, `design/linking-and-compilation.md`.
 
 ## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)
@@ -57,12 +57,12 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
 - **Arguments are dereferenced before an application closes** (`dereferenced`). A reference is a pure rename (§8.3:
   "a reference is the same type under another name"), so `box<user_id>` over `user_id => uuid` *is* `box<uuid>`
   and must be one entry; otherwise the arguments would be interchangeable at a scalar position and the
-  applications refused one layer up. A refinement (`!uuid ^ {}`) and a fresh instance (`!uuid_type {}`) are
+  applications refused one layer up. A refinement (`!uuid ^ {}`) and a fresh instance (`!net.uuid_type {}`) are
   ordinary entries and keep their own applications, which is what makes those spellings mean something. **Identity
-  is normalised, provenance is not**: the canonical application is what identity keys on, `@application` states
+  is normalised, provenance is not**: the canonical application is what identity keys on, `@meta.application` states
   the application as written past its alias hops, and the use site still names what the author wrote, since no
   pass rewrites use sites (§8.3). It rests on nothing that changes how
-  a value reads riding on a reference — a `bytes` alphabet is `bytes_type`'s own selector (§5.5).
+  a value reads riding on a reference — a `bytes` alphabet is `binary.bytes_type`'s own selector (§5.5).
   `AliasedArgumentIdentityTest` pins it. `closeApplicationInto` dereferences the same way, so the declared and the
   minted path agree on the name, the ownership key and the recorded application.
 - **It runs over the resolved form, not the AST.** An application arrives as a `schema.meta.TypeRef` carrying
@@ -99,7 +99,7 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   - **A use-site application still mints, and must** — it has no author-written name for identity to key on. One
     whose chain names a declared type, through a supertype or a parent application a declaration owns, would be an
     unnameable family member, and `refuseMintedMember` refuses it at minting, naming the application, against the
-    declaration that wrote it. A constructor (a record IS-A the kernel's `top`) is exempt. The linker's check
+    declaration that wrote it. A constructor (a record IS-A the kernel's `meta.top`) is exempt. The linker's check
     (`RecordExtension`, `design/inhabitance-and-record-extension.md`) covers the instantiation entry a self-reaching
     expansion keeps.
 - **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names it.
@@ -132,7 +132,7 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   follows, and `RecordTemplateTest` pins both:
   - **A literal applied where the body uses the parameter as a type** (`box<3>`) passes the argument check — a type
     parameter's check reads only a reference — and is refused after substitution, where the body is read against
-    the kernel's vocabulary: `record_field.type` is a `type_kind`, whose names are identifiers, so `'3': U+0033 at
+    the kernel's vocabulary: `meta.record_field.type` is a `meta.type_kind`, whose names are identifiers, so `'3': U+0033 at
     index 0 cannot start an identifier`. That is sharper than an unresolved reference, which would imply a type called
     `3` could be declared.
   - **A type name applied where the body routes the parameter into a field's value** (`retry<text>` over
@@ -200,9 +200,9 @@ resolves, before the batch pass runs. They are handled differently.
   only as the kernel's own entry: a schema's own `atom => { … }` composed into `payload => atom & { … }` leaves
   `payload` a PRODUCT. The reader stack branches on the body itself.
   - **The atom-refinement test rests on it** (`DefinitionResolver`): an atom *instance's* body is an `Atom`
-    (`integer` carries `!integer_type {}`), where its constructor's is the vocabulary record describing one
-    (`integer_type` carries a `!record { ... }`). So `body instanceof Atom` separates the pair, where neither the
-    kind nor the chain does alone: `integer_type` is ATOM-kinded exactly like its instances.
+    (`integer` carries `!numeric.integer_type {}`), where its constructor's is the vocabulary record describing one
+    (`numeric.integer_type` carries a `!meta.record { ... }`). So `body instanceof Atom` separates the pair, where neither
+    the kind nor the chain does alone: `numeric.integer_type` is ATOM-kinded exactly like its instances.
 - **A held template is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes it not a type, so
   `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than ALIAS — a template whose
   closure is a reference. It is not a base kind (§4.1). A record template is a type, the family base, and takes a
@@ -210,10 +210,10 @@ resolves, before the batch pass runs. They are handled differently.
   - **A closed entry's kind is its substituted value's**, §4.1's "construction transfers kind" asked of the
     construction — not the constructor's *name*.
   - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }` makes
-    `listed<text>` a constructor whose `!record` body describes its instances, so its kind is the base kind its chain
+    `listed<text>` a constructor whose `!meta.record` body describes its instances, so its kind is the base kind its chain
     reaches (ATOM), as for a declared entry (`EntryKind.ofChain`, which `DefinitionResolver.determineKind` guards);
     construction then transfers it to `!listed_text [...]`. A template over a constructor closes to what that
-    constructor builds: `payloads => <T> !namespace { key_type: identifier  value_type: T }` closes to a namespace
+    constructor builds: `payloads => <T> !meta.namespace { key_type: meta.identifier  value_type: T }` closes to a namespace
     type, and one over an ordinary type to a value entry.
   - **This keeps the derivation total**: every entry's kind follows from what it states, where an open entry
     claiming its application's kind would need a lookup outside itself. `OpenEntryResolvedFormTest` covers both

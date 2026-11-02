@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * The real proof this whole sketch works, not against small hand-built fragments: compiles the
- * ENTIRE real, registered {@code meta-kernel.tn} schema (55 entries after materialization -- see
+ * ENTIRE real, registered {@code meta.tn} schema (55 entries after materialization -- see
  * {@code MetaKernelSchemaRegistryTest}) with a registry covering every factory this codebase
  * currently has, then reads real TSON data text against several of its own genuinely useful record
  * types -- including {@code top} itself, the case that motivated {@link VariantParser}'s own
@@ -41,7 +41,7 @@ class MetaKernelEndToEndTest {
      * The raw {@link TsonCompiledSchema} underneath a bootstrap {@link TsonCompiledMetaSchema} --
      * unlike {@link TsonCompiledMetaSchema#reader}, {@link TsonCompiledSchema#get} reads *any*
      * entry, not just the ones with {@code constructor() == true}, which every test in this class
-     * needs (e.g. {@code integer_size}, {@code field_group}, ordinary records with no constructor of
+     * needs (e.g. {@code numeric.integer_size}, {@code meta.field_group}, ordinary records with no constructor of
      * their own). Mirrors {@link io.ltr8.tson.compiler.TsonCompiledMetaRegistry#bootstrap}'s own first
      * step exactly, without the final re-wrap that method's own return value would otherwise force.
      */
@@ -53,9 +53,9 @@ class MetaKernelEndToEndTest {
      * Every one of the real schema's entries compiles cleanly, the container constructors included:
      * {@link VariantParser} triggers on non-empty {@code subtypes} rather than non-empty {@code
      * parameters}, and always compiles a declaration's own body alongside any subtype dispatch rather than
-     * treating the two as mutually exclusive (see {@link VariantParser}'s own Javadoc), so {@code array},
-     * {@code set} and {@code map} compile via their own ordinary body reader, the same as any other
-     * constructor's vocabulary record. Nothing legitimate ever calls {@code compiled.get("map")} in
+     * treating the two as mutually exclusive (see {@link VariantParser}'s own Javadoc), so {@code array}
+     * and {@code set_type} compile via their own ordinary body reader, the same as any other
+     * constructor's vocabulary record. Nothing legitimate ever calls {@code compiled.get("meta.array")} in
      * practice, but there is no reason for it to fail if something did.
      */
     @Test
@@ -68,7 +68,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(73, registered.entries().size());
+        assertEquals(91, registered.entries().size());
     }
 
     /**
@@ -81,19 +81,19 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         ReadException untagged = assertThrows(ReadException.class,
-                () -> compiled.get("top").read(TestDocuments.document("{}")));
+                () -> compiled.get("meta.top").read(TestDocuments.document("{}")));
         ReadException self = assertThrows(ReadException.class,
-                () -> compiled.get("top").read(TestDocuments.document("!top {}")));
+                () -> compiled.get("meta.top").read(TestDocuments.document("!meta.top {}")));
 
-        assertTrue(untagged.getMessage().contains("'top' is abstract"), untagged.getMessage());
-        assertTrue(self.getMessage().contains("a tag naming 'top' selects nothing"), self.getMessage());
+        assertTrue(untagged.getMessage().contains("'meta.top' is abstract"), untagged.getMessage());
+        assertTrue(self.getMessage().contains("a tag naming 'meta.top' selects nothing"), self.getMessage());
         assertTrue(self.getMessage().contains("record"), "the subtypes that would satisfy it: " + self.getMessage());
     }
 
     @Test
     void readsEnumsOwnMembersFieldAgainstRealData() {
-        // enum => enum_type ^ { name_type?: = identifier }: the pinned `name_type` is injected, and `members` reads
-        // through enum_set, a genuine ArrayBody.
+        // enum => enum_type ^ { name_type?: = meta.identifier }: the pinned `name_type` is injected, and `members` reads
+        // through meta.enum_set, a genuine ArrayBody.
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
@@ -108,7 +108,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("integer_size")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("numeric.integer_size")
                 .read(TestDocuments.document("{ bits: 32 signed: true }")));
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
@@ -120,7 +120,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("field_group")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("meta.field_group")
                 .read(TestDocuments.document("{ members: [[foo] [bar baz]] optional_members: [baz] optional: true }")));
 
         assertEquals(List.of(List.of("foo"), List.of("bar", "baz")), result.get("members"));
@@ -129,15 +129,15 @@ class MetaKernelEndToEndTest {
     }
 
     @Test
-    void readsTupleElementAgainstRealNestedData() {
+    void readsRecordFieldAgainstRealNestedData() {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("tuple_element")
-                .read(TestDocuments.document("{ element_type: text voidable: true }")));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("meta.record_field")
+                .read(TestDocuments.document("{ type: text voidable: true }")));
 
         assertEquals(true, result.get("voidable"));
-        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("text"), result.get("element_type"),
-                "a type_kind slot holds a type's name, as the reference it is");
+        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("text"), result.get("type"),
+                "a meta.type_kind slot holds a type's name, as the reference it is");
     }
 }

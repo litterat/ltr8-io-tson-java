@@ -16,10 +16,10 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
 - `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
   *unquoted*.
 - Only a *template* is normalised to a held body; a closed record or closed alias resolves at its declaration. A
-  record template's normalised `!record { … }` payload is bound by the resolver into the open record it denotes
+  record template's normalised `!meta.record { … }` payload is bound by the resolver into the open record it denotes
   (`DefinitionResolver.openRecord`).
 - Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
-  facts at their `record_field` defaults.
+  facts at their `meta.record_field` defaults.
 - §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
 
 Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived names, reporting),
@@ -31,7 +31,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 - **Which entry a form lifts to is §5.3's one lift rule, and the enclosing declaration's parameters do not
   enter it.** A form naming none of them lifts *closed*, template or not; a form naming one lifts *open* — an
   `Instance` carrying just the parameters it uses, with the position that held it applying them straight
-  back (`<T> { a: [T] }` injects `array_p0_… => <p0> !array { element_type: p0 }` and the field becomes
+  back (`<T> { a: [T] }` injects `array_p0_… => <p0> !meta.array { element_type: p0 }` and the field becomes
   `array_p0_…<T>`). So `<T> { a: [T]  b: [order] }` injects one of each, and only the first waits for
   materialisation.
   - **The parameters are renamed positionally**, because two forms alike up to a consistent renaming are one
@@ -51,8 +51,8 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     `DerivedName.ofBinding` hashes) and the reference *as written*, which is what an open binding holds. Only
     `element_type`/`key_type`/`value_type` are reached this way, a named slot being the one an open binding
     can address; `tuple` and `choice` put their positions inside a collection, so they keep only the first
-    rendering — written through the same `WireForm.refValue` producer, since a `[type_kind]` holds what a
-    `type_kind` holds, and rewritten a pass later by `MetaRefs.mapBodyRefs`, which maps a choice's variants
+    rendering — written through the same `WireForm.refValue` producer, since a `[meta.type_kind]` holds what a
+    `meta.type_kind` holds, and rewritten a pass later by `MetaRefs.mapBodyRefs`, which maps a choice's variants
     and a tuple's elements like any other reference.
     - **No slot refuses an application, because a slot that did would not fail where it decided.** A
       `choiceBinding` requiring a bare name per variant would leave `( box<text> | int32 )` unlifted *whole*, to
@@ -84,7 +84,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 ## Parameterised aliases
 
 - **A parameterised alias is normalised here as well** (§5.10's partial application). `uuid_pair => <B>
-  pair<text, B>` leaves this phase as `<B> !alias { target: pair<text B> }` — §8.1's own reading of what
+  pair<text, B>` leaves this phase as `<B> !meta.alias { target: pair<text B> }` — §8.1's own reading of what
   an alias body is, spellable because the kernel's `alias.target` is a reference, which may carry arguments.
   With it no open form is anything but a constructor application: §12.1's
   `[type-params] "!" type-name ws core-value` covers every template and one walk closes them all.
@@ -95,8 +95,8 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 ## Record templates
 
 - **A record template is normalised here too, and for the same reason the sugar forms are** (`recordBinding`).
-  §5.2 says a bare record body denotes `!record { fields: { … } }`, so `test => <T> { x: T }` leaves this
-  phase as `test => <T> !record { fields: { x => { type: T } } }` — a held application like `<T> [T]`, and
+  §5.2 says a bare record body denotes `!meta.record { fields: { … } }`, so `test => <T> { x: T }` leaves this
+  phase as `test => <T> !meta.record { fields: { x => { type: T } } }` — a held application like `<T> [T]`, and
   closed by the same process. The rule is as fixed and as closed as the sugar table: §5.2's six field
   spellings decide `state` and `value` from the two marks the author wrote, and nothing else is consulted.
   - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because
@@ -105,7 +105,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     table (`FieldModifiers`) so the spellings and the errors around them cannot drift apart between a template and
     the closed record beside it.
   - **Only what the author wrote is written.** `access_pattern` and `size_type` are fixed on the `record`
-    constructor, and an unmarked field's facts are `record_field`'s own defaults, so none of them is stated —
+    constructor, and an unmarked field's facts are `meta.record_field`'s own defaults, so none of them is stated —
     the same economy `arrayBinding` makes with an unmarked element's `state`, and what keeps the held form the
     one the author would recognise.
   - **The rewrite has to be here rather than in the resolver.** Resolving the body and writing the resolved
@@ -118,7 +118,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
   - **A composition or refinement template is built one phase later**, as the *flattened* open record
     (`DefinitionResolver.parameterised`), and every open record's held tree is written by `WireForm.heldRecord`
     (through `HeldBody.of`). Both absorb fields from a source, and a §5.7 tightening entry states a modifier and no
-    type-ref, so it is not a `record_field` at all until the inherited field supplies one. That needs a namespace
+    type-ref, so it is not a `meta.record_field` at all until the inherited field supplies one. That needs a namespace
     this phase does not have, so the flattening happens in the resolver; the **spelling** is `WireForm`'s, which is
     the whole point. `WireForm.heldRecord` and this phase's `recordBinding` are two producers of the wire form and one
     producer of its spelling — both going through `WireForm.refValue` and `WireForm.nameField` is what makes
