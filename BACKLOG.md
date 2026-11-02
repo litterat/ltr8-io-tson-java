@@ -55,13 +55,6 @@ spec-required case:
   invariant break whose message calls `kind` "a template … not a type until it is applied". The default is a held
   value (SPEC-FEEDBACK.md #4 rule 3) and should be judged once every entry is ready. Reproduce, add the failing test,
   and route the judgement through the held-value settle.
-- [ ] **Identical synthetics minted by two documents collide instead of de-duplicating** ([TSON-SCHEMA] §5.3, §8.2).
-  Two documents that write the same sugar without importing each other each mint the same synthetic
-  (`array_text_…` for `[text]`), and a third schema importing both is refused at link: "declared by two different
-  schemas". net.tn and policy.tn hit it, and policy.tn imports core.tn only to reuse net.tn's synthetic. A synthetic
-  is identified by its form, so two of one form are one entry: the linker should unify them across the closure (one
-  entry, both documents' uses pointing at it) rather than treat them as a name collision. Add a link vector with two
-  independent libraries writing `[text]` and a schema importing both, then point policy.tn back at what it uses.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to

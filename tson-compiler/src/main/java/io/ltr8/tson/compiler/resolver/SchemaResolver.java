@@ -1254,7 +1254,8 @@ public final class SchemaResolver {
      * against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its transitivity and
      * its identity-based collision rule (§2.2.3), since this is the same concept applied one stage earlier: an
      * import contributes everything its namespace holds, one schema reached by
-     * several routes unifies, and two different schemas declaring one name is the error.
+     * several routes unifies, one synthetic minted by two documents unifies ({@link ImportedSynthetics}), and two
+     * different schemas declaring one name is the error.
      *
      * <p>Unlike the linker's, this merge has no {@code subtypes} to reconcile when a route repeats --
      * {@code subtypes} is populated at link time, one phase later, so both copies are still as their
@@ -1284,11 +1285,17 @@ public final class SchemaResolver {
                 }
                 if (incumbent != null) {
                     if (!incumbent.equals(origin)) {
-                        throw new SchemaValidationException("'" + name + "' is declared by two different "
-                                + "schemas reached through !!import ('" + incumbent + "' and '" + origin
-                                + "') -- distinct types cannot share one name in the flat namespace; import "
-                                + "one of them, or a version of each that agrees on where '" + name
-                                + "' is declared");
+                        // One synthetic minted by two documents is one entry (§8.2), whichever declared each.
+                        TsonSchema.EntryFacts arriving = imported.schema().factsOf(name);
+                        if (!ImportedSynthetics.areOne(name, facts.get(name), merged.get(name), incumbent, arriving,
+                                entry.getValue(), origin)) {
+                            throw new SchemaValidationException("'" + name + "' is declared by two different "
+                                    + "schemas reached through !!import ('" + incumbent + "' and '" + origin
+                                    + "') -- distinct types cannot share one name in the flat namespace; import "
+                                    + "one of them, or a version of each that agrees on where '" + name
+                                    + "' is declared");
+                        }
+                        facts.put(name, ImportedSynthetics.unified(facts.get(name), arriving));
                     }
                     continue;
                 }

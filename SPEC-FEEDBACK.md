@@ -422,7 +422,7 @@ supplied at ingest (§8.1).
   resolved from a document, and a document claiming its identity is checked against the bytes the processor ships.
   Its names reach a schema only by import: an import-free `!schema { a => { b: b }  b => {} }` is valid and sees its
   own names. numeric.tn, temporal.tn and net.tn each import the kernel alone, core.tn imports the
-  three, and policy.tn imports core.tn.
+  three, and policy.tn imports the kernel alone.
 - **A resolved form's header is its source's**, and its root `!schema`; nothing in it marks it resolved. Reading one is
   the caller's choice, as §10.1's ingest is: the reader is told the root's type, and reads under the form's own
   imports, the kernel's own form, which imports nothing, under the pre-loaded kernel. Nothing is supplied at ingest.
@@ -798,7 +798,10 @@ and the kernel types `meta.reference.of` and `meta.type_chain.supertypes`/`subty
   included: `[uuid]` in `geo.tagged` and in a root record is one `array_uuid_…`. A minted name is an identifier; a
   dotted name contributes its text with each dot written `_` (`array_geo_inner_tag_…`), a path under the kernel's
   `meta` its member's name (`array_record_…` for `[meta.record]`, #15); a path under another of the kernel's maps
-  keeps its first segment (`numeric_integer_type_…` for an application of `numeric.integer_type`).
+  keeps its first segment (`numeric_integer_type_…` for an application of `numeric.integer_type`). A synthetic's
+  identity is its form, not its declaring document: two documents that mint one form without importing each other
+  declare one entry, which a closure holding both holds once, the first import's, as it holds one schema reached by
+  two routes. A name only one of them mints is §2.2.3's collision.
 - **Qualified tags (Part 1).** A tag is `"!" qualified-name` with no arguments: `!geo.address { … }` in data resolves by
   the walk, and one naming no member is `UNKNOWN_TYPE`. A schemaless read keeps a dotted tag as written, as it keeps
   any tag. [TSON-JSON]'s `$type` takes the same text (edited in place).
@@ -816,7 +819,8 @@ and the kernel types `meta.reference.of` and `meta.type_chain.supertypes`/`subty
 - §4.1: "nothing in it lifting or minting" holds for a value of a namespace type other than `schema`. Added: "The rules
   for a schema document's root map apply to every value of `schema`: its members are declarations, which lift and
   mint, may be types, constructors or values, and are named by their path from the root."
-- §2.2.3, §10: an entry's identity is its declaring document's `!!id` plus its path. A schema map of one path
+- §2.2.3, §10: an entry's identity is its declaring document's `!!id` plus its path, and a synthetic's is its form
+  (§8.2), so one form minted by two documents is one entry of a closure holding both. A schema map of one path
   declared by several documents of a closure is one map, the union of their members; a member path two of them
   declare collides as any entry's name does, and a schema map's name collides with an entry of that name that is no
   schema map.
@@ -863,7 +867,7 @@ data format made a schema that wants dates reserve every network and numeric nam
   | temporal.tn | meta.tn | `date`, `time`, `datetime`, `duration`, `period` | `temporal`: their five `*_type` constructors |
   | net.tn | meta.tn | `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `hostname`, `host`, `media_type`, `uri_reference`, `uri`, `uuid` | `net`, beside the kernel's members: their eleven `*_type` constructors |
   | core.tn | numeric.tn, temporal.tn, net.tn | the author annotations `deprecated`, `title`, `comment`, `examples`, `read_only`, `write_only` | nothing: it declares no map of its own |
-  | policy.tn | core.tn | the processor policy's records and `restriction_level` | nothing |
+  | policy.tn | meta.tn | the processor policy's records and `restriction_level` | nothing |
 
   So an author writes `text`, `!enum [A B]`, `set<text>`, `@doc`, `bytes`, `int32`, `date` and `uuid` bare, and
   `meta.record`, `meta.identifier`, `meta.type_kind`, `meta.kind<meta.record>`, `meta.ref<method>`,
@@ -957,8 +961,8 @@ data format made a schema that wants dates reserve every network and numeric nam
   and none of the kernel's; core's holds its six annotations. The five fixtures this implementation
   holds itself to are `meta-resolved.tn`, `numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn` and
   `core-resolved.tn` (§13.3); policy.tn has none.
-- **Hash pins** run bottom-up in the import order: each library pins meta.tn, core.tn pins the three libraries,
-  policy.tn pins core.tn, so an edit to the kernel moves every pin above it.
+- **Hash pins** run bottom-up in the import order: each library and policy.tn pin meta.tn, core.tn pins the three
+  libraries, so an edit to the kernel moves every pin above it.
 - **Measured:** `Tson.standard()` loads six documents; in a fresh JVM, the first call about 440 ms and a warmed call
   about 65 ms.
 - **What is not running:** a library's resolved form holds instances of constructors its own source declares
@@ -966,17 +970,13 @@ data format made a schema that wants dates reserve every network and numeric nam
   only beside its source, the gap #4 states for any such form. An annotation inside a value read through an imported
   type's reader resolves in the namespace of the schema declaring that type, not the annotating document's (§3.3.3):
   a value entry's payload annotated `@atom.numeric` is refused where the value's type is declared by a schema whose
-  closure lacks it. This library's gap. And a synthetic two documents mint independently is two entries of one name:
-  net.tn and a document that writes `[text]` without importing net.tn each declare `array_text_…`, and a schema
-  importing both is refused, as two declarations of one name from two documents are (§2.2.3). policy.tn imports
-  core.tn rather than numeric.tn, the one library it types its fields by, so that its `[text]` is net.tn's and a
-  schema importing policy.tn beside core.tn loads.
+  closure lacks it. This library's gap.
 
 **Resolution, a proposal.**
 
 - §3.4, §9, §13.2: the kernel, meta.tn, `!!id` alone and pre-loaded, holds its wait cycle, what it names and the
   concepts that go with them; numeric.tn, temporal.tn and net.tn each import it alone and declare a data-format
-  family; core.tn imports the three and declares the author annotations; policy.tn imports core.tn. §2.2.3's
+  family; core.tn imports the three and declares the author annotations; policy.tn imports the kernel alone. §2.2.3's
   reservation of a closure's names covers each root and the map names `meta`, `atom`, `numeric`, `unicode`, `net`,
   `binary` and `temporal`.
 - §4.1, §9: the bundled documents' convention, stated once with the table above: the root holds the vocabulary an
@@ -1002,10 +1002,6 @@ data format made a schema that wants dates reserve every network and numeric nam
   a test.
 - **Where the author annotations live.** core.tn holds them for now; whether they belong in the kernel, in a library
   of their own, or in core.tn is open with the user.
-- **One synthetic per form across documents.** §8.2 mints one entry per form within a document; two documents that
-  do not import each other mint one form twice, and an importer of both collides (above). Unifying synthetics by form
-  across a closure, rather than by declaring document, is #14's open item ("synthetics homed by the innermost map")
-  seen from the import side.
 - **Who may contribute to `meta`** (#14's open item): any schema may, the collision rule guarding the kernel's own
   members only by their being declared first. The same holds for every bundled map; numeric.tn and net.tn contributing
   to the kernel's `numeric` and `net` is that rule used by the bundled documents themselves.

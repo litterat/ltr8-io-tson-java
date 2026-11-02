@@ -126,6 +126,13 @@ its own. **Per phase**: desugaring and materialisation hold one each and run eit
 name minted in one phase colliding with a different form in the other is not caught; the two share their
 naming functions, so such a pair would have to have collided within a phase as well to exist.
 
+**Across documents, one form is one entry.** Two documents that mint one form without importing each other declare
+one synthetic, and a closure holding both keeps the first (`resolver.ImportedSynthetics`,
+`design/linking-and-compilation.md`). No canonical rendering crosses a schema boundary, so that merge compares the
+resolved bodies instead, and two bodies under one minted name are the same `IllegalStateException`. A local lift whose
+name an import already declares references the import's entry without a comparison (`SchemaDesugarer`'s `imported`
+set).
+
 ## Why one walk, and what a refusal carries
 
 **One walk rather than one check per naming position, and that is the load-bearing part.** Running the

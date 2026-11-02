@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/policy.tn?sha256=c991c81dd1a876d7a88f1de0a865ec3c0d25012c5da16010b67f99a9e0763eba"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=8634e2f67744b7f88bf1aad347fe20971d6ed7e6b52764501698cdaf9f7fc691"
+!!id:"https://tson.io/2026/39/m/policy.tn?sha256=950abf1c343fc16268d8d965968373af4519efacee869e0390b8bf907a845b6e"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=f13d1d1c5354cb0c546fdbde5c54a9afd0172b7828c0f12aba749d2aec119180"
 @doc:"""
   TSON processor policy — what a processor admits and spends (2026 Revision 39
   draft).
@@ -16,11 +16,9 @@
   is §9.1's and [TSON-SCHEMA] §11.5's. A script is named by its Unicode Script
   property value alias (UAX #24), `Latin`, `Cyrillic`, `Han`.
 
-  It imports core.tn, for the sized integers its limits are typed by and the
-  kernel's `text`, `boolean` and `enum`, and so shares one closure with any
-  schema importing core.tn: a `[text]` written here and one written in a
-  library of that closure are one synthetic entry ([TSON-SCHEMA] §8.2). Its
-  entries sit at its root, and it declares no namespace of its own.
+  It imports meta.tn alone, every field typed by the kernel's vocabulary or by
+  an entry of its own. Its entries sit at its root, and it declares no
+  namespace of its own.
   """
 !schema {
   @doc:"UTS #39 §5.2's restriction levels, strictest first."
@@ -58,8 +56,9 @@
     refusal names the limit and the threshold, and is not a verdict on the
     document.
 
-    The §9.1 limits bound a document, a schema document among them. Sizes in
-    code points, octets or bytes are `int64`; counts and depths are `int32`.
+    The §9.1 limits bound a document, a schema document among them. Every
+    limit is a `numeric.non_negative_integer`: a count, a depth, or a size in
+    code points, octets or bytes.
     The §11.5 limits bound the work resolution adds over a schema: the
     schemas one header reaches through `!!import`, the
     declarations in one schema map (synthetic and instantiation entries
@@ -69,23 +68,23 @@
     runs, an entry waiting on the next being ready.
     """
   limits => {
-    max_depth?:                 int32 ~ 64
-    max_token_length?:          int64 ~ 1048576
-    max_text_length?:           int64 ~ 1048576
-    max_numeric_literal_length?: int32 ~ 4096
-    max_binary_size?:           int64 ~ 16777216
-    max_document_size?:         int64 ~ 16777216
-    max_elements?:              int32 ~ 1048576
-    max_entries?:               int32 ~ 1048576
-    max_fields?:                int32 ~ 65536
-    max_annotations?:           int32 ~ 64
-    max_values?:                int32 ~ 16777216
-    max_import_closure?:        int32 ~ 64
-    max_schema_entries?:        int32 ~ 65536
-    max_alias_chain?:           int32 ~ 64
-    max_supertype_chain?:       int32 ~ 64
-    max_materialisation_depth?: int32 ~ 64
-    max_wait_depth?:            int32 ~ 64
+    max_depth?:                  numeric.non_negative_integer ~ 64
+    max_token_length?:           numeric.non_negative_integer ~ 1048576
+    max_text_length?:            numeric.non_negative_integer ~ 1048576
+    max_numeric_literal_length?: numeric.non_negative_integer ~ 4096
+    max_binary_size?:            numeric.non_negative_integer ~ 16777216
+    max_document_size?:          numeric.non_negative_integer ~ 16777216
+    max_elements?:               numeric.non_negative_integer ~ 1048576
+    max_entries?:                numeric.non_negative_integer ~ 1048576
+    max_fields?:                 numeric.non_negative_integer ~ 65536
+    max_annotations?:            numeric.non_negative_integer ~ 64
+    max_values?:                 numeric.non_negative_integer ~ 16777216
+    max_import_closure?:         numeric.non_negative_integer ~ 64
+    max_schema_entries?:         numeric.non_negative_integer ~ 65536
+    max_alias_chain?:            numeric.non_negative_integer ~ 64
+    max_supertype_chain?:        numeric.non_negative_integer ~ 64
+    max_materialisation_depth?:  numeric.non_negative_integer ~ 64
+    max_wait_depth?:             numeric.non_negative_integer ~ 64
   }
 
   @doc:"""

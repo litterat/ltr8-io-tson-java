@@ -53,7 +53,7 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
 - **Verification is wired through the loader**: a data document's `!!import`s and each transitive `!!import` carrying
   a pin are checked before use, and a schema registered from text is hashed by the call that registers it.
   `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — numeric,
-  temporal and net each import the kernel, core imports the three, and policy imports core, each by a pinned reference —
+  temporal, net and policy each import the kernel, and core imports the three libraries, each by a pinned reference —
   so bootstrap verifies all of it. The kernel, meta.tn, imports nothing; its own `!!id` carries its pin.
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place, replacing any prior query. It is
   idempotent: the hashed bytes never change, so the pin stays valid.
@@ -65,8 +65,8 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
   so tokens that touched still touch and adjacency (§7.2) reads the same. The output is re-lexed against the intended tokens
   and re-parsed, either failure being a fault here. Every other annotation stays, since several are checked.
 - **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole chain, which no single-file command can do:
-  an edit to meta.tn moves its `!!id`, each library's `!!import` pinning it, each library's own `!!id`, and so every pin up
-  the chain through core.tn to policy.tn, the `TsonBundledSchemas` constants, and the getting-started example's pins in
+  an edit to meta.tn moves its `!!id`, each library's and policy.tn's `!!import` pinning it, their own `!!id`s, and so
+  every pin up the chain to core.tn, the `TsonBundledSchemas` constants, and the getting-started example's pins in
   `README.md` and `InitCommand.java` — the example pins core, so its own digest moves with core's. It hashes with
   `tail -n +2 | shasum -a 256` rather than calling `tson hash`, so it runs when the tree does not compile. Only a reference
   already carrying `?sha256=` is re-stamped: pinning is optional, and an unpinned mention is not a stale pin. When to run it
