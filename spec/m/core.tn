@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/39/m/core.tn?sha256=f4ac7ec28800c463b22471490d71c2b8c73fbad894847ec0fc10340cde9feff8"
-!!import:"https://tson.io/2026/39/m/numeric.tn?sha256=42861dfe0a5ccee06018084e6e163ec5f36fce6657b7883d1bd5a88372f63fc5"
-!!import:"https://tson.io/2026/39/m/temporal.tn?sha256=5598d4ade06e282b4a9090cb5d731e54d00ae570c05b86e4476459ae46e64d20"
-!!import:"https://tson.io/2026/39/m/net.tn?sha256=cd0c137c7f56a903beb123e6e26e5fddb5f1896fff78ac03ba65daf798f86249"
+!!id:"https://tson.io/2026/39/m/core.tn?sha256=8634e2f67744b7f88bf1aad347fe20971d6ed7e6b52764501698cdaf9f7fc691"
+!!import:"https://tson.io/2026/39/m/numeric.tn?sha256=60dc8685daea875c40af4b5788106432fbe4105b39f1b71939052e957263d277"
+!!import:"https://tson.io/2026/39/m/temporal.tn?sha256=3efd69fcd8e60411edf1772261079512012b1e1b9fb59f810261a317131576f3"
+!!import:"https://tson.io/2026/39/m/net.tn?sha256=73c10f4a6560ad282a7ee135d020849bfbca8c0ff0a59e75cfa63ef3873c9bd5"
 @doc:"""
   TSON core — every bundled type in one import (2026 Revision 39 draft).
 

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=e00fca6dbcd46ae7d2fcacadfed1d82895114c5fe4ce9d2479205e0d52f32135"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=f13d1d1c5354cb0c546fdbde5c54a9afd0172b7828c0f12aba749d2aec119180"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -1081,8 +1081,10 @@
   @doc:"The two-valued type of a constraint field that is a switch."
   boolean => !enum [true false]
 
+  @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
   integer => !numeric.integer_type {}
 
+  @atom.ordering:NONE @atom.bounded:false
   text => !unicode.text_type {}
 
   @doc:"""
@@ -1109,6 +1111,7 @@
   @atom.ordering:NONE @atom.bounded:false
   iri => !iri_reference ^ { allow_relative: false }
 
+  @atom.ordering:NONE @atom.bounded:false
   regex => !unicode.regex_type {}
 
   @doc:"""

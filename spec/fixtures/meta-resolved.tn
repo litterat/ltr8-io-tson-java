@@ -460,8 +460,10 @@
 
   boolean => !enum { members: [true false] }
 
+  @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
   integer => !numeric.integer_type { chain: { subtypes: [numeric.non_negative_integer] } }
 
+  @atom.ordering:NONE @atom.bounded:false
   text => !unicode.text_type {}
 
   @atom.ordering:NONE @atom.bounded:false
@@ -473,6 +475,7 @@
   @atom.ordering:NONE @atom.bounded:false
   iri => !net.iri_type { chain: { supertypes: [iri_reference] }  allow_relative: false }
 
+  @atom.ordering:NONE @atom.bounded:false
   regex => !unicode.regex_type {}
 
   doc => @meta.annotation !meta.alias { target: text }

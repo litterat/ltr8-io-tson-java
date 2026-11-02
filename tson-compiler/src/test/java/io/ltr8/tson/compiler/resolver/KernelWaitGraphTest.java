@@ -57,8 +57,8 @@ class KernelWaitGraphTest {
      * the closure names: the map, tuple and choice constructors, the tuple's element and the one-element tuple
      * templates, held template bodies and the {@code application} annotation, the {@code kind} and {@code ref}
      * references with {@code atom_kind}, {@code field_name}, the {@code set} template, the {@code disjoint} assertion,
-     * the octet-sequence constructor with its encodings and instance, and the classifying annotations {@code exact} and
-     * {@code numeric}. The measurement: a cycle of 25, a closure of 65.
+     * and the octet-sequence constructor with its encodings and instance. The measurement: a cycle of 25, a closure of
+     * 67.
      */
     @Test
     void theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts() throws Exception {
@@ -85,10 +85,10 @@ class KernelWaitGraphTest {
 
         assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
         assertEquals(25, cycle.size(), "the cycle");
-        assertEquals(65, closure.size(), "the cycle's closure");
+        assertEquals(67, closure.size(), "the cycle's closure");
         assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application", "meta.atom_kind",
-                "binary.bytes_encoding", "binary.bytes_type", "meta.choice", "meta.disjoint", "atom.exact",
-                "meta.field_name", "meta.kind", "meta.map", "atom.numeric", "meta.ref", "meta.template", "meta.tuple",
+                "binary.bytes_encoding", "binary.bytes_type", "meta.choice", "meta.disjoint",
+                "meta.field_name", "meta.kind", "meta.map", "meta.ref", "meta.template", "meta.tuple",
                 "meta.tuple1", "meta.tuple_element", "meta.voidable_tuple1", "set")),
                 new java.util.TreeSet<>(related.stream().filter(name -> !name.startsWith("array_")).toList()),
                 "the related concepts");

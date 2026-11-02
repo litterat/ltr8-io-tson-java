@@ -896,30 +896,27 @@ data format made a schema that wants dates reserve every network and numeric nam
   every name its declarations reference, and the concepts that belong with them. A kind and a constructor are the
   kernel's by declaring document (§4.1), which is meta.tn alone, so the libraries' constructors are ordinary
   constructors of the documents that declare them.
-- **The kernel, measured.** Over `meta-resolved.tn`'s own declarations (no compiled reader consulted), the cycle is
-  25 entries: `meta.record`, `meta.array`, `meta.set_type`, `enum`, `meta.namespace`, `meta.field_map`,
-  `meta.reference`, `numeric.integer_type`, `unicode.text_type`, `meta.value_type`, `boolean`, `integer`, `text`,
-  `numeric.non_negative_integer`, `meta.value`, `meta.type_kind`, `meta.type_chain`, `meta.record_field`,
-  `meta.field_group`, `meta.field_role`, `meta.enum_set` and four lifted arrays. Closing it under every name its
-  declarations reference — every rule-1 wait, every field type and `of`, every annotation type its entries carry, and
-  what reading the document itself waits on, its root tag's `meta.schema` with that map's key and value types and the
-  annotations on its keys — gives 65 entries, adding the base kinds, `meta.alias`, `meta.declared_type`, the
-  identifier, iri and regex families with `atom.specification`, `meta.template_param`, `meta.declared`,
-  `meta.type_name`, `doc`, `meta.annotation`, `meta.synthetic`, `[meta.template_param]`, and `atom.ordering` and
-  `atom.bounded`, the annotations `bytes` and `iri_reference` carry on their keys, and `iri_reference`, the source `iri`
-  refines. The iri and regex families are
+- **The kernel, measured.** Over `meta-resolved.tn`'s own declarations (no compiled reader consulted), the cycle is 25
+  entries: `meta.record`, `meta.array`, `meta.set_type`, `enum`, `meta.namespace`, `meta.field_map`, `meta.reference`,
+  `numeric.integer_type`, `unicode.text_type`, `meta.value_type`, `boolean`, `integer`, `text`,
+  `numeric.non_negative_integer`, `meta.value`, `meta.type_kind`, `meta.type_chain`, `meta.record_field`, `meta.field_group`,
+  `meta.field_role`, `meta.enum_set` and four lifted arrays. Closing it under every name its declarations reference — every
+  rule-1 wait, every field type and `of`, every annotation type its entries carry, and what reading the document itself waits
+  on, its root tag's `meta.schema` with that map's key and value types and the annotations on its keys — gives 67 entries,
+  adding the base kinds, `meta.alias`, `meta.declared_type`, the identifier, iri and regex families with
+  `atom.specification`, `meta.template_param`, `meta.declared`, `meta.type_name`, `doc`, `meta.annotation`, `meta.synthetic`,
+  `[meta.template_param]`, the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric`,
+  which the root atoms carry on their keys, and `iri_reference`, the source `iri` refines. The iri and regex families are
   there because `text_type.pattern` is typed `regex` and `identifier_type`, `iri_type` and `regex_type` compose
-  `atom.specification`, whose `spec` is an `iri`. The kernel is that closure and the concepts that belong with
-  it, which nothing in the closure names: `meta.map`, `meta.tuple`, `meta.choice`, `meta.tuple_element` (with its
-  lifted array), `meta.template`, `meta.application`, `meta.kind`, `meta.ref`, `meta.atom_kind`, `meta.field_name`,
-  `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet sequence (`binary.bytes_type`,
-  `binary.bytes_encoding`, `bytes`) and the classifying annotations `atom.exact` and `atom.numeric` —
-  85 entries, 68 under its six maps, 11 at the root and six synthetics, with the six maps themselves the 86th to
-  91st. A test holds the kernel
-  to containing the closure, pins the cycle at 25 and the closure at 65, and pins the related set, so an entry that
-  drifts in either direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` →
-  `meta.void_type` → `[meta.type_kind]`). A schema importing meta.tn alone has every elided construction,
-  `meta.kind<T>` and `meta.ref<T>`.
+  `atom.specification`, whose `spec` is an `iri`. The kernel is that closure and the concepts that belong with it, which
+  nothing in the closure names: `meta.map`, `meta.tuple`, `meta.choice`, `meta.tuple_element` (with its lifted array),
+  `meta.template`, `meta.application`, `meta.kind`, `meta.ref`, `meta.atom_kind`, `meta.field_name`, `meta.disjoint`,
+  `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet sequence (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) —
+  85 entries, 68 under its six maps, 11 at the root and six synthetics, with the six maps themselves the 86th to 91st. A test
+  holds the kernel to containing the closure, pins the cycle at 25 and the closure at 67, and pins the related set, so an
+  entry that drifts in either direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` →
+  `meta.void_type` → `[meta.type_kind]`). A schema importing meta.tn alone has every elided construction, `meta.kind<T>` and
+  `meta.ref<T>`.
 - **The bootstrap** builds by hand 13 of the cycle's 25 entries — its instances and its one refinement (`meta.value`,
   `boolean`, `meta.field_role`, `meta.enum_set`, `integer`, `numeric.non_negative_integer`, `text`, `meta.type_kind`,
   `meta.field_map`) and the four lifted arrays — resolves the other twelve, records and compositions that read
