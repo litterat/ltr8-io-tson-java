@@ -229,9 +229,10 @@ class KindMembersTest {
     }
 
     /**
-     * A namespace type is a type built with {@code namespace}: the kernel's {@code meta.type_kind} holds {@code field_map}
-     * and {@code schema}. A constructor is a member too, its value being a record whose instances are declarations:
-     * {@code record}, {@code namespace} and {@code set_type} alike. A held template is not.
+     * A map type and a namespace type are types: the kernel's {@code meta.type_kind} holds {@code field_map}, built with
+     * {@code map}, and {@code schema}, built with {@code namespace}. A constructor is a member too, its value being a
+     * record whose instances are declarations: {@code record}, {@code namespace} and {@code set_type} alike. A held
+     * template is not.
      */
     @Test
     void typeKindHoldsTheNamespaceTypesAndTheConstructors() {
@@ -247,9 +248,9 @@ class KindMembersTest {
     }
 
     /**
-     * {@code meta.kind<namespace>} is a kind: it holds the kernel's namespace types and a schema's own, and the kernel
+     * {@code meta.kind<namespace>} is a kind: it holds the kernel's namespace type and a schema's own, and the kernel
      * root's {@code schema}, an alias of {@code meta.schema}, beside its target, as a kind holds every alias of a
-     * member.
+     * member. A record's {@code field_map} is a map, and no member.
      */
     @Test
     void aKindOfNamespaceHoldsEveryNamespaceType() {
@@ -262,13 +263,13 @@ class KindMembersTest {
                 }
                 """, ""), "namespaces");
 
-        assertEquals(List.of("api", "meta.field_map", "meta.schema", "schema"), namespaces.memberNames());
+        assertEquals(List.of("api", "meta.schema", "schema"), namespaces.memberNames());
     }
 
     /**
      * A namespace type is built with {@code namespace}, which IS-A {@code product}: it is a member of
      * {@code meta.type_kind}, {@code meta.kind<namespace>} and {@code meta.kind<product>}, and of no kind of
-     * {@code record} or {@code map}.
+     * {@code record} or {@code map}. A record's {@code field_map} is a map type, a member of {@code meta.kind<map>}.
      */
     @Test
     void aNamespaceTypeIsAProductAndNoRecordOrMap() {
@@ -291,9 +292,11 @@ class KindMembersTest {
         assertTrue(kind(linked, "products").memberNames().contains("api"));
         for (String kind : List.of("records", "maps")) {
             List<String> members = kind(linked, kind).memberNames();
-            assertFalse(members.contains("api") || members.contains("field_map") || members.contains("schema"),
+            assertFalse(members.contains("api") || members.contains("meta.schema") || members.contains("schema"),
                     () -> kind + ": " + members);
         }
+        assertTrue(kind(linked, "maps").memberNames().containsAll(List.of("labels", "meta.field_map")));
+        assertFalse(kind(linked, "records").memberNames().contains("meta.field_map"));
     }
 
     /**

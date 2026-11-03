@@ -84,8 +84,8 @@ that names values gets `namesTypes` false and no members.
   is `net.uuid_type`, a path of the closure, and a schema contributing `uuid_type` to `net` collides with net.tn's
   member of that path under §2.2.3. The closure
   walked is the merged map, the kernel's own types included, so `meta.kind<meta.record>` lists the kernel's records beside
-  the schema's, and `meta.kind<meta.namespace>` holds a schema's own namespace type `api` beside `meta.schema` and
-  `meta.field_map`.
+  the schema's, and `meta.kind<meta.namespace>` holds a schema's own namespace type `api` beside `meta.schema`, and
+  `meta.kind<meta.map>` holds `meta.field_map`.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: a name resolving to nothing is
   an unresolved reference, and an open entry or a value entry is refused (`KindMembers.ofRefusal`), against the
   declaration that wrote the application (`reportedAgainst`). Anything else is admitted: `meta.kind<meta.top>` holds every
@@ -171,5 +171,6 @@ no kernel is in scope, the identifier grammar the default stands for applies.
   in the explicit `!meta.record { fields: { … } }` form is `meta.field_map`'s duplicate key, `DUPLICATE_MAP_KEY` where the
   form is read as data and restated against the declaration where a schema writes it; the brace form's repeat is the
   resolver's. What no map can see, two spellings that are one value of the name type (`name` and `NAME` under a case fold),
-  is `FieldNames`'. `meta.field_map` states no `key_type`: the key family is the host record's name type, so a key is read by
-  its spelling and judged here, and `discriminators` and group members are `text` for the same reason.
+  is `FieldNames`'. `meta.field_map` is an ordered map keyed by `text`, no namespace: the map's own uniqueness compares the
+  text as written, and each key is then read as a value of the record's name type and judged here, as `discriminators`
+  and group members are, and as `meta.enum_set` is for an enum's members.

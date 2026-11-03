@@ -212,15 +212,14 @@ pin naming a declaration not yet ready (enum's `name_type: = meta.identifier` mi
 ## Namespace types (§4.1)
 
 A namespace type is an instance of the kernel's `meta.namespace` constructor, `!meta.namespace { key_type: …  value_type:
-… ordered: … }` (`meta.field_map` and `meta.schema` in the kernel, `headers => !meta.namespace { key_type: header_name
-value_type: text }` in any schema), and resolves to a `NamespaceBody`. A value of it is a map from `key_type` to
+… ordered: … }` (`meta.schema` in the kernel, `headers => !meta.namespace { key_type: header_name value_type: text }` in
+any schema), and resolves to a `NamespaceBody`. A value of it is a map from `key_type` to
 `value_type`.
 
 - **The map is what the facets state.** `NamespaceBody.read()` gives the `MapBody`: keys of `key_type`, values of
-  `value_type`, ordered where `ordered` is `true`, values never void, no size bounds. A stated `key_type` is the family
-  every key is read and judged under, and must be a member of `meta.identifier_kind` (`validateBody`). An absent one is the
-  host's (`field_map`'s host is the record), so `read()` reads keys by spelling (`NamespaceBody.HOST_KEYS`, `text`) and
-  the host's family judges them once resolved (`FieldNames`).
+  `value_type`, ordered where `ordered` is `true`, values never void, no size bounds. `key_type` is required: the family
+  every key is read and judged under, a member of `meta.identifier_kind` (`validateBody`). A record's `fields` is no
+  namespace but `meta.field_map`, an ordered map keyed by `text` whose keys the record's `name_type` judges (`FieldNames`).
 - **Nothing beside the facets.** `namespace`'s own record reader refuses any other field at the construction, so the
   linker has no facet check of its own.
 - **The reader is the map's.** `TsonSchemaCompiler` and `JsonSchemaCompiler` hand `read()` to the `map` factory;

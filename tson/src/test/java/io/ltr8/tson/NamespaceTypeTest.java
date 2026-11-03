@@ -6,6 +6,7 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -97,7 +99,7 @@ class NamespaceTypeTest {
     void theLinkedSchemaRecordsTheMapAndTheKind() {
         TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
 
-        assertEquals(Optional.of(new NamespaceBody(Optional.of(TypeRef.of("header_name")), TypeRef.of("text"), false)),
+        assertEquals(Optional.of(new NamespaceBody(TypeRef.of("header_name"), TypeRef.of("text"), false)),
                 meta.namespace("headers"));
         assertEquals(EntryKind.PRODUCT, meta.kindOf("headers"));
         assertEquals(Optional.of("meta.namespace"), meta.schema().constructorOf("headers"));
@@ -105,17 +107,18 @@ class NamespaceTypeTest {
     }
 
     /**
-     * The kernel's {@code field_map} states its key family by default, the host record supplying it: its keys are
-     * read by spelling and judged by the record's {@code name_type}, so the map it is read as takes any key.
+     * The kernel's {@code field_map} is an ordered map keyed by {@code text}, not a namespace type: a field name is
+     * text within its own record, judged by the record's {@code name_type}, and no qualified name selects one.
      */
     @Test
-    void aDefaultKeyFamilyIsTheHostsAndIsReadBySpelling() {
-        NamespaceBody fields = tson("").bindRegistry().core().resolveLinked(META).namespace("meta.field_map")
-                .orElseThrow();
+    void aRecordsFieldMapIsAnOrderedMapKeyedByText() {
+        TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
 
-        assertEquals(Optional.empty(), fields.keyType());
-        assertEquals(false, fields.keysPinned());
-        assertEquals(TypeRef.of(NamespaceBody.HOST_KEYS), fields.read().keyType());
+        assertEquals(Optional.empty(), meta.namespace("meta.field_map"));
+        MapBody fields = assertInstanceOf(MapBody.class, meta.schema().entries().get("meta.field_map"));
+        assertEquals(TypeRef.of("text"), fields.keyType());
+        assertEquals(TypeRef.of("meta.record_field"), fields.valueType());
+        assertTrue(fields.ordered());
     }
 
     /**
@@ -144,5 +147,16 @@ class NamespaceTypeTest {
 
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("value_type"), problems::toString);
+    }
+
+    /** A namespace type states the family of its keys: an instance of {@code namespace} leaving it out is none. */
+    @Test
+    void aNamespaceTypeWithoutAKeyTypeIsRefused() {
+        List<Diagnostic> problems = tson("").validateSchema(META_TEXT.formatted("""
+                  keyed => !meta.namespace { value_type: text }
+                """));
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("key_type"), problems::toString);
     }
 }

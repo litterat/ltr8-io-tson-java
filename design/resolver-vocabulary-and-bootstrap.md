@@ -302,7 +302,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   lifted array is named by its content, so it is designated by what it holds; an entry the source declares is no lift,
   so a declaration whose body is `[text]` is read, not built). `instanceBody` covers the shapes those apply —
   a bare `{}` (each target's unconstrained constant), a bare token array (`enum`, the kernel's own enumeration constructor),
-  and a record of tokens (`meta.reference`, `meta.namespace` for `meta.field_map`, the `meta.array`/`meta.set_type` binding
+  and a record of tokens (`meta.reference`, `meta.map` for `meta.field_map`, the `meta.array`/`meta.set_type` binding
   records the desugar phase lifts, with their `min_items`/`max_items`) — and refuses any other target; `refinedBody` merges
   the integer family's `min`, `max` and `size` (`numeric.count`'s `size: { bits: 64  signed: true }`).
   `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from
@@ -310,7 +310,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 86 entries (67
   members of the six maps, 13 at the root and 6 synthetics; the maps themselves make the kernel's 92 resolved entries), one
   cycle of 26, longest wait chain 4 — and `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel
-  contains the cycle's closure (69 entries, the root tag's `schema` among them: reading the document waits on the alias its
+  contains the cycle's closure (70 entries, the root tag's `schema` among them: reading the document waits on the alias its
   tag names) and the related concepts, pinning all three. Of the 26, 13 are hand-built (the 9 of `PRE_LOADED` and 4 lifted
   arrays); the other 13 are records and compositions resolved from their grammar, and the 60 entries beyond the cycle are
   made ready in wait order.

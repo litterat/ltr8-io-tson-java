@@ -12,15 +12,15 @@ import java.util.function.BiConsumer;
 
 /**
  * A value of a namespace type -- an instance of the kernel's {@code namespace} constructor ([TSON-SCHEMA] §4.1,
- * {@link NamespaceBody}) -- written and read as the map its facets describe. The kernel declares two, and every
- * resolved schema holds values of both: the schema map is a value of {@code schema} ({@code TsonSchema.entries}),
- * and a record's fields are a value of {@code field_map} ({@link RecordBody#fields}). A schema declares its own,
- * {@code api => !meta.namespace { key_type: meta.identifier  value_type: method }}, and the entry {@code myapi => !api {
- * get_orders => { ... } }} in a schema importing it holds a third, as a {@link ValueEntry}.
+ * {@link NamespaceBody}) -- written and read as the map its facets describe. The kernel declares one, and every
+ * resolved schema holds a value of it: the schema map is a value of {@code schema} ({@code TsonSchema.entries}). A
+ * schema declares its own, {@code api => !meta.namespace { key_type: meta.identifier  value_type: method }}, and the
+ * entry {@code myapi => !api { get_orders => { ... } }} in a schema importing it holds another, as a {@link
+ * ValueEntry}. A record's fields are no namespace ({@link RecordBody#fields}).
  *
  * <p>{@link #type} names the namespace type the value is a value of, which fixes the family its keys are names of
  * and the type of its values; it is the tag resolved output writes where the value stands as a schema entry. At a
- * named position, {@code fields: { ... }}, the position's type says which namespace type it is, and the value writes
+ * named position, {@code methods: { ... }}, the position's type says which namespace type it is, and the value writes
  * as the map alone. {@link #entries} keeps each key's annotations and the order the keys were written in.
  *
  * <p>The read API of the map it holds is the value's own ({@link #get}, {@link #keySet}, {@link #getAnnotations},
@@ -29,7 +29,7 @@ import java.util.function.BiConsumer;
  *
  * <p><b>Equal namespaces are one constructor's values with the same keys, values and key annotations.</b> Key order
  * is not compared: whether order is part of the value is a facet of the constructor ({@code ordered}), so an owner
- * whose namespace is ordered compares it in order itself, as {@link RecordBody} does its {@code field_map}.
+ * whose namespace is ordered compares it in order itself.
  *
  * <p><b>A qualified name enters a {@code Namespace} and nothing else.</b> A segment after the first selects a key
  * of a namespace value (and a field of a record value); a map that is no namespace is not entered, whatever its

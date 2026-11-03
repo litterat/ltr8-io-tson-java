@@ -1312,18 +1312,16 @@ public final class TsonSchemaLinker {
                         entryName, " value_type");
             }
             case NamespaceBody n -> {
-                if (n.keyType().isPresent()) {
-                    TypeRef key = n.keyType().get();
-                    validateTypeRef(key, namespace, ownParameters, constructors, entryName, " key_type");
-                    // A namespace's keys are names: `key_type` is typed meta.identifier_kind (§4.1, §7.4).
-                    if (constructors != null && namespace.containsKey(IDENTIFIER_TYPE) && !ownParameters
-                            .contains(key.name()) && !KindMembers.isMember(key.name(), IDENTIFIER_TYPE,
-                                    namespace::get, constructors, namespace::get)) {
-                        throw new SchemaValidationException("'" + entryName + "' key_type names '" + key.name()
-                                + "', which is no identifier family -- a namespace's keys are names, so its key type "
-                                + "is a member of meta.identifier_kind, a type built with identifier_type; a closed set "
-                                + "of names is an identifier family with members");
-                    }
+                TypeRef key = n.keyType();
+                validateTypeRef(key, namespace, ownParameters, constructors, entryName, " key_type");
+                // A namespace's keys are names: `key_type` is typed meta.identifier_kind (§4.1, §7.4).
+                if (constructors != null && namespace.containsKey(IDENTIFIER_TYPE) && !ownParameters
+                        .contains(key.name()) && !KindMembers.isMember(key.name(), IDENTIFIER_TYPE,
+                                namespace::get, constructors, namespace::get)) {
+                    throw new SchemaValidationException("'" + entryName + "' key_type names '" + key.name()
+                            + "', which is no identifier family -- a namespace's keys are names, so its key type "
+                            + "is a member of meta.identifier_kind, a type built with identifier_type; a closed set "
+                            + "of names is an identifier family with members");
                 }
                 validateTypeRef(n.valueType(), namespace, ownParameters, constructors,
                         entryName, " value_type");
@@ -1552,7 +1550,7 @@ public final class TsonSchemaLinker {
                 collectNames(map.valueType(), into);
             }
             case NamespaceBody namespace -> {
-                namespace.keyType().ifPresent(key -> collectNames(key, into));
+                collectNames(namespace.keyType(), into);
                 collectNames(namespace.valueType(), into);
             }
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));

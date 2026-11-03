@@ -3,7 +3,6 @@ package io.ltr8.tson.schema;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import org.junit.jupiter.api.Test;
@@ -21,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** A nested schema map's value and its members' path entries, kept in step wherever a schema is built. */
 class SchemaPathsTest {
 
-    private static final Top ADDRESS = RecordBody.of(Namespace.<RecordField>of("field_map", Map.of()));
+    private static final Top ADDRESS = RecordBody.of(RecordBody.fieldMap());
     private static final Top DEEP = new ValueEntry("deep_type", "a value");
 
     private static ValueEntry map(Map<String, Top> members) {

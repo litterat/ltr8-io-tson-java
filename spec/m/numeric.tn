@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=9281e44fbc6962da86019d2e1be00249d7bb74cd2af66e0a356405a22294c941"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=6856ce37fb3c28f6206e45f3192002754a33c456feb23a60194467e581d898e5"
+!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=7a393466d5d8dcf78f27d99b52008f931c4d227be1e59d6bb361e2375f150b1a"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=01962c127e804243ac00d3db6ea6f3d4d7a425f9c62a04023c8bdbb49769c323"
 @doc:"""
   TSON numeric — the numeric type library (2026 Revision 39 draft).
 

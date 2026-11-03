@@ -243,9 +243,8 @@ public final class TsonSchemaCompiler {
                 return new ValueEntryReader(name, value.type(),
                         new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
             }
-            // A namespace type's value is the map it describes. Its keys are read under its key family, and by
-            // their spelling alone where the host supplies the family (NamespaceBody#read): a record's field
-            // names, which linking judges by the record's name_type.
+            // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key
+            // family.
             Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(read));
             TsonTypeReader<?> built = factory.create(name, read,

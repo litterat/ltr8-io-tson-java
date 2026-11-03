@@ -69,9 +69,9 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   reader reads its grammar alone and the name is judged a member where that schema links, or at ingest ([TSON-SCHEMA] §4.2,
   §8.1); in a data document the reader judges membership over the reading document's closure. `meta.namespace.key_type` is
   typed `meta.identifier_kind`: a namespace's keys are names, which is what a qualified name's segment selects, so an
-  enum-keyed map is no namespace. A stated `key_type` is the family every key is read and judged under; an absent one is the
-  value's host's to supply: `meta.field_map`'s keys are the record's `name_type`'s, its supertypes' where it states none, and
-  `meta.field_name` where neither does.
+  enum-keyed map is no namespace. `key_type` is required, the family every key is read and judged under. A record's fields
+  are no namespace: `meta.field_map` is an ordered map keyed by `text`, each key judged by the record's `name_type`, its
+  supertypes' where it states none, and `meta.field_name` where neither does.
 - **A constructor is an ordinary record type** (SPEC-FEEDBACK.md #11). A constructor whose declaration is a record
   (`net.uuid_type => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_kind`, `meta.kind<meta.record>` and
   `meta.kind<meta.product>` hold it, and `meta.record`, `meta.top`, `meta.alias`, `meta.template`, `meta.namespace` and
@@ -80,7 +80,7 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   `boxed<net.uuid_type>` and `[net.uuid_type]` close as any
   application does (`ConstructorAsRecordTypeTest`). A declaration read as data is judged by its record shape alone:
   it is not resolved, so a derived field such as `chain` is admitted as written.
-- A namespace type is an instance of `meta.namespace` (`meta.field_map`, `meta.schema`, a schema's own `api`), so
+- A namespace type is an instance of `meta.namespace` (`meta.schema`, a schema's own `api`), so
   `meta.type_kind`, `meta.kind<meta.product>` and `meta.kind<meta.namespace>` hold it and `meta.kind<meta.record>` and
   `meta.kind<meta.map>` do not. A value entry, `myapi => !api { … }`, is a member of no kind: its tag names an ordinary type,
   which no walk reaches a constructor through. `meta.kind<api>` (one entry with `meta.ref<api>`) names it, and every type
@@ -194,7 +194,7 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 
 | Position | Form | Store | Judgement | Where |
 |---|---|---|---|---|
-| schema-map key, `meta.field_map` key, `meta.template_param.name` | key | — | spelling under the key type; `fields` by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
+| schema-map key, `meta.field_map` key, `meta.template_param.name` | key | — | spelling under the key type; `fields`, keyed by `text`, by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
 | `meta.enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
 | `meta.type_chain.parents`, `application` | reference, `meta.type_kind`, with arguments where open | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
 | `meta.type_chain.supertypes`, `subtypes` | index, `meta.type_kind` | — | — | link |
@@ -213,14 +213,12 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 | `!I ^ { … }` head | reference | namespace | an atom instance, never the family's constructor | resolver |
 | `A & B` operand, `A - { … }` source | reference | namespace | a constructor or a record type | resolver |
 
-The schema map and a record's `fields` are values of the kernel's two namespace types, `meta.schema` and
-`meta.field_map`,
-and in Java each is a `Namespace` (`TsonSchema.entries`, `RecordBody.fields`). A
-namespace type is an instance of `meta.namespace` stating its facets (`meta.field_map => !meta.namespace { value_type:
-meta.record_field ordered: true }`), resolved to a `NamespaceBody`, and a value of one is written and read as a map from its
-`key_type` to its `value_type` (`NamespaceBody.read`). Its keys are the key rows above: of the stated family where `key_type`
-is given, and where it is absent, of the family the host supplies, read by spelling and judged once the host resolves (a
-record's field names by its `name_type`). Its values are judged by `value_type`.
+The schema map is a value of the kernel's one namespace type, `meta.schema`, and in Java a `Namespace`
+(`TsonSchema.entries`); a record's `fields` is a value of `meta.field_map`, an ordered map keyed by `text`, and in Java an
+`AnnotatedMap` (`RecordBody.fields`). A namespace type is an instance of `meta.namespace` stating its facets (`api =>
+!meta.namespace { key_type: meta.identifier  value_type: method }`), resolved to a `NamespaceBody`, and a value of one is
+written and read as a map from its `key_type` to its `value_type` (`NamespaceBody.read`). Its keys are of the family
+`key_type` states, and its values are judged by `value_type`.
 
 An entry may itself be a value of a namespace type: `myapi => !api { get_orders => { response: order_list } }`,
 in a schema importing one declaring `api => !meta.namespace { key_type: meta.identifier value_type: method }`. Its tag is the

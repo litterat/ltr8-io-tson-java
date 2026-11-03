@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=6856ce37fb3c28f6206e45f3192002754a33c456feb23a60194467e581d898e5"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=01962c127e804243ac00d3db6ea6f3d4d7a425f9c62a04023c8bdbb49769c323"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -436,16 +436,14 @@
       family, which is what a qualified name's segment is, and a segment selects
       a key of a namespace value and of no other map.
 
-      `key_type` is the family every key is read and judged under. Absent, the
-      host of the value supplies it: a record's `fields` are keyed by the
-      record's `name_type`. A value is never void and has no size bounds.
-      The schema map (`schema`) and a record's fields (`field_map`) are the
-      kernel's two.
+      `key_type` is the family every key is read and judged under. A value is
+      never void and has no size bounds. The schema map (`schema`) is the
+      kernel's one.
       """
     namespace => meta.product & {
       access_pattern?: meta.product_access_type = NAMED
       size_type?:      meta.product_size_type = VARIABLE
-      key_type?:       meta.identifier_kind
+      key_type:        meta.identifier_kind
       value_type:      meta.type_kind
       ordered?:        boolean ~ false
     }
@@ -711,14 +709,14 @@
 
     @doc:"""
       The fields of a record ([TSON-SCHEMA] §5.2): each field's name mapped to
-      its facts, in declaration order, which is part of the value. A name is
-      written once, by its spelling, as the key; two spellings that are one
-      value of the record's `name_type` are a resolver error. The key family is
-      the host record's: its `name_type`, so `field_map` states no `key_type`,
-      and the family is `meta.identifier` where neither the record nor a
-      supertype states one.
+      its facts, in declaration order, which is part of the value. The map's own
+      key uniqueness compares the text as written; each key is then read as a
+      value of the record's `name_type`, and two that are one value under that
+      type's equality are a duplicate, a resolver error. A field name is text
+      within its own record and is no namespace key: no qualified name selects
+      a field declaration.
       """
-    field_map => !meta.namespace { value_type: meta.record_field  ordered: true }
+    field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }
 
     @doc:"""
       A record: named fields, fixed by the type, with the field groups over

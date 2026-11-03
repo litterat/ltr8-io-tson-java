@@ -671,8 +671,7 @@ final class ParameterTypes {
 
         /**
          * A name's resolved body, alias chains followed -- the slot type a written value faces. A namespace type
-         * faces it as the map its value is ({@link NamespaceBody#read}): {@code record}'s {@code fields} is written
-         * as a map.
+         * faces it as the map its value is ({@link NamespaceBody#read}).
          */
         private Top resolve(String name) {
             Top definition = meta.apply(name);
