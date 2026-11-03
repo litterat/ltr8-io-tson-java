@@ -52,7 +52,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     `element_type`/`key_type`/`value_type` are reached this way, a named slot being the one an open binding
     can address; `tuple` and `choice` put their positions inside a collection, so they keep only the first
     rendering — written through the same `WireForm.refValue` producer, since a `[meta.type_ref]` holds what a
-    `meta.type_ref` holds, and rewritten a pass later by `MetaRefs.mapBodyRefs`, which maps a choice's variants
+    `meta.type_ref` holds, and rewritten a pass later by `MetaRefs.mapRefsKeepingChain`, which maps a choice's variants
     and a tuple's elements like any other reference.
     - **No slot refuses an application, because a slot that did would not fail where it decided.** A
       `choiceBinding` requiring a bare name per variant would leave `( box<text> | int32 )` unlifted *whole*, to

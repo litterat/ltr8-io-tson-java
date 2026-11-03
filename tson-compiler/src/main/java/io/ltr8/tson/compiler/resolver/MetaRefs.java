@@ -1,32 +1,37 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.ValueEntry;
 
 import java.util.function.UnaryOperator;
 
 /**
- * The {@code schema.meta} reference walk: every {@link TypeRef} an entry holds, rewritten or merely visited.
+ * The {@code schema.meta} reference walk: every {@link TypeRef} an entry holds that a rewrite may move.
  *
- * <p><b>One walk, three callers, and none of them is about templates.</b> {@code TemplateMaterialiser} closes
- * an application through it,
- * {@code SyntheticMerge} renames onto a merged entry (§8.2), and {@code TemplateRegularity} uses it as a
- * visitor by returning each reference unchanged. Which body shape carries which references is a fact about
- * the value model, not about any of those three, so it is stated once here.
+ * <p><b>One walk, two callers.</b> {@code TemplateMaterialiser} closes an application through it, and {@code
+ * SyntheticMerge} renames onto a merged entry (§8.2). Which body shape carries which references is a fact about the
+ * value model, not about either caller, so it is stated once here.
  *
- * <p><b>Visiting is rewriting with the identity function</b>, deliberately: a reader that walked bodies
- * separately would be a second list of shapes to keep in step, and the one that fell behind would silently
- * skip a reference rather than fail.
+ * <p><b>The switch over {@link Top} is exhaustive, with no default.</b> {@code Top} is sealed all the way down, so a
+ * body shape added to {@code schema.meta} fails to compile here until someone says which references it holds; a
+ * default arm would have skipped its references silently. The one grouped arm is {@link Atom} after {@link
+ * ReferenceBody}: an atom's facets are values, and the reference is the one atom that names an entry.
  */
 final class MetaRefs {
 
@@ -56,14 +61,6 @@ final class MetaRefs {
         return mapBodyRefs(definition, map, false);
     }
 
-    /**
-     * Every {@link TypeRef} one body holds, mapped -- <b>the only place that knows what each body shape
-     * carries</b>, so a shape added to {@code schema.meta} needs remembering here and nowhere else.
-     */
-    static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
-        return mapBodyRefs(body, map, true);
-    }
-
     private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapChain) {
         Top mapped = switch (body) {
             // An open record maps the field types that name none of its parameters, which mean the same thing in
@@ -83,6 +80,9 @@ final class MetaRefs {
             case MapBody mapBody -> new MapBody(mapBody.chain(),
                     map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),
                     mapBody.voidable(), mapBody.ordered(), mapBody.minItems(), mapBody.maxItems());
+            case NamespaceBody namespace -> new NamespaceBody(namespace.chain(),
+                    map.apply(namespace.keyType()), map.apply(namespace.valueType()),
+                    namespace.ordered(), namespace.minItems(), namespace.maxItems());
             case TupleBody tuple -> new TupleBody(tuple.chain(), tuple.elements().stream()
                     .map(element -> new TupleElement(map.apply(element.elementType()), element.voidable())).toList());
             case ChoiceBody choice -> new ChoiceBody(choice.chain(),
@@ -91,12 +91,22 @@ final class MetaRefs {
             // closed alias follow its target onto the entry materialisation minted for it, and a partial
             // application keep the arguments it binds.
             case Alias alias -> new Alias(map.apply(alias.target()));
+            // `of` holds a name: `meta.ref<T>` closes its argument before substituting it, so `of` names the
+            // entry the argument denotes -- a lifted synthetic among them, which the merge renames like any other
+            // reference. It maps as the bare reference it is, as a chain's names do; an application written in
+            // the body itself stays text and is refused at link. The index is carried, derived at link.
+            case ReferenceBody reference -> new ReferenceBody(reference.chain(),
+                    map.apply(TypeRef.of(reference.of())).name(), reference.index());
+            // Every other atom's facets are values, never references; a declared type holds its chain alone.
+            case Atom atom -> atom;
+            case DeclaredType declared -> declared;
             // A held body maps nothing: its references are tokens that have not been resolved against
             // anything yet, and rewriting one would be rewriting a name whose meaning is not settled until
             // substitution supplies the arguments.
-            // A kind holds none either: `of` names a constructor, which no rewrite of this schema's entries
-            // touches, and its members are derived at link, after every rewrite.
-            default -> body; // an atom body holds no type references
+            case TemplateBody held -> held;
+            // A value is data: a name it holds is judged at link against the closure (`ValuesByName`), and
+            // data writes no sugar form, so none names a synthetic a rewrite here could move.
+            case ValueEntry value -> value;
         };
         return mapChain && mapped instanceof Type type
                 ? TypeChain.withChain(mapped, mapChain(type.chain(), map)) : mapped;

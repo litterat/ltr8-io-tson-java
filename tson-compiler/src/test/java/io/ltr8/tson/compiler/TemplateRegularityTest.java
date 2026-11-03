@@ -59,6 +59,15 @@ class TemplateRegularityTest {
         assertTrue(message.contains("the application 'box<...>'"), "names what argument 1 actually is: " + message);
     }
 
+    /** A template of any constructor is checked, its held tree read as a record template's is. */
+    @Test
+    void aGrowingArgumentInANamespaceTemplateIsRejected() {
+        String message = rejected(
+                "  weird => <T> !meta.namespace { key_type: meta.identifier  value_type: weird<box<T>> }");
+
+        assertTrue(message.contains("'weird' applies 'weird' recursively"), message);
+    }
+
     @Test
     void passingTheParameterThroughUnchangedIsRegular() {
         assertNotNull(compile("  chain => <T> { head: T  tail: chain<T>? }"));

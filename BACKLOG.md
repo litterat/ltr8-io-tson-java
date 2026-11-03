@@ -68,8 +68,8 @@ spec-required case:
   ready so far (`SchemaResolver.readySoFar`) reaches the field's application before its minted entry is ready.
   Naming the application (`records => meta.ref<meta.record>`, `holder => { r: records }`) reads. A record template applied
   inline (`{ b: box<text> }`) fails the same way, reported as "no schema in this closure declares a subtype of
-  'box', and it is abstract". Make the field's application wait in the order, as a named one does, and add a
-  `link/valid` vector writing it inline.
+  'box', and it is abstract", and so does a value of a map or namespace type whose `value_type` is `box<text>`. Make
+  the application wait in the order, as a named one does, and add a `link/valid` vector writing it inline.
 - [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1;
   `SPEC-FEEDBACK.md #4`, the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
   `meta.schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
@@ -153,10 +153,11 @@ spec-required case:
   §5.7's rules, are not judged either: its chain is empty. The resolver holds the inherited field
   (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a deferred judgement there, or the inherited
   fields carried to link, would close all three without reporting a case the link already judges twice.
-- [ ] **`MetaRefs` does not rewrite a namespace type's references.** Its body rewrite falls to `default` for a
-  `NamespaceBody`, so a synthetic rename or a materialisation rewrite leaves `key_type` and `value_type` naming the old
-  entry; it needs a `NamespaceBody` arm beside `MapBody`'s. The same `default` comment says a reference's `of` names a
-  constructor, which a reference to a value (`meta.ref<method>`) does not: check whether `of` there needs mapping too.
+- [ ] **A reference's `of` written as an application in the body is refused** ([TSON-SCHEMA] §4.2). `r =>
+  !meta.reference { of: box<text> }` reports "'r' of has an unresolved reference 'box<text>'", where `meta.ref<box<text>>`,
+  which §4.2 says is that body, closes `of` to the expansion: `ReferenceBody.of` is a `String`, bound from the text,
+  and nothing closes it. Hold `of` as a `TypeRef`, map it in `MetaRefs`' reference arm as the application it is, and
+  add a `schema/valid` vector.
 - [ ] **A parameter in a record field's `value` has no channel of its own** ([TSON-SCHEMA] §5.10). It is an unquoted
   token in `meta.record_field.value`, told from a literal by §5.10's shadowing rule, in resolved output as in source; at a
   type position or among an application's arguments a parameter is its name, as the reference grammar reads one

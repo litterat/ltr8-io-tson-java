@@ -12,7 +12,8 @@ meta.tn, itself. Current form only; history lives in git.
 - `heldRecord` builds the wire tree directly — `TsonObjectWriter` output is fully quoted, and `HeldBody.names()` and
   substitution key on a token being *unquoted*.
 - Every walk over a held body descends into a map slot, key and value both.
-- `MetaRefs` visits by rewriting with the identity function; there is no separate read-only walk to fall behind.
+- `MetaRefs`' switch over `Top` is exhaustive with no default arm, so a new body shape fails to compile there until
+  it says which references it holds.
 - `DerivedName`'s two families stay apart, `ofBinding` is called by **both** lift channels, and a derived name is
   asserted by value, never by `startsWith`.
 - Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
@@ -98,14 +99,22 @@ array, `fields` being one.
   ([TSON-DATA] §2.6), rebuilt through `WireForm.rewritten` and `WireForm.retyped`; both halves descend, because a
   parameter reaches either.
 
-**`MetaRefs`** — the `schema.meta` reference walk, `mapRefs` over a definition and `mapBodyRefs` over a body.
-Three callers use it and only one is closing a template: materialisation rewrites an application onto the entry it
-closed, §8.2's synthetic merge renames onto a merged entry, and §5.10's regularity check uses it as a
-*visitor* by returning each reference unchanged. No pass rewrites a use site onto the end of an alias
-chain — see "References are hops" below. Which body shape carries which references is a fact about the value model, so it is
-stated where the model is walked. Visiting is rewriting with the identity function deliberately: a separate
-read-only walk would be a second list of body shapes to keep in step, and the one that fell behind would
-silently skip a reference rather than fail.
+**`MetaRefs`** — the `schema.meta` reference walk: `mapRefs` maps an entry's chain too,
+`mapRefsKeepingChain` leaves the chain as written. Two callers: materialisation rewrites an application onto the
+entry it closed, and §8.2's synthetic merge renames onto a merged entry. No pass rewrites a use site onto the end of
+an alias chain — see "References are hops" below. Which body shape carries which references is a fact about the
+value model, so it is stated once, where the model is walked:
+
+- A record's field types (an open record's only where they name none of its parameters), an array's element, a
+  map's and a namespace type's `key_type` and `value_type`, a tuple's elements, a choice's variants, and an alias's
+  target, each a `TypeRef`, arguments and all.
+- A reference's `of`, as a bare name. `meta.ref<T>` closes its argument before substituting, so `of` names an entry,
+  a lifted synthetic among them (`meta.ref<[box<text>]>`), which the merge renames like any other reference.
+- Nothing in any other atom (its facets are values), a declared type, a held body (its tokens are unresolved until
+  substitution), or a value entry (data writes no sugar form, and its names are judged at link by `ValuesByName`).
+
+§5.10's regularity check does not use the walk: every entry with parameters is open, and reads its applications off
+its held tree (`HeldBody.applications`).
 
 **`DerivedName`** — §8.2's names and the renderings their hashes run over, in two families that stay apart:
 
