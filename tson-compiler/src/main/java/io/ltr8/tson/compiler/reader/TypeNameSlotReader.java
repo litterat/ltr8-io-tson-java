@@ -12,29 +12,30 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.List;
 
 /**
- * A kind-typed position whose bound component is a {@link TypeRef}: {@code meta.record_field.type}, typed
- * {@code meta.type_kind} in the kernel, or a meta layer's own {@code request: meta.kind<record>}. The value is a
+ * A position typed by a reference that names types, whose bound component is a {@link TypeRef}:
+ * {@code meta.record_field.type}, typed {@code meta.type_ref} in the kernel, or a meta layer's own
+ * {@code request: meta.ref<record>}. The value is a
  * reference: a type's name, one token, or an application, the data grammar's reference with an argument list
- * ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12), which the stream delivers as one value. A name is read by the kind's own
+ * ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12), which the stream delivers as one value. A name is read by the reference's own
  * atom reader (the grammar, and the members where the document is data) into a {@code TypeRef}; in a schema document
- * that reader reads the grammar alone and records the name with the kind ({@link TsonReadContext#heldByName}), so the
- * linker judges it a member of the kind. An annotation written on the reference ({@code type: @doc:"x" text}) is kept
+ * that reader reads the grammar alone and records the name with the reference ({@link TsonReadContext#heldByName}), so
+ * the linker judges it a member. An annotation written on the reference ({@code type: @doc:"x" text}) is kept
  * on the {@code TypeRef}.
  *
  * <p><b>An application is a value here while a kernel body resolves</b>: resolved output holds one where an
  * application is still open (a record template's parents and field types), and a sugar form's lift writes one into the
- * slot it fills ({@code [meta.kind<record>]} fills {@code element_type} with {@code meta.kind<record>}), which the
+ * slot it fills ({@code [meta.ref<record>]} fills {@code element_type} with {@code meta.ref<record>}), which the
  * resolver closes afterwards and judges the name that replaces it. In a value body
  * ({@link TsonReadContext#readsValueBody()}) nothing lifts or mints, so an application is refused and the alias
  * spelling named ([TSON-SCHEMA] §5.6). In a data document the kind's reader judges an application through the entry the
  * closure closed it to, and refuses one nothing in the closure closed. A quoted token is never a reference.
  */
-final class KindSlotReader implements TsonTypeReader<TypeRef> {
+final class TypeNameSlotReader implements TsonTypeReader<TypeRef> {
 
     private final AtomTypeReader<?> kind;
     private final AnnotationTypes annotationTypes;
 
-    KindSlotReader(AtomTypeReader<?> kind, AnnotationTypes annotationTypes) {
+    TypeNameSlotReader(AtomTypeReader<?> kind, AnnotationTypes annotationTypes) {
         this.kind = kind;
         this.annotationTypes = annotationTypes;
     }

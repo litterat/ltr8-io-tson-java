@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=e6da922bf3b4da463401f5227d73c7c288cf55b16dc38863da1ed20d2c335bcc"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=93a1168733b1e78292b99ff5c899761030a7603d823d962790b31fdb7648b62c"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -6,11 +6,10 @@
   processor closes by pre-loading, the one holding `meta.record` ([TSON-SCHEMA]
   §3.4), every name its declarations reference, so it resolves and links on
   its own, and the concepts that belong with them — the map, tuple and choice
-  constructors, held template bodies, the `meta.kind<T>` and `meta.ref<T>`
-  references, the one-element tuple templates, the octet-sequence
-  constructor, and the classifying annotations the data-format libraries
-  state their types with (`atom.ordering`, `atom.bounded`, `atom.exact`,
-  `atom.numeric`).
+  constructors, held template bodies, the `meta.ref<T>` reference, the
+  one-element tuple templates, the octet-sequence constructor, and the
+  classifying annotations the data-format libraries state their types with
+  (`atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric`).
 
   Its root holds the vocabulary an author writes: `void`, `boolean`,
   `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`,
@@ -383,9 +382,9 @@
       the entries of this map only ([TSON-SCHEMA] §3.3.4).
       """
     type_chain => {
-      parents?:    [meta.type_kind]
-      supertypes?: [meta.type_kind]
-      subtypes?:   [meta.type_kind]
+      parents?:    [meta.type_ref]
+      supertypes?: [meta.type_ref]
+      subtypes?:   [meta.type_ref]
     }
 
     @doc:"""
@@ -441,36 +440,36 @@
       rather than a further hop.
       """
     alias => meta.top & {
-      target: meta.type_kind
+      target: meta.type_ref
     }
 
     @doc:"""
       One parameter of an open entry: its name, and the type an argument for it
       is read as — the declared type of the slot it stands in, in the vocabulary
       of the constructor the held body applies. It is derived from the body and
-      never required of the author: a type slot gives `meta.type_kind`; a scalar
+      never required of the author: a type slot gives `meta.type_ref`; a scalar
       slot of the applied constructor gives that slot's declared type
       (`min_items: N` gives `numeric.count`); a routed default or
       fixed value gives the field's own declared type (`w?: int32 ~ N` gives
       `int32`); and a parameter passed to another template takes that template's
-      recorded type for the position, with `meta.type_kind` where nothing
+      recorded type for the position, with `meta.type_ref` where nothing
       grounds it. A parameter is a type parameter exactly when its `type` is
-      `meta.type_kind`. A `type` may name an earlier parameter of the same
+      `meta.type_ref`. A `type` may name an earlier parameter of the same
       template, where a routed default's field is typed by one.
 
       A declaration may narrow what it derives by writing a type after the name,
       `<T: text, N: int8>`, read by the kind the positions give. On a value
       parameter it narrows `type` itself and must IS-A the derived type. On a
       type parameter it is `bound`: an argument must name a type that IS-A it.
-      `bound` is present only where `type` is `meta.type_kind`, and a parameter
+      `bound` is present only where `type` is `meta.type_ref`, and a parameter
       passed to another template inherits that template's bound for the
       position, so an unannotated parameter is bounded as narrowly as its uses
       require.
       """
     template_param => {
       name:   meta.param_name
-      type:   meta.type_kind
-      bound?: meta.type_kind
+      type:   meta.type_ref
+      bound?: meta.type_ref
     }
 
     @doc:"""
@@ -611,14 +610,14 @@
       application as the reference written, nested arguments unreduced,
       `@meta.application:foo<bar<text>>`.
       """
-    application => @meta.annotation meta.type_kind
+    application => @meta.annotation meta.type_ref
 
     @doc:"""
       Supporting records. A record field is the four facts a reader consults:
       `optional`, that the key may be missing; `voidable`, that the value may be
       void, the void sentinel `_` written in its place; `role`, what `value` is
       for; and `value`, a concrete default or fixed value read against the
-      field's declared type — for a `meta.type_kind` slot, a type name. Its name
+      field's declared type — for a `meta.type_ref` slot, a type name. Its name
       is not among them: a field is a value of `record.fields`, keyed by its
       name. Each fact is one mark of the spelling `name?: type? ~ value`: the
       name's `?`, the type's `?`, and `~` or `=` with its value. What omission
@@ -655,7 +654,7 @@
       container's part is never missing, so a container has no `optional`.
       """
     record_field => {
-      type:      meta.type_kind
+      type:      meta.type_ref
       optional?: boolean ~ false
       voidable?: boolean ~ false
       role?:     meta.field_role ~ FREE
@@ -732,7 +731,7 @@
       enum_type's names its members': every name in `fields`, `discriminators`
       and the groups is a value of it, and so is every field name a data value
       of this record writes. It names an identifier family, a member of
-      `meta.identifier_kind`, so every field name is a name under its profile,
+      `meta.identifier_ref`, so every field name is a name under its profile,
       and the field name slots are therefore `text`, each judged by this type. A
       record's name type is set where it is declared and a subtype cannot change
       it: absent, it is its supertypes' one name type, and `meta.identifier`,
@@ -747,14 +746,14 @@
       groups?:         [meta.field_group]
       extension?:      meta.record_extension_type ~ OPEN
       discriminators?: [text; 1..]
-      name_type?:      meta.identifier_kind
+      name_type?:      meta.identifier_ref
       parameters?:     [meta.template_param]
     }
 
     @doc:"""
       A sequence of elements of one type. The container constructors carry no
       parameters: a type slot (array's element_type, map's key_type and
-      value_type) is an ordinary required field typed `meta.type_kind`, filled
+      value_type) is an ordinary required field typed `meta.type_ref`, filled
       by the construction or by a sugar form's desugaring like any other
       required field, and a closed application carries the bound reference as
       the field's value (`!meta.array { element_type: person }`), its binding
@@ -773,7 +772,7 @@
     array => meta.product & {
       access_pattern?: meta.product_access_type = INDEX
       size_type?:      meta.product_size_type = VARIABLE
-      element_type:    meta.type_kind
+      element_type:    meta.type_ref
       voidable?:       boolean ~ false
       ordered?:        boolean ~ true
       unique_items?:   boolean ~ false
@@ -810,8 +809,8 @@
     map => meta.product & {
       access_pattern?: meta.product_access_type = NAMED
       size_type?:      meta.product_size_type = VARIABLE
-      key_type:        meta.type_kind
-      value_type:      meta.type_kind
+      key_type:        meta.type_ref
+      value_type:      meta.type_ref
       voidable?:       boolean ~ false
       ordered?:        boolean ~ false
       min_items?:      numeric.count
@@ -820,8 +819,8 @@
 
     @doc:"""
       A map keyed by names: the constructor of a namespace type, a refinement
-      of `map` whose `key_type` narrows from `meta.type_kind` to
-      `meta.identifier_kind`, which is IS-A it, and whose entries are never
+      of `map` whose `key_type` narrows from `meta.type_ref` to
+      `meta.identifier_ref`, which is IS-A it, and whose entries are never
       void. A namespace type is an instance, as a map type is one of `map`:
       `api => !meta.namespace { key_type: meta.identifier  value_type: method }`,
       and an entry holding a value of it, `orders => !api { ... }`, is an
@@ -834,7 +833,7 @@
       one.
       """
     namespace => meta.map ^ {
-      key_type:  meta.identifier_kind
+      key_type:  meta.identifier_ref
       voidable?: = false
     }
 
@@ -843,7 +842,7 @@
       position is never missing, so `[A, B?]` admits `[a _]` and refuses `[a]`.
       """
     tuple_element => {
-      element_type: meta.type_kind
+      element_type: meta.type_ref
       voidable?:    boolean ~ false
     }
 
@@ -878,7 +877,7 @@
       An enumeration: a closed set of names, and the type they are drawn from
       ([TSON-SCHEMA] §7.4), as a record's `name_type` is its field names'.
       `name_type` names an identifier family — a member of
-      `meta.identifier_kind`, a type built with identifier_type — and each
+      `meta.identifier_ref`, a type built with identifier_type — and each
       member must be a value of it, distinct from the others under its equality,
       and is a name under its profile ([TSON-DATA] §8.2). A closed set of text
       that is no name is the text family's own `members` facet,
@@ -893,7 +892,7 @@
       refinement narrows the members and never the type.
       """
     enum_type => meta.atom & {
-      name_type: meta.identifier_kind
+      name_type: meta.identifier_ref
       members:   meta.enum_set
     }
 
@@ -905,7 +904,7 @@
       encoding's discrimination rules consume ([TSON-SCHEMA] §5.4, §7.2).
       """
     choice => meta.sum & {
-      variants:  [meta.type_kind]
+      variants:  [meta.type_ref]
       disjoint?: boolean
     }
 
@@ -950,7 +949,7 @@
       value has a type, its tag: `order => { ... }` holds a value of `record`,
       `int32 => !integer ^ { ... }` a value of `integer_type`, and
       `orders => !api { ... }` a value of `api`. A field's type position, a
-      `meta.kind<meta.record>` slot and a `meta.ref<method>` slot all admit a
+      `meta.ref<meta.record>` slot and a `meta.ref<method>` slot all admit a
       name by that one predicate, and differ only in `of`.
 
       `of` names any type or constructor of the writer's namespace
@@ -959,7 +958,7 @@
       holds a type's name, which takes part in structural identity
       ([TSON-SCHEMA] §8.2). A record written in braces is built with `record`,
       and so is a record template, `top` itself, and a constructor whose
-      declaration is a record, so `meta.kind<meta.record>` holds all of them; a
+      declaration is a record, so `meta.ref<meta.record>` holds all of them; a
       template over another constructor is no type, and an application of one is
       the type it expands to. Where `of` is any other type, the values it admits
       are values, and a slot holds a value's qualified name: the first segment
@@ -994,34 +993,29 @@
 
       A refinement narrows `of`: the refined `of` is the source's or IS-A it,
       so every name the refinement admits the source admits too, and the
-      refinement is IS-A its source. `meta.identifier_kind` is `meta.type_kind`
+      refinement is IS-A its source. `meta.identifier_ref` is `meta.type_ref`
       narrowed to the identifier families.
       """
     reference => meta.atom & {
-      of: meta.type_kind
+      of: meta.type_ref
     }
 
     @doc:"""
-      The spelling of a reference whose `of` is a constructor:
-      `meta.kind<net.uuid_type>` is `!meta.reference { of: net.uuid_type }`,
-      the names of the types built with it.
+      The spelling of a reference: `meta.ref<T>` is
+      `!meta.reference { of: T }`. Where `T` is a constructor it holds the
+      names of the types built with it, `meta.ref<net.uuid_type>`, and
+      otherwise the names of values of `T`, `meta.ref<method>`.
       """
-    kind => <T> !meta.reference { of: T }
+    ref => <T> !meta.reference { of: T }
 
     @doc:"The names of the types a value can have."
-    type_kind => !meta.reference { of: meta.type }
+    type_ref => !meta.reference { of: meta.type }
 
     @doc:"""
       The names of the identifier families, which a `name_type` names: a
-      refinement of `meta.type_kind`, an identifier family being a type.
+      refinement of `meta.type_ref`, an identifier family being a type.
       """
-    identifier_kind => !meta.type_kind ^ { of: unicode.identifier_type }
-
-    @doc:"""
-      The spelling of a reference to a value: `meta.ref<method>` is
-      `!meta.reference { of: method }`, one reference with `meta.kind<method>`.
-      """
-    ref => <T> !meta.reference { of: T }
+    identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }
 
     @doc:"""
       Resolver output: a schema map, from each name to the value its entry

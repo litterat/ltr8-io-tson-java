@@ -153,9 +153,9 @@ class DefinitionResolverTest {
     // ── DefinitionResolver: the one construct it resolves so far ──────────────
 
 
-    /** How a type parameter is written: its {@code type} is {@code meta.type_kind}, the kind of the types. */
+    /** How a type parameter is written: its {@code type} is {@code meta.type_ref}, the kind of the types. */
     private static String typeParameter(String name) {
-        return "{ name: \"" + name + "\" type: meta.type_kind }";
+        return "{ name: \"" + name + "\" type: meta.type_ref }";
     }
 
     @Test
@@ -360,7 +360,7 @@ class DefinitionResolverTest {
 
         // alias: one brand-new field.
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" ] subtypes: [] } fields: { \"target\" => { "
-                + "type: meta.type_kind optional: false "
+                + "type: meta.type_ref optional: false "
                 + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                         write(alias));
     }
@@ -633,14 +633,14 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesTupleElementFromTheRealMetaKernelFixture() throws IOException, DataBindException {
-        // tuple_element => { element_type: meta.type_kind  voidable?: boolean ~ false } -- a fresh
+        // tuple_element => { element_type: meta.type_ref  voidable?: boolean ~ false } -- a fresh
         // record (no supertypes, so no tightening involved), exercising an ordinary literal default.
         SchemaMap schemaMap = kernelDeclarations();
 
         Top tupleElement = resolver.resolve(schemaMap.declarations().get("meta.tuple_element"));
 
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"element_type\" => { type: "
-                        + "meta.type_kind optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean "
+                        + "meta.type_ref optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } } groups: [] extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(tupleElement));
@@ -693,11 +693,11 @@ class DefinitionResolverTest {
      */
     @Test
     void aParametricFixedValueRidesTheValueSlotOfAFixedField() {
-        RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: meta.type_kind = T }"));
+        RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: meta.type_ref = T }"));
         RecordField value = sized.fields().get("value");
 
         assertEquals(List.of("T"), OpenEntry.parameterNames(sized));
-        assertEquals(TypeRef.of("meta.type_kind"), value.type());
+        assertEquals(TypeRef.of("meta.type_ref"), value.type());
         assertEquals("T", value.value().orElseThrow().text());
         assertEquals(FieldRole.FIXED, value.role());
         assertFalse(value.optional());
@@ -745,7 +745,7 @@ class DefinitionResolverTest {
                         + "\"access_pattern\" => { type: meta.product_access_type optional: true voidable: false role: "
                         + "\"FIXED\" value: INDEX } \"size_type\" => { type: meta.product_size_type optional: true "
                         + "voidable: "
-                        + "false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: meta.type_kind optional: "
+                        + "false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: meta.type_ref optional: "
                         + "false "
                         + "voidable: false role: \"FREE\" } \"voidable\" => { type: boolean optional: true voidable: "
                         + "false role: \"DEFAULT\" value: false } \"ordered\" => { type: boolean optional: true "
@@ -777,8 +777,8 @@ class DefinitionResolverTest {
                         + "\"access_pattern\" => { type: meta.product_access_type optional: true voidable: false role: "
                         + "\"FIXED\" value: NAMED } \"size_type\" => { type: meta.product_size_type optional: true "
                         + "voidable: "
-                        + "false role: \"FIXED\" value: VARIABLE } \"key_type\" => { type: meta.type_kind optional: false "
-                        + "voidable: false role: \"FREE\" } \"value_type\" => { type: meta.type_kind optional: false "
+                        + "false role: \"FIXED\" value: VARIABLE } \"key_type\" => { type: meta.type_ref optional: false "
+                        + "voidable: false role: \"FREE\" } \"value_type\" => { type: meta.type_ref optional: false "
                         + "voidable: "
                         + "false role: \"FREE\" } \"voidable\" => { type: boolean optional: true voidable: false role: "
                         + "\"DEFAULT\" value: false } \"ordered\" => { type: boolean optional: true voidable: false "
@@ -876,7 +876,7 @@ class DefinitionResolverTest {
                         + "role: "
                         + "\"FREE\" } \"access_pattern\" => { type: meta.product_access_type optional: true voidable: false "
                         + "role: \"FIXED\" value: INDEX } \"size_type\" => { type: meta.product_size_type optional: true "
-                        + "voidable: false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: meta.type_kind "
+                        + "voidable: false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: meta.type_ref "
                         + "optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean optional: "
                         + "true voidable: false role: \"FIXED\" value: false } \"ordered\" => { type: boolean optional: "
                         + "true voidable: false role: \"FIXED\" value: false } \"unique_items\" => { type: boolean "
@@ -928,7 +928,7 @@ class DefinitionResolverTest {
         assertEquals(EntryKind.ATOM, EntryKind.of(enumType, n -> true));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
                         + "fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "\"name_type\" => { type: meta.identifier_kind optional: false voidable: false role: \"FREE\" } "
+                        + "\"name_type\" => { type: meta.identifier_ref optional: false voidable: false role: \"FREE\" } "
                         + "\"members\" => { type: meta.enum_set optional: false voidable: false role: \"FREE\" } } groups: "
                         + "[] "
                         + "extension: \"OPEN\" discriminators: [] parameters: [] }",
@@ -940,7 +940,7 @@ class DefinitionResolverTest {
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.enum_type\" \"meta.top\" \"meta.type\" ] "
                         + "subtypes: [] } fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false "
                         + "role: "
-                        + "\"FREE\" } \"name_type\" => { type: meta.identifier_kind optional: true voidable: false role: "
+                        + "\"FREE\" } \"name_type\" => { type: meta.identifier_ref optional: true voidable: false role: "
                         + "\"FIXED\" value: meta.identifier } \"members\" => { type: meta.enum_set optional: false "
                         + "voidable: false "
                         + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
@@ -1528,10 +1528,10 @@ class DefinitionResolverTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   sneaky => !meta.template {
-                    parameters: [{ name: T  type: meta.type_kind }]  template: "!meta.array { element_type: T }"
+                    parameters: [{ name: T  type: meta.type_ref }]  template: "!meta.array { element_type: T }"
                   }
                   open_sneaky => <U> !meta.template {
-                    parameters: [{ name: U  type: meta.type_kind }]  template: "!meta.array { element_type: U }"
+                    parameters: [{ name: U  type: meta.type_ref }]  template: "!meta.array { element_type: U }"
                   }
                 }""").parseSchemaDocument().body();
 
@@ -1679,7 +1679,7 @@ class DefinitionResolverTest {
 
     /**
      * The kernel's and the libraries' declarations, each desugared as {@code SchemaResolver}
-     * desugars it: {@code type}'s own fields are {@code [meta.type_kind]} sugar, and every constructor composes them in.
+     * desugars it: {@code type}'s own fields are {@code [meta.type_ref]} sugar, and every constructor composes them in.
      */
     private SchemaMap kernelDeclarations() throws IOException {
         Map<String, SchemaMap.Declaration> declarations = new java.util.LinkedHashMap<>();

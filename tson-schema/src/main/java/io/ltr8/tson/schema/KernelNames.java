@@ -5,7 +5,7 @@ package io.ltr8.tson.schema;
  * author writes ({@code text}, {@code integer}, {@code doc}, {@code enum}, {@code set}, …) and declares everything
  * else as a member of one of six open schema maps nested in its root, each named by its path from the root
  * ([TSON-SCHEMA] §5.12): the type system under {@value #MAP} ({@code meta.record}, {@code meta.identifier}, {@code
- * meta.type_kind}), the datatype properties under {@value #ATOM} ({@code atom.ordering}, {@code atom.specification}),
+ * meta.type_ref}), the datatype properties under {@value #ATOM} ({@code atom.ordering}, {@code atom.specification}),
  * and the atom constructors under {@value #NUMERIC}, {@value #UNICODE}, {@value #NET} and {@value #BINARY} ({@code
  * numeric.integer_type}, {@code unicode.text_type}, {@code net.iri_type}, {@code binary.bytes_type}). A member's
  * identity is its declaring document and its path, so a path is the kernel's only where the kernel declares it

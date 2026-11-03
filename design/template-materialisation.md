@@ -132,7 +132,7 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   follows, and `RecordTemplateTest` pins both:
   - **A literal applied where the body uses the parameter as a type** (`box<3>`) passes the argument check — a type
     parameter's check reads only a reference — and is refused after substitution, where the body is read against
-    the kernel's vocabulary: `meta.record_field.type` is a `meta.type_kind`, whose names are identifiers, so `'3': U+0033 at
+    the kernel's vocabulary: `meta.record_field.type` is a `meta.type_ref`, whose names are identifiers, so `'3': U+0033 at
     index 0 cannot start an identifier`. That is sharper than an unresolved reference, which would imply a type called
     `3` could be declared.
   - **A type name applied where the body routes the parameter into a field's value** (`retry<text>` over

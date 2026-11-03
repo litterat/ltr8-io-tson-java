@@ -80,7 +80,7 @@ class OpenEntryResolvedFormTest {
      * implementation's.
      *
      * <p>It passes because the only templates the bundled schemas declare put every parameter in a {@code
-     * meta.type_kind} slot ({@code set<T>}, {@code meta.kind<T>}, {@code meta.tuple1<T>}), which is exactly the
+     * meta.type_ref} slot ({@code set<T>}, {@code meta.ref<T>}, {@code meta.tuple1<T>}), which is exactly the
      * case §8.1's premise covers. It is a regression guard, not evidence that the premise is sound; the next
      * test is the counterexample.
      */
@@ -130,7 +130,7 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   vector => !meta.template {
-                    parameters: [ { name: T  type: meta.type_kind } { name: N  type: numeric.count } ]
+                    parameters: [ { name: T  type: meta.type_ref } { name: N  type: numeric.count } ]
                     template: "!meta.array { element_type: T  min_items: N  max_items: N }"
                   }
                 }
@@ -340,7 +340,7 @@ class OpenEntryResolvedFormTest {
             return EntryKind.TEMPLATE;
         }
         if (definition instanceof Alias) {
-            // §4.1 gives an alias the kind ALIAS, a meta.type_kind and not a base kind -- and the kernel's `alias`
+            // §4.1 gives an alias the kind ALIAS, a meta.type_ref and not a base kind -- and the kernel's `alias`
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
             return EntryKind.ALIAS;
         }

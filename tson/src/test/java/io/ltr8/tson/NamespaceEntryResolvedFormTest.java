@@ -29,8 +29,8 @@ class NamespaceEntryResolvedFormTest {
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
               status_name => meta.identifier
-              method      => { request?: meta.kind<meta.record>  response?: meta.type_kind  errors?: [meta.kind<meta.record>]
-                               replies?: {status_name => meta.kind<meta.record>} }
+              method      => { request?: meta.ref<meta.record>  response?: meta.type_ref  errors?: [meta.ref<meta.record>]
+                               replies?: {status_name => meta.ref<meta.record>} }
               api         => !meta.namespace { key_type: meta.identifier  value_type: method }
             }
             """;

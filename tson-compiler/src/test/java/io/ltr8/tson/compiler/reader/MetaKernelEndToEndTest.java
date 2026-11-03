@@ -68,7 +68,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(92, registered.entries().size());
+        assertEquals(91, registered.entries().size());
     }
 
     /**
@@ -138,6 +138,6 @@ class MetaKernelEndToEndTest {
 
         assertEquals(true, result.get("voidable"));
         assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("text"), result.get("type"),
-                "a meta.type_kind slot holds a type's name, as the reference it is");
+                "a meta.type_ref slot holds a type's name, as the reference it is");
     }
 }

@@ -15,7 +15,7 @@ which is what substitution rewrites and the declaration-time checks inspect. Thi
   `HeldBody.of` writes an open record's tree through `WireForm.heldRecord`. `HeldBody.of` on a closed entry, and a held
   text that does not parse back, are `IllegalStateException`s too.
 - `HeldBody.held` is the only way a `TemplateBody` is minted, and it gives every parameter the provisional
-  `meta.type_kind` (`TemplateParam.typeParameter`); `ParameterTypes` stamps the derived types later.
+  `meta.type_ref` (`TemplateParam.typeParameter`); `ParameterTypes` stamps the derived types later.
 - A held tree is a working value: built per call, never cached or stored on the entry. Callers outside `resolver`
   ask it `names()` and `applications()` only, never for the `DataValue`.
 - Substitution is one rule at every depth (`WireForm.substitute`): an **unquoted** token whose text is one of the
@@ -27,7 +27,7 @@ which is what substitution rewrites and the declaration-time checks inspect. Thi
 - Closing dispatches on the held tree's constructor head: `meta.alias` closes to a name, `meta.record` to a record,
   anything else to a synthetic construction.
 - Every parameter is substituted, inside nested applications included, before any application in the body closes.
-- A parameter is a TYPE parameter exactly when its recorded type is `meta.type_kind` (§5.10); a slot typed `meta.type_kind`
+- A parameter is a TYPE parameter exactly when its recorded type is `meta.type_ref` (§5.10); a slot typed `meta.type_ref`
   gives one, an `Atom`-typed slot gives a VALUE parameter, and anything else is refused at the declaration.
 - An application in a held tree is a `ReferenceValue`, the data grammar's reference written unquoted (`result<T>`,
   [TSON-DATA] §7.4, SPEC-FEEDBACK.md #12): `WireForm.refValue` writes it, `WireForm.applicationIn` recognises it (an
@@ -64,7 +64,7 @@ edges in every application, a parameter list creates the one further edge (decla
 its base), and an application nothing declares is its expansion.
 
 - **A record template is the record it is.** Every slot a record template admits a parameter in already holds a name
-  or an uninterpreted token — a field's `type` (a `meta.type_kind` reference, with arguments while open), its `value`, an
+  or an uninterpreted token — a field's `type` (a `meta.type_ref` reference, with arguments while open), its `value`, an
   application's arguments — so the open record is a value of the vocabulary as it stands: a `RecordBody` with
   `parameters`, its chain keeping the parents as written. `DefinitionResolver.openRecord` binds the desugared
   `!meta.record { … }` payload through `meta.record`'s own reader once `ParameterTypes.checkSlots` has confined its
@@ -72,7 +72,7 @@ its base), and an application nothing declares is its expansion.
   (`DefinitionResolver.parameterised`), because both absorb fields from a source. Either way a selector typed by a parameter
   is refused (`refuseParameterTypedSelector`). An error placeholder for an open declaration is an open empty record
   (`SchemaResolver.unresolved`), so it closes like any record template.
-- **Every other open entry is held text.** `set` resolves to `!meta.template { parameters: [{ name: T  type: meta.type_kind
+- **Every other open entry is held text.** `set` resolves to `!meta.template { parameters: [{ name: T  type: meta.type_ref
   }]  template: "!meta.set_type { element_type: T }" }`. That covers an open instance (`<T, N> !meta.array { … }`), an
   open sugar form (`<T> [T]`, `<T> ( T | error )`), and §5.10's partial application, `uuid_pair => <B> pair<uuid, B>`,
   held as the `!meta.alias { target: pair<uuid B> }` §8.1 says it denotes — spellable because `meta.alias.target` is a
@@ -165,8 +165,8 @@ Each parameter records the type an argument for it is read as (`meta.template_pa
 positions it stands in; the kind follows from it. §12.1 decides an argument's channel by token shape, so an unquoted
 non-numeric argument arrives as a reference — wrong for `e => <M> !enum { members: [a b M] }` applied as `e<c>`, where
 `c` is a member. What settles it is the declared type of the slot the parameter stands in, read from the constructor's
-own vocabulary: `array.element_type` is `meta.type_kind`, `enum.members` is `meta.enum_set` (of `text`),
-`meta.record_field.value` is `value`. §4.2 types every slot that names a type `meta.type_kind`, an application included, so a
+own vocabulary: `array.element_type` is `meta.type_ref`, `enum.members` is `meta.enum_set` (of `text`),
+`meta.record_field.value` is `value`. §4.2 types every slot that names a type `meta.type_ref`, an application included, so a
 schema's own constructors classify by the same walk. The class Javadoc lists the four sources of a use type. Beyond those:
 
 - **Stamped twice.** A held body is built before anything can be typed. `SchemaResolver` runs
@@ -177,7 +177,7 @@ schema's own constructors classify by the same walk. The class Javadoc lists the
 - **A fixed point, not one walk.** An argument list holds a parameter of either kind, a reference by the grammar
   until the head's parameter judges it, so a parameter passed to another template says nothing locally: it takes the
   callee's recorded type at that position, and two templates may wait on each other. A parameter the fixed point leaves
-  ungrounded is a TYPE parameter (`meta.type_kind`), as §5.10 states, so `loop => <T> loop<T>` is judged on what is wrong
+  ungrounded is a TYPE parameter (`meta.type_ref`), as §5.10 states, so `loop => <T> loop<T>` is judged on what is wrong
   with it — it applies itself forever. An imported template is taken as recorded, since its held body does not carry
   what its author wrote.
 - **Several uses must agree**: the type is the use type that IS-A every other, uses unordered by IS-A are refused at

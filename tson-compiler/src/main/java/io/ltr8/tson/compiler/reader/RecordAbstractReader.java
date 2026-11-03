@@ -92,7 +92,7 @@ import java.util.stream.Collectors;
  * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
  * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
  * ReferenceNameReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
- * positional field is <b>atom</b>-typed -- {@code meta.record_field}'s {@code type}, a {@code meta.type_kind}, so {@code
+ * positional field is <b>atom</b>-typed -- {@code meta.record_field}'s {@code type}, a {@code meta.type_ref}, so {@code
  * !meta.record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,
  * where the explicit record is the only spelling. The record reader refuses a name it does not take as no record,
  * since a component that holds the name is read by {@link ReferenceNameReader} instead and never reaches this

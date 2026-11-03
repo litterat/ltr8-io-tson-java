@@ -47,9 +47,9 @@ class NamespaceEntryTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   status_name => meta.identifier
-                  method    => { request?: meta.kind<meta.record>  response?: meta.type_kind
-                                 errors?: [meta.kind<meta.record>]
-                                 replies?: {status_name => meta.kind<meta.record>} }
+                  method    => { request?: meta.ref<meta.record>  response?: meta.type_ref
+                                 errors?: [meta.ref<meta.record>]
+                                 replies?: {status_name => meta.ref<meta.record>} }
                   api       => !meta.namespace { key_type: meta.identifier  value_type: method }
                   http_verb => !enum [GET POST]
                   route     => { verb: http_verb  path: text  handler: meta.ref<method> }
@@ -232,9 +232,9 @@ class NamespaceEntryTest {
 
     // ── The entry is no type ──────────────────────────────────────────────────────────────────────────
 
-    /** {@code meta.type_kind} holds the names of types; a namespace value is a value, so a value body's slot refuses it. */
+    /** {@code meta.type_ref} holds the names of types; a namespace value is a value, so a value body's slot refuses it. */
     @Test
-    void aNamespaceEntryAtATypeKindSlotIsRefused() {
+    void aNamespaceEntryAtATypeRefSlotIsRefused() {
         refused(schema("type-slot", "other => !api { m => { response: myapi } }"),
                 "'other' at /m/response", "'myapi' is a value of the type 'api'", "not a type");
     }
@@ -245,7 +245,7 @@ class NamespaceEntryTest {
                 "'other' at /m/request", "'myapi' is a value of the type 'api'", "not a type");
     }
 
-    /** A field of a type declaration is a {@code meta.type_kind} slot too, judged by the linker. */
+    /** A field of a type declaration is a {@code meta.type_ref} slot too, judged by the linker. */
     @Test
     void aNamespaceEntryTypesNoField() {
         refused(schema("field", "holder => { s: myapi }"), "'myapi'", "a value of the type 'api'", "not a type");
@@ -267,15 +267,15 @@ class NamespaceEntryTest {
 
     /**
      * Construction is the walk a kind's members take: {@code api} is built with {@code namespace}, so
-     * {@code meta.kind<namespace>} and {@code meta.type_kind} hold it. {@code myapi} is a value of {@code api}, built
+     * {@code meta.ref<namespace>} and {@code meta.type_ref} hold it. {@code myapi} is a value of {@code api}, built
      * by no constructor, so no kind holds it; a reference names it ({@code meta.ref<api>}).
      */
     @Test
     void aNamespaceTypeIsAMemberOfItsKindsAndANamespaceEntryOfNone() {
         TsonLinkedSchema linked = registry().resolveLinked(schema("kinds", """
-                namespaces => meta.kind<meta.namespace>
-                types      => meta.kind<meta.type>
-                records    => meta.kind<meta.record>"""));
+                namespaces => meta.ref<meta.namespace>
+                types      => meta.ref<meta.type>
+                records    => meta.ref<meta.record>"""));
 
         assertTrue(members(linked, "namespaces").contains("api"), members(linked, "namespaces").toString());
         assertTrue(members(linked, "types").contains("api"), members(linked, "types").toString());
@@ -285,12 +285,12 @@ class NamespaceEntryTest {
     }
 
     /**
-     * {@code api} is a type and no constructor, so a reference over it names values: {@code meta.kind<api>} is {@code
+     * {@code api} is a type and no constructor, so a reference over it names values: {@code meta.ref<api>} is {@code
      * meta.ref<api>}, and the names it admits are the entries holding a value of {@code api}, judged where one is written.
      */
     @Test
     void aKindOfANamespaceTypeNamesItsValues() {
-        assertEquals(List.of(), problems(schema("kind-of-api", "apis => meta.kind<api>")));
+        assertEquals(List.of(), problems(schema("kind-of-api", "apis => meta.ref<api>")));
     }
 
     private static List<String> members(TsonLinkedSchema linked, String kind) {

@@ -77,8 +77,8 @@ class ReferenceDeclarationTest {
     }
 
     /**
-     * {@code meta.ref<record>} is {@code meta.kind<record>}: one reference whose {@code of} is a constructor, so the
-     * slot holds a type's name. Which template spelled it makes no difference.
+     * {@code meta.ref<record>} is one reference whose {@code of} is a constructor, so the slot holds a type's name: the
+     * one spelling names types or values by what {@code of} names.
      */
     @Test
     void aReferenceToAConstructorNamesTypes() {

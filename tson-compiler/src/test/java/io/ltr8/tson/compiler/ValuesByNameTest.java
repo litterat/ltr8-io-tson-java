@@ -49,15 +49,15 @@ class ValuesByNameTest {
                 !schema {
                   method_name => meta.identifier
                   status_name => meta.identifier
-                  method      => { request?: meta.kind<meta.record>  response?: meta.type_kind
-                                   errors?: [meta.kind<meta.record>]
-                                   replies?: {status_name => meta.kind<meta.record>} }
+                  method      => { request?: meta.ref<meta.record>  response?: meta.type_ref
+                                   errors?: [meta.ref<meta.record>]
+                                   replies?: {status_name => meta.ref<meta.record>} }
                   interface   => !meta.namespace { key_type: method_name  value_type: method }
                   http_verb   => !enum [GET POST]
                   binding     => { method: meta.ref<method>  verb: http_verb  route: text }
                   bindings    => !meta.namespace { key_type: meta.identifier  value_type: binding }
-                  filed_in_references => { request: meta.kind<meta.record>  method?: meta.ref<method> }
-                  filed_nowhere       => { request: meta.kind<meta.record> }
+                  filed_in_references => { request: meta.ref<meta.record>  method?: meta.ref<method> }
+                  filed_nowhere       => { request: meta.ref<meta.record> }
                   refs        => !meta.namespace { key_type: meta.identifier  value_type: filed_in_references }
                   nowheres    => !meta.namespace { key_type: meta.identifier  value_type: filed_nowhere }
                   pairing     => { primary: method }

@@ -717,7 +717,7 @@ final class SchemaDesugarer {
      *
      * <p><b>A variant is written through {@link #refValue}, like every other type slot.</b>
      * A collection-valued slot is no different from a named one in what it holds: {@code variants} is a
-     * {@code [meta.type_kind]}, so an application standing in it is spelled as its reference and
+     * {@code [meta.type_ref]}, so an application standing in it is spelled as its reference and
      * rewritten to the entry it denotes one pass later ({@code TemplateMaterialiser.mapBodyRefs}, which maps
      * a choice's variants like any other reference). Refusing the application here instead left the whole
      * choice unlifted, and a form the desugar table did not reduce reaches {@code DefinitionResolver} as a

@@ -38,20 +38,20 @@ import java.util.function.Function;
 /**
  * [TSON-SCHEMA] §5.10's parameters, typed by use: each parameter of an open entry gets the type an argument for it
  * is read as ({@code meta.template_param.type}), derived from the positions it stands in, and its kind follows -- a
- * parameter is a {@code TYPE} parameter exactly when that type is {@code meta.type_kind}.
+ * parameter is a {@code TYPE} parameter exactly when that type is {@code meta.type_ref}.
  *
  * <p><b>The slot's declared type is what says which.</b> A held body is the constructor application as written,
  * so the body alone cannot tell a parameter naming a type from one standing for an enum member -- both are bare
  * tokens. What separates them is the constructor's own vocabulary: {@code array.element_type} is typed
- * {@code meta.type_kind}, {@code array.min_items} {@code numeric.count}, {@code enum.members} a set of
+ * {@code meta.type_ref}, {@code array.min_items} {@code numeric.count}, {@code enum.members} a set of
  * {@code text}. §4.2 makes that reading general rather than a table of kernel names -- every slot that names the
- * type of a value is typed {@code meta.type_kind}, its value a name or an application -- so an extension
+ * type of a value is typed {@code meta.type_ref}, its value a name or an application -- so an extension
  * meta-schema's own constructors classify by the same walk with nothing added here.
  *
  * <p><b>Four sources of a use type</b>, and the last is why this is not one pass over one declaration:
  *
  * <ul>
- *   <li>a slot typed {@code meta.type_kind} gives a type use;</li>
+ *   <li>a slot typed {@code meta.type_ref} gives a type use;</li>
  *   <li>a slot whose type resolves to an {@link Atom} gives that declared type;</li>
  *   <li>a <b>routed default or fixed value</b> -- a parameter at {@code meta.record_field.value} -- gives the field's
  *   own declared type, read from the sibling {@code type} slot, and not {@code meta.record_field.value}'s own type
@@ -96,12 +96,12 @@ import java.util.function.Function;
  */
 final class ParameterTypes {
 
-    /** The kind every type slot is typed by, {@code meta.kind<type>}. */
-    private static final String TYPE_KIND = TemplateParam.TYPE_KIND.name();
+    /** The kind every type slot is typed by, {@code meta.ref<type>}. */
+    private static final String TYPE_REF = TemplateParam.TYPE_REF.name();
 
     /** Whether a slot declared {@code name} holds a type: the kind of the types, a name or an application. */
     private static boolean typePosition(String name) {
-        return TYPE_KIND.equals(name);
+        return TYPE_REF.equals(name);
     }
 
     /** The kernel record whose {@code value} slot routes a default or fixed value into its sibling's type. */
@@ -408,9 +408,9 @@ final class ParameterTypes {
                                 + spell(declared.get()) + " is not -- a written bound narrows what the uses "
                                 + "require, and never widens it");
                     }
-                    return new TemplateParam(parameter, TemplateParam.TYPE_KIND, declared);
+                    return new TemplateParam(parameter, TemplateParam.TYPE_REF, declared);
                 }
-                return new TemplateParam(parameter, TemplateParam.TYPE_KIND, inherited.map(Use::type));
+                return new TemplateParam(parameter, TemplateParam.TYPE_REF, inherited.map(Use::type));
             }
             Use derived = narrowest(parameter, "read as", all, local, meta);
             if (declared.isPresent()) {

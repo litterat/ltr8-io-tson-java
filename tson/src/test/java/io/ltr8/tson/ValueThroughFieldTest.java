@@ -41,7 +41,7 @@ class ValueThroughFieldTest {
             !!id:"https://example.test/meta-shop.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
-              endpoint     => { request?: meta.kind<meta.record>  response?: meta.type_kind }
+              endpoint     => { request?: meta.ref<meta.record>  response?: meta.type_ref }
               endpoint_map => !meta.namespace { key_type: meta.identifier  value_type: endpoint }
               service      => { extends?: [meta.identifier]  fallback?: endpoint  endpoints: endpoint_map }
               services     => !meta.namespace { key_type: meta.identifier  value_type: service }

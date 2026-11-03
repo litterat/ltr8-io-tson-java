@@ -57,7 +57,7 @@ class ResolutionOrderTest {
               plan    => !steps { first => "a"  second => "b" }
               base    => { id: int32 }
               derived => base & { extra?: counts }
-              step    => meta.top & { takes: meta.type_kind }
+              step    => meta.top & { takes: meta.type_ref }
               s       => !step { takes: derived }
             }
             """, """

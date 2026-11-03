@@ -55,8 +55,8 @@ class KernelWaitGraphTest {
      * reads, the annotations on its header and on its keys, {@code @atom.ordering} and {@code @atom.bounded} among
      * them), and every entry a declaration of that set names, closed to a fixed point -- and the concepts that belong
      * with them, which nothing in the closure names: the tuple and choice constructors, the tuple's element and
-     * the one-element tuple templates, held template bodies and the {@code application} annotation, the {@code kind}
-     * and {@code ref} references with {@code field_name}, the {@code set} template, the {@code disjoint} assertion,
+     * the one-element tuple templates, held template bodies and the {@code application} annotation, the {@code ref}
+     * reference with {@code field_name}, the {@code set} template, the {@code disjoint} assertion,
      * and the octet-sequence constructor with its encodings and instance. The measurement: a cycle of 26, a closure of
      * 70.
      */
@@ -88,7 +88,7 @@ class KernelWaitGraphTest {
         assertEquals(70, closure.size(), "the cycle's closure");
         assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application",
                 "binary.bytes_encoding", "binary.bytes_type", "meta.choice", "meta.disjoint",
-                "meta.field_name", "meta.kind", "meta.ref", "meta.template", "meta.tuple",
+                "meta.field_name", "meta.ref", "meta.template", "meta.tuple",
                 "meta.tuple1", "meta.tuple_element", "meta.voidable_tuple1", "set")),
                 new java.util.TreeSet<>(related.stream().filter(name -> !name.startsWith("array_")).toList()),
                 "the related concepts");

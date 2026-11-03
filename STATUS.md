@@ -29,12 +29,12 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Typed field names — `meta.record.name_type` names the identifier family a record's field names belong to, as
       `meta.enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
       judged under its own name type in both encodings (Part 2 §5.2)
-- [x] References ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — one atom, `!meta.reference { of: T }`, spelled `meta.kind<T>`
-      or `meta.ref<T>` alike, admits a name exactly when the named entry's value, past its alias hops, is of a type IS-A
-      `T`. Over a constructor (`meta.kind<net.uuid_type>`) its values are the names of the types in the schema's closure
+- [x] References ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — one atom, `!meta.reference { of: T }`, spelled `meta.ref<T>`
+      whatever `T` is, admits a name exactly when the named entry's value, past its alias hops, is of a type IS-A
+      `T`. Over a constructor (`meta.ref<net.uuid_type>`) its values are the names of the types in the schema's closure
       built with it: computed at link, never listed or written, and judged by membership in both encodings. Over any other
       type its values are qualified names of values. The kernel types `meta.enum_type.name_type` and `meta.record.name_type`
-      by its `meta.identifier_kind`, a refinement of `meta.type_kind`, and judges a name type by membership (Part 2
+      by its `meta.identifier_ref`, a refinement of `meta.type_ref`, and judges a name type by membership (Part 2
       §4.2). A refinement narrows `of` to the source's or a type IS-A it, judged at link (Part 2 §5.7)
 - [x] An application is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12) — a reference with arguments is
       data grammar ([TSON-DATA] §7.4), written unquoted (`t: set<text>`, `@meta.application:response<order 201>`, an open
@@ -48,7 +48,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       declaring `geo` contribute to one map, the union of their members, and only a member path declared twice
       collides.
       Every name resolves from the root, with no lexical scope, and a qualified name stands at every type position,
-      an application's head (`geo.box<text>`) and a reference's `of` (`meta.kind<geo.address>`) included; a value's name
+      an application's head (`geo.box<text>`) and a reference's `of` (`meta.ref<geo.address>`) included; a value's name
       walks through nested maps (`geo.home.at`). A data tag is a qualified name (`!geo.address { … }`, `"$type":
       "geo.address"` in JSON), and resolved output writes a nested map nested
 - [x] A bundled document's root holds only what an author writes ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #15) — the
@@ -56,17 +56,17 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       choice, template, reference and octet-sequence vocabulary and the classifying annotations; its root is `void`,
       `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum` (`!enum [A B]`),
       `set<T>` and `schema`, the alias of `meta.schema` every schema map's tag names, and all its machinery sits under
-      the open namespace `meta` (`meta.record`, `meta.identifier`, `meta.type_kind`, `meta.kind<meta.record>`,
+      the open namespace `meta` (`meta.record`, `meta.identifier`, `meta.type_ref`, `meta.ref<meta.record>`,
       `binary.bytes_type`, `@atom.ordering:TOTAL`, `@meta.synthetic`).
       The data-format libraries numeric.tn, temporal.tn and net.tn each import the kernel alone, hold their
       instances at their root (`int32`, `date`, `uuid`) and their constructors under a map of their own
       (`numeric.decimal_type`, `temporal.date_type`, `net.uuid_type`). core.tn imports the three and its root holds
       only the author annotations (`@title`, `@deprecated`, …). A schema importing core reserves `meta`, `atom`,
       `numeric`, `unicode`, `net`, `binary`, `temporal` and the root names of the kernel, the libraries and core, so
-      `record`, `identifier`, `type_kind` and `kind` stay free; one importing only temporal.tn sees `date` and no `int32`.
+      `record`, `identifier`, `type_ref` and `kind` stay free; one importing only temporal.tn sees `date` and no `int32`.
       Any schema may contribute a member to a nested map, which stays its own
 - [x] A constructor is an ordinary record type ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — `net.uuid_type`'s value is
-  a record, so `meta.type_kind` and `meta.kind<meta.record>` hold it and a field typed `net.uuid_type` holds a declaration
+  a record, so `meta.type_ref` and `meta.ref<meta.record>` hold it and a field typed `net.uuid_type` holds a declaration
   body as data, in TSON tree and bind mode and in JSON
 - [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
       opt-in carrier component

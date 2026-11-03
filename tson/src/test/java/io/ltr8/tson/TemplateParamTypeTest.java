@@ -53,10 +53,10 @@ class TemplateParamTypeTest {
         return new TemplateParam(name, TypeRef.of(type));
     }
 
-    /** A type slot gives {@code meta.type_kind}; a scalar slot of the applied constructor gives that slot's type. */
+    /** A type slot gives {@code meta.type_ref}; a scalar slot of the applied constructor gives that slot's type. */
     @Test
     void aSlotGivesItsDeclaredType() {
-        assertEquals(List.of(param("T", "meta.type_kind"), param("N", "numeric.count")),
+        assertEquals(List.of(param("T", "meta.type_ref"), param("N", "numeric.count")),
                 parameters().get("vector"));
     }
 
@@ -75,7 +75,7 @@ class TemplateParamTypeTest {
     /** A field typed by a parameter makes the routed parameter's type that parameter. */
     @Test
     void aTypeMayNameAnEarlierParameter() {
-        assertEquals(List.of(param("T", "meta.type_kind"), param("N", "T")), parameters().get("typed_by"));
+        assertEquals(List.of(param("T", "meta.type_ref"), param("N", "T")), parameters().get("typed_by"));
     }
 
     /**
@@ -114,7 +114,7 @@ class TemplateParamTypeTest {
     @Test
     void coresTemplatesRecordTheirTypes() {
         Map<String, List<TemplateParam>> core = parameters();
-        assertEquals(List.of(param("T", "meta.type_kind")), core.get("set"));
+        assertEquals(List.of(param("T", "meta.type_ref")), core.get("set"));
     }
 
     // ── A template over a meta constructor is the meta's ─────────────────────────────

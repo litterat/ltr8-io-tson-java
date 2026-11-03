@@ -128,7 +128,7 @@ class TemplateClosesByApplicationTest {
     }
 
     /**
-     * And the type-channel spelling closes the same way: {@code element_type} is typed {@code meta.type_kind}, an atom, so
+     * And the type-channel spelling closes the same way: {@code element_type} is typed {@code meta.type_ref}, an atom, so
      * §5.2 admits a fixed value there, and the pin {@code text} is judged a member of the kind where it is written --
      * a constructor template may pin its element type as {@code set_type} pins {@code unique_items}.
      */

@@ -5,7 +5,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.consumer.RhKindText;
+import io.ltr8.tson.compiler.consumer.RhTypeNameText;
 import io.ltr8.tson.compiler.consumer.RhRefText;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
@@ -38,16 +38,16 @@ class RefHostShapeTest {
                 !!id:"https://example.test/ref-host-meta.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
-                  rh_method         => { request?: meta.kind<meta.record> }
-                  rh_interface      => !meta.namespace { key_type: meta.identifier  value_type: rh_method }
-                  rh_ref_type_ref   => { method: meta.ref<rh_method> }
-                  rh_ref_text       => { method: meta.ref<rh_method> }
-                  rh_kind_type_ref  => { request: meta.kind<meta.record> }
-                  rh_kind_text      => { request: meta.kind<meta.record> }
-                  rh_ref_type_refs  => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_type_ref }
-                  rh_ref_texts      => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_text }
-                  rh_kind_type_refs => !meta.namespace { key_type: meta.identifier  value_type: rh_kind_type_ref }
-                  rh_kind_texts     => !meta.namespace { key_type: meta.identifier  value_type: rh_kind_text }
+                  rh_method              => { request?: meta.ref<meta.record> }
+                  rh_interface           => !meta.namespace { key_type: meta.identifier  value_type: rh_method }
+                  rh_ref_type_ref        => { method: meta.ref<rh_method> }
+                  rh_ref_text            => { method: meta.ref<rh_method> }
+                  rh_type_name_type_ref  => { request: meta.ref<meta.record> }
+                  rh_type_name_text      => { request: meta.ref<meta.record> }
+                  rh_ref_type_refs       => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_type_ref }
+                  rh_ref_texts           => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_text }
+                  rh_type_name_type_refs => !meta.namespace { key_type: meta.identifier  value_type: rh_type_name_type_ref }
+                  rh_type_name_texts     => !meta.namespace { key_type: meta.identifier  value_type: rh_type_name_text }
                 }
                 """);
     }
@@ -114,7 +114,7 @@ class RefHostShapeTest {
 
     @Test
     void aKindWithATypeRefHostIsJudged() {
-        refused(schema("kind-type-ref", "k => !rh_kind_type_refs { one => { request: no_such } }"),
+        refused(schema("kind-type-ref", "k => !rh_type_name_type_refs { one => { request: no_such } }"),
                 "'no_such' is no type declared in this schema or its imports");
     }
 
@@ -148,26 +148,26 @@ class RefHostShapeTest {
 
     @Test
     void aSoundKindWithATextHostResolves() {
-        String id = schema("kind-text-sound", "k => !rh_kind_texts { one => { request: order } }");
+        String id = schema("kind-text-sound", "k => !rh_type_name_texts { one => { request: order } }");
         assertEquals(List.of(), problems(id));
-        assertEquals("order", assertInstanceOf(RhKindText.class, held(id, "k")).request());
+        assertEquals("order", assertInstanceOf(RhTypeNameText.class, held(id, "k")).request());
     }
 
     @Test
     void aKindWithATextHostIsJudged() {
-        refused(schema("kind-text", "k => !rh_kind_texts { one => { request: no_such } }"),
+        refused(schema("kind-text", "k => !rh_type_name_texts { one => { request: no_such } }"),
                 "'k' at /one/request", "'no_such' is no type declared in this schema or its imports");
     }
 
     @Test
     void aKindNamingANamespaceEntryWithATextHostIsJudged() {
-        refused(schema("kind-text-namespace", "k => !rh_kind_texts { one => { request: orders } }"),
+        refused(schema("kind-text-namespace", "k => !rh_type_name_texts { one => { request: orders } }"),
                 "'orders' is a value of the type 'rh_interface'", "not a type");
     }
 
     @Test
     void aQuotedKindWithATextHostIsRefused() {
-        refused(schema("kind-text-quoted", "k => !rh_kind_texts { one => { request: \"order\" } }"),
+        refused(schema("kind-text-quoted", "k => !rh_type_name_texts { one => { request: \"order\" } }"),
                 "a position typed by a kind holds the name of a type");
     }
 }

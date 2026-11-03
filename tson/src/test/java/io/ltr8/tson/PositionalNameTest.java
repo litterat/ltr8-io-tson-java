@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * that field's type. A kind-typed field reaches a data document through core.tn's own {@code kind}; a field typed by a
  * kernel record ({@code meta.record_field}, {@code meta.template_param}) does not, since an ordinary schema imports
  * only ordinary ones (§2.2.3). The one schema-document case here is the contrast: there a bare token fills the
- * positional field only where that field is atom-typed, which {@code meta.record_field}'s {@code meta.type_kind} is.
+ * positional field only where that field is atom-typed, which {@code meta.record_field}'s {@code meta.type_ref} is.
  */
 class PositionalNameTest {
 
@@ -27,8 +27,8 @@ class PositionalNameTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               named  => { v: text }
-              slot   => { type: meta.kind<meta.record> }
-              holder => { c?: named  p?: slot  q?: meta.kind<meta.record> }
+              slot   => { type: meta.ref<meta.record> }
+              holder => { c?: named  p?: slot  q?: meta.ref<meta.record> }
             }""";
 
     private static List<Diagnostic> read(String data) {
@@ -49,7 +49,7 @@ class PositionalNameTest {
     }
 
     /**
-     * {@code slot}'s one field is {@code type}, a {@code meta.kind<record>}: in a data document a name fills it, and is
+     * {@code slot}'s one field is {@code type}, a {@code meta.ref<record>}: in a data document a name fills it, and is
      * judged a member of the kind in the governing schema's namespace.
      */
     @Test

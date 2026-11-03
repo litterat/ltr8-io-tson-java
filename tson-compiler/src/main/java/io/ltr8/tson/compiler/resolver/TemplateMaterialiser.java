@@ -479,9 +479,9 @@ final class TemplateMaterialiser {
 
     /**
      * The template an application's head names: the head itself, or, where it is an alias of a template ({@code
-     * kind_of => kind}), the template at the end of its alias chain, the alias being the same entry under
-     * another name ([TSON-SCHEMA] §8.3). Identity is the template's, so {@code kind_of<order>} and {@code
-     * meta.kind<order>} close to one entry.
+     * ref_of => ref}), the template at the end of its alias chain, the alias being the same entry under
+     * another name ([TSON-SCHEMA] §8.3). Identity is the template's, so {@code ref_of<order>} and {@code
+     * meta.ref<order>} close to one entry.
      */
     private String templateHead(String head) {
         String terminal = AliasChain.terminal(head, namespace::definition);

@@ -12,11 +12,10 @@ import java.util.Optional;
 
 /**
  * Parses and validates against a reference that names types -- an instance of the kernel's {@code reference}
- * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, spelled {@code meta.kind<record>} or {@code meta.ref<record>}
- * alike. A value is a type's name or an application, read by {@link ReferenceGrammar} into the {@link TypeRef} it is,
- * and then judged a member: the entry it denotes must be one of the reference's linked members. The value is the
- * reference, never a value of the type it names; a reader rolls a name token or a reference's tree into the one text
- * this reads.
+ * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, {@code meta.ref<record>}. A value is a type's name or an
+ * application, read by {@link ReferenceGrammar} into the {@link TypeRef} it is, and then judged a member: the entry it
+ * denotes must be one of the reference's linked members. The value is the reference, never a value of the type it
+ * names; a reader rolls a name token or a reference's tree into the one text this reads.
  *
  * <p><b>The value finds what it names.</b> A reference read here carries the closure the members were computed over
  * ({@link ReferenceBody#closure}), so {@link TypeRef#referent} answers with the entry it denotes.
@@ -36,16 +35,16 @@ import java.util.Optional;
  * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link EnumParser}: the members are the
  * closure's.
  */
-public record KindParser(ReferenceBody kind, boolean judgesMembers) implements AtomTypeParser<TypeRef> {
+public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) implements AtomTypeParser<TypeRef> {
 
     /** A kind read under the schema whose closure its members were computed over. */
-    public KindParser(ReferenceBody kind) {
+    public TypeNameRefParser(ReferenceBody kind) {
         this(kind, true);
     }
 
     /** {@code kind}, read where a name resolves in the document being read: the grammar alone. */
-    public static KindParser namesOnly(ReferenceBody kind) {
-        return new KindParser(kind, false);
+    public static TypeNameRefParser namesOnly(ReferenceBody kind) {
+        return new TypeNameRefParser(kind, false);
     }
 
     @Override

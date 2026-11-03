@@ -57,8 +57,8 @@ including records, record groups, enums and some in-built types. The `2026/39` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=f337c109abbf980b2a6c48bcb30007a7b1adc805b61a88f2e85928b44da546bb"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=9fd4a43200da5262a3b80ca8519a9202da8a7b9fc17ab51a284d705ef3cd9a47"
+!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=0801c9a12f62aba17ba535d00c98e8f9741ca37f1aab1b83543e09694473c4ef"
+!!import:"https://tson.io/2026/39/m/core.tn?sha256=51f1e4969402714fab82562564b259095be147c23af8508c5c9b5dc21e4150b7"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 !schema {
   role => !enum [admin member guest]
@@ -577,14 +577,14 @@ declaration is made ready in wait order, whatever order it is written in, so a c
 and a value of it, may share a document either way round. Every name a schema writes resolves in that one namespace —
 its own entries and its imports, transitively. A bundled document's root holds only what an author writes, bare
 (`text`, `integer`, `boolean`, `enum`, `set`, `@doc`, `uuid`, `int32`, …); its machinery sits under a prefix and is
-written by its path (`meta.record`, `meta.identifier`, `meta.type_kind`, `meta.kind<meta.record>`, `@atom.ordering`,
+written by its path (`meta.record`, `meta.identifier`, `meta.type_ref`, `meta.ref<meta.record>`, `@atom.ordering`,
 `net.uuid_type`). The kernel, meta.tn, holds the structural vocabulary; the data-format libraries numeric.tn,
 temporal.tn and net.tn each import it alone, with their instances at their root (`int32`, `date`, `uuid`) and their
 constructors under a map of their own (`numeric.decimal_type`, `temporal.date_type`, `net.uuid_type`); core.tn imports
 the three and adds the author annotations (`@title`, `@deprecated`, …). Import core.tn to get everything, or only the
 libraries you want: a schema importing temporal.tn alone sees `date` and no `int32`. A schema importing core reserves
 `meta`, `atom`, `numeric`, `unicode`, `net`, `binary`, `temporal` and every root name of those documents and of core, leaving
-`record`, `identifier`, `type_kind` and `kind` free. The
+`record`, `identifier`, `type_ref` and `kind` free. The
 kernel imports nothing and applies only its own constructors, a cycle closed by pre-loading a hand-written bootstrap
 (`MetaKernelBootstrapResolver`) rather than resolving it from a document. See
 [design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,

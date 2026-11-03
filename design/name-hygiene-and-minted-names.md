@@ -91,7 +91,7 @@ requirements meet there, and the second is why meeting the first is not enough:
   opens a worse hole: the namespace then takes on whatever a document happens to contain, unchecked.
 
 So the rule is ASCII, in four cases, after a kernel path is read as its member (a `meta.array` head reads
-`array`, so the kernel's `[meta.type_kind]` mints `array_type_kind_…`). What is ASCII and admitted
+`array`, so the kernel's `[meta.type_ref]` mints `array_type_ref_…`). What is ASCII and admitted
 by §7.7 is spliced verbatim — the ordinary case, a type name or a verb or a bound. A qualified name of ASCII
 identifiers, `geo.inner.tag`, writes each dot `_` (`array_geo_inner_tag_…`), a minted name being one identifier; its
 path is no part of identity, so it needs no hash of its own. What is ASCII but not admitted keeps its admitted

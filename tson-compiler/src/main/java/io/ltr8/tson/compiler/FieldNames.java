@@ -21,7 +21,7 @@ import java.util.function.Function;
 
 /**
  * What a record's {@code name_type} obliges ([TSON-SCHEMA] §5.2): that it names an identifier family, a member of
- * {@code meta.identifier_kind} ({@link NameType#admits}, [TSON-SCHEMA] §4.2), that every field name the record states
+ * {@code meta.identifier_ref} ({@link NameType#admits}, [TSON-SCHEMA] §4.2), that every field name the record states
  * -- in {@code fields}, {@code discriminators} and its groups -- is a value of it, and that no two of its fields are
  * one value under its equality. The peer of {@link EnumLabels}, on the same terms: a
  * checker over the linked closure that hands back violations and leaves reporting to the linker.

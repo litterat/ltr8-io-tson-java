@@ -13,7 +13,7 @@ import io.ltr8.tson.atom.parser.EnumParser;
 import io.ltr8.tson.atom.parser.IdentifierParser;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
-import io.ltr8.tson.atom.parser.KindParser;
+import io.ltr8.tson.atom.parser.TypeNameRefParser;
 import io.ltr8.tson.atom.parser.RefParser;
 import io.ltr8.tson.atom.parser.HostParser;
 import io.ltr8.tson.atom.parser.HostnameParser;
@@ -126,14 +126,14 @@ public final class AtomParsers {
     /**
      * How a value read at a position typed by {@code body} reads in a schema document's value -- a constructor's or
      * a value entry's payload -- where that differs from a data document's ({@link #forRead}): a reference that names
-     * types reads the type-name grammar alone ({@link KindParser#namesOnly}), and one that names values its qualified
+     * types reads the type-name grammar alone ({@link TypeNameRefParser#namesOnly}), and one that names values its qualified
      * name ({@link RefParser}). A name there resolves in the schema being resolved, which the closure the members were
      * computed over does not hold, so the read records it and the schema's link judges it ([TSON-SCHEMA] §4.2, §5.12).
      * Empty for every other body, which reads alike in both.
      */
     public static Optional<AtomType<?>> inSchemaDocument(Top body) {
         return switch (body) {
-            case ReferenceBody reference -> Optional.of(reference.namesTypes() ? KindParser.namesOnly(reference)
+            case ReferenceBody reference -> Optional.of(reference.namesTypes() ? TypeNameRefParser.namesOnly(reference)
                     : new RefParser(reference));
             default -> Optional.empty();
         };
@@ -148,7 +148,7 @@ public final class AtomParsers {
      */
     public static Optional<AtomType<?>> forRead(Top body, Normalization enumForm) {
         if (body instanceof ReferenceBody reference) {
-            return Optional.of(reference.namesTypes() ? new KindParser(reference) : new RefParser(reference));
+            return Optional.of(reference.namesTypes() ? new TypeNameRefParser(reference) : new RefParser(reference));
         }
         return Optional.ofNullable(switch (body) {
             case ValueType ignored -> null;

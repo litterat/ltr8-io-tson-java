@@ -154,7 +154,7 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is its 86 declarations -- its six maps and their 67 members, and the root's thirteen -- and one
+     * output is its 85 declarations -- its six maps and their 66 members, and the root's thirteen -- and one
      * injected declaration per distinct sugar form within them: six {@code array} entries from §5.3's {@code [X]}
      * field-type sugar, minted at the root. Producing them here is what leaves the linker with nothing to materialize
      * (see {@code MetaKernelSchemaRegistryTest}).
@@ -167,8 +167,8 @@ class MetaKernelBootstrapResolverTest {
     void theFixtureDeclarationsResolveAlongsideSixDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(92, schema.entries().size());
-        for (String head : List.of("array_array_text_1", "array_text_1", "array_type_kind",
+        assertEquals(91, schema.entries().size());
+        for (String head : List.of("array_array_text_1", "array_text_1", "array_type_ref",
                 "array_template_param", "array_field_group", "array_tuple_element")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
                     "expected a desugared entry with head '" + head + "'");

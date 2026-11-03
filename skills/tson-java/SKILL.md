@@ -199,7 +199,7 @@ The token `null` is not absence — §4 resolves it to the string `null`, so it 
 [TSON-DATA] §7.4). A schemaless read keeps one as a `TsonReference` — `segments()`, `arguments()` (each read by the
 ordinary rule: `201` a number, `text` a string, a nested application another `TsonReference`), `text()` for the
 canonical spelling — and resolves nothing, so it has no referent. Under a schema, a value at a kind-typed position
-(`meta.kind<T>`, `meta.type_kind`) arrives in tree mode as an atom holding a `schema.meta.TypeRef` (`as(TypeRef.class)`),
+(`meta.ref<T>`, `meta.type_ref`) arrives in tree mode as an atom holding a `schema.meta.TypeRef` (`as(TypeRef.class)`),
 never a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names in the schema it was
 read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text, a type mismatch.
 

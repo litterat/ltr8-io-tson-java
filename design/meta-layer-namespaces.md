@@ -21,7 +21,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
 - `Top` is sealed all the way down (`permits Type, Reference, TemplateBody, ValueEntry`). A switch over a body's kind
   is exhaustive with an explicit `ValueEntry` arm and no `default`: `EntryKind.of`, `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
-- **`meta.namespace` is a refinement of `meta.map`** (`meta.map ^ { key_type: meta.identifier_kind voidable?: = false
+- **`meta.namespace` is a refinement of `meta.map`** (`meta.map ^ { key_type: meta.identifier_ref voidable?: = false
   }`), IS-A `meta.map` and `meta.product`, and a namespace type is an instance of it, resolved to a `NamespaceBody`
   (`key_type`, `value_type`, `ordered`, `min_items`, `max_items`; `voidable` is pinned false): the kernel's one,
   `meta.schema => !meta.namespace { key_type: meta.type_name value_type: meta.declared }`, and a schema's own `api =>
@@ -33,17 +33,17 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   `DeclaredReader`, `MapBindReader` through `TsonLinkedSchema.namespace`, `ValuesByName`, `TypeInhabitance`,
   `DiscriminationClass`) takes the namespace path for a namespace type and the map path for a plain map; the
   IS-A edge is read where kind membership asks for it (`KindMembers`' construction walk).
-- `key_type` is required, and is a member of `meta.identifier_kind`, judged at link (`validateBody`): a namespace's
+- `key_type` is required, and is a member of `meta.identifier_ref`, judged at link (`validateBody`): a namespace's
   keys are always judged by its own family, never a host's.
 - **A record's fields are no namespace.** `meta.field_map => !meta.map { key_type: text value_type: meta.record_field
   ordered: true }` is an ordered map keyed by text (`RecordBody.fields`, an `AnnotatedMap`): a field name is text within
   its own record, judged by the record's `name_type` as `discriminators` and the groups are (`FieldNames`), and no
   qualified name selects a field declaration (§4.1's segments select in values only).
-- A namespace type is a member of `meta.type_kind`, `meta.kind<meta.product>`, `meta.kind<meta.map>` and
-  `meta.kind<meta.namespace>`, and of no `meta.kind<meta.record>`; `meta.namespace` itself is a constructor whose
-  declaration is a record, so `meta.type_kind` and `meta.kind<meta.record>` hold it. **A value entry is a member of no
+- A namespace type is a member of `meta.type_ref`, `meta.ref<meta.product>`, `meta.ref<meta.map>` and
+  `meta.ref<meta.namespace>`, and of no `meta.ref<meta.record>`; `meta.namespace` itself is a constructor whose
+  declaration is a record, so `meta.type_ref` and `meta.ref<meta.record>` hold it. **A value entry is a member of no
   kind** (no reference over a constructor), nothing is typed by it, and a reference over a type that is no constructor
-  names it where its type IS-A `of`: `meta.ref<api>` and `meta.kind<api>` are one entry, and either names `myapi`.
+  names it where its type IS-A `of`: `meta.ref<api>` names `myapi`.
 - A value entry is refused at every type position, in one sentence (`ValuesByName.aValueNoType`): a reference in a
   type declaration (`validateTypeRef`), a kind-typed slot in a value body (`judgeMember`). A data tag naming one
   compiles to a `ValueEntryReader` and is `TYPE_MISMATCH`.
@@ -56,7 +56,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   `compileReady(…, tree)`), so the schema loads and validates. The bind registry refuses such an entry in the closure it
   compiles, `BIND_MISMATCH` at `/entry` (`TsonCompiledSchemaRegistry.refuseUnbound`); the tree registry refuses nothing.
 - A host declares none of its references; the slot declares them, by the reference's `of`. A slot naming a type is
-  typed by a reference over a constructor (`request: meta.kind<meta.record>`), a slot naming a value by a reference over any
+  typed by a reference over a constructor (`request: meta.ref<meta.record>`), a slot naming a value by a reference over any
   other type (`method: meta.ref<method>`), and a record-typed slot holds the record's value inline. In a schema document
   the kind's or reference's reader (`AtomTypeReader`) reads the name's grammar and records it with its path and the
   slot's declared type (`TsonSchema.valuesByName`, `TsonSchema.SlotType`); the linker judges it by that type, whatever
@@ -65,7 +65,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   each segment naming a member of a nested `!schema` map collapsing onto that member's path entry (`geo.home`); a
   further segment selects a key of a namespace value or a field of a record value (bound or tree-held); a map that is
   no namespace, `{text => method}` or a record value's `meta.field_map`, is not entered whatever its key type, though
-  `meta.kind<meta.map>` holds namespace types and plain map types alike: the walk asks the body, a `NamespaceBody`.
+  `meta.ref<meta.map>` holds namespace types and plain map types alike: the walk asks the body, a `NamespaceBody`.
 - A field step through a bound record value reads the host object through the descriptor of the bind context it was
   bound under, by wire name, never by reflection (`TsonCompiledMetaRegistry.link`). An optional field the value does
   not hold is refused as not present, after the referent's type is judged.
@@ -100,7 +100,7 @@ instantiate one. A schema declares the record and a namespace type holding it, a
 value:
 
 ```
-method    => { request?: meta.kind<meta.record>  response?: meta.type_kind  errors?: [meta.kind<meta.record>] }
+method    => { request?: meta.ref<meta.record>  response?: meta.type_ref  errors?: [meta.ref<meta.record>] }
 interface => !meta.namespace { key_type: method_name  value_type: method }
 binding   => { method: meta.ref<method>  verb: http_verb  route: text }
 bindings  => !meta.namespace { key_type: meta.identifier  value_type: binding }
@@ -126,9 +126,9 @@ interface  => { extends?: [meta.type_name]  methods: method_map }
 interfaces => !meta.namespace { key_type: meta.identifier  value_type: interface }
 ```
 
-**A refinement of `meta.map`.** `meta.namespace` narrows `map`'s `key_type` from `meta.type_kind` to
-`meta.identifier_kind`, the refinement of `meta.type_kind` to the identifier families, and pins `voidable` false;
-`ordered` and the size bounds are `map`'s and bound a value as a map's do. So `meta.kind<meta.map>` holds every namespace
+**A refinement of `meta.map`.** `meta.namespace` narrows `map`'s `key_type` from `meta.type_ref` to
+`meta.identifier_ref`, the refinement of `meta.type_ref` to the identifier families, and pins `voidable` false;
+`ordered` and the size bounds are `map`'s and bound a value as a map's do. So `meta.ref<meta.map>` holds every namespace
 type, and a map that is no namespace is still never entered by a qualified name. Both compilers read a namespace type
 through the map factory with the map `NamespaceBody.read()` states (`design/linking-and-compilation.md`).
 
@@ -184,8 +184,8 @@ binding; a missing line of wiring says nothing about the schema (`design/schema-
 
 ## Names inside a value: the slot declares the spelling (§4.2, §5.12)
 
-A slot naming a type is typed by a reference over a constructor, `request: meta.kind<meta.record>`, and a slot naming a value
-by a reference over any other type, `method: meta.ref<method>`; the spelling is a convention, `of` decides
+A slot naming a type is typed by a reference over a constructor, `request: meta.ref<meta.record>`, and a slot naming a value
+by a reference over any other type, `method: meta.ref<method>`; the spelling is one, and `of` decides
 (`KindMembers.namesTypes`), and a slot typed by a record holds the record's value inline. In a schema document
 (`TsonReadContext.readsSchemaNames`) the kind's or reference's `AtomTypeReader` reads the name's grammar alone
 (`AtomParsers.inSchemaDocument`) and records it with the path it descended (`["post_orders", "method"]`) and the
@@ -271,7 +271,7 @@ schema importing it names them: an `!!import` contributes its whole namespace (S
 reservation: every root name in the closure is taken, so a schema importing core.tn cannot declare `text`, `enum`,
 `set`, `uuid` or `title` of its own, nor `meta`, `atom`, `numeric`, `unicode`, `net`, `binary` or `temporal`
 (`MetaLayerVocabularyTest`). The machinery is under those seven prefixes, so `record`, `identifier`, `map`, `namespace`,
-`template`, `type_kind`, `field_name`, `bounded`, `value` and `kind` are free; a schema importing only the libraries it wants
+`template`, `type_ref`, `field_name`, `bounded`, `value` and `kind` are free; a schema importing only the libraries it wants
 leaves the rest's root names free too (one importing temporal.tn alone may declare `title` or `int32`). The one thing a
 schema cannot do is hold a value of a type it declares itself: `!api { … }` beside `api => !meta.namespace { … }` waits on
 `api` being resolved first, which outside the kernel's bootstrap is a gap.

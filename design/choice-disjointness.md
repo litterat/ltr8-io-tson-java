@@ -15,7 +15,7 @@ and why the same table is what untagged reading dispatches on. Current form only
 - An enum's class is its members' shared class, read off each member's spelling; every enum is over an identifier
   family, so no fact beyond the body is needed. A closed set of text values is `unicode.text_type`'s `members` facet and is
   string-class as every text atom is, whatever its members spell.
-- A reference (`reference`, spelled `meta.kind<T>` or `meta.ref<T>`) is an atom whose values are names, type names or
+- A reference (`reference`, spelled `meta.ref<T>`) is an atom whose values are names, type names or
   qualified value names as its `of` decides, string-class as an identifier family is. It is no sum and carries no
   `disjoint`; a choice may list one as a variant like any other atom.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's

@@ -51,8 +51,8 @@ spec-required case:
   reaches the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
   an aliased application declared in an import and applied in the importer, and reduce on ingest if it misses.
 - [ ] **A kind-typed field's default naming a later entry throws `IllegalStateException`.** A record field written
-  `k: meta.kind<meta.record> = later`, with `later` declared after a value read reaches the field, escapes as an internal
-  invariant break whose message calls `kind` "a template … not a type until it is applied". The default is a held
+  `k: meta.ref<meta.record> = later`, with `later` declared after a value read reaches the field, escapes as an internal
+  invariant break whose message calls `ref` "a template … not a type until it is applied". The default is a held
   value (SPEC-FEEDBACK.md #4 rule 3) and should be judged once every entry is ready. Reproduce, add the failing test,
   and route the judgement through the held-value settle.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
@@ -63,10 +63,10 @@ spec-required case:
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **A value entry read against a type declared beside it cannot read a field typed by an inline application.**
-  `holder => { r: meta.kind<meta.record> }` with `held => !holder { r: order }` in one schema is refused: "'kind' is a
+  `holder => { r: meta.ref<meta.record> }` with `held => !holder { r: order }` in one schema is refused: "'ref' is a
   template taking 1 type argument … a data type-ref carries no arguments". The reader compiled from the entries
   ready so far (`SchemaResolver.readySoFar`) reaches the field's application before its minted entry is ready.
-  Naming the application (`records => meta.kind<meta.record>`, `holder => { r: records }`) reads. A record template applied
+  Naming the application (`records => meta.ref<meta.record>`, `holder => { r: records }`) reads. A record template applied
   inline (`{ b: box<text> }`) fails the same way, reported as "no schema in this closure declares a subtype of
   'box', and it is abstract". Make the field's application wait in the order, as a named one does, and add a
   `link/valid` vector writing it inline.
@@ -149,8 +149,8 @@ spec-required case:
   compares its states (`DefinitionResolver.refines`) and never its type with the inherited one, so `a: text` restated
   as `a: int32` resolves. §5.7 admits a restated type only where it narrows, to a type IS-A the original (a `void?` at
   a voidable position included). The IS-A is the link's (`TsonSchemaLinker.isA`, as `checkReferenceNarrows` asks it),
-  across containers, choices and atoms; the kernel's `meta.namespace` narrowing `key_type` to `meta.identifier_kind`
-  is the case it must admit, by `meta.identifier_kind`'s refinement of `meta.type_kind`.
+  across containers, choices and atoms; the kernel's `meta.namespace` narrowing `key_type` to `meta.identifier_ref`
+  is the case it must admit, by `meta.identifier_ref`'s refinement of `meta.type_ref`.
 - [ ] **`MetaRefs` does not rewrite a namespace type's references.** Its body rewrite falls to `default` for a
   `NamespaceBody`, so a synthetic rename or a materialisation rewrite leaves `key_type` and `value_type` naming the old
   entry; it needs a `NamespaceBody` arm beside `MapBody`'s. The same `default` comment says a reference's `of` names a

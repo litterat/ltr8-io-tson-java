@@ -32,18 +32,18 @@ import java.util.stream.Stream;
  * value argument of an enum type before linking has run.
  *
  * <p><b>What may stand there is the slot's kind's to say</b> ([TSON-SCHEMA] §4.2). The kernel types both slots
- * {@code meta.identifier_kind}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
+ * {@code meta.identifier_ref}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
  * kind off the constructor the entry is built with -- the {@code name_type} field's own type -- and asks {@link
  * KindMembers} whether the referent is a member. The resolution above is the store and the kind the judgment: the
  * referent is found first, and the kind refuses the one found. Where the slot's kind is out of reach -- a schema
- * assembled by hand whose closure holds no kernel -- the kernel's {@code meta.identifier_kind} is what the slot is typed
+ * assembled by hand whose closure holds no kernel -- the kernel's {@code meta.identifier_ref} is what the slot is typed
  * by in every schema this library loads, and its {@code of} is used.
  */
 public final class NameType {
 
     private static final String NAME_TYPE = "name_type";
 
-    /** The {@code of} of the kernel's {@code meta.identifier_kind}, for a slot whose own kind is out of reach. */
+    /** The {@code of} of the kernel's {@code meta.identifier_ref}, for a slot whose own kind is out of reach. */
     private static final String IDENTIFIER_TYPE = KernelNames.of(KernelNames.UNICODE, "identifier_type");
 
     private NameType() {
@@ -82,7 +82,7 @@ public final class NameType {
 
     /**
      * Whether {@code type}, {@code entry}'s resolved name type, is a member of the kind its {@code name_type} slot
-     * is typed by -- read off {@code constructor}, the one {@code entry}'s value applies: {@code meta.identifier_kind}
+     * is typed by -- read off {@code constructor}, the one {@code entry}'s value applies: {@code meta.identifier_ref}
      * for both of the kernel's slots. A referent that resolved to nothing is no member. The referent's own
      * constructor is its body's ({@link TsonSchema#constructorOf}), the resolved value being all a name type is
      * resolved to here.

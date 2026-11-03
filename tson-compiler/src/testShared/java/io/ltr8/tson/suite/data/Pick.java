@@ -4,7 +4,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
  * The host class for the corpus's {@code pick} record ({@code schemas/fixtures/meta-picks.tn}): a record type of the
- * governed schema, named at a slot typed {@code meta.kind<record>}.
+ * governed schema, named at a slot typed {@code meta.ref<record>}.
  */
 public record Pick(TypeRef t) {
 }

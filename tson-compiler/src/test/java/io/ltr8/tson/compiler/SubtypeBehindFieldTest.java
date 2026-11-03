@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A kind-typed slot that only a tagged subtype declares is judged wherever the value sits: held directly under a
- * namespace key, or one record field further down. {@code sb_op} declares {@code request: meta.type_kind}; its base {@code
+ * namespace key, or one record field further down. {@code sb_op} declares {@code request: meta.type_ref}; its base {@code
  * sb_endpoint} declares nothing, and {@code sb_resource.endpoints} holds the family by its base. The slot's declared
  * type comes with the name from the reader that read it, so nothing walks the declared types back to the slot.
  */
@@ -39,7 +39,7 @@ class SubtypeBehindFieldTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   sb_endpoint  => abstract {}
-                  sb_op        => sb_endpoint & { request?: meta.type_kind }
+                  sb_op        => sb_endpoint & { request?: meta.type_ref }
                   sb_ops       => !meta.namespace { key_type: meta.identifier  value_type: sb_endpoint }
                   sb_resource  => { endpoints: {meta.identifier => sb_endpoint} }
                   sb_resources => !meta.namespace { key_type: meta.identifier  value_type: sb_resource }

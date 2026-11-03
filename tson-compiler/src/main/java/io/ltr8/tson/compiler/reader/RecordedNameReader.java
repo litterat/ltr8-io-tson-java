@@ -42,7 +42,7 @@ final class RecordedNameReader implements TsonTypeReader<Object> {
         }
         Optional<String> name = ReferenceNameReader.nameIn(ctx.peek());
         if (name.isEmpty()) {
-            boolean refused = type.role() == TsonSchema.SlotType.Role.REFERENCE || ctx.readsValueBody();
+            boolean refused = type.role() == TsonSchema.SlotType.Role.VALUE_NAME || ctx.readsValueBody();
             return refused ? refusing.read(ctx) : inner.read(ctx);
         }
         return inner.read(ctx);

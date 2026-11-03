@@ -57,7 +57,7 @@ final class InternalName {
     /**
      * {@code text} as one part of a derived name -- its head, or one of its segments.
      *
-     * <p>A path under {@code meta} is first reduced to its member's name, {@code meta.type_kind} to {@code type_kind}:
+     * <p>A path under {@code meta} is first reduced to its member's name, {@code meta.type_ref} to {@code type_ref}:
      * the readable half says what a name came from, and the type system's names carry the one prefix. A path under
      * the kernel's other maps keeps its first segment, {@code unicode.text_type} reading {@code unicode_text_type}.
      * Then four cases, in the order they are tested:

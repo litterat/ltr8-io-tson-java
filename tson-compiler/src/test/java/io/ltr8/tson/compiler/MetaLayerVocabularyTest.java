@@ -62,13 +62,13 @@ class MetaLayerVocabularyTest {
               operation => {
                 path:     text
                 method:   text
-                request:  meta.type_kind
-                response: meta.type_kind
+                request:  meta.type_ref
+                response: meta.type_ref
               }
               operations => !meta.namespace { key_type: meta.identifier  value_type: operation }
               webhook => {
                 path:     text
-                delivers?: [meta.type_kind]?
+                delivers?: [meta.type_ref]?
               }
               webhooks    => !meta.namespace { key_type: meta.identifier  value_type: webhook }
               status_code => text

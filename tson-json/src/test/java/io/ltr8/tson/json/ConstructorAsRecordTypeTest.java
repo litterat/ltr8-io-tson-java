@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
  * A constructor is an ordinary record type ([TSON-SCHEMA] §4.1, §4.2; SPEC-FEEDBACK.md #11): a name slot over {@code
  * T} admits a name exactly when the type of the named entry's value IS-A {@code T}, and a constructor whose
  * declaration is a record, {@code uuid_type => atom & { ... }}, holds a value of {@code record}. So it is a type a
- * field may be typed by, its instances being declarations read as data, and a name {@code meta.kind<record>} admits.
+ * field may be typed by, its instances being declarations read as data, and a name {@code meta.ref<record>} admits.
  * Pinned in both encodings and both read modes.
  */
 class ConstructorAsRecordTypeTest {
@@ -34,8 +34,8 @@ class ConstructorAsRecordTypeTest {
             !!import:"https://tson.io/2026/39/m/core.tn"
             !schema {
               holder   => { spec: net.uuid_type }
-              pick     => { t: meta.kind<meta.record> }
-              tpick    => { t: meta.type_kind }
+              pick     => { t: meta.ref<meta.record> }
+              tpick    => { t: meta.type_ref }
               boxed    => <T> { v: T }
               box_spec => boxed<net.uuid_type>
               specs    => [net.uuid_type]

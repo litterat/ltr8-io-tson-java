@@ -7,8 +7,8 @@ is why they are the linker's. Current form only; history lives in git.
 **Invariants**
 
 - A kind is the kernel's `meta.reference` atom (`ReferenceBody`; SPEC-FEEDBACK.md #11) over a constructor, `meta.top`
-  or IS-A it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling:
-  `meta.kind<meta.record>` and `meta.ref<meta.record>` are one entry, and `meta.kind<api>`, over a type that is no
+  or IS-A it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling,
+  which is one, `meta.ref<T>`: `meta.ref<meta.record>` holds type names, and `meta.ref<api>`, over a type that is no
   constructor, names values (`ValuesByName`, `design/references.md`).
 - Every reference's derived `index` (`Index(namesTypes, members, applications, entries, shown)`: the members sorted;
   the entry each application the closure closed denotes, every `@meta.application` and every entry's
@@ -23,17 +23,17 @@ is why they are the linker's. Current form only; history lives in git.
 - `of` resolves in the schema's one namespace and names any type or constructor; refused are a name resolving to
   nothing, an open entry and a value entry (`KindMembers.ofRefusal`). A kind is not a bound.
 - A constructor is a member where the walk says so, as any type is: one whose declaration is a record (`net.uuid_type
-  => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_kind`, `meta.kind<meta.record>` and
-  `meta.kind<meta.product>` hold it, `meta.namespace` and `meta.reference` among them. A namespace type is built with
-  `meta.namespace`, a refinement of `meta.map`, so it is a member of `meta.type_kind`, `meta.kind<meta.product>`,
-  `meta.kind<meta.map>` and `meta.kind<meta.namespace>`, and of no `meta.kind<meta.record>`. A value entry is a member of
+  => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
+  `meta.ref<meta.product>` hold it, `meta.namespace` and `meta.reference` among them. A namespace type is built with
+  `meta.namespace`, a refinement of `meta.map`, so it is a member of `meta.type_ref`, `meta.ref<meta.product>`,
+  `meta.ref<meta.map>` and `meta.ref<meta.namespace>`, and of no `meta.ref<meta.record>`. A value entry is a member of
   no kind: its tag names an ordinary type, which no walk reaches a constructor through.
-- A refinement of a reference (`!meta.type_kind ^ { of: … }`) narrows `of` to the source's or a type IS-A it, judged
-  at link (`ReferenceBody.ofNarrowing`), and is IS-A its source: `meta.identifier_kind` is `meta.type_kind` narrowed to
-  `unicode.identifier_type`, its chain listing `meta.type_kind`.
+- A refinement of a reference (`!meta.type_ref ^ { of: … }`) narrows `of` to the source's or a type IS-A it, judged
+  at link (`ReferenceBody.ofNarrowing`), and is IS-A its source: `meta.identifier_ref` is `meta.type_ref` narrowed to
+  `unicode.identifier_type`, its chain listing `meta.type_ref`.
 - A kind-typed position is judged by membership in every data document, over the reading document's closure; in a
   schema document it reads its grammar alone and the link (or ingest) judges membership.
-- An empty kind admits no value, and `TypeInhabitance` refuses a required field typed by it: `meta.kind<meta.alias>` is one,
+- An empty kind admits no value, and `TypeInhabitance` refuses a required field typed by it: `meta.ref<meta.alias>` is one,
   no entry past its hops being an alias.
 - Whether a `name_type` referent may stand in its slot is membership of the slot's kind (`NameType.admits`, reading
   the kind off the constructor's `name_type` field), never a test of the referent's body class.
@@ -58,17 +58,17 @@ predicate on every slot; naming roles (`meta.type_name`, `method_name` as instan
 declares, any other slot references"), which fused token family, store and referent and broke at `meta.field_name`, whose
 family is the record's; a namespace kind with a role lattice, the same fusion plus an alias rule letting a family
 widen a role against §5.7; `name_type` with `target` and `relation` facets, where `relation` was two stores wearing
-one enum; the predicate as facets on the name atom; `meta.kind<T>` with `of` resolving in the writer's namespace, which
+one enum; the predicate as facets on the name atom; `meta.ref<T>` with `of` resolving in the writer's namespace, which
 sent `of` to two namespaces depending on who wrote it; and the kind as a sum over its members' values, which admitted
 an identifier token where a family's name was wanted. A kind is an atom whose values are names, `of` resolves in the
 schema's one namespace (SPEC-FEEDBACK.md #7), and the members are computed.
 
 ## The types built with a constructor (`KindMembers`, §4.2)
 
-A kind (`!meta.reference { of: net.uuid_type }`, or `meta.kind<net.uuid_type>` through the kernel's template) is an atom
+A kind (`!meta.reference { of: net.uuid_type }`, or `meta.ref<net.uuid_type>` through the kernel's template) is an atom
 whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a
-listed one. The kernel declares `meta.type_kind` and its refinement `meta.identifier_kind`, and types
-`meta.enum_type.name_type` and `meta.record.name_type` by the first. `computeKinds` derives every reference's index
+listed one. The kernel declares `meta.type_ref` and its refinement `meta.identifier_ref`, and types
+`meta.enum_type.name_type` and `meta.record.name_type` by the second. `computeKinds` derives every reference's index
 (`ReferenceBody.linked`) onto its body in the merged map after `computeSubtypes` and before the name-type checks; a reference
 that names values gets `namesTypes` false and no members.
 
@@ -76,19 +76,19 @@ that names values gets `namesTypes` false and no members.
   type, an alias stopping at an application, `meta.template` bodies and value entries excluded, then the constructor the
   value applies (its recorded tag, `EntryFacts.constructor`, else its body's `@Typename`) followed through a constructor
   template's held body until `of` or a constructor IS-A it is reached. So a record template is a member of
-  `meta.kind<meta.record>` (it is a type, §5.10), `set<text>` of `meta.kind<meta.set_type>` while the kernel's template `set`
-  is not, `meta.top` of `meta.type_kind`, `meta.kind<meta.product>` and `meta.kind<meta.record>`, and so is a constructor
+  `meta.ref<meta.record>` (it is a type, §5.10), `set<text>` of `meta.ref<meta.set_type>` while the kernel's template `set`
+  is not, `meta.top` of `meta.type_ref`, `meta.ref<meta.product>` and `meta.ref<meta.record>`, and so is a constructor
   whose declaration is a record: membership is not `EntryKind.isConstructor`, which answers applicability.
-- **A kind is a member of itself where the walk says so.** `meta.type_kind` is built with `meta.reference`, which IS-A
+- **A kind is a member of itself where the walk says so.** `meta.type_ref` is built with `meta.reference`, which IS-A
   `meta.type`, so it lists itself. Nothing loops: the walk reads construction chains and never a kind's members.
 - **A constructor is read in the schema's one namespace.** `KindMembers` and `NameType` take a `structure` lookup beside
   the entry's own, read first; the linker passes the merged namespace for both, and the second serves a caller holding a
   narrower first one (materialisation's imported entries). A schema's own root `uuid_type` captures no hop: the constructor
   is `net.uuid_type`, a path of the closure, and a schema contributing `uuid_type` to `net` collides with net.tn's
   member of that path under §2.2.3. The closure
-  walked is the merged map, the kernel's own types included, so `meta.kind<meta.record>` lists the kernel's records beside
-  the schema's, and `meta.kind<meta.namespace>` holds a schema's own namespace type `api` beside `meta.schema`, and
-  `meta.kind<meta.map>` holds those and `meta.field_map`, which `meta.kind<meta.namespace>` does not.
+  walked is the merged map, the kernel's own types included, so `meta.ref<meta.record>` lists the kernel's records beside
+  the schema's, and `meta.ref<meta.namespace>` holds a schema's own namespace type `api` beside `meta.schema`, and
+  `meta.ref<meta.map>` holds those and `meta.field_map`, which `meta.ref<meta.namespace>` does not.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: a name resolving to nothing is
   an unresolved reference, and an open entry or a value entry is refused (`KindMembers.ofRefusal`), against the
   declaration that wrote the application (`reportedAgainst`). A refinement's `of` is then judged against its source's
@@ -96,10 +96,10 @@ that names values gets `namesTypes` false and no members.
   widening or an unrelated `of` is refused. The resolver binds a refinement before the names `of` holds are ready
   (they wait on nothing, `design/resolver-vocabulary-and-bootstrap.md`), so the IS-A is the link's to ask, and the
   family's rule (`ReferenceBody.ofNarrowing`) takes it as a predicate; `constraintsCheck` asks only that a reference
-  refines a reference. Anything else is admitted: `meta.kind<meta.top>` holds every
-  type, `meta.kind<meta.alias>` holds nothing, and `meta.kind<stock_id>` or `meta.kind<api>` names values of that type.
+  refines a reference. Anything else is admitted: `meta.ref<meta.top>` holds every
+  type, `meta.ref<meta.alias>` holds nothing, and `meta.ref<stock_id>` or `meta.ref<api>` names values of that type.
 - **Recomputed everywhere, trusted nowhere.** Members are computed over each linking schema's closure, so the
-  kernel's `meta.identifier_kind` lists a user schema's own `text_identifier` at that schema's link, and `members` is
+  kernel's `meta.identifier_ref` lists a user schema's own `text_identifier` at that schema's link, and `members` is
   no field an author can write.
 - **A value at a kind-typed field is a name.** `checkFieldValue` hands a `~`/`=` value at a kind-typed field to
   `checkKindValue`, which resolves it in the schema's namespace and asks the walk. So
@@ -135,7 +135,7 @@ which equality, which profile) lives in a namespace the body cannot see.
   of its `meta.identifier`.
 - **Membership, not body class.** `NameType.admits` reads the slot's kind off the `name_type` field of the constructor
   the entry applies, and asks `KindMembers.isMember` of the referent. Where the slot's kind is out of reach (a
-  closure holding no kernel, as a hand-built schema's may), `meta.identifier_kind`'s `of`, `unicode.identifier_type`, is
+  closure holding no kernel, as a hand-built schema's may), `meta.identifier_ref`'s `of`, `unicode.identifier_type`, is
   used. An application of a template over `unicode.identifier_type` expands to a `unicode.identifier_type` instance, and is
   admitted (`KindMembersTest`).
 - **The profile is the type's.** `NameType.profile` reads the profile of an admitted type only; `checkNames` judges
