@@ -111,6 +111,13 @@ spec-required case:
   index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
   application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
+- [ ] **An entry reached by two import routes keeps only the first route's `subtypes`** ([TSON-SCHEMA] §3.3.4, §8.2).
+  `SchemaResolver.mergeImports` and `TsonSchemaLinker.mergeImports` keep the first copy of an entry several imports
+  bring, carrying the `subtypes` that route's own link derived; a subtype only the second route's link credited is
+  dropped, so the importer's view of the entry is incomplete and its chain facts depend on import order. No bundled
+  closure hits it. Union the `subtypes` of the copies (the entry's body otherwise agreeing, as the identity check
+  already requires), or derive `subtypes` once over the importer's whole closure rather than carrying them in.
+
 - [ ] **A value named through a FIXED field** ([TSON-SCHEMA] §5.12). A qualified name whose segment selects a
   FIXED field of a record value is reported as `NOT_IMPLEMENTED`: bind agreement exempts a FIXED field from having a
   component, so the host holds no value for it and `ValuesByName.fieldOf` finds no component to read. The value is the
