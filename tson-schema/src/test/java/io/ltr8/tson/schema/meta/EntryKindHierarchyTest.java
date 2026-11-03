@@ -4,7 +4,6 @@ import io.ltr8.annotation.AnnotatedMap;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,7 +39,7 @@ class EntryKindHierarchyTest {
 
     @Test
     void aNamespaceTypeIsAProductLikeAMapType() {
-        NamespaceBody api = new NamespaceBody(Optional.of(TypeRef.of("meta.identifier")), TypeRef.of("method"), false);
+        NamespaceBody api = new NamespaceBody(TypeRef.of("meta.identifier"), TypeRef.of("method"), false);
         assertEquals(EntryKind.PRODUCT, EntryKind.of(api, name -> true));
         assertInstanceOf(Product.class, api);
     }

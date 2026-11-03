@@ -102,8 +102,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DefinitionResolverTest {
 
     private static final String EXPECTED_INTEGER_SIZE =
-            "{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { bits => { type: integer optional: "
-                    + "false voidable: false role: \"FREE\" } signed => { type: boolean optional: false "
+            "{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"bits\" => { type: integer optional: "
+                    + "false voidable: false role: \"FREE\" } \"signed\" => { type: boolean optional: false "
                     + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] "
                     + "parameters: [] }";
 
@@ -343,21 +343,23 @@ class DefinitionResolverTest {
 
         // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
-                + "chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
+                + "\"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
                 + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(atom));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
-                + "chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
+                + "\"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
                 + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(sum));
 
         // product: two brand-new fields added by the trailing body (type contributes none).
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
-                + "chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } access_pattern => "
-                + "{ type: meta.product_access_type optional: false voidable: false role: \"FREE\" } size_type => { type: "
+                + "\"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } \"access_pattern\" "
+                + "=> "
+                + "{ type: meta.product_access_type optional: false voidable: false role: \"FREE\" } \"size_type\" => { "
+                + "type: "
                 + "meta.product_size_type optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
                 + "\"ABSTRACT\" discriminators: [] parameters: [] }", write(product));
 
         // alias: one brand-new field.
-        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" ] subtypes: [] } fields: { target => { "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" ] subtypes: [] } fields: { \"target\" => { "
                 + "type: meta.type_kind optional: false "
                 + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                         write(alias));
@@ -381,14 +383,16 @@ class DefinitionResolverTest {
         assertEquals(List.of("meta.atom", "meta.top", "meta.type"), TypeChain.supertypesOf(integerType));
 
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
-                        + "fields: { chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "size => { type: numeric.integer_size optional: true voidable: false role: \"FREE\" } min => { "
-                        + "type: integer optional: true voidable: false role: \"FREE\" } exclusive_min => { type: "
-                        + "integer optional: true voidable: false role: \"FREE\" } max => { type: integer "
+                        + "fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "\"size\" => { type: numeric.integer_size optional: true voidable: false role: \"FREE\" } \"min\" "
+                        + "=> { "
+                        + "type: integer optional: true voidable: false role: \"FREE\" } \"exclusive_min\" => { type: "
+                        + "integer optional: true voidable: false role: \"FREE\" } \"max\" => { type: integer "
                         + "optional: "
-                        + "true voidable: false role: \"FREE\" } exclusive_max => { type: integer optional: true "
-                        + "voidable: false role: \"FREE\" } multiple_of => { type: integer optional: "
-                        + "true voidable: false role: \"FREE\" } members => { type: numeric.integer_member_set optional: "
+                        + "true voidable: false role: \"FREE\" } \"exclusive_max\" => { type: integer optional: true "
+                        + "voidable: false role: \"FREE\" } \"multiple_of\" => { type: integer optional: "
+                        + "true voidable: false role: \"FREE\" } \"members\" => { type: numeric.integer_member_set "
+                        + "optional: "
                         + "true voidable: false role: \"FREE\" } } groups: [ { members: [ [ \"min\" ] [ "
                         + "\"exclusive_min\" ] ] optional_members: [] optional: true } { members: [ [ \"max\" ] [ "
                         + "\"exclusive_max\" ] ] optional_members: [] optional: true } ] extension: \"OPEN\" "
@@ -540,8 +544,8 @@ class DefinitionResolverTest {
     void resolvesAClosedRecordAsAnOrdinaryRecordBody() throws DataBindException {
         Top pair = resolveSnippet("pair => { first: text  second: text }");
 
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { first => { type: text optional: "
-                        + "false voidable: false role: \"FREE\" } second => { type: text optional: false voidable: "
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"first\" => { type: text optional: "
+                        + "false voidable: false role: \"FREE\" } \"second\" => { type: text optional: false voidable: "
                         + "false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(pair));
     }
@@ -635,8 +639,8 @@ class DefinitionResolverTest {
 
         Top tupleElement = resolver.resolve(schemaMap.declarations().get("meta.tuple_element"));
 
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { element_type => { type: "
-                        + "meta.type_kind optional: false voidable: false role: \"FREE\" } voidable => { type: boolean "
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"element_type\" => { type: "
+                        + "meta.type_kind optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } } groups: [] extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(tupleElement));
@@ -654,10 +658,10 @@ class DefinitionResolverTest {
 
         Top fieldGroup = resolver.resolve(schemaMap.declarations().get("meta.field_group"));
 
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { members => { type: "
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"members\" => { type: "
                         + "array_array_text_1_c67f2b5e_1_6504fe90 optional: false voidable: false role: \"FREE\" } "
-                        + "optional_members => { type: array_text_1_c67f2b5e optional: true voidable: false role: "
-                        + "\"FREE\" } optional => { type: boolean optional: true voidable: false role: \"DEFAULT\" "
+                        + "\"optional_members\" => { type: array_text_1_c67f2b5e optional: true voidable: false role: "
+                        + "\"FREE\" } \"optional\" => { type: boolean optional: true voidable: false role: \"DEFAULT\" "
                         + "value: false } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(fieldGroup));
     }
@@ -668,7 +672,7 @@ class DefinitionResolverTest {
         // composition, so it isn't also blocked by tightening -- an ordinary (non-parameter) fixed value.
         Top pinned = resolveSnippet("pinned => { access_pattern?: meta.product_access_type = INDEX }");
 
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { access_pattern => { type: "
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"access_pattern\" => { type: "
                         + "meta.product_access_type optional: true voidable: false role: \"FIXED\" value: INDEX } } groups: "
                         + "[] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(pinned));
@@ -737,15 +741,17 @@ class DefinitionResolverTest {
         assertTrue(TypeChain.supertypesOf(array).contains("meta.top"), "a constructor: IS-A meta.top");
         assertEquals(List.of("meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(array));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.product\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
-                        + "fields: { chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "access_pattern => { type: meta.product_access_type optional: true voidable: false role: "
-                        + "\"FIXED\" value: INDEX } size_type => { type: meta.product_size_type optional: true voidable: "
-                        + "false role: \"FIXED\" value: VARIABLE } element_type => { type: meta.type_kind optional: false "
-                        + "voidable: false role: \"FREE\" } voidable => { type: boolean optional: true voidable: "
-                        + "false role: \"DEFAULT\" value: false } ordered => { type: boolean optional: true "
-                        + "voidable: false role: \"DEFAULT\" value: true } unique_items => { type: boolean optional: "
-                        + "true voidable: false role: \"DEFAULT\" value: false } min_items => { type: "
-                        + "numeric.count optional: true voidable: false role: \"FREE\" } max_items => { "
+                        + "fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "\"access_pattern\" => { type: meta.product_access_type optional: true voidable: false role: "
+                        + "\"FIXED\" value: INDEX } \"size_type\" => { type: meta.product_size_type optional: true "
+                        + "voidable: "
+                        + "false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: meta.type_kind optional: "
+                        + "false "
+                        + "voidable: false role: \"FREE\" } \"voidable\" => { type: boolean optional: true voidable: "
+                        + "false role: \"DEFAULT\" value: false } \"ordered\" => { type: boolean optional: true "
+                        + "voidable: false role: \"DEFAULT\" value: true } \"unique_items\" => { type: boolean optional: "
+                        + "true voidable: false role: \"DEFAULT\" value: false } \"min_items\" => { type: "
+                        + "numeric.count optional: true voidable: false role: \"FREE\" } \"max_items\" => { "
                         + "type: numeric.count optional: true voidable: false role: \"FREE\" } } groups: [] "
                         + "extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
@@ -767,15 +773,17 @@ class DefinitionResolverTest {
         assertTrue(TypeChain.supertypesOf(map).contains("meta.top"), "a constructor: IS-A meta.top");
         assertEquals(List.of("meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(map));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.product\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
-                        + "fields: { chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "access_pattern => { type: meta.product_access_type optional: true voidable: false role: "
-                        + "\"FIXED\" value: NAMED } size_type => { type: meta.product_size_type optional: true voidable: "
-                        + "false role: \"FIXED\" value: VARIABLE } key_type => { type: meta.type_kind optional: false "
-                        + "voidable: false role: \"FREE\" } value_type => { type: meta.type_kind optional: false voidable: "
-                        + "false role: \"FREE\" } voidable => { type: boolean optional: true voidable: false role: "
-                        + "\"DEFAULT\" value: false } ordered => { type: boolean optional: true voidable: false "
-                        + "role: \"DEFAULT\" value: false } min_items => { type: numeric.count optional: "
-                        + "true voidable: false role: \"FREE\" } max_items => { type: numeric.count "
+                        + "fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "\"access_pattern\" => { type: meta.product_access_type optional: true voidable: false role: "
+                        + "\"FIXED\" value: NAMED } \"size_type\" => { type: meta.product_size_type optional: true "
+                        + "voidable: "
+                        + "false role: \"FIXED\" value: VARIABLE } \"key_type\" => { type: meta.type_kind optional: false "
+                        + "voidable: false role: \"FREE\" } \"value_type\" => { type: meta.type_kind optional: false "
+                        + "voidable: "
+                        + "false role: \"FREE\" } \"voidable\" => { type: boolean optional: true voidable: false role: "
+                        + "\"DEFAULT\" value: false } \"ordered\" => { type: boolean optional: true voidable: false "
+                        + "role: \"DEFAULT\" value: false } \"min_items\" => { type: numeric.count optional: "
+                        + "true voidable: false role: \"FREE\" } \"max_items\" => { type: numeric.count "
                         + "optional: true voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" "
                         + "discriminators: [] parameters: [] }",
                 write(map));
@@ -812,8 +820,8 @@ class DefinitionResolverTest {
 
         Top production = resolver.resolve(schemaMap.declarations().get("production"));
 
-        assertEquals("{ chain: { parents: [] supertypes: [ \"config\" ] subtypes: [] } fields: { host => { type: "
-                        + "text optional: true voidable: false role: \"FIXED\" value: \"prod.example.com\" } port => "
+        assertEquals("{ chain: { parents: [] supertypes: [ \"config\" ] subtypes: [] } fields: { \"host\" => { type: "
+                        + "text optional: true voidable: false role: \"FIXED\" value: \"prod.example.com\" } \"port\" => "
                         + "{ type: integer optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
                 write(production));
@@ -864,15 +872,16 @@ class DefinitionResolverTest {
         assertTrue(TypeChain.supertypesOf(set).contains("meta.top"), "a constructor: IS-A meta.top");
         assertEquals(List.of("meta.array", "meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(set));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.array\" \"meta.product\" \"meta.top\" \"meta.type\" ] "
-                        + "subtypes: [] } fields: { chain => { type: meta.type_chain optional: true voidable: false role: "
-                        + "\"FREE\" } access_pattern => { type: meta.product_access_type optional: true voidable: false "
-                        + "role: \"FIXED\" value: INDEX } size_type => { type: meta.product_size_type optional: true "
-                        + "voidable: false role: \"FIXED\" value: VARIABLE } element_type => { type: meta.type_kind "
-                        + "optional: false voidable: false role: \"FREE\" } voidable => { type: boolean optional: "
-                        + "true voidable: false role: \"FIXED\" value: false } ordered => { type: boolean optional: "
-                        + "true voidable: false role: \"FIXED\" value: false } unique_items => { type: boolean "
-                        + "optional: true voidable: false role: \"FIXED\" value: true } min_items => { type: "
-                        + "numeric.count optional: true voidable: false role: \"FREE\" } max_items => { "
+                        + "subtypes: [] } fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false "
+                        + "role: "
+                        + "\"FREE\" } \"access_pattern\" => { type: meta.product_access_type optional: true voidable: false "
+                        + "role: \"FIXED\" value: INDEX } \"size_type\" => { type: meta.product_size_type optional: true "
+                        + "voidable: false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: meta.type_kind "
+                        + "optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean optional: "
+                        + "true voidable: false role: \"FIXED\" value: false } \"ordered\" => { type: boolean optional: "
+                        + "true voidable: false role: \"FIXED\" value: false } \"unique_items\" => { type: boolean "
+                        + "optional: true voidable: false role: \"FIXED\" value: true } \"min_items\" => { type: "
+                        + "numeric.count optional: true voidable: false role: \"FREE\" } \"max_items\" => { "
                         + "type: numeric.count optional: true voidable: false role: \"FREE\" } } groups: [] "
                         + "extension: "
                         + "\"OPEN\" discriminators: [] parameters: [] }",
@@ -918,9 +927,10 @@ class DefinitionResolverTest {
         // enum_type => atom & { type: meta.type_name  members: meta.enum_set }: the constructor, `type` required.
         assertEquals(EntryKind.ATOM, EntryKind.of(enumType, n -> true));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
-                        + "fields: { chain => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
-                        + "name_type => { type: meta.identifier_kind optional: false voidable: false role: \"FREE\" } "
-                        + "members => { type: meta.enum_set optional: false voidable: false role: \"FREE\" } } groups: [] "
+                        + "fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
+                        + "\"name_type\" => { type: meta.identifier_kind optional: false voidable: false role: \"FREE\" } "
+                        + "\"members\" => { type: meta.enum_set optional: false voidable: false role: \"FREE\" } } groups: "
+                        + "[] "
                         + "extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(enumType));
         // enum => enum_type ^ { name_type?: = meta.identifier }: a constructor tightening, `name_type` pinned and
@@ -928,9 +938,10 @@ class DefinitionResolverTest {
         assertEquals(EntryKind.ATOM, EntryKind.of(enumDef, n -> true));
         assertEquals(List.of("meta.atom", "meta.enum_type", "meta.top", "meta.type"), TypeChain.supertypesOf(enumDef));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.enum_type\" \"meta.top\" \"meta.type\" ] "
-                        + "subtypes: [] } fields: { chain => { type: meta.type_chain optional: true voidable: false role: "
-                        + "\"FREE\" } name_type => { type: meta.identifier_kind optional: true voidable: false role: "
-                        + "\"FIXED\" value: meta.identifier } members => { type: meta.enum_set optional: false "
+                        + "subtypes: [] } fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false "
+                        + "role: "
+                        + "\"FREE\" } \"name_type\" => { type: meta.identifier_kind optional: true voidable: false role: "
+                        + "\"FIXED\" value: meta.identifier } \"members\" => { type: meta.enum_set optional: false "
                         + "voidable: false "
                         + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
                 write(enumDef));

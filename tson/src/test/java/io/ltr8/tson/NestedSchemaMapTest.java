@@ -76,7 +76,7 @@ class NestedSchemaMapTest {
         String written = tson.objectWriter().toTson(Namespace.of(TsonSchema.SCHEMA, own)).replaceAll("\\s+", " ");
         assertTrue(written.startsWith("!meta.schema { geo => !meta.schema { address => !meta.record "), written);
         assertTrue(written.contains("inner => !meta.schema { deep => !meta.record "), written);
-        assertTrue(written.contains("at => { type: geo.address "), written);
+        assertTrue(written.contains("\"at\" => { type: geo.address "), written);
         assertFalse(written.contains("geo.address =>"), written);
         assertFalse(written.contains("\"geo."), written);
     }

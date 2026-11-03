@@ -30,10 +30,10 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.ReferenceBody;
-import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.unicode.TextType;
@@ -99,7 +99,7 @@ public final class MetaKernelBootstrapResolver {
     /**
      * The kernel's named instances and refinements on its one wait cycle, built by hand: {@code value}, the
      * {@code boolean} and {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text}
-     * atoms, {@code meta.type_kind}, {@code field_map}, the namespace type a record's fields are a value of, and {@code
+     * atoms, {@code meta.type_kind}, {@code field_map}, the map type a record's fields are a value of, and {@code
      * numeric.count}, the one refinement.
      */
     private static final Set<String> PRE_LOADED = Set.of("meta.value", "boolean", "meta.field_role", "meta.enum_set",
@@ -394,7 +394,7 @@ public final class MetaKernelBootstrapResolver {
      * The hand-written construction of a pre-loaded instance (see the class Javadoc). The pre-loaded set applies
      * its constructors in three shapes, each checked rather than assumed: a bare {@code {}} for {@code value_type},
      * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; a bare token array for
-     * {@code enum}; and a record of tokens for {@code reference}, for {@code namespace} and for the {@code
+     * {@code enum}; and a record of tokens for {@code reference}, for {@code map} and for the {@code
      * array}/{@code set_type} binding records {@link SchemaDesugarer} lifts.
      *
      * <p>Package-private so {@code MetaKernelBootstrapResolverTest} can reach the refusals the real kernel never
@@ -418,10 +418,12 @@ public final class MetaKernelBootstrapResolver {
             // `!meta.reference { of: type }`: `of` is the one authored field, and the index is derived when the kernel
             // links, as every reference's is.
             case "meta.reference" -> new ReferenceBody(bindingField(instance.value(), "of"));
-            // `field_map => !meta.namespace { value_type: meta.record_field  ordered: true }`: keys of the host's family.
-            case "meta.namespace" -> new NamespaceBody(fieldToken(instance.value(), "key_type").map(TypeRef::of),
+            // `field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }`.
+            case "meta.map" -> new MapBody(TypeRef.of(bindingField(instance.value(), "key_type")),
                     TypeRef.of(bindingField(instance.value(), "value_type")),
-                    fieldToken(instance.value(), "ordered").map(Boolean::parseBoolean).orElse(false));
+                    fieldToken(instance.value(), "voidable").map(Boolean::parseBoolean).orElse(false),
+                    fieldToken(instance.value(), "ordered").map(Boolean::parseBoolean).orElse(false),
+                    optionalCount(instance.value(), "min_items"), optionalCount(instance.value(), "max_items"));
             // array and set differ only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
             case "meta.array" -> toArrayBody(instance.value(), false);
             case "meta.set_type" -> toArrayBody(instance.value(), true);

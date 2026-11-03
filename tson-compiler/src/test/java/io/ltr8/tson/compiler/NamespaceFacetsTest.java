@@ -67,11 +67,11 @@ class NamespaceFacetsTest {
                 """), "'api'", "unknown field 'extends' on 'meta.namespace'");
     }
 
-    /** {@code key_type} is optional: absent, the host of a value supplies the family, as a record's fields are keyed. */
+    /** {@code key_type} is required: no host supplies a namespace's key family. */
     @Test
-    void theKeyFamilyMayBeLeftToTheHost() {
-        assertEquals(List.of(), link("""
+    void theKeyFamilyIsRequired() {
+        refused(link("""
                 hosted => !meta.namespace { value_type: method }
-                """));
+                """), "'hosted'", "key_type");
     }
 }

@@ -139,20 +139,18 @@ spec-required case:
   component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`
   component there is a bind mismatch. Nothing in the JSON stack binds `schema.meta` today, so nothing fails yet; a
-  JSON reading of resolved output, a record's `fields` among it, would.
+  JSON reading of resolved output, its schema map among it, would.
 - [ ] **A JSON read naming a value entry reports a gap, not the document's mistake.** A TSON read whose tag names a
   value entry (`!orders { … }`) is a `TYPE_MISMATCH` (`ValueEntryReader`): a value is no type. `tson-json`'s
   `JsonSchemaCompiler` dispatches a `ValueEntry` to the factory of its type's name, finds none, and compiles an
   `ErrorReader`, so the same document in JSON reports `NOT_IMPLEMENTED`. Give the JSON stack the same refusal and a
   `CrossEncodingParityTest` case.
-- [ ] **`meta.namespace` is `meta.map`'s sibling, not its refinement** ([TSON-SCHEMA] §4.1, §5.7;
-  `SPEC-FEEDBACK.md #9`). Its form is a map's, but `meta.namespace => meta.product & { key_type?: … }` leaves
-  `meta.kind<meta.map>` without the namespace types: §5.7 refuses `meta.map ^ { … }` making the required `key_type`
-  optional, and it is optional only because `meta.field_map`'s key family is its record's `name_type`, a value
-  depending on its host. Once dependent fields exist (a Revision 39 proposal), make it `meta.namespace => meta.map ^ {
-  key_type: meta.identifier_kind … }` with `key_type` required, `meta.field_map` a template applied to its record's
-  `name_type`, and add a vector that `meta.kind<meta.map>` holds a
-  namespace type.
+- [ ] **Decide whether `meta.namespace` refines `meta.map`** ([TSON-SCHEMA] §4.1, §5.7; `SPEC-FEEDBACK.md #9`). Its
+  form is a map's, but `meta.namespace => meta.product & { key_type: meta.identifier_kind … }` is `meta.map`'s sibling,
+  so `meta.kind<meta.map>` does not hold the namespace types. What kept it a sibling, an optional `key_type` for
+  `meta.field_map`'s host-supplied key family, is gone: `key_type` is required and `meta.field_map` is a plain ordered
+  map keyed by text. Decide whether it becomes `meta.map ^ { key_type: meta.identifier_kind … }` (its values never
+  void and unbounded, as now) and, if so, add a vector that `meta.kind<meta.map>` holds a namespace type.
 - [ ] **A parameter in a record field's `value` has no channel of its own** ([TSON-SCHEMA] §5.10). It is an unquoted
   token in `meta.record_field.value`, told from a literal by §5.10's shadowing rule, in resolved output as in source; at a
   type position or among an application's arguments a parameter is its name, as the reference grammar reads one

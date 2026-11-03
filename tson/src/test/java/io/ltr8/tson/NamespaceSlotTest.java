@@ -21,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The kernel's two namespace types at their named positions: the schema map is a value of {@code schema} and a
- * record's {@code fields} a value of {@code field_map}, so the model holds both as {@link Namespace} values. At a
- * named position the value writes as the map alone -- {@code fields: { ... }}, the slot's type naming the
- * constructor -- and binds back as a {@code Namespace} of the slot's type.
+ * The kernel's schema map and a record's fields at their named positions: the schema map is a value of the
+ * namespace type {@code schema}, held as a {@link Namespace}, and a record's {@code fields} a value of {@code
+ * field_map}, an ordered map keyed by text. At a named position either writes as the map alone -- {@code fields: {
+ * ... }} -- and binds back as what the slot's host declares.
  */
 class NamespaceSlotTest {
 
@@ -47,20 +47,19 @@ class NamespaceSlotTest {
     }
 
     @Test
-    void theSchemaMapAndARecordsFieldsAreValuesOfTheKernelsNamespaceTypes() {
+    void theSchemaMapIsANamespaceValueAndARecordsFieldsAnOrderedMap() {
         TsonSchema schema = tson().resolve(SCHEMA).schema();
         assertEquals(TsonSchema.SCHEMA, schema.entries().type());
         RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
-        assertEquals(RecordBody.FIELD_MAP, person.fields().type());
         assertEquals(List.of("name", "age", "nick"), List.copyOf(person.fields().keySet()));
     }
 
     @Test
-    void aRecordsFieldsWriteAsTheMapAndBindBackAsANamespaceOfTheSlotsType() {
+    void aRecordsFieldsWriteAsTheMapAndBindBackInOrder() {
         Tson tson = tson();
         RecordBody person = person(tson);
         String written = tson.objectWriter().toTson(person);
-        assertTrue(written.replaceAll("\\s+", " ").contains("fields: { name => "), written);
+        assertTrue(written.replaceAll("\\s+", " ").contains("fields: { \"name\" => "), written);
         assertFalse(written.contains("!field_map"), written);
 
         Map<String, Object> read = ResolvedForm.readResolved(tson, """
@@ -70,7 +69,6 @@ class NamespaceSlotTest {
                   nick => { type: text  optional: true }
                 } } }""", List.of(TsonBundledSchemas.CORE_ID));
         RecordBody back = assertInstanceOf(RecordBody.class, read.get("person"));
-        assertEquals(RecordBody.FIELD_MAP, back.fields().type());
         assertEquals(List.of("name", "age", "nick"), List.copyOf(back.fields().keySet()));
         assertEquals(ResolvedForm.rendered(person.fields()), ResolvedForm.rendered(back.fields()));
     }
@@ -82,8 +80,20 @@ class NamespaceSlotTest {
         List.copyOf(person.fields().entrySet()).reversed().forEach(field -> fields.put(field.getKey(),
                 field.getValue()));
         RecordBody reversed = person.withFields(RecordBody.fieldMap(fields));
-        assertEquals(person.fields(), reversed.fields(), "field_map's own equality leaves order to its owner");
+        assertEquals(person.fields(), reversed.fields(), "a map's own equality leaves order to its owner");
         assertFalse(person.equals(reversed), "field_map is ordered, so the record compares its fields in order");
+    }
+
+    /** A key's annotations are part of the map they are written in, and output writes them ahead of the key. */
+    @Test
+    void aFieldKeysAnnotationsWriteAheadOfTheKey() {
+        Tson tson = tson();
+        RecordBody person = person(tson);
+        RecordBody marked = person.withFields(person.fields().withAnnotations("age",
+                io.ltr8.annotation.Annotations.of(List.of(io.ltr8.annotation.Annotation.of("note")))));
+        String written = tson.objectWriter().toTson(marked).replaceAll("\\s+", " ");
+        assertTrue(written.contains("@note \"age\" => "), written);
+        assertFalse(written.contains("@note @note"), written);
     }
 
     @Test

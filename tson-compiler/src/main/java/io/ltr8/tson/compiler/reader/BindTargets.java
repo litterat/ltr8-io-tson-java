@@ -36,8 +36,8 @@ import java.util.Optional;
  *       and {@code Map<String, SequencedMap<String, Long>>} each receive what they declare. A void element
  *       cannot reach a primitive array, an ordered map needs a map that keeps insertion order, and a tuple
  *       class needs the tuple's arity and somewhere for each voidable position's void value.</li>
- *   <li><b>A namespace type's map at a {@link Namespace} target</b> -- a record's {@code fields}, a value of {@code
- *       field_map} -- is read for the target's {@code entries} and delivered as an instance of the constructor
+ *   <li><b>A namespace type's map at a {@link Namespace} target</b> -- a value of a schema's {@code api =>
+ *       !meta.namespace { ... }} -- is read for the target's {@code entries} and delivered as an instance of the constructor
  *       ({@link NamespaceInstanceReader}). A map that is no namespace has no constructor to name and cannot fill
  *       one; a {@code Map} target at a namespace type receives the map.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and

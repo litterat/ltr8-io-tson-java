@@ -271,7 +271,7 @@
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
-      key_type       => !meta.record_field { type: meta.identifier_kind  optional: true }
+      key_type       => !meta.record_field { type: meta.identifier_kind }
       value_type     => !meta.record_field { type: meta.type_kind }
       ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     } }
@@ -337,7 +337,7 @@
       optional         => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     } }
 
-    field_map => !meta.namespace { value_type: meta.record_field  ordered: true }
+    field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }
 
     record => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }

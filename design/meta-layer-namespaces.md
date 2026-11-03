@@ -22,14 +22,16 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   is exhaustive with an explicit `ValueEntry` arm and no `default`: `EntryKind.of`, `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
 - **`meta.namespace` is a constructor under `meta.product`**, and a namespace type is an instance of it, resolved to a
-  `NamespaceBody` (`key_type` optional, `value_type`, `ordered`): the kernel's `meta.schema => !meta.namespace {
-  key_type: meta.type_name value_type: meta.declared }` and `meta.field_map => !meta.namespace { value_type:
-  meta.record_field ordered: true }`, a schema's own `api => !meta.namespace { key_type: meta.identifier value_type: method
-  }`. A value of one is the map its facets describe (`NamespaceBody.read()`), and nothing else: a field beside the facets is
-  refused by `meta.namespace`'s own record reader.
-- A stated `key_type` is a member of `meta.identifier_kind`, judged at link (`validateBody`). An absent one means the host
-  of a value supplies the family: keys read as `text` (`NamespaceBody.HOST_KEYS`) and are judged by the host, as a
-  record's `fields` are by its `name_type`.
+  `NamespaceBody` (`key_type`, `value_type`, `ordered`): the kernel's one, `meta.schema => !meta.namespace { key_type:
+  meta.type_name value_type: meta.declared }`, and a schema's own `api => !meta.namespace { key_type: meta.identifier
+  value_type: method }`. A value of one is the map its facets describe (`NamespaceBody.read()`), and nothing else: a
+  field beside the facets is refused by `meta.namespace`'s own record reader.
+- `key_type` is required, and is a member of `meta.identifier_kind`, judged at link (`validateBody`): a namespace's
+  keys are always judged by its own family, never a host's.
+- **A record's fields are no namespace.** `meta.field_map => !meta.map { key_type: text value_type: meta.record_field
+  ordered: true }` is an ordered map keyed by text (`RecordBody.fields`, an `AnnotatedMap`): a field name is text within
+  its own record, judged by the record's `name_type` as `discriminators` and the groups are (`FieldNames`), and no
+  qualified name selects a field declaration (§4.1's segments select in values only).
 - A namespace type is a member of `meta.type_kind`, `meta.kind<meta.product>` and `meta.kind<meta.namespace>`, and of no
   `meta.kind<meta.record>` or `meta.kind<meta.map>`; `meta.namespace` itself is a constructor whose declaration is a record,
   so `meta.type_kind` and `meta.kind<meta.record>` hold it. **A value entry is a member of no kind** (no reference over a
@@ -56,7 +58,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   each segment naming a member of a nested `!schema` map collapsing onto that member's path entry (`geo.home`); a
   further segment selects a key of a value of a named product, a namespace value's key or a record value's field
   (bound or tree-held), the record being a namespace whose keys its type fixes; a map that is no namespace, `{text =>
-  method}`, is not entered whatever its key type.
+  method}` or a record value's `meta.field_map`, is not entered whatever its key type.
 - A field step through a bound record value reads the host object through the descriptor of the bind context it was
   bound under, by wire name, never by reflection (`TsonCompiledMetaRegistry.link`). An optional field the value does
   not hold is refused as not present, after the referent's type is judged.
@@ -64,8 +66,8 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   `declared` position whose tag selects a namespace type (`DeclaredReader`, which is how resolved output's entries
   read), a namespace-typed slot whose host component is a `Namespace` (`BindTargets`), and a root read asked for
   `Namespace.class`. Everywhere else a namespace type reads as its map. Tree mode delivers the tree.
-- The model holds every bound value of a namespace type as a `Namespace`: a value entry's value, the schema map
-  (`TsonSchema.entries`) and a record's fields (`RecordBody.fields`). `Namespace` has its map's read API and is no
+- The model holds every bound value of a namespace type as a `Namespace`: a value entry's value and the schema map
+  (`TsonSchema.entries`). `Namespace` has its map's read API and is no
   `Map`; its equality is `type`, the entries as a map and each key's annotations, never order.
 - A value entry of a type declared in the same document, `!T { … }` with `T` local, is read once `T` is ready, in
   wait order, whichever is written first (`design/schema-resolution.md`). An instance of a constructor whose
@@ -117,10 +119,9 @@ interface  => { extends?: [meta.type_name]  methods: method_map }
 interfaces => !meta.namespace { key_type: meta.identifier  value_type: interface }
 ```
 
-**Not a refinement of `meta.map`.** §5.7 forbids a refinement to make a required field optional, and `meta.map`'s
-`key_type` is required, so `meta.namespace` is `meta.map`'s sibling under `meta.product`: `meta.kind<meta.map>` does not hold
-a namespace type, and a map
-that is no namespace is never entered by a qualified name. Both compilers read a namespace type through the map
+**Not a refinement of `meta.map`.** `meta.namespace` is `meta.map`'s sibling under `meta.product`, declaring its own
+facets: `meta.kind<meta.map>` does not hold a namespace type, and a map that is no namespace is never entered by a
+qualified name. Both compilers read a namespace type through the map
 factory with the map `NamespaceBody.read()` states (`design/linking-and-compilation.md`).
 
 **A kind is judged by origin.** `EntryKind.of` counts the base kinds only as the kernel's own entries (declared by
@@ -229,20 +230,23 @@ load-bearing rather than a nicety.
 `AnnotatedMap`, keeping each key's annotations and order (`MapBindReader`); `NamespaceInstanceReader` wraps it where
 the position asks for the instance: the resolver's read of a value entry's payload (`SchemaResolver.asValue`), a
 `declared` position whose tag selects a namespace type (`DeclaredReader`, the kernel `meta.schema` map's values), a
-namespace-typed slot whose host component is a `Namespace` (`BindTargets`, which is how a record's `fields` binds),
-and a root read asked for `Namespace.class` (`TsonObjectReader`). A host declaring a `Map` at a namespace-typed slot
-receives the map; a `Namespace` component at a map that is no namespace has no type to name and is a bind mismatch.
+namespace-typed slot whose host component is a `Namespace` (`BindTargets`), and a root read asked for
+`Namespace.class` (`TsonObjectReader`). A host declaring a `Map` at a namespace-typed slot receives the map; a
+`Namespace` component at a map that is no namespace has no type to name and is a bind mismatch.
 
 **`Namespace` is no `Map`.** A binder or writer testing `instanceof Map` would lose the type, so it has its map's read
-API and nothing more: iteration is over `entries()`, and `RecordBody` compares its `field_map` in order itself, order
-being the `ordered` facet and not part of equality. Its `type` names the namespace type; it carries no `@Typename`.
+API and nothing more: iteration is over `entries()`, and an owner whose namespace is ordered compares it in order
+itself, order being the `ordered` facet and not part of equality. Its `type` names the namespace type; it carries no
+`@Typename`.
 
 **Resolved output is written as written.** `DataClassObjectWriter` writes a `ValueEntry` as its `type` for the tag
 and then the value: a `Namespace` as its map, each key with its annotations, bare where it is an identifier and
 quoted otherwise; a bound object through its descriptor; a tree through the tree writer. A `Namespace` at a slot its
-host types as one is written untagged (`fields: { name => … }`). A value by name is a `TypeRef` and is written as the
-name written (§8.3). The kernel's `meta.schema` reader marks its read as a schema document's (`readsSchemaNames`), so a
-resolved form read as data reads its names by grammar alone, and their membership is ingest's
+host types as one is written untagged (`methods: { place_order => … }`). A record's `fields`, a plain map keyed by
+text, is written as one, each key quoted as text and preceded by the annotations its `AnnotatedMap` holds. A value
+by name is a `TypeRef` and is written as the name written (§8.3). The kernel's `meta.schema` reader marks its read as a
+schema document's (`readsSchemaNames`), so a resolved form read as data reads its names by grammar alone, and their
+membership is ingest's
 (`design/kinds-and-name-types.md`).
 
 **A value entry compiles to a refusal.** Nothing is read against a value, so `TsonSchemaCompiler` gives a value entry

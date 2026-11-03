@@ -163,8 +163,8 @@ whatever a deployment sets.
 The kernel, meta.tn (#15), measured from `meta-resolved.tn`'s own declarations, no compiled reader consulted, has one
 wait cycle, holding `meta.record` and 25 more of its 86 entries (`boolean`, `integer`, `text`, `numeric.count` and
 `numeric.integer_size` (#16), the enum and set machinery, `meta.field_group`, `meta.record_field`, `meta.type_chain`,
-`meta.namespace` and `meta.field_map`, `meta.type_kind`, and the synthetics they name), every other entry ordered after
-it, the longest chain 4; the kernel holds that cycle's closure and the concepts that go with it (#15). The kernel
+`meta.map` and its instance `meta.field_map`, `meta.type_kind`, and the synthetics they name), every other entry ordered
+after it, the longest chain 4; the kernel holds that cycle's closure and the concepts that go with it (#15). The kernel
 declares `meta.annotation => void`: annotating itself with `@meta.annotation` would be a second cycle, and the marker
 changes no value (§6). The bootstrap builds by hand exactly the instances and the one refinement on that cycle (a test
 holds the set to the measurement), and makes every other entry ready by the algorithm above. A pin reached through an
@@ -454,19 +454,21 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 **What is running.**
 
 - **`namespace` is a constructor under `product`**,
-  `namespace => product & { key_type?: meta.identifier_kind  value_type: meta.type_kind  ordered?: boolean ~ false }`,
+  `namespace => product & { key_type: meta.identifier_kind  value_type: meta.type_kind  ordered?: boolean ~ false }`,
   and a namespace type is an instance of it, as a map type is one of `map`:
   `schema => !namespace { key_type: meta.type_name  value_type: meta.declared }`,
-  `field_map => !namespace { value_type: meta.record_field  ordered: true }`,
   `api => !namespace { key_type: meta.identifier  value_type: method }`. A value of one is the map its facets
-  describe. `key_type` is optional: absent, the host of a value supplies the family, as a record's `fields` are keyed
-  by its `name_type`. A stated `key_type` is a member of `meta.identifier_kind`, judged at link. Its form is `map`'s:
-  the same access and size facets, and a value of a namespace type is read as a map. It is `map`'s sibling under
-  `product` rather than `map ^ { … }`, so `meta.kind<map>` holds no namespace type, and one thing holds it there: the
-  optional `key_type`. §5.7 is right to refuse a refinement that makes `map`'s required `key_type` optional, since a
-  value IS-A `map` is one a map's reader can read, and that needs its key type. The absent `key_type` stands in for a
-  value that depends on its host — `field_map`'s key family is its record's `name_type` — which the kernel has no
-  spelling for yet.
+  describe, every key a name of the family `key_type` states, a member of `meta.identifier_kind` judged at link.
+  `key_type` is required: no host supplies a namespace's key family. Its form is `map`'s: the same access and size
+  facets, and a value of a namespace type is read as a map. It is `map`'s sibling under `product` rather than `map ^ {
+  … }`, so `meta.kind<map>` holds no namespace type. `schema` is the kernel's one.
+- **A record's fields are no namespace.** `field_map => !map { key_type: text  value_type: meta.record_field  ordered:
+  true }`. A field name is text within its own record, judged by the record's `name_type` as `discriminators` and a
+  group's `members` are, and as `enum_set` is for an enum's members: the map's own key uniqueness compares the text
+  as written, and two keys that are one value under the name type's equality are a resolver error. §5.12's further
+  segments select in a value and a type entry admits none, so no qualified name selects a field declaration
+  (`foo.bar` and `foo.fields.bar` for `foo => { bar: text }` are refused); and a record value whose field is typed
+  `field_map` holds a map that is no namespace, which no segment enters (`point.p.fields.x` is refused at `fields`).
 - **An entry is a type exactly when its value is built by a constructor IS-A `type`.** `name => !T { … }` with `T` a
   constructor builds a type; with `T` an ordinary type — a record, a namespace type, any type of the closure — the
   entry is a value of `T`, read against `T` as a data value is, and marked by nothing but its tag. A value entry is a
@@ -487,9 +489,9 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   and its membership judged where that schema links, or at ingest. That replaces the stand-in that read grammar alone
   under the kernel and any schema importing it directly: a data document importing temporal.tn that writes
   `!meta.record_field { type: int32 }` is refused, `int32` being no member of `meta.type_kind` in temporal.tn's closure.
-- **The kernel's wait cycle** (#4) gains `namespace`, `field_map` being its instance, and loses `meta.field_name`,
-  `field_map`'s keys being read by their spelling: 26 of the kernel's 86 entries, longest chain 4 (#4). The bootstrap
-  builds `field_map` by hand with the rest of the pre-loaded set.
+- **The kernel's wait cycle** (#4) holds `map`, `field_map` being its instance, and not `namespace` or
+  `meta.field_name`, `field_map`'s keys being `text`: 26 of the kernel's 86 entries, longest chain 4 (#4). The
+  bootstrap builds `field_map` by hand with the rest of the pre-loaded set.
 - **Hosts.** One bind context serves schemas and data; the names the kernel declares and the libraries' members of `numeric`,
   `temporal` and `net` always bind to the schema model (#15), and every other name binds through the consumer's binder. A
   value entry whose type no class binds is held as a tree, so a schema loads and validates without host classes; a schema
@@ -503,22 +505,23 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 - §4.1: the kinds are `atom`, `product` and `sum` under `type`, beside `alias` (#10) and `template` under `top`;
   `namespace` is a constructor under `product` whose instances are namespace types, and the paragraph making a
   namespace type the one constructor whose instances are not types goes. An entry is a type exactly when its value
-  is built by a constructor IS-A `type`, and any other entry is a value, its tag naming its type. `schema`'s
-  `value_type` is `declared`, which with `declared_type` is the kernel's.
+  is built by a constructor IS-A `type`, and any other entry is a value, its tag naming its type. `namespace`'s
+  `key_type` is required. `schema`'s `value_type` is `declared`, which with `declared_type` is the kernel's.
+  `field_map` is an ordered `map` keyed by `text`, each key judged by the record's `name_type`.
 - §4.2: a namespace type is a member of `meta.type_kind`, `meta.kind<product>` and `meta.kind<namespace>`, and a
   value entry of no reference over a constructor; the rest of §4.2 is #11's.
 - §5.7: "Constructor refinement in a meta-schema is the meta-level exception and MAY replace fixed values (§4.2)"
   is ladder wording; with no meta-schema it is restated for a constructor refinement wherever it is written, or the
-  exception goes. The omission order stands: it is what keeps `namespace` from being `map ^ { … }` today.
+  exception goes. The omission order stands.
 - §5.12: a qualified name's first segment names an entry holding a value; a further segment selects a key of a value
   of a namespace type or a field of a record value.
 - §7.4, §8.1: a kind-typed position in a data document is judged by membership in the document's closure; in a
   schema document, and a resolved form read as one, its grammar is read and membership is the schema's link's or
   ingest's.
 
-**Open.** `namespace => map ^ { key_type: meta.identifier_kind … }`, with `key_type` required, once a field's value can
-depend on its host (dependent fields): `field_map` then becomes a template applied to its record's `name_type`, and
-`meta.kind<map>` holds every namespace type. §5.7 is unchanged by it.
+**Open.** Whether `namespace` becomes `map ^ { key_type: meta.identifier_kind … }`, now that its `key_type` is
+required and `field_map` is a plain map: `meta.kind<map>` would then hold every namespace type. §5.7 is unchanged by
+it.
 
 ## 10. [TSON-SCHEMA] §4.1, §7.2, §8, §11.5, §12.1 — the alias body is `alias`; a reference is a name in a slot
 
@@ -902,26 +905,26 @@ data format made a schema that wants dates reserve every network and numeric nam
   kernel's by declaring document (§4.1), which is meta.tn alone, so the libraries' constructors are ordinary
   constructors of the documents that declare them.
 - **The kernel, measured.** Over `meta-resolved.tn`'s own declarations (no compiled reader consulted), the cycle is 26
-  entries: `meta.record`, `meta.array`, `meta.set_type`, `enum`, `meta.namespace`, `meta.field_map`, `meta.reference`,
+  entries: `meta.record`, `meta.array`, `meta.set_type`, `enum`, `meta.map`, `meta.field_map`, `meta.reference`,
   `numeric.integer_type`, `unicode.text_type`, `meta.value_type`, `boolean`, `integer`, `text`, `numeric.count`,
   `numeric.integer_size` (`count`'s resolved `size` is read against it, #16), `meta.value`, `meta.type_kind`,
   `meta.type_chain`, `meta.record_field`, `meta.field_group`, `meta.field_role`, `meta.enum_set` and four lifted arrays.
   Closing it under every name its declarations reference — every rule-1 wait, every field type and `of`, every
   annotation type its entries carry, and what reading the document itself waits on, its root tag's `schema`, an alias
-  of `meta.schema`, with that map's key and value types and the annotations on its keys — gives 69 entries, adding
-  `schema`, the base kinds,
+  of `meta.schema`, with that map's key and value types and the annotations on its keys — gives 70 entries, adding
+  `schema`, `meta.namespace`, the base kinds,
   `meta.alias`, `meta.declared_type`, the identifier, iri and regex families with `atom.specification`,
   `meta.template_param`, `meta.declared`, `meta.type_name`, `doc`, `meta.annotation`, `meta.synthetic`,
   `[meta.template_param]`, the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric`,
   which the root atoms carry on their keys, `iri_reference`, the source `iri` refines, and `int64`, the source
   `numeric.count` refines. The iri and regex families are there because `text_type.pattern` is typed `regex` and
   `identifier_type`, `iri_type` and `regex_type` compose `atom.specification`, whose `spec` is an `iri`. The kernel is
-  that closure and the concepts that belong with it, which nothing in the closure names: `meta.map`, `meta.tuple`,
+  that closure and the concepts that belong with it, which nothing in the closure names: `meta.tuple`,
   `meta.choice`, `meta.tuple_element` (with its lifted array), `meta.template`, `meta.application`, `meta.kind`,
   `meta.ref`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet sequence
   (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) — 86 entries, 67 under its six maps, 13 at the root and six
   synthetics, with the six maps themselves the 87th to 92nd. A test holds the kernel to containing the closure, pins
-  the cycle at 26 and the closure at 69, and pins the related set, so an entry that drifts in either
+  the cycle at 26 and the closure at 70, and pins the related set, so an entry that drifts in either
   direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` → `meta.void_type` →
   `[meta.type_kind]`). A schema importing meta.tn alone has every elided construction, `meta.kind<T>` and `meta.ref<T>`.
 - **The bootstrap** builds by hand 13 of the cycle's 26 entries — its instances and its one refinement (`meta.value`,

@@ -1793,7 +1793,7 @@ final class DefinitionResolver {
     private RecordBody refineOnto(String name, RefinedDef refined,
             List<String> parameters, io.ltr8.tson.schema.meta.TypeRef source,
             List<String> transitiveSupertypes, RecordBody sourceBody) {
-        SequencedMap<String, RecordField> fields = new LinkedHashMap<>(sourceBody.fields().entries());
+        SequencedMap<String, RecordField> fields = new LinkedHashMap<>(sourceBody.fields());
         List<FieldGroup> groups = new ArrayList<>(sourceBody.groups());
         Set<String> inheritedFields = Set.copyOf(sourceBody.fields().keySet());
         refuseDeclaredChain(name, refined.body().entries(), transitiveSupertypes);

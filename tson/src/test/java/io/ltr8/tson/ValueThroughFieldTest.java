@@ -6,7 +6,6 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.consumer.Endpoint;
-import io.ltr8.tson.consumer.Pick;
 import io.ltr8.tson.consumer.Route;
 import io.ltr8.tson.consumer.Service;
 import io.ltr8.tson.consumer.Shape;
@@ -141,22 +140,25 @@ class ValueThroughFieldTest {
     }
 
     /**
-     * A value the consumer supplies no class for: a {@code field_map}'s values bind to the library's own {@link
-     * RecordField} through the kernel's binder, and the walk reads the consumer's {@code shape} by its descriptor,
-     * enters the {@code Namespace} its field holds, and delivers the {@code RecordField} under the key.
+     * A value the consumer supplies no class for binds through the kernel's binder: a {@code field_map}'s values are
+     * the library's own {@link RecordField}. The map is no namespace, so a qualified name does not enter it: a field
+     * name is text within its own record, and {@code point.p.fields.x} is refused at {@code fields}.
      */
     @Test
-    void aValueTheLibrarysOwnBinderBoundIsDelivered() {
-        Map<String, ?> entries = tson().resolve(shop("""
-                point => !shapes { p => { fields: { x => { type: int64 } } } }
-                look  => !picks { a => { field: point.p.fields.x } }""")).schema().entries().entries();
-
-        Pick pick = assertInstanceOf(Pick.class, assertInstanceOf(Namespace.class, valueOf(entries.get("look"))).get("a"));
+    void aRecordsFieldMapIsBoundAndNotEnteredByName() {
+        Tson tson = tson();
+        Map<String, ?> entries = tson.resolve(shop("""
+                point => !shapes { p => { fields: { x => { type: int64 } } } }""")).schema().entries().entries();
         Shape shape = assertInstanceOf(Shape.class,
                 assertInstanceOf(Namespace.class, valueOf(entries.get("point"))).get("p"));
-        RecordField x = assertInstanceOf(RecordField.class, pick.field().get());
-        assertEquals(TypeRef.of("int64"), x.type());
-        assertSame(shape.fields().get("x"), x);
+        assertEquals(TypeRef.of("int64"), assertInstanceOf(RecordField.class, shape.fields().get("x")).type());
+
+        List<Diagnostic> problems = tson.validateSchema(shop("""
+                point => !shapes { p => { fields: { x => { type: int64 } } } }
+                look  => !picks { a => { field: point.p.fields.x } }"""));
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains(
+                "'point.p.fields' is a 'meta.field_map', a map that is no namespace"), problems::toString);
     }
 
     // ── Refused ─────────────────────────────────────────────────────────────────────────────────────

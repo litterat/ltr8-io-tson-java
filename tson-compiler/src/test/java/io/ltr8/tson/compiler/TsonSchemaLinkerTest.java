@@ -10,7 +10,6 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
-import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
@@ -149,7 +148,7 @@ class TsonSchemaLinkerTest {
     }
 
     /** A one-parameter record template: the record it is, with its parameter stated ([TSON-SCHEMA] §5.10). */
-    private static Top recordTemplate(String parameter, Namespace<RecordField> fields) {
+    private static Top recordTemplate(String parameter, AnnotatedMap<String, RecordField> fields) {
         return RecordBody.of(fields).withParameters(List.of(TemplateParam.typeParameter(parameter)));
     }
 
