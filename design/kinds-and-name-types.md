@@ -25,9 +25,12 @@ is why they are the linker's. Current form only; history lives in git.
 - A constructor is a member where the walk says so, as any type is: one whose declaration is a record (`net.uuid_type
   => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_kind`, `meta.kind<meta.record>` and
   `meta.kind<meta.product>` hold it, `meta.namespace` and `meta.reference` among them. A namespace type is built with
-  `meta.namespace`, so it is a member of `meta.type_kind`, `meta.kind<meta.product>` and `meta.kind<meta.namespace>`, and of
-  no `meta.kind<meta.record>` or `meta.kind<meta.map>`. A value entry is a member of no kind: its tag names an ordinary type,
-  which no walk reaches a constructor through.
+  `meta.namespace`, a refinement of `meta.map`, so it is a member of `meta.type_kind`, `meta.kind<meta.product>`,
+  `meta.kind<meta.map>` and `meta.kind<meta.namespace>`, and of no `meta.kind<meta.record>`. A value entry is a member of
+  no kind: its tag names an ordinary type, which no walk reaches a constructor through.
+- A refinement of a reference (`!meta.type_kind ^ { of: … }`) narrows `of` to the source's or a type IS-A it, judged
+  at link (`ReferenceBody.ofNarrowing`), and is IS-A its source: `meta.identifier_kind` is `meta.type_kind` narrowed to
+  `unicode.identifier_type`, its chain listing `meta.type_kind`.
 - A kind-typed position is judged by membership in every data document, over the reading document's closure; in a
   schema document it reads its grammar alone and the link (or ingest) judges membership.
 - An empty kind admits no value, and `TypeInhabitance` refuses a required field typed by it: `meta.kind<meta.alias>` is one,
@@ -64,7 +67,7 @@ schema's one namespace (SPEC-FEEDBACK.md #7), and the members are computed.
 
 A kind (`!meta.reference { of: net.uuid_type }`, or `meta.kind<net.uuid_type>` through the kernel's template) is an atom
 whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a
-listed one. The kernel declares `meta.identifier_kind` and `meta.type_kind`, and types
+listed one. The kernel declares `meta.type_kind` and its refinement `meta.identifier_kind`, and types
 `meta.enum_type.name_type` and `meta.record.name_type` by the first. `computeKinds` derives every reference's index
 (`ReferenceBody.linked`) onto its body in the merged map after `computeSubtypes` and before the name-type checks; a reference
 that names values gets `namesTypes` false and no members.
@@ -85,10 +88,15 @@ that names values gets `namesTypes` false and no members.
   member of that path under §2.2.3. The closure
   walked is the merged map, the kernel's own types included, so `meta.kind<meta.record>` lists the kernel's records beside
   the schema's, and `meta.kind<meta.namespace>` holds a schema's own namespace type `api` beside `meta.schema`, and
-  `meta.kind<meta.map>` holds `meta.field_map`.
+  `meta.kind<meta.map>` holds those and `meta.field_map`, which `meta.kind<meta.namespace>` does not.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: a name resolving to nothing is
   an unresolved reference, and an open entry or a value entry is refused (`KindMembers.ofRefusal`), against the
-  declaration that wrote the application (`reportedAgainst`). Anything else is admitted: `meta.kind<meta.top>` holds every
+  declaration that wrote the application (`reportedAgainst`). A refinement's `of` is then judged against its source's
+  (`checkReferenceNarrows`): the source's or IS-A it, by the chain of the entry `of` names past its alias hops, so a
+  widening or an unrelated `of` is refused. The resolver binds a refinement before the names `of` holds are ready
+  (they wait on nothing, `design/resolver-vocabulary-and-bootstrap.md`), so the IS-A is the link's to ask, and the
+  family's rule (`ReferenceBody.ofNarrowing`) takes it as a predicate; `constraintsCheck` asks only that a reference
+  refines a reference. Anything else is admitted: `meta.kind<meta.top>` holds every
   type, `meta.kind<meta.alias>` holds nothing, and `meta.kind<stock_id>` or `meta.kind<api>` names values of that type.
 - **Recomputed everywhere, trusted nowhere.** Members are computed over each linking schema's closure, so the
   kernel's `meta.identifier_kind` lists a user schema's own `text_identifier` at that schema's link, and `members` is

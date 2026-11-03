@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=01962c127e804243ac00d3db6ea6f3d4d7a425f9c62a04023c8bdbb49769c323"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=e6da922bf3b4da463401f5227d73c7c288cf55b16dc38863da1ed20d2c335bcc"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -427,28 +427,6 @@
     sum       => abstract meta.type & {}
 
     @doc:"""
-      A map keyed by names: the constructor of a namespace type, whose values
-      are maps from `key_type` to `value_type`, `ordered` as a map's are. A
-      namespace type is an instance, as a map type is one of `map`:
-      `api => !meta.namespace { key_type: meta.identifier  value_type: method }`,
-      and an entry holding a value of it, `orders => !api { ... }`, is an
-      ordinary value of the type `api`. Its keys are names, of an identifier
-      family, which is what a qualified name's segment is, and a segment selects
-      a key of a namespace value and of no other map.
-
-      `key_type` is the family every key is read and judged under. A value is
-      never void and has no size bounds. The schema map (`schema`) is the
-      kernel's one.
-      """
-    namespace => meta.product & {
-      access_pattern?: meta.product_access_type = NAMED
-      size_type?:      meta.product_size_type = VARIABLE
-      key_type:        meta.identifier_kind
-      value_type:      meta.type_kind
-      ordered?:        boolean ~ false
-    }
-
-    @doc:"""
       Aliasing body — the entry `target` names: a type, or a constructor, since
       an alias of a constructor is applied as its target is ([TSON-SCHEMA]
       §3.3.1), a constructor's value being a record. A partial application
@@ -841,6 +819,26 @@
     }
 
     @doc:"""
+      A map keyed by names: the constructor of a namespace type, a refinement
+      of `map` whose `key_type` narrows from `meta.type_kind` to
+      `meta.identifier_kind`, which is IS-A it, and whose entries are never
+      void. A namespace type is an instance, as a map type is one of `map`:
+      `api => !meta.namespace { key_type: meta.identifier  value_type: method }`,
+      and an entry holding a value of it, `orders => !api { ... }`, is an
+      ordinary value of the type `api`. Its keys are names, of an identifier
+      family, which is what a qualified name's segment is, and a segment selects
+      a key of a namespace value and of no other map.
+
+      `key_type` is the family every key is read and judged under. `ordered`
+      and the size bounds are map's. The schema map (`schema`) is the kernel's
+      one.
+      """
+    namespace => meta.map ^ {
+      key_type:  meta.identifier_kind
+      voidable?: = false
+    }
+
+    @doc:"""
       One position of a tuple: its type, and whether its value may be void. A
       position is never missing, so `[A, B?]` admits `[a _]` and refuses `[a]`.
       """
@@ -966,9 +964,8 @@
       the type it expands to. Where `of` is any other type, the values it admits
       are values, and a slot holds a value's qualified name: the first segment
       resolves in the writer's namespace and names an entry, and each further
-      segment selects a key of a value of a named product, a namespace value's
-      key or a record value's field, the record being a namespace whose keys its
-      type fixes. A map that is no namespace is not entered.
+      segment selects a key of a namespace value or a field of a record value.
+      A map that is no namespace is not entered.
 
       A type's name is its entry's path from the document's root: `order`, or
       `geo.address` for a member of a schema map nested as
@@ -994,6 +991,11 @@
       value carries arguments only where an application is still open, in a
       record template's `parents` and field types, in held text, and in the
       `application` annotation.
+
+      A refinement narrows `of`: the refined `of` is the source's or IS-A it,
+      so every name the refinement admits the source admits too, and the
+      refinement is IS-A its source. `meta.identifier_kind` is `meta.type_kind`
+      narrowed to the identifier families.
       """
     reference => meta.atom & {
       of: meta.type_kind
@@ -1006,11 +1008,14 @@
       """
     kind => <T> !meta.reference { of: T }
 
-    @doc:"The names of the identifier families, which a `name_type` names."
-    identifier_kind => !meta.reference { of: unicode.identifier_type }
-
     @doc:"The names of the types a value can have."
     type_kind => !meta.reference { of: meta.type }
+
+    @doc:"""
+      The names of the identifier families, which a `name_type` names: a
+      refinement of `meta.type_kind`, an identifier family being a type.
+      """
+    identifier_kind => !meta.type_kind ^ { of: unicode.identifier_type }
 
     @doc:"""
       The spelling of a reference to a value: `meta.ref<method>` is

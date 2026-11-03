@@ -34,7 +34,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `T`. Over a constructor (`meta.kind<net.uuid_type>`) its values are the names of the types in the schema's closure
       built with it: computed at link, never listed or written, and judged by membership in both encodings. Over any other
       type its values are qualified names of values. The kernel types `meta.enum_type.name_type` and `meta.record.name_type`
-      by its `meta.identifier_kind`, and judges a name type by membership (Part 2 §4.2)
+      by its `meta.identifier_kind`, a refinement of `meta.type_kind`, and judges a name type by membership (Part 2
+      §4.2). A refinement narrows `of` to the source's or a type IS-A it, judged at link (Part 2 §5.7)
 - [x] An application is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12) — a reference with arguments is
       data grammar ([TSON-DATA] §7.4), written unquoted (`t: set<text>`, `@meta.application:response<order 201>`, an open
       alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonReference`, and at a kind-typed position

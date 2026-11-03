@@ -24,6 +24,9 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 - A network family's `within`/`excluding` pair is judged for emptiness by the family's own `coherenceCheck`
   (`AtomCoherence.checkAdmitsAValue`), never by the linker or the resolver; its prefix bounds fold in.
 - Unchecked by design: `pattern` against `pattern` (and `pattern` emptiness), selector facets.
+- A reference's `of` narrows to the source's or a type IS-A it, and that one rule is judged at **link**, not in
+  `checkNarrows`: `ReferenceBody.constraintsCheck` asks only that a reference refines a reference, and
+  `ReferenceBody.ofNarrowing` takes the IS-A as a predicate the linker supplies (`TsonSchemaLinker.checkReferenceNarrows`).
 - `unicode.text_type`'s `pattern` and `members` are each **settable once** — they occupy one logical position and the pattern
   half cannot be narrowed, so the position takes one rule. A member set may still be *added* to a patterned source.
 - `unicode.text_type`'s `normalization` is **identity-only**, default or not: setting it where the source left `NONE` changes
@@ -84,6 +87,18 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   source left unset widens the profile, so no set-once form of the rule is sound (`IdentifierType`). Every text
   family's `normalization` is identity-only on the same terms (`TextType`): turning folding on would make
   `Content-Type` one value under the source and another under the refinement.
+- **A reference narrows `of` by IS-A, and the link judges it** (§5.7, `meta.reference`'s own `@doc`). The refined `of`
+  is the source's or a type IS-A it -- a constructor IS-A one by its chain (`unicode.identifier_type` lists
+  `meta.type`), an ordinary type by its own (`big_order => order ^ {}`) -- so every name the refinement admits, the
+  source admits too: `meta.identifier_kind => !meta.type_kind ^ { of: unicode.identifier_type }` is the kernel's case.
+  The two names are a namespace's, not the bodies', and `of` holds names that order nothing
+  (`design/resolver-vocabulary-and-bootstrap.md`), so at resolution neither need be ready:
+  `ReferenceBody.constraintsCheck` admits any reference, and the linker's `checkReferenceNarrows` asks the family's
+  rule, `ReferenceBody.ofNarrowing`, with §7.2's IS-A over the merged namespace (alias hops followed, the entry's chain
+  read), against each reference the refinement's chain names. A widening (`!maps ^ { of: meta.product }` over `of:
+  meta.map`) and an unrelated `of` are `SchemaValidationException`s, reported as `checkNarrows` reports, "not a valid
+  refinement of '!maps' (§5.7)". The refinement's chain lists its source, as every atom refinement's does, so kind
+  membership and §7.2 see it IS-A its source.
 - **A body must also be coherent with itself**, which is the other question about the same facets and
   needs no source to compare against. `checkCoherent` asks `Atom.coherenceCheck()` — one rule per family over
   the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `SchemaValidationException`

@@ -110,7 +110,8 @@ import java.util.stream.Collectors;
  * entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for why crediting a
  * subtype onto an imported entry's copy here never touches the imported schema's own separately-registered
  * original), computes each kind's members ({@link #computeKinds}), derives choice disjointness, checks that every
- * reference anywhere in the schema actually resolves, and resolves and judges every value a value entry holds
+ * reference anywhere in the schema actually resolves and that a reference's refinement narrows its {@code of} ({@link
+ * #checkReferenceNarrows}), and resolves and judges every value a value entry holds
  * by name ({@code ValuesByName}). A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
@@ -1356,6 +1357,7 @@ public final class TsonSchemaLinker {
                 KindMembers.ofRefusal(reference, namespace::get).ifPresent(refusal -> {
                     throw new SchemaValidationException("'" + entryName + "' is a reference, but " + refusal);
                 });
+                checkReferenceNarrows(entryName, reference, namespace);
             }
             case TemplateBody ignored -> { } // open, answered above
             case ValueType ignored -> {
@@ -1611,6 +1613,39 @@ public final class TsonSchemaLinker {
                     + "each other: " + String.join("; ", violations) + " -- no value can satisfy them, so "
                     + "nothing could ever be a valid instance of the type it denotes");
         }
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.7's rule for a refinement of a reference, {@code !meta.type_kind ^ { of: … }}: its {@code of}
+     * is its source's or IS-A it ({@link ReferenceBody#ofNarrowing}). The resolver binds the refinement before the
+     * names {@code of} holds need be resolved, so the IS-A is asked here, over the one namespace both resolve in; the
+     * source is the reference the refinement's chain names, past its alias hops.
+     */
+    private static void checkReferenceNarrows(String entryName, ReferenceBody reference, Map<String, Top> namespace) {
+        for (String supertype : TypeChain.supertypesOf(reference)) {
+            if (namespace.get(AliasChain.terminal(supertype, namespace)) instanceof ReferenceBody source) {
+                List<String> violations = source.ofNarrowing(reference, (sub, sup) -> isA(sub, sup, namespace));
+                if (!violations.isEmpty()) {
+                    throw new SchemaValidationException("'" + entryName + "': not a valid refinement of '!"
+                            + supertype + "' (§5.7): " + String.join("; ", violations));
+                }
+            }
+        }
+    }
+
+    /**
+     * §7.2's IS-A between two names of {@code namespace}: past their alias hops they are one entry, or the first's
+     * chain lists the second.
+     */
+    private static boolean isA(String sub, String sup, Map<String, Top> namespace) {
+        String wanted = AliasChain.terminal(sup, namespace);
+        String terminal = AliasChain.terminal(sub, namespace);
+        if (terminal.equals(wanted)) {
+            return true;
+        }
+        Top definition = namespace.get(terminal);
+        return definition != null && TypeChain.supertypesOf(definition).stream()
+                .anyMatch(supertype -> AliasChain.terminal(supertype, namespace).equals(wanted));
     }
 
     /**

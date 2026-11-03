@@ -21,22 +21,29 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
 - `Top` is sealed all the way down (`permits Type, Reference, TemplateBody, ValueEntry`). A switch over a body's kind
   is exhaustive with an explicit `ValueEntry` arm and no `default`: `EntryKind.of`, `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
-- **`meta.namespace` is a constructor under `meta.product`**, and a namespace type is an instance of it, resolved to a
-  `NamespaceBody` (`key_type`, `value_type`, `ordered`): the kernel's one, `meta.schema => !meta.namespace { key_type:
-  meta.type_name value_type: meta.declared }`, and a schema's own `api => !meta.namespace { key_type: meta.identifier
-  value_type: method }`. A value of one is the map its facets describe (`NamespaceBody.read()`), and nothing else: a
-  field beside the facets is refused by `meta.namespace`'s own record reader.
+- **`meta.namespace` is a refinement of `meta.map`** (`meta.map ^ { key_type: meta.identifier_kind voidable?: = false
+  }`), IS-A `meta.map` and `meta.product`, and a namespace type is an instance of it, resolved to a `NamespaceBody`
+  (`key_type`, `value_type`, `ordered`, `min_items`, `max_items`; `voidable` is pinned false): the kernel's one,
+  `meta.schema => !meta.namespace { key_type: meta.type_name value_type: meta.declared }`, and a schema's own `api =>
+  !meta.namespace { key_type: meta.identifier value_type: method }`. A value of one is the map its facets describe
+  (`NamespaceBody.read()`), its size bounds judged as a map's are, and nothing else: a field beside the facets is
+  refused by `meta.namespace`'s own record reader.
+- **IS-A `meta.map` is a fact about kinds, not about bodies.** `NamespaceBody` and `MapBody` are distinct classes, so
+  every reader, compiler and walk that dispatches on the body (`TsonSchemaCompiler`, `JsonSchemaCompiler`,
+  `DeclaredReader`, `MapBindReader` through `TsonLinkedSchema.namespace`, `ValuesByName`, `TypeInhabitance`,
+  `DiscriminationClass`) takes the namespace path for a namespace type and the map path for a plain map; the
+  IS-A edge is read where kind membership asks for it (`KindMembers`' construction walk).
 - `key_type` is required, and is a member of `meta.identifier_kind`, judged at link (`validateBody`): a namespace's
   keys are always judged by its own family, never a host's.
 - **A record's fields are no namespace.** `meta.field_map => !meta.map { key_type: text value_type: meta.record_field
   ordered: true }` is an ordered map keyed by text (`RecordBody.fields`, an `AnnotatedMap`): a field name is text within
   its own record, judged by the record's `name_type` as `discriminators` and the groups are (`FieldNames`), and no
   qualified name selects a field declaration (§4.1's segments select in values only).
-- A namespace type is a member of `meta.type_kind`, `meta.kind<meta.product>` and `meta.kind<meta.namespace>`, and of no
-  `meta.kind<meta.record>` or `meta.kind<meta.map>`; `meta.namespace` itself is a constructor whose declaration is a record,
-  so `meta.type_kind` and `meta.kind<meta.record>` hold it. **A value entry is a member of no kind** (no reference over a
-  constructor), nothing is typed by it, and a reference over a type that is no constructor names it where its type IS-A `of`:
-  `meta.ref<api>` and `meta.kind<api>` are one entry, and either names `myapi`.
+- A namespace type is a member of `meta.type_kind`, `meta.kind<meta.product>`, `meta.kind<meta.map>` and
+  `meta.kind<meta.namespace>`, and of no `meta.kind<meta.record>`; `meta.namespace` itself is a constructor whose
+  declaration is a record, so `meta.type_kind` and `meta.kind<meta.record>` hold it. **A value entry is a member of no
+  kind** (no reference over a constructor), nothing is typed by it, and a reference over a type that is no constructor
+  names it where its type IS-A `of`: `meta.ref<api>` and `meta.kind<api>` are one entry, and either names `myapi`.
 - A value entry is refused at every type position, in one sentence (`ValuesByName.aValueNoType`): a reference in a
   type declaration (`validateTypeRef`), a kind-typed slot in a value body (`judgeMember`). A data tag naming one
   compiles to a `ValueEntryReader` and is `TYPE_MISMATCH`.
@@ -56,9 +63,9 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   the host component is.
 - A value by name is entered through a value entry only. Its first segment resolves in the schema's one namespace,
   each segment naming a member of a nested `!schema` map collapsing onto that member's path entry (`geo.home`); a
-  further segment selects a key of a value of a named product, a namespace value's key or a record value's field
-  (bound or tree-held), the record being a namespace whose keys its type fixes; a map that is no namespace, `{text =>
-  method}` or a record value's `meta.field_map`, is not entered whatever its key type.
+  further segment selects a key of a namespace value or a field of a record value (bound or tree-held); a map that is
+  no namespace, `{text => method}` or a record value's `meta.field_map`, is not entered whatever its key type, though
+  `meta.kind<meta.map>` holds namespace types and plain map types alike: the walk asks the body, a `NamespaceBody`.
 - A field step through a bound record value reads the host object through the descriptor of the bind context it was
   bound under, by wire name, never by reflection (`TsonCompiledMetaRegistry.link`). An optional field the value does
   not hold is refused as not present, after the referent's type is judged.
@@ -119,10 +126,11 @@ interface  => { extends?: [meta.type_name]  methods: method_map }
 interfaces => !meta.namespace { key_type: meta.identifier  value_type: interface }
 ```
 
-**Not a refinement of `meta.map`.** `meta.namespace` is `meta.map`'s sibling under `meta.product`, declaring its own
-facets: `meta.kind<meta.map>` does not hold a namespace type, and a map that is no namespace is never entered by a
-qualified name. Both compilers read a namespace type through the map
-factory with the map `NamespaceBody.read()` states (`design/linking-and-compilation.md`).
+**A refinement of `meta.map`.** `meta.namespace` narrows `map`'s `key_type` from `meta.type_kind` to
+`meta.identifier_kind`, the refinement of `meta.type_kind` to the identifier families, and pins `voidable` false;
+`ordered` and the size bounds are `map`'s and bound a value as a map's do. So `meta.kind<meta.map>` holds every namespace
+type, and a map that is no namespace is still never entered by a qualified name. Both compilers read a namespace type
+through the map factory with the map `NamespaceBody.read()` states (`design/linking-and-compilation.md`).
 
 **A kind is judged by origin.** `EntryKind.of` counts the base kinds only as the kernel's own entries (declared by
 meta.tn, `TsonBundledSchemas.isKernel`), and kind membership walks construction to the kernel's

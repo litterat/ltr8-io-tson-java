@@ -248,10 +248,10 @@ kernel's `annotation` no longer annotating itself), §3.4.1 (Pass 2 runs in rule
 `T ^ { … }` over field declarations, and atom refinement, `!I ^ { … }` over data merged into an atom instance's
 bindings. No other value can be refined. A container instance (`names => [text]`) has no refinement, and two
 instances of one constructor have no IS-A edge between them even where one admits a subset of the other.
-`meta.type_kind` (`!meta.reference { of: meta.type }`) and `meta.identifier_kind`
-(`!meta.reference { of: unicode.identifier_type }`) are siblings, so a record refinement narrowing a `meta.type_kind`
-field to `meta.identifier_kind` is refused by §5.7's field-narrowing check, although every identifier family is a
-type.
+Declared as two instances of `meta.reference`, `meta.type_kind` (`!meta.reference { of: meta.type }`) and
+`meta.identifier_kind` (`!meta.reference { of: unicode.identifier_type }`) are siblings, so a record refinement
+narrowing a `meta.type_kind` field to `meta.identifier_kind` is not a narrowing §5.7 admits, although every identifier
+family is a type.
 
 Under one level a `!` head looks as though it plays two roles, a type from `!decimal_type { … }` and a value from
 `!operation { … }`. It plays one: `!C { … }` is a value of `C`, and whether the entry is a type follows from `C`'s
@@ -259,8 +259,12 @@ chain (§3.3.1), as constructorness already does. Resolved output writes every t
 and the resolved form are one.
 
 **What is running.** `!C { … }` construction, atom refinement `!I ^ { … }` with each atom family's tightening rules,
-and record refinement `T ^ { … }`. Nothing else is refined. `meta.reference` states no tightening rule for `of`, and
-`meta.type_kind` and `meta.identifier_kind` are both direct instances of it.
+and record refinement `T ^ { … }`. Nothing else is refined. Item 5's worked example runs: `meta.reference` states its
+rule for `of` (a refinement's `of` is the source's or IS-A it, judged at link, where both names resolve, and a widening
+or an unrelated `of` is refused), `identifier_kind => !meta.type_kind ^ { of: unicode.identifier_type }` is IS-A
+`meta.type_kind`, and `namespace => meta.map ^ { key_type: meta.identifier_kind  voidable?: = false }` is IS-A
+`meta.map`. This library compares no restated field's type with its source's at §5.7, so a narrowing to a type that is
+no subtype is not refused yet either; the edge is what the rule will read.
 
 **Resolution, a proposal.**
 
@@ -453,15 +457,15 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 
 **What is running.**
 
-- **`namespace` is a constructor under `product`**,
-  `namespace => product & { key_type: meta.identifier_kind  value_type: meta.type_kind  ordered?: boolean ~ false }`,
-  and a namespace type is an instance of it, as a map type is one of `map`:
+- **`namespace` is a refinement of `map`**, `namespace => map ^ { key_type: meta.identifier_kind  voidable?: = false }`,
+  IS-A `map` and through it `product`, and a namespace type is an instance of it, as a map type is one of `map`:
   `schema => !namespace { key_type: meta.type_name  value_type: meta.declared }`,
   `api => !namespace { key_type: meta.identifier  value_type: method }`. A value of one is the map its facets
-  describe, every key a name of the family `key_type` states, a member of `meta.identifier_kind` judged at link.
-  `key_type` is required: no host supplies a namespace's key family. Its form is `map`'s: the same access and size
-  facets, and a value of a namespace type is read as a map. It is `map`'s sibling under `product` rather than `map ^ {
-  … }`, so `meta.kind<map>` holds no namespace type. `schema` is the kernel's one.
+  describe, every key a name of the family `key_type` states, a member of `meta.identifier_kind` judged at link, and
+  no value void. `key_type` is required: no host supplies a namespace's key family. `ordered` and the size bounds are
+  `map`'s, and a value of a namespace type is read as that map, its `min_items` and `max_items` judged as a map's are.
+  `meta.kind<map>` holds every namespace type beside the plain map types, and a qualified name still enters a value of
+  a namespace type alone: a plain map such as `field_map`'s is never entered. `schema` is the kernel's one.
 - **A record's fields are no namespace.** `field_map => !map { key_type: text  value_type: meta.record_field  ordered:
   true }`. A field name is text within its own record, judged by the record's `name_type` as `discriminators` and a
   group's `members` are, and as `enum_set` is for an enum's members: the map's own key uniqueness compares the text
@@ -503,13 +507,13 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 **Resolution, a proposal.** Sections amended:
 
 - §4.1: the kinds are `atom`, `product` and `sum` under `type`, beside `alias` (#10) and `template` under `top`;
-  `namespace` is a constructor under `product` whose instances are namespace types, and the paragraph making a
+  `namespace` is a refinement of `map` whose instances are namespace types, and the paragraph making a
   namespace type the one constructor whose instances are not types goes. An entry is a type exactly when its value
   is built by a constructor IS-A `type`, and any other entry is a value, its tag naming its type. `namespace`'s
   `key_type` is required. `schema`'s `value_type` is `declared`, which with `declared_type` is the kernel's.
   `field_map` is an ordered `map` keyed by `text`, each key judged by the record's `name_type`.
-- §4.2: a namespace type is a member of `meta.type_kind`, `meta.kind<product>` and `meta.kind<namespace>`, and a
-  value entry of no reference over a constructor; the rest of §4.2 is #11's.
+- §4.2: a namespace type is a member of `meta.type_kind`, `meta.kind<product>`, `meta.kind<map>` and
+  `meta.kind<namespace>`, and a value entry of no reference over a constructor; the rest of §4.2 is #11's.
 - §5.7: "Constructor refinement in a meta-schema is the meta-level exception and MAY replace fixed values (§4.2)"
   is ladder wording; with no meta-schema it is restated for a constructor refinement wherever it is written, or the
   exception goes. The omission order stands.
@@ -518,10 +522,6 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 - §7.4, §8.1: a kind-typed position in a data document is judged by membership in the document's closure; in a
   schema document, and a resolved form read as one, its grammar is read and membership is the schema's link's or
   ingest's.
-
-**Open.** Whether `namespace` becomes `map ^ { key_type: meta.identifier_kind … }`, now that its `key_type` is
-required and `field_map` is a plain map: `meta.kind<map>` would then hold every namespace type. §5.7 is unchanged by
-it.
 
 ## 10. [TSON-SCHEMA] §4.1, §7.2, §8, §11.5, §12.1 — the alias body is `alias`; a reference is a name in a slot
 

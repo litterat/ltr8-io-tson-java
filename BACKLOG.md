@@ -145,12 +145,16 @@ spec-required case:
   `JsonSchemaCompiler` dispatches a `ValueEntry` to the factory of its type's name, finds none, and compiles an
   `ErrorReader`, so the same document in JSON reports `NOT_IMPLEMENTED`. Give the JSON stack the same refusal and a
   `CrossEncodingParityTest` case.
-- [ ] **Decide whether `meta.namespace` refines `meta.map`** ([TSON-SCHEMA] §4.1, §5.7; `SPEC-FEEDBACK.md #9`). Its
-  form is a map's, but `meta.namespace => meta.product & { key_type: meta.identifier_kind … }` is `meta.map`'s sibling,
-  so `meta.kind<meta.map>` does not hold the namespace types. What kept it a sibling, an optional `key_type` for
-  `meta.field_map`'s host-supplied key family, is gone: `key_type` is required and `meta.field_map` is a plain ordered
-  map keyed by text. Decide whether it becomes `meta.map ^ { key_type: meta.identifier_kind … }` (its values never
-  void and unbounded, as now) and, if so, add a vector that `meta.kind<meta.map>` holds a namespace type.
+- [ ] **§5.7: a restated field's type is not checked to narrow.** A refinement or composition restating a field
+  compares its states (`DefinitionResolver.refines`) and never its type with the inherited one, so `a: text` restated
+  as `a: int32` resolves. §5.7 admits a restated type only where it narrows, to a type IS-A the original (a `void?` at
+  a voidable position included). The IS-A is the link's (`TsonSchemaLinker.isA`, as `checkReferenceNarrows` asks it),
+  across containers, choices and atoms; the kernel's `meta.namespace` narrowing `key_type` to `meta.identifier_kind`
+  is the case it must admit, by `meta.identifier_kind`'s refinement of `meta.type_kind`.
+- [ ] **`MetaRefs` does not rewrite a namespace type's references.** Its body rewrite falls to `default` for a
+  `NamespaceBody`, so a synthetic rename or a materialisation rewrite leaves `key_type` and `value_type` naming the old
+  entry; it needs a `NamespaceBody` arm beside `MapBody`'s. The same `default` comment says a reference's `of` names a
+  constructor, which a reference to a value (`meta.ref<method>`) does not: check whether `of` there needs mapping too.
 - [ ] **A parameter in a record field's `value` has no channel of its own** ([TSON-SCHEMA] §5.10). It is an unquoted
   token in `meta.record_field.value`, told from a literal by §5.10's shadowing rule, in resolved output as in source; at a
   type position or among an application's arguments a parameter is its name, as the reference grammar reads one

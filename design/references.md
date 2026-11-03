@@ -15,8 +15,9 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   `numeric.integer_type`, `orders => !api { … }` one of `api`. The kernel's `meta.kind => <T> !meta.reference { of: T }`
   and `meta.ref => <T> !meta.reference { of: T }` are its two spellings, so `meta.kind<order>` and `meta.ref<order>` mint one
   entry, and an application through an alias of either applies the template (`TemplateMaterialiser.templateHead`);
-  `meta.identifier_kind` and `meta.type_kind` are `!meta.reference { of: … }`. A field's type position,
-  `meta.kind<meta.record>` and `meta.ref<method>` differ only in `of`.
+  `meta.type_kind` is `!meta.reference { of: meta.type }` and `meta.identifier_kind` its refinement to
+  `unicode.identifier_type`, a refinement narrowing `of` to a type IS-A the source's (`ReferenceBody.ofNarrowing`). A
+  field's type position, `meta.kind<meta.record>` and `meta.ref<method>` differ only in `of`.
 - **What `of` names decides what the slot holds, never the spelling** (`KindMembers.namesTypes`). Over a constructor,
   `meta.top` or IS-A it, the values admitted are types: the slot holds a type's name, its path from the root (`order`,
   `geo.address`), judged a member over the governing closure (`KindMembers`) and delivered to a host as a `TypeRef`. Over any
@@ -80,11 +81,11 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   `boxed<net.uuid_type>` and `[net.uuid_type]` close as any
   application does (`ConstructorAsRecordTypeTest`). A declaration read as data is judged by its record shape alone:
   it is not resolved, so a derived field such as `chain` is admitted as written.
-- A namespace type is an instance of `meta.namespace` (`meta.schema`, a schema's own `api`), so
-  `meta.type_kind`, `meta.kind<meta.product>` and `meta.kind<meta.namespace>` hold it and `meta.kind<meta.record>` and
-  `meta.kind<meta.map>` do not. A value entry, `myapi => !api { … }`, is a member of no kind: its tag names an ordinary type,
-  which no walk reaches a constructor through. `meta.kind<api>` (one entry with `meta.ref<api>`) names it, and every type
-  position refuses it (`validateTypeRef`, `judgeMember`).
+- A namespace type is an instance of `meta.namespace` (`meta.schema`, a schema's own `api`), a refinement of `meta.map`,
+  so `meta.type_kind`, `meta.kind<meta.product>`, `meta.kind<meta.map>` and `meta.kind<meta.namespace>` hold it and
+  `meta.kind<meta.record>` does not. A value entry, `myapi => !api { … }`, is a member of no kind: its tag names an
+  ordinary type, which no walk reaches a constructor through. `meta.kind<api>` (one entry with `meta.ref<api>`) names
+  it, and every type position refuses it (`validateTypeRef`, `judgeMember`).
 - Two positions single out a constructor, and keep an IS-A `meta.top` check in Java: a `!C` head (a constructor builds
   a type, any other type a value entry) and a composition operand (constructor or record). `meta.alias.target` admits
   either, an alias being applied as its target is (§3.3.1). No reference covers "a constructor" alone: its value is a

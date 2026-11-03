@@ -211,13 +211,14 @@ pin naming a declaration not yet ready (enum's `name_type: = meta.identifier` mi
 
 ## Namespace types (§4.1)
 
-A namespace type is an instance of the kernel's `meta.namespace` constructor, `!meta.namespace { key_type: …  value_type:
-… ordered: … }` (`meta.schema` in the kernel, `headers => !meta.namespace { key_type: header_name value_type: text }` in
-any schema), and resolves to a `NamespaceBody`. A value of it is a map from `key_type` to
-`value_type`.
+A namespace type is an instance of the kernel's `meta.namespace` constructor, a refinement of `meta.map`,
+`!meta.namespace { key_type: …  value_type: … ordered: … }` (`meta.schema` in the kernel, `headers => !meta.namespace {
+key_type: header_name value_type: text }` in any schema), and resolves to a `NamespaceBody`. A value of it is a map from
+`key_type` to `value_type`.
 
 - **The map is what the facets state.** `NamespaceBody.read()` gives the `MapBody`: keys of `key_type`, values of
-  `value_type`, ordered where `ordered` is `true`, values never void, no size bounds. `key_type` is required: the family
+  `value_type`, ordered where `ordered` is `true`, values never void, bounded by `min_items`/`max_items` where stated
+  (`NamespaceBody.coherenceCheck` judges the pair as `MapBody`'s does). `key_type` is required: the family
   every key is read and judged under, a member of `meta.identifier_kind` (`validateBody`). A record's `fields` is no
   namespace but `meta.field_map`, an ordered map keyed by `text` whose keys the record's `name_type` judges (`FieldNames`).
 - **Nothing beside the facets.** `namespace`'s own record reader refuses any other field at the construction, so the
