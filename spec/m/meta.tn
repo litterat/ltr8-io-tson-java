@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=ca0dd2779bf8085917df569736405695d332ab616589f1d8832168587731466c"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=6856ce37fb3c28f6206e45f3192002754a33c456feb23a60194467e581d898e5"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -536,9 +536,7 @@
       directive.
 
       Used for meta.record_field.value (the type of fixed/default values, which
-      must be the field's declared type) and for constraint vocabulary fields
-      whose constrained atom has no instance here (float_type.min,
-      decimal_type.min, etc.).
+      must be the field's declared type).
       """
     value_type => meta.atom & {}
 

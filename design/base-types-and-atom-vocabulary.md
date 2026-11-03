@@ -227,26 +227,25 @@ does narrow, such as a media type that must parse, is a type of its own.
   carry a member set (§5.6) for a value set that is neither a contiguous range nor an arithmetic progression;
   `IntegerParser`/`DecimalParser` apply it beside the bounds and `multiple_of`. Membership is the value denoted: `0x50`
   is the member written `80`, having reduced to one `BigInteger`, and `2.5` is the member written `2.50`, which needs
-  `compareTo` — `BigDecimal`'s own equality carries scale and is not §4.3's. `numeric.decimal_type.members` is typed
-  `set<meta.value>` (the family cannot name its own atom, §7.4), so an element arrives as whatever §4 resolved it to;
-  `DecimalType`'s constructor reads each member as a decimal before the set is formed, which is where "`1` and `1.0`
-  are one member and a duplicate" is enforced and what lets the read, the tightening (`AtomNarrowing.checkSubset`) and
-  the coherence check (`AtomCoherence.checkMembers`) share one identity. `numeric.float_type` carries no member set, on the
+  `compareTo` — `BigDecimal`'s own equality carries scale and is not §4.3's. `numeric.decimal_type.members` is a set of
+  `number`, so every element arrives as the `BigDecimal` `number`'s reader produced, kept as written; `DecimalType`'s
+  constructor forms the set under `compareTo`, which is where "`1` and `1.0` are one member and a duplicate" is enforced
+  and what lets the read, the tightening (`AtomNarrowing.checkSubset`) and the coherence check
+  (`AtomCoherence.checkMembers`) share one identity. `numeric.float_type` carries no member set, on the
   rationale it carries no `multiple_of`: a step cannot hold on a binary grid.
-- **A `value`-typed slot is read under the atom of the position it stands in.** [TSON-SCHEMA] §7.4 types a constructor's
-  constraint fields `value`, and the declaration order leaves no alternative — `temporal.duration_type` declares its bounds
-  before any instance of it exists, `duration => !temporal.duration_type {}` among them — so a bound is decoded by §4, which
-  resolves boolean, number and string and none of those is a duration, a date or a UUID. `ValueParser.read(token, target)`
-  asks `HostAtoms.forHostType` which built-in produces the position's own host type and re-reads the token under it;
+- **A `value`-typed slot is read under the atom of the position it stands in.** A slot typed `meta.value` is decoded by
+  §4, which resolves boolean, number and string and none of those is a duration, a date or a UUID, so a schema's `{ slot:
+  meta.value }` bound to a `UUID` component would otherwise receive a string. `ValueParser.read(token, target)` asks
+  `HostAtoms.forHostType` which built-in produces the position's own host type and re-reads the token under it;
   `ValueParser.at(target)` is the same as a reader, which `reader.BindTargets` swaps in at a record field and at any depth
   below it, beside `RecordBindReader.tokenAware`, which specialises the same slot on the same evidence. **The host type is
   the class a component's bridge takes, never the one it declares** — a registered atom or a `@Transparent` wrapper is
   reached through its wire type, the same class the ordinary atom branch binds against. **Additive by construction**: a value
-  the component can already hold, or that a numeric narrowing reaches, is returned untouched, so `!number ^ { min: 0x10 }`
-  stays the integer 16 rather than being re-read under `number`, whose grammar admits no based-integer form. Only a token the
-  position could not hold under any narrowing reaches the atom — which is what makes `!number ^ { min: "abc" }` `number`'s
-  own verdict rather than a cast failure reported as a library gap. The resolver side of the same rule is
-  `design/atom-refinement-and-coherence.md`'s.
+  the component can already hold, or that a numeric narrowing reaches, is returned untouched, so `0x10` at a `BigDecimal`
+  slot stays the integer 16 rather than being re-read under `number`, whose grammar admits no based-integer form. Only a
+  token the position could not hold under any narrowing reaches the atom — which is what makes `"abc"` at a `BigDecimal`
+  slot `number`'s own verdict rather than a cast failure reported as a library gap. The bundled constructors' facets are not
+  such slots: each is typed by its family's instance (`design/atom-refinement-and-coherence.md`).
 - **No facet counts written digits, because scale is not part of the value.** numeric.tn and temporal.tn say it for both
   families that carry a digit-count facet — `numeric.decimal_type`'s "`1`, `1.0` and `1.00` are one value", and
   `temporal.time_type`'s "`12:00:00.500` is admitted under `precision: 1`". So `precision: N` tests that the value is a whole

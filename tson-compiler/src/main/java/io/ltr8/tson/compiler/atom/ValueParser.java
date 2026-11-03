@@ -44,28 +44,26 @@ public final class ValueParser implements TokenAtomType<Object> {
     }
 
     /**
-     * The {@code value} atom read at a slot whose bound host type is known -- [TSON-SCHEMA] §7.4's
-     * constraint fields, and any other {@code value}-typed position a class binds to something base type
-     * resolution does not produce.
+     * The {@code value} atom read at a slot whose bound host type is known -- a {@code value}-typed position a
+     * class binds to something base type resolution does not produce.
      *
      * <p><b>Base type resolution is what a {@code value} slot is decoded by; it is not what the slot means.</b>
      * §4 resolves three classes -- boolean, number, string -- and a duration, a date and a UUID are none of
-     * them, so {@code min: PT30M} on {@code duration_type} arrives here as the string {@code PT30M} and the
-     * position's own host type is the only thing left that says what it was. Where the natural resolution
+     * them, so {@code slot: PT30M} at a {@code Duration} component arrives here as the string {@code PT30M} and
+     * the position's own host type is the only thing left that says what it was. Where the natural resolution
      * cannot be what the position holds, the token is re-read under the built-in atom that produces that host
-     * type ({@link HostAtoms}) -- which is what the libraries' headers already describe the resolver as doing, and the same
-     * rule {@code DecimalType} applies to a member of a {@code set<value>}.
+     * type ({@link HostAtoms}).
      *
      * <p><b>The natural reading wins wherever it fits.</b> A value the position can already hold is returned
-     * untouched, and one a numeric narrowing reaches is narrowed here -- {@code min: 0x10} at a {@code
+     * untouched, and one a numeric narrowing reaches is narrowed here -- {@code 0x10} at a {@code
      * BigDecimal} slot is read as the integer 16 and widened, rather than being re-read under {@code number},
      * whose grammar admits no based-integer form. Only a token whose natural resolution the position could
-     * not hold under any narrowing reaches the atom, and there it gets that atom's own verdict:
-     * {@code !number ^ { min: "abc" }} is refused by {@code number}, not by a cast.
+     * not hold under any narrowing reaches the atom, and there it gets that atom's own verdict: {@code "abc"}
+     * at a {@code BigDecimal} slot is refused by {@code number}, not by a cast.
      *
      * <p><b>The slot that chose the target is the one that reaches it</b>, so the narrowing happens here and
-     * not in whatever holds the result: {@code min: 1} on a {@code decimal} facet -- an integer token at a
-     * {@code BigDecimal} component -- arrives as the {@code BigDecimal} the component holds.
+     * not in whatever holds the result: an integer token at a {@code BigDecimal} component arrives as the
+     * {@code BigDecimal} the component holds.
      *
      * <p>A position whose host type no built-in produces is left alone, so a consumer's own class binding a
      * {@code value} field to their own type keeps whatever their bind context does with it.

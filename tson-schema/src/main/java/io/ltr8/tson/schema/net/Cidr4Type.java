@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.net;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
+import io.ltr8.net.CidrInet4Network;
 import io.ltr8.tson.schema.atom.AtomCoherence;
 import io.ltr8.tson.schema.atom.AtomNarrowing;
 import io.ltr8.tson.schema.meta.Atom;
@@ -14,7 +15,7 @@ import java.util.Optional;
 
 /**
  * net.tn's {@code net.cidr4_type} constructor (IPv4-network constraint vocabulary, RFC 4632):
- * prefix-length bounds plus CIDR-text network lists. Pure constraint values, no parsing/validation
+ * prefix-length bounds plus network lists. Pure constraint values, no parsing/validation
  * behavior -- {@code tson-compiler}'s {@code Cidr4Parser} holds one of these and does the actual
  * reading/writing, applying all four facets: a value's prefix length against the bounds, and the value
  * itself against {@code within} and {@code excluding}.
@@ -31,20 +32,19 @@ import java.util.Optional;
  * TextType.pattern} is an {@code Optional<String>} rather than a compiled {@code Pattern}. Every atom
  * body in this package citing an external document follows both rules.
  *
- * <p>{@code within}/{@code excluding} are the schema's own {@code [meta.value]?} (an optional array of
- * the kernel's untyped {@code value}) -- modeled as a bare, always-present {@code List<String>}
- * (never {@code Optional<List<T>>}, which {@code ltr8-bind} doesn't support -- the same reason
- * every body's {@code supertypes}/{@code subtypes} are bare lists too), carrying each CIDR-text
- * network exactly as written, uninterpreted. Needs a defensive compact constructor -- confirmed
- * empirically, not assumed: a bare {@code List} field left absent from the wire data binds as Java
- * {@code null} (`ltr8-bind` has no auto-defaulting for a missing collection field), so the
- * constructor null-coalesces to {@link List#of()}.
+ * <p>{@code within}/{@code excluding} are the schema's own {@code [cidr4]?}, an optional array of networks,
+ * modeled as a bare, always-present {@code List<CidrInet4Network>} (never {@code Optional<List<T>>}, which {@code
+ * ltr8-bind} doesn't support -- the same reason every body's {@code supertypes}/{@code subtypes} are bare lists
+ * too), each entry the value {@code cidr4}'s reader produced. Needs a defensive compact constructor -- confirmed
+ * empirically, not assumed: a bare {@code List} field left absent from the wire data binds as Java {@code null}
+ * ({@code ltr8-bind} has no auto-defaulting for a missing collection field), so the constructor null-coalesces to
+ * {@link List#of()}.
  */
 @Typename(name = "net.cidr4_type")
 public record Cidr4Type(TypeChain chain,
         String spec, @Field("min_prefix") Optional<Long> minPrefix,
                          @Field("max_prefix") Optional<Long> maxPrefix,
-                         List<String> within, List<String> excluding) implements Atom {
+                         List<CidrInet4Network> within, List<CidrInet4Network> excluding) implements Atom {
 
     @Record
 
@@ -55,8 +55,8 @@ public record Cidr4Type(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public Cidr4Type(String spec, Optional<Long> minPrefix, Optional<Long> maxPrefix, List<String> within,
-            List<String> excluding) {
+    public Cidr4Type(String spec, Optional<Long> minPrefix, Optional<Long> maxPrefix, List<CidrInet4Network> within,
+            List<CidrInet4Network> excluding) {
         this(TypeChain.EMPTY, spec, minPrefix, maxPrefix, within, excluding);
     }
 
@@ -77,11 +77,11 @@ public record Cidr4Type(TypeChain chain,
      * each entry being a network the value is permitted to fall inside.
      *
      * <p>{@link #excluding} narrows the other way -- adding an exclusion narrows and removing one widens --
-     * so it is compared as a superset. Both list facets are compared <b>by entry</b>, not by containment, so
-     * a refinement excluding {@code 10.1.0.0/16} where its source excluded {@code 10.0.0.0/8} is refused even
-     * though it narrows. That is the conservative direction, and what a stated relation would replace;
-     * [TSON-SCHEMA] §5.7 gives the facet kinds their rules and leaves these two lists compared by entry. The
-     * containment arithmetic itself exists, in {@code io.ltr8.net.CidrNetwork}.
+     * so it is compared as a superset. Both list facets are compared <b>by entry</b>, a network equal to a
+     * network, not by containment, so a refinement excluding {@code 10.1.0.0/16} where its source excluded
+     * {@code 10.0.0.0/8} is refused even though it narrows. That is the conservative direction, and what a
+     * stated relation would replace; [TSON-SCHEMA] §5.7 gives the facet kinds their rules and leaves these two
+     * lists compared by entry. The containment arithmetic itself exists, in {@code io.ltr8.net.CidrNetwork}.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
@@ -105,10 +105,10 @@ public record Cidr4Type(TypeChain chain,
      * the schema level". So both facets are judged twice -- against each other, and against the 32
      * bits an IPv4 address has.
      *
-     * <p>{@link #within}/{@link #excluding} are judged twice over too: every entry must be a network of this
-     * family, and the two must between them leave one. The second half folds in the prefix bounds, and has
-     * to -- a value here is a block, refused for <em>overlapping</em> an exclusion rather than only for being
-     * covered by one, so {@code within: ["10.0.0.0/24"] excluding: ["10.0.0.5/32"] max_prefix: 24} admits
+     * <p>{@link #within}/{@link #excluding} hold networks already, the facets being typed {@code [cidr4]}; what
+     * is left is that the two must between them leave one. That folds in the prefix bounds, and has to -- a
+     * value here is a block, refused for <em>overlapping</em> an exclusion rather than only for being covered by
+     * one, so {@code within: ["10.0.0.0/24"] excluding: ["10.0.0.5/32"] max_prefix: 24} admits
      * nothing while almost every address in the range survives. See {@code AtomCoherence.checkAdmitsAValue}
      * for why cover over a prefix tree is decided exactly rather than approximated.
      */
@@ -118,8 +118,6 @@ public record Cidr4Type(TypeChain chain,
         AtomCoherence.checkWithin(violations, "min_prefix", minPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkWithin(violations, "max_prefix", maxPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkOrdered(violations, "min_prefix", minPrefix, "max_prefix", maxPrefix);
-        AtomCoherence.checkNetworks(violations, "within", within, 32);
-        AtomCoherence.checkNetworks(violations, "excluding", excluding, 32);
         AtomCoherence.checkAdmitsAValue(violations, "network", within, excluding, minPrefix, maxPrefix, 32);
         return List.copyOf(violations);
     }

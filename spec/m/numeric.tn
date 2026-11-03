@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=2ad4e12d8da59752c7600000b5a1381003fcaa1eac0527965dbbdee2a2aa2bb4"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=ca0dd2779bf8085917df569736405695d332ab616589f1d8832168587731466c"
+!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=9281e44fbc6962da86019d2e1be00249d7bb74cd2af66e0a356405a22294c941"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=6856ce37fb3c28f6206e45f3192002754a33c456feb23a60194467e581d898e5"
 @doc:"""
   TSON numeric — the numeric type library (2026 Revision 39 draft).
 
@@ -17,8 +17,8 @@
   `numeric.count`.
 
   It imports the kernel, meta.tn, alone: the kernel's constructors,
-  `meta.value`, `numeric.count` and classifying annotations are what it
-  builds on, and it needs nothing of temporal.tn or net.tn. A schema
+  `numeric.count` and classifying annotations are what it builds on, and it
+  needs nothing of temporal.tn or net.tn. A schema
   importing it reserves its root names beside the kernel's, `numeric` among
   those ([TSON-SCHEMA] §2.2.3). core.tn imports it with temporal.tn and
   net.tn, for a schema that wants every bundled type.
@@ -37,11 +37,11 @@
   Constructors that bind to a governing specification compose with the
   kernel's `atom.specification` mixin and pin the spec field with `=`.
 
-  Constraint fields whose values are of the constrained atom's own family — a
-  bound, which a constructor declares before any instance of it exists — use
-  the kernel's `meta.value` escape hatch; the resolver reads each such token
-  under the atom it stands for once that atom is in scope. A field that
-  counts something — a digit count — is typed by the kernel's `numeric.count`.
+  A constraint field whose value is of the constrained family — a bound, a
+  step, a member — is typed by that family's instance at this document's
+  root: `number` for the exact tier and for a float's bounds, `rational` for
+  the rational tier. A field that counts something — a digit count — is typed
+  by the kernel's `numeric.count`.
 
   The ordered families state their bounds as field groups ([TSON-SCHEMA]
   §5.11): one inclusive-or-exclusive group per side, so an inclusive and an
@@ -93,7 +93,8 @@
       `allow_negative_zero` default to true (`~ true` — the format's full set)
       and may be narrowed to false to exclude those representation artifacts.
       The bounds are optional domain restrictions validated against the value as
-      written, before rounding; they do not bound the special values. Not a
+      written, before rounding, so they are exact `number`s rather than values
+      on the grid; they do not bound the special values. Not a
       narrowing of the exact tier: infinities and NaN are not exact numbers.
 
       Bounds follow the header's field-group rule. There is no `multiple_of`;
@@ -106,8 +107,8 @@
     float_type => meta.atom & atom.specification & {
       spec?:                = "https://ieeexplore.ieee.org/document/8766229"
       format:               numeric.ieee_format
-      ( min: meta.value | exclusive_min: meta.value )?
-      ( max: meta.value | exclusive_max: meta.value )?
+      ( min: number | exclusive_min: number )?
+      ( max: number | exclusive_max: number )?
       allow_nan?:           boolean ~ true
       allow_infinity?:      boolean ~ true
       allow_subnormal?:     boolean ~ true
@@ -115,7 +116,7 @@
     }
 
     @doc:"The members of a decimal_type."
-    decimal_member_set => !meta.set_type { element_type: meta.value  min_items: 1 }
+    decimal_member_set => !meta.set_type { element_type: number  min_items: 1 }
 
     @doc:"""
       Exact-numeric constraint vocabulary (SQL's exact tier; ISO/IEC 11404
@@ -134,16 +135,15 @@
       `multiple_of` overlap but are not equivalent: `fraction_digits` 2 admits
       any hundredth, `multiple_of` 0.05 only multiples of a nickel.
 
-      `members` enumerates the admitted values. The resolver reads each member
-      under the constrained atom before the set is formed, so `1` and `1.0` are
-      one member and a duplicate rather than two, and a member that does not
-      parse as a decimal fails at schema load. The header's uniform `members`
-      rule applies.
+      `members` enumerates the admitted values. Each member is a `number`, so
+      `1` and `1.0` are one member and a duplicate rather than two, and a
+      member that is not a number fails at schema load. The header's uniform
+      `members` rule applies.
       """
     decimal_type => meta.atom & {
-      ( min: meta.value | exclusive_min: meta.value )?
-      ( max: meta.value | exclusive_max: meta.value )?
-      multiple_of?:     meta.value
+      ( min: number | exclusive_min: number )?
+      ( max: number | exclusive_max: number )?
+      multiple_of?:     number
       total_digits?:    numeric.count
       fraction_digits?: numeric.count
       members?:         numeric.decimal_member_set
@@ -157,9 +157,9 @@
       satisfy the same constraints.
       """
     rational_type => meta.atom & {
-      ( min: meta.value | exclusive_min: meta.value )?
-      ( max: meta.value | exclusive_max: meta.value )?
-      multiple_of?: meta.value
+      ( min: rational | exclusive_min: rational )?
+      ( max: rational | exclusive_max: rational )?
+      multiple_of?: rational
     }
 
     @doc:"""

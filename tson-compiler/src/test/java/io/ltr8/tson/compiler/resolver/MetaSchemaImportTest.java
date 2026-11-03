@@ -57,9 +57,9 @@ class MetaSchemaImportTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
         TsonSchema net = parseNet(registry);
-        // `net`, its eleven constructors, the twelve instances at the root, and the two arrays the desugar phase
-        // lifts at the root: `within`/`excluding` are `[meta.value]` and `types`/`suffixes` `[text]`.
-        assertEquals(26, net.entries().size(), "expected every net.tn declaration to resolve");
+        // `net`, its eleven constructors, the twelve instances at the root, and the three arrays the desugar phase
+        // lifts at the root: `within`/`excluding` are `[cidr4]` or `[cidr6]` and `types`/`suffixes` `[text]`.
+        assertEquals(27, net.entries().size(), "expected every net.tn declaration to resolve");
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(net, registry));
 

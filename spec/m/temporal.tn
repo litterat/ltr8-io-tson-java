@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/temporal.tn?sha256=5933b75c160da9ca465b81accd9aae82b4da630211d5b4f11ce6a49bd6a44869"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=ca0dd2779bf8085917df569736405695d332ab616589f1d8832168587731466c"
+!!id:"https://tson.io/2026/39/m/temporal.tn?sha256=110c6a68f041df3713ffd13faddf03c1f77a71b8c7e674586df4b2e0d2a1f840"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=6856ce37fb3c28f6206e45f3192002754a33c456feb23a60194467e581d898e5"
 @doc:"""
   TSON temporal — the temporal type library (2026 Revision 39 draft).
 
@@ -10,8 +10,8 @@
   `temporal.duration_type` and `temporal.period_type`.
 
   It imports the kernel, meta.tn, alone: the kernel's constructors,
-  `meta.value`, `numeric.count` and classifying annotations are what it
-  builds on, and it needs nothing of numeric.tn or net.tn. A schema
+  `numeric.count` and classifying annotations are what it builds on, and it
+  needs nothing of numeric.tn or net.tn. A schema
   importing it reserves `temporal` and its root names beside the kernel's
   ([TSON-SCHEMA] §2.2.3), and sees none of numeric.tn's: importing temporal.tn
   gives `date` and no `int32`. core.tn imports it with numeric.tn and net.tn,
@@ -30,11 +30,10 @@
   composes with the kernel's `atom.specification` mixin and pins the
   spec field with `=`.
 
-  Bounds are of the constrained atom's own family, which a constructor
-  declares before any instance of it exists, so they use the kernel's
-  `meta.value` escape hatch; the resolver reads each such token under the
-  atom it stands for once that atom is in scope. A precision counts digits
-  and is typed by the kernel's `numeric.count`. The bounds are field groups
+  A bound or a step is of the constrained family and is typed by that
+  family's instance at this document's root: a `date_type` bound is a `date`,
+  a `period_type` step a `period`. A precision counts digits and is typed by
+  the kernel's `numeric.count`. The bounds are field groups
   ([TSON-SCHEMA] §5.11): one inclusive-or-exclusive group per side, so an
   inclusive and an exclusive bound on the same side is unrepresentable.
   Value-level coherence (the lower bound not exceeding the upper) is a
@@ -58,8 +57,8 @@
     @doc:"Date constraint vocabulary. Instance is `date`."
     date_type => meta.atom & atom.specification & {
       spec?: = "https://www.rfc-editor.org/rfc/rfc3339"
-      ( min: meta.value | exclusive_min: meta.value )?
-      ( max: meta.value | exclusive_max: meta.value )?
+      ( min: date | exclusive_min: date )?
+      ( max: date | exclusive_max: date )?
     }
 
     @doc:"""
@@ -74,8 +73,8 @@
       """
     time_type => meta.atom & atom.specification & {
       spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
-      ( min: meta.value | exclusive_min: meta.value )?
-      ( max: meta.value | exclusive_max: meta.value )?
+      ( min: time | exclusive_min: time )?
+      ( max: time | exclusive_max: time )?
       precision?: numeric.count
     }
 
@@ -86,8 +85,8 @@
       """
     datetime_type => meta.atom & atom.specification & {
       spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
-      ( min: meta.value | exclusive_min: meta.value )?
-      ( max: meta.value | exclusive_max: meta.value )?
+      ( min: datetime | exclusive_min: datetime )?
+      ( max: datetime | exclusive_max: datetime )?
       precision?: numeric.count
     }
 
@@ -124,10 +123,10 @@
       """
     duration_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
-      ( min: meta.value | exclusive_min: meta.value )?
-      ( max: meta.value | exclusive_max: meta.value )?
+      ( min: duration | exclusive_min: duration )?
+      ( max: duration | exclusive_max: duration )?
       precision?:  numeric.count
-      multiple_of?: meta.value
+      multiple_of?: duration
     }
 
     @doc:"""
@@ -144,9 +143,9 @@
       """
     period_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
-      ( min: meta.value | exclusive_min: meta.value )?
-      ( max: meta.value | exclusive_max: meta.value )?
-      multiple_of?: meta.value
+      ( min: period | exclusive_min: period )?
+      ( max: period | exclusive_max: period )?
+      multiple_of?: period
     }
   }
 

@@ -24,10 +24,10 @@
       chain               => !meta.record_field { type: meta.type_chain  optional: true }
       spec                => !meta.record_field { type: iri      optional: true  role: FIXED  value: "https://ieeexplore.ieee.org/document/8766229" }
       format              => !meta.record_field { type: numeric.ieee_format }
-      min                 => !meta.record_field { type: meta.value    optional: true }
-      exclusive_min       => !meta.record_field { type: meta.value    optional: true }
-      max                 => !meta.record_field { type: meta.value    optional: true }
-      exclusive_max       => !meta.record_field { type: meta.value    optional: true }
+      min                 => !meta.record_field { type: number  optional: true }
+      exclusive_min       => !meta.record_field { type: number  optional: true }
+      max                 => !meta.record_field { type: number  optional: true }
+      exclusive_max       => !meta.record_field { type: number  optional: true }
       allow_nan           => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
       allow_infinity      => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
       allow_subnormal     => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
@@ -38,15 +38,15 @@
       !meta.field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
 
-    decimal_member_set => !meta.set_type { element_type: meta.value  min_items: 1 }
+    decimal_member_set => !meta.set_type { element_type: number  min_items: 1 }
 
     decimal_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
       chain           => !meta.record_field { type: meta.type_chain  optional: true }
-      min             => !meta.record_field { type: meta.value    optional: true }
-      exclusive_min   => !meta.record_field { type: meta.value    optional: true }
-      max             => !meta.record_field { type: meta.value    optional: true }
-      exclusive_max   => !meta.record_field { type: meta.value    optional: true }
-      multiple_of     => !meta.record_field { type: meta.value    optional: true }
+      min             => !meta.record_field { type: number  optional: true }
+      exclusive_min   => !meta.record_field { type: number  optional: true }
+      max             => !meta.record_field { type: number  optional: true }
+      exclusive_max   => !meta.record_field { type: number  optional: true }
+      multiple_of     => !meta.record_field { type: number  optional: true }
       total_digits    => !meta.record_field { type: numeric.count  optional: true }
       fraction_digits => !meta.record_field { type: numeric.count  optional: true }
       members         => !meta.record_field { type: numeric.decimal_member_set  optional: true }
@@ -58,11 +58,11 @@
 
     rational_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      min           => !meta.record_field { type: meta.value  optional: true }
-      exclusive_min => !meta.record_field { type: meta.value  optional: true }
-      max           => !meta.record_field { type: meta.value  optional: true }
-      exclusive_max => !meta.record_field { type: meta.value  optional: true }
-      multiple_of   => !meta.record_field { type: meta.value  optional: true }
+      min           => !meta.record_field { type: rational  optional: true }
+      exclusive_min => !meta.record_field { type: rational  optional: true }
+      max           => !meta.record_field { type: rational  optional: true }
+      exclusive_max => !meta.record_field { type: rational  optional: true }
+      multiple_of   => !meta.record_field { type: rational  optional: true }
     }
     groups: [
       !meta.field_group { members: [[min] [exclusive_min]]  optional: true }

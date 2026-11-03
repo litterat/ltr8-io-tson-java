@@ -64,26 +64,9 @@ public record Ipv6Parser(List<CidrInet6Network> within, List<CidrInet6Network> e
     /** {@code ipv6 => !net.ipv6_type {}} -- the unconstrained IPv6 address, §5.5's {@code !ipv6}. */
     public static final Ipv6Parser UNCONSTRAINED = new Ipv6Parser(List.of(), List.of());
 
-    /**
-     * The parser {@code constraints} asks for. A malformed entry in either list is refused before a reader is
-     * ever
-     * built ({@code Ipv6Type.coherenceCheck}), so reaching here with one is an internal fault rather than an
-     * author error.
-     */
+    /** The parser {@code constraints} asks for: its lists are networks already, read by {@code cidr6}. */
     public static Ipv6Parser of(Ipv6Type constraints) {
-        return new Ipv6Parser(networks(constraints.within()), networks(constraints.excluding()));
-    }
-
-    /**
-     * The facet's text entries as networks. Every entry has already been checked to be one at schema load
-     * ({@code Ipv6Type.coherenceCheck}), so a malformed entry cannot reach here; one that somehow did is dropped
-     * rather than silently treated as matching nothing, and the schema-load check is where it is reported.
-     */
-    private static List<CidrInet6Network> networks(List<String> entries) {
-        return entries.stream()
-                .map(entry -> CidrInet6Network.parse(entry))
-                .filter(java.util.Objects::nonNull)
-                .toList();
+        return new Ipv6Parser(constraints.within(), constraints.excluding());
     }
 
     private static final Pattern HEX_GROUP = Pattern.compile("[0-9a-fA-F]{1,4}");

@@ -112,8 +112,8 @@ class NetworkFacetsTest {
 
     /**
      * A malformed entry is refused at schema load rather than surfacing as every value failing against a
-     * constraint the author believes they wrote. The facets are typed {@code [meta.value]}, so nothing in the
-     * vocabulary catches it.
+     * constraint the author believes they wrote. The facets are typed {@code [cidr4]}, so the entry is read by
+     * {@code cidr4} like any other value of it, and refused by that reader.
      */
     @Test
     void aMalformedNetworkInTheListIsRefusedAtSchemaLoad() {
@@ -126,8 +126,7 @@ class NetworkFacetsTest {
                         !schema { oops => !ipv4 ^ { within: ["10.0.0.0" "not-a-network"] } }
                         """));
 
-        assertTrue(thrown.getMessage().contains("not-a-network"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("10.0.0.0"), "every bad entry is named: " + thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'10.0.0.0' is not a valid IPv4 network"), thrown.getMessage());
     }
 
     /**

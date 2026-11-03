@@ -7,22 +7,23 @@ import io.ltr8.tson.schema.atom.AtomNarrowing;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.TypeChain;
 
+import io.ltr8.net.CidrInet4Network;
+
 import java.util.List;
 
 /**
  * net.tn's {@code net.ipv4_type} constructor (IPv4 address constraint vocabulary, RFC 3986's {@code
- * IPv4address} production): CIDR-text network allow/deny lists. Pure constraint values, no
- * parsing/validation behavior -- {@code tson-compiler}'s {@code Ipv4Parser} does the actual
- * reading/writing, though it does not model {@code within}/{@code excluding} (see its own Javadoc).
+ * IPv4address} production): network allow/deny lists, each entry a {@code cidr4}. Pure constraint values, no
+ * parsing/validation behavior -- {@code tson-atom}'s {@code Ipv4Parser} does the actual reading/writing.
  *
  * <p>Same shape as {@link Cidr4Type} minus {@code min_prefix}/{@code max_prefix} (an address, not a
  * network, has no prefix length) -- see {@link Cidr4Type}'s own Javadoc for why {@code spec} is a
  * flat {@link String} rather than a {@link java.net.URI} and why {@code within}/{@code excluding} are
- * bare {@code List<String>} with a defensive compact constructor.
+ * bare lists with a defensive compact constructor.
  */
 @Typename(name = "net.ipv4_type")
 public record Ipv4Type(TypeChain chain,
-        String spec, List<String> within, List<String> excluding) implements Atom {
+        String spec, List<CidrInet4Network> within, List<CidrInet4Network> excluding) implements Atom {
 
     @Record
 
@@ -33,7 +34,7 @@ public record Ipv4Type(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public Ipv4Type(String spec, List<String> within, List<String> excluding) {
+    public Ipv4Type(String spec, List<CidrInet4Network> within, List<CidrInet4Network> excluding) {
         this(TypeChain.EMPTY, spec, within, excluding);
     }
 
@@ -54,10 +55,10 @@ public record Ipv4Type(TypeChain chain,
      * removes addresses, so a refinement narrows by <b>growing</b> it. {@code spec} is fixed by the
      * constructor and has nothing to compare.
      *
-     * <p><b>Both are compared as written</b>, by entry rather than by containment, so a refinement naming a
-     * strictly smaller network than the source's is refused here even though it narrows. That is the
-     * conservative direction -- it refuses a legal refinement rather than admitting an illegal one -- and it
-     * is what a stated relation would replace. The containment arithmetic to decide it properly does exist
+     * <p><b>Both are compared by entry</b>, a network equal to a network, rather than by containment, so a
+     * refinement naming a strictly smaller network than the source's is refused here even though it narrows.
+     * That is the conservative direction -- it refuses a legal refinement rather than admitting an illegal
+     * one -- and it is what a stated relation would replace. The containment arithmetic to decide it properly does exist
      * now ({@code io.ltr8.net.CidrNetwork}); what is missing is the spec rule saying which way a set facet
      * narrows, which [TSON-SCHEMA] §5.7 requires.
      */
@@ -75,16 +76,8 @@ public record Ipv4Type(TypeChain chain,
     /**
      * {@inheritDoc}
      *
-     * <p>Every entry of {@code within} and {@code excluding} must be a network. The facets are typed
-     * {@code [meta.value]} in net.tn -- they list networks, and no facet is typed by a family's own instance
-     * ({@code cidr4}) -- so any token satisfies the vocabulary and a missing prefix length or a transposed octet
-     * reaches here as ordinary text.
-     *
-     * <p>It is checked here rather than anywhere downstream because it is this family's rule: a malformed
-     * entry makes the facet unreadable, which is the same kind of defect as a floor above a ceiling. Every
-     * bad entry is named rather than the first, a list being written in one go.
-     *
-     * <p>The two are then judged <b>together</b>: an {@code excluding} list covering every network {@code
+     * <p>Every entry is a network already, the facets being typed {@code [cidr4]}, so what is left is to
+     * judge the two <b>together</b>: an {@code excluding} list covering every network {@code
      * within} permits admits no address, and the emptiness question is exactly what this check is for. Cover
      * over a prefix tree is decidable exactly -- see {@code AtomCoherence.checkAdmitsAValue} -- so nothing is
      * approximated and no pair is left undecided.
@@ -92,8 +85,6 @@ public record Ipv4Type(TypeChain chain,
     @Override
     public java.util.List<String> coherenceCheck() {
         java.util.List<String> violations = new java.util.ArrayList<>();
-        AtomCoherence.checkNetworks(violations, "within", within, 32);
-        AtomCoherence.checkNetworks(violations, "excluding", excluding, 32);
         AtomCoherence.checkAdmitsAValue(violations, "address", within, excluding, 32);
         return java.util.List.copyOf(violations);
     }
