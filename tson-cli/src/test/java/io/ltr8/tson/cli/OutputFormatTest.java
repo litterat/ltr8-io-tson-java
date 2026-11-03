@@ -374,6 +374,25 @@ class OutputFormatTest {
         assertEquals(POLICY, reread);
     }
 
+    /**
+     * A report states the limits its producer ran under, each a {@code policy.limit}, an {@code int64}: a limit past
+     * {@code int} binds, and renders back as written.
+     */
+    @Test
+    void aPolicyStatingALimitPastIntBinds() {
+        String rendered = OutputFormat.TSON.render(POLICY);
+        String wide = rendered.replaceFirst("max_depth: *64", "max_depth: 3000000000")
+                .replaceFirst("max_wait_depth: *64", "max_wait_depth: 9223372036854775807");
+        assertTrue(wide.contains("3000000000") && wide.contains("9223372036854775807"), wide);
+
+        CliPolicy reread = (CliPolicy) DiagnosticsSchema.compiled().get("policy.processor")
+                .read(TestDocuments.document(wide));
+        assertEquals(3_000_000_000L, reread.limits().maxDepth());
+        assertEquals(Long.MAX_VALUE, reread.limits().maxWaitDepth());
+        assertTrue(OutputFormat.JSON.render(new ValidationReport(Outcome.ACCEPTED, reread, List.of()))
+                .contains("\"max_depth\":3000000000"));
+    }
+
     /** The same distinction in {@code --output json}, where it is the code a consumer reads. */
     @Test
     void jsonRendersWhichWayAFetchFailed() {

@@ -106,7 +106,7 @@ public record IntegerType(TypeChain chain,
      * <p>The integer family is the one where a bound is not always written as a bound: {@link
      * #size} implies a range of its own ({@code int8} admits -128..127 while carrying no {@code
      * min}/{@code max} at all), so a stated bound is compared against the source's <em>effective</em>
-     * floor and ceiling -- the tighter of its explicit bound and the one its width implies. That is
+     * floor and ceiling -- its explicit bound and the one its width implies, each in turn. That is
      * what makes {@code !uint8 ^ { min: -10  max: 300 }} the error it should be: {@code uint8}
      * states no bounds, but its width fixes 0..255, and both stated facets fall outside it.
      *
@@ -121,9 +121,8 @@ public record IntegerType(TypeChain chain,
      * bounded-but-unsized source ({@code !integer ^ { min: 1 }}) genuinely narrows even
      * though the width's range on its own reaches below that floor.
      *
-     * <p>A width whose {@code bits} exceeds 4096 contributes no derived range -- materialising a
-     * bound for it would allocate an arbitrarily large {@link BigInteger} from a single schema
-     * declaration. No built-in width comes close (the ladder tops out at 256).
+     * <p>A width's range is never materialised: every comparison against one is {@link IntegerSize}'s bit-length
+     * test, exact and total for any {@code bits}.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
@@ -131,12 +130,22 @@ public record IntegerType(TypeChain chain,
             return List.of("refines an integer with " + refined.getClass().getSimpleName());
         }
         List<String> violations = new ArrayList<>();
-        AtomNarrowing.checkLower(violations, effectiveLower(), AtomNarrowing.bound(other.min, other.exclusiveMin,
-                "min", "exclusive_min"));
-        AtomNarrowing.checkUpper(violations, effectiveUpper(), AtomNarrowing.bound(other.max, other.exclusiveMax,
-                "max", "exclusive_max"));
-        AtomNarrowing.checkLower(violations, sizeLower(size), sizeLower(other.size));
-        AtomNarrowing.checkUpper(violations, sizeUpper(size), sizeUpper(other.size));
+        AtomNarrowing.Bound<BigInteger> lower = other.statedLower();
+        AtomNarrowing.Bound<BigInteger> upper = other.statedUpper();
+        int before = violations.size();
+        AtomNarrowing.checkLower(violations, statedLower(), lower);
+        if (violations.size() == before && lower != null && size.isPresent() && size.get().isBelow(lower.value())) {
+            violations.add(lower + " is below the source's own " + size.get().describe() + " size");
+        }
+        before = violations.size();
+        AtomNarrowing.checkUpper(violations, statedUpper(), upper);
+        if (violations.size() == before && upper != null && size.isPresent() && size.get().isAbove(upper.value())) {
+            violations.add(upper + " is above the source's own " + size.get().describe() + " size");
+        }
+        if (size.isPresent() && other.size.isPresent() && !other.size.get().within(size.get())) {
+            violations.add("size " + other.size.get().describe() + " is wider than the source's own "
+                    + size.get().describe());
+        }
         if (multipleOf.isPresent() && other.multipleOf.isPresent()
                 && !other.multipleOf.get().remainder(multipleOf.get()).equals(BigInteger.ZERO)) {
             violations.add("multiple_of " + other.multipleOf.get() + " is not itself a multiple of the source's own "
@@ -149,11 +158,12 @@ public record IntegerType(TypeChain chain,
     /**
      * {@inheritDoc}
      *
-     * <p>Judged on the <em>effective</em> range, the same fold {@link #constraintsCheck} compares
-     * against: a stated bound and the one {@link #size} implies contradict each other exactly as
-     * readily as two stated bounds do, so {@code !numeric.integer_type { size: { bits: 8  signed: false }
-     * min: 300 }} is caught by the same comparison that catches {@code min: 10  max: 3}. This is the
-     * one family where a body can be empty without stating both ends.
+     * <p>Judged on the <em>effective</em> range, the stated bounds with the one {@link #size} implies: a stated
+     * bound and the width contradict each other exactly as readily as two stated bounds do, so {@code
+     * !numeric.integer_type { size: { bits: 8  signed: false } min: 300 }} is caught as {@code min: 10  max: 3}
+     * is, and a member outside the width as one outside a stated bound. This is the one family where a body can
+     * be empty without stating both ends. The width is judged by {@link IntegerSize}'s bit-length test, so any
+     * {@code bits} is checked exactly and none is materialised.
      *
      * <p>The fold is what {@link #constraintsCheck} deliberately does <em>not</em> do to the
      * refinement side, and the difference is not an inconsistency: there, intersecting first would
@@ -166,51 +176,49 @@ public record IntegerType(TypeChain chain,
      * AtomCoherence#checkPositiveStep} for why it is the one incoherence here that is actively
      * unsound rather than merely undiagnosed. A {@link IntegerSize#bits} of zero or below is refused on
      * the same terms: {@code bits} is typed {@code integer}, since {@code numeric.count} refines {@code int64},
-     * whose width is stated through it, and a width that is no width leaves {@code IntegerParser} no range to
-     * derive.
+     * whose width is stated through it, and a width that is no width admits no value.
      */
     @Override
     public List<String> coherenceCheck() {
         List<String> violations = new ArrayList<>();
-        AtomCoherence.checkRange(violations, effectiveLower(), effectiveUpper());
+        AtomNarrowing.Bound<BigInteger> lower = statedLower();
+        AtomNarrowing.Bound<BigInteger> upper = statedUpper();
+        AtomCoherence.checkRange(violations, lower, upper);
         AtomCoherence.checkPositiveStep(violations, "multiple_of", multipleOf, BigInteger::signum);
-        size.map(IntegerSize::bits).filter(bits -> bits.signum() <= 0)
-                .ifPresent(bits -> violations.add("size.bits " + bits + " is not a width above zero"));
-        AtomCoherence.checkMembers(violations, members.orElse(List.of()), effectiveLower(), effectiveUpper());
+        if (size.isPresent()) {
+            IntegerSize width = size.get();
+            if (width.bits().signum() <= 0) {
+                violations.add("size.bits " + width.bits() + " is not a width above zero");
+            } else {
+                // An exclusive end excludes the width's own end too: `exclusive_min: 255` leaves nothing of uint8.
+                if (lower != null && width.isAbove(lower.inclusive() ? lower.value() : lower.value().add(BigInteger.ONE))) {
+                    violations.add(lower + " is above the " + width.describe() + " size's ceiling");
+                }
+                if (upper != null
+                        && width.isBelow(upper.inclusive() ? upper.value() : upper.value().subtract(BigInteger.ONE))) {
+                    violations.add(upper + " is below the " + width.describe() + " size's floor");
+                }
+            }
+        }
+        List<BigInteger> listed = members.orElse(List.of());
+        AtomCoherence.checkMembers(violations, listed, lower, upper);
+        if (size.isPresent() && size.get().bits().signum() > 0) {
+            for (BigInteger member : listed) {
+                if (!size.get().admits(member)) {
+                    violations.add("member " + member + " is outside the " + size.get().describe() + " size");
+                }
+            }
+        }
         return List.copyOf(violations);
     }
 
-    /** The widest {@link IntegerSize#bits} a derived range is materialised for -- see {@link #constraintsCheck}. */
-    private static final int MAX_DERIVED_BITS = 4096;
-
-    /** The tighter of this type's stated floor and the one {@link #size} implies, {@code null} when unbounded below. */
-    private AtomNarrowing.Bound<BigInteger> effectiveLower() {
-        return AtomNarrowing.tighterLower(sizeLower(size), AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"));
+    /** This type's stated floor, {@code min} or {@code exclusive_min}, {@code null} when it states none. */
+    private AtomNarrowing.Bound<BigInteger> statedLower() {
+        return AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min");
     }
 
-    /** The {@link #effectiveLower} twin. */
-    private AtomNarrowing.Bound<BigInteger> effectiveUpper() {
-        return AtomNarrowing.tighterUpper(sizeUpper(size), AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
-    }
-
-    private static AtomNarrowing.Bound<BigInteger> sizeLower(Optional<IntegerSize> size) {
-        return derivedBits(size)
-                .map(bits -> new AtomNarrowing.Bound<>(
-                        size.get().signed() ? BigInteger.ONE.shiftLeft(bits - 1).negate() : BigInteger.ZERO, true, "size"))
-                .orElse(null);
-    }
-
-    private static AtomNarrowing.Bound<BigInteger> sizeUpper(Optional<IntegerSize> size) {
-        return derivedBits(size)
-                .map(bits -> BigInteger.ONE.shiftLeft(size.get().signed() ? bits - 1 : bits).subtract(BigInteger.ONE))
-                .map(ceiling -> new AtomNarrowing.Bound<>(ceiling, true, "size"))
-                .orElse(null);
-    }
-
-    /** A width's bit count when it is small enough to materialise a range for, per {@link #MAX_DERIVED_BITS}. */
-    private static Optional<Integer> derivedBits(Optional<IntegerSize> size) {
-        return size.map(IntegerSize::bits)
-                .filter(bits -> bits.signum() > 0 && bits.compareTo(BigInteger.valueOf(MAX_DERIVED_BITS)) <= 0)
-                .map(BigInteger::intValueExact);
+    /** The {@link #statedLower} twin. */
+    private AtomNarrowing.Bound<BigInteger> statedUpper() {
+        return AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max");
     }
 }

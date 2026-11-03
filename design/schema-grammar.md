@@ -6,8 +6,8 @@ history lives in git.
 **Invariants**
 
 - `TsonSchemaParser` is grammar-only: no namespace resolution, no materialization, no validation.
-- A schema document is `[!!id] *!!import *annotation !schema schema-map`; the `!schema` tag is matched as a
-  spelling, and an untagged root is a syntax error.
+- A schema document is `[!!id] *!!import *annotation !schema schema-map`; the `!schema` tag names the pre-loaded
+  kernel's root `schema`, an alias of `meta.schema`, and is matched as a spelling; an untagged root is a syntax error.
 - It `extends TsonDataParser` in the same package and calls its package-private methods rather than re-implementing
   Part 1's grammar.
 - `type-name = meta.identifier`: every declared name and type parameter is matched against `IdentifierProfile`; a type
@@ -39,12 +39,15 @@ materialization, no validation (those are the resolver's/linker's jobs).
   re-implementing them, adding only the schema-only tokens (`~ ^ & | ( ) < > ? ; -`).
 - **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
   takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
-  the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's `meta.schema`
-  whatever the document imports, so it is matched as a spelling, never looked up; an untagged root is a syntax
-  error saying the document is data.
-- **A schema map nests as an entry** (`nestedSchemaMap`, SPEC-FEEDBACK.md #14). A `!` head spelled `schema` and
-  followed by `{` reads `"!schema" ws schema-map`: the tag is matched as a spelling, as the root's is, so the payload
-  is the schema grammar and never a data map. It declares at least one member and takes no type parameters. Every
+  the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's root `schema`, an
+  alias of `meta.schema`, whatever the document imports, so it is matched as a spelling (`DocumentStart.SCHEMA_TAG`):
+  which grammar the payload takes is settled before any name is looked up; an untagged root is a syntax error saying
+  the document is data.
+- **A schema map nests as an entry** (`nestedSchemaMap`, SPEC-FEEDBACK.md #14). A `!` head spelled `schema`, or its
+  target's path `meta.schema`, and followed by `{` reads `"!schema" ws schema-map`: the tag names what the root's
+  does and is matched as a spelling for the same reason, so the payload is the schema grammar and never a data map,
+  and no declaration of the document captures it — an import-free schema may declare its own `schema`, which the tag
+  still does not name. It declares at least one member and takes no type parameters. Every
   schema map's members, the root's and each nested one's, go through `parseMembers` into the document's one
   declaration map, a nested map's under its path (`geo.address`, `geo.inner.deep`): the path is the member's identity
   and the key every later phase addresses it by. The entry `geo` is a `SchemaMapDef` of its members' own names, in

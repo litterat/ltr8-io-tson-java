@@ -72,30 +72,32 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
      * document and resolving one schema, where the two {@code *_policy} fields say what it will admit as a
      * name. The whole of {@code policy.tn}'s {@code limits} record, field for field from {@link LimitsPolicy}:
      * a limit the processor does not yet count is still its stated threshold, and a report that left it out
-     * would leave a sender guessing at it.
+     * would leave a sender guessing at it. Every field is a {@code long}, as {@code policy.limit}, an {@code int64},
+     * is: a report states whatever limit its producer ran under, which need not be one this processor's own
+     * {@link LimitsPolicy} could hold.
      *
      * <p>Inside {@code policy} rather than beside it in the envelope because the envelope's one question is
      * "what judged this run", and a limit refusal answers it as much as a name refusal does. It also gets
      * {@link CliPolicy#isDefault()} for free, so a run that raised the depth states it even when nothing was
      * refused -- the same rule §8.2 imposes on a relaxation, and true here for the same reason.
      */
-    public record CliLimits(@Field("max_depth") int maxDepth,
+    public record CliLimits(@Field("max_depth") long maxDepth,
                             @Field("max_token_length") long maxTokenLength,
                             @Field("max_text_length") long maxTextLength,
-                            @Field("max_numeric_literal_length") int maxNumericLiteralLength,
+                            @Field("max_numeric_literal_length") long maxNumericLiteralLength,
                             @Field("max_binary_size") long maxBinarySize,
                             @Field("max_document_size") long maxDocumentSize,
-                            @Field("max_elements") int maxElements,
-                            @Field("max_entries") int maxEntries,
-                            @Field("max_fields") int maxFields,
-                            @Field("max_annotations") int maxAnnotations,
-                            @Field("max_values") int maxValues,
-                            @Field("max_import_closure") int maxImportClosure,
-                            @Field("max_schema_entries") int maxSchemaEntries,
-                            @Field("max_alias_chain") int maxAliasChain,
-                            @Field("max_supertype_chain") int maxSupertypeChain,
-                            @Field("max_materialisation_depth") int maxMaterialisationDepth,
-                            @Field("max_wait_depth") int maxWaitDepth) {
+                            @Field("max_elements") long maxElements,
+                            @Field("max_entries") long maxEntries,
+                            @Field("max_fields") long maxFields,
+                            @Field("max_annotations") long maxAnnotations,
+                            @Field("max_values") long maxValues,
+                            @Field("max_import_closure") long maxImportClosure,
+                            @Field("max_schema_entries") long maxSchemaEntries,
+                            @Field("max_alias_chain") long maxAliasChain,
+                            @Field("max_supertype_chain") long maxSupertypeChain,
+                            @Field("max_materialisation_depth") long maxMaterialisationDepth,
+                            @Field("max_wait_depth") long maxWaitDepth) {
 
         static CliLimits from(LimitsPolicy limits) {
             return new CliLimits(limits.maxDepth(), limits.maxTokenLength(), limits.maxTextLength(),

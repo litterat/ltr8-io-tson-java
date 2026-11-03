@@ -15,7 +15,7 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   `numeric.integer_type`, `orders => !api { … }` one of `api`. The kernel's `meta.kind => <T> !meta.reference { of: T }`
   and `meta.ref => <T> !meta.reference { of: T }` are its two spellings, so `meta.kind<order>` and `meta.ref<order>` mint one
   entry, and an application through an alias of either applies the template (`TemplateMaterialiser.templateHead`);
-  `meta.identifier_kind`, `meta.atom_kind` and `meta.type_kind` are `!meta.reference { of: … }`. A field's type position,
+  `meta.identifier_kind` and `meta.type_kind` are `!meta.reference { of: … }`. A field's type position,
   `meta.kind<meta.record>` and `meta.ref<method>` differ only in `of`.
 - **What `of` names decides what the slot holds, never the spelling** (`KindMembers.namesTypes`). Over a constructor,
   `meta.top` or IS-A it, the values admitted are types: the slot holds a type's name, its path from the root (`order`,
@@ -208,7 +208,7 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 | `meta.reference.of` | reference, `meta.type_kind` | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |
 | a slot typed by a reference over a type that is no constructor | reference by key, a path | root namespace, then nested `!schema` members, namespace values and record fields | the referent's type IS-A `of` | `ValuesByName.judge` |
 | a schema-map value (`meta.schema.value_type: declared`) | tag | namespace | a constructor builds a type; any other type a value of it | `DefinitionResolver` |
-| `geo => !schema { … }` | tag, a spelling | — | none: the payload is schema grammar, its members declarations keyed by path | `TsonSchemaParser`, `SchemaPaths` |
+| `geo => !schema { … }` | tag, a spelling of the pre-loaded kernel's `schema` (an alias of `meta.schema`) or `meta.schema` | pre-loaded kernel | none: the payload is schema grammar, its members declarations keyed by path | `TsonSchemaParser`, `SchemaPaths` |
 | `myapi => !api { … }` | tag | namespace | a type that is no constructor; the payload a value of `api`, here a map of its keys and values | `DefinitionResolver` |
 | `!I ^ { … }` head | reference | namespace | an atom instance, never the family's constructor | resolver |
 | `A & B` operand, `A - { … }` source | reference | namespace | a constructor or a record type | resolver |

@@ -202,7 +202,7 @@ class AtomCoherenceTest {
         IntegerType belowAnUnsignedFloor = new IntegerType(Optional.of(new IntegerSize(BigInteger.valueOf(8), false)),
                 Optional.empty(), Optional.empty(), Optional.of(BigInteger.valueOf(-5)), Optional.empty(),
                 Optional.empty());
-        assertViolation(belowAnUnsignedFloor, "is above max -5");
+        assertViolation(belowAnUnsignedFloor, "max -5 is below the unsigned 8-bit size's floor");
 
         IntegerType aboveAnUnsignedCeiling = new IntegerType(Optional.of(new IntegerSize(BigInteger.valueOf(8), false)),
                 Optional.of(BigInteger.valueOf(300)), Optional.empty(), Optional.empty(), Optional.empty(),

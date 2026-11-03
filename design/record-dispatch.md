@@ -69,9 +69,8 @@ whose base is a **template** has a minted entry for the base and for every membe
 name non-normative, so an alias is the only spelling either end has. The dispatchers apply it on the same
 terms as the concrete record readers, or a subtype-template family would read in one encoding and be
 refused in the other — the same schema, the same document, two answers. `CrossEncodingParityTest` carries both
-ends of it. `Subsumption.namesMeaning` admits one more spelling: `!schema`, a schema document's root tag, names the
-kernel's `meta.schema` wherever it is written (§3.4, SPEC-FEEDBACK.md #15), so a resolved form's root reads as a value
-of it.
+ends of it. A resolved form's root reads as a value of `meta.schema` by the same rule and no other: its tag, `!schema`,
+names the kernel root's `schema`, an alias of `meta.schema`.
 
 **`NamedDispatchReader` is not reused**, close as the shape is. Its verdicts are a choice's, and
 [TSON-JSON] §9.4 binds a family's to the ones the JSON stack gives — which is what `base.diagnostics`'

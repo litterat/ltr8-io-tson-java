@@ -268,16 +268,16 @@ is read through the compile of the document that declared it — `!meta.record` 
 
 ## Kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 
-The kernel, meta.tn (`TsonBundledSchemas.META_ID`), is special: its header is its `!!id` alone. It holds
-the kernel's one wait cycle, every name the cycle's declarations reference, closed to a fixed point, so it resolves and
-links on its own, and the concepts that belong with them: `meta.map`, `meta.tuple`, `meta.choice` and
-`meta.tuple_element`, `meta.template`, `meta.application`, `meta.kind`, `meta.ref`, `meta.atom_kind`,
-`meta.field_name`, `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet-sequence constructor
-`binary.bytes_type` with `binary.bytes_encoding` and `bytes`, and the classifying annotations `atom.ordering`,
-`atom.bounded`, `atom.exact` and `atom.numeric` the data-format libraries state their types with. It is the one kernel
-document. Its root is the eleven names an author writes (`void`, `boolean`, `integer`, `text`, `bytes`, `iri`,
-`iri_reference`, `regex`, `doc`, `enum`, `set`;
-`enum => meta.enum_type ^ { name_type?: = meta.identifier }`, so resolved output tags `!enum`); everything else is a
+The kernel, meta.tn (`TsonBundledSchemas.META_ID`), is special: its header is its `!!id` alone. It holds the kernel's
+one wait cycle, every name the cycle's declarations reference, closed to a fixed point, so it resolves and links on its
+own, and the concepts that belong with them: `meta.map`, `meta.tuple`, `meta.choice` and `meta.tuple_element`,
+`meta.template`, `meta.application`, `meta.kind`, `meta.ref`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`,
+`meta.voidable_tuple1`, `set`, the octet-sequence constructor `binary.bytes_type` with `binary.bytes_encoding` and
+`bytes`, and the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric` the
+data-format libraries state their types with. It is the one kernel document. Its root is the thirteen names an author
+writes (`void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`
+and `schema`; `enum => meta.enum_type ^ { name_type?: = meta.identifier }`, so resolved output tags `!enum`, and `schema
+=> meta.schema`, the alias every schema map's tag names); everything else is a
 member of `meta => !schema { … }`, named by its path (`SPEC-FEEDBACK.md #15`), `meta.identifier` among them. It imports
 nothing and applies only its own constructors (§3.4's one cycle, closed by pre-loading, not resolution). It is never resolved
 from a document, and its names reach any other schema only by import. Every name resolves from the root (#14), so an entry
@@ -307,12 +307,13 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   the integer family's `min`, `max` and `size` (`numeric.count`'s `size: { bits: 64  signed: true }`).
   `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from
   `spec/fixtures/meta-resolved.tn` (the six maps read as their members under their paths) and asserts the hand-built names
-  equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 86 entries (68
-  members of the six maps, 12 at the root and 6 synthetics; the maps themselves make the kernel's 92 resolved entries), one
+  equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 86 entries (67
+  members of the six maps, 13 at the root and 6 synthetics; the maps themselves make the kernel's 92 resolved entries), one
   cycle of 26, longest wait chain 4 — and `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel
-  contains the cycle's closure (68 entries) and the related concepts, pinning all three. Of the 26, 13 are hand-built (the 9
-  of `PRE_LOADED` and 4 lifted arrays); the other 13 are records and compositions resolved from their grammar, and the 60
-  entries beyond the cycle are made ready in wait order.
+  contains the cycle's closure (69 entries, the root tag's `schema` among them: reading the document waits on the alias its
+  tag names) and the related concepts, pinning all three. Of the 26, 13 are hand-built (the 9 of `PRE_LOADED` and 4 lifted
+  arrays); the other 13 are records and compositions resolved from their grammar, and the 60 entries beyond the cycle are
+  made ready in wait order.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies.

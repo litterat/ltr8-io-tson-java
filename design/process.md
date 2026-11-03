@@ -60,11 +60,12 @@ source schema, run the resolver, canonicalise, compare" — and `ResolvedFixture
 keeps only its header note for the reader and leaves entry docs out, since it exists to be compared and a summary of a source
 doc only drifts from it. **Key annotations are compared from the parsed text**, never through the bound document, which drops
 them, so both sides would carry none and agree for the wrong reason. They are the only external statement of what a
-conforming resolver produces. Keep them in step with the `.tn` beside them. A fixture's header is its source's and its root
-is `!schema`, the spelling of the kernel's `meta.schema`; nothing marks it resolved, so `ResolvedFixtureTest` reads it as one
-(`parseResolvedForm()`, or `withImports(imports).readAs(text, "meta.schema")`), the kernel's form, which imports nothing,
-under the pre-loaded kernel. The kernel's form, `meta-resolved.tn`, writes its six maps nested, each tagged `!meta.schema`,
-their members inside them, and its twelve root names and six synthetics at the root; `numeric-resolved.tn`,
+conforming resolver produces. Keep them in step with the `.tn` beside them. A fixture's header is its source's and its
+root is `!schema`, the kernel root's `schema`, an alias of `meta.schema`; nothing marks it resolved, so
+`ResolvedFixtureTest` reads it as one (`parseResolvedForm()`, or `withImports(imports).readAs(text, "meta.schema")`),
+the kernel's form, which imports nothing, under the pre-loaded kernel. The kernel's form, `meta-resolved.tn`, writes its
+six maps nested, each tagged `!meta.schema`, their members inside them, and its thirteen root names and six synthetics
+at the root; `numeric-resolved.tn`,
 `temporal-resolved.tn` and `net-resolved.tn` write their library's map the same way, with its instances at the root, and
 `core-resolved.tn` core.tn's author annotations. A fixture states its own document's entries only, never an import's members
 of the same map. A library's fixture holds instances of constructors its own source declares (net.tn's

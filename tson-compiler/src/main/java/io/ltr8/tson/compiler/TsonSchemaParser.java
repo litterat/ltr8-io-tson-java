@@ -247,9 +247,11 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * The root's {@code !schema} tag ([TSON-DATA] §2.2): what makes the document a schema. It names the pre-loaded
-     * kernel's {@code schema} whatever the document imports, so it is read here as a spelling, never looked up.
-     * A document without it is data, and handing one to a schema parser is a syntax error naming the rule.
+     * The root's {@code !schema} tag ([TSON-DATA] §2.2): what makes the document a schema. It names the kernel root's
+     * {@code schema}, an alias of {@code meta.schema}, resolved against the pre-loaded kernel whatever the document
+     * imports, so the grammar matches it as a spelling ({@link DocumentStart#SCHEMA_TAG}): which grammar the payload
+     * takes is decided before any name is looked up. A document without it is data, and handing one to a schema
+     * parser is a syntax error naming the rule.
      */
     private void expectSchemaTag() {
         if (!check(TokenType.BANG)) {
@@ -465,9 +467,11 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /**
      * {@code "!schema" ws schema-map} as a declaration's value ({@link SchemaMapDef}): a schema map nested as an entry,
-     * its members declarations of this document under their paths. The tag is read as a spelling, as the root's is
-     * ({@link #expectSchemaTag}), so the payload is the schema grammar's and never a data map. A schema map is a value
-     * and takes no parameters.
+     * its members declarations of this document under their paths. The tag names what the root's does
+     * ({@link #expectSchemaTag}), the pre-loaded kernel's {@code schema} or its target by path, {@code meta.schema}, and
+     * is matched as a spelling for the same reason: it decides that the payload is the schema grammar's and never a
+     * data map, before any name is looked up, so no declaration of this document can capture it. A schema map is a
+     * value and takes no parameters.
      */
     private TypeDef nestedSchemaMap(List<String> typeParams) {
         if (!typeParams.isEmpty()) {
@@ -495,8 +499,8 @@ public final class TsonSchemaParser extends TsonDataParser {
         requireQualifiedName(name);
         String target = name.text();
 
-        // A nested schema map is tagged `!schema`, the spelling the root's tag has, or by its type's path,
-        // `!meta.schema`, as resolved output writes it: one grammar for both.
+        // A nested schema map is tagged `!schema`, the kernel root's alias the root's tag names, or by its target's
+        // path, `!meta.schema`, as resolved output writes it: one grammar for both (see nestedSchemaMap).
         if ((DocumentStart.SCHEMA_TAG.equals(target) || TsonSchema.SCHEMA.equals(target))
                 && check(TokenType.LBRACE)) {
             return nestedSchemaMap(typeParams);

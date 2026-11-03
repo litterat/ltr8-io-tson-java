@@ -17,8 +17,10 @@ import java.util.Optional;
 public record DocumentStart(Optional<String> id, List<String> imports, Position position) implements TsonEvent {
 
     /**
-     * The root tag that makes a document a schema ([TSON-DATA] §2.2). It always names the pre-loaded kernel's
-     * {@code schema}, whatever the document imports: the tag says what the document is before any import is read.
+     * The root tag that makes a document a schema ([TSON-DATA] §2.2): the kernel root's {@code schema}, an alias of
+     * {@code meta.schema}, resolved against the pre-loaded kernel as every root tag is, whatever the document imports.
+     * The tag says what the document is before any import is read, so classification matches this spelling rather
+     * than looking the name up; the lookup it stands for has one answer, the kernel being pre-loaded.
      */
     public static final String SCHEMA_TAG = "schema";
 

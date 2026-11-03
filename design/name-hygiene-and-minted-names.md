@@ -130,8 +130,11 @@ naming functions, so such a pair would have to have collided within a phase as w
 one synthetic, and a closure holding both keeps the first (`resolver.ImportedSynthetics`,
 `design/linking-and-compilation.md`). No canonical rendering crosses a schema boundary, so that merge compares the
 resolved bodies instead, and two bodies under one minted name are the same `IllegalStateException`. A local lift whose
-name an import already declares references the import's entry without a comparison (`SchemaDesugarer`'s `imported`
-set).
+name an import already declares references the import's entry, and is held to it: `SchemaDesugarer` keeps the declaration
+it would have injected (`reused`), `SchemaResolver` resolves that form on its own once every entry is ready, and
+`ImportedSynthetics.requireForm` compares it with the import's entry, chain and a choice's linker-derived `disjoint` left
+out, an open entry by its parameter names and held text. A declared entry of the name is §2.2.3's collision, a
+`SchemaValidationException`; a synthetic of another form is the `IllegalStateException`.
 
 ## Why one walk, and what a refusal carries
 

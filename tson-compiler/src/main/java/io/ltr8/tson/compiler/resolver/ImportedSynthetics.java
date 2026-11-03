@@ -1,10 +1,15 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -24,6 +29,13 @@ import java.util.stream.Stream;
  * minted name are the same broken naming function {@link MintedNames#claim} refuses within one phase, now met across
  * two documents: {@link IllegalStateException}, neither the author's error nor a gap. Each route's link credits
  * {@code subtypes} against its own view of the namespace, so the comparison leaves them out.
+ *
+ * <p><b>A document's own lift is held to the same rule</b> ({@link #requireForm}). A sugar form whose derived name an
+ * import already declares references the import's entry rather than declaring its own, so the import's entry must be
+ * a synthetic of that form: a declared entry of the name is §2.2.3's collision, and a synthetic of another form is
+ * the broken naming function again. There the arriving side is this document's form resolved on its own, before any
+ * link, so the comparison leaves out what only a link or the whole schema's resolution derives: the chain, and a
+ * choice's {@code disjoint}.
  */
 public final class ImportedSynthetics {
 
@@ -62,6 +74,39 @@ public final class ImportedSynthetics {
         }
         return incumbent.withCloses(Stream.concat(incumbent.closes().stream(), arriving.closes().stream())
                 .distinct().toList());
+    }
+
+    /**
+     * Holds {@code imported}, the entry an import declares under {@code name}, to {@code own}, the form this
+     * document's lift derived {@code name} from, resolved on its own.
+     *
+     * @throws SchemaValidationException if the import's entry is a declared one, the collision of a declared entry
+     *         and a minted one
+     * @throws IllegalStateException if it is a synthetic of a different form
+     */
+    public static void requireForm(String name, TsonSchema.EntryFacts importedFacts, Top imported,
+                                   String importedOrigin, Top own) {
+        if (!importedFacts.synthetic()) {
+            throw new SchemaValidationException("'" + name + "', the internal name this schema's sugar form "
+                    + "derives, is declared by '" + importedOrigin + "' as an entry of its own, which collides with "
+                    + "it ([TSON-SCHEMA] §2.2.3, §8.2)");
+        }
+        if (!form(imported).equals(form(own))) {
+            throw new IllegalStateException("'" + importedOrigin + "' mints the internal name '" + name + "' for "
+                    + "a different form than this schema's ([TSON-SCHEMA] §8.2 derives the name from the form "
+                    + "alone): " + imported + " and " + own);
+        }
+    }
+
+    /** What a lift's form fixes of an entry: its body, without its chain or a choice's derived {@code disjoint}. */
+    private static Object form(Top value) {
+        Top bare = TypeChain.withoutChain(value);
+        return switch (bare) {
+            case ChoiceBody choice -> new ChoiceBody(choice.chain(), choice.variants(), Optional.empty());
+            case TemplateBody template -> List.of(template.parameters().stream().map(TemplateParam::name).toList(),
+                    template.template().replaceAll("\\s+", " ").strip());
+            default -> bare;
+        };
     }
 
     private static Top withoutSubtypes(Top value) {

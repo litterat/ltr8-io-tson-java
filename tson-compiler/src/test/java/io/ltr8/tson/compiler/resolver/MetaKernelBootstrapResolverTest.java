@@ -154,10 +154,10 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is its 85 declarations -- its six maps and their 68 members, and the root's eleven -- and one
+     * output is its 86 declarations -- its six maps and their 67 members, and the root's thirteen -- and one
      * injected declaration per distinct sugar form within them: six {@code array} entries from §5.3's {@code [X]}
-     * field-type sugar, minted at the root. Producing them here
-     * is what leaves the linker with nothing to materialize (see {@code MetaKernelSchemaRegistryTest}).
+     * field-type sugar, minted at the root. Producing them here is what leaves the linker with nothing to materialize
+     * (see {@code MetaKernelSchemaRegistryTest}).
      * {@code enum}'s member set is not among them: it is the fixture's own {@code meta.enum_set} declaration, since
      * {@code set} has no sugar and a {@code !} form stays prohibited at a field position (§5.2) -- and {@code
      * record.fields} is the fixture's own

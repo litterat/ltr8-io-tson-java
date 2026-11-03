@@ -37,6 +37,10 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 - `numeric.integer_size.bits` is `integer`, not a count: `int64`'s `size` is read against `integer_size` and `count`
   refines `int64`, so typing `bits` by `count` makes `count` wait on itself. That `bits` is above zero is
   `IntegerType.coherenceCheck`'s.
+- A width's range is never materialised. `IntegerSize.admits` judges a value by bit length (signed `n` bits: below `n`;
+  unsigned: non-negative and at most `n`), `within` compares two widths by their bits and signedness, and both
+  `IntegerType`'s checks and `IntegerParser`'s read go through them, so any `bits` a schema states loads and reads
+  exactly (`IntegerWidthTest`).
 
 Related: `design/schema-resolution.md` (the resolution phase and its exception boundary),
 `design/constructor-application.md` (what makes an entry an atom instance), `design/template-materialisation.md`
@@ -114,7 +118,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     and `DecimalParser` validate with `value.remainder(m)`, which throws on a zero divisor — so without the
     check a valid *data* document read against such a type would fail on the library's own fault code, an
     author error reported against the wrong document. `RationalParser` guards its own divisor. A `size.bits` of
-    zero or below is refused on the same footing: `IntegerParser` derives the width's range from it.
+    zero or below is refused on the same footing: a width of no bits admits no value.
   - **`unicode.text_type.members` answers to every facet beside it, in one place.** `TextType.coherenceCheck` judges
     every member against the length facets and against the `pattern` — one rule ("every member satisfies the
     other facets on the same body"), not split by which engine each half needs, which is why `tson-schema`
