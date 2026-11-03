@@ -14,6 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -44,10 +45,21 @@ class ImportedSyntheticTest {
             "https://example.test/thing-two.tn", """
                     !!id:"https://example.test/thing-two.tn"
                     !!import:"https://tson.io/2026/39/m/meta.tn"
-                    !schema { thing => { tags: [text] } }""");
+                    !schema { thing => { tags: [text] } }""",
+            "https://example.test/shapes.tn", """
+                    !!id:"https://example.test/shapes.tn"
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !schema {
+                      shaped => { either: (text | integer)  pairs: {text => integer}  tags: [text] }
+                      held   => <T> { items: [T]  either: (T | text) }
+                    }""");
 
     private static Tson tson() {
-        SchemaSource source = uri -> DOCUMENTS.entrySet().stream()
+        return tson(DOCUMENTS);
+    }
+
+    private static Tson tson(Map<String, String> documents) {
+        SchemaSource source = uri -> documents.entrySet().stream()
                 .filter(document -> CanonicalIdentity.sameIdentity(uri, document.getKey()))
                 .map(Map.Entry::getValue).findFirst()
                 .orElseThrow(() -> new IllegalStateException("unexpected fetch: " + uri));
@@ -128,5 +140,58 @@ class ImportedSyntheticTest {
         assertEquals(1, problems.size(), problems.toString());
         assertTrue(problems.getFirst().message().contains("'thing' is declared by two different schemas"),
                 problems.toString());
+    }
+
+    /** The name this library mints for {@code [text]}, read off a schema that writes it. */
+    private static String mintedForTextArray() {
+        return ownClosedArray(tson().bindRegistry().core().resolveLinked("https://example.test/tags.tn"));
+    }
+
+    /**
+     * A document whose own lift derives a name an import already declares references the import's entry, so that
+     * entry must be the form: an import marking a different form synthetic under the name is the broken naming
+     * function, an invariant break rather than a silent reuse of the wrong type.
+     */
+    @Test
+    void aLiftReusingAnImportedSyntheticOfAnotherFormIsAnInvariantBreak() {
+        String minted = mintedForTextArray();
+        Tson tson = tson(Map.of("https://example.test/forged.tn", """
+                !!id:"https://example.test/forged.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { @meta.synthetic %s => !meta.array { element_type: integer } }""".formatted(minted)));
+
+        assertThrows(IllegalStateException.class, () -> tson.validateSchema("""
+                !!id:"https://example.test/reuser.tn"
+                !!import:"https://example.test/forged.tn"
+                !schema { tagged => { tags: [text] } }"""));
+    }
+
+    /** An import <em>declaring</em> the name a lift derives is the collision of a declared entry and a minted one. */
+    @Test
+    void aLiftWhoseNameAnImportDeclaresCollides() {
+        String minted = mintedForTextArray();
+        Tson tson = tson(Map.of("https://example.test/declared.tn", """
+                !!id:"https://example.test/declared.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { %s => !meta.array { element_type: text } }""".formatted(minted)));
+
+        List<Diagnostic> problems = tson.validateSchema("""
+                !!id:"https://example.test/reuser.tn"
+                !!import:"https://example.test/declared.tn"
+                !schema { tagged => { tags: [text] } }""");
+        assertEquals(1, problems.size(), problems.toString());
+        assertTrue(problems.getFirst().message().contains("as an entry of its own"), problems.toString());
+    }
+
+    /** The same lift reusing an imported synthetic of its own form loads, as every import of the kernel's does. */
+    @Test
+    void aLiftReusingAnImportedSyntheticOfItsOwnFormLoads() {
+        assertEquals(List.of(), tson().validateSchema("""
+                !!id:"https://example.test/reuser.tn"
+                !!import:"https://example.test/shapes.tn"
+                !schema {
+                  more  => { either: (text | integer)  pairs: {text => integer}  tags: [text] }
+                  again => <U> { items: [U]  either: (U | text) }
+                }"""));
     }
 }

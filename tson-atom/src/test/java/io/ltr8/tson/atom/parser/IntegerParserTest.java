@@ -294,4 +294,32 @@ class IntegerParserTest {
         assertThrows(AtomValidationException.class,
                 () -> new IntegerParser(new IntegerSize(8, true)).read(token("255")));
     }
+
+    /** A width off the standard ladder is judged by bit length at both ends of its range. */
+    @Test
+    void anExoticWidthIsExactAtItsEnds() {
+        IntegerParser int24 = new IntegerParser(new IntegerSize(24, true));
+        assertEquals(BigInteger.valueOf(8_388_607), big(int24, "8388607"));
+        assertEquals(BigInteger.valueOf(-8_388_608), big(int24, "-8388608"));
+        assertThrows(AtomValidationException.class, () -> int24.read(token("8388608")));
+        assertThrows(AtomValidationException.class, () -> int24.read(token("-8388609")));
+        IntegerParser uint1 = new IntegerParser(new IntegerSize(1, false));
+        assertEquals(1, uint1.read(token("1")).intValue());
+        assertThrows(AtomValidationException.class, () -> uint1.read(token("2")));
+    }
+
+    /**
+     * A width beyond {@code int} bits reads: its range is never built, so three billion bits reads a value into a
+     * {@link BigInteger}, refuses one of the wrong sign, and names its range by its power of two.
+     */
+    @Test
+    void aHugeWidthReadsWithoutBuildingItsRange() {
+        BigInteger bits = BigInteger.valueOf(3_000_000_000L);
+        IntegerParser wide = new IntegerParser(new IntegerSize(bits, true));
+        assertInstanceOf(BigInteger.class, wide.read(token("-99999999999999999999999")));
+        assertEquals(BigInteger.TEN.pow(40), big(wide, "1" + "0".repeat(40)));
+        AtomValidationException refused = assertThrows(AtomValidationException.class,
+                () -> new IntegerParser(new IntegerSize(bits, false)).read(token("-1")));
+        assertEquals(">= 0 and <= 2^3000000000 - 1", refused.expected());
+    }
 }

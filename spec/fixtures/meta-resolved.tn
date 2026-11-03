@@ -437,8 +437,6 @@
 
     identifier_kind => !meta.reference { of: unicode.identifier_type }
 
-    atom_kind => !meta.reference { of: meta.atom }
-
     type_kind => !meta.reference { of: meta.type }
 
     ref => !meta.template { parameters: [{ name: T  type: meta.type_kind }]  template: "!meta.reference { of: T }" }
@@ -494,6 +492,8 @@
   } }
 
   set => !meta.template { parameters: [{ name: T  type: meta.type_kind }]  template: "!meta.set_type { element_type: T }" }
+
+  schema => !meta.alias { target: meta.schema }
 
   @meta.synthetic array_template_param_xxhash => !meta.array { element_type: meta.template_param }
 

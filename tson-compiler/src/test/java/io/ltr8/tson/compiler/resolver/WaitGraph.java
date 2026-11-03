@@ -126,6 +126,11 @@ final class WaitGraph {
         }
     }
 
+    /**
+     * Whether {@code value} is a schema map nested as an entry: tagged {@code !schema}, the kernel root's alias, or by
+     * its target's path, {@code !meta.schema}. Matched as a spelling, as the parser matches it, since this decides
+     * which entries exist before any of them can be looked up.
+     */
     private static boolean isSchemaMap(DataValue value) {
         return value.typeRef().filter(t -> t.equals("schema") || t.equals(SCHEMA)).isPresent();
     }
@@ -267,7 +272,9 @@ final class WaitGraph {
 
     private void readDocument(DataValue root) {
         Read read = new Read("<document>");
-        String rootType = root.typeRef().filter(t -> !t.equals("schema")).orElse(SCHEMA);
+        // The root tag is the kernel root's `schema`, an alias of `meta.schema`: the read waits on the alias, and
+        // its shape is its target's.
+        String rootType = root.typeRef().orElse(SCHEMA);
         read.waitOn(rootType, "head", "");
         read.annotations(root.annotations(), "");
         Shape shape = shape(rootType, read, "");

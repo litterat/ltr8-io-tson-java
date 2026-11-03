@@ -167,12 +167,16 @@ final class SchemaDesugarer {
 
     /**
      * Names already in scope from {@code !!import}. A sugar form that generates a name an import already
-     * declares is <em>referenced</em> rather than redeclared: the name is derived from the resolved binding
-     * record itself, so an identical form in an imported schema has already produced the same type. Without
-     * this, a schema writing {@code [text; 1..]} would redeclare the one it imports from the kernel and be
-     * rejected as a local-vs-import collision.
+     * declares is <em>referenced</em> rather than redeclared: the name is derived from the binding record
+     * itself, so an identical form in an imported schema has produced the same type. Without this, a schema
+     * writing {@code [text; 1..]} would redeclare the one it imports from the kernel and be rejected as a
+     * local-vs-import collision. The declaration it would have injected is kept in {@link #reused}, so that
+     * {@code SchemaResolver} can hold the import's entry to the form ({@code ImportedSynthetics.requireForm}).
      */
     private final Set<String> imported;
+
+    /** The declaration each reference to an imported synthetic stands for, keyed by its derived name. */
+    private final Map<String, SchemaMap.Declaration> reused = new LinkedHashMap<>();
 
     /** Declarations synthesised for sugar forms encountered during the walk, keyed by their generated name. */
     private final Map<String, SchemaMap.Declaration> injected = new LinkedHashMap<>();
@@ -243,9 +247,20 @@ final class SchemaDesugarer {
      */
     static SchemaDocument desugar(SchemaDocument document, Set<String> imported,
             DesugarFailureReporter reporter, SchemaPositions positions) {
+        return desugar(document, imported, reporter, positions, new LinkedHashMap<>());
+    }
+
+    /**
+     * {@link #desugar(SchemaDocument, Set, DesugarFailureReporter, SchemaPositions)}, putting into {@code reused}
+     * the declaration each lift whose name an import already declares would have injected: the form the import's
+     * entry must be.
+     */
+    static SchemaDocument desugar(SchemaDocument document, Set<String> imported,
+            DesugarFailureReporter reporter, SchemaPositions positions, Map<String, SchemaMap.Declaration> reused) {
         SchemaDesugarer pass = new SchemaDesugarer(imported, reporter, positions);
         pass.local = document.body().declarations();
         SchemaMap body = pass.schemaMap(document.body());
+        reused.putAll(pass.reused);
         if (body == document.body() && pass.injected.isEmpty()) {
             return document;
         }
@@ -943,19 +958,15 @@ final class SchemaDesugarer {
         List<String> parameters = parametersIn(binding);
         if (parameters.isEmpty()) {
             String name = bindingName(binding);
-            if (!imported.contains(name)) {
-                claim(name, binding, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
-                        Optional.empty(), instance(binding)));
-            }
+            claim(name, binding, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
+                    Optional.empty(), instance(binding)));
             return new SimpleRef(name);
         }
         List<String> renamed = positionalNames(binding, parameters);
         Binding normalised = rename(binding, parameters, renamed);
         String name = bindingName(normalised);
-        if (!imported.contains(name)) {
-            claim(name, normalised, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
-                    Optional.empty(), instance(normalised, renamed)));
-        }
+        claim(name, normalised, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
+                Optional.empty(), instance(normalised, renamed)));
         return new GenericRef(name, parameters.stream()
                 .<TypeArg>map(parameter -> new TypeArg.Ref(new SimpleRef(parameter))).toList());
     }
@@ -1089,10 +1100,14 @@ final class SchemaDesugarer {
 
     // ── Internal names (§8.2) ────────────────────────────────────────────────────────────────────
 
-    /** Injects {@code declaration} under {@code name}, unless the same form already claimed it. */
+    /**
+     * Mints {@code name} for {@code binding} (§8.2's freshness, {@link MintedNames}) and injects its declaration the
+     * first time, or records it in {@link #reused} where an import already declares the name: the import's entry
+     * stands for it, and is held to it once resolution can read the form.
+     */
     private void claim(String name, Binding binding, Supplier<SchemaMap.Declaration> declaration) {
         if (minted.claim(name, DerivedName.canonicalBinding(binding.head(), binding.fields()))) {
-            injected.put(name, declaration.get());
+            (imported.contains(name) ? reused : injected).put(name, declaration.get());
         }
     }
 

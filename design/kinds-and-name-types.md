@@ -64,7 +64,7 @@ schema's one namespace (SPEC-FEEDBACK.md #7), and the members are computed.
 
 A kind (`!meta.reference { of: net.uuid_type }`, or `meta.kind<net.uuid_type>` through the kernel's template) is an atom
 whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a
-listed one. The kernel declares `meta.identifier_kind`, `meta.atom_kind` and `meta.type_kind`, and types
+listed one. The kernel declares `meta.identifier_kind` and `meta.type_kind`, and types
 `meta.enum_type.name_type` and `meta.record.name_type` by the first. `computeKinds` derives every reference's index
 (`ReferenceBody.linked`) onto its body in the merged map after `computeSubtypes` and before the name-type checks; a reference
 that names values gets `namesTypes` false and no members.

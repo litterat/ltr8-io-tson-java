@@ -233,23 +233,23 @@ enum OutputFormat {
      */
     private static List<Map.Entry<String, Long>> limits(CliPolicy.CliLimits limits) {
         return List.of(
-                Map.entry("max_depth", (long) limits.maxDepth()),
+                Map.entry("max_depth", limits.maxDepth()),
                 Map.entry("max_token_length", limits.maxTokenLength()),
                 Map.entry("max_text_length", limits.maxTextLength()),
-                Map.entry("max_numeric_literal_length", (long) limits.maxNumericLiteralLength()),
+                Map.entry("max_numeric_literal_length", limits.maxNumericLiteralLength()),
                 Map.entry("max_binary_size", limits.maxBinarySize()),
                 Map.entry("max_document_size", limits.maxDocumentSize()),
-                Map.entry("max_elements", (long) limits.maxElements()),
-                Map.entry("max_entries", (long) limits.maxEntries()),
-                Map.entry("max_fields", (long) limits.maxFields()),
-                Map.entry("max_annotations", (long) limits.maxAnnotations()),
-                Map.entry("max_values", (long) limits.maxValues()),
-                Map.entry("max_import_closure", (long) limits.maxImportClosure()),
-                Map.entry("max_schema_entries", (long) limits.maxSchemaEntries()),
-                Map.entry("max_alias_chain", (long) limits.maxAliasChain()),
-                Map.entry("max_supertype_chain", (long) limits.maxSupertypeChain()),
-                Map.entry("max_materialisation_depth", (long) limits.maxMaterialisationDepth()),
-                Map.entry("max_wait_depth", (long) limits.maxWaitDepth()));
+                Map.entry("max_elements", limits.maxElements()),
+                Map.entry("max_entries", limits.maxEntries()),
+                Map.entry("max_fields", limits.maxFields()),
+                Map.entry("max_annotations", limits.maxAnnotations()),
+                Map.entry("max_values", limits.maxValues()),
+                Map.entry("max_import_closure", limits.maxImportClosure()),
+                Map.entry("max_schema_entries", limits.maxSchemaEntries()),
+                Map.entry("max_alias_chain", limits.maxAliasChain()),
+                Map.entry("max_supertype_chain", limits.maxSupertypeChain()),
+                Map.entry("max_materialisation_depth", limits.maxMaterialisationDepth()),
+                Map.entry("max_wait_depth", limits.maxWaitDepth()));
     }
 
     /**

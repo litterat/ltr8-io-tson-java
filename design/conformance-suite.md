@@ -138,11 +138,12 @@ and handed to the front door as the one context schemas and data bind through
 binding. A new fixture record is a new host record beside them; the fixture's `@doc` lists the records its value entries
 hold, which is the corpus's half of the contract (`RUNNER.md`).
 **A `schema/` vector's expected side is read under the subject's first `!!import`** (`ResolvedForm.readResolved`, a
-`withImports(…).readAs(text, "meta.schema")` read, its root tag `!schema` the spelling of `meta.schema`; the pre-loaded
-kernel where the subject imports nothing), and the object reader binds through `SuiteBindings` too: a fixture imports the
-bundled schemas it builds on and adds its own types, and a value entry in resolved output is typed by that fixture alone, so
-a vector showing a value by name written back as written reads only there. Only the first: `SuiteBindings` binds by name
-across the corpus, and reading under every import would bind a second fixture's same-named record to the first's class.
+`withImports(…).readAs(text, "meta.schema")` read, its root tag `!schema` the kernel root's alias of `meta.schema`; the
+pre-loaded kernel where the subject imports nothing), and the object reader binds through `SuiteBindings` too: a fixture
+imports the bundled schemas it builds on and adds its own types, and a value entry in resolved output is typed by that
+fixture alone, so a vector showing a value by name written back as written reads only there. Only the first:
+`SuiteBindings` binds by name across the corpus, and reading under every import would bind a second fixture's same-named
+record to the first's class.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist

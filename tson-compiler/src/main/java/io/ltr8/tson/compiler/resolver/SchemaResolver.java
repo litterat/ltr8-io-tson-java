@@ -266,8 +266,11 @@ public final class SchemaResolver {
         // position lookup below goes through this copy, so a rewritten declaration is located like any other.
         SchemaPositions positions = declarationPositions.copy();
         Problems problems = new Problems(CanonicalIdentity.canonicalize(id), positions, receiver);
+        // A lift whose name an import already declares references the import's entry: the form it stands for is
+        // kept, to hold that entry to once resolution can read it.
+        Map<String, SchemaMap.Declaration> reused = new LinkedHashMap<>();
         SchemaDocument desugared = SchemaDesugarer.desugar(document,
-                namespace.keySet(), problems.collecting() ? problems::report : null, positions);
+                namespace.keySet(), problems.collecting() ? problems::report : null, positions, reused);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
         // The names desugaring generated, as opposed to the ones the author wrote. These are the schema's
         // synthetic entries (§5.3's lift rule), so they are both what carries the derived @meta.synthetic marker
@@ -422,6 +425,25 @@ public final class SchemaResolver {
         onDemand.resolveWith(resolver);
 
         waitOrder.readyAll(name -> false);
+        // Each imported entry a lift of this document references is a synthetic of that lift's form (§8.2): the
+        // form is resolved on its own, its facts left as the import's, and compared.
+        reused.forEach((name, declaration) -> {
+            TsonSchema.EntryFacts importedFacts = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
+            try {
+                Top own;
+                try {
+                    own = resolver.resolve(declaration);
+                } finally {
+                    facts.put(name, importedFacts);
+                }
+                ImportedSynthetics.requireForm(name, importedFacts, namespace.get(name), origins.get(name), own);
+            } catch (SchemaValidationException collision) {
+                if (!problems.collecting()) {
+                    throw collision;
+                }
+                problems.report(declaration, collision);
+            }
+        });
         // Every entry is ready: the judgements that walk a name to what it names run now (§3.4.1's sixth rule).
         resolver.judgeDeferred((name, error) -> {
             if (!problems.collecting()) {
@@ -1257,9 +1279,10 @@ public final class SchemaResolver {
      * several routes unifies, one synthetic minted by two documents unifies ({@link ImportedSynthetics}), and two
      * different schemas declaring one name is the error.
      *
-     * <p>Unlike the linker's, this merge has no {@code subtypes} to reconcile when a route repeats --
-     * {@code subtypes} is populated at link time, one phase later, so both copies are still as their
-     * declaring schema resolved them and the first is kept. Each entry's facts travel with it into {@code
+     * <p>An entry reached by several routes is kept as it first arrived, as the linker's merge keeps it. Every
+     * import is already linked, so each route's copy carries the {@code subtypes} that route's own link credited
+     * over its own closure; the first copy's are kept and none is reconciled, and a synthetic minted by two
+     * documents is compared without them ({@link ImportedSynthetics}). Each entry's facts travel with it into {@code
      * facts}, so the tag of a constructor's instance another schema declared is found here as a local one's is.
      */
     private Map<String, Top> mergeImports(SchemaDocument document,

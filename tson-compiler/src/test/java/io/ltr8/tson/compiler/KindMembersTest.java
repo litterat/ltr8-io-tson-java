@@ -246,7 +246,11 @@ class KindMembersTest {
         assertFalse(members.contains("meta.kind") || members.contains("meta.ref"), members::toString);
     }
 
-    /** {@code meta.kind<namespace>} is a kind: it holds the kernel's namespace types and a schema's own. */
+    /**
+     * {@code meta.kind<namespace>} is a kind: it holds the kernel's namespace types and a schema's own, and the kernel
+     * root's {@code schema}, an alias of {@code meta.schema}, beside its target, as a kind holds every alias of a
+     * member.
+     */
     @Test
     void aKindOfNamespaceHoldsEveryNamespaceType() {
         ReferenceBody namespaces = kind(link("""
@@ -258,7 +262,7 @@ class KindMembersTest {
                 }
                 """, ""), "namespaces");
 
-        assertEquals(List.of("api", "meta.field_map", "meta.schema"), namespaces.memberNames());
+        assertEquals(List.of("api", "meta.field_map", "meta.schema", "schema"), namespaces.memberNames());
     }
 
     /**
@@ -419,9 +423,6 @@ class KindMembersTest {
 
         assertEquals(List.of("meta.field_name", "meta.identifier", "meta.param_name", "meta.type_name",
                 "net.scheme_name"), kind(meta, "meta.identifier_kind").memberNames());
-        assertTrue(kind(meta, "meta.atom_kind").memberNames().containsAll(
-                List.of("boolean", "meta.identifier", "meta.identifier_kind", "meta.atom_kind")),
-                kind(meta, "meta.atom_kind").memberNames().toString());
     }
 
     /**

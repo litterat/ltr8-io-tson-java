@@ -65,7 +65,7 @@ class KernelUnderMetaTest {
     @Test
     void theRootsHoldTheCommonVocabulary() {
         assertEquals(Set.of("void", "boolean", "integer", "int64", "text", "bytes", "iri", "iri_reference", "regex", "doc",
-                "enum", "set"), rootNames(TsonBundledSchemas.META_ID));
+                "enum", "set", "schema"), rootNames(TsonBundledSchemas.META_ID));
         assertEquals(Set.of("number", "rational", "complex", "int8", "int16", "int32", "int128", "int256",
                 "uint8", "uint16", "uint32", "uint64", "uint128", "uint256", "float32", "float64"),
                 rootNames(TsonBundledSchemas.NUMERIC_ID));
@@ -285,7 +285,10 @@ class KernelUnderMetaTest {
                 () -> SchemaMetaNameBinder.INSTANCE.resolve("meta.short_text_type"));
     }
 
-    /** A resolved form's root, tagged {@code !schema}, reads as a value of the kernel's {@code meta.schema}. */
+    /**
+     * A resolved form's root, tagged {@code !schema}, reads as a value of the kernel's {@code meta.schema}: the tag
+     * names the kernel root's {@code schema}, an alias of it.
+     */
     @Test
     void theRootTagIsTheSpellingOfTheKernelsSchema() {
         Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=249f7b0de7d79716f642b42166b274a2b4414b08c91e6d638557b7bbe7264a6c"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=ca0dd2779bf8085917df569736405695d332ab616589f1d8832168587731466c"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -14,9 +14,10 @@
 
   Its root holds the vocabulary an author writes: `void`, `boolean`,
   `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`,
-  `doc`, the `enum` constructor and the `set<T>` template. Everything else
-  is machinery, a member of one of six schema maps nested in this document's
-  root, each member named by its path from the root:
+  `doc`, the `enum` constructor, the `set<T>` template and `schema`, the tag
+  of a schema map. Everything else is machinery, a member of one of six
+  schema maps nested in this document's root, each member named by its path
+  from the root:
 
     meta      the type system: the kinds and constructors, fields,
               collections, references, templates, aliases, `meta.schema`,
@@ -36,7 +37,7 @@
               encodings
 
   A schema whose import closure holds this document reserves those six map
-  names and the twelve root names ([TSON-SCHEMA] §2.2.3). Every name resolves
+  names and the thirteen root names ([TSON-SCHEMA] §2.2.3). Every name resolves
   from the root, so an entry here naming a member of a map writes its path,
   as an importer does.
 
@@ -47,10 +48,10 @@
 
   The kernel imports nothing and is never resolved from a document: it is
   pre-loaded by special resolution ([TSON-SCHEMA] §3.4), and must be the
-  revision the processor was built for. Its root tag and the tag of the map
-  it nests, `!schema`, name its own `meta.schema`, as every schema document's
-  root tag does. Implementations ship the kernel's resolved structure, and
-  this document describes it.
+  revision the processor was built for. Its root tag and the tag of each map
+  it nests, `!schema`, name its own `schema`, an alias of `meta.schema`, as
+  every schema document's root tag does. Implementations ship the kernel's
+  resolved structure, and this document describes it.
 
   The data-format libraries build on it, each importing this document alone
   and declaring its constructors under the map named for it, numeric.tn and
@@ -1012,9 +1013,6 @@
     @doc:"The names of the identifier families, which a `name_type` names."
     identifier_kind => !meta.reference { of: unicode.identifier_type }
 
-    @doc:"The names of the atoms."
-    atom_kind => !meta.reference { of: meta.atom }
-
     @doc:"The names of the types a value can have."
     type_kind => !meta.reference { of: meta.type }
 
@@ -1141,4 +1139,11 @@
     `top`.
     """
   set => <T> !meta.set_type { element_type: T }
+
+  @doc:"""
+    The tag of a schema map, an alias of `meta.schema`: a schema document's
+    root, `!schema { … }`, and a map nested as an entry,
+    `geo => !schema { … }`.
+    """
+  schema => meta.schema
 }

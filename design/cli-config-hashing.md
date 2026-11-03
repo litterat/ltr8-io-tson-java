@@ -196,7 +196,8 @@ name the way to write the thing today, and a trace and a bug-report banner would
 `validation_report`: `CliPolicy`, the shape of `policy.tn`'s `policy.processor` — `identifier_policy` (level, `per_segment`,
 `skeleton_distinctness`, `permitting` combinations with each script by its UAX #24 alias), `token_policy` (level,
 `permitting`), `unicode_data_version`, and `limits` (all seventeen of §9.1's and §11.5's, `max_depth` and
-`max_wait_depth` among them). It is on the envelope rather than each
+`max_wait_depth` among them, each a `long`, as `policy.limit` is an `int64`: a report states the limits its producer ran
+under, which this processor's own `LimitsPolicy` need not hold). It is on the envelope rather than each
 diagnostic because it is a fact about the processor: constant for the run, and needed by a sender *before* it writes
 a document, which a channel that opens only on failure cannot give. `limits` sits inside `policy` because the
 envelope's one question is "what judged this run", and a limit refusal answers it as much as a name refusal. The

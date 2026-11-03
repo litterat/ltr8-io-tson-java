@@ -213,9 +213,10 @@ is the other side of the line: `api => !meta.namespace { … }` applies the cons
 ## Nested schema maps
 
 `geo => !schema { address => { … } }` declares: every value of `meta.schema` does, as the root does. The tag is
-`!schema`, the root's spelling, or `!meta.schema`, as resolved output writes a nested map (`TsonSchemaParser` takes
-either). The kernel's machinery is one such map, `meta`; the data-format libraries'
-constructors are three more, numeric.tn's `numeric`, temporal.tn's `temporal` and net.tn's `net`.
+`!schema`, the kernel root's alias the root's tag names, or `!meta.schema`, its target, as resolved output writes a
+nested map (`TsonSchemaParser` takes either, matched as a spelling, so no declaration captures it). The kernel's
+machinery is one such map, `meta`; the data-format libraries' constructors are three more, numeric.tn's `numeric`,
+temporal.tn's `temporal` and net.tn's `net`.
 `TsonSchemaParser`
 puts each member into the document's one declaration map under its path (`geo.address`, `geo.inner.deep`), and the
 entry `geo` itself is a `SchemaMapDef` holding its members' own names. So every phase reads a member as a root entry:

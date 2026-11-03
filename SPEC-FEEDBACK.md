@@ -403,7 +403,8 @@ supplied at ingest (§8.1).
   parse errors naming their replacement; an unknown directive, and an `!!id` after an `!!import`, are refused by the
   same grammar. A directive past the header is the parse error #6 left.
 - **A document is a schema exactly when its root is tagged `!schema`.** The tag always names the pre-loaded kernel's
-  `schema`, whatever the document imports, and is read as a spelling; a schema parser refuses an untagged root.
+  root `schema`, `schema => meta.schema`, an alias, whatever the document imports, and is read as a spelling; a schema
+  parser refuses an untagged root.
   Classification reads the header, the root's leading annotations and its tag, and never the root's value, so a schema
   map's sugar is never parsed to classify it. That is not §7.1's "at most two directives of lookahead and no value
   parsing": annotations stand before the tag (§7.4's `*annotation [type-ref] core-value`), so a schema carrying a
@@ -565,8 +566,8 @@ constructor's declaration is a record (`uuid_type => atom & { … }`) and a reco
 **What is running.**
 
 - **One atom.** The kernel declares `reference => atom & { of: meta.type_kind }` (`of` a qualified name, #14), with
-  `kind => <T> !reference { of: T }` and `ref => <T> !reference { of: T }` its two spellings; `meta.identifier_kind`,
-  `meta.atom_kind` and `meta.type_kind` are `!reference { of: … }`. `kind_type` and `ref_type` are gone, and with
+  `kind => <T> !reference { of: T }` and `ref => <T> !reference { of: T }` its two spellings; `meta.identifier_kind`
+  and `meta.type_kind` are `!reference { of: … }`. `kind_type` and `ref_type` are gone, and with
   #12's removal of `type_ref` and `type_argument` the kernel holds 86 entries (80 declarations, #15).
   `meta.kind<order>` and `meta.ref<order>` expand to one content and mint one entry.
 - **The slot's meaning comes from `of`, never from the spelling.** Where `of` is a constructor, `top` or IS-A it, the
@@ -766,8 +767,9 @@ and the kernel types `meta.reference.of` and `meta.type_chain.supertypes`/`subty
 
 **What is running.**
 
-- **Every value of `schema` declares.** `geo => !schema { … }` is a schema map nested as an entry: its tag is read as
-  a spelling, as the root's is, its payload is the schema grammar, and its members are declarations that lift, mint,
+- **Every value of `schema` declares.** `geo => !schema { … }` is a schema map nested as an entry: its tag, `!schema`
+  or its target's path `!meta.schema`, names what the root's does and is read as a spelling, its payload is the schema
+  grammar, and its members are declarations that lift, mint,
   link and compile exactly as root entries do — types, constructors, values, aliases, templates. It declares at least
   one member and takes no parameters. A value of any other namespace type (`!api { … }`) stays a value map. The
   document root is the outermost `!schema`.
@@ -801,7 +803,9 @@ and the kernel types `meta.reference.of` and `meta.type_chain.supertypes`/`subty
   keeps its first segment (`numeric_integer_type_…` for an application of `numeric.integer_type`). A synthetic's
   identity is its form, not its declaring document: two documents that mint one form without importing each other
   declare one entry, which a closure holding both holds once, the first import's, as it holds one schema reached by
-  two routes. A name only one of them mints is §2.2.3's collision.
+  two routes. A name only one of them mints is §2.2.3's collision. A document whose own sugar form derives a name an
+  import already declares references the import's entry, which must be that form: a declared entry of the name is the
+  collision, and a synthetic of another form an internal error, the naming function broken.
 - **Qualified tags (Part 1).** A tag is `"!" qualified-name` with no arguments: `!geo.address { … }` in data resolves by
   the walk, and one naming no member is `UNKNOWN_TYPE`. A schemaless read keeps a dotted tag as written, as it keeps
   any tag. [TSON-JSON]'s `$type` takes the same text (edited in place).
@@ -862,7 +866,7 @@ data format made a schema that wants dates reserve every network and numeric nam
 
   | Document | Imports | At the root | Under its maps |
   |---|---|---|---|
-  | meta.tn | nothing (pre-loaded) | `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set` | the other 68. `meta`, the type system (48): the kinds and constructors, `meta.schema` and `meta.field_map`, the map, tuple and choice constructors, `meta.template`, `meta.identifier` and its aliases (`meta.type_name`, `meta.field_name`, `meta.param_name`), the supporting records, sets and enums (`meta.type_chain`, `meta.record_field`, `meta.field_role`, …), the references (`meta.type_kind`, `meta.kind`, `meta.ref`, …), `meta.value`, `meta.declared`, the annotation machinery (`meta.annotation`, `meta.synthetic`, `meta.application`), the checked assertion `meta.disjoint` and the one-element tuple templates. `atom` (5): the ISO/IEC 11404 datatype properties `atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric` and the mixin `atom.specification`. `numeric` (4): `numeric.integer_type`, `numeric.integer_size`, `numeric.integer_member_set`, `numeric.count` (#16). `unicode` (6): `unicode.text_type`, `unicode.text_member_set`, `unicode.normalization`, `unicode.identifier_type`, `unicode.identifier_base`, `unicode.regex_type`. `net` (3): `net.iri_type`, `net.scheme_set`, `net.scheme_name`. `binary` (2): `binary.bytes_type`, `binary.bytes_encoding` |
+  | meta.tn | nothing (pre-loaded) | `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`, `schema` | the other 67. `meta`, the type system (47): the kinds and constructors, `meta.schema` and `meta.field_map`, the map, tuple and choice constructors, `meta.template`, `meta.identifier` and its aliases (`meta.type_name`, `meta.field_name`, `meta.param_name`), the supporting records, sets and enums (`meta.type_chain`, `meta.record_field`, `meta.field_role`, …), the references (`meta.type_kind`, `meta.kind`, `meta.ref`, …), `meta.value`, `meta.declared`, the annotation machinery (`meta.annotation`, `meta.synthetic`, `meta.application`), the checked assertion `meta.disjoint` and the one-element tuple templates. `atom` (5): the ISO/IEC 11404 datatype properties `atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric` and the mixin `atom.specification`. `numeric` (4): `numeric.integer_type`, `numeric.integer_size`, `numeric.integer_member_set`, `numeric.count` (#16). `unicode` (6): `unicode.text_type`, `unicode.text_member_set`, `unicode.normalization`, `unicode.identifier_type`, `unicode.identifier_base`, `unicode.regex_type`. `net` (3): `net.iri_type`, `net.scheme_set`, `net.scheme_name`. `binary` (2): `binary.bytes_type`, `binary.bytes_encoding` |
   | numeric.tn | meta.tn | `number`, `rational`, `complex`, `int8`…`int256` but `int64`, `uint8`…`uint256`, `float32`, `float64` | `numeric`, beside the kernel's members: `numeric.decimal_type`, `numeric.float_type`, `numeric.rational_type`, `numeric.complex_type`, `numeric.ieee_format`, `numeric.complex_component`, `numeric.decimal_member_set` |
   | temporal.tn | meta.tn | `date`, `time`, `datetime`, `duration`, `period` | `temporal`: their five `*_type` constructors |
   | net.tn | meta.tn | `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `hostname`, `host`, `media_type`, `uri_reference`, `uri`, `uuid` | `net`, beside the kernel's members: their eleven `*_type` constructors |
@@ -906,8 +910,9 @@ data format made a schema that wants dates reserve every network and numeric nam
   `numeric.integer_size` (`count`'s resolved `size` is read against it, #16), `meta.value`, `meta.type_kind`,
   `meta.type_chain`, `meta.record_field`, `meta.field_group`, `meta.field_role`, `meta.enum_set` and four lifted arrays.
   Closing it under every name its declarations reference — every rule-1 wait, every field type and `of`, every
-  annotation type its entries carry, and what reading the document itself waits on, its root tag's `meta.schema` with
-  that map's key and value types and the annotations on its keys — gives 68 entries, adding the base kinds,
+  annotation type its entries carry, and what reading the document itself waits on, its root tag's `schema`, an alias
+  of `meta.schema`, with that map's key and value types and the annotations on its keys — gives 69 entries, adding
+  `schema`, the base kinds,
   `meta.alias`, `meta.declared_type`, the identifier, iri and regex families with `atom.specification`,
   `meta.template_param`, `meta.declared`, `meta.type_name`, `doc`, `meta.annotation`, `meta.synthetic`,
   `[meta.template_param]`, the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric`,
@@ -916,10 +921,10 @@ data format made a schema that wants dates reserve every network and numeric nam
   `identifier_type`, `iri_type` and `regex_type` compose `atom.specification`, whose `spec` is an `iri`. The kernel is
   that closure and the concepts that belong with it, which nothing in the closure names: `meta.map`, `meta.tuple`,
   `meta.choice`, `meta.tuple_element` (with its lifted array), `meta.template`, `meta.application`, `meta.kind`,
-  `meta.ref`, `meta.atom_kind`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the
-  octet sequence (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) — 86 entries, 68 under its six maps, 12 at the
-  root and six synthetics, with the six maps themselves the 87th to 92nd. A test holds the kernel to containing the
-  closure, pins the cycle at 26 and the closure at 68, and pins the related set, so an entry that drifts in either
+  `meta.ref`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet sequence
+  (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) — 86 entries, 67 under its six maps, 13 at the root and six
+  synthetics, with the six maps themselves the 87th to 92nd. A test holds the kernel to containing the closure, pins
+  the cycle at 26 and the closure at 69, and pins the related set, so an entry that drifts in either
   direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` → `meta.void_type` →
   `[meta.type_kind]`). A schema importing meta.tn alone has every elided construction, `meta.kind<T>` and `meta.ref<T>`.
 - **The bootstrap** builds by hand 13 of the cycle's 26 entries — its instances and its one refinement (`meta.value`,
@@ -951,13 +956,21 @@ data format made a schema that wants dates reserve every network and numeric nam
   A schemaless read keeps a dotted name as written, and an empty segment (`@x..y`) is a parse error.
 - **The elided constructions target the kernel's entries**, whatever a document imports: `{ … }` is `meta.record`,
   `[T]` `meta.array`, `{K => V}` `meta.map`, `[A, B]` `meta.tuple`, `(A | B)` `meta.choice` and a partial application
-  `meta.alias`. The root tag stays `!schema`, a spelling of the pre-loaded kernel's `meta.schema` (#8), admitted as that
-  spelling wherever a value of `meta.schema` is read; a nested map is tagged `!schema` in source, or `!meta.schema`, as
-  resolved output writes it.
+  `meta.alias`. The root tag stays `!schema`, the pre-loaded kernel's root `schema`, `schema => meta.schema`, an alias
+  (#8), so a position typed `meta.schema` admits it as it admits any alias of its type; a nested map is tagged
+  `!schema` in source, or `!meta.schema`, as resolved output writes it.
+- **`schema` is a kernel root name like the others.** A schema whose closure holds meta.tn writes it bare at a type
+  position (`types: schema`, kept as written in resolved output) and may not declare it, the collision any root name is
+  (`a-schema-importing-the-kernel-declares-schema`). A schema importing nothing may declare `schema`, as it may declare
+  `int64`; a tag still names the pre-loaded kernel's, the root's and every nested map's, so `geo => !schema { … }`
+  beside a local `schema => { … }` is a nested map and the local name is the schema's own everywhere else
+  (`an-import-free-schema-declares-schema-and-nests-a-map`). The tag is matched as a spelling because classification
+  and the choice of the payload's grammar precede reading any import, and the pre-loaded kernel gives the one answer
+  a lookup would.
 - **Resolved output** tags a body by its constructor's name (`!meta.record`, `!enum`, `!numeric.decimal_type`,
   `!net.uuid_type`) and names each entry as its document does (`!meta.record_field { type: text }`, `@meta.synthetic`,
   `@meta.application`). The kernel's form is `!schema { numeric => !meta.schema { … } … meta => !meta.schema { … }
-  … }`, its 68 members in its six maps and its twelve root entries and six synthetics at the root; each library's is
+  … }`, its 67 members in its six maps and its thirteen root entries and six synthetics at the root; each library's is
   `!schema { numeric => !meta.schema { … } number => !numeric.decimal_type {} … }`, its map holding its own members
   and none of the kernel's; core's holds its six annotations. The five fixtures this implementation
   holds itself to are `meta-resolved.tn`, `numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn` and
@@ -991,6 +1004,9 @@ data format made a schema that wants dates reserve every network and numeric nam
   targets are `meta.record`, `meta.array`, `meta.map`, `meta.tuple`, `meta.choice`, `meta.alias`.
 - §6: the documentary annotation is `@doc`, the kernel's; the author annotations are core.tn's.
 - §3.3.1: an alias of a constructor is applied as its target is, in a held body as anywhere.
+- §3.4, §4.1, §12.1 ([TSON-DATA] §2.2): the kernel's root declares `schema => meta.schema`, and the `!schema` tag of a
+  schema document's root and of a nested map names it, resolved against the pre-loaded kernel whatever the document
+  imports or declares.
 - §8.1 to §8.3: resolved output tags a body by its constructor's name; an alias of a template applies it.
 - [TSON-DATA] §3.1, §7.4: `annotation = "@" qualified-name [ ":" data-value ]`.
 
@@ -1001,6 +1017,11 @@ data format made a schema that wants dates reserve every network and numeric nam
   under `atom` and the kernel's atom constructors under `numeric`, `unicode`, `net` and `binary`. A revision that
   wants a rule rather than a list needs a test an entry can be put to; "what an author writes" is the intent, not yet
   a test.
+- **The tag beside a local `schema`.** §2.2 and §3 say the root tag classifies the document and §3.3.1 that no local
+  declaration captures a `!` target, but no section says which `schema` a nested map's tag names in a schema that
+  imports nothing and declares its own. The running answer is the pre-loaded kernel's, as for the root, so the one
+  spelling means two things in that document, the tag and every other position. The alternative, refusing a local
+  `schema` in every schema, would be a reservation of a name no import brings, which no other root name has.
 - **Where the author annotations live.** core.tn holds them for now; whether they belong in the kernel, in a library
   of their own, or in core.tn is open with the user.
 - **Who may contribute to `meta`** (#14's open item): any schema may, the collision rule guarding the kernel's own
