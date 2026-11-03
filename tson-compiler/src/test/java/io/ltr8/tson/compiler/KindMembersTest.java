@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -267,12 +268,13 @@ class KindMembersTest {
     }
 
     /**
-     * A namespace type is built with {@code namespace}, which IS-A {@code product}: it is a member of
-     * {@code meta.type_kind}, {@code meta.kind<namespace>} and {@code meta.kind<product>}, and of no kind of
-     * {@code record} or {@code map}. A record's {@code field_map} is a map type, a member of {@code meta.kind<map>}.
+     * A namespace type is built with {@code namespace}, a refinement of {@code map} and so IS-A {@code map} and {@code
+     * product}: it is a member of {@code meta.type_kind}, {@code meta.kind<namespace>}, {@code meta.kind<map>} and
+     * {@code meta.kind<product>}, and of no kind of {@code record}. A record's {@code field_map} is a map type, a
+     * member of {@code meta.kind<map>} and of no {@code meta.kind<namespace>}.
      */
     @Test
-    void aNamespaceTypeIsAProductAndNoRecordOrMap() {
+    void aNamespaceTypeIsAMapAndNoRecord() {
         TsonLinkedSchema linked = link("""
                 !!id:"https://example.test/kinds.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
@@ -287,16 +289,86 @@ class KindMembersTest {
                 }
                 """, "");
 
-        assertTrue(kind(linked, "types").memberNames().contains("api"));
-        assertTrue(kind(linked, "namespaces").memberNames().contains("api"));
-        assertTrue(kind(linked, "products").memberNames().contains("api"));
-        for (String kind : List.of("records", "maps")) {
+        for (String kind : List.of("types", "namespaces", "products", "maps")) {
             List<String> members = kind(linked, kind).memberNames();
-            assertFalse(members.contains("api") || members.contains("meta.schema") || members.contains("schema"),
-                    () -> kind + ": " + members);
+            assertTrue(members.containsAll(List.of("api", "meta.schema")), () -> kind + ": " + members);
         }
+        List<String> records = kind(linked, "records").memberNames();
+        assertFalse(records.contains("api") || records.contains("meta.schema") || records.contains("meta.field_map"),
+                () -> "records: " + records);
         assertTrue(kind(linked, "maps").memberNames().containsAll(List.of("labels", "meta.field_map")));
-        assertFalse(kind(linked, "records").memberNames().contains("meta.field_map"));
+        assertFalse(kind(linked, "namespaces").memberNames().contains("labels"));
+        assertFalse(kind(linked, "namespaces").memberNames().contains("meta.field_map"));
+    }
+
+    /**
+     * A refinement of a reference narrows {@code of} to the source's or a type IS-A it ([TSON-SCHEMA] §5.7), and is
+     * IS-A its source: {@code meta.map} IS-A {@code meta.product}, and {@code meta.namespace}, a refinement of {@code
+     * meta.map}, IS-A {@code meta.map}. The kernel's own {@code meta.identifier_kind} is such a refinement of {@code
+     * meta.type_kind}.
+     */
+    @Test
+    void aReferenceRefinementNarrowsOfAndIsAItsSource() {
+        TsonLinkedSchema linked = link("""
+                {
+                  api        => !meta.namespace { key_type: meta.identifier  value_type: text }
+                  products   => !meta.reference { of: meta.product }
+                  maps       => !products ^ { of: meta.map }
+                  namespaces => !maps ^ { of: meta.namespace }
+                  records    => !meta.type_kind ^ { of: meta.record }
+                  same       => !products ^ {}
+                  order      => { id: text }
+                  big_order  => order ^ {}
+                  orders     => !meta.reference { of: order }
+                  big_orders => !orders ^ { of: big_order }
+                }
+                """);
+
+        assertEquals(List.of("products"), TypeChain.supertypesOf(kind(linked, "maps")));
+        assertEquals(List.of("maps", "products"), TypeChain.supertypesOf(kind(linked, "namespaces")));
+        assertEquals(List.of("meta.type_kind"), TypeChain.supertypesOf(kind(linked, "meta.identifier_kind")));
+        assertTrue(TypeChain.subtypesOf(kind(linked, "meta.type_kind")).contains("meta.identifier_kind"));
+        assertEquals("meta.namespace", kind(linked, "namespaces").of());
+        assertEquals("big_order", kind(linked, "big_orders").of());
+        List<String> namespaces = kind(linked, "namespaces").memberNames();
+        assertTrue(namespaces.contains("api") && !namespaces.contains("meta.field_map"), namespaces::toString);
+        assertTrue(kind(linked, "products").memberNames().containsAll(kind(linked, "maps").memberNames()));
+    }
+
+    /** A refinement whose {@code of} widens the source's is refused: it would admit names the source refuses. */
+    @Test
+    void aReferenceRefinementThatWidensOfIsRefused() {
+        SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
+                {
+                  maps => !meta.reference { of: meta.map }
+                  wide => !maps ^ { of: meta.product }
+                }
+                """));
+
+        assertTrue(e.getMessage().contains("not a valid refinement of '!maps'"), e.getMessage());
+        assertTrue(e.getMessage().contains("of 'meta.product' is not 'meta.map' or IS-A it"), e.getMessage());
+    }
+
+    /** And so is one whose {@code of} is unrelated to the source's, over constructors and over ordinary types. */
+    @Test
+    void aReferenceRefinementToAnUnrelatedOfIsRefused() {
+        SchemaValidationException constructors = assertThrows(SchemaValidationException.class, () -> link("""
+                {
+                  maps => !meta.reference { of: meta.map }
+                  odd  => !maps ^ { of: meta.record }
+                }
+                """));
+        assertTrue(constructors.getMessage().contains("of 'meta.record' is not 'meta.map' or IS-A it"),
+                constructors.getMessage());
+
+        SchemaValidationException types = assertThrows(SchemaValidationException.class, () -> link("""
+                {
+                  order  => { id: text }
+                  orders => !meta.reference { of: order }
+                  texts  => !orders ^ { of: text }
+                }
+                """));
+        assertTrue(types.getMessage().contains("of 'text' is not 'order' or IS-A it"), types.getMessage());
     }
 
     /**

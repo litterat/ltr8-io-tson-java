@@ -267,15 +267,6 @@
       chain => !meta.record_field { type: meta.type_chain  optional: true }
     }  extension: ABSTRACT }
 
-    namespace => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
-      chain          => !meta.record_field { type: meta.type_chain  optional: true }
-      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
-      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
-      key_type       => !meta.record_field { type: meta.identifier_kind }
-      value_type     => !meta.record_field { type: meta.type_kind }
-      ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
-    } }
-
     alias => !meta.record { chain: { supertypes: [meta.top] }  fields: {
       target => !meta.record_field { type: meta.type_kind }
     } }
@@ -375,13 +366,25 @@
       max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
-    map => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
+    map => !meta.record { chain: { supertypes: [meta.product meta.top meta.type]  subtypes: [meta.namespace] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
       key_type       => !meta.record_field { type: meta.type_kind }
       value_type     => !meta.record_field { type: meta.type_kind }
       voidable       => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      min_items      => !meta.record_field { type: numeric.count  optional: true }
+      max_items      => !meta.record_field { type: numeric.count  optional: true }
+    } }
+
+    namespace => !meta.record { chain: { supertypes: [meta.map meta.product meta.top meta.type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
+      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
+      key_type       => !meta.record_field { type: meta.identifier_kind }
+      value_type     => !meta.record_field { type: meta.type_kind }
+      voidable       => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
       ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       min_items      => !meta.record_field { type: numeric.count  optional: true }
       max_items      => !meta.record_field { type: numeric.count  optional: true }
@@ -435,9 +438,9 @@
 
     kind => !meta.template { parameters: [{ name: T  type: meta.type_kind }]  template: "!meta.reference { of: T }" }
 
-    identifier_kind => !meta.reference { of: unicode.identifier_type }
+    type_kind => !meta.reference { chain: { subtypes: [meta.identifier_kind] }  of: meta.type }
 
-    type_kind => !meta.reference { of: meta.type }
+    identifier_kind => !meta.reference { chain: { supertypes: [meta.type_kind] }  of: unicode.identifier_type }
 
     ref => !meta.template { parameters: [{ name: T  type: meta.type_kind }]  template: "!meta.reference { of: T }" }
 

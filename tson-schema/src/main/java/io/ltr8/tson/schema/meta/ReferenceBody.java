@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 
 /**
  * An instance of the kernel's {@code reference} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom whose
@@ -25,6 +26,11 @@ import java.util.Optional;
  * <p><b>The {@link #index} is derived and never written.</b> It is absent on a declaration and computed at link over
  * the governing schema's closure: whether {@code of} names a constructor, and, for one that does, the names it admits,
  * sorted. Membership is the linker's judgement, so resolved output carries {@code of} alone.
+ *
+ * <p><b>A refinement narrows {@link #of}</b> ([TSON-SCHEMA] §5.7): {@code !meta.type_kind ^ { of: unicode.identifier_type
+ * }} is {@code meta.identifier_kind}, its {@code of} IS-A the source's, so every name it admits the source admits too,
+ * and it is IS-A its source. Whether one name IS-A another is the namespace's, so the rule ({@link #ofNarrowing}) takes
+ * that relation from the linker.
  *
  * <p><b>Equality is {@link #of} and the chain, never the index.</b> Two schemas that both apply {@code meta.kind<uuid_type>}
  * hold one instance with different members, and an importer that re-derives an entry an import already minted unifies
@@ -143,16 +149,25 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
     /**
      * {@inheritDoc}
      *
-     * <p>A reference's one authored facet is {@link #of}, and it is what the reference is: a refinement restating
-     * another names another set. The index is derived, so nothing else is compared.
+     * <p>A reference's one authored facet is {@link #of}, and whether a refinement's {@code of} narrows the source's
+     * is an IS-A question about two names, which only the namespace they resolve in answers: that half of the rule
+     * is {@link #ofNarrowing}, asked at link. Here a reference refines only a reference.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
-        if (!(refined instanceof ReferenceBody other)) {
-            return List.of("refines a reference with " + refined.getClass().getSimpleName());
-        }
-        return of.equals(other.of) ? List.of() : List.of("of '" + other.of + "' replaces the source's own '" + of
-                + "'; a reference admits the names of one type's values, fixed where it is constructed");
+        return refined instanceof ReferenceBody ? List.of()
+                : List.of("refines a reference with " + refined.getClass().getSimpleName());
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.7's rule for {@code of}, this body being the source: the refined {@code of} is the source's or
+     * IS-A it, so every name the refinement admits the source admits too. {@code isA} answers whether its first name
+     * IS-A its second in the namespace both resolve in, a name being IS-A itself; an empty list means {@code refined}
+     * narrows. A widening, and an {@code of} unrelated to the source's, is refused.
+     */
+    public List<String> ofNarrowing(ReferenceBody refined, BiPredicate<String, String> isA) {
+        return isA.test(refined.of, of) ? List.of() : List.of("of '" + refined.of + "' is not '" + of
+                + "' or IS-A it, so the refinement admits names the source refuses -- a refinement narrows 'of' (§5.7)");
     }
 
     /** Compares {@link #of} and the chain, never the index -- see this class's own Javadoc for why. */

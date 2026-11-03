@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -61,7 +62,8 @@ class TopKindHierarchyTest {
 
     /**
      * A reference's identity is its {@code of}: its index is derived over a closure, and one reference holds
-     * different members in two schemas. A refinement may not name another {@code of}.
+     * different members in two schemas. A refinement's {@code of} is the source's or IS-A it, a question the
+     * namespace answers ({@link ReferenceBody#ofNarrowing}); a reference refines only a reference.
      */
     @Test
     void aReferenceIsItsOf() {
@@ -72,7 +74,15 @@ class TopKindHierarchyTest {
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
         assertTrue(linked.namesTypes());
         assertEquals(List.of(), linked.constraintsCheck(new ReferenceBody("uuid_type")));
-        assertEquals(1, linked.constraintsCheck(new ReferenceBody("text_type")).size());
+        assertEquals(List.of(), linked.constraintsCheck(new ReferenceBody("text_type")));
+        assertEquals(1, linked.constraintsCheck(new EnumBody(List.of("A"))).size());
+
+        BiPredicate<String, String> isA = (sub, sup) -> sub.equals(sup)
+                || sub.equals("uuid_v4_type") && sup.equals("uuid_type");
+        assertEquals(List.of(), linked.ofNarrowing(new ReferenceBody("uuid_type"), isA));
+        assertEquals(List.of(), linked.ofNarrowing(new ReferenceBody("uuid_v4_type"), isA));
+        assertEquals(1, linked.ofNarrowing(new ReferenceBody("text_type"), isA).size());
+        assertEquals(1, new ReferenceBody("uuid_v4_type").ofNarrowing(new ReferenceBody("uuid_type"), isA).size());
     }
 
     @Test

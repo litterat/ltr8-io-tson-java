@@ -169,7 +169,7 @@ class ApplicabilityIsIsATopTest {
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("'!meta.product' names an abstract entry"), problems::toString);
         assertTrue(problems.getFirst().message().contains(
-                "(meta.namespace | meta.record | meta.array | meta.set_type | meta.map | meta.tuple)"), problems::toString);
+                "(meta.record | meta.array | meta.set_type | meta.map | meta.namespace | meta.tuple)"), problems::toString);
         assertFalse(problems.getFirst().message().contains("constraint vocabulary"),
                 "one sentence, not the applicability clause beside the abstract one: " + problems);
     }

@@ -316,7 +316,10 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   made ready in wait order.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
-  the pre-loaded set first, so the first compile holds every head a read applies.
+  the pre-loaded set first, so the first compile holds every head a read applies. Two refinements wait on the cycle
+  and stay off it: `meta.namespace => meta.map ^ { … }` waits on its source `meta.map`, and `meta.identifier_kind =>
+  !meta.type_kind ^ { … }` on `meta.type_kind`, hand-built; the names their `key_type` and `of` hold order nothing, so
+  neither is a wait of the cycle's entries and the measurements above stand.
 - **Every other instance is read through the ordinary path.** `DefinitionResolver.resolveInstance` binds through a
   `DefinitionMetaReader` that reads through `WaitOrder.read`, against readers compiled from the entries ready now:
   `TsonSchemaLinker.linkReady(ready, null, pending)` then `TsonSchemaCompiler.compileReady(linked, factories,

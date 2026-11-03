@@ -99,11 +99,69 @@ class NamespaceTypeTest {
     void theLinkedSchemaRecordsTheMapAndTheKind() {
         TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
 
-        assertEquals(Optional.of(new NamespaceBody(TypeRef.of("header_name"), TypeRef.of("text"), false)),
+        assertEquals(Optional.of(NamespaceBody.of(TypeRef.of("header_name"), TypeRef.of("text"), false)),
                 meta.namespace("headers"));
         assertEquals(EntryKind.PRODUCT, meta.kindOf("headers"));
         assertEquals(Optional.of("meta.namespace"), meta.schema().constructorOf("headers"));
         assertEquals(Optional.empty(), meta.namespace("header_name"));
+    }
+
+    private static final String SMALL = "small => !meta.namespace { key_type: header_name  value_type: text  "
+            + "min_items: 1  max_items: 2 }";
+
+    /** The problems with a governed schema holding {@code !small} applied to {@code map}. */
+    private static List<Diagnostic> readSmall(String map) {
+        return tson(SMALL).validateSchema("""
+                !!id:"https://example.test/request.tn"
+                !!import:"https://example.test/meta-headers.tn"
+                !schema {
+                  defaults => !small %s
+                }
+                """.formatted(map));
+    }
+
+    /**
+     * {@code namespace} refines {@code map}, so its size bounds are a map's: a value entry of a namespace type holds
+     * no fewer than {@code min_items} entries and no more than {@code max_items}.
+     */
+    @Test
+    void aNamespaceTypesSizeBoundsAreAMapsAndAValueMeetsThem() {
+        assertEquals(List.of(), readSmall("{ accept => \"text/plain\" }"));
+        assertEquals(List.of(), readSmall("{ accept => \"text/plain\"  user-agent => \"probe\" }"));
+        assertTrue(readSmall("{}").toString().contains("fewer than the minimum 1"));
+        List<Diagnostic> over = readSmall("{ a => \"x\"  b => \"y\"  c => \"z\" }");
+        assertEquals(1, over.size(), over::toString);
+        assertTrue(over.toString().contains("more than the maximum 2"), over::toString);
+    }
+
+    /** And a data document's value at a field typed by one meets them too. */
+    @Test
+    void aDataValueOfABoundedNamespaceTypeMeetsItsBounds() {
+        Tson tson = tson(SMALL + "\n  request => { headers: small }");
+        String data = """
+                !!import:"https://example.test/meta-headers.tn"
+                !request { headers: %s }
+                """;
+
+        assertEquals(List.of(), tson.validate(data.formatted("{ accept => \"text/plain\" }")));
+        List<Diagnostic> problems = tson.validate(data.formatted("{}"));
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("fewer than the minimum 1"), problems::toString);
+    }
+
+    /** A namespace type whose floor is above its ceiling admits no value, as a map type's does. */
+    @Test
+    void aNamespaceTypeWhoseBoundsCrossIsRefused() {
+        List<Diagnostic> problems = tson("").validateSchema("""
+                !!id:"https://example.test/crossed.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
+                  hs => !meta.namespace { key_type: meta.identifier  value_type: text  min_items: 3  max_items: 1 }
+                }
+                """);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("min_items"), problems::toString);
     }
 
     /**
