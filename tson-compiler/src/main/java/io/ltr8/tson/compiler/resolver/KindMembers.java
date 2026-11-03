@@ -23,14 +23,14 @@ import java.util.function.Function;
  * exactly when <b>the type of the named entry's value, past its alias hops, IS-A {@code of}</b>. An entry's value has a
  * type, its tag: {@code order => { … }} holds a value of {@code record}, {@code int32 => !integer ^ { … }} a value of
  * {@code integer_type}, {@code orders => !api { … }} a value of {@code api}. A field's type position
- * ({@code meta.type_kind}, the reference over {@code type}), {@code meta.kind<record>} and {@code meta.ref<method>} all
+ * ({@code meta.type_ref}, the reference over {@code type}), {@code meta.ref<record>} and {@code meta.ref<method>} all
  * ask it.
  *
  * <p><b>What {@code of} names decides which names a slot holds</b> ({@link #namesTypes}): a constructor, {@code top}
  * or IS-A it, has types as its values, so the slot holds type names and the linker computes them ({@link #of}); any
  * other type has values as its values, and the slot holds a value's qualified name, which the linker judges where it
- * is written ({@code ValuesByName}). The partition is by {@code of}, never by the spelling: {@code meta.kind<order>} and
- * {@code meta.ref<order>} are one reference.
+ * is written ({@code ValuesByName}). The partition is by {@code of}, never by the spelling, which is one: {@code
+ * meta.ref<order>} names values and {@code meta.ref<record>} types.
  *
  * <p><b>Membership of a type name is one walk</b> over resolved entries, never over spellings. From an entry, alias
  * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a template
@@ -44,7 +44,7 @@ import java.util.function.Function;
  * predicate sets it apart -- {@link io.ltr8.tson.schema.meta.EntryKind#isConstructor} answers for applicability, a
  * different question, and is not consulted here.
  *
- * <p><b>A reference is a member of itself where the walk says so.</b> {@code meta.type_kind} is built with {@code
+ * <p><b>A reference is a member of itself where the walk says so.</b> {@code meta.type_ref} is built with {@code
  * reference}, which IS-A {@code type}, so it is one of the names it holds. Nothing loops: membership reads
  * constructors and never a reference's own members, and a value of a reference is a name, not a value read through
  * the type it names.

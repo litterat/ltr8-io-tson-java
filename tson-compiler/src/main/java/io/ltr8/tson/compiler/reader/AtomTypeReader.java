@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.schema.KernelNames;
 import java.util.Optional;
 
 import io.ltr8.tson.base.Diagnostic;
@@ -129,7 +128,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     private final IdentifierProfile names;
 
     /**
-     * The {@code of} of a reference that names types, a constructor ({@code meta.kind<record>}'s {@code record}), or {@code
+     * The {@code of} of a reference that names types, a constructor ({@code meta.ref<record>}'s {@code record}), or {@code
      * null} for every other atom.
      */
     private final String kindOf;
@@ -171,10 +170,10 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     TsonSchema.SlotType slotType() {
         if (kindOf != null) {
-            return TsonSchema.SlotType.kind(kindOf, name);
+            return TsonSchema.SlotType.typeName(kindOf, name);
         }
         if (refOf != null) {
-            return TsonSchema.SlotType.reference(refOf, name);
+            return TsonSchema.SlotType.valueName(refOf, name);
         }
         throw new IllegalStateException("'" + name + "' reads neither a kind nor a reference, so no name is held "
                 + "there");

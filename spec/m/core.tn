@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/39/m/core.tn?sha256=9fd4a43200da5262a3b80ca8519a9202da8a7b9fc17ab51a284d705ef3cd9a47"
-!!import:"https://tson.io/2026/39/m/numeric.tn?sha256=ce16114ff7f09c8f325f8eb9afc5c2f952ba2b06df353371201a2f6b95affd78"
-!!import:"https://tson.io/2026/39/m/temporal.tn?sha256=3ea2a5440dc72c7af9272f710ec7f1fcbe44ad6eda498f144cb6a33dd9463b4c"
-!!import:"https://tson.io/2026/39/m/net.tn?sha256=a291dd9ddeafb2548e91c72c8670bf6e619aaccdec5952269939f5b2330ac21c"
+!!id:"https://tson.io/2026/39/m/core.tn?sha256=51f1e4969402714fab82562564b259095be147c23af8508c5c9b5dc21e4150b7"
+!!import:"https://tson.io/2026/39/m/numeric.tn?sha256=a4c961efd34296ce7cef0b3b1ca7413a8b5653c456f34e86c0f90f83f8ea8042"
+!!import:"https://tson.io/2026/39/m/temporal.tn?sha256=409bec4982528700b3ac6b63a0bfab7cca182ecaf5929ff651ae7eb64d62ffc3"
+!!import:"https://tson.io/2026/39/m/net.tn?sha256=9adb912794347acca9f23abd147f32f2c14fbaab428c00adc9b75d26a3733676"
 @doc:"""
   TSON core — every bundled type in one import (2026 Revision 39 draft).
 
@@ -12,7 +12,7 @@
   kernel and the libraries (`text`, `integer`, `bytes`, `enum`, `set`, `doc`,
   `number`, `int32`, `date`, `datetime`, `uuid`, `uri`), and the machinery
   under the maps those documents declare, by path (`meta.record`,
-  `meta.type_kind`, `unicode.text_type`, `numeric.decimal_type`,
+  `meta.type_ref`, `unicode.text_type`, `numeric.decimal_type`,
   `temporal.date_type`, `net.uuid_type`). It reserves the map names `meta`,
   `atom`, `numeric`, `unicode`, `net`, `binary` and `temporal` and every root
   name of those documents and of this one. A schema that wants only some of

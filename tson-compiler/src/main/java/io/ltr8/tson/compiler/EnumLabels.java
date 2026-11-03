@@ -23,7 +23,7 @@ import java.util.function.Function;
 
 /**
  * What an enum's {@code name_type} obliges ([TSON-SCHEMA] §7.4): that it names an identifier family -- a member of
- * {@code meta.identifier_kind}, the kind the slot is typed by ({@link NameType#admits}) -- that each member is a value of
+ * {@code meta.identifier_ref}, the kind the slot is typed by ({@link NameType#admits}) -- that each member is a value of
  * it, and that no two members are one value under its equality. {@link FieldNames} holds a
  * record's field names to the same three; the peer of {@link RecordExtension} in shape: a checker over the linked
  * closure that hands back violations and leaves reporting to the linker.
@@ -35,7 +35,7 @@ import java.util.function.Function;
  * is the first place it is whole.
  *
  * <p><b>An identifier family is a type built with {@code identifier_type}</b>, which is what membership of the
- * kernel's {@code meta.identifier_kind} walks: an instance, a refinement of one, an instantiation of a template over the
+ * kernel's {@code meta.identifier_ref} walks: an instance, a refinement of one, an instantiation of a template over the
  * constructor, and an alias of any of them. An enum's members are names under a naming vocabulary's equality, and
  * carry §8.2's per-name rules under its profile; a closed set of values on any other family, {@code text} included,
  * is that family's own {@code members} facet.

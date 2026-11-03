@@ -61,7 +61,7 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
       by the diagnostic's position. An expansion that names its own application keeps an instantiation entry (an
       `Alias` to the synthetic, recording the application), and that one is named like any other hop.
     - **A kind's refusal lists its members the same way** (`ReferenceBody.shownMembers()`, the index's `shown`): a
-      minted member by its application, `meta.kind<net.uuid_type>`, never `reference_uuid_type_…`, and one with no spelling
+      minted member by its application, `meta.ref<net.uuid_type>`, never `reference_uuid_type_…`, and one with no spelling
       left out.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per

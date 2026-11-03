@@ -251,7 +251,7 @@ class WaitOrderTest {
     // ── A constructor no class backs ───────────────────────────────────────
 
     private static final String STEPS = """
-              step => meta.top & { takes: meta.type_kind }
+              step => meta.top & { takes: meta.type_ref }
               order => { id: int32 }
               s => !step { takes: order }
             """;

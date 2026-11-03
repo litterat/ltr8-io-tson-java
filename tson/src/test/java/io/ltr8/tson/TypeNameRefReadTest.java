@@ -25,12 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A value at a kind position ([TSON-SCHEMA] §4.2), read in TSON text: a kind is an atom whose values are the
- * names of the types built with its constructor, so a value is a type name ([TSON-DATA] §7.7) that resolves, in
- * the governing schema's type-name namespace, to a member. {@code meta.kind<uuid_type>} holds {@code stock_id}, never a
+ * A value at a position typed by a reference that names types ([TSON-SCHEMA] §4.2), read in TSON text: its values
+ * are the names of the types built with its constructor, so a value is a type name ([TSON-DATA] §7.7) that resolves, in
+ * the governing schema's type-name namespace, to a member. {@code meta.ref<uuid_type>} holds {@code stock_id}, never a
  * uuid.
  */
-class KindReadTest {
+class TypeNameRefReadTest {
 
     private static final String IDS = "https://example.test/kind-ids.tn";
 
@@ -42,12 +42,12 @@ class KindReadTest {
               stock_id    => !net.uuid_type {}
               customer_id => !net.uuid_type {}
               sku         => text
-              ledger      => { named: meta.kind<net.uuid_type>  fallback?: meta.kind<net.uuid_type> ~ customer_id }
+              ledger      => { named: meta.ref<net.uuid_type>  fallback?: meta.ref<net.uuid_type> ~ customer_id }
               box         => <T> { v: T }
               pair        => <A, B> { a: A  b: B }
               inner       => box<text>
               outer       => pair<box<text> int32>
-              typed       => { t: meta.type_kind }
+              typed       => { t: meta.type_ref }
             }""";
 
     private static final SchemaSource SOURCE = uri -> IDS_SCHEMA;
@@ -101,7 +101,7 @@ class KindReadTest {
     }
 
     /**
-     * A refusal lists the kind's members as an author can write them: the entry {@code meta.kind<net.uuid_type>}
+     * A refusal lists the kind's members as an author can write them: the entry {@code meta.ref<net.uuid_type>}
      * closed to is minted under a name nobody wrote, and the list names it by its application.
      */
     @Test
@@ -109,7 +109,7 @@ class KindReadTest {
         List<Diagnostic> problems = problems("!typed { t: nope }");
         assertEquals(1, problems.size(), problems.toString());
         String message = problems.getFirst().message();
-        assertTrue(message.contains("meta.kind<net.uuid_type>"), message);
+        assertTrue(message.contains("meta.ref<net.uuid_type>"), message);
         assertFalse(message.contains("reference_uuid_type"), message);
         assertFalse(problems.getFirst().expected().contains("reference_uuid_type"), problems.getFirst().expected());
     }

@@ -24,7 +24,7 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   type or a reference, and imports any schema document.
 - A reference to a value entry (a `ValueEntry`, `myapi => !api { … }`) is refused at every position a type-ref
   occupies: it is a value, and nothing is typed by it.
-- A kernel slot typed `meta.type_kind` (`meta.record_field.type`, the element and container type slots,
+- A kernel slot typed `meta.type_ref` (`meta.record_field.type`, the element and container type slots,
   `meta.choice.variants`) is judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor whose declaration
   is a record is a member, its value being of `meta.record`, and a value entry is refused there. An alias's target (`Alias`),
   which may name a constructor, is judged by resolution and arity alone (`constructors == null`). `design/references.md` has
@@ -140,7 +140,7 @@ are worth their place here, each catching what would otherwise link, compile, an
 - **A value entry is refused at every type-ref position** (a field type, a variant, an element, a map key or
   value), naming the type it is a value of. A value entry's payload was judged by the read against its type and its
   names by `ValuesByName`, so `validateBody` asks nothing of it.
-- **A `meta.type_kind` slot is judged by membership** of `meta.type_kind` (`KindMembers.isMember`), where `type` is in reach:
+- **A `meta.type_ref` slot is judged by membership** of `meta.type_ref` (`KindMembers.isMember`), where `type` is in reach:
   an alias stopping at an application, an open entry and a value entry are no type a value can have. A constructor
   is one, its declaration a record (`spec: net.uuid_type` holds a declaration body as data; SPEC-FEEDBACK.md #11).
 - **A choice's variants are distinct at the end of each §8.3 alias chain** (`AliasChain.terminal`), since an
@@ -151,7 +151,7 @@ are worth their place here, each catching what would otherwise link, compile, an
 meta.array ^ {...}` carries `[meta.array, meta.product, meta.top, meta.type]`), and the defining schema's closure is inside
 the importer's, so every name on it is there. A `reference` body's `of` names any type or constructor, never a value entry or
 an open entry (`KindMembers.ofRefusal`); what it names decides whether the slot holds a type's name or a value's. A namespace
-type's stated `key_type` must be a member of `meta.identifier_kind`: its keys are names.
+type's stated `key_type` must be a member of `meta.identifier_ref`: its keys are names.
 
 **Every body is asked its family's coherence rule** (`checkCoherent`), which catches the bounds an application closed
 onto parameters (`sized<10, 3>`); a declared body was already asked at resolution, and one refused there never reaches
@@ -219,7 +219,7 @@ key_type: header_name value_type: text }` in any schema), and resolves to a `Nam
 - **The map is what the facets state.** `NamespaceBody.read()` gives the `MapBody`: keys of `key_type`, values of
   `value_type`, ordered where `ordered` is `true`, values never void, bounded by `min_items`/`max_items` where stated
   (`NamespaceBody.coherenceCheck` judges the pair as `MapBody`'s does). `key_type` is required: the family
-  every key is read and judged under, a member of `meta.identifier_kind` (`validateBody`). A record's `fields` is no
+  every key is read and judged under, a member of `meta.identifier_ref` (`validateBody`). A record's `fields` is no
   namespace but `meta.field_map`, an ordered map keyed by `text` whose keys the record's `name_type` judges (`FieldNames`).
 - **Nothing beside the facets.** `namespace`'s own record reader refuses any other field at the construction, so the
   linker has no facet check of its own.
@@ -228,12 +228,12 @@ key_type: header_name value_type: text }` in any schema), and resolves to a `Nam
   it is delivered as a `Namespace` is `design/meta-layer-namespaces.md`'s.
 - **Any schema's vocabulary.** Any schema declares a namespace type or types a field by it, and a schema importing the
   declaring one holds values of it as entries. Such an entry (`myapi => !api { … }`) is a `ValueEntry`: refused at
-  every type position (above), a member of no kind, named by `meta.ref<api>` (one entry with `meta.kind<api>`, `api` being no
+  every type position (above), a member of no kind, named by `meta.ref<api>` (`api` being no
   constructor), and compiled to a `ValueEntryReader`.
 
 ## Values by name (`ValuesByName`, §5.12)
 
-A value entry's payload may hold a name, `request: place_order_request` at a slot typed `meta.kind<meta.record>` or
+A value entry's payload may hold a name, `request: place_order_request` at a slot typed `meta.ref<meta.record>` or
 `method: orders.place_order` at a slot typed `meta.ref<method>`. The read keeps the name as written with its path and the
 slot's declared type (`TsonSchema.SlotType`), and `checkValuesByName` judges each one over local entries after
 `validateEntry`, by what the slot's `of` names over `merged` (`KindMembers.namesTypes`), whatever the read guessed:

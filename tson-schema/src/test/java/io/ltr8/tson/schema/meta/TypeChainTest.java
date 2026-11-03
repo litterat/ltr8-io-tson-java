@@ -70,7 +70,7 @@ class TypeChainTest {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
                 .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
         RecordBody templated = RecordBody.of(RecordBody.fieldMap())
-                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_KIND, Optional.empty())))
+                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())))
                 .withSupertypes(List.of("meta.namespace", "meta.top"));
 
         assertTrue(EntryKind.isConstructor("numeric.integer_type", constructor, n -> true));
@@ -83,7 +83,7 @@ class TypeChainTest {
     @Test
     void aRecordTemplateCarriesAChainAsAnyTypeDoes() {
         RecordBody pet = RecordBody.of(RecordBody.fieldMap())
-                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_KIND, Optional.empty())));
+                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())));
         RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
 

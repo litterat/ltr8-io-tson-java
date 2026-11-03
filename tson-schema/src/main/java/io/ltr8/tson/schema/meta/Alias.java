@@ -10,7 +10,7 @@ import io.ltr8.annotation.Typename;
  * template application whose expansion names itself (§5.10, §8.2). It composes {@code top} directly and so carries no
  * IS-A chain: a hop is not a type of its own.
  *
- * <p><b>{@code target} is a reference, typed {@code meta.type_kind}, so an alias to an application states its own
+ * <p><b>{@code target} is a reference, typed {@code meta.type_ref}, so an alias to an application states its own
  * arguments.</b> A reference may carry an argument list (SPEC-FEEDBACK.md #12): [TSON-SCHEMA] §5.10's partial
  * application, {@code uuid_pair => <B> pair<uuid, B>}, is an alias whose target is the reference {@code
  * pair<uuid B>}, written unquoted ([TSON-DATA] §7.4).

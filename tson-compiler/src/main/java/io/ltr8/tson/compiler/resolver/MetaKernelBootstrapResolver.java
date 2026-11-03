@@ -99,18 +99,18 @@ public final class MetaKernelBootstrapResolver {
     /**
      * The kernel's named instances and refinements on its one wait cycle, built by hand: {@code value}, the
      * {@code boolean} and {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text}
-     * atoms, {@code meta.type_kind}, {@code field_map}, the map type a record's fields are a value of, and {@code
+     * atoms, {@code meta.type_ref}, {@code field_map}, the map type a record's fields are a value of, and {@code
      * numeric.count}, the one refinement.
      */
     private static final Set<String> PRE_LOADED = Set.of("meta.value", "boolean", "meta.field_role", "meta.enum_set",
-            "integer", "numeric.count", "text", "meta.type_kind", "meta.field_map");
+            "integer", "numeric.count", "text", "meta.type_ref", "meta.field_map");
 
     /**
-     * The element types whose lifted arrays are on the cycle: {@code [meta.type_kind]}, {@code [meta.field_group]} and
+     * The element types whose lifted arrays are on the cycle: {@code [meta.type_ref]}, {@code [meta.field_group]} and
      * {@code [text; 1..]}, and an array of one of those ({@code [[text; 1..]; 1..]}). A lifted array is named by its
      * content (§8.2), so it is designated by what it holds rather than by its name.
      */
-    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("meta.type_kind", "meta.field_group", "text");
+    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("meta.type_ref", "meta.field_group", "text");
 
     private MetaKernelBootstrapResolver() {
     }

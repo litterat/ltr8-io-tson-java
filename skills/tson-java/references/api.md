@@ -620,8 +620,8 @@ map of them, a namespace type (`operations => !meta.namespace { key_type: meta.i
 member of no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind
 context binds one (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its
 references. A slot
-typed by a reference (`ReferenceBody`, spelled `meta.kind<T>` or `meta.ref<T>` alike) holds what its `T` decides: over a
-constructor (`request: meta.kind<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root,
+typed by a reference (`ReferenceBody`, spelled `meta.ref<T>`) holds what its `T` decides: over a
+constructor (`request: meta.ref<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root,
 `geo.address` for a member of a nested `!schema` map) or an application the schema
 closes (`set<text>`, written unquoted), whose `referent()` is the value of the entry it names — a tree read
 delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type

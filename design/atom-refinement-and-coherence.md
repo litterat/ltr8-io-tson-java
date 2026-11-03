@@ -90,7 +90,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
 - **A reference narrows `of` by IS-A, and the link judges it** (§5.7, `meta.reference`'s own `@doc`). The refined `of`
   is the source's or a type IS-A it -- a constructor IS-A one by its chain (`unicode.identifier_type` lists
   `meta.type`), an ordinary type by its own (`big_order => order ^ {}`) -- so every name the refinement admits, the
-  source admits too: `meta.identifier_kind => !meta.type_kind ^ { of: unicode.identifier_type }` is the kernel's case.
+  source admits too: `meta.identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is the kernel's case.
   The two names are a namespace's, not the bodies', and `of` holds names that order nothing
   (`design/resolver-vocabulary-and-bootstrap.md`), so at resolution neither need be ready:
   `ReferenceBody.constraintsCheck` admits any reference, and the linker's `checkReferenceNarrows` asks the family's

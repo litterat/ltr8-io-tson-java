@@ -161,9 +161,9 @@ refusal and not a verdict, whichever order the chain is reached in; the bundled 
 whatever a deployment sets.
 
 The kernel, meta.tn (#15), measured from `meta-resolved.tn`'s own declarations, no compiled reader consulted, has one
-wait cycle, holding `meta.record` and 25 more of its 86 entries (`boolean`, `integer`, `text`, `numeric.count` and
+wait cycle, holding `meta.record` and 25 more of its 85 entries (`boolean`, `integer`, `text`, `numeric.count` and
 `numeric.integer_size` (#16), the enum and set machinery, `meta.field_group`, `meta.record_field`, `meta.type_chain`,
-`meta.map` and its instance `meta.field_map`, `meta.type_kind`, and the synthetics they name), every other entry ordered
+`meta.map` and its instance `meta.field_map`, `meta.type_ref`, and the synthetics they name), every other entry ordered
 after it, the longest chain 4; the kernel holds that cycle's closure and the concepts that go with it (#15). The kernel
 declares `meta.annotation => void`: annotating itself with `@meta.annotation` would be a second cycle, and the marker
 changes no value (§6). The bootstrap builds by hand exactly the instances and the one refinement on that cycle (a test
@@ -201,7 +201,7 @@ The rule is 1; the rest are its consequences.
    declaration is read against its head (`C` in `!C { … }`, the source's constructor in `!I ^ { … }`) and waits as
    well on each refinement source and `&` operand, since it starts from their declarations. An alias is ready when its
    target is; a closed application when its materialised body is.
-2. **A reference orders nothing.** A name at a slot typed `meta.type_kind`, `meta.kind<C>` or `meta.ref<T>`, an
+2. **A reference orders nothing.** A name at a slot typed `meta.type_ref` or `meta.ref<T>`, an
    application among them (#12), is read by its atom's grammar alone; what it names is resolved and judged once every
    entry is ready (§4.2, §8.3). So `tree => { t: tree }`, mutual recursion, and a constructor whose facet is typed by
    its own instance (`decimal_type => atom & { min?: number }` beside `number => !decimal_type {}`) are sound.
@@ -248,9 +248,9 @@ kernel's `annotation` no longer annotating itself), §3.4.1 (Pass 2 runs in rule
 `T ^ { … }` over field declarations, and atom refinement, `!I ^ { … }` over data merged into an atom instance's
 bindings. No other value can be refined. A container instance (`names => [text]`) has no refinement, and two
 instances of one constructor have no IS-A edge between them even where one admits a subset of the other.
-Declared as two instances of `meta.reference`, `meta.type_kind` (`!meta.reference { of: meta.type }`) and
-`meta.identifier_kind` (`!meta.reference { of: unicode.identifier_type }`) are siblings, so a record refinement
-narrowing a `meta.type_kind` field to `meta.identifier_kind` is not a narrowing §5.7 admits, although every identifier
+Declared as two instances of `meta.reference`, `meta.type_ref` (`!meta.reference { of: meta.type }`) and
+`meta.identifier_ref` (`!meta.reference { of: unicode.identifier_type }`) are siblings, so a record refinement
+narrowing a `meta.type_ref` field to `meta.identifier_ref` is not a narrowing §5.7 admits, although every identifier
 family is a type.
 
 Under one level a `!` head looks as though it plays two roles, a type from `!decimal_type { … }` and a value from
@@ -261,8 +261,8 @@ and the resolved form are one.
 **What is running.** `!C { … }` construction, atom refinement `!I ^ { … }` with each atom family's tightening rules,
 and record refinement `T ^ { … }`. Nothing else is refined. Item 5's worked example runs: `meta.reference` states its
 rule for `of` (a refinement's `of` is the source's or IS-A it, judged at link, where both names resolve, and a widening
-or an unrelated `of` is refused), `identifier_kind => !meta.type_kind ^ { of: unicode.identifier_type }` is IS-A
-`meta.type_kind`, and `namespace => meta.map ^ { key_type: meta.identifier_kind  voidable?: = false }` is IS-A
+or an unrelated `of` is refused), `identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is IS-A
+`meta.type_ref`, and `namespace => meta.map ^ { key_type: meta.identifier_ref  voidable?: = false }` is IS-A
 `meta.map`. This library compares no restated field's type with its source's at §5.7, so a narrowing to a type that is
 no subtype is not refused yet either; the edge is what the rule will read.
 
@@ -282,9 +282,9 @@ no subtype is not refused yet either; the edge is what the rule will read.
    narrows to a type IS-A the original. A value whose type states none is refused at `^`, naming the type, so the
    rule is total. A namespace type states none, so `!orders ^ { … }`, with `orders => !api { … }`, is refused.
 5. **Worked example.** With `meta.reference` stating that `of` narrows to a constructor IS-A the original,
-   `identifier_kind => !meta.type_kind ^ { of: unicode.identifier_type }` is IS-A `meta.type_kind`. A record
-   refinement narrowing a `meta.type_kind` field to `meta.identifier_kind`, such as
-   `namespace => meta.map ^ { key_type: meta.identifier_kind … }`, then passes §5.7 by that edge.
+   `identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is IS-A `meta.type_ref`. A record
+   refinement narrowing a `meta.type_ref` field to `meta.identifier_ref`, such as
+   `namespace => meta.map ^ { key_type: meta.identifier_ref … }`, then passes §5.7 by that edge.
 
 **Grammar (§12.1).** Unchanged. `atom-refinement`'s head generalises from an atom instance to any value whose type
 states refinement rules; no new token, and no lexer change.
@@ -360,10 +360,10 @@ importer applies, unexpressible. Each is a rule about levels, which the dependen
   check; the structure/type-name split (§3.3.1, §3.3.2, §3.3.4's invisibility of structural vocabulary); and §3.3.5's
   sibling allowance. Two same-named entries in one closure are §2.2.3's collision, decided by identity.
 - **core.tn imports numeric.tn, temporal.tn and net.tn**, each importing the kernel alone, and declares none of `void`,
-  `boolean`, `integer`, `text`, `bytes`, `regex`, `iri`, `iri_reference`, `doc` or `set` (the kernel's root vocabulary)
-  or `meta.kind` (the kernel's), each where the kernel places it (#15). The kernel's `iri` refines its
-  `iri_reference` (`iri => !iri_reference ^ { allow_relative: false }`), so `iri` IS-A `iri_reference` as `uri` IS-A
-  `uri_reference`. The descriptive
+  `boolean`, `integer`, `text`, `bytes`, `regex`, `iri`, `iri_reference`, `doc` or `set` (the kernel's root vocabulary),
+  each where the kernel places it (#15), nor a `kind`, the kernel's `meta.ref` being the one spelling (#11). The
+  kernel's `iri` refines its `iri_reference` (`iri => !iri_reference ^ { allow_relative: false }`), so `iri` IS-A
+  `iri_reference` as `uri` IS-A `uri_reference`. The descriptive
   annotations Revision 38's core puts on its copies (`@ordering`, `@bounded`, …) go with them.
 - **A same-document read waits:** applying a constructor declared in the same document (`!C { … }` with `C` local),
   reading a value of a type declared there, and reading an annotation value against one each wait on that
@@ -457,14 +457,14 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 
 **What is running.**
 
-- **`namespace` is a refinement of `map`**, `namespace => map ^ { key_type: meta.identifier_kind  voidable?: = false }`,
+- **`namespace` is a refinement of `map`**, `namespace => map ^ { key_type: meta.identifier_ref  voidable?: = false }`,
   IS-A `map` and through it `product`, and a namespace type is an instance of it, as a map type is one of `map`:
   `schema => !namespace { key_type: meta.type_name  value_type: meta.declared }`,
   `api => !namespace { key_type: meta.identifier  value_type: method }`. A value of one is the map its facets
-  describe, every key a name of the family `key_type` states, a member of `meta.identifier_kind` judged at link, and
+  describe, every key a name of the family `key_type` states, a member of `meta.identifier_ref` judged at link, and
   no value void. `key_type` is required: no host supplies a namespace's key family. `ordered` and the size bounds are
   `map`'s, and a value of a namespace type is read as that map, its `min_items` and `max_items` judged as a map's are.
-  `meta.kind<map>` holds every namespace type beside the plain map types, and a qualified name still enters a value of
+  `meta.ref<map>` holds every namespace type beside the plain map types, and a qualified name still enters a value of
   a namespace type alone: a plain map such as `field_map`'s is never entered. `schema` is the kernel's one.
 - **A record's fields are no namespace.** `field_map => !map { key_type: text  value_type: meta.record_field  ordered:
   true }`. A field name is text within its own record, judged by the record's `name_type` as `discriminators` and a
@@ -476,8 +476,8 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
 - **An entry is a type exactly when its value is built by a constructor IS-A `type`.** `name => !T { … }` with `T` a
   constructor builds a type; with `T` an ordinary type — a record, a namespace type, any type of the closure — the
   entry is a value of `T`, read against `T` as a data value is, and marked by nothing but its tag. A value entry is a
-  member of no reference over a constructor (`meta.type_kind` excludes it unmarked), nothing is typed by it, and a
-  reference over `T` names it where its type IS-A `T`: `meta.ref<api>`, and `meta.kind<api>` with it (#11), name `orders =>
+  member of no reference over a constructor (`meta.type_ref` excludes it unmarked), nothing is typed by it, and a
+  reference over `T` names it where its type IS-A `T`: `meta.ref<api>` (#11) names `orders =>
   !api { … }`. A value entry's payload lifts and mints nothing (a value of `schema` is no value entry: it declares,
   #14); its names at kind- and reference-typed slots are judged at link, and a qualified name walks into it by key
   and by field. A template over an ordinary type closes to a value entry (`fetch => <T> !operations { … }`,
@@ -492,9 +492,9 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   as data, a resolved form — resolves in that schema, which the reading closure does not hold: its grammar is read
   and its membership judged where that schema links, or at ingest. That replaces the stand-in that read grammar alone
   under the kernel and any schema importing it directly: a data document importing temporal.tn that writes
-  `!meta.record_field { type: int32 }` is refused, `int32` being no member of `meta.type_kind` in temporal.tn's closure.
+  `!meta.record_field { type: int32 }` is refused, `int32` being no member of `meta.type_ref` in temporal.tn's closure.
 - **The kernel's wait cycle** (#4) holds `map`, `field_map` being its instance, and not `namespace` or
-  `meta.field_name`, `field_map`'s keys being `text`: 26 of the kernel's 86 entries, longest chain 4 (#4). The
+  `meta.field_name`, `field_map`'s keys being `text`: 26 of the kernel's 85 entries, longest chain 4 (#4). The
   bootstrap builds `field_map` by hand with the rest of the pre-loaded set.
 - **Hosts.** One bind context serves schemas and data; the names the kernel declares and the libraries' members of `numeric`,
   `temporal` and `net` always bind to the schema model (#15), and every other name binds through the consumer's binder. A
@@ -512,8 +512,8 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   is built by a constructor IS-A `type`, and any other entry is a value, its tag naming its type. `namespace`'s
   `key_type` is required. `schema`'s `value_type` is `declared`, which with `declared_type` is the kernel's.
   `field_map` is an ordered `map` keyed by `text`, each key judged by the record's `name_type`.
-- §4.2: a namespace type is a member of `meta.type_kind`, `meta.kind<product>`, `meta.kind<map>` and
-  `meta.kind<namespace>`, and a value entry of no reference over a constructor; the rest of §4.2 is #11's.
+- §4.2: a namespace type is a member of `meta.type_ref`, `meta.ref<product>`, `meta.ref<map>` and
+  `meta.ref<namespace>`, and a value entry of no reference over a constructor; the rest of §4.2 is #11's.
 - §5.7: "Constructor refinement in a meta-schema is the meta-level exception and MAY replace fixed values (§4.2)"
   is ladder wording; with no meta-schema it is restated for a constructor refinement wherever it is written, or the
   exception goes. The omission order stands.
@@ -533,7 +533,7 @@ says "reference" leaves the reader to work out which of the two it means.
 
 **What is running.**
 
-- **The kernel declares `alias => top & { target: meta.type_kind }`** (#12). An alias body is `!alias { target: T }`, written
+- **The kernel declares `alias => top & { target: meta.type_ref }`** (#12). An alias body is `!alias { target: T }`, written
   explicitly or derived from `name => T`, and its kind is ALIAS. The kernel's and core.tn's resolved forms state
   `!meta.alias` for `meta.type_name`, `meta.field_name`, `meta.param_name`, `annotation`, `doc` and the annotation markers.
 - **§8.3's walk is the alias chain.** Policy's limit is `max_alias_chain`, default 64, and diagnostics that walk it say
@@ -565,18 +565,24 @@ constructor's declaration is a record (`uuid_type => atom & { … }`) and a reco
 
 **What is running.**
 
-- **One atom.** The kernel declares `reference => atom & { of: meta.type_kind }` (`of` a qualified name, #14), with
-  `kind => <T> !reference { of: T }` and `ref => <T> !reference { of: T }` its two spellings; `meta.identifier_kind`
-  and `meta.type_kind` are `!reference { of: … }`. `kind_type` and `ref_type` are gone, and with
-  #12's removal of `type_ref` and `type_argument` the kernel holds 86 entries (80 declarations, #15).
-  `meta.kind<order>` and `meta.ref<order>` expand to one content and mint one entry.
+- **One atom.** The kernel declares `reference => atom & { of: meta.type_ref }` (`of` a qualified name, #14).
+  `kind_type` and `ref_type` are gone, and with #12's removal of the records `type_ref` and `type_argument` the kernel
+  holds 85 entries (79 declarations, #15).
+- **One spelling.** `ref => <T> !reference { of: T }` is the kernel's one template over it, and no `kind` stands beside
+  it: what `of` names decides what a slot holds, so a second spelling could say nothing the first does not.
+  `meta.ref<record>` reads as a reference to a record type and `meta.ref<method>` as one to a method value. The two
+  named instances read as instances of it, `<target>_ref`: `type_ref => !reference { of: meta.type }`, a reference
+  to a type, typing every slot that names the type of a value, and `identifier_ref => !meta.type_ref ^ { of:
+  unicode.identifier_type }`, a reference to an identifier family, typing both `name_type` slots. Revision 38's
+  `type_kind` and `identifier_kind` are these two renamed, and its `type_ref` record is #12's. "Kind" stays the
+  concept, §4.2's set of the types a constructor builds, which a reference over a constructor holds.
 - **The slot's meaning comes from `of`, never from the spelling.** Where `of` is a constructor, `top` or IS-A it, the
   values it admits are types: the slot holds a type's name, judged a member over the governing closure and delivered
   to a host as a `TypeRef`. Where `of` is any other type, the values it admits are values: the slot holds a value's
-  qualified name, judged at link and delivered as the referent (`Ref<T>`). So `meta.kind<bar>` over a record type names
-  values of `bar`, `meta.ref<record>` names types, and `meta.kind<api>` names `myapi`.
+  qualified name, judged at link and delivered as the referent (`Ref<T>`). So `meta.ref<bar>` over a record type names
+  values of `bar`, `meta.ref<record>` names types, and `meta.ref<api>` names `myapi`.
 - **`of` names any type or constructor.** Refused are a name that resolves to nothing, an open entry and a value
-  entry. `meta.kind<top>` holds every type; `meta.kind<alias>` holds nothing, no entry past its hops being an alias, and a
+  entry. `meta.ref<top>` holds every type; `meta.ref<alias>` holds nothing, no entry past its hops being an alias, and a
   required field typed by it is refused by §5.10.1's productivity rule.
 - **`members` is no part of the body.** A resolved form states `of` alone, and an author writing `members` is refused
   as an unknown field. The admitted set is derived at link and kept by the processor for its own judgements.
@@ -586,7 +592,7 @@ constructor's declaration is a record (`uuid_type => atom & { … }`) and a reco
 - **A qualified name selects a key of a value of a named product**: a namespace value's key, or a record value's field,
   the record being a namespace whose keys its type fixes. That is §5.12's walk restated, and nothing it admits moves.
 - **A constructor is an ordinary record type.** Nothing in the predicate sets a constructor apart. `uuid_type`'s
-  value is of `record`, so `meta.type_kind`, `meta.kind<meta.record>` and `meta.kind<product>` hold it, and `record`,
+  value is of `record`, so `meta.type_ref`, `meta.ref<meta.record>` and `meta.ref<product>` hold it, and `record`,
   `top`, `alias` and `template` with it. A field typed `uuid_type` holds a declaration's body as data,
   `!holder { spec: { version: 4 } }`, read in a TSON tree, bound to the constructor's own model class, and read from
   JSON; `boxed<uuid_type>` and `[uuid_type]` close as any application does. A declaration read as data is judged by
@@ -597,20 +603,18 @@ constructor's declaration is a record (`uuid_type => atom & { … }`) and a reco
 
 **Resolution, a proposal.**
 
-- §4.2: one atom, `reference => atom & { of: meta.type_kind }`, admitting a name exactly when the type of the named entry's
-  value, past its alias hops, IS-A `of`; `meta.kind<T>` and `meta.ref<T>` its spellings; `of` any type or constructor of the
+- §4.2: one atom, `reference => atom & { of: meta.type_ref }`, admitting a name exactly when the type of the named entry's
+  value, past its alias hops, IS-A `of`; `meta.ref<T>` its one spelling; `of` any type or constructor of the
   writer's namespace, never a value or an open entry. A slot over a constructor holds a type's name and takes part in
-  structural identity; any other holds a value's name. `kind_type`, `ref_type` and both refusals go.
+  structural identity; any other holds a value's name. `kind_type`, `ref_type`, the `kind` template (the kernel's and
+  core's) and both refusals go. `type_kind` and `identifier_kind` are renamed `type_ref` and `identifier_ref`, in
+  §4.2, §5.10 and §8.1 alike.
 - §4.1: a constructor is a type like any other at a name slot and a type position: its declaration is a record, whose
   instances are declarations. The sentence making a constructor "never itself the type of a value" goes.
 - §5.12: a further segment selects a key of a value of a named product, a namespace value's key or a record value's
   field, the record being a namespace whose keys its type fixes; a map that is no namespace is not entered.
 - §7.4 and §8.1: "a kind-typed position" reads "a position typed by a reference over a constructor"; `members` is no
   longer a derived index written in resolved output.
-
-**Open.** One spelling or two: `meta.kind<X>` and `meta.ref<X>` are one application and cannot differ by spelling, so a
-remaining difference would have to be in what the slot does with the name. The grammar is no longer one: a type's
-name and a value's are both qualified names (#14).
 
 ## 12. [TSON-SCHEMA] §4.2, §5.10, §8.1, §8.2 — an application is a reference value
 
@@ -626,8 +630,8 @@ binds.
 
 - **One value.** The `reference` atom's values are the reference #13 makes data grammar: a qualified name with an
   optional argument list, `geo.address<T>`, each argument a reference or a token. `type_ref` and `type_argument` are
-  gone; `alias.target`, `meta.type_chain.parents` and the `application` annotation are typed `meta.type_kind`. The kernel
-  holds 86 entries (80 declarations, #15).
+  gone; `alias.target`, `meta.type_chain.parents` and the `application` annotation are typed `meta.type_ref`. The kernel
+  holds 85 entries (79 declarations, #15).
 - **Written unquoted, canonically.** Resolved output and held text write an open application as source does, one
   space between arguments and no comma: `!alias { target: pair<uuid B> }`, `chain: { parents: [result<T>] }`.
 - **The value is an object, in every mode.** A reference read at a reference-typed position, in a tree read and a
@@ -655,7 +659,7 @@ binds.
   application in it closes, so data never creates one: an application nothing in the closure closed names no type
   the schema closes and is refused, as a name no member is.
 - **A message names a minted entry by its application**, as written: `'b<10>': '5' is less than the minimum 10`, and
-  a kind's refusal lists `meta.kind<uuid_type>` where it would have listed the entry minted for it.
+  a kind's refusal lists `meta.ref<uuid_type>` where it would have listed the entry minted for it.
 - `value_type` stays: the libraries' facets and `meta.record_field.value` still use `value`.
 
 **Resolution, a proposal.**
@@ -663,7 +667,7 @@ binds.
 - §4.2: the `reference` atom's values are #13's reference, compared as their parsed form; a value carrying
   arguments is an application, stands where one is still open, and in data names the entry the schema closed it to.
 - §8.1: `type_ref` and `type_argument` go from the kernel table; `alias.target`, `meta.type_chain.parents` and
-  `application` are typed `meta.type_kind`; `@meta.application` states the application as written, nested arguments
+  `application` are typed `meta.type_ref`; `@meta.application` states the application as written, nested arguments
   unreduced.
 - §8.2: identity compares a reference's parsed form, its head, and its arguments as references or tokens, never the
   text or the channel a processor filed an argument in; a nested argument is compared as the entry it closed to.
@@ -790,9 +794,9 @@ and the kernel types `meta.reference.of` and `meta.type_chain.supertypes`/`subty
   fails to resolve. There is no relative lookup, so there is no shadowing rule.
 - **A qualified name stands at every type position:** a field's type, an element, key or value type, a choice
   variant, a supertype and an `&` operand, a refinement or subtraction source, a `!` head, a template bound, a
-  reference's `of` (`meta.kind<geo.address>`), an alias target, and an application's head (`geo.box<text>`). A slot over a
-  constructor reads a qualified name in data as it does in a schema (#11's open item): `t: geo.location` at a
-  `meta.kind<meta.record>` slot is a member.
+  reference's `of` (`meta.ref<geo.address>`), an alias target, and an application's head (`geo.box<text>`). A slot over a
+  constructor reads a qualified name in data as it does in a schema (#11): `t: geo.location` at a
+  `meta.ref<meta.record>` slot is a member.
 - **The value walk passes through nested maps.** A value's qualified name enters a `!schema` map by member name, then
   a namespace value by key and a record value by field: `geo.home` names the value entry `home` of `geo`, and
   `geo.home.at` its field.
@@ -812,9 +816,9 @@ and the kernel types `meta.reference.of` and `meta.type_chain.supertypes`/`subty
 - **Name hygiene is per map.** Each schema map is a §8.2 scope of its own, and the per-name rules judge each member's
   own name.
 - **The kernel.** `meta.reference.of`, `meta.type_chain.supertypes` and `meta.type_chain.subtypes` are typed
-  `meta.type_kind`; `meta.type_name` stays the schema map's key type, one identifier. `kind`'s and `ref`'s parameter
+  `meta.type_ref`; `meta.type_name` stays the schema map's key type, one identifier. `ref`'s parameter
   is then a type parameter, the `[meta.type_name]` synthetic is gone, and the kernel's measured wait cycle gains
-  `[meta.type_kind]` and loses `meta.identifier` (#4).
+  `[meta.type_ref]` and loses `meta.identifier` (#4).
 - **Hosts.** The default name binder binds a dotted type name to the class of its last segment in one sub-package per
   earlier segment: `geo.route` to `geo.Route`. A processor's choice, not the spec's.
 
@@ -830,7 +834,7 @@ and the kernel types `meta.reference.of` and `meta.type_chain.supertypes`/`subty
   schema map.
 - §3.3.2, §5.12: every name resolves from the root. The first segment names an entry of the root namespace; a further
   segment selects a member of a `!schema` map, a key of a namespace value or a field of a record value.
-- §4.2, §8.1: `meta.reference.of`, `meta.type_chain.supertypes` and `meta.type_chain.subtypes` are typed `meta.type_kind`;
+- §4.2, §8.1: `meta.reference.of`, `meta.type_chain.supertypes` and `meta.type_chain.subtypes` are typed `meta.type_ref`;
   a type's name is its path from the root.
 - §12.1: `schema-map-entry`'s value admits `"!schema" ws schema-map`; a declared key stays `type-name = meta.identifier`,
   and every reference position reads `qualified-name` (#13's grammar).
@@ -866,7 +870,7 @@ data format made a schema that wants dates reserve every network and numeric nam
 
   | Document | Imports | At the root | Under its maps |
   |---|---|---|---|
-  | meta.tn | nothing (pre-loaded) | `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`, `schema` | the other 67. `meta`, the type system (47): the kinds and constructors, `meta.schema` and `meta.field_map`, the map, tuple and choice constructors, `meta.template`, `meta.identifier` and its aliases (`meta.type_name`, `meta.field_name`, `meta.param_name`), the supporting records, sets and enums (`meta.type_chain`, `meta.record_field`, `meta.field_role`, …), the references (`meta.type_kind`, `meta.kind`, `meta.ref`, …), `meta.value`, `meta.declared`, the annotation machinery (`meta.annotation`, `meta.synthetic`, `meta.application`), the checked assertion `meta.disjoint` and the one-element tuple templates. `atom` (5): the ISO/IEC 11404 datatype properties `atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric` and the mixin `atom.specification`. `numeric` (4): `numeric.integer_type`, `numeric.integer_size`, `numeric.integer_member_set`, `numeric.count` (#16). `unicode` (6): `unicode.text_type`, `unicode.text_member_set`, `unicode.normalization`, `unicode.identifier_type`, `unicode.identifier_base`, `unicode.regex_type`. `net` (3): `net.iri_type`, `net.scheme_set`, `net.scheme_name`. `binary` (2): `binary.bytes_type`, `binary.bytes_encoding` |
+  | meta.tn | nothing (pre-loaded) | `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`, `schema` | the other 66. `meta`, the type system (46): the kinds and constructors, `meta.schema` and `meta.field_map`, the map, tuple and choice constructors, `meta.template`, `meta.identifier` and its aliases (`meta.type_name`, `meta.field_name`, `meta.param_name`), the supporting records, sets and enums (`meta.type_chain`, `meta.record_field`, `meta.field_role`, …), the references (`meta.reference`, `meta.ref`, `meta.type_ref`, `meta.identifier_ref`), `meta.value`, `meta.declared`, the annotation machinery (`meta.annotation`, `meta.synthetic`, `meta.application`), the checked assertion `meta.disjoint` and the one-element tuple templates. `atom` (5): the ISO/IEC 11404 datatype properties `atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric` and the mixin `atom.specification`. `numeric` (4): `numeric.integer_type`, `numeric.integer_size`, `numeric.integer_member_set`, `numeric.count` (#16). `unicode` (6): `unicode.text_type`, `unicode.text_member_set`, `unicode.normalization`, `unicode.identifier_type`, `unicode.identifier_base`, `unicode.regex_type`. `net` (3): `net.iri_type`, `net.scheme_set`, `net.scheme_name`. `binary` (2): `binary.bytes_type`, `binary.bytes_encoding` |
   | numeric.tn | meta.tn | `number`, `rational`, `complex`, `int8`…`int256` but `int64`, `uint8`…`uint256`, `float32`, `float64` | `numeric`, beside the kernel's members: `numeric.decimal_type`, `numeric.float_type`, `numeric.rational_type`, `numeric.complex_type`, `numeric.ieee_format`, `numeric.complex_component`, `numeric.decimal_member_set` |
   | temporal.tn | meta.tn | `date`, `time`, `datetime`, `duration`, `period` | `temporal`: their five `*_type` constructors |
   | net.tn | meta.tn | `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `hostname`, `host`, `media_type`, `uri_reference`, `uri`, `uuid` | `net`, beside the kernel's members: their eleven `*_type` constructors |
@@ -874,7 +878,7 @@ data format made a schema that wants dates reserve every network and numeric nam
   | policy.tn | meta.tn | nothing | `policy`: the processor policy's records (`policy.processor` and its parts), `policy.restriction_level` and `policy.limit` (#16) |
 
   So an author writes `text`, `!enum [A B]`, `set<text>`, `@doc`, `bytes`, `int32`, `date` and `uuid` bare, and
-  `meta.record`, `meta.identifier`, `meta.type_kind`, `meta.kind<meta.record>`, `meta.ref<method>`,
+  `meta.record`, `meta.identifier`, `meta.type_ref`, `meta.ref<meta.record>`, `meta.ref<method>`,
   `@atom.ordering:TOTAL`, `@meta.disjoint`, `!numeric.decimal_type {}`, `!temporal.date_type {}` and
   `!net.uuid_type {}` by path.
 - **A library imports the kernel alone; core.tn is the bundle.** numeric.tn, temporal.tn and net.tn each import
@@ -883,7 +887,7 @@ data format made a schema that wants dates reserve every network and numeric nam
   `numeric`, which the kernel declares; one importing numeric.tn and net.tn has both, their closures meeting at the
   kernel by identity. Every schema reserves the kernel's map names `meta`, `atom`, `numeric`, `unicode`, `net` and
   `binary`. core.tn imports the three, so a schema wanting every bundled type imports core.tn and reserves those,
-  `temporal` and every root above; `record`, `identifier`, `type_kind`, `field_name`, `bounded`, `value`, `kind` and
+  `temporal` and every root above; `record`, `identifier`, `type_ref`, `field_name`, `bounded`, `value`, `kind` and
   `core` stay free. No two of the bundled documents declare one root name or one member path, and the maps two of
   them declare, `numeric` and `net`, are open and the union of their members, so no closure of them collides with
   itself. The corpus pins each case (`a-schema-importing-temporal-alone-*`,
@@ -907,7 +911,7 @@ data format made a schema that wants dates reserve every network and numeric nam
 - **The kernel, measured.** Over `meta-resolved.tn`'s own declarations (no compiled reader consulted), the cycle is 26
   entries: `meta.record`, `meta.array`, `meta.set_type`, `enum`, `meta.map`, `meta.field_map`, `meta.reference`,
   `numeric.integer_type`, `unicode.text_type`, `meta.value_type`, `boolean`, `integer`, `text`, `numeric.count`,
-  `numeric.integer_size` (`count`'s resolved `size` is read against it, #16), `meta.value`, `meta.type_kind`,
+  `numeric.integer_size` (`count`'s resolved `size` is read against it, #16), `meta.value`, `meta.type_ref`,
   `meta.type_chain`, `meta.record_field`, `meta.field_group`, `meta.field_role`, `meta.enum_set` and four lifted arrays.
   Closing it under every name its declarations reference — every rule-1 wait, every field type and `of`, every
   annotation type its entries carry, and what reading the document itself waits on, its root tag's `schema`, an alias
@@ -920,17 +924,17 @@ data format made a schema that wants dates reserve every network and numeric nam
   `numeric.count` refines. The iri and regex families are there because `text_type.pattern` is typed `regex` and
   `identifier_type`, `iri_type` and `regex_type` compose `atom.specification`, whose `spec` is an `iri`. The kernel is
   that closure and the concepts that belong with it, which nothing in the closure names: `meta.tuple`,
-  `meta.choice`, `meta.tuple_element` (with its lifted array), `meta.template`, `meta.application`, `meta.kind`,
+  `meta.choice`, `meta.tuple_element` (with its lifted array), `meta.template`, `meta.application`,
   `meta.ref`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet sequence
-  (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) — 86 entries, 67 under its six maps, 13 at the root and six
-  synthetics, with the six maps themselves the 87th to 92nd. A test holds the kernel to containing the closure, pins
+  (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) — 85 entries, 66 under its six maps, 13 at the root and six
+  synthetics, with the six maps themselves the 86th to 91st. A test holds the kernel to containing the closure, pins
   the cycle at 26 and the closure at 70, and pins the related set, so an entry that drifts in either
   direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` → `meta.void_type` →
-  `[meta.type_kind]`). A schema importing meta.tn alone has every elided construction, `meta.kind<T>` and `meta.ref<T>`.
+  `[meta.type_ref]`). A schema importing meta.tn alone has every elided construction and `meta.ref<T>`.
 - **The bootstrap** builds by hand 13 of the cycle's 26 entries — its instances and its one refinement (`meta.value`,
-  `boolean`, `meta.field_role`, `meta.enum_set`, `integer`, `numeric.count`, `text`, `meta.type_kind`,
+  `boolean`, `meta.field_role`, `meta.enum_set`, `integer`, `numeric.count`, `text`, `meta.type_ref`,
   `meta.field_map`) and the four lifted arrays — resolves the other thirteen, records and compositions that read
-  nothing, from their grammar, and reads the 60 entries beyond the cycle in wait order (#4).
+  nothing, from their grammar, and reads the 59 entries beyond the cycle in wait order (#4).
 - **Each library declares `<name> => !schema { … }`** and its instances at its root (`uuid => !net.uuid_type {}`,
   `int32 => !integer ^ { size: { bits: 32  signed: true } }`). The schema model binds the kernel's entries and each
   library's members under its own map, by declaring document, each by its last segment (`meta.record` to
@@ -970,7 +974,7 @@ data format made a schema that wants dates reserve every network and numeric nam
 - **Resolved output** tags a body by its constructor's name (`!meta.record`, `!enum`, `!numeric.decimal_type`,
   `!net.uuid_type`) and names each entry as its document does (`!meta.record_field { type: text }`, `@meta.synthetic`,
   `@meta.application`). The kernel's form is `!schema { numeric => !meta.schema { … } … meta => !meta.schema { … }
-  … }`, its 67 members in its six maps and its thirteen root entries and six synthetics at the root; each library's is
+  … }`, its 66 members in its six maps and its thirteen root entries and six synthetics at the root; each library's is
   `!schema { numeric => !meta.schema { … } number => !numeric.decimal_type {} … }`, its map holding its own members
   and none of the kernel's; core's holds its six annotations. The five fixtures this implementation
   holds itself to are `meta-resolved.tn`, `numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn` and

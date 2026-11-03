@@ -158,7 +158,7 @@ public final class TsonSchemaLinker {
     /** The kernel's {@code void}-targeted marker (§5.4), written bare -- presence is the assertion. */
     private static final String DISJOINT = "meta.disjoint";
 
-    /** The constructor every type a value can have is built with: what `meta.type_kind` is the kind of. */
+    /** The constructor every type a value can have is built with: what `meta.type_ref` is the kind of. */
     private static final String TYPE = KernelNames.of("type");
 
     /** The constructor of the identifier families, the kind a namespace's {@code key_type} is a member of. */
@@ -1296,7 +1296,7 @@ public final class TsonSchemaLinker {
             // The target in full: an alias naming an application states its arguments there, and a closed one
             // names the entry materialisation minted for it.
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
-            // An alias naming a template bare names the template under another name (`kind_of => kind`),
+            // An alias naming a template bare names the template under another name (`ref_of => ref`),
             // applied as its target is, so it is no use of the template without its arguments.
             case Alias ref when ref.target().arguments().isEmpty()
                     && OpenEntry.isOpen(namespace.get(AliasChain.terminal(ref.target().name(), namespace))) -> {
@@ -1315,13 +1315,13 @@ public final class TsonSchemaLinker {
             case NamespaceBody n -> {
                 TypeRef key = n.keyType();
                 validateTypeRef(key, namespace, ownParameters, constructors, entryName, " key_type");
-                // A namespace's keys are names: `key_type` is typed meta.identifier_kind (§4.1, §7.4).
+                // A namespace's keys are names: `key_type` is typed meta.identifier_ref (§4.1, §7.4).
                 if (constructors != null && namespace.containsKey(IDENTIFIER_TYPE) && !ownParameters
                         .contains(key.name()) && !KindMembers.isMember(key.name(), IDENTIFIER_TYPE,
                                 namespace::get, constructors, namespace::get)) {
                     throw new SchemaValidationException("'" + entryName + "' key_type names '" + key.name()
                             + "', which is no identifier family -- a namespace's keys are names, so its key type "
-                            + "is a member of meta.identifier_kind, a type built with identifier_type; a closed set "
+                            + "is a member of meta.identifier_ref, a type built with identifier_type; a closed set "
                             + "of names is an identifier family with members");
                 }
                 validateTypeRef(n.valueType(), namespace, ownParameters, constructors,
@@ -1616,7 +1616,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * [TSON-SCHEMA] §5.7's rule for a refinement of a reference, {@code !meta.type_kind ^ { of: … }}: its {@code of}
+     * [TSON-SCHEMA] §5.7's rule for a refinement of a reference, {@code !meta.type_ref ^ { of: … }}: its {@code of}
      * is its source's or IS-A it ({@link ReferenceBody#ofNarrowing}). The resolver binds the refinement before the
      * names {@code of} holds need be resolved, so the IS-A is asked here, over the one namespace both resolve in; the
      * source is the reference the refinement's chain names, past its alias hops.
@@ -1795,7 +1795,7 @@ public final class TsonSchemaLinker {
      * held body deferred surfaces on the entry materialisation minted and belongs to the declaration whose
      * text wrote it, and only the subject differs between the two statements of it.
      *
-     * <p>A slot typed {@code meta.type_kind} holds the name of a type a value can have: resolved, then judged a member of
+     * <p>A slot typed {@code meta.type_ref} holds the name of a type a value can have: resolved, then judged a member of
      * the kind ({@link KindMembers}) where {@code constructors} is given, and a value entry refused with its own
      * diagnostic. A constructor is a member: its value is a record, whose instances are declarations. An alias's
      * target passes {@code null} and is judged by resolution alone, an alias of a constructor being applied as its
@@ -1822,7 +1822,7 @@ public final class TsonSchemaLinker {
                 && (namespace.containsKey(TYPE) || namespace.containsKey(TYPE))
                 && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, namespace::get)) {
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is no type a value "
-                    + "can have -- a slot typed 'meta.type_kind' holds the name of an entry whose value is of 'type'");
+                    + "can have -- a slot typed 'meta.type_ref' holds the name of an entry whose value is of 'type'");
         }
         for (TypeRef nested : typeArguments(ref, namespace)) {
             validateTypeRef(nested, namespace, ownParameters, constructors, subject, trail);

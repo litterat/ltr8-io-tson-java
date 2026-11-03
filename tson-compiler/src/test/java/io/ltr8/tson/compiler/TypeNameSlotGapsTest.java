@@ -25,14 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * slot's declared type.
  *
  * <ol>
- *   <li>An application at a kind-typed slot of a value body is refused with the alias spelling named: nothing lifts
+ *   <li>An application at a type-name slot of a value body is refused with the alias spelling named: nothing lifts
  *       or mints in a value body, so an application there would have no entry to be the name of.
  *   <li>A slot that only the subtype the value's tag selected declares, below a record family base, is judged by
  *       its declared type ({@code SubtypeBehindFieldTest} has the same one record field further down).
  *   <li>A slot's pointer writes the key for a map key that carries annotations.
  * </ol>
  */
-class KindSlotGapsTest {
+class TypeNameSlotGapsTest {
 
     private static final String META = "https://example.test/gap-meta.tn";
 
@@ -44,11 +44,11 @@ class KindSlotGapsTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   gap_status        => !numeric.integer_type { min: 100  max: 599 }
-                  gap_reply         => { status: gap_status  body: meta.type_kind }
-                  gap_operation     => { request: meta.type_kind  replies?: [gap_reply] }
+                  gap_reply         => { status: gap_status  body: meta.type_ref }
+                  gap_operation     => { request: meta.type_ref  replies?: [gap_reply] }
                   gap_operations    => !meta.namespace { key_type: meta.identifier  value_type: gap_operation }
                   gap_endpoint      => { status?: gap_status ~ 200 }
-                  gap_op            => gap_endpoint & { request: meta.type_kind }
+                  gap_op            => gap_endpoint & { request: meta.type_ref }
                   gap_api           => !meta.namespace { key_type: meta.identifier  value_type: gap_endpoint }
                   gap_replies       => !meta.namespace { key_type: meta.identifier  value_type: gap_reply }
                 }

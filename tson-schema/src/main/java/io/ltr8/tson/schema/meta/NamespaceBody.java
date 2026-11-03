@@ -13,7 +13,7 @@ import java.util.Optional;
 /**
  * The kernel's {@code namespace} constructor's own vocabulary, resolved ([TSON-SCHEMA] §4.1, §5.7, §8.1): a map type
  * keyed by names. {@code meta.namespace} is a refinement of {@code meta.map}, IS-A it, whose {@code key_type}
- * narrows to {@code meta.identifier_kind} and whose {@code voidable} is pinned false. A namespace type is an
+ * narrows to {@code meta.identifier_ref} and whose {@code voidable} is pinned false. A namespace type is an
  * instance, as a map type is one of {@code map} -- the kernel's {@code schema}, and a schema's own {@code api =>
  * !meta.namespace { key_type: meta.identifier  value_type: method }} -- and a value of it is the map its facets
  * describe ({@link #read()}), delivered as a {@link Namespace} where the position asks for one. {@code

@@ -10,21 +10,21 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
 **Invariants**
 
 - A name held in a slot is a value of the kernel's one atom of names, `meta.reference => meta.atom & { of:
-  meta.type_kind }` (`ReferenceBody`). It admits a name exactly when the type of the named entry's value, its tag,
+  meta.type_ref }` (`ReferenceBody`). It admits a name exactly when the type of the named entry's value, its tag,
   past its alias hops, IS-A `of`: `order => { … }` holds a value of `meta.record`, `int32 => !integer ^ { … }` one of
-  `numeric.integer_type`, `orders => !api { … }` one of `api`. The kernel's `meta.kind => <T> !meta.reference { of: T }`
-  and `meta.ref => <T> !meta.reference { of: T }` are its two spellings, so `meta.kind<order>` and `meta.ref<order>` mint one
-  entry, and an application through an alias of either applies the template (`TemplateMaterialiser.templateHead`);
-  `meta.type_kind` is `!meta.reference { of: meta.type }` and `meta.identifier_kind` its refinement to
+  `numeric.integer_type`, `orders => !api { … }` one of `api`. The kernel's `meta.ref => <T> !meta.reference { of: T }`
+  is its one spelling, whatever `of` names, and an application through an alias of it applies the template
+  (`TemplateMaterialiser.templateHead`);
+  `meta.type_ref` is `!meta.reference { of: meta.type }` and `meta.identifier_ref` its refinement to
   `unicode.identifier_type`, a refinement narrowing `of` to a type IS-A the source's (`ReferenceBody.ofNarrowing`). A
-  field's type position, `meta.kind<meta.record>` and `meta.ref<method>` differ only in `of`.
+  field's type position, `meta.ref<meta.record>` and `meta.ref<method>` differ only in `of`.
 - **What `of` names decides what the slot holds, never the spelling** (`KindMembers.namesTypes`). Over a constructor,
   `meta.top` or IS-A it, the values admitted are types: the slot holds a type's name, its path from the root (`order`,
   `geo.address`), judged a member over the governing closure (`KindMembers`) and delivered to a host as a `TypeRef`. Over any
   other type the values admitted are values: the slot holds a value's qualified name, judged at link (`ValuesByName`) and
-  delivered as the referent (`Ref<T>`). So `meta.kind<bar>` over a record type names values of `bar`, `meta.ref<meta.record>`
-  is `meta.kind<meta.record>`, and `meta.kind<api>` names `myapi`. These notes call a reference over a constructor a *kind*,
-  whichever spelling wrote it.
+  delivered as the referent (`Ref<T>`). So `meta.ref<bar>` over a record type names values of `bar`, `meta.ref<meta.record>`
+  names record types, and `meta.ref<api>` names `myapi`. These notes call a reference over a constructor a *kind*, the
+  concept of Part 2 §4.2: the set of types a constructor builds.
 - **Every name resolves from the root** (SPEC-FEEDBACK.md #14). A name's first segment names an entry of the root
   namespace, the root's entries and the import closure, and each further segment selects in what it reached: a member
   of a nested `!schema` map, a key of a namespace value, a field of a record value. Inside `geo`, a sibling is
@@ -38,8 +38,8 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   `!meta.reference { of: … }` alone, a written `members:` is refused as an unknown field, and equality and `toString`
   exclude it (`ReferenceBody.memberNames()` is the processor's own).
 - `of` names any type or constructor of the writer's namespace. Refused are a name resolving to nothing (an unresolved
-  reference), an open entry and a value entry (`KindMembers.ofRefusal`, from `validateBody`). `meta.kind<meta.top>` holds
-  every type. `meta.kind<meta.alias>` admits nothing, no entry past its hops being an alias, and a required field typed by it
+  reference), an open entry and a value entry (`KindMembers.ofRefusal`, from `validateBody`). `meta.ref<meta.top>` holds
+  every type. `meta.ref<meta.alias>` admits nothing, no entry past its hops being an alias, and a required field typed by it
   is refused by §5.10.1's productivity check (`TypeInhabitance`). A reference is not a bound: `meta.template_param.bound`
   still refuses a constructor (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
 - **A reference may carry an argument list** (SPEC-FEEDBACK.md #12), and that is what an application is in a slot.
@@ -60,7 +60,7 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
   resolution and arity, and its arguments by the head's parameters: only an argument at a type parameter is judged
   as a type's name (`TsonSchemaLinker.typeArguments`).
-- A slot that names the type of a value is typed `meta.type_kind` (`meta.record_field.type`,
+- A slot that names the type of a value is typed `meta.type_ref` (`meta.record_field.type`,
   `meta.tuple_element.element_type`, `meta.array.element_type`, `meta.map.key_type` and `value_type`,
   `meta.namespace.value_type`, `meta.choice.variants`, `meta.template_param.type` and `bound`, `meta.alias.target`,
   `meta.type_chain.parents`, and the `application` annotation), and so are `meta.reference.of` and the
@@ -69,32 +69,32 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   types no reference. In a schema document (a construction's or a value entry's payload, or a resolved form read as data) the
   reader reads its grammar alone and the name is judged a member where that schema links, or at ingest ([TSON-SCHEMA] §4.2,
   §8.1); in a data document the reader judges membership over the reading document's closure. `meta.namespace.key_type` is
-  typed `meta.identifier_kind`: a namespace's keys are names, which is what a qualified name's segment selects, so an
+  typed `meta.identifier_ref`: a namespace's keys are names, which is what a qualified name's segment selects, so an
   enum-keyed map is no namespace. `key_type` is required, the family every key is read and judged under. A record's fields
   are no namespace: `meta.field_map` is an ordered map keyed by `text`, each key judged by the record's `name_type`, its
   supertypes' where it states none, and `meta.field_name` where neither does.
 - **A constructor is an ordinary record type** (SPEC-FEEDBACK.md #11). A constructor whose declaration is a record
-  (`net.uuid_type => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_kind`, `meta.kind<meta.record>` and
-  `meta.kind<meta.product>` hold it, and `meta.record`, `meta.top`, `meta.alias`, `meta.template`, `meta.namespace` and
+  (`net.uuid_type => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
+  `meta.ref<meta.product>` hold it, and `meta.record`, `meta.top`, `meta.alias`, `meta.template`, `meta.namespace` and
   `meta.reference` themselves. A field typed `spec: net.uuid_type` holds a declaration body as data (`!holder { spec: {
   version: 4 } }`), in a TSON tree, bound to the constructor's model class (`UuidType`) and read from JSON;
   `boxed<net.uuid_type>` and `[net.uuid_type]` close as any
   application does (`ConstructorAsRecordTypeTest`). A declaration read as data is judged by its record shape alone:
   it is not resolved, so a derived field such as `chain` is admitted as written.
 - A namespace type is an instance of `meta.namespace` (`meta.schema`, a schema's own `api`), a refinement of `meta.map`,
-  so `meta.type_kind`, `meta.kind<meta.product>`, `meta.kind<meta.map>` and `meta.kind<meta.namespace>` hold it and
-  `meta.kind<meta.record>` does not. A value entry, `myapi => !api { … }`, is a member of no kind: its tag names an
-  ordinary type, which no walk reaches a constructor through. `meta.kind<api>` (one entry with `meta.ref<api>`) names
+  so `meta.type_ref`, `meta.ref<meta.product>`, `meta.ref<meta.map>` and `meta.ref<meta.namespace>` hold it and
+  `meta.ref<meta.record>` does not. A value entry, `myapi => !api { … }`, is a member of no kind: its tag names an
+  ordinary type, which no walk reaches a constructor through. `meta.ref<api>` names
   it, and every type position refuses it (`validateTypeRef`, `judgeMember`).
 - Two positions single out a constructor, and keep an IS-A `meta.top` check in Java: a `!C` head (a constructor builds
   a type, any other type a value entry) and a composition operand (constructor or record). `meta.alias.target` admits
   either, an alias being applied as its target is (§3.3.1). No reference covers "a constructor" alone: its value is a
   record, as a record type's is, and the series has no classifier of constructors.
-- `meta.top` is a member of `meta.type_kind`, `meta.kind<meta.product>` and `meta.kind<meta.record>`: a fresh abstract record
+- `meta.top` is a member of `meta.type_ref`, `meta.ref<meta.product>` and `meta.ref<meta.record>`: a fresh abstract record
   IS-A nothing holds a value of `meta.record` by the one predicate. `EntryKind.isConstructor` answers a different question,
   applicability, and counts `meta.top` by name and origin.
-- A type parameter is one whose `type` is `meta.type_kind` (`TemplateParam.TYPE_KIND`); a parameter standing at a
-  `meta.type_kind` slot is a type parameter (`ParameterTypes.typePosition`).
+- A type parameter is one whose `type` is `meta.type_ref` (`TemplateParam.TYPE_REF`); a parameter standing at a
+  `meta.type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the
   slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A `ReferenceEvent` is an application,
@@ -118,10 +118,9 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
 - A name at a reference-typed slot is recorded and judged whatever the host component holds, since the
   slot's `AtomTypeReader` records it: a host other than `TypeRef`/`Ref` (a `String`) receives what the slot's atom
   reads, through a `RecordedNameReader` that refuses what is no name as a `TypeRef` host's reader refuses it.
-- A slot that names a value is typed by a reference over a type that is no constructor, `meta.ref<method>` by convention
-  and `meta.kind<method>` alike. Its value is a qualified name. A slot typed by a record holds the record's value inline
-  and takes no name.
-- Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `meta.kind` and `meta.ref` are in every closure,
+- A slot that names a value is typed by a reference over a type that is no constructor, `meta.ref<method>`. Its value
+  is a qualified name. A slot typed by a record holds the record's value inline and takes no name.
+- Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `meta.ref` is in every closure,
   and `!meta.reference { of: order }` applied directly is no different
   (`ReferenceDeclarationTest`). A value's qualified name is judged by what it reaches, which only a link can judge: a
   reference over a type that is no constructor reads its grammar in a schema document (`AtomParsers.inSchemaDocument`), and
@@ -156,7 +155,7 @@ repeat it at every slot, and a per-slot annotation was this design's own `bound`
 LinkML, Xtext) selects the store from the referent's kind, which needs a closed metamodel; a meta-declared namespace
 has no kind to key on, so here the store is positional, the kind is the slot's, and no slot states where its first
 segment resolves. A kind is a predicate on type codes, a set of *names* and not a sum of types: the sum reading
-(`meta.kind<net.uuid_type>` as a computed choice) admitted an identifier token where a family's name was wanted, and the two
+(`meta.ref<net.uuid_type>` as a computed choice) admitted an identifier token where a family's name was wanted, and the two
 are indistinguishable on the wire. Deferred, not decided against: a `scope` facet stating a reference's store on
 the slot (a reference into a sibling's referent), which no kernel row wants; a named value of atom type
 (`max_items: default_limit`), where the token is ambiguous between a literal and a name and would need a marker on
@@ -197,16 +196,16 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 |---|---|---|---|---|
 | schema-map key, `meta.field_map` key, `meta.template_param.name` | key | — | spelling under the key type; `fields`, keyed by `text`, by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
 | `meta.enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
-| `meta.type_chain.parents`, `application` | reference, `meta.type_kind`, with arguments where open | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
-| `meta.type_chain.supertypes`, `subtypes` | index, `meta.type_kind` | — | — | link |
-| `meta.alias.target` | reference, `meta.type_kind` | namespace | any entry, type or constructor, by resolution; arguments only in an open alias's held text | `validateTypeRef` |
-| `meta.template_param.type`, `bound` | reference | namespace | `meta.type_kind`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
+| `meta.type_chain.parents`, `application` | reference, `meta.type_ref`, with arguments where open | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
+| `meta.type_chain.supertypes`, `subtypes` | index, `meta.type_ref` | — | — | link |
+| `meta.alias.target` | reference, `meta.type_ref` | namespace | any entry, type or constructor, by resolution; arguments only in an open alias's held text | `validateTypeRef` |
+| `meta.template_param.type`, `bound` | reference | namespace | `meta.type_ref`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
 | `meta.template.template` | parameters and applications as parsed | `parameters`, then namespace | §5.10's shadowing rule | `HeldBody` |
-| `meta.record_field.type`, `meta.tuple_element.element_type`, `meta.array.element_type`, `meta.map.key_type`, `meta.map.value_type`, `meta.namespace.value_type`, `meta.choice.variants` | reference | namespace | `meta.type_kind`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
+| `meta.record_field.type`, `meta.tuple_element.element_type`, `meta.array.element_type`, `meta.map.key_type`, `meta.map.value_type`, `meta.namespace.value_type`, `meta.choice.variants` | reference | namespace | `meta.type_ref`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
 | `meta.record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference | namespace | member of the slot's kind | `checkKindValue` |
 | `meta.record.discriminators`, `meta.field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
-| `meta.record.name_type`, `meta.enum_type.name_type` | reference | namespace | `meta.identifier_kind` | `NameType.admits` |
-| `meta.reference.of` | reference, `meta.type_kind` | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |
+| `meta.record.name_type`, `meta.enum_type.name_type` | reference | namespace | `meta.identifier_ref` | `NameType.admits` |
+| `meta.reference.of` | reference, `meta.type_ref` | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |
 | a slot typed by a reference over a type that is no constructor | reference by key, a path | root namespace, then nested `!schema` members, namespace values and record fields | the referent's type IS-A `of` | `ValuesByName.judge` |
 | a schema-map value (`meta.schema.value_type: declared`) | tag | namespace | a constructor builds a type; any other type a value of it | `DefinitionResolver` |
 | `geo => !schema { … }` | tag, a spelling of the pre-loaded kernel's `schema` (an alias of `meta.schema`) or `meta.schema` | pre-loaded kernel | none: the payload is schema grammar, its members declarations keyed by path | `TsonSchemaParser`, `SchemaPaths` |
@@ -230,7 +229,7 @@ selects its fields.
 
 A value of `meta.schema` is the one namespace value that declares: `geo => !schema { address => { … } }` is a schema map
 nested as an entry, and its members are entries of the document under their paths, so `geo.address` is a type, a
-member of `meta.type_kind`, and `meta.kind<geo.address>` is a reference over it (`design/schema-resolution.md`).
+member of `meta.type_ref`, and `meta.ref<geo.address>` is a reference over it (`design/schema-resolution.md`).
 
 An annotation use `@name: v` is a reference by key into the annotating schema's namespace (§3.3.3). In a data
 document a tag resolves in its schema's namespace (or the family's `subtypes` index, or the closure a `declared` position

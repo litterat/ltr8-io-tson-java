@@ -682,7 +682,7 @@ final class DefinitionResolver {
         Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
         if (body instanceof io.ltr8.tson.schema.meta.Alias) {
             // `!meta.alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
-            // denotes the same entry: `kind: ALIAS` (§4.1 -- a meta.type_kind, not one the supertype chain
+            // denotes the same entry: `kind: ALIAS` (§4.1 -- a meta.type_ref, not one the supertype chain
             // could give). Dispatched on the *body* rather than on the head's name because this path has
             // already read it; `resolveInstanceTemplate` holds its body unread and so has only the name.
             return body;

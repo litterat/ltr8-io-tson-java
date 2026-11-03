@@ -114,7 +114,7 @@ rebuilt and called a cache.
   differ between two runs of the same application. `SchemaDesugarerTest` pins two derived names to exact
   strings, because a change to them is a change to the resolved form of every schema.
 - **The variadic pair, `choice` and `tuple`, differ in what one position *is*.** A variant is a bare
-  `meta.type_kind` reference; an element is a `meta.tuple_element` record carrying a type **and** its own `voidable`, so each
+  `meta.type_ref` reference; an element is a `meta.tuple_element` record carrying a type **and** its own `voidable`, so each
   tuple position needs a record built for it. `voidable` is written only for a marked position — the member
   is defaulted (`voidable?: boolean ~ false`), so an unmarked one is spelled by omitting it,
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the

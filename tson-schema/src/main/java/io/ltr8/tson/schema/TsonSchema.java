@@ -190,18 +190,18 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * The declared type of a slot holding a reference by name, in the namespace of the schema declaring the slot's
      * record, which the reading schema's closure contains: what the reader of that slot was built from, so the linker
      * judges the name without walking the path back through the declarations. {@code of} is the slot's reference's
-     * {@code of}; {@code name} is the declared type as a message names it, {@code meta.kind<record>} or
-     * {@code meta.type_kind}. The role is how the read read the name; the linker judges it by what {@code of} names, a
+     * {@code of}; {@code name} is the declared type as a message names it, {@code meta.ref<record>} or
+     * {@code meta.type_ref}. The role is how the read read the name; the linker judges it by what {@code of} names, a
      * constructor's names being types' and any other type's values'.
      */
     public record SlotType(Role role, String of, String name) {
 
         /** What the slot holds, which decides how the name it holds is judged. */
         public enum Role {
-            /** A type's name, read where {@code of} is a constructor ({@code meta.kind<record>}, {@code meta.type_kind}). */
-            KIND,
+            /** A type's name, read where {@code of} is a constructor ({@code meta.ref<record>}, {@code meta.type_ref}). */
+            TYPE_NAME,
             /** A value's qualified name, read where {@code of} is any other type ({@code meta.ref<method>}). */
-            REFERENCE
+            VALUE_NAME
         }
 
         public SlotType {
@@ -210,14 +210,14 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
             Objects.requireNonNull(name, "name");
         }
 
-        /** A slot typed by a kind whose {@code of} is {@code of}, named {@code name} where an author named it. */
-        public static SlotType kind(String of, String name) {
-            return new SlotType(Role.KIND, of, name != null ? name : "meta.kind<" + of + ">");
+        /** A slot typed by a reference over the constructor {@code of}, named {@code name} where an author named it. */
+        public static SlotType typeName(String of, String name) {
+            return new SlotType(Role.TYPE_NAME, of, name != null ? name : "meta.ref<" + of + ">");
         }
 
-        /** A slot typed {@code meta.ref<of>}, named {@code name} where an author named it. */
-        public static SlotType reference(String of, String name) {
-            return new SlotType(Role.REFERENCE, of, name != null ? name : "meta.ref<" + of + ">");
+        /** A slot typed by a reference over the type {@code of}, named {@code name} where an author named it. */
+        public static SlotType valueName(String of, String name) {
+            return new SlotType(Role.VALUE_NAME, of, name != null ? name : "meta.ref<" + of + ">");
         }
     }
 

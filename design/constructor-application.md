@@ -103,10 +103,10 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `meta.type` (`c => meta.product & { … }`), the instance would be a type, whose body must be one of the schema model's, and
   it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an instance is open work.
 - **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
-  substituted as a token and read by the position it lands in, so a slot typed `meta.type_kind` takes a type where
+  substituted as a token and read by the position it lands in, so a slot typed `meta.type_ref` takes a type where
   an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where
-  the argument lands. A parameter routed into a *vocabulary slot* typed `meta.type_kind` — `my_set => <T> array ^ {
-  element_type: = T }` — pins the element type when it closes, `meta.type_kind` being an atom whose value is a type's
+  the argument lands. A parameter routed into a *vocabulary slot* typed `meta.type_ref` — `my_set => <T> array ^ {
+  element_type: = T }` — pins the element type when it closes, `meta.type_ref` being an atom whose value is a type's
   name, so §5.2 admits the fixed value and judges it a member where it is written; the value-routed form
   (`max_items: = N`, an atom-typed
   slot) closes normally. A parameter standing as a *field type* or a *variant* closes into a working type

@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * lands in", and once the parameter's kind is inferred that position is known at the application. The kind
  * comes from the declared type of the slot the parameter stands in, read from the constructor's own
  * vocabulary -- which §9 makes general rather than a table of kernel names, since a slot holding a type's
- * name is typed {@code meta.type_kind}.
+ * name is typed {@code meta.type_ref}.
  */
 class ParameterKindTest {
 
@@ -108,7 +108,7 @@ class ParameterKindTest {
         assertEquals("c", assertInstanceOf(TypeArgument.Value.class, argument).value().text());
     }
 
-    /** A parameter at a {@code meta.type_kind} slot stays a type parameter, and its argument stays a reference. */
+    /** A parameter at a {@code meta.type_ref} slot stays a type parameter, and its argument stays a reference. */
     @Test
     void anArgumentBindingATypeParameterIsStillAReference() {
         TsonCompiledSchema compiled = compile("""

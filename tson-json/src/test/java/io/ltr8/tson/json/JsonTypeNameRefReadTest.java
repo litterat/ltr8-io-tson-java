@@ -21,12 +21,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A kind-typed position in JSON ([TSON-SCHEMA] §4.2, [TSON-JSON] §5): a kind is an atom whose values are type
- * names, so its JSON form is a string naming a member of the kind in the governing schema's closure, read as the
- * same token in TSON text is. It is never a discrimination case: {@code meta.kind<uuid_type>} takes {@code "stock_id"}
+ * A position typed by a reference that names types, in JSON ([TSON-SCHEMA] §4.2, [TSON-JSON] §5): its values are
+ * type names, so its JSON form is a string naming a member in the governing schema's closure, read as the same
+ * token in TSON text is. It is never a discrimination case: {@code meta.ref<uuid_type>} takes {@code "stock_id"}
  * and refuses a uuid.
  */
-class JsonKindReadTest {
+class JsonTypeNameRefReadTest {
 
     private static final String ID = "https://example.test/json-kinds.tn";
 
@@ -38,7 +38,7 @@ class JsonKindReadTest {
               stock_id    => !net.uuid_type {}
               customer_id => !net.uuid_type {}
               sku         => text
-              ledger      => { named: meta.kind<net.uuid_type> }
+              ledger      => { named: meta.ref<net.uuid_type> }
             }
             """;
 

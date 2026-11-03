@@ -84,7 +84,7 @@ class KernelUnderMetaTest {
         assertTrue(core.isKernel("binary.bytes_type") && core.isKernel("bytes"));
         assertFalse(core.isKernel("numeric.decimal_type") || core.isKernel("net.uuid_type"));
         TsonSchema kernel = linked(TsonBundledSchemas.META_ID).schema();
-        assertTrue(kernel.entries().containsKey("meta.type_kind") && kernel.entries().containsKey("meta.map")
+        assertTrue(kernel.entries().containsKey("meta.type_ref") && kernel.entries().containsKey("meta.map")
                 && kernel.entries().containsKey("atom.ordering"));
     }
 
@@ -158,7 +158,7 @@ class KernelUnderMetaTest {
                 map        => { m: {text => int32} }
                 namespace  => [text]
                 template   => !enum [a b]
-                type_kind  => { k: text }
+                type_ref  => { k: text }
                 field_name => !text ^ { max_length: 8 }
                 bounded    => !integer ^ { min: 0  max: 9 }
                 value      => { v: int32 }
@@ -245,7 +245,7 @@ class KernelUnderMetaTest {
                 """));
         assertEquals(List.of(), problems(kernel, """
                 lookup => { m: {text => integer}  pair: [text, integer]  either: (text | integer)
-                            k: meta.kind<meta.record> }
+                            k: meta.ref<meta.record> }
                 """), "the container sugar's constructors and the references are the kernel's");
     }
 

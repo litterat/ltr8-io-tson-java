@@ -28,12 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Each walk case the kernel's {@code reference} doc names is pinned on its own: a construction is a member, a
  * refinement of a member is one, a type built with another constructor is not, an ABSTRACT record base is a member of
- * {@code meta.kind<record>} with no values of its own, an instantiation is a member of its constructor's kind where the
- * template it closes is not, and a constructor, whose declaration is a record, is a member of {@code meta.kind<record>}
- * and {@code meta.type_kind}. A kind's members are computed over the whole closure, so the kernel's and numeric.tn's own
+ * {@code meta.ref<record>} with no values of its own, an instantiation is a member of its constructor's kind where the
+ * template it closes is not, and a constructor, whose declaration is a record, is a member of {@code meta.ref<record>}
+ * and {@code meta.type_ref}. A kind's members are computed over the whole closure, so the kernel's and numeric.tn's own
  * types join them wherever the schema reaches core. Then {@code of}: any type or constructor of the schema's one
  * namespace, a type that is no constructor making the reference one that names values. Last, the kernel's {@code
- * name_type} slots, typed {@code meta.identifier_kind}, judged by membership.
+ * name_type} slots, typed {@code meta.identifier_ref}, judged by membership.
  */
 class KindMembersTest {
 
@@ -92,7 +92,7 @@ class KindMembersTest {
         TsonLinkedSchema linked = link("""
                 {
                   stock_id => !net.uuid_type {}
-                  order    => { id: meta.kind<net.uuid_type> }
+                  order    => { id: meta.ref<net.uuid_type> }
                 }
                 """);
         RecordBody order = assertInstanceOf(RecordBody.class, linked.schema().entries().get("order"));
@@ -170,7 +170,7 @@ class KindMembersTest {
     /**
      * The walk reads construction and never a kind's own members, so a kind built with a constructor at or below
      * its {@code of} is one of its own names, and nothing loops: a kind is an atom, and so is a member of {@code
-     * meta.kind<atom>}; a kind of kinds lists every kind, itself among them.
+     * meta.ref<atom>}; a kind of kinds lists every kind, itself among them.
      */
     @Test
     void aKindIsAMemberOfItselfWhereTheWalkSaysSo() {
@@ -179,14 +179,14 @@ class KindMembersTest {
                   shape => (text | int32)
                   atoms => !meta.reference { of: meta.atom }
                   kinds => !meta.reference { of: meta.reference }
-                  ids   => meta.kind<net.uuid_type>
+                  ids   => meta.ref<net.uuid_type>
                 }
                 """);
 
         ReferenceBody atoms = kind(linked, "atoms");
         assertTrue(atoms.memberNames().containsAll(List.of("atoms", "kinds", "ids")), atoms.memberNames().toString());
         assertTrue(!atoms.memberNames().contains("shape"), atoms.memberNames().toString());
-        assertTrue(kind(linked, "kinds").memberNames().containsAll(List.of("atoms", "ids", "kinds", "meta.type_kind")),
+        assertTrue(kind(linked, "kinds").memberNames().containsAll(List.of("atoms", "ids", "kinds", "meta.type_ref")),
                 kind(linked, "kinds").memberNames().toString());
     }
 
@@ -198,7 +198,7 @@ class KindMembersTest {
                 !!import:"https://example.test/kind-ids.tn"
                 !schema {
                   customer_id => !net.uuid_type {}
-                  any_id      => meta.kind<net.uuid_type>
+                  any_id      => meta.ref<net.uuid_type>
                 }
                 """, """
                 !!id:"https://example.test/kind-ids.tn"
@@ -206,7 +206,7 @@ class KindMembersTest {
                 !!import:"https://tson.io/2026/39/m/core.tn"
                 !schema {
                   stock_id => !net.uuid_type {}
-                  some_id  => meta.kind<net.uuid_type>
+                  some_id  => meta.ref<net.uuid_type>
                 }
                 """);
 
@@ -230,18 +230,18 @@ class KindMembersTest {
     }
 
     /**
-     * A map type and a namespace type are types: the kernel's {@code meta.type_kind} holds {@code field_map}, built with
+     * A map type and a namespace type are types: the kernel's {@code meta.type_ref} holds {@code field_map}, built with
      * {@code map}, and {@code schema}, built with {@code namespace}. A constructor is a member too, its value being a
      * record whose instances are declarations: {@code record}, {@code namespace} and {@code set_type} alike. A held
      * template is not.
      */
     @Test
-    void typeKindHoldsTheNamespaceTypesAndTheConstructors() {
+    void typeRefHoldsTheNamespaceTypesAndTheConstructors() {
         TsonLinkedSchema kernel = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
                 uri -> {
                     throw new IllegalStateException("unexpected fetch: " + uri);
                 }).resolveLinked(TsonBundledSchemas.META_ID);
-        List<String> members = kind(kernel, "meta.type_kind").memberNames();
+        List<String> members = kind(kernel, "meta.type_ref").memberNames();
 
         assertTrue(members.containsAll(List.of("meta.field_map", "meta.schema", "meta.declared", "meta.set_type",
                 "meta.record", "meta.alias", "meta.namespace", "meta.reference", "meta.top")), members::toString);
@@ -249,7 +249,7 @@ class KindMembersTest {
     }
 
     /**
-     * {@code meta.kind<namespace>} is a kind: it holds the kernel's namespace type and a schema's own, and the kernel
+     * {@code meta.ref<namespace>} is a kind: it holds the kernel's namespace type and a schema's own, and the kernel
      * root's {@code schema}, an alias of {@code meta.schema}, beside its target, as a kind holds every alias of a
      * member. A record's {@code field_map} is a map, and no member.
      */
@@ -269,9 +269,9 @@ class KindMembersTest {
 
     /**
      * A namespace type is built with {@code namespace}, a refinement of {@code map} and so IS-A {@code map} and {@code
-     * product}: it is a member of {@code meta.type_kind}, {@code meta.kind<namespace>}, {@code meta.kind<map>} and
-     * {@code meta.kind<product>}, and of no kind of {@code record}. A record's {@code field_map} is a map type, a
-     * member of {@code meta.kind<map>} and of no {@code meta.kind<namespace>}.
+     * product}: it is a member of {@code meta.type_ref}, {@code meta.ref<namespace>}, {@code meta.ref<map>} and
+     * {@code meta.ref<product>}, and of no kind of {@code record}. A record's {@code field_map} is a map type, a
+     * member of {@code meta.ref<map>} and of no {@code meta.ref<namespace>}.
      */
     @Test
     void aNamespaceTypeIsAMapAndNoRecord() {
@@ -304,8 +304,8 @@ class KindMembersTest {
     /**
      * A refinement of a reference narrows {@code of} to the source's or a type IS-A it ([TSON-SCHEMA] §5.7), and is
      * IS-A its source: {@code meta.map} IS-A {@code meta.product}, and {@code meta.namespace}, a refinement of {@code
-     * meta.map}, IS-A {@code meta.map}. The kernel's own {@code meta.identifier_kind} is such a refinement of {@code
-     * meta.type_kind}.
+     * meta.map}, IS-A {@code meta.map}. The kernel's own {@code meta.identifier_ref} is such a refinement of {@code
+     * meta.type_ref}.
      */
     @Test
     void aReferenceRefinementNarrowsOfAndIsAItsSource() {
@@ -315,7 +315,7 @@ class KindMembersTest {
                   products   => !meta.reference { of: meta.product }
                   maps       => !products ^ { of: meta.map }
                   namespaces => !maps ^ { of: meta.namespace }
-                  records    => !meta.type_kind ^ { of: meta.record }
+                  records    => !meta.type_ref ^ { of: meta.record }
                   same       => !products ^ {}
                   order      => { id: text }
                   big_order  => order ^ {}
@@ -326,8 +326,8 @@ class KindMembersTest {
 
         assertEquals(List.of("products"), TypeChain.supertypesOf(kind(linked, "maps")));
         assertEquals(List.of("maps", "products"), TypeChain.supertypesOf(kind(linked, "namespaces")));
-        assertEquals(List.of("meta.type_kind"), TypeChain.supertypesOf(kind(linked, "meta.identifier_kind")));
-        assertTrue(TypeChain.subtypesOf(kind(linked, "meta.type_kind")).contains("meta.identifier_kind"));
+        assertEquals(List.of("meta.type_ref"), TypeChain.supertypesOf(kind(linked, "meta.identifier_ref")));
+        assertTrue(TypeChain.subtypesOf(kind(linked, "meta.type_ref")).contains("meta.identifier_ref"));
         assertEquals("meta.namespace", kind(linked, "namespaces").of());
         assertEquals("big_order", kind(linked, "big_orders").of());
         List<String> namespaces = kind(linked, "namespaces").memberNames();
@@ -373,14 +373,14 @@ class KindMembersTest {
 
     /**
      * {@code of} names any type or constructor, and the predicate decides what it admits: past its alias hops no
-     * entry's value is an alias, so {@code meta.kind<alias>} admits nothing, and a required field typed by it can hold
+     * entry's value is an alias, so {@code meta.ref<alias>} admits nothing, and a required field typed by it can hold
      * no value -- the inhabitance check's verdict, not a refusal of the declaration.
      */
     @Test
     void aKindOfAliasAdmitsNothing() {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
-                  order => { id: meta.kind<meta.alias> }
+                  order => { id: meta.ref<meta.alias> }
                 }
                 """));
 
@@ -401,8 +401,8 @@ class KindMembersTest {
     }
 
     /**
-     * A reference whose {@code of} is no constructor names values, whichever template spelled it: {@code
-     * meta.kind<stock_id>} is {@code meta.ref<stock_id>}, and no type's name is one.
+     * A reference whose {@code of} is no constructor names values: {@code !meta.reference { of: stock_id }}, which
+     * {@code meta.ref<stock_id>} spells, holds no type's name.
      */
     @Test
     void ofNamingATypeThatIsNoConstructorNamesValues() {
@@ -469,39 +469,39 @@ class KindMembersTest {
         link("""
                 {
                   stock_id => !net.uuid_type {}
-                  ledger   => { named?: meta.kind<net.uuid_type> ~ stock_id }
+                  ledger   => { named?: meta.ref<net.uuid_type> ~ stock_id }
                 }
                 """);
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
                   stock_id => !net.uuid_type {}
                   sku      => text
-                  ledger   => { named?: meta.kind<net.uuid_type> ~ sku }
+                  ledger   => { named?: meta.ref<net.uuid_type> ~ sku }
                 }
                 """));
 
         assertTrue(e.getMessage().contains("'sku' is not a member of the kind"), e.getMessage());
     }
 
-    // ── The kernel's name_type slots, typed by meta.identifier_kind ───────────────────────────────────────────
+    // ── The kernel's name_type slots, typed by meta.identifier_ref ───────────────────────────────────────────
 
     /**
-     * The kernel's own kinds, computed when meta.tn links over its closure: {@code meta.identifier_kind} holds the
+     * The kernel's own kinds, computed when meta.tn links over its closure: {@code meta.identifier_ref} holds the
      * kernel's identifier families and the aliases beside them, and nothing meta.tn adds is built with
      * {@code identifier_type}.
      */
     @Test
-    void theKernelsIdentifierKindHoldsItsIdentifierFamilies() {
+    void theKernelsIdentifierRefHoldsItsIdentifierFamilies() {
         TsonLinkedSchema meta = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
                 uri -> { throw new IllegalStateException("unexpected fetch: " + uri); })
                 .resolveLinked("https://tson.io/2026/39/m/meta.tn");
 
         assertEquals(List.of("meta.field_name", "meta.identifier", "meta.param_name", "meta.type_name",
-                "net.scheme_name"), kind(meta, "meta.identifier_kind").memberNames());
+                "net.scheme_name"), kind(meta, "meta.identifier_ref").memberNames());
     }
 
     /**
-     * {@code enum_type.name_type} is typed {@code meta.identifier_kind}, and the name type an enum states is judged a
+     * {@code enum_type.name_type} is typed {@code meta.identifier_ref}, and the name type an enum states is judged a
      * member of it: an instantiation of a template over {@code identifier_type} is built with {@code
      * identifier_type}, so it names an identifier family.
      */

@@ -132,8 +132,8 @@ class CrossEncodingParityTest {
               screened    => { h: safe_header }
               stock_id    => !net.uuid_type {}
               customer_id => !net.uuid_type {}
-              ided        => { id: meta.kind<net.uuid_type> }
-              typed       => { t: meta.type_kind }
+              ided        => { id: meta.ref<net.uuid_type> }
+              typed       => { t: meta.type_ref }
               marks      => {
                 nickname?: text
                 from:      int32?

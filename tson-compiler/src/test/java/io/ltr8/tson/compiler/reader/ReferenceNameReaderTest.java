@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ReferenceNameReaderTest {
 
-    private static final TsonSchema.SlotType METHOD = TsonSchema.SlotType.reference("method", null);
+    private static final TsonSchema.SlotType METHOD = TsonSchema.SlotType.valueName("method", null);
 
     private static Optional<String> in(String text, TokenForm form) {
         return ReferenceNameReader.nameIn(new TokenEvent(text, form, new Position(1, 1, 0)));

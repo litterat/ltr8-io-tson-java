@@ -31,7 +31,7 @@ meta.tn, itself. Current form only; history lives in git.
   root holds only the author annotations. A Java literal naming a member is its path, `KernelNames.of("record")` for
   `"meta.record"`, `KernelNames.of(KernelNames.UNICODE, "identifier_type")`, never the bare member; one naming a root entry
   is bare (`"text"`). The minted names' readable half reads a `meta.` path as its member (`InternalName.part`:
-  `array_type_kind_…`, `record_…`); a path under the kernel's other maps keeps its first segment
+  `array_type_ref_…`, `record_…`); a path under the kernel's other maps keeps its first segment
   (`numeric_integer_type_…`).
 - The bootstrap hand-builds exactly the pre-loaded set — the instances and the one refinement on the kernel's one
   wait cycle (`SPEC-FEEDBACK.md #4`, rule 4) — and makes every other entry ready by `WaitOrder`, the one algorithm
@@ -158,7 +158,7 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `AL
   being the answer there. `AliasChainWalkTest` pins all four stops.
 - **Three positions walk a chain where a declared entry might stand.** An application through an alias of a template
   applies the template (`TemplateMaterialiser.templateHead`, `checkArity`), its identity the template's, so over
-  `kind_of => meta.kind` the applications `kind_of<order>` and `meta.kind<order>` close to one entry; an alias naming a
+  `ref_of => meta.ref` the applications `ref_of<order>` and `meta.ref<order>` close to one entry; an alias naming a
   template bare is no use of the template without arguments (`validateBody`'s `Alias` arm). An atom refinement's source
   written as an alias refines the instance at the end of the chain, and its chain names that instance
   (`resolveAtomRefinement`: `!count ^ { … }` over `count => integer` IS-A `integer`). An annotation is identified by the
@@ -213,7 +213,7 @@ annotation is: there is no author to resolve against, and the value is fixed.
   little, so `SyntheticEntryMarkerTest` asserts both halves.
 - **`@meta.application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
   closes a template application, the application it is the instantiation of, `@meta.application:box<int32>`, a
-  `meta.type_kind` reference carrying arguments, written unquoted and stated as written: nested arguments unreduced
+  `meta.type_ref` reference carrying arguments, written unquoted and stated as written: nested arguments unreduced
   (`@meta.application:pair<box<text> int32>`), a bare-name argument past its alias hops, an argument at a value parameter
   a value token (`TemplateMaterialiser.asWritten`). An expansion carries none; what a data read and a message need
   of it is `TsonSchema.EntryFacts.closes`, held in memory and never written. It is about the entry, not about a
@@ -271,7 +271,7 @@ is read through the compile of the document that declared it — `!meta.record` 
 The kernel, meta.tn (`TsonBundledSchemas.META_ID`), is special: its header is its `!!id` alone. It holds the kernel's
 one wait cycle, every name the cycle's declarations reference, closed to a fixed point, so it resolves and links on its
 own, and the concepts that belong with them: `meta.map`, `meta.tuple`, `meta.choice` and `meta.tuple_element`,
-`meta.template`, `meta.application`, `meta.kind`, `meta.ref`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`,
+`meta.template`, `meta.application`, `meta.ref`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`,
 `meta.voidable_tuple1`, `set`, the octet-sequence constructor `binary.bytes_type` with `binary.bytes_encoding` and
 `bytes`, and the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric` the
 data-format libraries state their types with. It is the one kernel document. Its root is the thirteen names an author
@@ -282,7 +282,7 @@ member of `meta => !schema { … }`, named by its path (`SPEC-FEEDBACK.md #15`),
 nothing and applies only its own constructors (§3.4's one cycle, closed by pre-loading, not resolution). It is never resolved
 from a document, and its names reach any other schema only by import. Every name resolves from the root (#14), so an entry
 naming a sibling writes its path, and the synthetics its sugar lifts are minted at its root. A schema importing it alone has
-every sugar form and `meta.kind`/`meta.ref`. numeric.tn, temporal.tn and net.tn each import it alone and declare their
+every sugar form and `meta.ref`. numeric.tn, temporal.tn and net.tn each import it alone and declare their
 constructors under a map of their own, `numeric`, `temporal` and `net`, contributing nothing to `meta`
 (`design/meta-layer-namespaces.md` has the open-namespace merge); core.tn imports the three. Ordinary resolution
 can't bootstrap the kernel: an instance waits on its constructor being ready, and the instances on the one wait cycle wait on
@@ -297,8 +297,8 @@ constructor, positions included (the bootstrap resolves with the parser's positi
 
 - **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the kernel's
   one wait cycle, the one holding `meta.record`: `meta.value`, `boolean`, `meta.field_role`, `meta.enum_set`,
-  `integer`, `numeric.count`, `text`, `meta.type_kind`, `meta.field_map` (`PRE_LOADED`), and the
-  arrays lifted over `meta.type_kind`, `meta.field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a
+  `integer`, `numeric.count`, `text`, `meta.type_ref`, `meta.field_map` (`PRE_LOADED`), and the
+  arrays lifted over `meta.type_ref`, `meta.field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a
   lifted array is named by its content, so it is designated by what it holds; an entry the source declares is no lift,
   so a declaration whose body is `[text]` is read, not built). `instanceBody` covers the shapes those apply —
   a bare `{}` (each target's unconstrained constant), a bare token array (`enum`, the kernel's own enumeration constructor),
@@ -307,18 +307,18 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   the integer family's `min`, `max` and `size` (`numeric.count`'s `size: { bits: 64  signed: true }`).
   `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from
   `spec/fixtures/meta-resolved.tn` (the six maps read as their members under their paths) and asserts the hand-built names
-  equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 86 entries (67
-  members of the six maps, 13 at the root and 6 synthetics; the maps themselves make the kernel's 92 resolved entries), one
+  equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 85 entries (66
+  members of the six maps, 13 at the root and 6 synthetics; the maps themselves make the kernel's 91 resolved entries), one
   cycle of 26, longest wait chain 4 — and `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel
   contains the cycle's closure (70 entries, the root tag's `schema` among them: reading the document waits on the alias its
   tag names) and the related concepts, pinning all three. Of the 26, 13 are hand-built (the 9 of `PRE_LOADED` and 4 lifted
-  arrays); the other 13 are records and compositions resolved from their grammar, and the 60 entries beyond the cycle are
+  arrays); the other 13 are records and compositions resolved from their grammar, and the 59 entries beyond the cycle are
   made ready in wait order.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies. Two refinements wait on the cycle
-  and stay off it: `meta.namespace => meta.map ^ { … }` waits on its source `meta.map`, and `meta.identifier_kind =>
-  !meta.type_kind ^ { … }` on `meta.type_kind`, hand-built; the names their `key_type` and `of` hold order nothing, so
+  and stay off it: `meta.namespace => meta.map ^ { … }` waits on its source `meta.map`, and `meta.identifier_ref =>
+  !meta.type_ref ^ { … }` on `meta.type_ref`, hand-built; the names their `key_type` and `of` hold order nothing, so
   neither is a wait of the cycle's entries and the measurements above stand.
 - **Every other instance is read through the ordinary path.** `DefinitionResolver.resolveInstance` binds through a
   `DefinitionMetaReader` that reads through `WaitOrder.read`, against readers compiled from the entries ready now:
@@ -338,7 +338,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   entry not yet ready (`net.scheme_name` reaching `unicode.identifier_base` and `unicode.normalization`) forces another
   compile. Its output's nested map `meta` is derived from the members, so the order test compares its names.
 - **Parameter types are derived after every entry is ready**, through `ParameterTypes.inferAll` as `SchemaResolver`
-  derives a schema's, so `meta.kind` and `meta.ref` carry `T: meta.type_kind`, a type parameter, as their ordinary
+  derives a schema's, so `meta.ref` carries `T: meta.type_ref`, a type parameter, as their ordinary
   resolution does.
 - **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
   first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by

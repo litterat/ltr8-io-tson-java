@@ -14,8 +14,8 @@ import java.util.function.BiPredicate;
 /**
  * An instance of the kernel's {@code reference} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom whose
  * values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link #of}.
- * {@code meta.kind<record>}, {@code meta.ref<record>} and {@code !meta.reference { of: record }} are one instance; the
- * two templates are spellings, and the slot's meaning comes from {@link #of} and never from which one was written.
+ * {@code meta.ref<record>} and {@code !meta.reference { of: record }} are one instance; the template is a spelling, and
+ * the slot's meaning comes from {@link #of}.
  *
  * <p><b>What {@link #of} names decides what the slot holds.</b> Where it is a constructor ({@code top} or IS-A it),
  * the values it admits are types, and the slot holds a type's name, delivered to a host as a {@link TypeRef} that
@@ -27,12 +27,12 @@ import java.util.function.BiPredicate;
  * the governing schema's closure: whether {@code of} names a constructor, and, for one that does, the names it admits,
  * sorted. Membership is the linker's judgement, so resolved output carries {@code of} alone.
  *
- * <p><b>A refinement narrows {@link #of}</b> ([TSON-SCHEMA] §5.7): {@code !meta.type_kind ^ { of: unicode.identifier_type
- * }} is {@code meta.identifier_kind}, its {@code of} IS-A the source's, so every name it admits the source admits too,
+ * <p><b>A refinement narrows {@link #of}</b> ([TSON-SCHEMA] §5.7): {@code !meta.type_ref ^ { of: unicode.identifier_type
+ * }} is {@code meta.identifier_ref}, its {@code of} IS-A the source's, so every name it admits the source admits too,
  * and it is IS-A its source. Whether one name IS-A another is the namespace's, so the rule ({@link #ofNarrowing}) takes
  * that relation from the linker.
  *
- * <p><b>Equality is {@link #of} and the chain, never the index.</b> Two schemas that both apply {@code meta.kind<uuid_type>}
+ * <p><b>Equality is {@link #of} and the chain, never the index.</b> Two schemas that both apply {@code meta.ref<uuid_type>}
  * hold one instance with different members, and an importer that re-derives an entry an import already minted unifies
  * with it rather than colliding (§8.2).
  */

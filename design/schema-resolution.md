@@ -254,8 +254,8 @@ missing-field error → injected (`RecordField.omitted`, asked of a plain field)
 → FIXED. A restatement refines its source when no order moves backwards, which reproduces §5.7's transition matrix
 cell for cell without the matrix existing in code. No rule compares a restated type with its source's here, so
 `nickname?: void?` restating `nickname?: text?` narrows the field to `_` and keeps it in the contract, and the kernel's
-`meta.namespace` restating `meta.map`'s `key_type: meta.type_kind` as `meta.identifier_kind` resolves without the IS-A
-edge between them, which `meta.identifier_kind`'s refinement of `meta.type_kind` gives, being consulted.
+`meta.namespace` restating `meta.map`'s `key_type: meta.type_ref` as `meta.identifier_ref` resolves without the IS-A
+edge between them, which `meta.identifier_ref`'s refinement of `meta.type_ref` gives, being consulted.
 
 **A restated field's annotations are the restatement's, in source order, then the inherited field's** (`merged`,
 §5.8), one path for refinement and composition. Concatenation, because [TSON-DATA] §3.1 makes an annotation name
