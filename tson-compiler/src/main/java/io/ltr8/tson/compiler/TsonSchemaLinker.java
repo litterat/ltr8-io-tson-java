@@ -110,8 +110,9 @@ import java.util.stream.Collectors;
  * entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for why crediting a
  * subtype onto an imported entry's copy here never touches the imported schema's own separately-registered
  * original), computes each kind's members ({@link #computeKinds}), derives choice disjointness, checks that every
- * reference anywhere in the schema actually resolves and that a reference's refinement narrows its {@code of} ({@link
- * #checkReferenceNarrows}), and resolves and judges every value a value entry holds
+ * reference anywhere in the schema actually resolves, that a reference's refinement narrows its {@code of} ({@link
+ * #checkReferenceNarrows}) and that a field a record restates narrows its type ({@link #checkRestatedFieldTypes}),
+ * and resolves and judges every value a value entry holds
  * by name ({@code ValuesByName}). A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
@@ -756,7 +757,7 @@ public final class TsonSchemaLinker {
                 // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
                 // a name §8.2 makes non-normative and nobody ever typed.
                 validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
-                        merged, constructors);
+                        merged, constructors, other -> displayName(other, namespace, facts, applications));
             } catch (UnresolvedReference e) {
                 if (pending.contains(e.name())) {
                     continue; // a declaration not yet ready: judged when the whole schema links
@@ -1241,7 +1242,8 @@ public final class TsonSchemaLinker {
     // ── Validation ───────────────────────────────────────────────────────
 
     private static void validateEntry(String name, Top def, Map<String, Top> namespace,
-                                       Function<String, Optional<String>> constructors) {
+                                       Function<String, Optional<String>> constructors,
+                                       Function<String, String> shown) {
         checkOpenEntryUsesEveryParameter(name, def);
         // A chain reaches a constructor whenever a refinement derives from one -- the kernel's own `set_type =>
         // array ^ {...}` resolves with [array, product, top, type] -- and every name on it is in the one namespace,
@@ -1256,11 +1258,11 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def, namespace, OpenEntry.parameterNames(def), constructors);
+        validateBody(name, def, namespace, OpenEntry.parameterNames(def), constructors, shown);
     }
 
     private static void validateBody(String entryName, Top body, Map<String, Top> namespace, List<String> ownParameters,
-                                      Function<String, Optional<String>> constructors) {
+                                      Function<String, Optional<String>> constructors, Function<String, String> shown) {
         if (OpenEntry.isOpen(body)) {
             // A held body is opaque to everything that needs to know what a reference *resolves to*: that
             // cannot be settled until substitution supplies the arguments, so type-kind validation and
@@ -1292,6 +1294,7 @@ public final class TsonSchemaLinker {
                         }
                     }
                 }
+                checkRestatedFieldTypes(entryName, r, namespace, shown);
             }
             // The target in full: an alias naming an application states its arguments there, and a closed one
             // names the entry materialisation minted for it.
@@ -1631,6 +1634,59 @@ public final class TsonSchemaLinker {
                 }
             }
         }
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.7's rule for a restated field's type, which §5.8 applies to a composition's tightening
+     * entries: refinement only restricts, so a field a record restates is typed by its source's type or a type IS-A
+     * it, §7.2's IS-A asked as {@link #checkReferenceNarrows} asks it, past alias hops on both sides, and nothing
+     * structural beside it (SPEC-FEEDBACK.md #18): {@code [int8]} restating {@code [int32]} is no narrowing. §5.7's
+     * one other narrowing is {@code void} at a voidable position, whose value set {@code {_}} is inside every voidable
+     * position's; the voidable order itself is the resolver's ({@code DefinitionResolver.refines}). The resolver binds
+     * the restatement before the names it holds need be ready, so the IS-A is asked here, over the one namespace both
+     * resolve in.
+     *
+     * <p><b>Judged against the nearest closed record on the chain.</b> A supertype another supertype lists was judged
+     * when that one linked, so only the minimal ones are asked, and the diagnostic names the source the author wrote. A
+     * supertype that is still open -- the family base an applied operand reaches -- has parameter-typed fields and is
+     * skipped; an applied operand is judged through the closed entry its application denotes, where one exists. A
+     * field typed by an application not yet closed, or by a name no entry holds, is the reference checks' to report.
+     */
+    private static void checkRestatedFieldTypes(String entryName, RecordBody record, Map<String, Top> namespace,
+                                                Function<String, String> shown) {
+        List<String> supertypes = TypeChain.supertypesOf(record);
+        for (String supertype : supertypes) {
+            boolean nearest = supertypes.stream().noneMatch(other -> !other.equals(supertype)
+                    && TypeChain.supertypesOf(namespace.get(AliasChain.terminal(other, namespace))).contains(supertype));
+            if (!nearest || !(namespace.get(AliasChain.terminal(supertype, namespace)) instanceof RecordBody source)
+                    || OpenEntry.isOpen(source)) {
+                continue;
+            }
+            List<String> violations = new ArrayList<>();
+            for (Map.Entry<String, RecordField> inherited : source.fields().entrySet()) {
+                RecordField restated = record.fields().get(inherited.getKey());
+                if (restated != null && !narrows(inherited.getValue(), restated, namespace)) {
+                    violations.add("field '" + inherited.getKey() + "' is typed '" + shown.apply(restated.type().name())
+                            + "', which is not '" + shown.apply(inherited.getValue().type().name()) + "' or IS-A it");
+                }
+            }
+            if (!violations.isEmpty()) {
+                throw new SchemaValidationException("'" + entryName + "': not a valid refinement of '"
+                        + shown.apply(supertype) + "' (§5.7): " + String.join("; ", violations));
+            }
+        }
+    }
+
+    /** Whether {@code restated}'s type narrows {@code inherited}'s, as {@link #checkRestatedFieldTypes} states it. */
+    private static boolean narrows(RecordField inherited, RecordField restated, Map<String, Top> namespace) {
+        TypeRef from = inherited.type();
+        TypeRef to = restated.type();
+        if (!from.arguments().isEmpty() || !to.arguments().isEmpty() || !namespace.containsKey(from.name())
+                || !namespace.containsKey(to.name())) {
+            return true;
+        }
+        return isA(to.name(), from.name(), namespace) || restated.voidable()
+                && namespace.get(AliasChain.terminal(to.name(), namespace)) instanceof VoidType;
     }
 
     /**

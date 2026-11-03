@@ -263,8 +263,8 @@ and record refinement `T ^ { … }`. Nothing else is refined. Item 5's worked ex
 rule for `of` (a refinement's `of` is the source's or IS-A it, judged at link, where both names resolve, and a widening
 or an unrelated `of` is refused), `identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is IS-A
 `meta.type_ref`, and `namespace => meta.map ^ { key_type: meta.identifier_ref  voidable?: = false }` is IS-A
-`meta.map`. This library compares no restated field's type with its source's at §5.7, so a narrowing to a type that is
-no subtype is not refused yet either; the edge is what the rule will read.
+`meta.map`, and passes §5.7 by that edge: the link judges every restated field's type against its source's by IS-A
+(#18), and refuses a restatement whose type is no subtype.
 
 **Resolution, a proposal.**
 
@@ -1131,3 +1131,35 @@ implementation choice inside it have nothing left to govern.
   declaration" is `record_field.value` alone; say so. §5.2's eager-resolution paragraph keeps its reference to the
   `value`-typed default, and drops "this matches §7.4's eager-conversion rule for constraint-field values".
 - §5.5: a network list is a list of the family's network instance, and its coherence rule is the pair's emptiness.
+
+## 18. [TSON-SCHEMA] §5.7, §5.8, §7.2 — a restated field's type narrows by IS-A, which no section states
+
+**Problem.** §5.7 says a refinement "can only restrict, never expand", and that "restating the type-ref remains
+necessary when the tightening also narrows the field's type", so a restated type is meant to narrow. It never says by
+which relation. Its one worked case argues by value sets — `void` "refines every type at a voidable position, the
+value set `{_}` being a subset of every voidable position's" — while the only relation §7.2 defines between two
+types is the nominal one, `T` in `S`'s `chain.supertypes`. The two readings part on ordinary schemas: `[int8]`
+restating `[int32]`, a variant restating its choice (`x: (int32 | text)` restated `x: int32`), and a fresh
+`!integer_type { size: { bits: 8 } }` restating `int32` each narrow the value set and are no IS-A. §5.8 applies
+§5.7's rules to a composition's tightening entries, so the two operators agree, and the gap is §5.7's alone.
+
+**What is running.** The nominal reading, with §5.7's `void` case beside it. A restated field's type is the inherited
+type, or a type IS-A it by §7.2's chain, alias hops followed on both sides, or `void` at a voidable position; anything
+else is a resolver error against the restating declaration, in refinement and composition alike. It is judged at link,
+where every name both types hold resolves, against the nearest closed records on the declaration's chain. The kernel's
+`meta.namespace => meta.map ^ { key_type: meta.identifier_ref … }` passes by `meta.identifier_ref`'s refinement of
+`meta.type_ref`; `[int8]` for `[int32]` and a variant for its choice are refused, no IS-A edge joining either pair
+(#5: a container instance has no refinement, and two instances of one constructor have no edge). A restatement over an
+applied operand that denotes no entry, `dog => pet<"dog", dog_type> & { pet: cat_type }`, reaches only the open
+family base, and a subtraction's tightening entry (§5.9's rule 4) has an empty chain; neither is judged yet.
+
+Nominal, because it is the relation every typed position already admits by (§7.2's subsumption), so a value of the
+refinement read at the source's position meets the field's type by the rule that reads it; and because it is total and
+decidable from names, where value-set inclusion needs a containment judgement for every pair of families, containers
+and choices included, that the series states nowhere.
+
+**Resolution, a proposal.** §5.7, beside the elided type-ref paragraph: "A restated field's type MUST be the inherited
+type or a type IS-A it (§7.2), or `void` at a voidable position; any other restatement is a resolver error. §5.8's
+tightening entries follow the same rule." If a structural narrowing between containers or a variant restating its
+choice is wanted, it is a rule of its own that each constructor states, as #5's last paragraph leaves the container
+constructors' tightening rules theirs to state.

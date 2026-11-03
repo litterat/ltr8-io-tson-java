@@ -30,7 +30,8 @@ is why they are the linker's. Current form only; history lives in git.
   no kind: its tag names an ordinary type, which no walk reaches a constructor through.
 - A refinement of a reference (`!meta.type_ref ^ { of: … }`) narrows `of` to the source's or a type IS-A it, judged
   at link (`ReferenceBody.ofNarrowing`), and is IS-A its source: `meta.identifier_ref` is `meta.type_ref` narrowed to
-  `unicode.identifier_type`, its chain listing `meta.type_ref`.
+  `unicode.identifier_type`, its chain listing `meta.type_ref`. That edge is what admits `meta.namespace`'s restating
+  `meta.map`'s `key_type` as `meta.identifier_ref` (`TsonSchemaLinker.checkRestatedFieldTypes`, §5.7).
 - A kind-typed position is judged by membership in every data document, over the reading document's closure; in a
   schema document it reads its grammar alone and the link (or ingest) judges membership.
 - An empty kind admits no value, and `TypeInhabitance` refuses a required field typed by it: `meta.ref<meta.alias>` is one,
