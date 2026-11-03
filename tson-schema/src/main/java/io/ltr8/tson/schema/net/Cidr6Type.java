@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.net;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
+import io.ltr8.net.CidrInet6Network;
 import io.ltr8.tson.schema.atom.AtomCoherence;
 import io.ltr8.tson.schema.atom.AtomNarrowing;
 import io.ltr8.tson.schema.meta.Atom;
@@ -17,7 +18,7 @@ import java.util.Optional;
  * {@link Cidr4Type}'s exact IPv6 counterpart, same shape, different RFC citation and prefix-length
  * family range (0-128 instead of 0-32). See {@link Cidr4Type}'s own
  * Javadoc for why {@code spec} is a flat {@link String} rather than a {@link java.net.URI} and why
- * {@code within}/{@code excluding} are bare {@code List<String>} with a defensive compact constructor, and
+ * {@code within}/{@code excluding} are bare lists with a defensive compact constructor, and
  * for both of this family's rules. {@code tson-compiler}'s {@code Cidr6Parser} holds one of these and does
  * the actual reading/writing.
  */
@@ -25,7 +26,7 @@ import java.util.Optional;
 public record Cidr6Type(TypeChain chain,
         String spec, @Field("min_prefix") Optional<Long> minPrefix,
                          @Field("max_prefix") Optional<Long> maxPrefix,
-                         List<String> within, List<String> excluding) implements Atom {
+                         List<CidrInet6Network> within, List<CidrInet6Network> excluding) implements Atom {
 
     @Record
 
@@ -36,8 +37,8 @@ public record Cidr6Type(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public Cidr6Type(String spec, Optional<Long> minPrefix, Optional<Long> maxPrefix, List<String> within,
-            List<String> excluding) {
+    public Cidr6Type(String spec, Optional<Long> minPrefix, Optional<Long> maxPrefix, List<CidrInet6Network> within,
+            List<CidrInet6Network> excluding) {
         this(TypeChain.EMPTY, spec, minPrefix, maxPrefix, within, excluding);
     }
 
@@ -77,8 +78,6 @@ public record Cidr6Type(TypeChain chain,
         AtomCoherence.checkWithin(violations, "min_prefix", minPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkWithin(violations, "max_prefix", maxPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkOrdered(violations, "min_prefix", minPrefix, "max_prefix", maxPrefix);
-        AtomCoherence.checkNetworks(violations, "within", within, 128);
-        AtomCoherence.checkNetworks(violations, "excluding", excluding, 128);
         AtomCoherence.checkAdmitsAValue(violations, "network", within, excluding, minPrefix, maxPrefix, 128);
         return List.copyOf(violations);
     }

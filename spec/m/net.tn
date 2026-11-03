@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/net.tn?sha256=f2cf8da89827cd8a39eba72aea2433a58b41fa924525d6cbb97a068f6adb556e"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=ca0dd2779bf8085917df569736405695d332ab616589f1d8832168587731466c"
+!!id:"https://tson.io/2026/39/m/net.tn?sha256=42251e0fdf69593f42bbe47a98447b2b2d39160768d644f323da158dbe7de9d3"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=6856ce37fb3c28f6206e45f3192002754a33c456feb23a60194467e581d898e5"
 @doc:"""
   TSON net — the network and identifier type library (2026 Revision 39
   draft).
@@ -16,8 +16,8 @@
   the same names ([TSON-DATA] §5.5) denote these types.
 
   It imports the kernel, meta.tn, alone: the kernel's constructors,
-  `atom.specification`, `meta.value`, `net.scheme_set` and classifying
-  annotations are what it builds on, and it needs nothing of numeric.tn or
+  `atom.specification`, `net.scheme_set` and classifying annotations are
+  what it builds on, and it needs nothing of numeric.tn or
   temporal.tn. A schema importing it reserves its root names beside the
   kernel's, `net` among those ([TSON-SCHEMA] §2.2.3), so a schema imports it
   when it wants these names, and only then. core.tn imports it with numeric.tn and
@@ -57,58 +57,58 @@
     @doc:"""
       IPv4 address constraint vocabulary. Instance is `ipv4`. The spec pin cites
       RFC 3986 for its `IPv4address` production — the normative dotted-quad
-      grammar ([TSON-DATA] §5.5). `within` and `excluding` list IPv4 networks in
-      CIDR text (quoted — the form contains `/`): the address must lie inside at
-      least one `within` network when the field is present, and inside no
-      `excluding` network. `excluding` carves holes out of `within`.
+      grammar ([TSON-DATA] §5.5). `within` and `excluding` list IPv4 networks,
+      each a `cidr4`: the address must lie inside at least one `within` network
+      when the field is present, and inside no `excluding` network. `excluding`
+      carves holes out of `within`.
       """
     ipv4_type => meta.atom & atom.specification & {
       spec?:      = "https://www.rfc-editor.org/rfc/rfc3986"
-      within?:    [meta.value]
-      excluding?: [meta.value]
+      within?:    [cidr4]
+      excluding?: [cidr4]
     }
 
     @doc:"""
       IPv6 address constraint vocabulary. Instance is `ipv6`. `within` and
-      `excluding` list IPv6 networks in CIDR text (quoted): the address must lie
+      `excluding` list IPv6 networks, each a `cidr6`: the address must lie
       inside at least one `within` network when the field is present, and inside
       no `excluding` network.
       """
     ipv6_type => meta.atom & atom.specification & {
       spec?:      = "https://www.rfc-editor.org/rfc/rfc4291"
-      within?:    [meta.value]
-      excluding?: [meta.value]
+      within?:    [cidr6]
+      excluding?: [cidr6]
     }
 
     @doc:"""
       IPv4 network constraint vocabulary. Instance is `cidr4`.
       `min_prefix`/`max_prefix` narrow the prefix length within the family range
       0-32; bounds outside that range are invalid at the schema level. `within`
-      lists IPv4 networks in CIDR text (quoted): the value must be a subnet of
-      at least one. `excluding`: the value must not overlap any listed network —
+      lists IPv4 networks, each a `cidr4`: the value must be a subnet of at
+      least one. `excluding`: the value must not overlap any listed network —
       overlap, not containment.
       """
     cidr4_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc4632"
       min_prefix?: numeric.count
       max_prefix?: numeric.count
-      within?:     [meta.value]
-      excluding?:  [meta.value]
+      within?:     [cidr4]
+      excluding?:  [cidr4]
     }
 
     @doc:"""
       IPv6 network constraint vocabulary. Instance is `cidr6`.
       `min_prefix`/`max_prefix` narrow the prefix length within the family range
-      0-128. `within` and `excluding` list IPv6 networks in CIDR text (quoted),
-      with the semantics of `cidr4_type`: subnet-of for `within`, non-overlap
-      for `excluding`.
+      0-128. `within` and `excluding` list IPv6 networks, each a `cidr6`, with
+      the semantics of `cidr4_type`: subnet-of for `within`, non-overlap for
+      `excluding`.
       """
     cidr6_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc4291"
       min_prefix?: numeric.count
       max_prefix?: numeric.count
-      within?:     [meta.value]
-      excluding?:  [meta.value]
+      within?:     [cidr6]
+      excluding?:  [cidr6]
     }
 
     @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac`."

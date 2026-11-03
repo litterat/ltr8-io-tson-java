@@ -25,15 +25,15 @@
     ipv4_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
       chain     => !meta.record_field { type: meta.type_chain  optional: true }
       spec      => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
-      within    => !meta.record_field { type: array_value_xxhash  optional: true }
-      excluding => !meta.record_field { type: array_value_xxhash  optional: true }
+      within    => !meta.record_field { type: array_cidr4_xxhash  optional: true }
+      excluding => !meta.record_field { type: array_cidr4_xxhash  optional: true }
     } }
 
     ipv6_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
       chain     => !meta.record_field { type: meta.type_chain  optional: true }
       spec      => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
-      within    => !meta.record_field { type: array_value_xxhash  optional: true }
-      excluding => !meta.record_field { type: array_value_xxhash  optional: true }
+      within    => !meta.record_field { type: array_cidr6_xxhash  optional: true }
+      excluding => !meta.record_field { type: array_cidr6_xxhash  optional: true }
     } }
 
     cidr4_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
@@ -41,8 +41,8 @@
       spec       => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
       min_prefix => !meta.record_field { type: numeric.count  optional: true }
       max_prefix => !meta.record_field { type: numeric.count  optional: true }
-      within     => !meta.record_field { type: array_value_xxhash  optional: true }
-      excluding  => !meta.record_field { type: array_value_xxhash  optional: true }
+      within     => !meta.record_field { type: array_cidr4_xxhash  optional: true }
+      excluding  => !meta.record_field { type: array_cidr4_xxhash  optional: true }
     } }
 
     cidr6_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
@@ -50,8 +50,8 @@
       spec       => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
       min_prefix => !meta.record_field { type: numeric.count  optional: true }
       max_prefix => !meta.record_field { type: numeric.count  optional: true }
-      within     => !meta.record_field { type: array_value_xxhash  optional: true }
-      excluding  => !meta.record_field { type: array_value_xxhash  optional: true }
+      within     => !meta.record_field { type: array_cidr6_xxhash  optional: true }
+      excluding  => !meta.record_field { type: array_cidr6_xxhash  optional: true }
     } }
 
     mac_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
@@ -135,7 +135,9 @@
   @atom.ordering:NONE @atom.bounded:false
   uuid => !net.uuid_type {}
 
-  @meta.synthetic array_value_xxhash => !meta.array { element_type: meta.value }
+  @meta.synthetic array_cidr4_xxhash => !meta.array { element_type: cidr4 }
+
+  @meta.synthetic array_cidr6_xxhash => !meta.array { element_type: cidr6 }
 
   @meta.synthetic array_text_xxhash => !meta.array { element_type: text }
 }

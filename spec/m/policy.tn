@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/39/m/policy.tn?sha256=c48de57ee847f1b13ea1195108bb9f5b96e40db8c15e836e97dfa43a7efe8849"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=ca0dd2779bf8085917df569736405695d332ab616589f1d8832168587731466c"
+!!id:"https://tson.io/2026/39/m/policy.tn?sha256=2ed4dfd75c8131ea2ec4ea02328c0177cc5df92f8b06d9cc194320ad304c5ca7"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=6856ce37fb3c28f6206e45f3192002754a33c456feb23a60194467e581d898e5"
 @doc:"""
   TSON processor policy — what a processor admits and spends (2026 Revision 39
   draft).

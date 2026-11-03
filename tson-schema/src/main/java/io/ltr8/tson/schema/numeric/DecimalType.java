@@ -10,7 +10,6 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -137,26 +136,17 @@ public record DecimalType(TypeChain chain,
     }
 
     /**
-     * Every member read as a decimal before the set is formed, which is what {@code members} being typed
-     * {@code set<value>} makes this record's own job. {@code value} is what §7.4's constraint-fields rule and
-     * the bootstrap ordering behind it leave {@code decimal_type} able to say -- the family cannot name its
-     * own atom -- so an element arrives as whatever [TSON-DATA] §4 resolved it to, {@code 1} as an integer
-     * beside {@code 2.50} as a float, and nothing between the wire and here narrows a collection's elements
-     * the way a record field's scalar is narrowed. Reading each one here is what makes the declared element
-     * type true and lets one identity serve the three rules that ask about a member: the read
-     * ({@code DecimalParser}), the tightening ({@link #constraintsCheck}) and the coherence check below.
-     *
-     * <p>That identity is [TSON-DATA] §4.3's -- the value denoted, not the spelling -- so {@code 1} and
-     * {@code 1.0} are one member and a duplicate rather than two, which the {@code set} the facet is
-     * declared as cannot see for itself: its uniqueness rule runs on the decoded elements, where the two are
-     * a {@code BigInteger} and a {@code BigDecimal} and nothing compares them. The value is kept exactly as
-     * written -- {@code 2.50} stays {@code 2.50}, §8.2's "recorded as written and compared as the value
-     * denoted" -- so the comparison is {@code compareTo}, never {@code equals}.
+     * The members as a set under [TSON-DATA] §4.3's identity -- the value denoted, not the spelling -- so {@code
+     * 1} and {@code 1.0} are one member and a duplicate rather than two. Each member is a {@code number}, the
+     * facet's element type, and arrives as the {@link BigDecimal} that reader produced, kept exactly as written:
+     * {@code 2.50} stays {@code 2.50}, §8.2's "recorded as written and compared as the value denoted", so the
+     * comparison is {@code compareTo}, never {@code equals}. That one identity serves the three rules that ask
+     * about a member: the read ({@code DecimalParser}), the tightening ({@link #constraintsCheck}) and the
+     * coherence check above.
      */
     private static List<BigDecimal> readMembers(List<BigDecimal> written) {
         List<BigDecimal> members = new ArrayList<>(written.size());
-        for (Object element : (List<?>) written) {
-            BigDecimal member = asDecimal(element);
+        for (BigDecimal member : written) {
             if (members.stream().anyMatch(seen -> seen.compareTo(member) == 0)) {
                 throw new SchemaValidationException(
                         "'members' requires unique elements, '" + member + "' appears more than once");
@@ -164,30 +154,5 @@ public record DecimalType(TypeChain chain,
             members.add(member);
         }
         return List.copyOf(members);
-    }
-
-    /**
-     * A member that does not read as a decimal is the author's error, not a coverage gap: {@code !number}
-     * says which tokens it admits (§5.6) and {@code value} admitting anything is a property of the slot, not
-     * a licence for what stands in it.
-     */
-    private static BigDecimal asDecimal(Object element) {
-        return switch (element) {
-            case BigDecimal decimal -> decimal;
-            case BigInteger integer -> new BigDecimal(integer);
-            case Number number -> exact(number);
-            case null -> throw new SchemaValidationException("'members' does not admit an absent member");
-            default -> throw new SchemaValidationException("'members' admits only numbers -- '" + element
-                    + "' is not one");
-        };
-    }
-
-    private static BigDecimal exact(Number number) {
-        try {
-            return new BigDecimal(number.toString());
-        } catch (NumberFormatException e) {
-            throw new SchemaValidationException("'members' admits only exact numbers -- '" + number
-                    + "' is not one; !number, being exact, does not accept the special values (§5.6)");
-        }
     }
 }

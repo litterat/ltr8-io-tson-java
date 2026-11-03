@@ -43,26 +43,9 @@ public record Ipv4Parser(List<CidrInet4Network> within, List<CidrInet4Network> e
     /** {@code ipv4 => !net.ipv4_type {}} -- the unconstrained IPv4 address, §5.5's {@code !ipv4}. */
     public static final Ipv4Parser UNCONSTRAINED = new Ipv4Parser(List.of(), List.of());
 
-    /**
-     * The parser {@code constraints} asks for. A malformed entry in either list is refused before a reader is
-     * ever
-     * built ({@code Ipv4Type.coherenceCheck}), so reaching here with one is an internal fault rather than an
-     * author error.
-     */
+    /** The parser {@code constraints} asks for: its lists are networks already, read by {@code cidr4}. */
     public static Ipv4Parser of(Ipv4Type constraints) {
-        return new Ipv4Parser(networks(constraints.within()), networks(constraints.excluding()));
-    }
-
-    /**
-     * The facet's text entries as networks. Every entry has already been checked to be one at schema load
-     * ({@code Ipv4Type.coherenceCheck}), so a malformed entry cannot reach here; one that somehow did is dropped
-     * rather than silently treated as matching nothing, and the schema-load check is where it is reported.
-     */
-    private static List<CidrInet4Network> networks(List<String> entries) {
-        return entries.stream()
-                .map(entry -> CidrInet4Network.parse(entry))
-                .filter(java.util.Objects::nonNull)
-                .toList();
+        return new Ipv4Parser(constraints.within(), constraints.excluding());
     }
 
     @Override

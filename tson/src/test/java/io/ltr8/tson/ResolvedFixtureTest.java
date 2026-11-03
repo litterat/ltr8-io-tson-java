@@ -206,7 +206,7 @@ class ResolvedFixtureTest {
      * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
      * {@code @meta.synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
      * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark six keys
-     * in meta.tn and two in net.tn, each at its document's root; numeric.tn, temporal.tn and core.tn lift no inline
+     * in meta.tn and three in net.tn, each at its document's root; numeric.tn, temporal.tn and core.tn lift no inline
      * form and have none, which is as much a statement as the others.
      *
      * <p>This is the one assertion here that does not go through the bound document -- see {@link
@@ -217,7 +217,7 @@ class ResolvedFixtureTest {
         // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
         // scan that stopped matching or a resolver that stopped marking.
         assertEquals(6, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks six keys");
-        assertEquals(2, fixtureSynthetics("net-resolved.tn").size(), "net.tn marks two keys");
+        assertEquals(3, fixtureSynthetics("net-resolved.tn").size(), "net.tn marks three keys");
 
         for (Map.Entry<String, String> fixture : FIXTURES.entrySet()) {
             assertEquals(fixtureSynthetics(fixture.getKey()),

@@ -60,33 +60,18 @@ public record Cidr4Parser(Cidr4Type constraints) implements AtomTypeParser<CidrI
      * {@code excluding}: the value must not <b>overlap</b> any -- overlap rather than containment, so a value
      * wider than an excluded block cannot smuggle it through, which is what net.tn's own {@code @doc} asks
      * for.
-     *
-     * <p>The lists are text here because the facets are typed {@code [meta.value]}; every entry has already been
-     * checked to be a network at schema load ({@code Cidr4Type.coherenceCheck}), so a null from {@code parse}
-     * is unreachable rather than an author error.
      */
     private void checkNetworks(String text, CidrInet4Network value) {
-        List<String> within = constraints.within();
-        if (!within.isEmpty() && within.stream()
-                .noneMatch(entry -> subnetOf(entry, value))) {
+        List<CidrInet4Network> within = constraints.within();
+        if (!within.isEmpty() && within.stream().noneMatch(network -> network.contains(value))) {
             throw new AtomValidationException("'" + text + "' is a subnet of none of this type's permitted "
                     + "networks", "a subnet of one of " + within.size() + " permitted network"
                     + (within.size() == 1 ? "" : "s"));
         }
-        if (constraints.excluding().stream().anyMatch(entry -> overlaps(entry, value))) {
+        if (constraints.excluding().stream().anyMatch(network -> network.overlaps(value))) {
             throw new AtomValidationException("'" + text + "' overlaps a network this type excludes",
                     "a network overlapping none of the excluded ones");
         }
-    }
-
-    private static boolean subnetOf(String entry, CidrInet4Network value) {
-        CidrInet4Network network = CidrInet4Network.parse(entry);
-        return network != null && network.contains(value);
-    }
-
-    private static boolean overlaps(String entry, CidrInet4Network value) {
-        CidrInet4Network network = CidrInet4Network.parse(entry);
-        return network != null && network.overlaps(value);
     }
 
     @Override

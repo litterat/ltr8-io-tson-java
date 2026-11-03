@@ -145,25 +145,6 @@ public final class AtomCoherence {
     }
 
     /**
-     * Every entry of a {@code within}/{@code excluding} list must be a network of the family's own width.
-     *
-     * <p>The facets are typed {@code [meta.value]} in net.tn (no facet is typed by a family's own instance), so
-     * they arrive as text and the family that owns the rule is the only place that
-     * can judge them. {@link io.ltr8.net.CidrNetwork#parse} is the grammar, and it refuses a
-     * malformed address, a prefix outside the family range, and nonzero host bits alike.
-     */
-    public static void checkNetworks(List<String> out, String facet, List<String> entries, int familyBits) {
-        for (String entry : entries) {
-            CidrNetwork network = CidrNetwork.parse(entry, familyBits);
-            if (network == null || !network.hostBitsAreZero()) {
-                out.add(facet + " lists '" + entry + "', which is not an IPv" + (familyBits == 32 ? "4" : "6")
-                        + " network -- expected CIDR notation, an address followed by '/' and a prefix length "
-                        + "of 0-" + familyBits + ", with zero host bits beyond the prefix");
-            }
-        }
-    }
-
-    /**
      * The address families' emptiness rule: {@code within} and {@code excluding} must leave a value between
      * them. {@code within: ["10.0.0.0/8"]} beside {@code excluding: ["10.0.0.0/8"]} admits nothing, which is
      * {@code { min: 10 max: 3 }}'s exact twin -- two individually legal facets that between them describe no
@@ -182,14 +163,14 @@ public final class AtomCoherence {
      *
      * @param noun what the family's values are, for the message: an address, or a network
      */
-    public static void checkAdmitsAValue(List<String> out, String noun, List<String> within, List<String> excluding,
-            int familyBits) {
+    public static void checkAdmitsAValue(List<String> out, String noun, List<? extends CidrNetwork> within,
+            List<? extends CidrNetwork> excluding, int familyBits) {
         checkAdmitsAValue(out, noun, within, excluding, Optional.empty(), Optional.empty(), familyBits);
     }
 
     /** {@link #checkAdmitsAValue(List, String, List, List, int)} for a family that also bounds the prefix length. */
-    public static void checkAdmitsAValue(List<String> out, String noun, List<String> within, List<String> excluding,
-            Optional<Long> minPrefix, Optional<Long> maxPrefix, int familyBits) {
+    public static void checkAdmitsAValue(List<String> out, String noun, List<? extends CidrNetwork> within,
+            List<? extends CidrNetwork> excluding, Optional<Long> minPrefix, Optional<Long> maxPrefix, int familyBits) {
         long floorBound = minPrefix.orElse(0L);
         long ceilingBound = maxPrefix.orElse((long) familyBits);
         if (floorBound < 0 || ceilingBound > familyBits || floorBound > ceilingBound) {
@@ -197,11 +178,8 @@ public final class AtomCoherence {
         }
         int floor = (int) floorBound;
         int ceiling = (int) ceilingBound;
-        List<CidrNetwork> permitted = networks(within, familyBits);
-        List<CidrNetwork> excluded = networks(excluding, familyBits);
-        if (permitted == null || excluded == null) {
-            return; // a malformed entry is checkNetworks' to report, and there is nothing to judge under it
-        }
+        List<CidrNetwork> permitted = List.copyOf(within);
+        List<CidrNetwork> excluded = List.copyOf(excluding);
         if (permitted.isEmpty()) {
             permitted = List.of(CidrNetwork.all(familyBits)); // no `within` permits everything
         }
@@ -251,18 +229,5 @@ public final class AtomCoherence {
             }
         }
         return shortest;
-    }
-
-    /** The facet's entries as networks, or {@code null} where any one of them is not a network of this family. */
-    private static List<CidrNetwork> networks(List<String> entries, int familyBits) {
-        List<CidrNetwork> parsed = new ArrayList<>(entries.size());
-        for (String entry : entries) {
-            CidrNetwork network = CidrNetwork.parse(entry, familyBits);
-            if (network == null || !network.hostBitsAreZero()) {
-                return null;
-            }
-            parsed.add(network);
-        }
-        return parsed;
     }
 }

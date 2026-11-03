@@ -156,9 +156,9 @@ spec-required case:
 - [ ] **A parameter in a record field's `value` has no channel of its own** ([TSON-SCHEMA] §5.10). It is an unquoted
   token in `meta.record_field.value`, told from a literal by §5.10's shadowing rule, in resolved output as in source; at a
   type position or among an application's arguments a parameter is its name, as the reference grammar reads one
-  (`SPEC-FEEDBACK.md #12`). Decide with typed facets, which retype `value`, whether `value` gains a channel (`( value:
-  meta.value | value_param: meta.param_name )`), and with it what `@meta.application` means on a declared entry that is no
-  record.
+  (`SPEC-FEEDBACK.md #12`). Decide when `record_field.value`, the last `meta.value`-typed slot in the kernel, is
+  retyped, whether `value` gains a channel (`( value: meta.value | value_param: meta.param_name )`), and with it what
+  `@meta.application` means on a declared entry that is no record.
 
 - [ ] **An annotation inside a value read through an imported type's reader resolves in the declaring schema's
   namespace.** [TSON-SCHEMA] §3.3.3 resolves an annotation in the annotating document's namespace, and a value

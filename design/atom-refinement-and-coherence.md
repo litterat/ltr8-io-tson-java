@@ -17,10 +17,13 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 - Emptiness is the rule, not narrowness: `{ min: 5 max: 5 }` resolves; integer folds its `size`-derived range in first.
 - `Product.coherenceCheck` lives on the family, not with any one spelling, and `TsonSchemaLinker` asks every family
   again for the entries materialisation mints.
-- A network family's `within`/`excluding` entries are judged by the family's own `coherenceCheck`
-  (`AtomCoherence.checkNetworks`), never by the linker or the resolver; its prefix bounds fold in.
-- Unchecked by design: `pattern` against `pattern` (and `pattern` emptiness), selector facets. A `value`-typed bound
-  binds to its family's host type (`ValueParser.at`), so temporal and duration bounds are compared as values.
+- A bound, step or member of a bundled constructor is typed by its family's instance in the same document
+  (`temporal.duration_type.min` is a `duration`, `net.ipv4_type.within` a `[cidr4]`), so it is read by that instance's
+  reader and binds the family's host type; a float's bounds are `number`, validated before rounding. A refinement of a
+  refinement reads its bound as the base instance, and widening is the tightening check's to refuse, not the read's.
+- A network family's `within`/`excluding` pair is judged for emptiness by the family's own `coherenceCheck`
+  (`AtomCoherence.checkAdmitsAValue`), never by the linker or the resolver; its prefix bounds fold in.
+- Unchecked by design: `pattern` against `pattern` (and `pattern` emptiness), selector facets.
 - `unicode.text_type`'s `pattern` and `members` are each **settable once** — they occupy one logical position and the pattern
   half cannot be narrowed, so the position takes one rule. A member set may still be *added* to a patterned source.
 - `unicode.text_type`'s `normalization` is **identity-only**, default or not: setting it where the source left `NONE` changes
@@ -127,12 +130,14 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   - Unchecked by design, each documented on its class and matching that family's existing narrowing gap: `pattern` emptiness
     and selector facets. `temporal.duration_type` and `temporal.period_type` bounds are compared as the values they denote (a
     `Duration`; a period's months), never as text — `"P1M"` vs `"P30D"` does not order lexically.
-  - **The four network families check their own `within`/`excluding` entries here**, through
-    `AtomCoherence.checkNetworks`: the facets are typed `[meta.value]` in net.tn's constructors (they list
-    networks in CIDR text), so they arrive as text and the family that owns the rule is the only place that can judge them.
-    That is why the `CidrNetwork` pair and `InternetAddress` sit beneath `tson-schema`, in `ltr8-net`: a check in the linker
-    or the resolver would be a second home for one family's rule, which is what `Atom.coherenceCheck` exists to prevent.
-    **The pair's own emptiness is judged there too** (`checkAdmitsAValue`): an `excluding` set covering every network
+  - **The four network families judge their own `within`/`excluding` pair here**, through
+    `AtomCoherence.checkAdmitsAValue`. The facets are typed `[cidr4]`/`[cidr6]` in net.tn's constructors, so every
+    entry arrives as a `CidrInet4Network`/`CidrInet6Network` that `cidr4`'s or `cidr6`'s reader has already judged a
+    network; a malformed entry is that reader's refusal at schema load, like any other value of it. What is left is the
+    pair, and the family that owns the rule is the only place that judges it, which is why the `CidrNetwork` pair and
+    `InternetAddress` sit beneath `tson-schema`, in `ltr8-net`: a check in the linker or the resolver would be a second
+    home for one family's rule, which is what `Atom.coherenceCheck` exists to prevent.
+    **The pair's emptiness**: an `excluding` set covering every network
     `within` permits admits nothing, which is `{ min: 10 max: 3 }` with a different spelling. Cover over a prefix tree is
     counting rather than searching — two blocks are nested or disjoint, so an exclusion meeting a permitted block either
     contains it or lies wholly inside one half — so the rule is exact and total, not a partial prover. **A network family
@@ -140,12 +145,13 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     `within: ["10.0.0.0/24"] excluding: ["10.0.0.5/32"] max_prefix: 24` admits no network while admitting almost every
     address. That is the same fold `integer` performs with its `size`-derived range, and §5.5 states both halves: the pair
     MUST admit a value, and for a network family the prefix bounds participate.
-  - **A non-numeric bound binds, so the temporal and duration families' rules are live at the resolver.**
-    `temporal.date_type.min`/`max` and their siblings are declared `meta.value` in temporal.tn (§7.4; its header states
-    the rule for a bound of the constrained atom's own family), so a bound is decoded by [TSON-DATA] §4 and arrives as a
-    `String`. `ValueParser.at` closes the distance: where the natural resolution cannot be what the bound
-    component holds, the token is re-read under the built-in atom that produces that host type (`HostAtoms`), so
-    `!date ^ { min: 2020-01-01 }` binds a `LocalDate` and `!duration ^ { min: PT30M }` a `Duration`. A bound the
-    atom refuses (`!date ^ { min: "not-a-date" }`, `!duration ^ { min: P1Y }`) is the author's error and reports
-    `SCHEMA_ERROR`, named by the facet written. `ValueTypedFacetTest` pins the binding, the refusals, and that a
-    loaded bound decides a read; `AtomCoherenceTest` reaches the same rules by direct construction.
+  - **A bound binds the family's host type, so the temporal and duration families' rules are live at the resolver.**
+    `temporal.date_type.min`/`max` and their siblings are typed by their family's instance in temporal.tn (`date`,
+    `duration`, …), as numeric.tn types its bounds `number` and `rational`, so a bound is read by that instance's reader:
+    `!date ^ { min: 2020-01-01 }` binds a `LocalDate` and `!duration ^ { min: PT30M }` a `Duration`. A bound the atom
+    refuses (`!date ^ { min: "not-a-date" }`, `!duration ^ { min: P1Y }`, `!number ^ { min: 0x10 }`) is the author's error
+    and reports `SCHEMA_ERROR` with that reader's verdict, as the kernel's `integer`-typed bounds do. `rational`'s host
+    value is a record, so `ResolverBindContext` registers `Rational` as an atom for the schema model. **A refinement of a
+    refinement reads its bound as the base instance**: `!positive ^ { min: -5 }` reads `-5` as a `number`, and its
+    widening is `checkNarrows`' to refuse. `TypedFacetTest` pins the binding, the refusals, and that a loaded bound decides
+    a read; `AtomCoherenceTest` reaches the same rules by direct construction.

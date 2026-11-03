@@ -52,27 +52,24 @@ import java.util.UUID;
  * name-&gt;{@link AtomType} table, keyed on the Java type a value arrives as rather than the name a schema
  * wrote.
  *
- * <p><b>It exists for the {@code value}-typed slot.</b> [TSON-SCHEMA] §7.4 types a constructor's constraint
- * fields {@code value}, and the bootstrap ordering behind it leaves no choice: {@code temporal.duration_type} is
- * what defines a duration, and {@code duration => !temporal.duration_type {}} lives a layer up in temporal.tn, so the kernel
- * cannot write {@code min: duration}. A slot typed {@code value} is decoded by [TSON-DATA] §4 base type
- * resolution and by nothing else, which resolves three classes and none of them is a duration -- so {@code
- * min: PT30M} arrives as the string {@code PT30M} and the position's own type is the only thing that says
- * what it meant. This table is how {@code tson-compiler}'s {@code ValueParser#read(TokenValue, Class)}
- * asks.
+ * <p><b>It exists for the {@code value}-typed slot.</b> A slot typed {@code value} is decoded by [TSON-DATA] §4
+ * base type resolution and by nothing else, which resolves three classes -- boolean, number, string -- so a
+ * schema's {@code { slot: meta.value }} bound to a {@code UUID} component receives the string the token was,
+ * and the component's own type is the only thing that says what it meant. This table is how {@code
+ * tson-compiler}'s {@code ValueParser#read(TokenValue, Class)} asks.
  *
  * <p>{@code java.net.URI} answers with {@code iri_reference}, the widest of the four atoms it holds: every
  * URI, URI-reference and IRI is an IRI-reference, and the class holds any of them, so the class alone names
  * no narrower contract.
  *
- * <p>The entries are unconstrained instances, deliberately: a bound is a value of the atom's own type, not
- * of the refinement being declared, and asking a half-built refinement to validate its own bound would be
- * circular ({@code min} of an atom whose {@code min} is what is being read).
+ * <p>The entries are unconstrained instances, deliberately: a host class names a family and no refinement of
+ * it, so the family's own instance is the whole contract the class implies.
  *
  * <p><b>Not the same table as the writers' own</b> ({@code VocabularyAtoms}), and the difference is the
  * numeric families. A writer must not annotate every {@code BigDecimal} it emits with {@code !number}, so it
  * carries no reverse entry for one; a reader asking "what should this slot's token have been" must answer
- * for {@code number} too, or {@code !number ^ { min: "abc" }} has nothing to be refused by. The two tables
+ * for {@code number} too, or a {@code value} slot bound to a {@code BigDecimal} has nothing to refuse {@code "abc"}
+ * by. The two tables
  * answer different questions and only look alike.
  */
 public final class HostAtoms {

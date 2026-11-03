@@ -1077,3 +1077,53 @@ range for any of them.
 - §5.3 and the facet descriptions: a count facet admits any value of `count`; a bound past what a processor's values
   can reach is met or never reached, never a schema error.
 - [TSON-DATA] §9.1, §11.5: a limit is a positive `int64`, and a processor holding one in a narrower type caps it.
+
+## 17. [TSON-SCHEMA] §4.2, §5.2, §5.5, §7.4, §13.2 — a facet is typed by its family's instance, and `value` keeps one slot
+
+**Problem.** §7.4's "Constraint fields typed as `value`" types every bound, step, member set and network list of the
+non-kernel atom constructors `value`, because "the constrained atom cannot be referenced at the point of declaration"
+(bootstrap ordering, §3.4), and then needs a rule of its own to make those slots mean anything: "the resolver reads
+it under the atom it stands for, once that atom is in scope", a set's members read before the set is formed, and an
+eager-conversion paragraph whose accepted types are "an implementation choice". Once a constructor and its canonical
+instance sit in one document (#7's one namespace, #15's roots), that reason is gone: `number => !numeric.decimal_type
+{}` is declared beside `numeric.decimal_type`, so `decimal_type.min` can be typed `number`, which is the kernel's own
+pattern — `integer_type`'s bounds are `integer`, "the exception that proves the rule". With the facet typed, the
+ordinary field reader does what the bespoke rule described, and the rule, its eager-conversion paragraph and the
+implementation choice inside it have nothing left to govern.
+
+**What is running.**
+
+- **Every facet of a bundled constructor holding a value of the constrained family is typed by that family's
+  instance**, declared at the root of the same document: numeric.tn's `decimal_type` bounds and `multiple_of` are
+  `number` and `members` a set of `number`; `rational_type`'s bounds and `multiple_of` are `rational`; temporal.tn's
+  `date_type`, `time_type` and `datetime_type` bounds are `date`, `time` and `datetime`, `duration_type`'s bounds and
+  `multiple_of` `duration`, `period_type`'s `period`. Nothing in numeric.tn, temporal.tn or net.tn names `meta.value`.
+- **A float's bounds are `number`, not `float64`.** float_type's own `@doc` validates them "against the value as
+  written, before rounding", so they are exact; typing them by the grid would round a bound the type says is unrounded.
+- **net.tn's network lists are `[cidr4]` and `[cidr6]`**: `ipv4_type` and `cidr4_type` list `cidr4`s, `ipv6_type`
+  and `cidr6_type` list `cidr6`s. A malformed entry, or one with nonzero host bits, is refused at schema load by that
+  reader, as any value of it would be, so the coherence rule of §5.5 is left only the pair's emptiness.
+- **No wait cycle.** Each instance is `!C {}` with no facets, so a facet read against it waits on nothing further;
+  the resolver's wait order (#4) reports none over the five documents.
+- **A refinement of a refinement reads its bound as the base instance.** `positive => !number ^ { min: 0 }` then
+  `!positive ^ { min: -5 }` reads `-5` as a `number`, which it is; its widening is §5.7's tightening rule to refuse,
+  not the read's. The verdict is the one Revision 38's text gives, by the rule that owns it.
+- **A bound is spelled as a value of its family.** `!number ^ { min: 0x10 }` is refused, as `!number 0x10` in data
+  is (§5.6 admits no based-integer `number`), where a `value`-typed slot decoded `0x10` by §4 and narrowed it. A
+  refused bound carries its family reader's verdict (`'P1Y' is not a valid duration … a month is a period`), as the
+  kernel's `integer`-typed bounds already do.
+- **`value` keeps one slot**: `meta.record_field.value`, a field's default or pin, whose type is the field's declared
+  type and is not expressible in the kernel without dependent fields. `value => !meta.value_type {}` stays, and its
+  `@doc` names that slot alone.
+- The resolved fixtures (`spec/fixtures/numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn`) carry the
+  typed facets; net.tn's lifted `[meta.value]` becomes two synthetics, `[cidr4]` and `[cidr6]`.
+
+**Resolution, a proposal.**
+
+- §13.2 and the constructor listings: type each facet as above.
+- §7.4: delete "Constraint fields typed as `value`" and the eager-conversion paragraph after it; what remains true is
+  the ordinary rule that a field is read by its type at schema load, a value the type refuses being a resolver error.
+- §4.2's `value` entry: "the escape hatch for fields whose type the schema language cannot express at the point of
+  declaration" is `record_field.value` alone; say so. §5.2's eager-resolution paragraph keeps its reference to the
+  `value`-typed default, and drops "this matches §7.4's eager-conversion rule for constraint-field values".
+- §5.5: a network list is a list of the family's network instance, and its coherence rule is the pair's emptiness.

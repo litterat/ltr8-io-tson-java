@@ -1,5 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.net.CidrInet4Network;
+import io.ltr8.net.CidrInet6Network;
 import io.ltr8.tson.base.atom.Rational;
 import io.ltr8.tson.schema.binary.BytesType;
 import io.ltr8.tson.schema.net.Cidr4Type;
@@ -395,7 +397,7 @@ class AtomCoherenceTest {
         assertCoherent(new UuidType(some(4)));
         assertCoherent(new ComplexType(ComplexType.Component.FLOAT64));
         assertCoherent(new MacType("s"));
-        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.1.0.0/16")));
+        assertCoherent(new Ipv4Type("s", v4("10.0.0.0/8"), v4("10.1.0.0/16")));
         assertCoherent(new EnumBody(List.of("A", "B")));
     }
 
@@ -408,16 +410,16 @@ class AtomCoherenceTest {
      */
     @Test
     void anExclusionCoveringItsOwnWithinEntryAdmitsNothing() {
-        assertViolation(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.0.0.0/8")),
+        assertViolation(new Ipv4Type("s", v4("10.0.0.0/8"), v4("10.0.0.0/8")),
                 "excluding covers every network within permits");
-        assertViolation(new Cidr4Type("s", NONE, NONE, List.of("10.0.0.0/8"), List.of("10.0.0.0/8")),
+        assertViolation(new Cidr4Type("s", NONE, NONE, v4("10.0.0.0/8"), v4("10.0.0.0/8")),
                 "excluding covers every network within permits");
     }
 
     /** A wider exclusion covers it too -- containment, not equality, is what empties the pair. */
     @Test
     void anExclusionWiderThanItsWithinEntryAdmitsNothing() {
-        assertViolation(new Ipv4Type("s", List.of("10.1.0.0/16"), List.of("10.0.0.0/8")),
+        assertViolation(new Ipv4Type("s", v4("10.1.0.0/16"), v4("10.0.0.0/8")),
                 "excluding covers every network within permits");
     }
 
@@ -428,38 +430,38 @@ class AtomCoherenceTest {
      */
     @Test
     void exclusionsThatTileAWithinEntryBetweenThemAdmitNothing() {
-        assertViolation(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.0.0.0/9", "10.128.0.0/9")),
+        assertViolation(new Ipv4Type("s", v4("10.0.0.0/8"), v4("10.0.0.0/9", "10.128.0.0/9")),
                 "excluding covers every network within permits");
     }
 
     /** One tile short, and the type is inhabited again -- the rule is cover, not "several exclusions". */
     @Test
     void exclusionsThatLeaveOneTileUncoveredAreCoherent() {
-        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.0.0.0/9")));
+        assertCoherent(new Ipv4Type("s", v4("10.0.0.0/8"), v4("10.0.0.0/9")));
         // A /10, a /10 and a /9 do tile a /8, so this pair leaves exactly the third quarter and no more.
-        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.0.0.0/10", "10.128.0.0/9")));
+        assertCoherent(new Ipv4Type("s", v4("10.0.0.0/8"), v4("10.0.0.0/10", "10.128.0.0/9")));
     }
 
     /** Cover has to be reached in every {@code within} entry: one uncovered entry inhabits the type. */
     @Test
     void aSecondWithinEntryTheExclusionsDoNotReachIsCoherent() {
-        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/8", "192.168.0.0/16"), List.of("10.0.0.0/8")));
+        assertCoherent(new Ipv4Type("s", v4("10.0.0.0/8", "192.168.0.0/16"), v4("10.0.0.0/8")));
     }
 
     /** No {@code within} is the whole address space, so excluding it wholesale still empties the body. */
     @Test
     void excludingTheWholeSpaceWithNoWithinAdmitsNothing() {
-        assertViolation(new Ipv4Type("s", List.of(), List.of("0.0.0.0/0")),
+        assertViolation(new Ipv4Type("s", List.of(), v4("0.0.0.0/0")),
                 "excluding covers every network within permits");
-        assertCoherent(new Ipv4Type("s", List.of(), List.of("10.0.0.0/8")));
+        assertCoherent(new Ipv4Type("s", List.of(), v4("10.0.0.0/8")));
     }
 
     /** The same walk over sixteen octets. */
     @Test
     void theV6FamiliesUseTheSameArithmetic() {
-        assertViolation(new Ipv6Type("s", List.of("2001:db8::/32"), List.of("2001:db8::/32")),
+        assertViolation(new Ipv6Type("s", v6("2001:db8::/32"), v6("2001:db8::/32")),
                 "excluding covers every network within permits");
-        assertCoherent(new Ipv6Type("s", List.of("2001:db8::/32"), List.of("2001:db8:1::/48")));
+        assertCoherent(new Ipv6Type("s", v6("2001:db8::/32"), v6("2001:db8:1::/48")));
     }
 
     /**
@@ -472,30 +474,26 @@ class AtomCoherenceTest {
      */
     @Test
     void aSurvivingBlockTooSmallForMaxPrefixAdmitsNoNetwork() {
-        assertViolation(new Cidr4Type("s", NONE, some(24), List.of("10.0.0.0/24"), List.of("10.0.0.5/32")),
+        assertViolation(new Cidr4Type("s", NONE, some(24), v4("10.0.0.0/24"), v4("10.0.0.5/32")),
                 "the largest block they leave is a /25, and max_prefix is 24");
         // Lift the ceiling to the surviving block's own length and the same body is inhabited.
-        assertCoherent(new Cidr4Type("s", NONE, some(32), List.of("10.0.0.0/24"), List.of("10.0.0.5/32")));
+        assertCoherent(new Cidr4Type("s", NONE, some(32), v4("10.0.0.0/24"), v4("10.0.0.5/32")));
     }
 
     /** And the address family is not troubled by it: an uncovered address is a value there. */
     @Test
     void theAddressFamilyAdmitsWhatTheNetworkFamilyRefuses() {
-        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/24"), List.of("10.0.0.5/32")));
+        assertCoherent(new Ipv4Type("s", v4("10.0.0.0/24"), v4("10.0.0.5/32")));
     }
 
     /**
-     * A malformed entry is {@code checkNetworks}' to report, and reporting the emptiness it causes on top
-     * would name a consequence as a second cause. Same for an inverted prefix pair.
+     * An inverted prefix pair is its own check's to report, and reporting the emptiness it causes on top would
+     * name a consequence as a second cause.
      */
     @Test
     void anUnreadableFacetIsReportedOnceByTheCheckThatOwnsIt() {
-        List<String> violations = new Ipv4Type("s", List.of("nonsense"), List.of("0.0.0.0/0")).coherenceCheck();
-        assertEquals(1, violations.size(), () -> "one cause, one message: " + violations);
-        assertTrue(violations.getFirst().contains("not an IPv4 network"), violations::toString);
-
         List<String> inverted =
-                new Cidr4Type("s", some(24), some(8), List.of("10.0.0.0/8"), List.of("10.0.0.0/8")).coherenceCheck();
+                new Cidr4Type("s", some(24), some(8), v4("10.0.0.0/8"), v4("10.0.0.0/8")).coherenceCheck();
         assertEquals(1, inverted.size(), () -> "one cause, one message: " + inverted);
     }
 
@@ -512,5 +510,15 @@ class AtomCoherenceTest {
     void identifierMembersInsideTheGrammarAreCoherent() {
         assertCoherent(IdentifierType.IDENTIFIER.withTextConstraints(new TextType(Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of("north", "south")))));
+    }
+
+    /** IPv4 networks from their CIDR text, as {@code cidr4}'s reader produces them. */
+    private static List<CidrInet4Network> v4(String... networks) {
+        return java.util.Arrays.stream(networks).map(CidrInet4Network::parse).toList();
+    }
+
+    /** IPv6 networks from their CIDR text, as {@code cidr6}'s reader produces them. */
+    private static List<CidrInet6Network> v6(String... networks) {
+        return java.util.Arrays.stream(networks).map(CidrInet6Network::parse).toList();
     }
 }
