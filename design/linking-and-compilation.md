@@ -153,6 +153,11 @@ the importer's, so every name on it is there. A `reference` body's `of` names an
 an open entry (`KindMembers.ofRefusal`); what it names decides whether the slot holds a type's name or a value's. A namespace
 type's stated `key_type` must be a member of `meta.identifier_ref`: its keys are names.
 
+**Two narrowings are judged here, both by `isA`** (§7.2's chain IS-A, alias hops followed): a reference refinement's
+`of` (`checkReferenceNarrows`), and a record's restated field types against the nearest closed records on its chain
+(`checkRestatedFieldTypes`, §5.7, §5.8). The resolver binds each before the names it holds need be ready, which is why
+neither runs there; `design/schema-resolution.md` has the field rule.
+
 **Every body is asked its family's coherence rule** (`checkCoherent`), which catches the bounds an application closed
 onto parameters (`sized<10, 3>`); a declared body was already asked at resolution, and one refused there never reaches
 the linker (`design/atom-refinement-and-coherence.md`).

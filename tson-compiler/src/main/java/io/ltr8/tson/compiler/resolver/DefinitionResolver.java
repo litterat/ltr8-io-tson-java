@@ -2124,7 +2124,9 @@ final class DefinitionResolver {
      * an elided type-ref (a modifier-only entry, {@code field: = value}) inherits {@code
      * inherited.type()} and its voidability rather than failing, and the result MUST refine the inherited
      * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: meta.product_access_type =
-     * INDEX} pins {@code product}'s required field, which refines it. The identity-diagonal rule (a FIXED
+     * INDEX} pins {@code product}'s required field, which refines it. Whether a restated type narrows the inherited
+     * one is an IS-A question over names not yet ready here, so the link asks it ({@code
+     * TsonSchemaLinker.checkRestatedFieldTypes}). The identity-diagonal rule (a FIXED
      * restatement MUST NOT change the pinned value) is not checked here: the two values are never compared.
      *
      * <p><b>A restated group member stays a member</b> (§5.11). Its presence is the group's, so the name takes

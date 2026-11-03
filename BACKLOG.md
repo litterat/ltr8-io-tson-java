@@ -145,12 +145,14 @@ spec-required case:
   `JsonSchemaCompiler` dispatches a `ValueEntry` to the factory of its type's name, finds none, and compiles an
   `ErrorReader`, so the same document in JSON reports `NOT_IMPLEMENTED`. Give the JSON stack the same refusal and a
   `CrossEncodingParityTest` case.
-- [ ] **§5.7: a restated field's type is not checked to narrow.** A refinement or composition restating a field
-  compares its states (`DefinitionResolver.refines`) and never its type with the inherited one, so `a: text` restated
-  as `a: int32` resolves. §5.7 admits a restated type only where it narrows, to a type IS-A the original (a `void?` at
-  a voidable position included). The IS-A is the link's (`TsonSchemaLinker.isA`, as `checkReferenceNarrows` asks it),
-  across containers, choices and atoms; the kernel's `meta.namespace` narrowing `key_type` to `meta.identifier_ref`
-  is the case it must admit, by `meta.identifier_ref`'s refinement of `meta.type_ref`.
+- [ ] **§5.7: a field restated where no closed record is on the chain is not judged for its type.** The link
+  judges a restated type against the nearest closed records on the chain (`TsonSchemaLinker.checkRestatedFieldTypes`).
+  `dog => pet<"dog", dog_type> & { pet: cat_type }`, where no entry names `pet<"dog", dog_type>`, has an edge only to
+  the open family base `pet`, whose `pet` is `T`, so it links; so does `wrap<text>` from `wrap => <T> box<T> & { v:
+  int32 }` where nothing denotes `box<text>`. A subtraction's tightening entries, which §5.9's rule 4 puts under
+  §5.7's rules, are not judged either: its chain is empty. The resolver holds the inherited field
+  (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a deferred judgement there, or the inherited
+  fields carried to link, would close all three without reporting a case the link already judges twice.
 - [ ] **`MetaRefs` does not rewrite a namespace type's references.** Its body rewrite falls to `default` for a
   `NamespaceBody`, so a synthetic rename or a materialisation rewrite leaves `key_type` and `value_type` naming the old
   entry; it needs a `NamespaceBody` arm beside `MapBody`'s. The same `default` comment says a reference's `of` names a

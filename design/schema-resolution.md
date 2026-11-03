@@ -252,10 +252,18 @@ it its voidability; its name's `?` is always its own. That is why `resolveField`
 **Refinement is three orders** (`refines`), each least to most determined: what omission yields, absent →
 missing-field error → injected (`RecordField.omitted`, asked of a plain field); voidable → not; role FREE → DEFAULT
 → FIXED. A restatement refines its source when no order moves backwards, which reproduces §5.7's transition matrix
-cell for cell without the matrix existing in code. No rule compares a restated type with its source's here, so
-`nickname?: void?` restating `nickname?: text?` narrows the field to `_` and keeps it in the contract, and the kernel's
-`meta.namespace` restating `meta.map`'s `key_type: meta.type_ref` as `meta.identifier_ref` resolves without the IS-A
-edge between them, which `meta.identifier_ref`'s refinement of `meta.type_ref` gives, being consulted.
+cell for cell without the matrix existing in code.
+
+**A restated type narrows, and the link judges it** (`TsonSchemaLinker.checkRestatedFieldTypes`, §5.7, §5.8). The
+restated type is the inherited one or IS-A it by §7.2's chain, alias hops followed on both sides, or `void` at a
+voidable position: `nickname?: void?` restating `nickname?: text?` narrows the field to `_`. The resolver binds a
+restatement before the names it holds need be ready, so the IS-A is asked at link, as a reference's `of` is; the
+kernel's `meta.namespace` narrowing `meta.map`'s `key_type: meta.type_ref` to `meta.identifier_ref` passes by
+`meta.identifier_ref`'s refinement of `meta.type_ref`. The relation is nominal and nothing more (SPEC-FEEDBACK.md
+#18): `[int8]` restating `[int32]` and a variant restating its choice are refused, no IS-A edge joining either pair.
+Each record is judged against the nearest closed records on its chain, so an applied operand is judged through the
+entry its application denotes. One denoting none, whose edge is only to the open family base, is not judged, nor is
+a subtraction's tightening entry, its chain being empty (`BACKLOG.md`).
 
 **A restated field's annotations are the restatement's, in source order, then the inherited field's** (`merged`,
 §5.8), one path for refinement and composition. Concatenation, because [TSON-DATA] §3.1 makes an annotation name
