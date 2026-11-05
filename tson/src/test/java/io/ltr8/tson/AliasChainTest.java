@@ -37,7 +37,8 @@ class AliasChainTest {
 
     private static TypeRef fieldType(Top definition, String field) {
         return assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
-                .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow().type();
+                .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
+                .typeRef();
     }
 
     private static Top kernelEntry(String name) {

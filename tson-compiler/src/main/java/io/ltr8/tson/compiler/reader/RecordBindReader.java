@@ -227,7 +227,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 return AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
             }
             // Otherwise by the field's declared type, as tree mode does -- see FieldReaders.byType.
-            return resolver.resolve(field.type().name());
+            return FieldReaders.declared(resolver, field);
         };
     }
 

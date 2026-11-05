@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A reference: the value of the kernel's {@code reference} atom ([TSON-SCHEMA] §4.2), the object every
- * reference-typed position delivers, in a tree read and a bound one alike. It is a {@link NameRef} or an {@link
- * ApplicationRef}, and {@link #of(String, List, Annotations, Closure)} decides which. {@code name} is the qualified
+ * A type reference: a {@link Reference} that names a type, the object every reference-typed position but a record
+ * field's type delivers, in a tree read and a bound one alike ([TSON-SCHEMA] §4.2). It is a {@link NameRef} or an
+ * {@link ApplicationRef}, and {@link #of(String, List, Annotations, Closure)} decides which. {@code name} is the qualified
  * name, its {@link #segments} joined by {@code .}; {@code arguments} is the argument list, empty for a name, so
  * {@code result<T>} is the application {@code result} with arguments {@code [Ref(T)]} (SPEC-FEEDBACK.md #12).
  *
@@ -36,7 +36,7 @@ import java.util.Optional;
  * <b>Identity</b> is the variant, the name and the arguments: {@code annotations} and {@code closure} are excluded
  * from {@code equals}, as both are about where a reference came from, and §8.2 keys identity on where it points.
  */
-public sealed interface TypeRef permits NameRef, ApplicationRef {
+public sealed interface TypeRef extends Reference permits NameRef, ApplicationRef {
 
     /** Where a reference finds what it names: the closure it was read under. */
     @FunctionalInterface
@@ -55,13 +55,10 @@ public sealed interface TypeRef permits NameRef, ApplicationRef {
     /** The argument list: empty for a {@link NameRef}, never empty for an {@link ApplicationRef}. */
     List<TypeArgument> arguments();
 
-    /** The annotations written on the reference itself; no part of its identity. */
-    Annotations annotations();
-
     /** The closure the reference was read under, {@link Closure#NONE} where none is known; no part of its identity. */
     Closure closure();
 
-    /** A copy of this reference with {@code annotations} replaced -- every other component unchanged. */
+    @Override
     TypeRef withAnnotations(Annotations annotations);
 
     /** A copy of this reference that finds what it names in {@code closure}, each reference argument as well. */
@@ -107,6 +104,7 @@ public sealed interface TypeRef permits NameRef, ApplicationRef {
      * The canonical text: the head, then, where there are arguments, {@code <}, each argument's {@link
      * TypeArgument#text} separated by one space, and {@code >}. What resolved output writes, unquoted.
      */
+    @Override
     default String text() {
         List<TypeArgument> arguments = arguments();
         if (arguments.isEmpty()) {

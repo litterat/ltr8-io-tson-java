@@ -114,7 +114,10 @@ public final class EntryDisplayName {
             case RecordBody record when facts.synthetic() && record.fields().isEmpty() -> "{}";
             case RecordBody record when facts.synthetic() -> record.fields().entrySet().stream()
                     .map(field -> field.getKey() + (field.getValue().optional() ? "?" : "") + ": "
-                            + shown(field.getValue().type(), lookup))
+                            + switch (field.getValue().type()) {
+                                case TypeRef type -> shown(type, lookup);
+                                case SiblingRef sibling -> sibling.text();
+                            })
                     .collect(Collectors.joining("  ", "{ ", " }"));
             // An entry nobody marked as minted is declared, wherever its position went.
             default -> facts.synthetic() ? null : name;

@@ -24,7 +24,11 @@ import java.util.Optional;
  * would be admitted where the pin refuses it, and a DEFAULT on a field that is not optional, a value only
  * omission reaches.
  *
- * <p><b>A record field is closed</b>: its {@code type} names a type and its {@code value} is a literal, never a
+ * <p><b>{@code type} is a {@link Reference}</b>: a type reference, or a sibling reference ({@code kind!}) naming the
+ * field of the same record whose value chooses the type ([TSON-SCHEMA] §5.2, proposed) -- the one slot besides a
+ * template field's that may hold one. {@link #typeRef()} is the type reference, for a consumer that needs one.
+ *
+ * <p><b>A record field is closed</b>: its {@code type} names no parameter and its {@code value} is a literal, never a
  * parameter. A field that may carry one is a {@code meta.record_template_field}, which only a record template holds,
  * and an application turns each of those into one of these.
  *
@@ -47,7 +51,7 @@ import java.util.Optional;
  * against really-resolved ones, and a position in equality would stop two representations of one logical
  * field comparing equal.
  */
-public record RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
+public record RecordField(Reference type, boolean optional, boolean voidable, FieldRole role,
                            Optional<Token> value, Annotations annotations,
                            @Unbound Optional<SourcePosition> position) {
 
@@ -58,50 +62,75 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
     }
 
     /** Same as the canonical constructor with no position -- every caller that does not know its own source. */
-    public RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
+    public RecordField(Reference type, boolean optional, boolean voidable, FieldRole role,
                         Optional<Token> value, Annotations annotations) {
         this(type, optional, voidable, role, value, annotations, Optional.empty());
     }
 
     /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
-    public RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
+    public RecordField(Reference type, boolean optional, boolean voidable, FieldRole role,
                         Optional<Token> value) {
         this(type, optional, voidable, role, value, Annotations.empty(), Optional.empty());
     }
 
     /** {@code a: T} -- the key must be written, and {@code _} is refused. */
-    public static RecordField required(TypeRef type) {
+    public static RecordField required(Reference type) {
         return new RecordField(type, false, false, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T} -- the key may be omitted, and {@code _} is refused. */
-    public static RecordField optional(TypeRef type) {
+    public static RecordField optional(Reference type) {
         return new RecordField(type, true, false, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a: T?} -- the key must be written, and may be written {@code _}. */
-    public static RecordField voidable(TypeRef type) {
+    public static RecordField voidable(Reference type) {
         return new RecordField(type, false, true, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T?} -- the key may be omitted, and may be written {@code _}. */
-    public static RecordField optionalVoidable(TypeRef type) {
+    public static RecordField optionalVoidable(Reference type) {
         return new RecordField(type, true, true, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T ~ value} -- omission injects {@code value}, and a written value overrides it. */
-    public static RecordField defaulted(TypeRef type, Token value) {
+    public static RecordField defaulted(Reference type, Token value) {
         return new RecordField(type, true, false, FieldRole.DEFAULT, Optional.of(value));
     }
 
     /** {@code a?: T = value} -- omission injects {@code value}, and a written value must equal it. */
-    public static RecordField fixed(TypeRef type, Token value) {
+    public static RecordField fixed(Reference type, Token value) {
         return new RecordField(type, true, false, FieldRole.FIXED, Optional.of(value));
     }
 
     /** {@code a: T = value} -- a marker: the key must be written, and its value must equal {@code value}. */
-    public static RecordField marker(TypeRef type, Token value) {
+    public static RecordField marker(Reference type, Token value) {
         return new RecordField(type, false, false, FieldRole.FIXED, Optional.of(value));
+    }
+
+    /**
+     * {@link #type} as the type it names. A sibling reference ({@code kind!}) is chosen per instance, and nothing that
+     * asks a field for its type reads one yet: {@link #siblingNotImplemented}.
+     */
+    public TypeRef typeRef() {
+        return typeRef(type);
+    }
+
+    /** A record field's or a record template field's {@code type} as the type it names -- see {@link #typeRef()}. */
+    public static TypeRef typeRef(Reference type) {
+        return switch (type) {
+            case TypeRef reference -> reference;
+            case SiblingRef sibling -> throw siblingNotImplemented(sibling);
+        };
+    }
+
+    /**
+     * The gap a consumer of a field's type reports for {@code sibling}: this library's, an {@link
+     * UnsupportedOperationException}, which travels as {@code NOT_IMPLEMENTED}.
+     */
+    public static UnsupportedOperationException siblingNotImplemented(SiblingRef sibling) {
+        return new UnsupportedOperationException("a sibling reference ('" + sibling.text() + "') at a record field's "
+                + "type is not implemented yet");
     }
 
     /** What a field yields when a document never writes it -- see {@link #omitted}. */
@@ -159,7 +188,7 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
      * ones it does not mention -- {@code annotations} and {@code position} both, the second of which no test
      * comparing resolved values can catch, since it is excluded from equality.
      */
-    public RecordField withType(TypeRef type) {
+    public RecordField withType(Reference type) {
         return new RecordField(type, optional, voidable, role, value, annotations, position);
     }
 

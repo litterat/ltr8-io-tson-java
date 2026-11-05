@@ -30,6 +30,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.SiblingRef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -818,7 +819,11 @@ final class TemplateMaterialiser {
         AnnotatedMap<String, RecordField> substituted = RecordTemplateSubstitution.closed(head, template, bindings);
         AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
         substituted.forEach((name, field) -> fields.put(name,
-                field.withType(close(field.type())).withPosition(Optional.empty()), substituted.getAnnotations(name)));
+                field.withType(switch (field.type()) {
+                    case TypeRef reference -> close(reference);
+                    // A sibling names a field of the record, and has no application to close.
+                    case SiblingRef sibling -> sibling;
+                }).withPosition(Optional.empty()), substituted.getAnnotations(name)));
         return new RecordBody(Ancestry.chainOf(RecordTemplateSubstitution.parents(template, bindings), namespace),
                 AnnotatedMap.copyOf(fields), template.groups(), closedExtension(template), List.of(),
                 template.nameType());

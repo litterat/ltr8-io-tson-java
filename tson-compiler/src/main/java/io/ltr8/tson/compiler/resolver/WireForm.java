@@ -235,7 +235,7 @@ final class WireForm {
         List<MapValue.MapEntry> fields = new ArrayList<>();
         for (Map.Entry<String, RecordField> declared : body.fields().entrySet()) {
             RecordField field = declared.getValue();
-            fields.add(fieldEntry(declared.getKey(), fieldWire(refValue(field.type()), field.optional(),
+            fields.add(fieldEntry(declared.getKey(), fieldWire(refValue(field.typeRef()), field.optional(),
                     field.voidable(), field.role(),
                     field.value().map(token -> new TokenValue(token.text(), tokenForm(token.form()))),
                     annotations(field.annotations(), annotationValue))));

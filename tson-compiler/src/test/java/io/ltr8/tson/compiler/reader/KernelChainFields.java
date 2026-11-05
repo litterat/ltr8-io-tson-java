@@ -30,7 +30,7 @@ final class KernelChainFields {
     static Map.Entry<String, RecordField> chainField(Map<String, Top> entries) {
         TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
         RecordField declared = ((RecordBody) kernel.entries().get("meta.type")).fields().get("chain");
-        copy(declared.type(), kernel, entries);
+        copy(declared.typeRef(), kernel, entries);
         return Map.entry("chain", declared);
     }
 
@@ -42,7 +42,7 @@ final class KernelChainFields {
         }
         entries.put(name, value);
         switch (value) {
-            case RecordBody record -> record.fields().values().forEach(f -> copy(f.type(), kernel, entries));
+            case RecordBody record -> record.fields().values().forEach(f -> copy(f.typeRef(), kernel, entries));
             case ArrayBody array -> copy(array.elementType(), kernel, entries);
             case MapBody map -> {
                 copy(map.keyType(), kernel, entries);

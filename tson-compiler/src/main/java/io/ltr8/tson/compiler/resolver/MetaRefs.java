@@ -18,6 +18,8 @@ import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.SiblingRef;
 
 import java.util.function.UnaryOperator;
 
@@ -61,6 +63,14 @@ final class MetaRefs {
         return mapBodyRefs(definition, map, false);
     }
 
+    /** A field's type with {@code map} applied; a sibling names a field, which no rewrite of type names touches. */
+    private static Reference mapField(Reference type, UnaryOperator<TypeRef> map) {
+        return switch (type) {
+            case TypeRef reference -> map.apply(reference);
+            case SiblingRef sibling -> sibling;
+        };
+    }
+
     private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapChain) {
         Top mapped = switch (body) {
             // A record template maps the field types that name none of its parameters, which mean the same thing
@@ -69,12 +79,13 @@ final class MetaRefs {
             // argument. Its chain maps below, a record template being IS-A its parents as any record is.
             case RecordTemplateBody template -> template.withFields(template.mapFields(field ->
                     field.parameterInType(template.parameterNames()).isPresent()
-                            ? field : field.withType(map.apply(field.type().orElseThrow()))));
+                            ? field : field.withType(mapField(field.type().orElseThrow(), map))));
             // `discriminators` is carried, not mapped: it holds field *names* of this record, which no
             // reference rewrite touches. Dropping it here would lose a family's selector list on every
             // synthetic rename and every materialisation rewrite -- a body that arrived sealed would come
             // back with nothing to dispatch on.
-            case RecordBody record -> record.withFields(record.mapFields(field -> field.withType(map.apply(field.type()))));
+            case RecordBody record -> record.withFields(record.mapFields(field ->
+                    field.withType(mapField(field.type(), map))));
             case ArrayBody array -> new ArrayBody(array.chain(), map.apply(array.elementType()),
                     array.voidable(), array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(mapBody.chain(),

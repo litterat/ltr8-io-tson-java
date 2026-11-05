@@ -67,7 +67,7 @@ class ApplicationInContainerPositionTest {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record);
         return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .type().name();
+                .typeRef().name();
     }
 
     /**

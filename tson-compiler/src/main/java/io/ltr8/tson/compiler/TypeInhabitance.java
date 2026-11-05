@@ -198,8 +198,8 @@ final class TypeInhabitance {
         if (field.voidable()) {
             return true;
         }
-        return !AliasChain.resolvesToVoid(field.type().name(), namespace)
-                && refInhabited(field.type(), namespace, inhabited);
+        return !AliasChain.resolvesToVoid(field.typeRef().name(), namespace)
+                && refInhabited(field.typeRef(), namespace, inhabited);
     }
 
     private static boolean positionInhabited(TupleElement element, Map<String, Top> namespace,
@@ -267,7 +267,7 @@ final class TypeInhabitance {
             RecordField field = entry.getValue();
             if (!grouped.contains(entry.getKey()) && !demandsNothing(field)
                     && !satisfiable(field, namespace, inhabited)) {
-                return field.type().name();
+                return field.typeRef().name();
             }
         }
         return record.groups().stream()
@@ -276,7 +276,7 @@ final class TypeInhabitance {
                 .flatMap(group -> group.memberNames().stream())
                 .flatMap(member -> java.util.Optional.ofNullable(record.fields().get(member)).stream())
                 .filter(field -> !satisfiable(field, namespace, inhabited))
-                .map(field -> field.type().name()).findFirst().orElse(null);
+                .map(field -> field.typeRef().name()).findFirst().orElse(null);
     }
 
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */

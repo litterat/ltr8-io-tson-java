@@ -39,7 +39,7 @@ import java.util.Optional;
  * {@link RecordField}'s reasons.
  */
 @Typename(name = "meta.record_template_field")
-public record RecordTemplateField(Optional<TypeRef> type, @Field("type_param") Optional<String> typeParam,
+public record RecordTemplateField(Optional<Reference> type, @Field("type_param") Optional<String> typeParam,
                                   boolean optional, boolean voidable, FieldRole role, Optional<Token> value,
                                   @Field("value_param") Optional<String> valueParam, Annotations annotations,
                                   @Unbound Optional<SourcePosition> position) {
@@ -80,11 +80,18 @@ public record RecordTemplateField(Optional<TypeRef> type, @Field("type_param") O
      * same thing in every application.
      */
     public Optional<String> parameterInType(List<String> parameters) {
-        return typeParam.isPresent() ? typeParam : OpenEntry.parameterIn(type.orElseThrow(), parameters);
+        if (typeParam.isPresent()) {
+            return typeParam;
+        }
+        return switch (type.orElseThrow()) {
+            case TypeRef reference -> OpenEntry.parameterIn(reference, parameters);
+            // A sibling is spelled with its mark, so no substitution makes it a parameter, or a parameter it.
+            case SiblingRef ignored -> Optional.empty();
+        };
     }
 
     /** A copy of this field with {@code type} replaced -- every other component unchanged. */
-    public RecordTemplateField withType(TypeRef type) {
+    public RecordTemplateField withType(Reference type) {
         return new RecordTemplateField(Optional.of(type), Optional.empty(), optional, voidable, role, value,
                 valueParam, annotations, position);
     }

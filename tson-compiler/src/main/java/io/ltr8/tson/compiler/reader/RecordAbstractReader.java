@@ -20,6 +20,8 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -265,7 +267,18 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
          * two readers by this rule alone.
          */
         static FieldReaders byType(TsonTypeReaderResolver resolver) {
-            return (name, field) -> resolver.resolve(field.type().name());
+            return (name, field) -> declared(resolver, field);
+        }
+
+        /**
+         * The reader of {@code field}'s declared type, the one choice every {@link FieldReaders} falls back to. A
+         * sibling reference's type is chosen per instance by its sibling's value, which no reader reads yet.
+         */
+        static TsonTypeReader<?> declared(TsonTypeReaderResolver resolver, RecordField field) {
+            return switch (field.type()) {
+                case TypeRef type -> resolver.resolve(type.name());
+                case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
+            };
         }
     }
 
@@ -695,7 +708,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 value = readSchemaDefault(field, built);
             } catch (ReadException e) {
                 throw new IllegalStateException("'" + displayName + "': field '" + field.name() + "''s "
-                        + heldValueNoun(schema) + " was judged a value of '" + schema.type().name() + "' when the "
+                        + heldValueNoun(schema) + " was judged a value of '" + schema.typeRef().name() + "' when the "
                         + "schema linked, but its reader refuses it -- " + e.getMessage(), e);
             }
             if (schema.role() == FieldRole.FIXED) {

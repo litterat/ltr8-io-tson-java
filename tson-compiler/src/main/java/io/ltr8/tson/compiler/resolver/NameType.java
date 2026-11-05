@@ -124,7 +124,7 @@ public final class NameType {
             return Optional.empty();
         }
         return Optional.ofNullable(record.fields().get(NAME_TYPE))
-                .map(field -> constructors.apply(AliasChain.terminal(field.type().name(), constructors)))
+                .map(field -> constructors.apply(AliasChain.terminal(field.typeRef().name(), constructors)))
                 .filter(ReferenceBody.class::isInstance)
                 .map(ReferenceBody.class::cast);
     }

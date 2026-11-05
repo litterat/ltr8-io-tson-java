@@ -175,7 +175,7 @@ class ParameterKindTest {
                   use   => { w: weird<text> }""");
 
         String instantiation = ((RecordBody) compiled.schema().entries().get("use"))
-                .fields().values().iterator().next().type().name();
+                .fields().values().iterator().next().typeRef().name();
         TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 

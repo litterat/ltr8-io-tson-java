@@ -89,12 +89,17 @@ public record RecordTemplateBody(TypeChain chain, AnnotatedMap<String, RecordTem
     }
 
     /**
-     * Every reference this template holds, in its fields' {@code type}s and its parents as written -- the one place a
-     * parameter stands that is not a label, as an argument of an application. A {@code type_param} is no reference.
+     * Every type reference this template holds, in its fields' {@code type}s and its parents as written -- the one
+     * place a parameter stands that is not a label, as an argument of an application. A {@code type_param} is no
+     * reference, and a sibling reference names a field, never a parameter or a type, so neither is among them.
      */
     public List<TypeRef> references() {
         List<TypeRef> references = new ArrayList<>();
-        fields.values().forEach(field -> field.type().ifPresent(references::add));
+        fields.values().forEach(field -> field.type().ifPresent(type -> {
+            if (type instanceof TypeRef reference) {
+                references.add(reference);
+            }
+        }));
         references.addAll(chain.parents());
         return List.copyOf(references);
     }

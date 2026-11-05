@@ -5,19 +5,23 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.schema.meta.ApplicationRef;
 import io.ltr8.tson.schema.meta.NameRef;
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
  * {@link TypeRef} as an atom host: its data form is the reference's text, parsed by {@link ReferenceGrammar} and
  * written as {@link TypeRef#text} ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12) -- the text a reader rolls a
  * reference's tree into in TSON, where it is written unquoted, and what a JSON string holds. A reference-typed slot
- * of a schema read does not come through here ({@code BindTargets} sets {@code KindSlotReader} in place, which
+ * of a schema read does not come through here ({@code BindTargets} sets {@code TypeNameSlotReader} in place, which
  * records the name for the linker), and the writers write a reference themselves; this serves a reference bound
  * from its text anywhere else, a JSON string's among them.
  *
- * <p><b>Each variant is an atom as well</b> ({@link ForName}, {@link ForApplication}): a value written where no
- * component declares its type -- an annotation's value, a value entry's -- is described by its own class, which is
- * the variant, never the interface.
+ * <p><b>Each variant is an atom as well</b> ({@link ForName}, {@link ForApplication}, {@link ForSibling}): a value
+ * written where no component declares its type -- an annotation's value, a value entry's -- is described by its own
+ * class, which is the variant, never the interface. {@link ForReference} serves a component typed {@link Reference},
+ * a record field's type.
  */
 public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
 
@@ -74,6 +78,49 @@ public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
                 return application;
             }
             throw new AtomParseException("'" + text + "' is a name, not an application", "an application");
+        }
+    }
+
+    /**
+     * {@link Reference} as an atom host: the reference's text. Read as {@link TypeRefTextBridge} reads it, the
+     * grammar spelling a name or an application.
+     */
+    public static final class ForReference implements DataBridge<String, Reference> {
+
+        /** The bridge; it holds nothing. */
+        public ForReference() {
+        }
+
+        @Override
+        public String toData(Reference reference) {
+            return reference.text();
+        }
+
+        @Override
+        public Reference toObject(String text) {
+            return ReferenceGrammar.parse(text);
+        }
+    }
+
+    /**
+     * {@link SiblingRef} as an atom host: written as its text, {@code kind!}. The reference grammar does not read a
+     * sibling reference yet, so reading one is this library's gap ({@link RecordField#siblingNotImplemented}).
+     */
+    public static final class ForSibling implements DataBridge<String, SiblingRef> {
+
+        /** The bridge; it holds nothing. */
+        public ForSibling() {
+        }
+
+        @Override
+        public String toData(SiblingRef reference) {
+            return reference.text();
+        }
+
+        @Override
+        public SiblingRef toObject(String text) {
+            throw new UnsupportedOperationException("reading a sibling reference ('" + text + "') is not "
+                    + "implemented yet");
         }
     }
 }

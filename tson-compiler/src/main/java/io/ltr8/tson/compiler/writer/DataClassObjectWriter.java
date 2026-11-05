@@ -28,6 +28,7 @@ import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
@@ -193,6 +194,15 @@ public final class DataClassObjectWriter {
                 } else {
                     writer.quotedString(reference.text());
                 }
+                return;
+            }
+            if (value instanceof SiblingRef sibling) {
+                // A sibling reference is data grammar as well: its field's name and the mark, unquoted.
+                writeAnnotations(sibling.annotations(), writer);
+                if (typeRef != null) {
+                    writer.typeRef(typeRef);
+                }
+                writer.reference(sibling);
                 return;
             }
             if (dataClass.bridge().isPresent()) {
