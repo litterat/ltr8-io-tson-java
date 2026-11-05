@@ -10,16 +10,16 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
-import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
-import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
+import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
@@ -27,7 +27,6 @@ import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
@@ -35,14 +34,13 @@ import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
+import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.base.SourcePosition;
 
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -487,25 +485,25 @@ final class SchemaDesugarer {
      */
     private TypeRef typeRef(TypeRef ref) {
         return switch (ref) {
-            case SimpleRef simple -> simple;
+            case NameRef simple -> simple;
             case ArrayRef _, TupleRef _, MapRef _ -> hoistOrKeep(binding(ref), ref);
             case ChoiceRef _ -> hoistOrKeep(binding(ref), ref);
-            case GenericRef generic -> {
+            case ApplicationRef generic -> {
                 checkTemplateApplication(generic.name());
                 List<TypeArg> args = mapShared(generic.args(), this::typeArg);
-                yield args == generic.args() ? generic : new GenericRef(generic.name(), args);
+                yield args == generic.args() ? generic : new ApplicationRef(generic.name(), args);
             }
         };
     }
 
     /** Expands only within a reference's arguments, leaving its own head in place. */
     private TypeRef argumentsOnly(TypeRef ref) {
-        if (!(ref instanceof GenericRef generic)) {
+        if (!(ref instanceof ApplicationRef generic)) {
             return ref;
         }
         checkTemplateApplication(generic.name());
         List<TypeArg> args = mapShared(generic.args(), this::typeArg);
-        return args == generic.args() ? generic : new GenericRef(generic.name(), args);
+        return args == generic.args() ? generic : new ApplicationRef(generic.name(), args);
     }
 
     private TypeArg typeArg(TypeArg arg) {
@@ -589,10 +587,10 @@ final class SchemaDesugarer {
 
     /** A grammar-level reference as the reference value it spells: a name, or an application of names and tokens. */
     private static io.ltr8.tson.schema.meta.TypeRef reference(TypeRef ref) {
-        if (ref instanceof SimpleRef simple) {
+        if (ref instanceof NameRef simple) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
-        GenericRef generic = (GenericRef) ref;
+        ApplicationRef generic = (ApplicationRef) ref;
         List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new ArrayList<>();
         for (TypeArg argument : generic.args()) {
             arguments.add(switch (argument) {
@@ -605,7 +603,7 @@ final class SchemaDesugarer {
                         }));
             });
         }
-        return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments);
+        return io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), arguments);
     }
 
     /** One position of a tuple after expansion: the type it names, and whether it is marked voidable. */
@@ -659,7 +657,7 @@ final class SchemaDesugarer {
      * enclosing container unexpanded rather than half-built.
      */
     private static boolean isReference(TypeRef ref) {
-        return ref instanceof SimpleRef || ref instanceof GenericRef;
+        return ref instanceof NameRef || ref instanceof ApplicationRef;
     }
 
     /**
@@ -688,7 +686,7 @@ final class SchemaDesugarer {
 
     /** How a map side is quoted back in the one diagnostic that shows the form. */
     private static String shownRef(TypeRef ref) {
-        return ref instanceof SimpleRef simple ? simple.name() : ((GenericRef) ref).name() + "<...>";
+        return ref instanceof NameRef simple ? simple.name() : ((ApplicationRef) ref).name() + "<...>";
     }
 
     /**
@@ -721,8 +719,8 @@ final class SchemaDesugarer {
     /**
      * {@code !meta.choice { variants: [A B ...] }} -- the choice row of the table. Variants arrive already
      * expanded: a nested inline form is hoisted by the caller first, so what reaches here is a {@link
-     * SimpleRef} or -- for a §5.10 application, which has no entry to be hoisted to until materialisation
-     * mints one -- a {@code GenericRef}.
+     * NameRef} or -- for a §5.10 application, which has no entry to be hoisted to until materialisation
+     * mints one -- an {@code ApplicationRef}.
      *
      * <p><b>A variant is written through {@link #refValue}, like every other type slot.</b>
      * A collection-valued slot is no different from a named one in what it holds: {@code variants} is a
@@ -923,7 +921,7 @@ final class SchemaDesugarer {
      */
     private boolean parametricallyPinned(FieldDef field) {
         if (field.type().isEmpty()
-                || (field.type().get().typeRef() instanceof SimpleRef simple
+                || (field.type().get().typeRef() instanceof NameRef simple
                         && currentParameters.contains(simple.name()))) {
             return false;
         }
@@ -1046,15 +1044,15 @@ final class SchemaDesugarer {
             String name = bindingName(binding);
             claim(name, binding, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
                     Optional.empty(), instance(binding)));
-            return new SimpleRef(name);
+            return new NameRef(name);
         }
         List<String> renamed = positionalNames(binding, parameters);
         Binding normalised = rename(binding, parameters, renamed);
         String name = bindingName(normalised);
         claim(name, normalised, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
                 Optional.empty(), instance(normalised, renamed)));
-        return new GenericRef(name, parameters.stream()
-                .<TypeArg>map(parameter -> new TypeArg.Ref(new SimpleRef(parameter))).toList());
+        return new ApplicationRef(name, parameters.stream()
+                .<TypeArg>map(parameter -> new TypeArg.Ref(new NameRef(parameter))).toList());
     }
 
     /**
@@ -1181,7 +1179,7 @@ final class SchemaDesugarer {
      * whose expansion carries a derived name the author never wrote.
      */
     private static String shownElement(ElementType element) {
-        return element.typeRef() instanceof SimpleRef simple ? simple.name() : "T";
+        return element.typeRef() instanceof NameRef simple ? simple.name() : "T";
     }
 
     // ── Internal names (§8.2) ────────────────────────────────────────────────────────────────────

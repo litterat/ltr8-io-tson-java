@@ -30,8 +30,8 @@ class TypeRefWriteTest {
 
     @Test
     void anApplicationIsItsUnquotedText() {
-        assertEquals("box<text>", written(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
-        assertEquals("map<text 3 \"a b\">", written(new TypeRef("map", List.of(
+        assertEquals("box<text>", written(TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
+        assertEquals("map<text 3 \"a b\">", written(TypeRef.of("map", List.of(
                 new TypeArgument.Ref(TypeRef.of("text")), new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED)),
                 new TypeArgument.Value(new Token("a b", Token.Form.SINGLE_LINE_QUOTED))))));
     }

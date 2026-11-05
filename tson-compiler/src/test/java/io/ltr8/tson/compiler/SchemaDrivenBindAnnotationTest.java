@@ -8,6 +8,7 @@ import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -74,7 +75,8 @@ class SchemaDrivenBindAnnotationTest {
                 ? widgetClass
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
+                ResolverBindContext.registerAbsent(
+                        DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -174,7 +176,8 @@ class SchemaDrivenBindAnnotationTest {
                 ? Catalogue.class
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
+                ResolverBindContext.registerAbsent(
+                        DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -221,7 +224,8 @@ class SchemaDrivenBindAnnotationTest {
                 ? bound
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
+                ResolverBindContext.registerAbsent(
+                        DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;

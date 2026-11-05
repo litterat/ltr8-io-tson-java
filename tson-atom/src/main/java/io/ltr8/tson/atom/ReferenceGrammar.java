@@ -126,7 +126,7 @@ public final class ReferenceGrammar {
                         throw error("an argument list holds at least one argument, and '" + head + "<>' holds none");
                     }
                     at++;
-                    return new TypeRef(head, arguments);
+                    return TypeRef.of(head, arguments);
                 }
                 arguments.add(argument());
                 int beforeSeparator = at;

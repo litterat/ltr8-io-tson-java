@@ -43,7 +43,7 @@ public sealed interface TypeArgument {
 
         @Override
         public String text() {
-            return value.form() == Token.Form.UNQUOTED ? value.text() : TypeRef.quoted(value.text());
+            return value.form() == Token.Form.UNQUOTED ? value.text() : quoted(value.text());
         }
 
         @Override
@@ -54,6 +54,29 @@ public sealed interface TypeArgument {
         @Override
         public int hashCode() {
             return text().hashCode();
+        }
+
+        /**
+         * {@code text} as a quoted token inside a reference's argument list: {@code "} and {@code \} escaped, and a
+         * control character as {@code \}{@code uXXXX}, so the argument reads back as the one token it is.
+         */
+        private static String quoted(String text) {
+            StringBuilder out = new StringBuilder(text.length() + 2).append('"');
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+                switch (c) {
+                    case '"' -> out.append("\\\"");
+                    case '\\' -> out.append("\\\\");
+                    default -> {
+                        if (c < 0x20 || c == 0x7f) {
+                            out.append(String.format("\\u%04X", (int) c));
+                        } else {
+                            out.append(c);
+                        }
+                    }
+                }
+            }
+            return out.append('"').toString();
         }
     }
 }

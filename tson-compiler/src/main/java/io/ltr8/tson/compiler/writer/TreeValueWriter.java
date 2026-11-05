@@ -80,7 +80,7 @@ public final class TreeValueWriter {
                         String.valueOf(argument), io.ltr8.tson.schema.meta.Token.Form.UNQUOTED));
             });
         }
-        return new io.ltr8.tson.schema.meta.TypeRef(reference.name(), arguments);
+        return io.ltr8.tson.schema.meta.TypeRef.of(reference.name(), arguments);
     }
 
     /**

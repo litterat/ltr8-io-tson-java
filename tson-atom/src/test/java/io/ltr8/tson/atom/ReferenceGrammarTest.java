@@ -36,12 +36,12 @@ class ReferenceGrammarTest {
     /** A qualified name is a reference, nested ones included; any other token, a number or a quoted one, a value. */
     @Test
     void anArgumentIsAReferenceOrAToken() {
-        assertEquals(new TypeRef("response", List.of(ref("order"), value("201", Token.Form.UNQUOTED))),
+        assertEquals(TypeRef.of("response", List.of(ref("order"), value("201", Token.Form.UNQUOTED))),
                 ReferenceGrammar.parse("response<order 201>"));
-        assertEquals(new TypeRef("box", List.of(new TypeArgument.Ref(new TypeRef("pair",
+        assertEquals(TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("pair",
                         List.of(ref("text"), value("a b", Token.Form.SINGLE_LINE_QUOTED)))))),
                 ReferenceGrammar.parse("box<pair<text \"a b\">>"));
-        assertEquals(new TypeRef("p", List.of(value("-1", Token.Form.UNQUOTED), value("1box", Token.Form.UNQUOTED))),
+        assertEquals(TypeRef.of("p", List.of(value("-1", Token.Form.UNQUOTED), value("1box", Token.Form.UNQUOTED))),
                 ReferenceGrammar.parse("p<-1 1box>"));
     }
 
@@ -59,7 +59,7 @@ class ReferenceGrammarTest {
     /** An argument's channel is no part of the reference: an unquoted token filed as a value is the name it spells. */
     @Test
     void anArgumentComparesByItsText() {
-        assertEquals(new TypeRef("names", List.of(value("red", Token.Form.UNQUOTED))),
+        assertEquals(TypeRef.of("names", List.of(value("red", Token.Form.UNQUOTED))),
                 ReferenceGrammar.parse("names<red>"));
     }
 

@@ -80,7 +80,7 @@ class EntryDisplayNameTest {
      */
     @Test
     void anInstantiationEntryRendersAsTheApplication() {
-        TypeRef application = new TypeRef("paged", List.of(new TypeArgument.Ref(TypeRef.of("order")),
+        TypeRef application = TypeRef.of("paged", List.of(new TypeArgument.Ref(TypeRef.of("order")),
                 new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED))));
 
         assertEquals("paged<order, 3>", EntryDisplayName.of("paged_order_3_abc", RecordBody.of(RecordBody.fieldMap()),

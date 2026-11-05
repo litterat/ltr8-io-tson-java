@@ -76,7 +76,7 @@ final class TypeNameSlotReader implements TsonTypeReader<TypeRef> {
         return switch (read) {
             case null -> null; // a refusal is reported by the kind
             case TypeRef reference -> reference.withAnnotations(annotations);
-            default -> new TypeRef(read.toString(), List.of(), annotations);
+            default -> TypeRef.of(read.toString(), List.of(), annotations);
         };
     }
 }

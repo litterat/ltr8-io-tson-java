@@ -81,7 +81,7 @@ final class RecordTemplateSubstitution {
                     && bindings.containsKey(value.value().text()) -> bindings.get(value.value().text());
             case TypeArgument.Value value -> value;
         }).toList();
-        return new TypeRef(ref.name(), arguments, ref.annotations(), ref.closure());
+        return TypeRef.of(ref.name(), arguments, ref.annotations(), ref.closure());
     }
 
     private static RecordTemplateField field(String head, RecordTemplateField field,
