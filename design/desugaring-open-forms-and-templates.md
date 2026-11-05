@@ -1,7 +1,8 @@
 # Desugaring: open forms and templates
 
-Design notes for the half of `SchemaDesugarer` that deals with type parameters: which sugar forms lift open, and how a
-parameterised alias and a record template are normalised into held `!C value` bodies. Current form only; history lives
+Design notes for the half of `SchemaDesugarer` that deals with type parameters: which sugar forms lift open, how a
+parameterised alias is normalised into a held `!C value` body, and how a record template is written as the labelled
+`!meta.record_template` payload it denotes. Current form only; history lives
 in git. The sugar table and the naming rule these bullets refer to are in `design/schema-grammar-and-desugaring.md`.
 
 **Invariants**
@@ -15,9 +16,10 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
   `DerivedName.ofBinding` hashes what is written.
 - `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
   *unquoted*.
-- Only a *template* is normalised to a held body; a closed record or closed alias resolves at its declaration. A
-  record template's normalised `!meta.record { … }` payload is bound by the resolver into the `meta.record_template`
-  it denotes (`DefinitionResolver.openRecord`), which labels each whole-type and whole-value parameter.
+- Only a *template* is normalised; a closed record or closed alias resolves at its declaration. A record template,
+  sugar or explicit `<T> !meta.record { … }`, is written as the `!meta.record_template { … }` it denotes, each
+  whole-type and whole-value parameter labelled here, where the parameters are in scope (`RecordTemplateDef`), and the
+  resolver binds it (`DefinitionResolver.openRecord`).
 - Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
   facts at their `meta.record_field` defaults.
 - §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
@@ -94,11 +96,16 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 
 ## Record templates
 
-- **A record template is normalised here too, and for the same reason the sugar forms are** (`recordBinding`).
-  §5.2 says a bare record body denotes `!meta.record { fields: { … } }`, so `test => <T> { x: T }` leaves this
-  phase as `test => <T> !meta.record { fields: { x => { type: T } } }` — a held application like `<T> [T]`, and
-  closed by the same process. The rule is as fixed and as closed as the sugar table: §5.2's six field
-  spellings decide `state` and `value` from the two marks the author wrote, and nothing else is consulted.
+- **A record template is normalised here too, and for the same reason the sugar forms are** (`recordTemplate`).
+  §5.2 says a bare record body denotes a record construction, and with parameters that is a `record_template`, so
+  `test => <T> { x: T }` leaves this phase as the `RecordTemplateDef` `<T> !meta.record_template { fields: { x => {
+  type_param: T } }  parameters: [ { name: T  type: meta.type_ref } ] }`. The rule is as fixed and as closed as the
+  sugar table: §5.2's six field spellings decide `state` and `value` from the two marks the author wrote, and nothing
+  else is consulted. The explicit `<T> !meta.record { … }` takes the same labels (`labelled`), every other slot
+  carried as written for the resolver to answer in `meta.record`'s terms.
+  - **Its own `TypeDef`, so no flag tells it from an author's construction.** A written `!meta.record_template { … }`
+    is an `Instance`, refused as resolver vocabulary (`requireAuthorable`); the desugarer's is a `RecordTemplateDef`,
+    which no parser builds, and goes straight to `openRecord`.
   - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because
     nothing about it is deferred. **Every** template takes it: there is no marker to route one elsewhere. The
     two paths share the §5.2 state
@@ -112,17 +119,16 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     form back out puts a *second producer* in front of a wire form two later phases read, and since
     `DerivedName.ofBinding` hashes what is written, a second spelling is a second entry for one type. One
     producer, one spelling: `WireForm.refValue` is the single place a type slot's shape is decided.
-  - **A parameter rides the ordinary `value` slot of this phase's payload**, written as the author wrote it,
-    unquoted. This payload is source spelling, so the resolver classifies each field from it once, when it reads
-    the payload as the `meta.record_template` it denotes (`WireForm.recordTemplatePayload`): an unquoted parameter
-    token in `value` is the field's `value_param`, a bare parameter name in `type` its `type_param`. The role beside
-    it is the modifier's (`FieldModifiers`): `= P` is FIXED where it is written, and closing only substitutes the
-    value.
+  - **A parameter is labelled where it is written** (`label`, §5.10's shadowing rule over the source spelling): an
+    unquoted parameter token in `value` is the field's `value_param`, a bare parameter name in `type` its
+    `type_param`. The role beside it is the modifier's (`FieldModifiers`): `= P` is FIXED where it is written, and
+    closing only substitutes the value. A positional field (`a => T`) is spelled out and labelled the same way, so the
+    explicit form's three spellings of one field are one template field.
   - **A composition or refinement template is built one phase later**, as the *flattened* record template
-    (`DefinitionResolver.Built`). Both absorb fields from a source, and a §5.7 tightening entry states a modifier and
-    no type-ref, so it is not a field at all until the inherited field supplies one. That needs a namespace this phase
-    does not have, so the flattening happens in the resolver, which labels each entry the declaration writes as it
-    resolves it and writes no wire form for the template at all.
+    (`DefinitionResolver.Built`, over its own `BuiltField`). Both absorb fields from a source, and a §5.7 tightening entry
+    states a modifier and no type-ref, so it is not a field at all until the inherited field supplies one. That needs a
+    namespace this phase does not have, so the flattening happens in the resolver, which labels each entry the declaration
+    writes as it resolves it and writes no wire form for the template at all.
   - **§5.11's uniqueness rule is asked here as well**, and asking it twice is not duplication: the resolver's
     copy sees a closed record body and this one sees a template's, which after normalisation are two
     different phases. Left to the constructor's own reader instead, the wire form carries one name twice as

@@ -164,7 +164,10 @@ atom, string-class like any other (`design/choice-disjointness.md`).
 `EnumLabels`' peer over field names: the type must be an identifier family, every name the record states (in `fields`,
 `discriminators` and its groups) must be a value of it, and no two fields may be one value under its equality. Where
 no kernel is in scope, the identifier grammar the default stands for applies. A record template is judged the same
-way, once, its field names being every application's.
+way, once, its field names being every application's. The facts read are the ones both bodies state at the record
+level, read as one value (`schema.meta.RecordHead`, `RecordHead.of`), so `FieldNames`, `NameType.of`, the linker's
+field-name scope and `FamilySelectors.namesOf` ask one question of either shape. It is a value each body produces and
+no parent type: a record never names a template.
 
 - **Supertypes decide.** A record with supertypes takes their one type, refuses two that disagree, and refuses a
   stated type that is not theirs; two are one when their alias chains end at one entry (`sameNameType`), so an

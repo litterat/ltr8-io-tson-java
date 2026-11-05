@@ -139,14 +139,18 @@ class RecordTemplateSlotTest {
                 + "never an operand of '^'"), refined);
     }
 
-    /** §5.10's shadowing rule: a parameter hides a schema entry of the same name, at an operand as anywhere. */
+    /**
+     * §5.10's shadowing rule: a parameter spelled like a schema entry is refused at its declaration, so a template
+     * whose operand would be that parameter is refused for the shadowing before the operand is read.
+     */
     @Test
-    void aParameterShadowsAnEntryOfTheSameNameAtAnOperand() {
+    void aParameterShadowingAnEntryIsRefusedBeforeItsOperand() {
         String message = rejected("""
                   T => { age: int32 }
                   mixin => <T> T & { name: text }
                 """);
 
-        assertTrue(message.contains("supertype 'T' is a parameter of this declaration"), message);
+        assertTrue(message.contains("'mixin': parameter 'T' shadows the entry 'T' this schema's namespace holds"),
+                message);
     }
 }

@@ -171,7 +171,9 @@ the constructor it applies.
 A record template is a `RecordTemplateBody` (`meta.record_template`), ABSTRACT by construction
 (`FamilySelectors.extensionOf`), and takes part in IS-A (§5.10). Its fields are `RecordTemplateField`s, labelling
 a parameter that stands for the whole type (`type_param`) or the whole value (`value_param`), each field classified
-once by its source spelling where it is built (`openRecord`, `DefinitionResolver.Built`); `checked` refuses a selector
+once by its source spelling where it is built (`SchemaDesugarer`'s `RecordTemplateDef`, `DefinitionResolver.Built` over
+`BuiltField`); a parameter spelled like a schema type or like a name an absorbed field's arguments write is refused
+(`design/held-template-bodies.md`), and `checked` refuses a selector
 typed by a parameter and a literal value on a parameter-typed field. That is safe by *elimination*: no
 value is read against the template; a value at a position typed by it is a value of some member, selected by tag or
 discriminators, each member closed with its arguments fixed (`AbstractTemplateReader`,

@@ -17,13 +17,14 @@ package io.ltr8.tson.compiler.ast.schema;
  *       every other position</li>
  *   <li>{@link SchemaMapDef} -- {@code "!schema" ws schema-map}: a schema map nested as an entry, whose members
  *       are declarations of the document under their paths</li>
+ *   <li>{@link RecordTemplateDef} -- a record template as {@code SchemaDesugarer} normalises it, the one variant no
+ *       parser builds</li>
  * </ul>
  *
- * <p>Every variant has an ABNF alternative behind it -- each is parsed, never synthesised. §5.3's sized sugar
- * is no exception: {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its
- * bindings denote -- the sugar names {@code array} and binds its fields directly, with no size template in
- * between.
+ * <p>Every other variant has an ABNF alternative behind it and is parsed. §5.3's sized sugar is no exception:
+ * {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its bindings denote -- the
+ * sugar names {@code array} and binds its fields directly, with no size template in between.
  */
 public sealed interface TypeDef
-        permits AtomRefinement, Instance, StructuralTypeDef, ReferenceTypeDef, SchemaMapDef {
+        permits AtomRefinement, Instance, StructuralTypeDef, ReferenceTypeDef, SchemaMapDef, RecordTemplateDef {
 }

@@ -17,6 +17,7 @@ import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
+import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -109,9 +110,9 @@ import java.util.function.Predicate;
  * </ul>
  *
  * <p><b>A declaration carrying type parameters (§5.10) is open.</b> A record template is a {@code
- * record_template}: the record resolution builds with the parameters standing as names and tokens, its fields
- * labelled ({@link #openRecord}, and {@link Built} for a composition or refinement, which absorbs fields from a
- * source and so is a template in its flattened form). Any other open instance is held as written
+ * record_template}, its fields labelled: bound from the payload {@code SchemaDesugarer} labelled ({@link #openRecord}),
+ * or, for a composition or refinement, which absorbs fields from a source and so is a template in its flattened form,
+ * built over the builder's own fields ({@link Built}). Any other open instance is held as written
  * ({@link #resolveInstanceTemplate}). Nothing is substituted here -- that is {@code TemplateMaterialiser}'s, over
  * the resolved form.
  *
@@ -519,8 +520,7 @@ final class DefinitionResolver {
                 List<String> parameters = structural.typeParams();
                 yield (switch (structural.body()) {
                     // Only an error placeholder is both open and still a bare RecordDef here -- the desugar phase
-                    // rewrote every real record template into the `!meta.record { ... }` §5.2 says it denotes,
-                    // which `openRecord` reads as the template it is.
+                    // rewrote every real record template into the `RecordTemplateDef` §5.2 says it denotes.
                     case RecordDef recordDef -> resolveRecordBody(recordDef.entries(), parameters);
                     case ConstructionDef construction -> resolveComposition(name, construction, parameters);
                     case RefinedDef refined -> resolveRefinement(name, refined, parameters);
@@ -547,6 +547,7 @@ final class DefinitionResolver {
             // and stays that way until materialisation substitutes it away (§5.10).
             case Instance instance -> instance.typeParams().isEmpty() ? resolveInstance(name, instance)
                     : resolveInstanceTemplate(name, instance);
+            case RecordTemplateDef template -> openRecord(name, template);
             case AtomRefinement refinement -> resolveAtomRefinement(name, refinement);
             // A schema map nested as an entry: a value of `schema` whose members are declarations of this document
             // under their paths, each resolved as any entry is. Its namespace is built from them wherever the
@@ -571,13 +572,11 @@ final class DefinitionResolver {
 
     /**
      * A record body as resolution builds it -- a fresh record, a composition or a refinement, flattened -- before it
-     * is either a record or a record template. Its fields are {@link RecordTemplateField}s, each classified once,
-     * where it is built: an entry this declaration writes labels a bare parameter name in its type slot and an
-     * unquoted parameter token in its value slot ({@link #templateField}, §5.10's shadowing rule over source
-     * spelling), a closed source's field arrives as it is, and an open operand's arrives substituted on the model
-     * ({@link RecordTemplateSubstitution}). So no {@code RecordBody} ever holds a parameter.
+     * is either a record or a record template. Its fields are {@link BuiltField}s, the builder's own, so neither a
+     * closed record's working value nor a template's kernel value is the other's: {@link #finish} makes the one the
+     * declaration is.
      */
-    private record Built(TypeChain chain, SequencedMap<String, RecordTemplateField> fields, List<FieldGroup> groups,
+    private record Built(TypeChain chain, SequencedMap<String, BuiltField> fields, List<FieldGroup> groups,
                          List<String> discriminators, Optional<String> nameType) {
 
         /**
@@ -593,34 +592,108 @@ final class DefinitionResolver {
                 return new RecordBody(chain, RecordBody.fieldMap(closed), groups, RecordExtensionType.OPEN,
                         discriminators, nameType);
             }
-            return checked(new RecordTemplateBody(chain.withSubtypes(List.of()), AnnotatedMap.copyOf(fields), groups,
+            SequencedMap<String, RecordTemplateField> template = new LinkedHashMap<>();
+            fields.forEach((name, field) -> template.put(name, field.template()));
+            return checked(new RecordTemplateBody(chain.withSubtypes(List.of()), AnnotatedMap.copyOf(template), groups,
                     RecordExtensionType.OPEN, discriminators, nameType, typeParameters(parameters)));
         }
     }
 
     /**
-     * A field this declaration writes, classified against its own {@code parameters} by its source spelling (§5.10):
-     * a type that is a bare parameter name is the field's {@code type_param}, an unquoted value token that is one its
-     * {@code value_param}, and anything else its {@code type} or {@code value}.
+     * One field as resolution builds it: a field's four facts and a label where one of the declaration's own
+     * parameters stands for the whole type or value. Classified once, where it is built: an entry this declaration
+     * writes labels a bare parameter name in its type slot and an unquoted parameter token in its value slot ({@link
+     * #written}, §5.10's shadowing rule over the source spelling); a closed source's field arrives as it is ({@link
+     * #of(RecordField)}), and an open operand's substituted on the model ({@link #of(RecordTemplateField)}), neither
+     * relabelled. A closed declaration's fields are never labelled, so {@link #closed} is total for them; a template's
+     * become {@link RecordTemplateField}s ({@link #template}).
      */
-    private static RecordTemplateField templateField(io.ltr8.tson.schema.meta.TypeRef type, List<String> parameters,
-            boolean optional, boolean voidable, FieldRole role, Optional<Token> value, Annotations annotations,
-            Optional<SourcePosition> position) {
-        boolean typeParam = type.arguments().isEmpty() && parameters.contains(type.name());
-        return templateField(typeParam ? Optional.empty() : Optional.of(type),
-                typeParam ? Optional.of(type.name()) : Optional.empty(), parameters, optional, voidable, role, value,
-                annotations, position);
-    }
+    private record BuiltField(Optional<io.ltr8.tson.schema.meta.TypeRef> type, Optional<String> typeParam,
+                              boolean optional, boolean voidable, FieldRole role, Optional<Token> value,
+                              Optional<String> valueParam, Annotations annotations, Optional<SourcePosition> position) {
 
-    /** The same over a type already classified -- an elided one taken from the field it tightens. */
-    private static RecordTemplateField templateField(Optional<io.ltr8.tson.schema.meta.TypeRef> type,
-            Optional<String> typeParam, List<String> parameters, boolean optional, boolean voidable, FieldRole role,
-            Optional<Token> value, Annotations annotations, Optional<SourcePosition> position) {
-        Optional<String> valueParam = value
-                .filter(token -> token.form() == Token.Form.UNQUOTED && parameters.contains(token.text()))
-                .map(Token::text);
-        return new RecordTemplateField(type, typeParam, optional, voidable, role,
-                valueParam.isPresent() ? Optional.empty() : value, valueParam, annotations, position);
+        /** A closed source's field: its facts as they are, labelling nothing. */
+        static BuiltField of(RecordField field) {
+            return new BuiltField(Optional.of(field.type()), Optional.empty(), field.optional(), field.voidable(),
+                    field.role(), field.value(), Optional.empty(), field.annotations(), field.position());
+        }
+
+        /** An open operand's field, substituted with the absorbing declaration's parameters as its arguments. */
+        static BuiltField of(RecordTemplateField field) {
+            return new BuiltField(field.type(), field.typeParam(), field.optional(), field.voidable(), field.role(),
+                    field.value(), field.valueParam(), field.annotations(), field.position());
+        }
+
+        /**
+         * A field this declaration writes, classified against its own {@code parameters} by its source spelling
+         * (§5.10): a type that is a bare parameter name is its {@code type_param}, an unquoted value token that is one
+         * its {@code value_param}, and anything else its {@code type} or {@code value}.
+         */
+        static BuiltField written(io.ltr8.tson.schema.meta.TypeRef type, List<String> parameters, boolean optional,
+                boolean voidable, FieldRole role, Optional<Token> value, Annotations annotations,
+                Optional<SourcePosition> position) {
+            boolean whole = type.arguments().isEmpty() && parameters.contains(type.name());
+            return new BuiltField(whole ? Optional.empty() : Optional.of(type),
+                    whole ? Optional.of(type.name()) : Optional.empty(), optional, voidable, role, Optional.empty(),
+                    Optional.empty(), annotations, position).valued(value, parameters);
+        }
+
+        /**
+         * This field restated by a modifier-only entry that elides its type: the type and its label kept, the facts
+         * and the value the entry's own, the value classified as {@link #written} classifies one.
+         */
+        BuiltField restated(List<String> parameters, boolean optional, boolean voidable, FieldRole role,
+                            Optional<Token> value, Optional<SourcePosition> position) {
+            return new BuiltField(type, typeParam, optional, voidable, role, Optional.empty(), Optional.empty(),
+                    Annotations.empty(), position).valued(value, parameters);
+        }
+
+        /** This field with {@code value} as the declaration wrote it: a parameter's token is its {@code value_param}. */
+        private BuiltField valued(Optional<Token> value, List<String> parameters) {
+            Optional<String> parameter = value
+                    .filter(token -> token.form() == Token.Form.UNQUOTED && parameters.contains(token.text()))
+                    .map(Token::text);
+            return new BuiltField(type, typeParam, optional, voidable, role,
+                    parameter.isPresent() ? Optional.empty() : value, parameter, annotations, position);
+        }
+
+        /** The record field a closed declaration holds; it never labels one, having no parameter to label. */
+        RecordField closed() {
+            if (typeParam.isPresent() || valueParam.isPresent()) {
+                throw new IllegalStateException("a closed declaration's field names the parameter '"
+                        + typeParam.or(() -> valueParam).orElseThrow() + "'");
+            }
+            return new RecordField(type.orElseThrow(), optional, voidable, role, value, annotations, position);
+        }
+
+        /** The record template field a template holds. */
+        RecordTemplateField template() {
+            return new RecordTemplateField(type, typeParam, optional, voidable, role, value, valueParam, annotations,
+                    position);
+        }
+
+        BuiltField withFacts(boolean optional, boolean voidable, FieldRole role) {
+            return new BuiltField(type, typeParam, optional, voidable, role, value, valueParam, annotations, position);
+        }
+
+        BuiltField withAnnotations(Annotations annotations) {
+            return new BuiltField(type, typeParam, optional, voidable, role, value, valueParam, annotations, position);
+        }
+
+        /** What a document that never writes the field yields, asked of a plain field ({@link RecordField#omitted}). */
+        RecordField.Omitted omitted() {
+            return RecordField.omitted(optional, value.isPresent() || valueParam.isPresent(), false);
+        }
+
+        /** These facts in a diagnostic's words ({@link RecordField#describe}). */
+        String describe() {
+            return RecordField.describe(optional, role);
+        }
+
+        /** The type as a message names it: the type's name, or the parameter standing for it. */
+        String typeName() {
+            return typeParam.orElseGet(() -> type.orElseThrow().name());
+        }
     }
 
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
@@ -940,26 +1013,33 @@ final class DefinitionResolver {
         // application of it produces -- that is the constructor's, read off the closed body at
         // materialisation. The alias form is no exception: `<B> pair<uuid, B>` is a template whose closure
         // is a reference, not a reference that happens to have parameters.
-        if (WireForm.RECORD.equals(template.value().typeRef().orElse(null))) {
-            return openRecord(name, template.typeParams(), template.value());
-        }
         return HeldBody.held(template.typeParams(), template.value());
     }
 
     /**
-     * A record template, built directly: its {@code !record { … }} payload as written, each field labelled by its
-     * source spelling ({@link WireForm#recordTemplatePayload}), read through {@code record_template}'s own reader
-     * ([TSON-SCHEMA] §5.10). The slot rule runs first, on the payload as written, so a parameter in a scalar slot
-     * is refused for standing there rather than for not reading as a boolean.
+     * A record template, built directly: the {@code !meta.record_template { … }} payload {@code SchemaDesugarer}
+     * labelled ({@link RecordTemplateDef}), read through {@code record_template}'s own reader ([TSON-SCHEMA] §5.10).
+     * What the author wrote is answered first, in the terms they wrote it in -- a construction of {@code meta.record}
+     * -- so a binding the record does not declare names the record's vocabulary, and a parameter in a scalar slot is
+     * refused for standing there rather than for not reading as a boolean. The parameter list the desugarer stated
+     * last is no binding the author wrote.
      */
-    private Top openRecord(String name, List<String> parameters, DataValue payload) {
-        ParameterTypes.checkSlots(parameters, payload, metaDefinitions::definition);
-        if (!(bindAtomInstance(name, WireForm.recordTemplatePayload(payload, parameters), WireForm.RECORD)
-                instanceof RecordTemplateBody template)) {
+    private Top openRecord(String name, RecordTemplateDef template) {
+        DataValue payload = template.payload();
+        if (!(resolveConstructorTarget(name, WireForm.RECORD).definition() instanceof RecordBody vocabulary)) {
+            throw new IllegalStateException("'" + name + "': constructor '" + WireForm.RECORD + "' is no record");
+        }
+        refuseWrittenChain(name, WireForm.RECORD, payload);
+        if (payload.coreValue() instanceof RecordValue bindings && !bindings.fields().isEmpty()) {
+            checkTemplateBindings(name, WireForm.RECORD, vocabulary,
+                    new RecordValue(bindings.fields().subList(0, bindings.fields().size() - 1)));
+        }
+        ParameterTypes.checkSlots(template.typeParams(), payload, metaDefinitions::definition);
+        if (!(bindAtomInstance(name, payload, WireForm.RECORD) instanceof RecordTemplateBody built)) {
             throw new IllegalStateException("'" + name + "': '!record_template { ... }' bound to something other "
                     + "than a record template");
         }
-        return checked(template);
+        return checked(built);
     }
 
     /** The two rules a template's fields answer to, checked against its parameters. */
@@ -1488,7 +1568,7 @@ final class DefinitionResolver {
         String nameTypeFrom = null;   // the first record supertype, whose name type the rest must share
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
-        SequencedMap<String, RecordTemplateField> fields = new LinkedHashMap<>();
+        SequencedMap<String, BuiltField> fields = new LinkedHashMap<>();
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
         Set<String> inheritedFields = new HashSet<>();
@@ -1605,6 +1685,7 @@ final class DefinitionResolver {
                 addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
             }
 
+            refuseAbsorbedSpelling(name, supertypeName, typesOf(supertypeBody), parameters, List.of());
             absorb(name, closedFields(supertypeBody), supertypeBody.groups(), fields, groups, seenFieldNames,
                     inheritedFields);
             if (nameTypeFrom == null) {
@@ -1686,7 +1767,7 @@ final class DefinitionResolver {
      * equals ({@link #dissolveInto}), and removing every member drops the group with them.
      */
     private static void applyRemovals(String declarationName, RemovalSet removal, Set<String> bodyDeclared,
-                                       SequencedMap<String, RecordTemplateField> fields, List<FieldGroup> groups) {
+                                       SequencedMap<String, BuiltField> fields, List<FieldGroup> groups) {
         Set<String> removed = new LinkedHashSet<>();
         for (String fieldName : removal.fieldNames()) {
             if (bodyDeclared.contains(fieldName)) {
@@ -1748,13 +1829,13 @@ final class DefinitionResolver {
      * optional; in an optional group every member is optional. A sole member takes the group's own
      * {@code optional} for both its marks.
      */
-    private static void dissolveInto(SequencedMap<String, RecordTemplateField> fields, List<String> option,
+    private static void dissolveInto(SequencedMap<String, BuiltField> fields, List<String> option,
                                      List<String> optional, boolean optionalGroup) {
-        for (Map.Entry<String, RecordTemplateField> entry : fields.entrySet()) {
+        for (Map.Entry<String, BuiltField> entry : fields.entrySet()) {
             if (!option.contains(entry.getKey())) {
                 continue;
             }
-            RecordTemplateField field = entry.getValue();
+            BuiltField field = entry.getValue();
             boolean omittable = optionalGroup || optional.contains(entry.getKey());
             entry.setValue(field.withFacts(omittable, option.size() == 1 ? omittable : field.voidable(),
                     FieldRole.FREE));
@@ -1871,6 +1952,7 @@ final class DefinitionResolver {
         for (String ancestor : Ancestry.closedNames(sourceBody)) {
             addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
         }
+        refuseAbsorbedSpelling(name, sourceName, typesOf(sourceBody), parameters, List.of());
         return refineOnto(name, refined, parameters, sourceRef, transitiveSupertypes, closedFields(sourceBody),
                 sourceBody.groups(), sourceBody.nameType());
     }
@@ -1884,9 +1966,9 @@ final class DefinitionResolver {
      */
     private Built refineOnto(String name, RefinedDef refined,
             List<String> parameters, io.ltr8.tson.schema.meta.TypeRef source, List<String> transitiveSupertypes,
-            SequencedMap<String, RecordTemplateField> sourceFields, List<FieldGroup> sourceGroups,
+            SequencedMap<String, BuiltField> sourceFields, List<FieldGroup> sourceGroups,
             Optional<String> nameType) {
-        SequencedMap<String, RecordTemplateField> fields = new LinkedHashMap<>(sourceFields);
+        SequencedMap<String, BuiltField> fields = new LinkedHashMap<>(sourceFields);
         List<FieldGroup> groups = new ArrayList<>(sourceGroups);
         Set<String> inheritedFields = Set.copyOf(sourceFields.keySet());
         refuseDeclaredChain(name, refined.body().entries(), transitiveSupertypes);
@@ -1902,7 +1984,7 @@ final class DefinitionResolver {
                 continue;
             }
             FieldDef fieldDef = (FieldDef) entry;
-            RecordTemplateField inherited = fields.get(fieldDef.name());
+            BuiltField inherited = fields.get(fieldDef.name());
             if (inherited == null) {
                 throw new SchemaValidationException("'" + name + "': refinement body field '" + fieldDef.name()
                         + "' names no inherited field -- a refinement copies its source's whole field set and "
@@ -1953,10 +2035,10 @@ final class DefinitionResolver {
      * -- a closed supertype's own {@code RecordBody} and an open operand's substituted one -- so an operand
      * that contributes no name still contributes its fields on exactly the terms one that does would.
      */
-    private void absorb(String name, SequencedMap<String, RecordTemplateField> sourceFields,
-            List<FieldGroup> sourceGroups, SequencedMap<String, RecordTemplateField> fields, List<FieldGroup> groups,
+    private void absorb(String name, SequencedMap<String, BuiltField> sourceFields,
+            List<FieldGroup> sourceGroups, SequencedMap<String, BuiltField> fields, List<FieldGroup> groups,
             Set<String> seenFieldNames, Set<String> inheritedFields) {
-        for (Map.Entry<String, RecordTemplateField> field : sourceFields.entrySet()) {
+        for (Map.Entry<String, BuiltField> field : sourceFields.entrySet()) {
             requireFieldNameNotSeen(name, field.getKey(), seenFieldNames, FieldOrigin.SUPERTYPE);
             seenFieldNames.add(field.getKey());
             inheritedFields.add(field.getKey());
@@ -1965,10 +2047,64 @@ final class DefinitionResolver {
         groups.addAll(sourceGroups);
     }
 
+    /**
+     * Refuses a record template's parameter spelled like a name or an unquoted token an absorbed field's type writes
+     * among an application's arguments ([TSON-SCHEMA] §5.10), {@code excluded} -- an open operand's own parameters,
+     * which this declaration's arguments replace -- aside. Inside a template a parameter's name is read before the
+     * schema's, and §5.10's shadowing rule classifies what the template writes, never what it absorbs; so a field
+     * absorbed with {@code two<V, T>}, its {@code T} an enum member, would become an application of this template's
+     * {@code T}, a different type in every application and none of them the source's. A literal {@code value} needs
+     * no rule: the {@code value}/{@code value_param} labels already tell it from a parameter. A name spelled like a
+     * schema entry is refused at the parameter list itself, the shadowing rule's other half.
+     *
+     * <p><b>It judges what the source holds when it is absorbed.</b> A closed source of this schema has not been
+     * materialised yet, so its fields still write their applications; an imported one has, so each closed application
+     * is the bare name of the entry it denotes, with no argument a parameter could be read in, and nothing is refused
+     * -- nor needs to be.
+     */
+    private static void refuseAbsorbedSpelling(String name, String source,
+            Map<String, io.ltr8.tson.schema.meta.TypeRef> types, List<String> parameters, List<String> excluded) {
+        if (parameters.isEmpty()) {
+            return;
+        }
+        types.forEach((field, type) -> type.arguments().forEach(argument ->
+                spelledIn(argument, parameters, excluded).ifPresent(parameter -> {
+                    throw new SchemaValidationException("'" + name + "': parameter '" + parameter + "' is spelled "
+                            + "like '" + parameter + "' in the field '" + field + ": " + ParameterTypes.spell(type)
+                            + "' it absorbs from '" + source + "', where it is no parameter of '" + name + "' -- "
+                            + "inside a template a parameter's name is read before the schema's, so the absorbed type "
+                            + "would change its meaning (§5.10). Rename the parameter");
+                })));
+    }
+
+    /** The first of {@code parameters} an argument writes, as a name or an unquoted token, at any depth. */
+    private static Optional<String> spelledIn(TypeArgument argument, List<String> parameters, List<String> excluded) {
+        return switch (argument) {
+            case TypeArgument.Ref ref -> {
+                String head = ref.ref().name();
+                if (parameters.contains(head) && !excluded.contains(head)) {
+                    yield Optional.of(head);
+                }
+                yield ref.ref().arguments().stream().map(nested -> spelledIn(nested, parameters, excluded))
+                        .flatMap(Optional::stream).findFirst();
+            }
+            case TypeArgument.Value value -> Optional.of(value.value()).filter(token -> token.form()
+                    == Token.Form.UNQUOTED && parameters.contains(token.text()) && !excluded.contains(token.text()))
+                    .map(Token::text);
+        };
+    }
+
+    /** A closed record's field types, by field name. */
+    private static Map<String, io.ltr8.tson.schema.meta.TypeRef> typesOf(RecordBody record) {
+        Map<String, io.ltr8.tson.schema.meta.TypeRef> types = new LinkedHashMap<>();
+        record.fields().forEach((field, declared) -> types.put(field, declared.type()));
+        return types;
+    }
+
     /** A closed source's fields as the fields resolution builds with: as they are, labelling nothing. */
-    private static SequencedMap<String, RecordTemplateField> closedFields(RecordBody source) {
-        SequencedMap<String, RecordTemplateField> fields = new LinkedHashMap<>();
-        source.fields().forEach((name, field) -> fields.put(name, RecordTemplateField.of(field)));
+    private static SequencedMap<String, BuiltField> closedFields(RecordBody source) {
+        SequencedMap<String, BuiltField> fields = new LinkedHashMap<>();
+        source.fields().forEach((name, field) -> fields.put(name, BuiltField.of(field)));
         return fields;
     }
 
@@ -2086,8 +2222,20 @@ final class DefinitionResolver {
                     + "<...>' has no fields to contribute -- it is a binding record, not a vocabulary, so "
                     + "there is nothing to compose with (§5.8, and §5.7's vocabulary-body rule read across)");
         }
-        SequencedMap<String, RecordTemplateField> fields = new LinkedHashMap<>(
-                RecordTemplateSubstitution.fields(head, record, bindings, typeParams));
+        // The operand's own parameters are replaced by what this declaration writes; every other name stays.
+        Map<String, io.ltr8.tson.schema.meta.TypeRef> written = new LinkedHashMap<>();
+        record.fields().forEach((field, open) -> open.type().ifPresent(type -> written.put(field, type)));
+        refuseAbsorbedSpelling(name, head, written, typeParams, templateParameters);
+        // A closed declaration takes the member's fields, an open one its own template's, each applied argument
+        // that is one of its parameters landing as its label.
+        SequencedMap<String, BuiltField> fields = new LinkedHashMap<>();
+        if (typeParams.isEmpty()) {
+            RecordTemplateSubstitution.closed(head, record, bindings)
+                    .forEach((field, closed) -> fields.put(field, BuiltField.of(closed)));
+        } else {
+            RecordTemplateSubstitution.fields(head, record, bindings, typeParams)
+                    .forEach((field, open) -> fields.put(field, BuiltField.of(open)));
+        }
         return new OpenOperand(Ancestry.ofTemplate(head, namespaceDefinitions), fields, record.groups(),
                 record.nameType(), classified);
     }
@@ -2100,7 +2248,7 @@ final class DefinitionResolver {
      * until {@code SchemaResolver} folds it, and the linker validates that channel: an argument left on
      * §12.1's token-shape reading sends it looking for a type called {@code red}.
      */
-    private record OpenOperand(List<String> ancestors, SequencedMap<String, RecordTemplateField> fields,
+    private record OpenOperand(List<String> ancestors, SequencedMap<String, BuiltField> fields,
                                List<FieldGroup> groups, Optional<String> nameType, List<TypeArgument> arguments) {
     }
 
@@ -2138,7 +2286,7 @@ final class DefinitionResolver {
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
 
     private Built resolveRecordBody(List<RecordEntry> entries, List<String> parameters) {
-        SequencedMap<String, RecordTemplateField> fields = new LinkedHashMap<>();
+        SequencedMap<String, BuiltField> fields = new LinkedHashMap<>();
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
         for (RecordEntry entry : entries) {
@@ -2188,7 +2336,7 @@ final class DefinitionResolver {
      * against, and replaces in place, the already-inherited field of that name, rather than being appended.
      */
     private void resolveEntry(String declarationName, RecordEntry entry, List<String> parameters,
-                               SequencedMap<String, RecordTemplateField> fields, List<FieldGroup> groups,
+                               SequencedMap<String, BuiltField> fields, List<FieldGroup> groups,
                                Set<String> seenFieldNames, Set<String> inheritedFields) {
         switch (entry) {
             case FieldDef fieldDef -> {
@@ -2232,8 +2380,8 @@ final class DefinitionResolver {
      * a value only omission reaches; and a pin is admitted and never injected ({@link RecordField#omitted}),
      * since an injected member would be present and presence is what selects the group's alternative.
      */
-    private RecordTemplateField resolveTighteningField(String declarationName, FieldDef fieldDef,
-            RecordTemplateField inherited, List<String> parameters, List<FieldGroup> groups) {
+    private BuiltField resolveTighteningField(String declarationName, FieldDef fieldDef,
+            BuiltField inherited, List<String> parameters, List<FieldGroup> groups) {
         boolean member = groups.stream().anyMatch(group -> group.hasMember(fieldDef.name()));
         if (member) {
             restateMemberMark(declarationName, fieldDef, groups);
@@ -2244,7 +2392,7 @@ final class DefinitionResolver {
                     + "a member's omission is the group's (§5.11). A pin ('= value') is checked where written "
                     + "and never supplied");
         }
-        RecordTemplateField tightened = resolveField(fieldDef, Optional.of(inherited), parameters);
+        BuiltField tightened = resolveField(fieldDef, Optional.of(inherited), parameters);
         if (member) {
             tightened = tightened.withFacts(true, tightened.voidable(), tightened.role());
         }
@@ -2299,7 +2447,7 @@ final class DefinitionResolver {
      * <p>That reproduces §5.7's transition table cell for cell: a plain required field may take a default or
      * a pin, an optional one may become anything, a default may be pinned, and a pin is terminal.
      */
-    private static boolean refines(RecordTemplateField from, RecordTemplateField to) {
+    private static boolean refines(BuiltField from, BuiltField to) {
         return omission(to) >= omission(from) && (from.voidable() || !to.voidable())
                 && to.role().ordinal() >= from.role().ordinal();
     }
@@ -2309,8 +2457,8 @@ final class DefinitionResolver {
      * injected value. Asked as of a plain field: a group member's presence is the group's, and a member's
      * facts refine like any field's.
      */
-    private static int omission(RecordTemplateField field) {
-        return switch (field.omitted(false)) {
+    private static int omission(BuiltField field) {
+        return switch (field.omitted()) {
             case NOTHING -> 0;
             case MISSING -> 1;
             case VALUE -> 2;
@@ -2358,7 +2506,7 @@ final class DefinitionResolver {
      * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) is the field's {@code
      * value} where it is a literal and its {@code value_param} where it is one of this declaration's own
      * {@code parameters} -- told apart once, here, by §5.10's shadowing rule over the source spelling: an
-     * unquoted token is a parameter exactly when its text names one ({@link #templateField}). A bare parameter
+     * unquoted token is a parameter exactly when its text names one ({@link BuiltField#written}). A bare parameter
      * name in the type slot is likewise the field's {@code type_param}.
      *
      * <p><b>The role is the modifier's, whatever stands in {@code value}.</b> {@code =} gives FIXED and
@@ -2381,7 +2529,7 @@ final class DefinitionResolver {
      * extra: ?}) has no annotation position at all, so an entry that mentions nothing must not be able to
      * erase what it does not mention.
      */
-    private RecordTemplateField resolveField(FieldDef field, Optional<RecordTemplateField> inherited,
+    private BuiltField resolveField(FieldDef field, Optional<BuiltField> inherited,
                                              List<String> parameters) {
         Annotations own = annotationsOf(field.name(), field.annotations());
         // No mark to inherit: which fields a family dispatches on is the *record's* statement
@@ -2429,7 +2577,7 @@ final class DefinitionResolver {
      * output". Unlike a declaration, there is no before/after ambiguity here -- a field has one annotation
      * position and it is the field's own.
      */
-    private RecordTemplateField resolveFieldEntry(FieldDef field, Optional<RecordTemplateField> inherited,
+    private BuiltField resolveFieldEntry(FieldDef field, Optional<BuiltField> inherited,
                                                   List<String> parameters) {
         if (field.type().isEmpty() && inherited.isEmpty()) {
             // §5.7: "a modifier-only entry is always a tightening -- it names no type, so it cannot declare a
@@ -2447,7 +2595,7 @@ final class DefinitionResolver {
         // The name's `?` is always the entry's own: an unmarked name says the key is written.
         boolean voidable = field.type().isPresent()
                 ? field.type().get().voidable()
-                : inherited.map(RecordTemplateField::voidable).orElse(false);
+                : inherited.map(BuiltField::voidable).orElse(false);
 
         // The role is the modifier's whatever stands in the value -- a literal, or this declaration's own
         // parameter, which labels it (§5.10's shadowing rule over the source spelling).
@@ -2455,12 +2603,12 @@ final class DefinitionResolver {
                 FieldModifiers.of(field.name(), field.omittable(), voidable, field.modifier());
         Optional<Token> value = resolved.value().map(DefinitionResolver::toMetaToken);
         if (field.type().isPresent()) {
-            return templateField(resolveTypeRef(field.type().get().typeRef()), parameters, resolved.optional(),
+            return BuiltField.written(resolveTypeRef(field.type().get().typeRef()), parameters, resolved.optional(),
                     resolved.voidable(), resolved.role(), value, Annotations.empty(), positions.of(field));
         }
-        // An elided type is the inherited field's, a parameter it carries included.
-        return templateField(inherited.get().type(), inherited.get().typeParam(), parameters, resolved.optional(),
-                resolved.voidable(), resolved.role(), value, Annotations.empty(), positions.of(field));
+        // An elided type is the inherited field's, a parameter it carries and what its names mean included.
+        return inherited.get().restated(parameters, resolved.optional(), resolved.voidable(), resolved.role(), value,
+                positions.of(field));
     }
 
     /** {@code schema.meta} has no dependency on {@code tson-compiler}, so it can't reuse {@link TokenValue} directly (see {@link Token}'s own Javadoc) -- this converts field by field instead. */
@@ -2493,7 +2641,7 @@ final class DefinitionResolver {
      * restatement that got the order wrong and one that changed a member's type need different fixes.
      */
     private boolean restatesInheritedGroup(String declarationName, GroupDef groupDef, List<String> parameters,
-                                            SequencedMap<String, RecordTemplateField> fields,
+                                            SequencedMap<String, BuiltField> fields,
                                             List<FieldGroup> groups, Set<String> inheritedFields) {
         FieldGroup restatement = groupDef.fieldGroup();
         List<String> restated = restatement.memberNames();
@@ -2533,12 +2681,13 @@ final class DefinitionResolver {
                     + "loosens its option (§5.11)");
         }
         for (GroupDef.Member member : groupDef.members()) {
-            RecordTemplateField restatedMember = resolveGroupMember(member, parameters);
-            RecordTemplateField inheritedMember = fields.get(member.name());
+            BuiltField restatedMember = resolveGroupMember(member, parameters);
+            BuiltField inheritedMember = fields.get(member.name());
             if (!restatedMember.type().equals(inheritedMember.type())
                     || !restatedMember.typeParam().equals(inheritedMember.typeParam())) {
                 throw new SchemaValidationException(prefix + "gives member '" + member.name() + "' the type "
-                        + "'" + typeName(restatedMember) + "' where the source declares '" + typeName(inheritedMember)
+                        + "'" + restatedMember.typeName() + "' where the source declares '"
+                        + inheritedMember.typeName()
                         + "' -- member type-refs are restated verbatim (§5.11); narrowing a member's type is "
                         + "done by naming it as an ordinary field");
             }
@@ -2562,14 +2711,9 @@ final class DefinitionResolver {
      * nothing. One reached by refinement is the linker's to refuse. The member is optional, presence being
      * governed by the group (§5.11), and voidable exactly where its type carries {@code ?}.
      */
-    private RecordTemplateField resolveGroupMember(GroupDef.Member member, List<String> parameters) {
-        return templateField(resolveTypeRef(member.typeRef()), parameters, true, member.voidable(), FieldRole.FREE,
+    private BuiltField resolveGroupMember(GroupDef.Member member, List<String> parameters) {
+        return BuiltField.written(resolveTypeRef(member.typeRef()), parameters, true, member.voidable(), FieldRole.FREE,
                 Optional.empty(), annotationsOf(member.name(), member.annotations()), Optional.empty());
-    }
-
-    /** A field's type as a message names it: the type's name, or the parameter standing for it. */
-    private static String typeName(RecordTemplateField field) {
-        return field.typeParam().orElseGet(() -> field.type().orElseThrow().name());
     }
 
     /**

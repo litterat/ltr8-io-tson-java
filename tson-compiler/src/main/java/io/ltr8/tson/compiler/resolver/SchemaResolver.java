@@ -306,7 +306,7 @@ public final class SchemaResolver {
         // variant's, an element's) is carried as a name, judged by the linker, and orders nothing. The imports are
         // ready before anything starts; a value read against one of this document's own entries is read through
         // readers compiled from the entries ready so far.
-        OnDemand onDemand = new OnDemand(declarations, problems, facts);
+        OnDemand onDemand = new OnDemand(declarations, Set.copyOf(namespace.keySet()), generated, problems, facts);
         WaitOrder waitOrder = new WaitOrder(CanonicalIdentity.canonicalize(id), namespace, declarations,
                 limits.maxWaitDepth(),
                 (pending, tree) -> loader.compileReady(readySoFar(document, namespace, origins, facts), pending,
@@ -958,6 +958,8 @@ public final class SchemaResolver {
     private static final class OnDemand implements WaitOrder.Readiness {
 
         private final Map<String, SchemaMap.Declaration> declarations;
+        private final Set<String> imported;
+        private final Set<String> generated;
         private final Problems problems;
         private final Map<String, TsonSchema.EntryFacts> facts;
 
@@ -966,9 +968,11 @@ public final class SchemaResolver {
 
         private DefinitionResolver resolver;
 
-        OnDemand(Map<String, SchemaMap.Declaration> declarations, Problems problems,
-                 Map<String, TsonSchema.EntryFacts> facts) {
+        OnDemand(Map<String, SchemaMap.Declaration> declarations, Set<String> imported, Set<String> generated,
+                 Problems problems, Map<String, TsonSchema.EntryFacts> facts) {
             this.declarations = declarations;
+            this.imported = imported;
+            this.generated = generated;
             this.problems = problems;
             this.facts = facts;
         }
@@ -985,9 +989,30 @@ public final class SchemaResolver {
 
         @Override
         public Top resolve(String name, SchemaMap.Declaration declaration) {
+            if (!generated.contains(name)) {
+                refuseShadowingParameters(name, SchemaDesugarer.typeParams(declaration.typeDef()));
+            }
             Top resolved = resolver.resolve(declaration, problems.positions().of(declaration));
             refuseHeadAbstraction(name, resolved);
             return resolved;
+        }
+
+        /**
+         * [TSON-SCHEMA] §5.10: within a template's body a parameter's name is read before the schema's, so a
+         * parameter spelled like an entry the schema's namespace holds -- a type or a value entry, its own or an
+         * import's -- makes that entry unreachable there, and is a resolver error at the declaration rather than a
+         * silent capture. Judged by the name alone, before anything resolves, so no entry is waited on. A parameter
+         * list the desugarer wrote for a lifted form is its own renaming ({@code p0}, {@code p1}), and is not asked.
+         */
+        private void refuseShadowingParameters(String name, List<String> parameters) {
+            for (String parameter : parameters) {
+                if (declarations.containsKey(parameter) || imported.contains(parameter)) {
+                    throw new SchemaValidationException("'" + name + "': parameter '" + parameter + "' shadows the "
+                            + "entry '" + parameter + "' this schema's namespace holds -- inside a template a "
+                            + "parameter's name is read before the schema's, so the entry would be unreachable there "
+                            + "(§5.10). Rename the parameter");
+                }
+            }
         }
 
         @Override

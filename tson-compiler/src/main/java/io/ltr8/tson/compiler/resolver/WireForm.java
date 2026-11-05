@@ -17,7 +17,6 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -33,8 +32,8 @@ import java.util.function.Function;
 /**
  * How schema vocabulary is spelled as data, in both directions -- the one place that knows what a reference and a
  * held application look like on the wire, and the one that rewrites a parameter standing inside one. A record
- * template is no held body: its payload is labelled here once, as written ({@link #recordTemplatePayload}), and it
- * is substituted on the model afterwards ({@code RecordTemplateSubstitution}).
+ * template is no held body: {@code SchemaDesugarer} writes its payload labelled, and it is substituted on the model
+ * afterwards ({@code RecordTemplateSubstitution}).
  *
  * <p><b>Why one class rather than a producer over here and a consumer over there.</b> A held body is written
  * by one phase and read by four: {@code SchemaDesugarer} lifts a sugar form; {@code TemplateMaterialiser} closes
@@ -64,18 +63,22 @@ final class WireForm {
     /** {@code meta.record_field.value}: §8.1's literal channel. */
     static final String VALUE = "value";
 
-    /** The constructor a record template's payload is written with in source, the one its members close to. */
+    /** {@code meta.record}: the constructor a record template's explicit spelling applies, and its members close to. */
     static final String RECORD = KernelNames.of("record");
 
-    /** The constructor a record template's payload is read as, once its fields are labelled. */
+    /** {@code meta.record_template}: the constructor {@code SchemaDesugarer} writes a record template's body with. */
     static final String RECORD_TEMPLATE = KernelNames.of("record_template");
 
-    private static final String RECORD_FIELD = KernelNames.of("record_field");
-    private static final String RECORD_TEMPLATE_FIELD = KernelNames.of("record_template_field");
-    private static final String PARAMETERS = "parameters";
-    private static final String NAME = "name";
-    private static final String TYPE_PARAM = "type_param";
-    private static final String VALUE_PARAM = "value_param";
+    static final String RECORD_FIELD = KernelNames.of("record_field");
+    static final String RECORD_TEMPLATE_FIELD = KernelNames.of("record_template_field");
+    static final String PARAMETERS = "parameters";
+    static final String NAME = "name";
+
+    /** {@code meta.record_template_field.type_param}: a parameter standing for a field's whole type. */
+    static final String TYPE_PARAM = "type_param";
+
+    /** {@code meta.record_template_field.value_param}: a parameter standing for a field's whole value. */
+    static final String VALUE_PARAM = "value_param";
 
     static final String ALIAS = KernelNames.of("alias");
 
@@ -224,54 +227,6 @@ final class WireForm {
     }
 
     /**
-     * A record template's payload as written -- the {@code !meta.record { … }} a declaration with type parameters
-     * applies, its sugar form desugared or spelled out -- as the {@code !meta.record_template { … }} it denotes,
-     * read by that constructor's reader into the template. Each field is classified here, once, by its source
-     * spelling (§5.10's shadowing rule): an unquoted {@code type} token naming one of {@code parameters} becomes
-     * {@code type_param}, an unquoted {@code value} token naming one becomes {@code value_param}, and every other
-     * slot is carried as written. A positional field ({@code x => T}) is spelled out, a template field having no
-     * positional form. The parameters are stated with the provisional type every parameter starts with.
-     */
-    static DataValue recordTemplatePayload(DataValue record, List<String> parameters) {
-        if (!(record.coreValue() instanceof RecordValue binding)) {
-            return new DataValue(record.annotations(), Optional.of(RECORD_TEMPLATE), record.coreValue());
-        }
-        List<RecordValue.Field> fields = new ArrayList<>();
-        for (RecordValue.Field written : binding.fields()) {
-            fields.add(FIELDS.equals(written.name()) && written.value().coreValue() instanceof MapValue map
-                    ? new RecordValue.Field(FIELDS, rewritten(written.value(), new MapValue(map.entries().stream()
-                            .map(entry -> new MapValue.MapEntry(entry.key(), templateField(entry.value(), parameters)))
-                            .toList())))
-                    : written);
-        }
-        fields.add(new RecordValue.Field(PARAMETERS, plain(new ArrayValue(parameters.stream()
-                .map(parameter -> plain(new RecordValue(List.of(nameField(NAME, parameter),
-                        nameField(TYPE, TemplateParam.TYPE_REF.name())))))
-                .toList()))));
-        return new DataValue(record.annotations(), Optional.of(RECORD_TEMPLATE), new RecordValue(fields));
-    }
-
-    /** One {@code record_template_field} as written, a whole-type or whole-value parameter labelled. */
-    private static DataValue templateField(DataValue field, List<String> parameters) {
-        Optional<String> tag = field.typeRef().map(written -> RECORD_FIELD.equals(written) ? RECORD_TEMPLATE_FIELD
-                : written);
-        List<RecordValue.Field> members = switch (field.coreValue()) {
-            case RecordValue record -> record.fields().stream().map(member -> {
-                String label = member.name().equals(TYPE) ? TYPE_PARAM
-                        : member.name().equals(VALUE) ? VALUE_PARAM : null;
-                return label != null && member.value().coreValue() instanceof TokenValue token
-                        && token.form() == TokenForm.UNQUOTED && parameters.contains(token.text())
-                        ? new RecordValue.Field(label, member.value()) : member;
-            }).toList();
-            case TokenValue token when token.form() == TokenForm.UNQUOTED && parameters.contains(token.text()) ->
-                    List.of(new RecordValue.Field(TYPE_PARAM, plain(token)));
-            case EmptyBrace ignored -> List.of();
-            default -> List.of(new RecordValue.Field(TYPE, plain(field.coreValue())));
-        };
-        return new DataValue(field.annotations(), tag, new RecordValue(members));
-    }
-
-    /**
      * A closed record's binding record, written as an author would write it -- what a minted record's name derives
      * from ({@code TemplateMaterialiser.mintedRecord}, {@link DerivedName#ofBinding}), so a record a template
      * application closes to is named from its own content, the same spelling every other closed form is named by.
@@ -394,29 +349,6 @@ final class WireForm {
             });
         }
         return new TypeRef(application.name(), arguments, application.annotations());
-    }
-
-    /**
-     * The parents a held {@code !meta.record { chain: { parents: [...] } ... }} tree writes, as references -- empty for a
-     * held body that is no record or writes none. They are the parents as written ([TSON-SCHEMA] §5.10), a bare
-     * name or an application, which is what closing a record template completes into a chain.
-     */
-    static List<TypeRef> writtenParents(DataValue held) {
-        if (!(held.coreValue() instanceof RecordValue record)
-                || !(field(record, CHAIN).orElse(null) instanceof RecordValue chain)
-                || !(field(chain, PARENTS).orElse(null) instanceof ArrayValue parents)) {
-            return List.of();
-        }
-        List<TypeRef> written = new ArrayList<>();
-        for (DataValue parent : parents.elements()) {
-            Optional<TypeRef> application = applicationIn(parent.coreValue());
-            if (application.isPresent()) {
-                written.add(application.get());
-            } else if (parent.coreValue() instanceof TokenValue token && token.form() == TokenForm.UNQUOTED) {
-                written.add(TypeRef.of(token.text()));
-            }
-        }
-        return List.copyOf(written);
     }
 
     static Optional<CoreValue> field(RecordValue record, String name) {

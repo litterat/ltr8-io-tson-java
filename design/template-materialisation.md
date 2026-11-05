@@ -151,8 +151,9 @@ resolves, before the batch pass runs. They are handled differently.
 
 - **A composition operand never closes, open or closed** (`DefinitionResolver.openOperand`). §8.2: "an application
   there is subsumed as an operand and mints nothing". The operand, a record template, is substituted on the model with
-  the arguments as written (`RecordTemplateSubstitution`), an argument naming the absorbing declaration's own
-  parameter landing as that declaration's label; the fields are absorbed, the operand contributes its template's
+  the arguments as written (`RecordTemplateSubstitution.fields`), an argument naming the absorbing declaration's own
+  parameter landing as that declaration's label, or, absorbed by a closed declaration, closed to a member's fields
+  (`RecordTemplateSubstitution.closed`); the fields are absorbed, the operand contributes its template's
   ancestors (`Ancestry.ofTemplate`) and not its own name, and the application is kept in the declaration's
   `parents`, arguments and all. Minting an entry for it would give a form nothing names an entry with one subtype
   and no referent. The arguments still need §5.10's kinds, which closing would have given them, so `openOperand`

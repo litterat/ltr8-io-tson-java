@@ -25,8 +25,8 @@ import java.util.Optional;
  * omission reaches.
  *
  * <p><b>A record field is closed</b>: its {@code type} names a type and its {@code value} is a literal, never a
- * parameter. A field that may carry one is a {@link RecordTemplateField}, which only a {@link RecordTemplateBody}
- * holds, and an application turns each of those into one of these.
+ * parameter. A field that may carry one is a {@code meta.record_template_field}, which only a record template holds,
+ * and an application turns each of those into one of these.
  *
  * <p><b>A field never says it is a discriminator.</b> Which fields a sealed family dispatches on is the
  * enclosing record's own statement ({@code record.discriminators}), because §5.8 flattens a base's fields
@@ -119,7 +119,7 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
     }
 
     /** {@link #omitted(boolean)} over the facts it reads: whether the field is optional, and whether it has a value. */
-    static Omitted omitted(boolean optional, boolean valued, boolean groupMember) {
+    public static Omitted omitted(boolean optional, boolean valued, boolean groupMember) {
         if (!optional) {
             return Omitted.MISSING;
         }
@@ -135,7 +135,7 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
     }
 
     /** {@link #describe()} over the facts it reads. */
-    static String describe(boolean optional, FieldRole role) {
+    public static String describe(boolean optional, FieldRole role) {
         if (!optional) {
             return "required";
         }

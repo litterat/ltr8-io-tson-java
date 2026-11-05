@@ -1195,12 +1195,30 @@ literal that happens to spell a parameter has no resolved form at all.
   ordinary `!meta.record` whose `status` is `value: 201`: substitution turns `type_param` into `type` and
   `value_param` into `value`, and changes no other fact.
 - **The source spelling is unchanged, and the shadowing rule is spent where it is written.** The labels are the
-  resolver's: a token the template's own body writes is a parameter by §5.10's shadowing rule, and is labelled as the
-  template is built. Nothing is classified after that. A field the template takes from a closed source keeps its
-  literal, even one spelled like the template's parameter (`base => { kind?: text = T }` with `fam => <T> base & {
-  v: T }`: `fam`'s `kind` is `value: T`, not `value_param: T`). §5.10's "a literal spelled like a live parameter is
-  unreachable" therefore reaches only what the template writes. `!meta.record_template { … }` written in source is
-  refused as resolver vocabulary, as `!meta.template` already is.
+  processor's: a token the template's own body writes is a parameter by §5.10's shadowing rule, and is labelled where
+  the body is normalised, its parameters in scope. Nothing is classified after that. A field the template takes from
+  a closed source keeps its literal, even one spelled like the template's parameter (`base => { kind?: text = T }`
+  with `fam => <T> base & { v: T }`: `fam`'s `kind` is `value: T`, not `value_param: T`). §5.10's "a literal spelled
+  like a live parameter is unreachable" therefore reaches only what the template writes. `!meta.record_template { … }`
+  written in source is refused as resolver vocabulary, as `!meta.template` already is.
+- **Recognising a parameter by its text needs two refusals, both running.** A type's arguments carry no label, so a
+  parameter there is recognised by its text, and two spellings would make that ambiguous.
+  - §5.10's own rule, enforced: a parameter spelled like an entry the schema's namespace holds, a type or a
+    value entry, is a resolver error at the declaration, a held template and a record template alike (`T => { … }`
+    beside `<T> [T]`). The draft's sentence reads "within a template's body, held or a record template's" and "a
+    parameter that shadows a schema entry, a type or a value entry"; §5.8's `<T> T & { … }` sentence leaves a
+    same-named entry to that rule.
+  - **New: a record template's parameter must not be spelled like a name or an unquoted token written among the
+    arguments of an application in a field type it absorbs**, from a closed source, or from an open operand other
+    than the operand's own parameters, which the absorber's arguments replace. With `mode => !enum [T U]`, `two =>
+    <A, M> { a: A  m?: mode ~ M }` and `pair => <V> { z: two<V, T> }`, `t3 => <T> pair<T> & { x: T }` is refused at
+    `t3`, naming `T` and `z: two<V, T>`; `pair` itself is valid. Without it, `t3`'s `z` would be `two<T, T>`, its
+    first `T` the parameter and its second the member, which no `record_template_field` can tell apart; and a closed
+    `base => { f: pick<T> }` absorbed into `<T> base & { … }` would make every application's `f` a different type
+    from `base`'s, against IS-A. A literal `value` is not covered: the `value`/`value_param` labels tell it apart.
+    The rule judges the source as it is when absorbed: a closed source of the same schema still writes its
+    applications and is judged; an imported source is materialised, each closed application already the bare name
+    of its entry, so there is no argument to collide with and nothing is refused.
 - **Two declaration-time rules, one of them new.** A selector's type names no parameter — §5.10's existing condition,
   unchanged and already refused (`a-discriminator-typed-by-a-parameter`). **New: a literal `value` needs a closed
   type**, so a field typed by a parameter, whole or as an argument, takes `value_param` or no value: `<T> { v?: T ~ 5
@@ -1222,8 +1240,11 @@ literal that happens to spell a parameter has no resolved form at all.
   with nothing written out as text and read back. A value where a type parameter stands (`box<3>`) and an application
   where a value parameter stands are refused at the application, by the label the argument lands at. The record
   template's fields are a second field type, and the two record shapes share no Java parent, as `record_template` and
-  `record` share no kernel parent beyond `product`: the duplication is a handful of arms (field-name hygiene, the
-  name type, the selector derivation) that read the same five record-level facts.
+  `record` share no kernel parent beyond `product`: the five record-level facts both state (name type, field names,
+  discriminators, groups, extension) are a value each produces, read in one place by the checks that need only them
+  (field-name hygiene, the name type). Resolution builds a record over a field type of its own, which becomes a
+  `record_field` for a closed declaration and a `record_template_field` for a template, and the body written for a
+  record template is the labelled `!record_template { … }` from the start.
 - `spec/fixtures/meta-resolved.tn` carries the three new entries and `record` without `parameters`; the corpus's
   record-template outputs move to the new form, with vectors for the labels, an absorbed literal left a literal,
   both literal refusals and the refused construction.
@@ -1240,8 +1261,14 @@ shared parent; if one is wanted, it is a `meta.product` refinement holding `chai
   argument of an application; add "A literal value needs a closed type: a field whose type is a parameter, or an
   application over one, takes a value parameter or no value, and a literal there is a resolver error at the
   declaration", and that the shadowing rule classifies what the template's own body writes, a field it absorbs
-  keeping its literal. "Substitution": a `type_param` and a `value_param` become `type` and `value`. The family-base
-  paragraph: a member of `kind<record_template>`, recognised by its constructor; no reader or writer is built for it.
+  keeping its literal; add "A record template's parameter MUST NOT be spelled like a name or an unquoted token written
+  among an application's arguments in a field type it absorbs, an open operand's own parameters aside; the resolver
+  refuses one at the declaration". "Substitution": a `type_param` and a `value_param` become `type` and `value`.
+  "Scoping and shadowing": "within a held body" becomes "within a template's body", since a record template is no
+  longer held and the refusal is every template's, and "a schema type" becomes "a schema entry, a type or a value
+  entry". §5.8, "Parameterized references": `<T> T & { … }` is refused as an operand, a same-named entry being the
+  shadowing rule's. The family-base paragraph: a member of `kind<record_template>`, recognised by its constructor;
+  no reader or writer is built for it.
 - §8.1, "Open entries" and the `record_field` paragraph: state `record_template` and `record_template_field` as above,
   and drop "in a record template it may hold a parameter, unlabelled"; `template` and `record_template` are both
   resolver vocabulary. §8.1's table row and "Closed entries are parameter-free": an open entry is a
