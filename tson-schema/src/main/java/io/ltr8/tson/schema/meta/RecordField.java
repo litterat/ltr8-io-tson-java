@@ -115,10 +115,15 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
      * never supplied; anything else stays absent.
      */
     public Omitted omitted(boolean groupMember) {
+        return omitted(optional, value.isPresent(), groupMember);
+    }
+
+    /** {@link #omitted(boolean)} over the facts it reads, for a template's field, whose value may be a parameter. */
+    static Omitted omitted(boolean optional, boolean valued, boolean groupMember) {
         if (!optional) {
             return Omitted.MISSING;
         }
-        return value.isPresent() && !groupMember ? Omitted.VALUE : Omitted.NOTHING;
+        return valued && !groupMember ? Omitted.VALUE : Omitted.NOTHING;
     }
 
     /**
@@ -126,6 +131,11 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
      * {@code optional}, {@code defaulted} or {@code fixed}.
      */
     public String describe() {
+        return describe(optional, role);
+    }
+
+    /** {@link #describe()} over the facts it reads. */
+    static String describe(boolean optional, FieldRole role) {
         if (!optional) {
             return "required";
         }

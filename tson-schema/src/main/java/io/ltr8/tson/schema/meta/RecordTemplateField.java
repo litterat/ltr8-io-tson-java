@@ -61,21 +61,33 @@ public record RecordTemplateField(Optional<TypeRef> type, @Field("type_param") O
         }
     }
 
+    /** A closed field as a template field: its type and value as they are, labelling nothing. */
+    public static RecordTemplateField of(RecordField field) {
+        return new RecordTemplateField(Optional.of(field.type()), Optional.empty(), field.optional(),
+                field.voidable(), field.role(), field.value(), Optional.empty(), field.annotations(),
+                field.position());
+    }
+
     /**
-     * {@code shape}'s facts labelled against {@code parameters}: a type that is a bare parameter becomes {@code
-     * type_param}, and an unquoted value token that is one becomes {@code value_param} (§5.10's shadowing rule,
-     * which is how a parameter stands in source). Everything else is kept as it is.
+     * This field as the closed {@link RecordField} it is once no parameter is left in it -- what a closed record's
+     * resolution and an application's substitution end in. A field still carrying a label is no record field.
      */
-    public static RecordTemplateField of(RecordField shape, List<String> parameters) {
-        boolean typeIsParameter = shape.type().arguments().isEmpty() && parameters.contains(shape.type().name());
-        Optional<String> valueParam = shape.value()
-                .filter(token -> token.form() == Token.Form.UNQUOTED && parameters.contains(token.text()))
-                .map(Token::text);
-        return new RecordTemplateField(typeIsParameter ? Optional.empty() : Optional.of(shape.type()),
-                typeIsParameter ? Optional.of(shape.type().name()) : Optional.empty(),
-                shape.optional(), shape.voidable(), shape.role(),
-                valueParam.isPresent() ? Optional.empty() : shape.value(), valueParam,
-                shape.annotations(), shape.position());
+    public RecordField closed() {
+        if (typeParam.isPresent() || valueParam.isPresent()) {
+            throw new IllegalStateException("a field naming the parameter '" + typeParam.or(() -> valueParam)
+                    .orElseThrow() + "' is a record template's, and a record's fields carry no parameter");
+        }
+        return new RecordField(type.orElseThrow(), optional, voidable, role, value, annotations, position);
+    }
+
+    /** What this field yields when a document never writes it, as {@link RecordField#omitted} answers it. */
+    public RecordField.Omitted omitted(boolean groupMember) {
+        return RecordField.omitted(optional, value.isPresent() || valueParam.isPresent(), groupMember);
+    }
+
+    /** These facts in the words a diagnostic uses, as {@link RecordField#describe} says them. */
+    public String describe() {
+        return RecordField.describe(optional, role);
     }
 
     /**
@@ -90,6 +102,18 @@ public record RecordTemplateField(Optional<TypeRef> type, @Field("type_param") O
     public RecordTemplateField withType(TypeRef type) {
         return new RecordTemplateField(Optional.of(type), Optional.empty(), optional, voidable, role, value,
                 valueParam, annotations, position);
+    }
+
+    /** A copy of this field with its presence and role replaced -- every other component unchanged. */
+    public RecordTemplateField withFacts(boolean optional, boolean voidable, FieldRole role) {
+        return new RecordTemplateField(type, typeParam, optional, voidable, role, value, valueParam, annotations,
+                position);
+    }
+
+    /** A copy of this field with {@code annotations} replaced -- every other component unchanged. */
+    public RecordTemplateField withAnnotations(Annotations annotations) {
+        return new RecordTemplateField(type, typeParam, optional, voidable, role, value, valueParam, annotations,
+                position);
     }
 
     /** Excludes {@code annotations}/{@code position} -- neither changes a field's identity. */

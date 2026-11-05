@@ -1194,9 +1194,13 @@ literal that happens to spell a parameter has no resolved form at all.
   !meta.record_template_field { type_param: T } } … }`, and its application `created => response<order, 201>` to an
   ordinary `!meta.record` whose `status` is `value: 201`: substitution turns `type_param` into `type` and
   `value_param` into `value`, and changes no other fact.
-- **The source spelling is unchanged.** The labels are the resolver's: a token in the body is a parameter by §5.10's
-  shadowing rule where it is written, and is labelled then. `!meta.record_template { … }` written in source is refused
-  as resolver vocabulary, as `!meta.template` already is.
+- **The source spelling is unchanged, and the shadowing rule is spent where it is written.** The labels are the
+  resolver's: a token the template's own body writes is a parameter by §5.10's shadowing rule, and is labelled as the
+  template is built. Nothing is classified after that. A field the template takes from a closed source keeps its
+  literal, even one spelled like the template's parameter (`base => { kind?: text = T }` with `fam => <T> base & {
+  v: T }`: `fam`'s `kind` is `value: T`, not `value_param: T`). §5.10's "a literal spelled like a live parameter is
+  unreachable" therefore reaches only what the template writes. `!meta.record_template { … }` written in source is
+  refused as resolver vocabulary, as `!meta.template` already is.
 - **Two declaration-time rules, one of them new.** A selector's type names no parameter — §5.10's existing condition,
   unchanged and already refused (`a-discriminator-typed-by-a-parameter`). **New: a literal `value` needs a closed
   type**, so a field typed by a parameter, whole or as an argument, takes `value_param` or no value: `<T> { v?: T ~ 5
@@ -1206,23 +1210,24 @@ literal that happens to spell a parameter has no resolved form at all.
 - **Kinds follow the constructor.** A record template is a member of `meta.ref<meta.record_template>` and of no
   `meta.ref<meta.record>`, where §5.10 calls it "a member of `kind<record>`"; its declared applications are records.
   The kernel's `meta.ref<meta.map>` gains `meta.record_template_field_map` (`the-kind-of-map-holds-the-namespace-types`).
-- **In this implementation the split is a type-level fact.** The record template is its own Java type beside the
-  record's, so a reader, a writer or a member dispatcher built from a record cannot be handed a template, and the
-  "a template IS-A the base is no member" rule both encodings' dispatchers carried is the record type test they
-  already made. The record template's fields are a second field type, and the two record shapes share no Java parent,
-  as `record_template` and `record` share no kernel parent beyond `product`: the duplication is a handful of arms
-  (field-name hygiene, the name type, the selector derivation) that read the same five record-level facts.
+- **In this implementation the split is a type-level fact, end to end.** The record template is its own Java type
+  beside the record's, so a reader, a writer or a member dispatcher built from a record cannot be handed a template,
+  and the "a template IS-A the base is no member" rule both encodings' dispatchers carried is the record type test
+  they already made. No record value holds a parameter, inside the resolver as in output: a template is built as a
+  template where it is declared, and an application substitutes on that value into a record -- `type_param` and
+  `value_param` take their arguments, a parameter among an application's arguments is replaced where it stands --
+  with nothing written out as text and read back. A value where a type parameter stands (`box<3>`) and an application
+  where a value parameter stands are refused at the application, by the label the argument lands at. The record
+  template's fields are a second field type, and the two record shapes share no Java parent, as `record_template` and
+  `record` share no kernel parent beyond `product`: the duplication is a handful of arms (field-name hygiene, the
+  name type, the selector derivation) that read the same five record-level facts.
 - `spec/fixtures/meta-resolved.tn` carries the three new entries and `record` without `parameters`; the corpus's
-  record-template outputs move to the new form, with vectors for the labels, both literal refusals and the refused
-  construction.
+  record-template outputs move to the new form, with vectors for the labels, an absorbed literal left a literal,
+  both literal refusals and the refused construction.
 
-**Open edges, not resolved by the split.** An *inherited* literal whose text spells a parameter of the absorbing
-template (`base => { kind: mode = T }` with `fam => <T> base & { … }`) is labelled `value_param: T` by the same
-shadowing rule, though the author never wrote it in the template's body; §5.10's "a literal spelled like a live
-parameter is unreachable" covers the body as written and is silent on an absorbed field. And the kernel duplicates
-`record`'s record-level fields on `record_template` rather than composing a shared parent; if one is wanted, it is a
-`meta.product` refinement holding `chain`, `groups`, `extension`, `discriminators` and `name_type`, with `fields`
-left to each.
+**Open edge.** The kernel duplicates `record`'s record-level fields on `record_template` rather than composing a
+shared parent; if one is wanted, it is a `meta.product` refinement holding `chain`, `groups`, `extension`,
+`discriminators` and `name_type`, with `fields` left to each.
 
 **Resolution, a proposal.**
 
@@ -1231,7 +1236,8 @@ left to each.
   }  parameters: [ … ] }`; the three places a parameter stands are a field's `type_param`, its `value_param`, and an
   argument of an application; add "A literal value needs a closed type: a field whose type is a parameter, or an
   application over one, takes a value parameter or no value, and a literal there is a resolver error at the
-  declaration." "Substitution": a `type_param` and a `value_param` become `type` and `value`. The family-base
+  declaration", and that the shadowing rule classifies what the template's own body writes, a field it absorbs
+  keeping its literal. "Substitution": a `type_param` and a `value_param` become `type` and `value`. The family-base
   paragraph: a member of `kind<record_template>`, recognised by its constructor; no reader or writer is built for it.
 - §8.1, "Open entries" and the `record_field` paragraph: state `record_template` and `record_template_field` as above,
   and drop "in a record template it may hold a parameter, unlabelled"; `template` and `record_template` are both

@@ -117,9 +117,9 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
 - **Substitution changes no field fact.** A routed `= P` is FIXED where it is written and `~ P` DEFAULT, `optional`
   as the name was marked (§5.7), so `response<order, 201>` lands on exactly what the literal `status?: int32 = 201`
   lands on: the template's `value_param: S` becomes the member's `value: 201`, `type_param` becomes `type`, and
-  every member field is a closed `meta.record_field`. What closing changes is the record-level selector list: the
-  member names none (`asMember`), its pins being in place, and an ABSTRACT base that dispatches on members closes to
-  OPEN (`closedExtension`).
+  every member field is a closed `meta.record_field`, substituted on the model (`closeRecordTemplate`) with nothing
+  written out or read back. What closing changes is the record-level selector list: the member names none, its pins
+  being in place, and an ABSTRACT base that dispatches on members closes to OPEN (`closedExtension`).
 - **A closed record is minted with no subtypes.** `subtypes` is linking's, derived over the closed namespace. Taking
   the template's list would hand each instantiation the whole family and, for a template imported already linked,
   itself — and an entry shaped by *which* schema closed it is not a function of its form, so two schemas closing one
@@ -150,8 +150,9 @@ A composition operand (§5.8) and a refinement source (§5.7) both need the sour
 resolves, before the batch pass runs. They are handled differently.
 
 - **A composition operand never closes, open or closed** (`DefinitionResolver.openOperand`). §8.2: "an application
-  there is subsumed as an operand and mints nothing". The operand's held body is substituted with the arguments as
-  written and read back through its constructor; the fields are absorbed, the operand contributes its template's
+  there is subsumed as an operand and mints nothing". The operand, a record template, is substituted on the model with
+  the arguments as written (`RecordTemplateSubstitution`), an argument naming the absorbing declaration's own
+  parameter landing as that declaration's label; the fields are absorbed, the operand contributes its template's
   ancestors (`Ancestry.ofTemplate`) and not its own name, and the application is kept in the declaration's
   `parents`, arguments and all. Minting an entry for it would give a form nothing names an entry with one subtype
   and no referent. The arguments still need §5.10's kinds, which closing would have given them, so `openOperand`
@@ -159,7 +160,7 @@ resolves, before the batch pass runs. They are handled differently.
   reference into a value slot.
   - **Open** (`vip => <T> customer & box<T>`): the held body writes `box<T>` as a parent, and it closes with
     everything else when `vip` does. Closing builds the chain from those parents (`Ancestry.chainOf`, in
-    `closeHeldRecord`), the fold turns `box<text>` into the edge to the entry that application denotes, and
+    `closeRecordTemplate`), the fold turns `box<text>` into the edge to the entry that application denotes, and
     `closeChains` drops the parents. A closed `vip<text>` therefore stands where `customer`, `base` and `box<text>`
     are expected, the same entry the hand-written `customer & box<text>` reaches. The parent is carried as a
     reference rather than as the head name §5.8 describes because the edge is to `box<text>` and not to

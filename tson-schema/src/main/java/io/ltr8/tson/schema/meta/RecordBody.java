@@ -19,8 +19,11 @@ import java.util.function.UnaryOperator;
  * access_pattern}/{@code size_type} are fixed by the constructor itself ({@code NAMED}/{@code FIXED}) and
  * never appear in output; {@code groups} and {@code discriminators} are empty for a record with none.
  *
- * <p><b>A record is closed</b>: no field carries a parameter, and it is what readers and writers are built for. A
- * record with parameters is a {@link RecordTemplateBody}, a separate type, so code that builds a reader or a writer
+ * <p><b>A record is closed, everywhere it exists</b>: no {@code RecordBody} holds a parameter token -- not in a field's
+ * {@code type}, not in its {@code value}, not in an argument of an application or a parent -- in resolved output, in
+ * a resolver's working values, or as the closing of an application. It is what readers and writers are built for.
+ * A record declared with parameters is a {@link RecordTemplateBody} from the moment the resolver builds it, and an
+ * application of one substitutes on that model into a {@code RecordBody}, so code that builds a reader or a writer
  * from a {@code RecordBody} is never handed a template.
  *
  * <p><b>{@code chain} is {@code chained}'s</b> (see {@link TypeChain}): the complete IS-A chain and its inverse,

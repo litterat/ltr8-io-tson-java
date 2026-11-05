@@ -208,18 +208,16 @@ class TsonValidateSchemaTest {
      *
      * <p>The literal case is refused for a sharper reason than the typo in {@link
      * #anUnresolvedArgumentStaysWithTheApplier}: {@code 3} is not an unresolved <em>name</em>, it is not a
-     * name at all, and {@code meta.record_field.type} is typed {@code meta.type_ref}, so it fails where the substituted
-     * body is read against the kernel's own vocabulary rather than later at reference resolution. The verdict
-     * is the same and the explanation is better — "an identifier never begins with a digit or a sign" is
-     * actionable where "unresolved reference '3'" implies an author could go and declare one.
+     * name at all, and {@code T} is the field's {@code type_param}, so it is refused where the argument is
+     * substituted for the label rather than later at reference resolution. The verdict is the same and the
+     * explanation is better — "an identifier never begins with a digit or a sign" is actionable where "unresolved
+     * reference '3'" implies an author could go and declare one.
      */
     @Test
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
         assertStaysWithTheApplier("box<3>",
-                "'box<...>' substitutes into a body that is not valid data for 'meta.record', the constructor's "
-                        + "own constraint vocabulary -- 'meta.type_ref': '3' is no reference -- '3' is no name: '3': "
-                        + "U+0033 at index 0 cannot start an identifier -- an identifier never begins with a digit or "
-                        + "a sign");
+                "'box<...>' binds the type parameter 'T' to '3', which is no type -- '3': U+0033 at index 0 cannot "
+                        + "start an identifier -- an identifier never begins with a digit or a sign (§5.10)");
     }
 
     /** The same rule for a name that is a name: {@code some_typo} is the applier's typo, not the template's. */

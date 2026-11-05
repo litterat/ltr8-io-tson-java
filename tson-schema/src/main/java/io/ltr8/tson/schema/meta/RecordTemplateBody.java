@@ -6,6 +6,7 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,22 +74,20 @@ public record RecordTemplateBody(TypeChain chain, AnnotatedMap<String, RecordTem
         });
     }
 
-    /**
-     * {@code shape} -- a record resolution built with the parameters standing as names and tokens -- as the template
-     * it is: each field labelled against {@code parameters} ({@link RecordTemplateField#of}), everything else kept.
-     */
-    public static RecordTemplateBody over(RecordBody shape, List<TemplateParam> parameters) {
-        List<String> names = parameters.stream().map(TemplateParam::name).toList();
-        AnnotatedMap<String, RecordTemplateField> fields = new AnnotatedMap<>();
-        shape.fields().forEach((name, field) -> fields.put(name, RecordTemplateField.of(field, names),
-                shape.fields().getAnnotations(name)));
-        return new RecordTemplateBody(shape.chain(), fields, shape.groups(), shape.extension(),
-                shape.discriminators(), shape.nameType(), parameters);
-    }
-
     /** The parameter names, in declaration order. */
     public List<String> parameterNames() {
         return parameters.stream().map(TemplateParam::name).toList();
+    }
+
+    /**
+     * Every reference this template holds, in its fields' {@code type}s and its parents as written -- the one place a
+     * parameter stands that is not a label, as an argument of an application. A {@code type_param} is no reference.
+     */
+    public List<TypeRef> references() {
+        List<TypeRef> references = new ArrayList<>();
+        fields.values().forEach(field -> field.type().ifPresent(references::add));
+        references.addAll(chain.parents());
+        return List.copyOf(references);
     }
 
     /**

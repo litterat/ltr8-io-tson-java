@@ -7,10 +7,12 @@ meta.tn, itself. Current form only; history lives in git.
 
 **Invariants**
 
-- There is one `WireForm`: a held body is written by two phases and read by four, and a second opinion about what an
-  application looks like is what makes one of them wrong.
-- `heldRecord` builds the wire tree directly — `TsonObjectWriter` output is fully quoted, and `HeldBody.names()` and
-  substitution key on a token being *unquoted*.
+- There is one `WireForm`: a held body is written by one phase and read by four, and a second opinion about what an
+  application looks like is what makes one of them wrong. A record template has no held body: its source payload is
+  labelled here once (`recordTemplatePayload`) and it is substituted on the model (`RecordTemplateSubstitution`).
+- `recordWire` builds a closed record's binding record directly, for a minted member's name — `TsonObjectWriter`
+  output is fully quoted and writes every default, a different spelling from the one every other closed form is
+  named by.
 - Every walk over a held body descends into a map slot, key and value both.
 - `MetaRefs`' switch over `Top` is exhaustive with no default arm, so a new body shape fails to compile there until
   it says which references it holds.
@@ -58,18 +60,18 @@ Three dependency-free leaf classes the phases share. Each owns a fact that belon
 individually; stated inside whichever phase happens to need it first, such a fact ends up stated more than
 once.
 
-**`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
-the `plain`/`nameField` builders every producer goes through; `refValue`, which writes a reference as a bare token
-or, carrying arguments, as a `ReferenceValue`, the data grammar's reference ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12),
-and its inverse `applicationIn`, an `instanceof ReferenceValue`; `substituted`, which walks an application's argument
-tree, rewrites a parameter named among its arguments at any depth, and writes the application again as a
-`ReferenceValue`; the held-record writer `heldRecord`, which spells `fields` as a map
-from each field's declared name to its `meta.record_field` (`fieldMap`/`fieldEntry`); and §5.10 `substitute` over a
-held body. Every walk over a held body descends into a map's keys and values as it does into a record or an
-array, `fields` being one.
+**`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names; the
+`plain`/`nameField` builders every producer goes through; `refValue`, which writes a reference as a bare token or,
+carrying arguments, as a `ReferenceValue`, the data grammar's reference ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12), and
+its inverse `applicationIn`, an `instanceof ReferenceValue`; `substituted`, which walks an application's argument tree,
+rewrites a parameter named among its arguments at any depth, and writes the application again as a `ReferenceValue`;
+`recordTemplatePayload`, which reads a record template's source payload as the `meta.record_template` it denotes; the
+closed-record writer `recordWire`, which spells `fields` as a map from each field's declared name to its
+`meta.record_field` (`fieldMap`/`fieldEntry`) for a minted record's name; and §5.10 `substitute` over a held body. Every
+walk over a held body descends into a map's keys and values as it does into a record or an array, `fields` being one.
 
 - **Why one class and not a producer beside one phase and a consumer beside another.** A held tree is written
-  by two phases (`SchemaDesugarer` lifting a sugar form, `HeldBody.of` writing a record template's) and read by
+  by one phase (`SchemaDesugarer` lifting a sugar form) and read by
   four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
   declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterTypes`
   walking one for parameter kinds). `applicationIn`'s own contract is that a held body is written by one
@@ -81,8 +83,8 @@ array, `fields` being one.
 - **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
   gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
   `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
-  parameters at all. That is why `heldRecord` builds the wire tree directly, for a record template's held tree. A
-  held body of any other constructor is built by the desugar phase the same way. Once built, the tree is an
+  parameters at all. A held body is built by the desugar phase directly, and a minted record's binding record by
+  `recordWire`. Once built, the tree is an
   AST, and `TsonObjectWriter` writes an AST as syntax rather than as a description of itself
   (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the

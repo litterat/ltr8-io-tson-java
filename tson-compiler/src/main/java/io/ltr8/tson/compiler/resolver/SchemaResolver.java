@@ -32,6 +32,7 @@ import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
@@ -1053,9 +1054,9 @@ public final class SchemaResolver {
         if (!OpenEntry.isOpen(resolved)) {
             return;
         }
-        HeldBody held = HeldBody.of(resolved);
-        for (io.ltr8.tson.schema.meta.TypeRef application : held.applications()) {
-            if (held.parameters().contains(application.name())) {
+        List<String> parameters = OpenEntry.parameterNames(resolved);
+        for (io.ltr8.tson.schema.meta.TypeRef application : HeldBody.applicationsOf(resolved)) {
+            if (parameters.contains(application.name())) {
                 throw new SchemaValidationException("'" + name + "': '" + application.name()
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
                         + "for a template, and §5.10 admits no head abstraction, so '" + application.name()
@@ -1093,10 +1094,10 @@ public final class SchemaResolver {
      * placeholder exists to prevent.
      */
     private static Top unresolved(List<String> parameters) {
-        RecordBody empty = RecordBody.of(RecordBody.fieldMap());
         // An open placeholder is an empty record template, so it closes by the one process a template does.
-        return parameters.isEmpty() ? empty
-                : RecordTemplateBody.over(empty, parameters.stream().map(TemplateParam::typeParameter).toList());
+        return parameters.isEmpty() ? RecordBody.of(RecordBody.fieldMap())
+                : new RecordTemplateBody(TypeChain.EMPTY, new AnnotatedMap<>(), List.of(), RecordExtensionType.OPEN,
+                        List.of(), Optional.empty(), parameters.stream().map(TemplateParam::typeParameter).toList());
     }
 
     /**

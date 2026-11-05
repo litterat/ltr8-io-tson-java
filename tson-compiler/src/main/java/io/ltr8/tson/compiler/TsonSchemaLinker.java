@@ -612,7 +612,7 @@ public final class TsonSchemaLinker {
         }
         for (Map.Entry<String, Top> candidate : entries.entrySet()) {
             if (at(facts, candidate.getKey()).isPresent() && OpenEntry.isOpen(candidate.getValue())
-                    && HeldBody.of(candidate.getValue()).names().contains(name)) {
+                    && HeldBody.namesOf(candidate.getValue()).contains(name)) {
                 return candidate.getKey();
             }
         }
@@ -1543,7 +1543,7 @@ public final class TsonSchemaLinker {
             // The one question a held body answers without being resolved, and it answers it about tokens
             // rather than about references -- which is the same rule substitution follows when it decides
             // what to rewrite.
-            into.addAll(HeldBody.of(body).names());
+            into.addAll(HeldBody.namesOf(body));
             return;
         }
         switch (body) {
@@ -1929,7 +1929,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkHeldArity(String entryName, Top held,
             Map<String, Top> namespace, List<String> ownParameters) {
-        for (TypeRef application : HeldBody.of(held).applications()) {
+        for (TypeRef application : HeldBody.applicationsOf(held)) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
             for (TypeRef nested : typeArguments(application, namespace)) {
                 checkArity(nested, namespace, ownParameters, "'" + entryName + "'");

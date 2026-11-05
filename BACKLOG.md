@@ -163,6 +163,12 @@ spec-required case:
   value a literal of the field's own type, and a record template's value parameter has its own label
   (`value_param`), so the slot no longer carries a parameter. Decide when `value` is retyped, and with it what
   `@meta.application` means on a declared entry that is no record.
+- [ ] **An application argument where a value parameter stands is accepted when a record template closes**
+  ([TSON-SCHEMA] §5.10). With `pin => <N> { v?: int32 = N }`, `<T> pin<box<T>> & { … }` is refused where the operand
+  is substituted (`RecordTemplateSubstitution`), but `pin<box<text>>` is not: `TemplateMaterialiser` closes nested
+  arguments to an entry name before the substitution classifies them, so the minted name reads as a token and lands
+  in `value`. Classify each argument against its parameter's kind before closing nested applications, and add an
+  invalid vector.
 
 - [ ] **An annotation inside a value read through an imported type's reader resolves in the declaring schema's
   namespace.** [TSON-SCHEMA] §3.3.3 resolves an annotation in the annotating document's namespace, and a value

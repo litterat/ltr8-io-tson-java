@@ -97,6 +97,40 @@ class RecordTemplateShapeTest {
         assertEquals(Optional.of("M"), e.valueParam());
     }
 
+    /**
+     * A field taken from a closed source is never relabelled: its literal {@code T} is the base's value, though the
+     * template absorbing it declares a parameter spelled {@code T}. Only what the template itself writes is
+     * classified by the shadowing rule (§5.10).
+     */
+    @Test
+    void anInheritedLiteralSpelledLikeAParameterStaysALiteral() {
+        TsonCompiledSchema compiled = compile("""
+                  mode => !enum [T U]
+                  base => { kind?: mode = T }
+                  fam  => <T> base & { v: T }
+                """);
+
+        RecordTemplateBody fam = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("fam"));
+        assertEquals(Optional.of("T"), fam.fields().get("kind").value().map(Token::text));
+        assertEquals(Optional.empty(), fam.fields().get("kind").valueParam());
+        assertEquals(Optional.of("T"), fam.fields().get("v").typeParam());
+    }
+
+    /**
+     * An application still open where a value parameter stands -- an operand absorbing {@code pin<box<T>>} -- is
+     * refused at the declaration that wrote it (§5.10): a value parameter's argument is a token.
+     */
+    @Test
+    void anApplicationArgumentForAValueParameterIsRefused() {
+        String refused = assertThrows(SchemaValidationException.class, () -> compile("""
+                  box  => <T> { v: T }
+                  pin  => <N> { n?: text = N }
+                  bad  => <T> pin<box<T>> & { w: T }
+                """)).getMessage();
+
+        assertTrue(refused.contains("binds the value parameter 'N' to 'box<T>', an application"), refused);
+    }
+
     /** A literal needs a closed type: a field typed by a parameter, whole or as an argument, takes none (§5.10). */
     @Test
     void aLiteralOnAParameterTypedFieldIsRefused() {

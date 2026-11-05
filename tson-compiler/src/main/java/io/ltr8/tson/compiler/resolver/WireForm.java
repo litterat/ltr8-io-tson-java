@@ -17,8 +17,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
-import io.ltr8.tson.schema.meta.RecordTemplateField;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -33,15 +32,15 @@ import java.util.function.Function;
 
 /**
  * How schema vocabulary is spelled as data, in both directions -- the one place that knows what a reference and a
- * held application look like on the wire, a record template's tree included, and the one that rewrites a parameter
- * standing inside one.
+ * held application look like on the wire, and the one that rewrites a parameter standing inside one. A record
+ * template is no held body: its payload is labelled here once, as written ({@link #recordTemplatePayload}), and it
+ * is substituted on the model afterwards ({@code RecordTemplateSubstitution}).
  *
  * <p><b>Why one class rather than a producer over here and a consumer over there.</b> A held body is written
- * by two phases and read by four: {@code SchemaDesugarer} lifts a sugar form and {@link HeldBody} writes an open
- * record's tree ({@link #heldRecord}); {@code TemplateMaterialiser} closes one, {@link HeldBody}
- * answers §5.10's declaration-time questions about one, {@code SyntheticMerge} asks whether one holds an
- * application, and {@code ParameterTypes} walks one for §5.10's parameter types. A second opinion about what
- * an application looks like is what makes one of those wrong.
+ * by one phase and read by four: {@code SchemaDesugarer} lifts a sugar form; {@code TemplateMaterialiser} closes
+ * one, {@link HeldBody} answers §5.10's declaration-time questions about one, {@code SyntheticMerge} asks whether
+ * one holds an application, and {@code ParameterTypes} walks one for §5.10's parameter types. A second opinion
+ * about what an application looks like is what makes one of those wrong.
  *
  * <p><b>Nothing here is canonical output, and {@code DataClassObjectWriter} cannot serve any of it.</b> That
  * writer's output is canonical-explicit and fully quoted, which is a different language from the one a held
@@ -65,8 +64,18 @@ final class WireForm {
     /** {@code meta.record_field.value}: §8.1's literal channel. */
     static final String VALUE = "value";
 
-    /** The constructor a record template's held tree applies, the one its members close to. */
+    /** The constructor a record template's payload is written with in source, the one its members close to. */
     static final String RECORD = KernelNames.of("record");
+
+    /** The constructor a record template's payload is read as, once its fields are labelled. */
+    static final String RECORD_TEMPLATE = KernelNames.of("record_template");
+
+    private static final String RECORD_FIELD = KernelNames.of("record_field");
+    private static final String RECORD_TEMPLATE_FIELD = KernelNames.of("record_template_field");
+    private static final String PARAMETERS = "parameters";
+    private static final String NAME = "name";
+    private static final String TYPE_PARAM = "type_param";
+    private static final String VALUE_PARAM = "value_param";
 
     static final String ALIAS = KernelNames.of("alias");
 
@@ -88,15 +97,14 @@ final class WireForm {
      * pins are compared as a tuple. Written only where the record states one, the constructor's own default
      * being absent, on {@link #EXTENSION}'s terms.
      *
-     * <p>A record template's held tree states it ({@link #heldRecord}), so each application closes with the base's
-     * selectors in hand.
+     * <p>Written for a closed record ({@link #recordWire}), where a minted member names none.
      */
     static final String DISCRIMINATORS = "discriminators";
 
     /**
      * {@code record.extension} -- how the record may be realised (§5.2). Written only where it is not
-     * {@code OPEN}, the constructor's own default, so a record template's tree states a mark exactly when one was
-     * made.
+     * {@code OPEN}, the constructor's own default, so a closed record's binding record ({@link #recordWire}) states a
+     * mark exactly when one was made.
      */
     static final String EXTENSION = "extension";
 
@@ -216,44 +224,57 @@ final class WireForm {
     }
 
     /**
-     * A record template's held tree ({@code HeldBody.of}): the {@code !meta.record { … }} application closing
-     * substitutes into and reads back through {@code record}'s own reader, written from the template value -- its
-     * parents as written, its fields, groups, selectors, a non-default {@code name_type}, and its own {@code
-     * extension} where it is not OPEN, the constructor's default. Through {@link #refValue} and {@link #nameField},
-     * the spelling every other wire form here shares.
-     *
-     * <p><b>The labels fold into the slots they stand for.</b> A {@code type_param} is written as {@code type} and a
-     * {@code value_param} as {@code value}, each the bare parameter name, so substitution's one rule -- an unquoted
-     * token naming a parameter is rewritten -- turns each into the closed field an application holds. A literal
-     * {@code value} whose text happens to spell a parameter is written quoted, which keeps it a literal through
-     * substitution (§5.10's shadowing rule recognises an unquoted token only).
-     *
-     * <p><b>{@code annotationValue} is the one thing this cannot do itself.</b> A resolved annotation carries
-     * its value as a <em>bound object</em> ({@code Annotation.value} is {@code Optional<Object>}), and
-     * unbinding one is exactly what an object writer is for -- so the caller passes that single leaf in and
-     * everything structural stays here.
+     * A record template's payload as written -- the {@code !meta.record { … }} a declaration with type parameters
+     * applies, its sugar form desugared or spelled out -- as the {@code !meta.record_template { … }} it denotes,
+     * read by that constructor's reader into the template. Each field is classified here, once, by its source
+     * spelling (§5.10's shadowing rule): an unquoted {@code type} token naming one of {@code parameters} becomes
+     * {@code type_param}, an unquoted {@code value} token naming one becomes {@code value_param}, and every other
+     * slot is carried as written. A positional field ({@code x => T}) is spelled out, a template field having no
+     * positional form. The parameters are stated with the provisional type every parameter starts with.
      */
-    static DataValue heldRecord(RecordTemplateBody body, Function<Object, DataValue> annotationValue) {
-        List<String> parameters = body.parameterNames();
-        List<MapValue.MapEntry> fields = new ArrayList<>();
-        for (Map.Entry<String, RecordTemplateField> declared : body.fields().entrySet()) {
-            RecordTemplateField field = declared.getValue();
-            CoreValue type = field.typeParam().<CoreValue>map(parameter -> new TokenValue(parameter,
-                    TokenForm.UNQUOTED)).orElseGet(() -> refValue(field.type().orElseThrow()));
-            Optional<TokenValue> value = field.valueParam().map(parameter -> new TokenValue(parameter,
-                    TokenForm.UNQUOTED)).or(() -> field.value().map(token -> new TokenValue(token.text(),
-                    token.form() == Token.Form.UNQUOTED && parameters.contains(token.text())
-                            ? TokenForm.SINGLE_LINE_QUOTED : tokenForm(token.form()))));
-            fields.add(fieldEntry(declared.getKey(), fieldWire(type, field.optional(), field.voidable(),
-                    field.role(), value, annotations(field.annotations(), annotationValue))));
+    static DataValue recordTemplatePayload(DataValue record, List<String> parameters) {
+        if (!(record.coreValue() instanceof RecordValue binding)) {
+            return new DataValue(record.annotations(), Optional.of(RECORD_TEMPLATE), record.coreValue());
         }
-        return recordWire(fields, body.chain().parents(), body.nameType(), body.groups(), body.discriminators(),
-                body.extension());
+        List<RecordValue.Field> fields = new ArrayList<>();
+        for (RecordValue.Field written : binding.fields()) {
+            fields.add(FIELDS.equals(written.name()) && written.value().coreValue() instanceof MapValue map
+                    ? new RecordValue.Field(FIELDS, rewritten(written.value(), new MapValue(map.entries().stream()
+                            .map(entry -> new MapValue.MapEntry(entry.key(), templateField(entry.value(), parameters)))
+                            .toList())))
+                    : written);
+        }
+        fields.add(new RecordValue.Field(PARAMETERS, plain(new ArrayValue(parameters.stream()
+                .map(parameter -> plain(new RecordValue(List.of(nameField(NAME, parameter),
+                        nameField(TYPE, TemplateParam.TYPE_REF.name())))))
+                .toList()))));
+        return new DataValue(record.annotations(), Optional.of(RECORD_TEMPLATE), new RecordValue(fields));
+    }
+
+    /** One {@code record_template_field} as written, a whole-type or whole-value parameter labelled. */
+    private static DataValue templateField(DataValue field, List<String> parameters) {
+        Optional<String> tag = field.typeRef().map(written -> RECORD_FIELD.equals(written) ? RECORD_TEMPLATE_FIELD
+                : written);
+        List<RecordValue.Field> members = switch (field.coreValue()) {
+            case RecordValue record -> record.fields().stream().map(member -> {
+                String label = member.name().equals(TYPE) ? TYPE_PARAM
+                        : member.name().equals(VALUE) ? VALUE_PARAM : null;
+                return label != null && member.value().coreValue() instanceof TokenValue token
+                        && token.form() == TokenForm.UNQUOTED && parameters.contains(token.text())
+                        ? new RecordValue.Field(label, member.value()) : member;
+            }).toList();
+            case TokenValue token when token.form() == TokenForm.UNQUOTED && parameters.contains(token.text()) ->
+                    List.of(new RecordValue.Field(TYPE_PARAM, plain(token)));
+            case EmptyBrace ignored -> List.of();
+            default -> List.of(new RecordValue.Field(TYPE, plain(field.coreValue())));
+        };
+        return new DataValue(field.annotations(), tag, new RecordValue(members));
     }
 
     /**
-     * A closed record's tree in the same spelling as {@link #heldRecord}'s, so a minted record is named from the
-     * binding record a template application closes from ({@code TemplateMaterialiser.mintedRecord}).
+     * A closed record's binding record, written as an author would write it -- what a minted record's name derives
+     * from ({@code TemplateMaterialiser.mintedRecord}, {@link DerivedName#ofBinding}), so a record a template
+     * application closes to is named from its own content, the same spelling every other closed form is named by.
      */
     static DataValue recordWire(RecordBody body, Function<Object, DataValue> annotationValue) {
         List<MapValue.MapEntry> fields = new ArrayList<>();
@@ -268,7 +289,7 @@ final class WireForm {
                 body.extension());
     }
 
-    /** One {@code meta.record_field} as both record writers spell it. */
+    /** One {@code meta.record_field} as {@link #recordWire} spells it. */
     private static DataValue fieldWire(CoreValue type, boolean optional, boolean voidable, FieldRole role,
                                        Optional<TokenValue> value, List<Annotation> annotations) {
         List<RecordValue.Field> members = new ArrayList<>();
@@ -278,7 +299,7 @@ final class WireForm {
         return plain(new RecordValue(members), annotations);
     }
 
-    /** The record-level members both {@link #heldRecord} and {@link #recordWire} write, around their fields. */
+    /** The record-level members {@link #recordWire} writes around a record's fields. */
     private static DataValue recordWire(List<MapValue.MapEntry> fields, List<TypeRef> parents,
             Optional<String> nameType, List<FieldGroup> declaredGroups, List<String> discriminators,
             RecordExtensionType extension) {

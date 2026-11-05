@@ -162,7 +162,7 @@ derives none: `array ^ { element_type: = T }` pins a constructor's facet and say
 **On a template**, `abstract` is admitted and `final` refused: every application is a subtype of the template by
 construction, so the claim is false before anything else is written (§5.2, §5.10). On a record template the mark
 sets the template's own `extension`, which is each application's — the base itself is ABSTRACT by construction
-— and `WireForm.heldRecord` writes it into the held tree that closing reads back. The `=?`-forces-ABSTRACT rule is
+— and closing carries it to each member (`TemplateMaterialiser.closedExtension`). The `=?`-forces-ABSTRACT rule is
 a closed record's alone. An open body applying anything but `record` has no `extension` and is refused, named by
 the constructor it applies.
 
@@ -170,9 +170,9 @@ the constructor it applies.
 
 A record template is a `RecordTemplateBody` (`meta.record_template`), ABSTRACT by construction
 (`FamilySelectors.extensionOf`), and takes part in IS-A (§5.10). Its fields are `RecordTemplateField`s, labelling
-a parameter that stands for the whole type (`type_param`) or the whole value (`value_param`); `asTemplate` builds
-it from the record resolution produced with the parameters standing as names and tokens, and refuses there a
-selector typed by a parameter and a literal value on a parameter-typed field. That is safe by *elimination*: no
+a parameter that stands for the whole type (`type_param`) or the whole value (`value_param`), each field classified
+once by its source spelling where it is built (`openRecord`, `DefinitionResolver.Built`); `checked` refuses a selector
+typed by a parameter and a literal value on a parameter-typed field. That is safe by *elimination*: no
 value is read against the template; a value at a position typed by it is a value of some member, selected by tag or
 discriminators, each member closed with its arguments fixed (`AbstractTemplateReader`,
 `design/class2-compilation.md`). A container, reference or

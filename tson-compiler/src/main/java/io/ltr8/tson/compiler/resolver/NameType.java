@@ -230,8 +230,8 @@ public final class NameType {
         Set<String> seen = new HashSet<>();
         while (head.isPresent() && seen.add(head.get())) {
             Top applied = lookup.apply(head.get());
-            if (OpenEntry.isOpen(applied)) {
-                head = HeldBody.of(applied).application().typeRef();
+            if (applied instanceof TemplateBody held) {
+                head = HeldBody.of(held).application().typeRef();
                 continue;
             }
             return applied instanceof RecordBody record

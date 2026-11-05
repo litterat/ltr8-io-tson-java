@@ -157,14 +157,13 @@ final class TemplateRegularity {
      * Every application a template's body writes, including ones nested inside another application's
      * arguments ({@code box<chain<T>>} at a field position applies both).
      *
-     * <p>Every entry with parameters is open -- a held body or a family base -- and every open entry has one
-     * held tree, so the held tree answers: {@code applications()} is the same kind of declared question as
-     * {@code names()}, and reading the applications the wire tree holds is what keeps this rule at the
-     * declaration, before anything is resolved against it.
+     * <p>Every entry with parameters is open -- a held body or a record template -- and either answers which
+     * applications it writes ({@link HeldBody#applicationsOf}), the same kind of declared question as its names,
+     * which is what keeps this rule at the declaration, before anything is resolved against it.
      */
     private static List<Application> applicationsIn(Top template) {
         List<Application> found = new ArrayList<>();
-        HeldBody.of(template).applications().forEach(ref -> collect(ref, found));
+        HeldBody.applicationsOf(template).forEach(ref -> collect(ref, found));
         return found;
     }
 
