@@ -157,11 +157,12 @@ record factory, because the concrete reading is the only one that differs by mod
 - **ABSTRACT naming discriminators** (SEALED) gets `DispatchMemberReader`, which reads those members and looks the
   value up. In the wrapper form the discriminators are inside `$value`, so the tag places the value and is required.
 - **A family-base template** ([TSON-SCHEMA] §5.10) gets whichever dispatcher its body asks for, through
-  `DispatchFactories.TEMPLATE`, which `JsonSchemaCompiler` picks for every open entry (`OpenEntry.isOpen`): `{ b: box }`
-  admits `{"$type": "int_box", "v": 1}` and refuses an untagged object, as TSON text does. The selectors are stated on
-  the entry (`tson-schema`'s `FamilySelectors`), so neither side of the module wall keeps its own opinion of them. A
-  record template IS-A the base is no member, so `DispatchMemberReader` skips an open subtype. Every other template
-  reaches `OpenTemplateReader`.
+  `DispatchFactories.RECORD_TEMPLATE`, the factory registered for `meta.record_template`, which `JsonSchemaCompiler`
+  picks by the body's `@Typename` as it picks every other: `{ b: box }` admits `{"$type": "int_box", "v": 1}` and
+  refuses an untagged object, as TSON text does. The selectors are stated on the entry (`tson-schema`'s
+  `FamilySelectors`), so neither side of the module wall keeps its own opinion of them. A member is a `RecordBody`, so
+  a record template IS-A the base is no member, and `DispatchMemberReader` passes it by type. Every other template is
+  a `meta.template` and reaches `OpenTemplateReader` (`DispatchFactories.TEMPLATE`).
 
 **Every reader a dispatcher can select is wired at compile** (`Route`). A base's `subtypes` is its whole family, so a
 tag reaches a type any levels down, or an alias of one, in one step. A route holds two readers because §3.3's forms want

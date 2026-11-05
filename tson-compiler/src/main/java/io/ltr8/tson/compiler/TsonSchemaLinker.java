@@ -61,6 +61,7 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.numeric.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.compiler.resolver.AliasChain;
@@ -125,14 +126,10 @@ import java.util.stream.Collectors;
  * bind the constructor generically and so cover every shape, rather than the per-shape assemblers a
  * linker-side materialization would need -- and the resolver's {@code TemplateMaterialiser} closes every
  * template application into an entry. What survives into an entry the linker sees is therefore a bare name in
- * every position except one: a parameterized declaration's own body, which legitimately references its own
- * parameters ({@code array<T>}) and is validated, not rewritten.
- *
- * <p><b>Type-parameter exception:</b> a bare name is valid if it resolves in the schema's own
- * namespace, or if it's one of the checked entry's own declared {@code parameters} -- load-bearing
- * for every declaration that takes type parameters -- a user template ({@code box => <T> { v: T }}) and the
- * open synthetics lifted from one -- whose held body references its own type parameter by bare name, not a real
- * other entry.
+ * every position except one: an open entry's own body, which legitimately references its own parameters ({@code
+ * array<T>}) and is checked only for what no argument changes -- the arity of the applications it writes, and a
+ * literal argument whose type it leaves open ({@link #checkHeldArity}) -- never resolved against the schema. A
+ * closed entry holds no parameter, so every name it holds resolves in the schema's own namespace or is unresolved.
  *
  * <p><b>One namespace per schema (Part 2 §2.2.3, SPEC-FEEDBACK.md #7).</b> The namespace a schema is checked
  * against is built in two stages, in this order: (1) the whole namespace of every {@code !!import} ({@link
@@ -340,18 +337,31 @@ public final class TsonSchemaLinker {
             List<String> names = switch (body) {
                 case RecordBody record when !refusedEnums.contains(name) ->
                         List.copyOf(record.fields().keySet());
+                case RecordTemplateBody template when !refusedEnums.contains(name) ->
+                        List.copyOf(template.fields().keySet());
                 case EnumBody enumBody when !refusedEnums.contains(name) -> List.copyOf(enumBody.members());
                 default -> List.of();
             };
-            String noun = body instanceof RecordBody ? "field names" : "members";
+            String noun = body instanceof RecordBody || body instanceof RecordTemplateBody ? "field names" : "members";
             // An enum's members and a record's field names are names of its name type, an identifier family, and
             // are judged under that type's profile, whose added characters are its own.
             IdentifierProfile profile = NameType.profile(definition, constructorOf(name, definition, facts),
                             merged::get, structure)
                     .orElse(IdentifierGrammar.PROFILE);
             checkScope(receiver, schema, name, position, names, noun, identifiers, profile);
-            if (body instanceof RecordBody record) {
-                checkFieldValues(receiver, schema, name, position, record, merged, identifiers);
+            // A template's literal values are every application's, so they are judged here, once; a value parameter
+            // is an argument's, judged where the application writes it.
+            switch (body) {
+                case RecordBody record -> checkFieldValues(receiver, schema, name, position,
+                        record.fields().entrySet().stream().filter(f -> f.getValue().value().isPresent())
+                                .map(f -> new FieldValue(f.getKey(), f.getValue().type(), f.getValue().role(),
+                                        f.getValue().value().get())).toList(), merged, identifiers);
+                case RecordTemplateBody template -> checkFieldValues(receiver, schema, name, position,
+                        template.fields().entrySet().stream()
+                                .filter(f -> f.getValue().value().isPresent() && f.getValue().type().isPresent())
+                                .map(f -> new FieldValue(f.getKey(), f.getValue().type().get(), f.getValue().role(),
+                                        f.getValue().value().get())).toList(), merged, identifiers);
+                default -> { }
             }
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
@@ -396,24 +406,24 @@ public final class TsonSchemaLinker {
      * as a read judges it: over the value, the text in the family's normalization form.
      */
     private static void checkFieldValues(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
-                                         Optional<SourcePosition> definition, RecordBody record,
+                                         Optional<SourcePosition> definition, List<FieldValue> values,
                                          Map<String, Top> merged, IdentifierPolicy identifiers) {
-        for (Map.Entry<String, RecordField> declared : record.fields().entrySet()) {
-            RecordField field = declared.getValue();
-            if (field.value().isEmpty()) {
-                continue;
-            }
+        for (FieldValue field : values) {
             Optional<IdentifierType> family = AliasChain.terminalDefinition(field.type().name(), merged)
                     .filter(IdentifierType.class::isInstance)
                     .map(IdentifierType.class::cast);
             if (family.isPresent()) {
                 String what = field.role() == FieldRole.FIXED ? "a fixed value" : "a default";
                 perName(receiver, schema, entry, definition,
-                        family.get().normalization().apply(field.value().get().text()),
-                        "'" + entry + "' has " + what + " for '" + declared.getKey() + "' where ", identifiers,
+                        family.get().normalization().apply(field.value().text()),
+                        "'" + entry + "' has " + what + " for '" + field.name() + "' where ", identifiers,
                         family.get().profile());
             }
         }
+    }
+
+    /** One field's literal value, with the type it is a value of -- a record's, or a record template's. */
+    private record FieldValue(String name, TypeRef type, FieldRole role, Token value) {
     }
 
     /**
@@ -609,7 +619,7 @@ public final class TsonSchemaLinker {
         }
         for (Map.Entry<String, Top> candidate : entries.entrySet()) {
             if (at(facts, candidate.getKey()).isPresent() && OpenEntry.isOpen(candidate.getValue())
-                    && HeldBody.of(candidate.getValue()).names().contains(name)) {
+                    && HeldBody.namesOf(candidate.getValue()).contains(name)) {
                 return candidate.getKey();
             }
         }
@@ -1258,10 +1268,10 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def, namespace, OpenEntry.parameterNames(def), constructors, shown);
+        validateBody(name, def, namespace, constructors, shown);
     }
 
-    private static void validateBody(String entryName, Top body, Map<String, Top> namespace, List<String> ownParameters,
+    private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
                                       Function<String, Optional<String>> constructors, Function<String, String> shown) {
         if (OpenEntry.isOpen(body)) {
             // A held body is opaque to everything that needs to know what a reference *resolves to*: that
@@ -1273,7 +1283,7 @@ public final class TsonSchemaLinker {
             // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
             // entry declares, which no argument changes. See checkHeldArity for why that has to be asked
             // here rather than left to an application that may never happen.
-            checkHeldArity(entryName, body, namespace, ownParameters);
+            checkHeldArity(entryName, body, namespace, OpenEntry.parameterNames(body));
             return;
         }
         checkCoherent(body);
@@ -1281,10 +1291,9 @@ public final class TsonSchemaLinker {
             case RecordBody r -> {
                 // The chain is checked by validateEntry, its every member a bare name in a closed body.
                 for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
-                    validateTypeRef(field.getValue().type(), namespace, ownParameters,
-                            constructors, entryName, " field '" + field.getKey() + "'");
-                    checkFieldValue(entryName, field.getKey(), field.getValue(), namespace,
-                            ownParameters, constructors);
+                    validateTypeRef(field.getValue().type(), namespace, constructors, entryName,
+                            " field '" + field.getKey() + "'");
+                    checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors);
                 }
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.memberNames()) {
@@ -1307,35 +1316,34 @@ public final class TsonSchemaLinker {
                     throw new UnresolvedReference(entryName, "", ref.target().name());
                 }
             }
-            case Alias ref -> validateTypeRef(ref.target(), namespace, ownParameters, null,
+            case Alias ref -> validateTypeRef(ref.target(), namespace, null,
                     entryName, "");
             case MapBody m -> {
-                validateTypeRef(m.keyType(), namespace, ownParameters, constructors, entryName,
+                validateTypeRef(m.keyType(), namespace, constructors, entryName,
                         " key_type");
-                validateTypeRef(m.valueType(), namespace, ownParameters, constructors,
+                validateTypeRef(m.valueType(), namespace, constructors,
                         entryName, " value_type");
             }
             case NamespaceBody n -> {
                 TypeRef key = n.keyType();
-                validateTypeRef(key, namespace, ownParameters, constructors, entryName, " key_type");
+                validateTypeRef(key, namespace, constructors, entryName, " key_type");
                 // A namespace's keys are names: `key_type` is typed meta.identifier_ref (§4.1, §7.4).
-                if (constructors != null && namespace.containsKey(IDENTIFIER_TYPE) && !ownParameters
-                        .contains(key.name()) && !KindMembers.isMember(key.name(), IDENTIFIER_TYPE,
-                                namespace::get, constructors, namespace::get)) {
+                if (constructors != null && namespace.containsKey(IDENTIFIER_TYPE)
+                        && !KindMembers.isMember(key.name(), IDENTIFIER_TYPE, namespace::get, constructors,
+                                namespace::get)) {
                     throw new SchemaValidationException("'" + entryName + "' key_type names '" + key.name()
                             + "', which is no identifier family -- a namespace's keys are names, so its key type "
                             + "is a member of meta.identifier_ref, a type built with identifier_type; a closed set "
                             + "of names is an identifier family with members");
                 }
-                validateTypeRef(n.valueType(), namespace, ownParameters, constructors,
+                validateTypeRef(n.valueType(), namespace, constructors,
                         entryName, " value_type");
             }
-            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, ownParameters,
-                    constructors, entryName, " element_type");
+            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, constructors, entryName, " element_type");
             case TupleBody t -> {
                 int index = 0;
                 for (TupleElement element : t.elements()) {
-                    validateTypeRef(element.elementType(), namespace, ownParameters, constructors,
+                    validateTypeRef(element.elementType(), namespace, constructors,
                             entryName, " element[" + index + "]");
                     index++;
                 }
@@ -1343,7 +1351,7 @@ public final class TsonSchemaLinker {
             case ChoiceBody c -> {
                 int index = 0;
                 for (TypeRef variant : c.variants()) {
-                    validateTypeRef(variant, namespace, ownParameters, constructors, entryName,
+                    validateTypeRef(variant, namespace, constructors, entryName,
                             " variant[" + index + "]");
                     index++;
                 }
@@ -1363,6 +1371,7 @@ public final class TsonSchemaLinker {
                 checkReferenceNarrows(entryName, reference, namespace);
             }
             case TemplateBody ignored -> { } // open, answered above
+            case RecordTemplateBody ignored -> { } // open, answered above
             case ValueType ignored -> {
             }
             case VoidType ignored -> {
@@ -1509,8 +1518,8 @@ public final class TsonSchemaLinker {
      * -- has no check of its own, a parameter and a literal sharing one slot: at a closed entry there are no
      * parameters for a token to resolve into, so a token there <em>is</em> a literal (§8.1's shadowing rule)
      * and there is nothing to detect. The rule's reference half is unaffected, and needs no code of its own:
-     * {@link #validateTypeRef} accepts a name only if the namespace holds it or {@code ownParameters} lists
-     * it, so at a closed entry a parameter reference is already an unresolved one.
+     * {@link #validateTypeRef} accepts a name only if the namespace holds it, so at a closed entry a parameter
+     * reference is already an unresolved one.
      *
      * <p>Deciding this rather than admitting the degenerate form also settles a question the open
      * representation would otherwise have to answer: with an unreferenced parameter rejected, a template
@@ -1536,10 +1545,9 @@ public final class TsonSchemaLinker {
     /** Every name an entry's body mentions, for {@link #checkOpenEntryUsesEveryParameter}. */
     private static void collectBodyNames(Top body, Set<String> into) {
         if (OpenEntry.isOpen(body)) {
-            // The one question a held body answers without being resolved, and it answers it about tokens
-            // rather than about references -- which is the same rule substitution follows when it decides
-            // what to rewrite.
-            into.addAll(HeldBody.of(body).names());
+            // The one question an open body answers without being resolved: a held body's tokens, the same rule
+            // substitution follows when it decides what to rewrite, or a record template's labels and references.
+            into.addAll(HeldBody.namesOf(body));
             return;
         }
         switch (body) {
@@ -1562,6 +1570,7 @@ public final class TsonSchemaLinker {
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Alias alias -> collectNames(alias.target(), into);
             case TemplateBody ignored -> { } // open, answered above
+            case RecordTemplateBody ignored -> { } // open, answered above
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
             case ValueEntry ignored -> { } // a value names no type of its own
@@ -1658,8 +1667,7 @@ public final class TsonSchemaLinker {
         for (String supertype : supertypes) {
             boolean nearest = supertypes.stream().noneMatch(other -> !other.equals(supertype)
                     && TypeChain.supertypesOf(namespace.get(AliasChain.terminal(other, namespace))).contains(supertype));
-            if (!nearest || !(namespace.get(AliasChain.terminal(supertype, namespace)) instanceof RecordBody source)
-                    || OpenEntry.isOpen(source)) {
+            if (!nearest || !(namespace.get(AliasChain.terminal(supertype, namespace)) instanceof RecordBody source)) {
                 continue;
             }
             List<String> violations = new ArrayList<>();
@@ -1719,14 +1727,13 @@ public final class TsonSchemaLinker {
      * against one declaration is already reported with the declaration's own name and line.
      *
      * <p><b>Atoms and enums only, and the rest is refused.</b> A field typed by a record, container or choice
-     * carries no value ({@link #notAScalarType}). A field whose type is a parameter is skipped by construction --
-     * a held body is not read as this vocabulary at all, so the only parametric field reaching here has
-     * already been substituted by materialisation, and is checked against the argument it was closed with.
+     * carries no value ({@link #notAScalarType}). Only a closed record reaches here: a record template's member is
+     * checked once materialisation has substituted its arguments, against the argument it was closed with.
      */
     private static void checkFieldValue(String entryName, String fieldName, RecordField field,
-                                        Map<String, Top> namespace, List<String> ownParameters,
+                                        Map<String, Top> namespace,
                                         Function<String, Optional<String>> constructors) {
-        if (field.value().isEmpty() || ownParameters.contains(field.type().name())) {
+        if (field.value().isEmpty()) {
             return;
         }
         // The chain end is what has to be checked, not the hop: a field typed by an alias
@@ -1858,7 +1865,7 @@ public final class TsonSchemaLinker {
      * target is.
      */
     private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace,
-                                         List<String> ownParameters, Function<String, Optional<String>> constructors,
+                                         Function<String, Optional<String>> constructors,
                                          String subject, String trail) {
         String context = "'" + subject + "'" + trail;
         Top target = namespace.get(ref.name());
@@ -1868,20 +1875,20 @@ public final class TsonSchemaLinker {
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is "
                     + ValuesByName.aValueNoType(value));
         }
-        if (!namespace.containsKey(ref.name()) && !ownParameters.contains(ref.name())) {
+        if (!namespace.containsKey(ref.name())) {
             throw new UnresolvedReference(subject, trail, ref.name());
         }
-        checkArity(ref, namespace, ownParameters, context);
+        checkArity(ref, namespace, List.of(), context);
         // Membership walks construction to `type`, so it is judged only where `type` is in reach: a namespace built
         // without the kernel (a test's, a fragment's) gets resolution alone, as a kind with no meta gets no verdict.
-        if (constructors != null && ref.arguments().isEmpty() && !ownParameters.contains(ref.name())
+        if (constructors != null && ref.arguments().isEmpty()
                 && (namespace.containsKey(TYPE) || namespace.containsKey(TYPE))
                 && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, namespace::get)) {
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is no type a value "
                     + "can have -- a slot typed 'meta.type_ref' holds the name of an entry whose value is of 'type'");
         }
         for (TypeRef nested : typeArguments(ref, namespace)) {
-            validateTypeRef(nested, namespace, ownParameters, constructors, subject, trail);
+            validateTypeRef(nested, namespace, constructors, subject, trail);
         }
     }
 
@@ -1925,12 +1932,63 @@ public final class TsonSchemaLinker {
      */
     private static void checkHeldArity(String entryName, Top held,
             Map<String, Top> namespace, List<String> ownParameters) {
-        for (TypeRef application : HeldBody.of(held).applications()) {
+        for (TypeRef application : HeldBody.applicationsOf(held)) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
+            checkOpenLiterals(entryName, application, namespace, ownParameters);
             for (TypeRef nested : typeArguments(application, namespace)) {
                 checkArity(nested, namespace, ownParameters, "'" + entryName + "'");
+                checkOpenLiterals(entryName, nested, namespace, ownParameters);
             }
         }
+    }
+
+    /**
+     * A literal needs a closed type ([TSON-SCHEMA] §5.10), and an open entry's application can give it one that is
+     * not: {@code pin2 => <T, P> { a?: T = P }} reads {@code P}'s argument as a value of {@code T}'s, so in {@code
+     * <X> { f: pin2<X, 3> }} the literal {@code 3} is a value of {@code X}, a type no application has fixed yet.
+     * Refused at the declaration that wrote the application, naming the argument -- the same verdict an operand
+     * applied the same way gets where it is substituted ({@code RecordTemplateSubstitution}).
+     */
+    private static void checkOpenLiterals(String entryName, TypeRef application, Map<String, Top> namespace,
+                                          List<String> ownParameters) {
+        Top head = namespace.get(AliasChain.terminal(application.name(), namespace));
+        List<TemplateParam> parameters = head == null ? List.of() : OpenEntry.parameters(head);
+        if (parameters.size() != application.arguments().size()) {
+            return; // arity is checkArity's
+        }
+        List<String> names = parameters.stream().map(TemplateParam::name).toList();
+        for (int i = 0; i < parameters.size(); i++) {
+            TemplateParam parameter = parameters.get(i);
+            int typedBy = names.indexOf(parameter.type().name());
+            if (parameter.isTypeParameter() || typedBy < 0) {
+                continue;
+            }
+            Optional<String> open = switch (application.arguments().get(typedBy)) {
+                case TypeArgument.Ref ref -> OpenEntry.parameterIn(ref.ref(), ownParameters);
+                case TypeArgument.Value value -> Optional.of(value.value().text()).filter(ownParameters::contains);
+            };
+            Optional<String> literal = switch (application.arguments().get(i)) {
+                case TypeArgument.Ref ref -> ref.ref().arguments().isEmpty()
+                        && !ownParameters.contains(ref.ref().name()) ? Optional.of(ref.ref().name()) : Optional.empty();
+                case TypeArgument.Value value -> value.value().form() == Token.Form.UNQUOTED
+                        && ownParameters.contains(value.value().text()) ? Optional.empty()
+                        : Optional.of(value.value().text());
+            };
+            if (open.isPresent() && literal.isPresent()) {
+                throw new SchemaValidationException("'" + entryName + "': '" + spelled(application) + "' binds '"
+                        + parameter.name() + "' to the literal '" + literal.get() + "', whose type is '" + open.get()
+                        + "', still open here -- a literal needs a closed type: pass a parameter for '"
+                        + parameter.name() + "' too, or close '" + open.get() + "' (§5.10)");
+            }
+        }
+    }
+
+    /** An application as the schema spells it, for a message. */
+    private static String spelled(TypeRef application) {
+        return application.name() + application.arguments().stream().map(argument -> switch (argument) {
+            case TypeArgument.Ref ref -> spelled(ref.ref());
+            case TypeArgument.Value value -> value.value().text();
+        }).collect(java.util.stream.Collectors.joining(", ", "<", ">")).replace("<>", "");
     }
 
     /**

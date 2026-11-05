@@ -44,9 +44,10 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   is on being a template — having parameters — so any §5.10 template gets the
   same advice instead of the "did you mean atom refinement?" hint, which cannot help when what is missing is
   the argument list. **This check is what keeps the `RecordBody` check below it sound**: a parameterised
-  declaration is either held (a `TemplateBody`) or an open record, so without it `!my_set { … }` would reach an
-  `IllegalStateException` — this project's spelling of *an internal invariant broke*, which the CLI reports as a
-  library fault at exit 70 — and `!box { … }` over a record template would apply a template as a constructor.
+  declaration is either held (a `TemplateBody`) or a record template (a `RecordTemplateBody`), so without it
+  `!my_set { … }` would reach an `IllegalStateException` — this project's spelling of *an internal invariant broke*,
+  which the CLI reports as a library fault at exit 70 — and `!box { … }` over a record template would apply a
+  template as a constructor.
   `TemplateClosesByApplicationTest` pins all of it.
 - **A construction head resolves through its alias chain first** (§8.3, `resolveConstructorTarget`).
   An alias is a hop, not a rewrite, so `alias_array => meta.array` makes `!alias_array { … }` an application of

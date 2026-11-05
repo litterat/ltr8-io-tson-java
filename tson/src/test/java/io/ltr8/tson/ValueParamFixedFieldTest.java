@@ -8,6 +8,8 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -76,22 +78,23 @@ class ValueParamFixedFieldTest {
      * FIXED field exactly as {@code status?: int32 = 201} is, and only the value waits for an application
      * ([TSON-SCHEMA] §5.7).
      *
-     * <p>A record template is the record it is, so the role and the parameter are read off its own {@code
-     * RecordField}: the parameter stands in the ordinary {@code value} slot, with §8.1's shadowing rule to tell it
-     * from a literal.
+     * <p>A record template's field carries the parameter under its label: {@code value_param}, beside the role the
+     * modifier gives it, with the type a closed {@code type}.
      */
     @Test
     void anOpenTemplatesParametricPinIsFixedWhereDeclared() {
         TsonLinkedSchema linked = tson().resolve(SCHEMA);
 
-        RecordBody open = assertInstanceOf(RecordBody.class,
+        RecordTemplateBody open = assertInstanceOf(RecordTemplateBody.class,
                 linked.schema().entries().get("response"));
-        RecordField status = open.fields().get("status");
+        RecordTemplateField status = open.fields().get("status");
 
         assertEquals(List.of("T", "S"), open.parameterNames(), "the entry's own parameter list, as declared");
         assertEquals(List.of(TemplateParam.typeParameter("T"), new TemplateParam("S", TypeRef.of("int32"))),
                 open.parameters(), "S is routed into an int32 field, so an argument for it is read as an int32");
-        assertEquals("S", status.value().orElseThrow().text(), "the parameter stands in the ordinary value slot");
+        assertEquals(java.util.Optional.of("S"), status.valueParam(), "the parameter stands under value_param");
+        assertEquals(java.util.Optional.empty(), status.value(), "and no literal beside it");
+        assertEquals(java.util.Optional.of(TypeRef.of("int32")), status.type(), "its type is closed");
         assertEquals(FieldRole.FIXED, status.role(), "the pin is fixed where it is written");
         assertTrue(status.optional(), "and the name's mark is as written");
     }

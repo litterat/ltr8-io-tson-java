@@ -97,7 +97,7 @@ class HeldBodyTest {
         return new DataValue(List.of(), Optional.empty(), value);
     }
 
-    /** A record template is a record with parameters, never held text (§5.10): the door refuses one. */
+    /** A record template is a {@code record_template}, never held text (§5.10): the door refuses one. */
     @Test
     void aRecordIsNeverHeld() {
         assertThrows(IllegalStateException.class, () -> template("meta.record"));

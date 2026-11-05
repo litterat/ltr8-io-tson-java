@@ -12,12 +12,12 @@ import java.util.List;
  * of is no part of it: an entry of any kind can be one, so that fact sits on the entry's key ({@code
  * TsonSchema#applicationOf}).
  *
- * <p><b>Three states, one record.</b> {@link #parents} is what was written -- the parents of held template text,
- * one of which may be an application ({@code <T> result<T> & { ... }}), and of a family-base template after it
- * closes. It is the only list that ever holds an application, and a closed type that is no template carries
- * none. {@link #supertypes} is the closed chain: every entry this one IS-A, complete to a fixed point through
- * applied parents (§5.8), each a bare name, sorted; empty for a fresh record, an instance and a subtracted
- * record alike. {@link #subtypes} is the inverse, over this schema map only (§3.3.4).
+ * <p><b>Three states, one record.</b> {@link #parents} is what was written -- a record template's parents, one of which
+ * may be an application ({@code <T> result<T> & { ... }}), and a closed declaration's applied parents until {@code
+ * SchemaResolver} folds them into edges. It is the only list that ever holds an application, and a closed type that is
+ * no template carries none once linked. {@link #supertypes} is the closed chain: every entry this one IS-A, complete to
+ * a fixed point through applied parents (§5.8), each a bare name, sorted; empty for a fresh record, an instance and a
+ * subtracted record alike. {@link #subtypes} is the inverse, over this schema map only (§3.3.4).
  *
  * <p>A declaration never writes the record: the resolver computes it and the linker inverts it, and ingest reads
  * it as stated, since a flat body and its chain cannot be recomputed from each other. Absent and empty are one

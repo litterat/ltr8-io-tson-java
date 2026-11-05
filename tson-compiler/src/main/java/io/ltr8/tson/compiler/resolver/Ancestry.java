@@ -17,7 +17,8 @@ import java.util.Set;
  * <p><b>A closed parent</b> contributes itself, the end of its alias chain (§8.3: the terminal is the same
  * type under another name, so IS-A reaches it) and that entry's own chain. <b>An application</b> denotes no entry
  * at the position that writes it -- its fields are absorbed by value -- so it contributes its template's
- * ancestors, and nothing for the template, which §5.10 makes no type. The edge to the entry a closed application
+ * ancestors, and nothing for the template's head, an applied parent reaching the entry its arguments name and never
+ * its head (§5.8). The edge to the entry a closed application
  * denotes is {@code SchemaResolver}'s to fold, once every declaration has resolved; until then the application is
  * kept in the chain's {@code parents}, the one list that holds applications.
  *

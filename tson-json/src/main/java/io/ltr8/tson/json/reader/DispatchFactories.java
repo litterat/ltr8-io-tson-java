@@ -26,7 +26,8 @@ import java.util.Set;
  *   <li><b>OPEN with subtypes</b> is a {@link DispatchTagReader} in front of the concrete reader, which
  *       takes the untagged value.</li>
  *   <li><b>ABSTRACT</b> is a {@link DispatchTagReader} with no concrete reader behind it.</li>
- *   <li><b>SEALED</b> is a {@link DispatchMemberReader}, which selects on the discriminator members.</li>
+ *   <li><b>ABSTRACT naming discriminators</b> is a {@link DispatchMemberReader}, which selects on the discriminator
+ *       members.</li>
  * </ul>
  *
  * <p>Both dispatchers compare a written tag against flattened names ([TSON-SCHEMA] §7.2 compares "after
@@ -69,21 +70,20 @@ final class DispatchFactories {
     }
 
     /**
-     * An entry that declares type parameters. A <b>family base</b> -- a record template (§5.10) -- is a type by
-     * the only test that matters, a value standing at it being a value of one of its instantiations, so it
-     * dispatches exactly as a closed base does: ABSTRACT on {@code $type}, SEALED on the discriminators the open
-     * record states. Reported under the
-     * template's own name, the one the author wrote; a family base has no field list of its own, so the
-     * closure rules carry none.
-     *
-     * <p>Any other template is not a type until it is applied ([TSON-SCHEMA] §5.10), and its body is held
+     * A record template (§5.10), a <b>family base</b>: a type by the only test that matters, a value standing at it
+     * being a value of one of its members, so it dispatches exactly as a closed ABSTRACT base does: on {@code
+     * $type}, or on the discriminators the template states. Reported under the template's own name, the one the
+     * author wrote; a family base has no field list of its own, so the closure rules carry none.
+     */
+    static final ValueReaderFactory RECORD_TEMPLATE = (name, definition, context) ->
+            family(name, name, definition, context, new RecordDiagnostics(name, ""));
+
+    /**
+     * Any other template, which is not a type until it is applied ([TSON-SCHEMA] §5.10): its body is held
      * unsubstituted text no reader could read, so it reaches {@link OpenTemplateReader} unexamined.
      */
-    static final ValueReaderFactory TEMPLATE = (name, definition, context) -> {
-        return OpenEntry.isFamilyBase(definition)
-                ? family(name, name, definition, context, new RecordDiagnostics(name, ""))
-                : new OpenTemplateReader(name, OpenEntry.parameterNames(definition), context.locationOf(name));
-    };
+    static final ValueReaderFactory TEMPLATE = (name, definition, context) ->
+            new OpenTemplateReader(name, OpenEntry.parameterNames(definition), context.locationOf(name));
 
     /**
      * An ABSTRACT base, closed or a template: the family's dispatcher, with no concrete reading. Which

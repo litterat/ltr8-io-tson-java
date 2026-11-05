@@ -71,6 +71,7 @@ public final class SchemaMetaNameBinder {
     /** Full path to the path its class is mangled from, where the entry's own name does not reach it. */
     private static final Map<String, String> ALIASES = Map.ofEntries(
             Map.entry("meta.record", "meta.record_body"),
+            Map.entry("meta.record_template", "meta.record_template_body"),
             Map.entry("meta.array", "meta.array_body"),
             Map.entry("meta.map", "meta.map_body"),
             Map.entry("meta.namespace", "meta.namespace_body"),

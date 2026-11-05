@@ -11,6 +11,10 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
+import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.unicode.TextType;
@@ -147,9 +151,13 @@ class TsonSchemaLinkerTest {
         assertTrue(thrown.getMessage().contains("'set' declares no type parameters"), thrown.getMessage());
     }
 
-    /** A one-parameter record template: the record it is, with its parameter stated ([TSON-SCHEMA] §5.10). */
-    private static Top recordTemplate(String parameter, AnnotatedMap<String, RecordField> fields) {
-        return RecordBody.of(fields).withParameters(List.of(TemplateParam.typeParameter(parameter)));
+    /** A one-parameter record template whose one field {@code field} is typed by the parameter ([TSON-SCHEMA] §5.10). */
+    private static Top recordTemplate(String parameter, String field) {
+        AnnotatedMap<String, RecordTemplateField> fields = new AnnotatedMap<>();
+        fields.put(field, new RecordTemplateField(Optional.empty(), Optional.of(parameter), false, false,
+                FieldRole.FREE, Optional.empty(), Optional.empty(), null, null));
+        return new RecordTemplateBody(null, fields, null, RecordExtensionType.OPEN, null, Optional.empty(),
+                List.of(TemplateParam.typeParameter(parameter)));
     }
 
     /**
@@ -169,7 +177,7 @@ class TsonSchemaLinkerTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
         entries.put("other",
-                recordTemplate("U", RecordBody.fieldMap(Map.entry("v", RecordField.required(TypeRef.of("U"))))));
+                recordTemplate("U", "v"));
         TypeRef otherOfToken = new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
         entries.put("generic", RecordBody.of(RecordBody.fieldMap()));
 

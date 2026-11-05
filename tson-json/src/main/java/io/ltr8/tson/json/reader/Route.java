@@ -26,7 +26,7 @@ record Route(JsonTypeReader<?> entry, JsonTypeReader<?> inline) {
     /**
      * The reader that reads exactly the type {@code entry} was compiled for. An OPEN record with subtypes
      * compiles to a dispatcher in front of its own concrete reader, and a tag naming that record wants the
-     * concrete one; every other reader already reads exactly its type -- an ABSTRACT or SEALED base included,
+     * concrete one; every other reader already reads exactly its type -- an ABSTRACT base included, by tag or by member,
      * since naming one selects nothing and its dispatcher is what says so.
      */
     static JsonTypeReader<?> exact(JsonTypeReader<?> entry) {

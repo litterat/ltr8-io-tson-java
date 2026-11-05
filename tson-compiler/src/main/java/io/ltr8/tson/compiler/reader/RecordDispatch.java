@@ -10,11 +10,11 @@ import java.util.Set;
 /**
  * Which reader a record position gets, decided once from {@code record.extension} ([TSON-SCHEMA] §5.2).
  *
- * <p><b>A decorator over the mode's own record factory rather than a branch inside it.</b> ABSTRACT and
- * SEALED positions do not read a record at all -- they place the value and hand it to the selected member's
- * reader -- so they need neither mode's field machinery, and one dispatcher serves both on {@link
- * ChoiceReader}'s reasoning. What is left is the concrete case, which is exactly what the mode's factory
- * already built, unchanged.
+ * <p><b>A decorator over the mode's own record factory rather than a branch inside it.</b> An ABSTRACT position,
+ * dispatching by tag or on its members' discriminators, does not read a record at all -- it places the value and hands
+ * it to the selected member's reader -- so it needs neither mode's field machinery, and one dispatcher serves both on
+ * {@link ChoiceReader}'s reasoning. What is left is the concrete case, which is exactly what the mode's factory already
+ * built, unchanged.
  *
  * <p>OPEN and FINAL share that concrete reader because they read identically. The difference between them is
  * only which names a tag may carry -- the subtype set -- and a FINAL record's is empty by construction, so

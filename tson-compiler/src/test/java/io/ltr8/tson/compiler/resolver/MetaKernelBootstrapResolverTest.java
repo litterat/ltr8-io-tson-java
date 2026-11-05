@@ -154,8 +154,8 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is its 85 declarations -- its six maps and their 66 members, and the root's thirteen -- and one
-     * injected declaration per distinct sugar form within them: six {@code array} entries from §5.3's {@code [X]}
+     * output is its 88 declarations -- its six maps and their 69 members, and the root's thirteen -- and one
+     * injected declaration per distinct sugar form within them: seven {@code array} entries from §5.3's {@code [X]}
      * field-type sugar, minted at the root. Producing them here is what leaves the linker with nothing to materialize
      * (see {@code MetaKernelSchemaRegistryTest}).
      * {@code enum}'s member set is not among them: it is the fixture's own {@code meta.enum_set} declaration, since
@@ -164,12 +164,12 @@ class MetaKernelBootstrapResolverTest {
      * {@code field_map} for the same reason, an ordered map having no sugar either.
      */
     @Test
-    void theFixtureDeclarationsResolveAlongsideSixDesugaredEntries() {
+    void theFixtureDeclarationsResolveAlongsideSevenDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(91, schema.entries().size());
+        assertEquals(95, schema.entries().size());
         for (String head : List.of("array_array_text_1", "array_text_1", "array_type_ref",
-                "array_template_param", "array_field_group", "array_tuple_element")) {
+                "array_template_param", "array_template_param_1", "array_field_group", "array_tuple_element")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
                     "expected a desugared entry with head '" + head + "'");
         }

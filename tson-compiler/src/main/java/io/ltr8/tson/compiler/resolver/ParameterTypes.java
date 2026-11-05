@@ -16,6 +16,8 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TemplateParam;
@@ -140,8 +142,8 @@ final class ParameterTypes {
      */
     static boolean readsInStructure(Top template, Function<String, Top> entries) {
         Top current = template;
-        for (int hop = 0; hop < 64 && OpenEntry.isOpen(current); hop++) {
-            String head = HeldBody.of(current).application().typeRef().orElse(null);
+        for (int hop = 0; hop < 64 && current instanceof TemplateBody held; hop++) {
+            String head = HeldBody.of(held).application().typeRef().orElse(null);
             if (head == null || head.equals(RECORD)) {
                 return false;
             }
@@ -182,7 +184,7 @@ final class ParameterTypes {
                     written.getOrDefault(name, Map.of()),
                     readsInStructure(definition, entries::get));
             try {
-                Walk.over(HeldBody.of(definition), occurrences, meta);
+                walk(definition, occurrences, meta);
             } catch (SchemaValidationException e) {
                 reporter.report(name, e);
                 return;
@@ -219,7 +221,7 @@ final class ParameterTypes {
         }
         Occurrences occurrences = new Occurrences(OpenEntry.parameterNames(template), Map.of(), false);
         try {
-            Walk.over(HeldBody.of(template), occurrences, meta);
+            walk(template, occurrences, meta);
         } catch (SchemaValidationException e) {
             return Map.of();
         }
@@ -246,6 +248,28 @@ final class ParameterTypes {
      */
     static void checkSlots(List<String> parameters, DataValue payload, Function<String, Top> meta) {
         Walk.over(HeldBody.ofTree(parameters, payload), new Occurrences(parameters, Map.of(), false), meta);
+    }
+
+    /**
+     * One open entry's occurrences: a held template's text walked against its constructor's vocabulary ({@link
+     * Walk}), or a record template's labels and references read off the model -- a {@code type_param} is a type
+     * position, a {@code value_param} is read as the field's own declared type (or, where that type is a parameter,
+     * as whatever that parameter's argument names), and a parameter as an argument of an application in a field's
+     * type or a parent takes the head's parameter at that position.
+     */
+    private static void walk(Top open, Occurrences occurrences, Function<String, Top> meta) {
+        if (!(open instanceof RecordTemplateBody template)) {
+            Walk.over(HeldBody.of((TemplateBody) open), occurrences, meta);
+            return;
+        }
+        Walk walk = new Walk(occurrences, meta, true);
+        template.fields().values().forEach(field -> {
+            field.typeParam().ifPresent(parameter -> occurrences.observe(parameter, TemplateParam.TYPE_REF, false));
+            field.type().ifPresent(walk::application);
+            field.valueParam().ifPresent(parameter -> occurrences.observe(parameter,
+                    field.type().orElseGet(() -> TypeRef.of(field.typeParam().orElseThrow())), true));
+        });
+        template.parents().forEach(walk::application);
     }
 
     /** Where a declaration whose parameters will not type is reported, entry by entry. */

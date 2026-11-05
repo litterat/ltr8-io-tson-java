@@ -38,6 +38,9 @@ class JsonFieldNameTypeTest {
               pet => abstract fbase & { kind: text =?  name: text }
               dog => pet & { kind?: = "dog"  breed: text }
               kennel => { p: pet }
+              tpet => <B> fbase & { kind: text =?  name: text  extra?: B }
+              tdog => tpet<text> & { kind?: = "dog" }
+              tkennel => { p: tpet }
               words => !unicode.identifier_type { continue_add: "-"  medial: " " }
               row => !meta.record { name_type: words  fields: { "first name" => { type: text } } }
               json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
@@ -93,11 +96,15 @@ class JsonFieldNameTypeTest {
         assertEquals(List.of(), read("located", "{\"@id\": \"urn:x\", \"label\": \"y\", \"city\": \"z\"}"));
     }
 
-    /** A member name is matched in the record's name type's form, and so is a family's selector (§5.5). */
+    /**
+     * A member name is matched in the record's name type's form, and so is a family's selector (§5.5) -- a record
+     * template base's included, whose members take its name type.
+     */
     @Test
     void aMemberNameIsMatchedInItsNameTypesForm() {
         assertEquals(List.of(), read("frow", "{\"NAME\": \"x\"}"));
         assertEquals(List.of(), read("kennel", "{\"p\": {\"KIND\": \"dog\", \"name\": \"Rex\", \"Breed\": \"c\"}}"));
+        assertEquals(List.of(), read("tkennel", "{\"p\": {\"KIND\": \"dog\", \"name\": \"Rex\"}}"));
     }
 
     /**

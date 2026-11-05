@@ -16,8 +16,8 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
 - `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
   *unquoted*.
 - Only a *template* is normalised to a held body; a closed record or closed alias resolves at its declaration. A
-  record template's normalised `!meta.record { … }` payload is bound by the resolver into the open record it denotes
-  (`DefinitionResolver.openRecord`).
+  record template's normalised `!meta.record { … }` payload is bound by the resolver into the `meta.record_template`
+  it denotes (`DefinitionResolver.openRecord`), which labels each whole-type and whole-value parameter.
 - Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
   facts at their `meta.record_field` defaults.
 - §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
@@ -112,27 +112,17 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     form back out puts a *second producer* in front of a wire form two later phases read, and since
     `DerivedName.ofBinding` hashes what is written, a second spelling is a second entry for one type. One
     producer, one spelling: `WireForm.refValue` is the single place a type slot's shape is decided.
-  - **A parameter rides the ordinary `value` slot**, with §8.1's shadowing rule to tell it from a literal,
-    which is why the kernel declares one `value` slot and no labelled group. The role beside it is the
-    modifier's (`FieldModifiers`): `= P` is FIXED where it is written, and closing only substitutes the value.
-  - **A composition or refinement template is built one phase later**, as the *flattened* open record
-    (`DefinitionResolver.parameterised`), and every open record's held tree is written by `WireForm.heldRecord`
-    (through `HeldBody.of`). Both absorb fields from a source, and a §5.7 tightening entry states a modifier and no
-    type-ref, so it is not a `meta.record_field` at all until the inherited field supplies one. That needs a namespace
-    this phase does not have, so the flattening happens in the resolver; the **spelling** is `WireForm`'s, which is
-    the whole point. `WireForm.heldRecord` and this phase's `recordBinding` are two producers of the wire form and one
-    producer of its spelling — both going through `WireForm.refValue` and `WireForm.nameField` is what makes
-    that true by construction rather than by two authors agreeing.
-    - **`DataClassObjectWriter` cannot serve as that second producer**, which is why `WireForm.heldRecord` exists rather
-      than a round-trip. It spells a reference as this phase does, but differs two ways: every other token
-      quoted, and a field's facts written where the default covers them. The first is fatal on its own, since
-      `HeldBody.names()` and substitution both key on a token being *unquoted*, so a fully-quoted body references
-      no parameters at all. Its output is canonical-explicit — a different
-      language from the one a held body is written in.
-    - **The writer is used for exactly one leaf**: a resolved annotation carries its value as a *bound
-      object* (`Annotation.value` is `Optional<Object>`), and unbinding one is what an object writer is for.
-      That is a self-contained value rather than part of the spelling, so it goes through
-      `HeldBody.annotationValue` and nothing structural does.
+  - **A parameter rides the ordinary `value` slot of this phase's payload**, written as the author wrote it,
+    unquoted. This payload is source spelling, so the resolver classifies each field from it once, when it reads
+    the payload as the `meta.record_template` it denotes (`WireForm.recordTemplatePayload`): an unquoted parameter
+    token in `value` is the field's `value_param`, a bare parameter name in `type` its `type_param`. The role beside
+    it is the modifier's (`FieldModifiers`): `= P` is FIXED where it is written, and closing only substitutes the
+    value.
+  - **A composition or refinement template is built one phase later**, as the *flattened* record template
+    (`DefinitionResolver.Built`). Both absorb fields from a source, and a §5.7 tightening entry states a modifier and
+    no type-ref, so it is not a field at all until the inherited field supplies one. That needs a namespace this phase
+    does not have, so the flattening happens in the resolver, which labels each entry the declaration writes as it
+    resolves it and writes no wire form for the template at all.
   - **§5.11's uniqueness rule is asked here as well**, and asking it twice is not duplication: the resolver's
     copy sees a closed record body and this one sees a template's, which after normalisation are two
     different phases. Left to the constructor's own reader instead, the wire form carries one name twice as

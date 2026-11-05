@@ -35,7 +35,8 @@ import java.util.SequencedMap;
 import java.util.Set;
 
 /**
- * A SEALED record position ([TSON-SCHEMA] §5.2): the base declares one or more discriminator fields, each
+ * A member-dispatched record position ([TSON-SCHEMA] §5.2): an ABSTRACT base declares one or more discriminator
+ * fields, each
  * member of the family pins them, and a value here is placed by reading those fields rather than by carrying
  * a tag. The text encoding reads a sealed position exactly as [TSON-JSON] §6.1.5 has JSON read one -- the tag
  * is not required and MUST agree where written -- so the discriminator is a field the reference encoding
@@ -96,7 +97,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.readerFor = readerFor;
         this.selectors = selectorFields.entrySet().stream()
                 .map(field -> selectorOf(field.getKey(), field.getValue(), entries, context.linked())).toList();
-        // The family's members compose the base, so they share its name type; a template base states none.
+        // The family's members compose the base, so they share its name type, a template base's included.
         this.nameForm = selfNames.stream().map(context.linked()::nameForm)
                 .filter(form -> form != io.ltr8.unicode.Normalization.NFC).findFirst()
                 .orElse(io.ltr8.unicode.Normalization.NFC);
@@ -105,9 +106,8 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            // A record template IS-A the base is no member: its applications are, each pinned once closed.
-            if (!(entries.get(subtype) instanceof RecordBody record)
-                    || io.ltr8.tson.schema.meta.OpenEntry.isOpen(record)) {
+            // Only a record is a member: a record template IS-A the base is none, its applications are.
+            if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }
             List<Object> key = pinsOf(record);

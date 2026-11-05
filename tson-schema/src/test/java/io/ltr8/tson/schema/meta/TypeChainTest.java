@@ -69,8 +69,8 @@ class TypeChainTest {
     void aConstructorIsWhatIsATheKernelsTopAndTheKernelsTopItself() {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
                 .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
-        RecordBody templated = RecordBody.of(RecordBody.fieldMap())
-                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())))
+        RecordTemplateBody templated = emptyTemplate(
+                        List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())))
                 .withSupertypes(List.of("meta.namespace", "meta.top"));
 
         assertTrue(EntryKind.isConstructor("numeric.integer_type", constructor, n -> true));
@@ -82,14 +82,19 @@ class TypeChainTest {
 
     @Test
     void aRecordTemplateCarriesAChainAsAnyTypeDoes() {
-        RecordBody pet = RecordBody.of(RecordBody.fieldMap())
-                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())));
-        RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
+        RecordTemplateBody pet = emptyTemplate(
+                List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())));
+        RecordTemplateBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
 
         assertEquals(List.of("animal"), TypeChain.supertypesOf(placed));
         assertEquals(List.of(TypeRef.of("animal")), TypeChain.parentsOf(placed));
         assertEquals(List.of("dog"), TypeChain.subtypesOf(placed));
         assertEquals(placed.parameterNames(), pet.parameterNames());
+    }
+
+    private static RecordTemplateBody emptyTemplate(List<TemplateParam> parameters) {
+        return new RecordTemplateBody(TypeChain.EMPTY, new io.ltr8.annotation.AnnotatedMap<>(), List.of(),
+                RecordExtensionType.OPEN, List.of(), Optional.empty(), parameters);
     }
 }

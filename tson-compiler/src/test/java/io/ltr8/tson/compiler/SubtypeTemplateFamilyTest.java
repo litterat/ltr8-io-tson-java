@@ -94,6 +94,28 @@ class SubtypeTemplateFamilyTest {
     }
 
     /**
+     * <b>An applied parent reaches the entry its arguments name, never its head</b> ([TSON-SCHEMA] §5.8's
+     * "Parameterized references", §8.1's derived indexes: "{@code ok<text>} indexes {@code result<text>}, never a
+     * head name"). So the template {@code ok} is IS-A nothing of {@code result}'s, and {@code ok<text>} reaches
+     * {@code result} only through a declaration naming {@code result<text>}: with none, it is a member of {@code
+     * ok}'s family alone.
+     */
+    @Test
+    void anAppliedParentReachesTheEntryItsArgumentsNameAndNeverTheHead() {
+        TsonCompiledSchema compiled = compile("""
+                  result    => <T> { payload: T }
+                  ok        => <T> result<T> & { note: text }
+                  ok_of     => ok<text>
+                """);
+
+        assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get("ok")),
+                "the template is IS-A no head name");
+        assertEquals(List.of("ok"), TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
+                "no declaration names result<text>, so its application reaches no member of result's family");
+        assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get("result")));
+    }
+
+    /**
      * <b>A family-base template is IS-A its parents, and so are its instantiations</b> ([TSON-SCHEMA] §4.1). A
      * record template carries a chain: it holds {@code base} as written and as reached, which puts the
      * template in {@code base.subtypes} as any record composing {@code base} is, and every instantiation closing
@@ -113,7 +135,7 @@ class SubtypeTemplateFamilyTest {
         assertTrue(TypeChain.subtypesOf(baseEntry).contains("box"),
                 () -> "the template is IS-A its parent too: " + TypeChain.subtypesOf(baseEntry));
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(compiled.schema().entries().get("box")),
-                "the open record keeps its parent as written, which closing completes");
+                "the record template keeps its parent as written, which closing completes");
     }
 
     /**

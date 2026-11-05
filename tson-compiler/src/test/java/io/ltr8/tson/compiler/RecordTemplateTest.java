@@ -522,14 +522,9 @@ class RecordTemplateTest {
     }
 
     /**
-     * A literal applied where the body uses the parameter as a <b>type</b> is still refused -- the substituted
-     * token stands in a type position, and nothing declares a type called {@code 3}.
-     *
-     * <p><b>The verdict arrives as an unresolved reference rather than as a kind error</b>, because a held
-     * body has no slot types: §5.10's argument-kind rule ("a reference argument binds a type parameter, a
-     * literal binds a value parameter") is enforced by knowing what the slot expected, and holding is
-     * precisely not knowing that until materialisation. What survives is the consequence -- a literal in a
-     * type position resolves to nothing -- which is why this half is caught and its converse below is not.
+     * A literal applied where the template uses the parameter as a <b>type</b> is a kind error: {@code T} is the
+     * field's {@code type_param}, so its argument names a type, and {@code 3} is no name -- refused where the
+     * argument is substituted for the label, at the application (§5.10).
      */
     @Test
     void applyingAValueWhereTheBodyUsesAParameterAsATypeIsAnError() {
@@ -537,8 +532,8 @@ class RecordTemplateTest {
                 () -> compile("""
                           box => <T> { v: T }
                           holder => { b: box<3> }"""));
-        assertTrue(thrown.getMessage().contains("'3': U+0033 at index 0 cannot start an identifier"),
-                thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'box<...>' binds the type parameter 'T' to '3', which is no type -- "
+                + "'3': U+0033 at index 0 cannot start an identifier"), thrown.getMessage());
     }
 
     /**

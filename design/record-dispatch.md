@@ -18,9 +18,10 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
 - `UNKNOWN_TYPE_REF` means the written name denotes nothing; a name that resolves and is not admissible, or a required
   selector that is absent, is `TYPE_MISMATCH`.
 - The pin table is keyed by `ValueIdentity`, and the selector scan is a `lookingAhead` that rewinds.
-- A record template IS-A a base is no member of it, even where it pins the selector: it has no values, and its
-  applications are the members. Both member dispatchers skip it, so a pin only the template states selects nothing
-  and the refusal offers only pins a document could write (`CrossEncodingParityTest`).
+- A member is a `RecordBody`, so a record template IS-A a base is no member of it, even where it pins the selector:
+  it has no values, and its applications are the members. Both member dispatchers take only `RecordBody` subtypes,
+  which passes a template by type rather than by a check, so a pin only the template states selects nothing and the
+  refusal offers only pins a document could write (`CrossEncodingParityTest`).
 - In a data document a bare token fills a record's one positional field (§5.6) whatever its type. In a schema
   document (`TsonReadContext.readsSchemaDocument()`) it does so only where that field is atom-typed; an unquoted
   token is otherwise a value by name, read only by a `TypeRef` component at a record-typed slot.
@@ -43,7 +44,9 @@ play, so no family-base position reaches it.
   the failure lands before the record's shape is consulted. It selects among a record's subtypes and knows nothing
   of namespace types: resolved output's `myapi => !api { … }` is read at the schema map's `declared` position, whose
   reader delivers a `Namespace` (`DeclaredReader`, `design/declared-positions.md`, `design/meta-layer-namespaces.md`).
-- **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up.
+- **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up. Their
+  keys are matched in the base's name form (`TsonLinkedSchema.nameForm`), a record template base's included: its
+  members take its name type, and `FieldNames.readBy` records the template's as it records a record's.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
 it, so the member's own reader takes the whole data-value and does with it whatever that mode does everywhere

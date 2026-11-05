@@ -974,7 +974,7 @@ data format made a schema that wants dates reserve every network and numeric nam
 - **Resolved output** tags a body by its constructor's name (`!meta.record`, `!enum`, `!numeric.decimal_type`,
   `!net.uuid_type`) and names each entry as its document does (`!meta.record_field { type: text }`, `@meta.synthetic`,
   `@meta.application`). The kernel's form is `!schema { numeric => !meta.schema { … } … meta => !meta.schema { … }
-  … }`, its 66 members in its six maps and its thirteen root entries and six synthetics at the root; each library's is
+  … }`, its 69 members in its six maps and its thirteen root entries and seven synthetics at the root; each library's is
   `!schema { numeric => !meta.schema { … } number => !numeric.decimal_type {} … }`, its map holding its own members
   and none of the kernel's; core's holds its six annotations. The five fixtures this implementation
   holds itself to are `meta-resolved.tn`, `numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn` and
@@ -1116,9 +1116,9 @@ implementation choice inside it have nothing left to govern.
   is (§5.6 admits no based-integer `number`), where a `value`-typed slot decoded `0x10` by §4 and narrowed it. A
   refused bound carries its family reader's verdict (`'P1Y' is not a valid duration … a month is a period`), as the
   kernel's `integer`-typed bounds already do.
-- **`value` keeps one slot**: `meta.record_field.value`, a field's default or pin, whose type is the field's declared
-  type and is not expressible in the kernel without dependent fields. `value => !meta.value_type {}` stays, and its
-  `@doc` names that slot alone.
+- **`value` keeps one slot**: a field's default or pin (`meta.record_field.value`, and the same slot on #19's
+  `meta.record_template_field`), whose type is the field's declared type and is not expressible in the kernel without
+  dependent fields. `value => !meta.value_type {}` stays, and its `@doc` names that slot alone.
 - The resolved fixtures (`spec/fixtures/numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn`) carry the
   typed facets; net.tn's lifted `[meta.value]` becomes two synthetics, `[cidr4]` and `[cidr6]`.
 
@@ -1163,3 +1163,118 @@ type or a type IS-A it (§7.2), or `void` at a voidable position; any other rest
 tightening entries follow the same rule." If a structural narrowing between containers or a variant restating its
 choice is wanted, it is a rule of its own that each constructor states, as #5's last paragraph leaves the container
 constructors' tightening rules theirs to state.
+
+## 19. [TSON-SCHEMA] §1.3, §4.2, §5.7, §5.10, §8.1, §13.2 — a record template is its own constructor, its fields labelled
+
+**Problem.** §5.10 and §8.1 make a record template "a `!record` with `parameters`", and §1.3's resolved-output
+consumer recognises one "by its `parameters`". So one constructor holds two things with opposite contracts: a closed
+record, which is what readers and writers are built for, and a family base, which nothing is ever read or written
+against — a position it types dispatches to a member. Every consumer that builds a reader or writer from a `!record`
+has to ask the optional list first, and a consumer that forgets builds a reader for a template; nothing in the
+vocabulary stops it. Inside the template, a parameter rides a field's `type` or `value` unlabelled, told from a type
+name or a literal by §5.10's shadowing rule "in resolved output as in source", so a resolved-output consumer that wants
+to know whether `value: S` is a pin or a parameter needs the template's parameter list and the shadowing rule, and a
+literal that happens to spell a parameter has no resolved form at all.
+
+**What is running** (on the Revision 39 proposal branch; `spec/m/meta.tn` and the Part 2 draft carry it).
+
+- **The kernel splits the constructor.** `meta.record` loses `parameters` and is closed: no field carries a parameter.
+  `meta.record_template => meta.product & { access_pattern? size_type? fields: meta.record_template_field_map  groups?
+  extension? discriminators? name_type?  parameters: [meta.template_param; 1..] }` is the family base: a type a
+  position may name, ABSTRACT by construction, IS-A its parents and parent of its declared applications, and never
+  read or written against. `extension` is each application's, `discriminators` the family's, `groups` and
+  `name_type` each application's, unchanged by substitution.
+- **A template's field labels a whole parameter.** `meta.record_template_field => { ( type: meta.type_ref | type_param:
+  meta.param_name )  optional?  voidable?  role?  ( value: meta.value | value_param: meta.param_name )? }`: `type_param`
+  names a parameter standing for the whole type, `value_param` one standing for the whole value, and `type` and
+  `value` are as on a record field. A parameter as an argument of an application in `type` (`items: box<T>`) or in a
+  parent stays where it is, recognised by its text resolving into `parameters` — the one place resolved output still
+  applies the shadowing rule. `<T, S> { status?: int32 = S  body: T }` resolves to `!meta.record_template { fields: {
+  status => !meta.record_template_field { type: int32  optional: true  role: FIXED  value_param: S }  body =>
+  !meta.record_template_field { type_param: T } } … }`, and its application `created => response<order, 201>` to an
+  ordinary `!meta.record` whose `status` is `value: 201`: substitution turns `type_param` into `type` and
+  `value_param` into `value`, and changes no other fact.
+- **The source spelling is unchanged, and the shadowing rule is spent where it is written.** The labels are the
+  resolver's: a token the template's own body writes is a parameter by §5.10's shadowing rule, and is labelled as the
+  template is built. Nothing is classified after that. A field the template takes from a closed source keeps its
+  literal, even one spelled like the template's parameter (`base => { kind?: text = T }` with `fam => <T> base & {
+  v: T }`: `fam`'s `kind` is `value: T`, not `value_param: T`). §5.10's "a literal spelled like a live parameter is
+  unreachable" therefore reaches only what the template writes. `!meta.record_template { … }` written in source is
+  refused as resolver vocabulary, as `!meta.template` already is.
+- **Two declaration-time rules, one of them new.** A selector's type names no parameter — §5.10's existing condition,
+  unchanged and already refused (`a-discriminator-typed-by-a-parameter`). **New: a literal `value` needs a closed
+  type**, so a field typed by a parameter, whole or as an argument, takes `value_param` or no value: `<T> { v?: T ~ 5
+  }` and `<M> { v?: capped<M> ~ 5 }` are refused at the declaration. Revision 38 accepts both and judges the literal
+  per application (`box<int32>` and `box<text>` pass; `capped<3>` refuses `5`), so a template could be valid for
+  some arguments and not others; the rule makes the template's verdict its own. The same rule reaches a literal
+  *argument*: with `pin2 => <T, P> { a?: T = P }`, `<X> pin2<X, 3> & { … }` and `<X> { f: pin2<X, 3> }` bind `P`, a
+  value of `T`'s argument, to `3` while that argument is the open `X`, and both are refused at the application,
+  naming `3`, `P` and `X`; `pin2<int8, 3>` is a closed application and its member pins `a` to `3`.
+- **Kinds follow the constructor.** A record template is a member of `meta.ref<meta.record_template>` and of no
+  `meta.ref<meta.record>`, where §5.10 calls it "a member of `kind<record>`"; its declared applications are records.
+  The kernel's `meta.ref<meta.map>` gains `meta.record_template_field_map` (`the-kind-of-map-holds-the-namespace-types`).
+- **In this implementation the split is a type-level fact, end to end.** The record template is its own Java type
+  beside the record's, so a reader, a writer or a member dispatcher built from a record cannot be handed a template,
+  and the "a template IS-A the base is no member" rule both encodings' dispatchers carried is the record type test
+  they already made. No record value holds a parameter, inside the resolver as in output: a template is built as a
+  template where it is declared, and an application substitutes on that value into a record -- `type_param` and
+  `value_param` take their arguments, a parameter among an application's arguments is replaced where it stands --
+  with nothing written out as text and read back. A value where a type parameter stands (`box<3>`) and an application
+  where a value parameter stands are refused at the application, by the label the argument lands at. The record
+  template's fields are a second field type, and the two record shapes share no Java parent, as `record_template` and
+  `record` share no kernel parent beyond `product`: the duplication is a handful of arms (field-name hygiene, the
+  name type, the selector derivation) that read the same five record-level facts.
+- `spec/fixtures/meta-resolved.tn` carries the three new entries and `record` without `parameters`; the corpus's
+  record-template outputs move to the new form, with vectors for the labels, an absorbed literal left a literal,
+  both literal refusals and the refused construction.
+
+**Open edge.** The kernel duplicates `record`'s record-level fields on `record_template` rather than composing a
+shared parent; if one is wanted, it is a `meta.product` refinement holding `chain`, `groups`, `extension`,
+`discriminators` and `name_type`, with `fields` left to each.
+
+**Resolution, a proposal.**
+
+- §5.10, "Template forms": a record template is a **`record_template`**, not a `record` with `parameters`; a record is
+  closed. "Held bodies": `<T> { x: T }` is `!record_template { fields: { x => !record_template_field { type_param: T }
+  }  parameters: [ … ] }`; the three places a parameter stands are a field's `type_param`, its `value_param`, and an
+  argument of an application; add "A literal value needs a closed type: a field whose type is a parameter, or an
+  application over one, takes a value parameter or no value, and a literal there is a resolver error at the
+  declaration", and that the shadowing rule classifies what the template's own body writes, a field it absorbs
+  keeping its literal. "Substitution": a `type_param` and a `value_param` become `type` and `value`. The family-base
+  paragraph: a member of `kind<record_template>`, recognised by its constructor; no reader or writer is built for it.
+- §8.1, "Open entries" and the `record_field` paragraph: state `record_template` and `record_template_field` as above,
+  and drop "in a record template it may hold a parameter, unlabelled"; `template` and `record_template` are both
+  resolver vocabulary. §8.1's table row and "Closed entries are parameter-free": an open entry is a
+  `!record_template` or a `!template`.
+- §1.3: a consumer recognises a record template by its constructor; §4.2's application-form list names
+  `record_template_field.type`; §5.7's open modifiers: the parameter is the field's `value_param` while open.
+- §13.2: the kernel listing gains the three entries and `record` loses `parameters`.
+
+## 20. [TSON-SCHEMA] §5.8, §5.10, §8.1 — an applied parent reaches the head at a closed operand, not through a template
+
+**Problem.** §5.8 gives two answers to one question: does a type whose parent is an application of a record template
+take an IS-A edge to that template? For a closed declaration it does: an application at a composition operand "is
+subsumed where it stands", so `dog => pet<"dog", dog_type> & { … }` is the hand-written
+`dog => pet & { pet_type?: = "dog"  pet: dog_type }` "with one IS-A edge to `pet`", the head. For a template it does
+not: with `ok => <T> result<T> & { note: text }`, "`ok<text>` reaches an IS-A edge to `result<text>`", and §8.1's
+derived indexes add "`ok<text>` indexes `result<text>`, never a head name". So `ok_of => ok<text>` is IS-A `ok` and,
+only where a declaration names `result<text>`, `result<text>` — never `result`. Yet §8.1 also says "a template's
+expansion carries whatever chain the expansion's own `^` or `&` gives it", and `ok<text>` expands to
+`result<text> & { note: text }`, whose operand by §5.8's first answer earns the edge to `result`. The application and
+its hand-written expansion land in different families, and a position typed `result` admits the second and refuses
+the first.
+
+**What is running.** Both texts as written. A closed declaration composing an application is a declared member of the
+template and IS-A its head; a template's applied parent is substituted and closed, and the closed entry's chain
+reaches the entry its arguments name, so the template is IS-A nothing of `result`'s and `ok_of`'s supertypes are
+`[ok]` unless some declaration names `result<text>` (`SubtypeTemplateFamilyTest`).
+
+**Resolution, a proposal.** Make the expansion rule govern: a declared application of a template whose parent is an
+application of another record template is IS-A that template too, as its hand-written expansion is, and joins its
+family. §5.8's "never asked to carry the distinction" survives — the edge to `result<text>` still distinguishes
+instantiations, and the head edge says only "a member of the `result` family", as `dog`'s does. Two consequences to
+state with it: the member must pin the outer family's discriminators, which `ok`'s own pins (or its parameters'
+arguments) supply; and §8.1's "never a head name" narrows to "a parent application contributes the entry its
+arguments name, and a declared member additionally the head". The alternative, keeping the asymmetry, needs §8.1's
+expansion sentence to except applied parents, and the hand-written-expansion equivalence §5.8 states for `dog` to be
+said to hold only for closed declarations.

@@ -10,8 +10,9 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
 - Inhabitance is a least fixed point over the entry graph: exact, total and two-valued, with no third answer.
 - Every local entry is judged, referenced or not; imported entries are skipped, having been judged when their own
   schema linked.
-- An open entry (a held template or a record template) is inhabited by fiat; the entries materialisation mints from
-  it are judged like any other, so a template nobody applies is judged nowhere.
+- An open entry (a held template, a `TemplateBody`, or a record template, a `RecordTemplateBody`) is inhabited by
+  fiat; the entries materialisation mints from it are judged like any other, so a template nobody applies is judged
+  nowhere.
 - An unresolved reference is inhabited by fiat, and the check runs after `validateEntry`, so one defect is reported
   once.
 - A kind is inhabited exactly when it has a member; a value entry and every atom are inhabited here. An atom whose
@@ -86,8 +87,9 @@ usable and its members pin them distinctly, and every member is declared.
   `discriminators` (§5.2), resolved to the base's own fields by `FamilySelectors`, the derivation both encodings'
   readers dispatch on, so the check and the read cannot disagree about which fields select a member. A member states
   no discriminators of its own, so an inherited selector needs no exemption. A record template is a family base and
-  is judged as one, its body assembled from what it states as a base: skipping it would accept a marked template with
-  no family check at all.
+  is judged as one, its body assembled from what it states as a base (`familyBodyOf`: ABSTRACT, its
+  `discriminators`, each selector closed at the type the template declares): skipping it would accept a marked
+  template with no family check at all.
 - **Every family in the closure is judged**, not only one with a part declared here. §3.3.4 makes `subtypes` open
   across schemas, so an importer can add a member that collides with an imported one, and two imports that each link
   cleanly can each add a member that collides with the other's. The second is the merge's own fault and is reported
@@ -100,7 +102,8 @@ usable and its members pin them distinctly, and every member is declared.
   what a read reports, a tag names and a binding maps, all by name, and a minted name is unwritable (§8.2). It also
   keeps §8.2's content-derived duplicates harmless: two schemas minting one form hold two entries no value can tell
   apart, and with members declared no duplicate is a family member. An undeclared member is skipped by the collision
-  check, so one mistake gets one verdict; so is a record template IS-A the base, whose applications are the members.
+  check, so one mistake gets one verdict; and only a `RecordBody` is a member at all, so a record template IS-A the
+  base, whose applications are the members, is passed by type.
 - **Pins compare as values through `ValueIdentity`**, which is why that class is visible outside its package. §4.3
   makes `= 255` and `= 0xFF` one pin and §5.5 makes `= 1` and `= 1.0` one, so a comparison of tokens would accept a
   schema whose dispatch table is not a function. They are read **at the base's declared type**, an enum selector in

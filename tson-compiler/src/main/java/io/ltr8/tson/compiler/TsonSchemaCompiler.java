@@ -9,7 +9,8 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.reader.Subsumption;
@@ -214,18 +215,18 @@ public final class TsonSchemaCompiler {
         }
 
         private TsonTypeReader<?> build(String name, Top definition) {
-            if (OpenEntry.isOpen(definition)) {
-                ValueReaderContext context =
-                        new ValueReaderContext(linked, readers, namesMeaning, referrers);
-                if (OpenEntry.isFamilyBase(definition)) {
-                    // A *family base* -- a record template (§5.10). No
-                    // value is read against it: one of its instantiations is, selected by a tag or by the
-                    // discriminators, so it dispatches exactly as a closed abstract or sealed record does.
-                    return new AbstractTemplateReader(name, definition, context, readers);
-                }
+            if (definition instanceof RecordTemplateBody template) {
+                // A *family base* -- a record template (§5.10). No value is read against it: one of its
+                // members is, selected by a tag or by the discriminators, so it dispatches exactly as a closed
+                // abstract or sealed record does.
+                return new AbstractTemplateReader(name, template,
+                        new ValueReaderContext(linked, readers, namesMeaning, referrers), readers);
+            }
+            if (definition instanceof TemplateBody held) {
                 // Every other template is not a type ([TSON-SCHEMA] §5.10). See OpenTemplateReader for why the
                 // refusal is the entry's own reader rather than a check at the root.
-                return new OpenTemplateReader(name, OpenEntry.parameterNames(definition), context.locationOf(name));
+                return new OpenTemplateReader(name, held.parameterNames(),
+                        new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
             }
             Top body = definition;
             if (body instanceof Alias r) {

@@ -19,7 +19,8 @@ public enum EntryKind {
     /**
      * A held template -- [TSON-SCHEMA] §5.10's open entry over any constructor but {@code record}, whose body is a
      * {@link TemplateBody}. It is not a type: it cannot validate data, and naming one where a type is expected is
-     * a resolver error. A record template is a type, the family base, and takes a record's kind. Like {@link
+     * a resolver error. A record template ({@link RecordTemplateBody}) is a type, the family base, and takes a
+     * record's kind. Like {@link
      * #ALIAS} it is a {@code meta.type_ref} and not a base kind (§4.1), and it says nothing about what an
      * application of the template will produce -- that is the kind of the entry materialisation mints, derived
      * from the constructor its closed body applies.
@@ -28,9 +29,9 @@ public enum EntryKind {
 
     /**
      * {@code value}'s kind. A body is the branch of {@link Top} it occupies -- an instance takes its constructor's
-     * kind by being built as one (§5.5's transfer) -- except a record, whose kind is the base kind its chain
-     * reaches ({@link #ofChain}): {@code integer_type => atom & { ... }} is a record describing atoms, and the kind
-     * of a constructor is what its instances are.
+     * kind by being built as one (§5.5's transfer) -- except a record or a record template, whose kind is the base
+     * kind its chain reaches ({@link #ofChain}): {@code integer_type => atom & { ... }} is a record describing
+     * atoms, and the kind of a constructor is what its instances are.
      *
      * @param kernel whether a chain's name denotes the kernel's own entry of that name -- a kind is judged by
      *               where a base kind is defined, never by its spelling, so a schema's own {@code atom => { ... }}
@@ -39,6 +40,7 @@ public enum EntryKind {
     public static EntryKind of(Top value, Predicate<String> kernel) {
         return switch (value) {
             case RecordBody record -> ofChain(record.supertypes(), kernel);
+            case RecordTemplateBody template -> ofChain(template.supertypes(), kernel);
             case Atom ignored -> ATOM;
             case Product ignored -> PRODUCT;
             case Sum ignored -> SUM;

@@ -181,6 +181,22 @@ class IdentifierValueHygieneTest {
                 "account => { role?: slug ~ admin  bind?: js_name ~ \"$scope\"  tag?: text ~ " + MIXED + " }")));
     }
 
+    /**
+     * A record template's literal value is every application's, so it is judged once, at the template, against the
+     * template's own declaration -- applied or not. A value parameter is no literal of the template's and is judged
+     * where an application writes its argument.
+     */
+    @Test
+    void aRecordTemplatesIdentifierTypedValueIsAName() {
+        Diagnostic refused = only(tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
+                "acct => <T> { kind: slug = a\u0132b  v: T }")));
+        assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, refused.code());
+        assertEquals(Optional.of("/acct"), refused.schemaPointer());
+
+        assertEquals(List.of(), tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
+                "acct => <T, K> { kind: slug = K  v: T }")));
+    }
+
     private static String schemaWith(String declaration) {
         return """
                 !!id:"https://example.test/names-3.tn"
