@@ -7,8 +7,7 @@ import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.unicode.IdentifierType;
-import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.RecordHead;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
@@ -46,12 +45,7 @@ final class FieldNames {
      */
     static Optional<Top> readBy(Top record, Map<String, Top> merged,
                                            Function<String, Top> structure) {
-        Optional<String> stated = switch (record) {
-            case RecordBody body -> body.nameType();
-            case RecordTemplateBody template -> template.nameType();
-            case null, default -> Optional.empty();
-        };
-        if (stated.isEmpty()) {
+        if (RecordHead.of(record).flatMap(RecordHead::nameType).isEmpty()) {
             return Optional.empty();
         }
         return NameType.of(record, Optional.empty(), merged::get, structure).map(NameType.Resolved::definition);
@@ -63,29 +57,14 @@ final class FieldNames {
         List<EnumLabels.Violation> violations = new ArrayList<>();
         for (String name : localNames) {
             Top definition = merged.get(name);
-            Optional<Shape> shape = switch (definition) {
-                case RecordBody body -> Optional.of(new Shape(body.nameType(), body.fields().keySet(),
-                        body.discriminators(), body.groups()));
-                // A template's field names are each application's, so they are judged once, here.
-                case RecordTemplateBody template -> Optional.of(new Shape(template.nameType(),
-                        template.fields().keySet(), template.discriminators(), template.groups()));
-                case null, default -> Optional.empty();
-            };
-            shape.flatMap(body -> check(name, definition, body, merged, structure)).ifPresent(violations::add);
+            // A template's field names are each application's, so they are judged once, here.
+            RecordHead.of(definition).flatMap(head -> check(name, definition, head, merged, structure))
+                    .ifPresent(violations::add);
         }
         return List.copyOf(violations);
     }
 
-    /** What the check reads of a record or a record template: its name type and the names it declares or names. */
-    private record Shape(Optional<String> nameType, Set<String> fieldNames, List<String> discriminators,
-                         List<FieldGroup> groups) {
-
-        String nameTypeName() {
-            return nameType.orElse(RecordBody.FIELD_NAME);
-        }
-    }
-
-    private static Optional<EnumLabels.Violation> check(String name, Top definition, Shape body,
+    private static Optional<EnumLabels.Violation> check(String name, Top definition, RecordHead body,
                                                         Map<String, Top> merged,
                                                         Function<String, Top> structure) {
         Optional<NameType.Resolved> resolved = NameType.of(definition, Optional.empty(), merged::get, structure);

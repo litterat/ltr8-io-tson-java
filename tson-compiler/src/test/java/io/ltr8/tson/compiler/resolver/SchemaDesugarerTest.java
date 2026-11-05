@@ -14,6 +14,7 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
+import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
@@ -557,12 +558,11 @@ class SchemaDesugarerTest {
         assertEquals(new TokenValue("p0", TokenForm.UNQUOTED),
                 payload.fields().getFirst().value().coreValue());
 
-        // `box` itself is `!record { ... }` by the time it leaves this phase (§5.2), so the field applying
-        // the lifted form is a reference inside the held binding record rather than a `GenericRef`
-        // in the AST.
-        Instance boxTemplate =
-                assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
-        assertEquals("meta.record", boxTemplate.target());
+        // `box` itself is `!record_template { ... }` by the time it leaves this phase (§5.2), so the field
+        // applying the lifted form is a reference inside its payload rather than a `GenericRef` in the AST.
+        RecordTemplateDef boxTemplate =
+                assertInstanceOf(RecordTemplateDef.class, document.body().declarations().get("box").typeDef());
+        assertEquals(Optional.of("meta.record_template"), boxTemplate.payload().typeRef());
         assertEquals(applicationValue(lifted.name(), "T"), fieldSlot(boxTemplate, 0, "type"));
     }
 
@@ -601,9 +601,9 @@ class SchemaDesugarerTest {
 
     /**
      * A record <b>template</b> is normalised here -- §5.2's own rewrite, {@code { v: T }} into the
-     * {@code !record { fields: [ ... ] }} it denotes -- so that every open body is a held application and one
-     * process closes them all. The <b>application</b> of it still passes through untouched: substitution
-     * happens over the resolved open form ({@code TemplateMaterialiser}), not over the AST, so this phase
+     * {@code !record_template { fields: { ... }  parameters: [ ... ] }} it denotes, a whole parameter labelled while
+     * the parameters are in scope. The <b>application</b> of it still passes through untouched: substitution
+     * happens over the resolved template ({@code TemplateMaterialiser}), not over the AST, so this phase
      * leaves {@code box<text>}'s head and arguments alone.
      */
     @Test
@@ -612,13 +612,14 @@ class SchemaDesugarerTest {
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
 
-        Instance box = assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
-        assertEquals("meta.record", box.target());
+        RecordTemplateDef box = assertInstanceOf(RecordTemplateDef.class,
+                document.body().declarations().get("box").typeDef());
+        assertEquals(Optional.of("meta.record_template"), box.payload().typeRef());
         assertEquals(List.of("T"), box.typeParams(), "the declaration's own list, as written");
         assertEquals(new TokenValue("v", TokenForm.UNQUOTED), fieldKey(box, 0),
-                "the field's name is its key in the held field map");
-        assertEquals(new TokenValue("T", TokenForm.UNQUOTED), fieldSlot(box, 0, "type"),
-                "the parameter stands in the slot, as it does in every other held form");
+                "the field's name is its key in the field map");
+        assertEquals(new TokenValue("T", TokenForm.UNQUOTED), fieldSlot(box, 0, "type_param"),
+                "a whole-type parameter is labelled where it is written");
 
         RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
                 .typeDef()).body();
@@ -724,20 +725,20 @@ class SchemaDesugarerTest {
                 .reduce((a, b) -> a + " " + b).orElse("") + "] }";
     }
 
-    /** The {@code fields} map of a held {@code !record} binding record. */
-    private static MapValue heldFields(Instance template) {
-        RecordValue binding = (RecordValue) template.value().coreValue();
+    /** The {@code fields} map of a record template's payload. */
+    private static MapValue heldFields(RecordTemplateDef template) {
+        RecordValue binding = (RecordValue) template.payload().coreValue();
         return (MapValue) binding.fields().stream().filter(f -> f.name().equals("fields"))
                 .findFirst().orElseThrow().value().coreValue();
     }
 
-    /** The key -- the field's name -- of the {@code n}th entry in a held {@code !record}'s {@code fields}. */
-    private static CoreValue fieldKey(Instance template, int n) {
+    /** The key -- the field's name -- of the {@code n}th entry in a record template's {@code fields}. */
+    private static CoreValue fieldKey(RecordTemplateDef template, int n) {
         return heldFields(template).entries().get(n).key().coreValue();
     }
 
-    /** One member of the {@code n}th {@code meta.record_field} in a held {@code !record} binding record. */
-    private static CoreValue fieldSlot(Instance template, int n, String member) {
+    /** One member of the {@code n}th field in a record template's payload. */
+    private static CoreValue fieldSlot(RecordTemplateDef template, int n, String member) {
         RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().coreValue();
         return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()
                 .value().coreValue();

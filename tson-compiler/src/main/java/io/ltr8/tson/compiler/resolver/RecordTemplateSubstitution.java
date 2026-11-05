@@ -4,6 +4,7 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.Token;
@@ -22,10 +23,10 @@ import java.util.Optional;
  * fact of a field changes.
  *
  * <p><b>Two callers, one rule.</b> {@code TemplateMaterialiser} closes an application, where every argument is
- * closed and the result is a member's fields ({@link RecordTemplateField#closed}). {@code DefinitionResolver}
- * absorbs an operand still applied to the absorbing declaration's own parameters ({@code <T> box<T> & { … }}),
- * where {@code outer} names those parameters and an argument that is one of them lands as a label again: the
- * result is the absorbing template's fields.
+ * closed and the result is a member's fields ({@link #closed}); so does {@code DefinitionResolver} where a closed
+ * declaration absorbs an applied operand. Where the absorbing declaration is itself open and the operand is applied
+ * to its parameters ({@code <T> box<T> & { … }}), {@code outer} names those parameters and an argument that is one
+ * of them lands as a label again: the result is the absorbing template's fields ({@link #fields}).
  *
  * <p><b>The argument's kind is checked here</b>, because a label says which kind its slot takes: a value where a
  * type parameter stands ({@code box<3>}) and an application where a value parameter stands are refused at the
@@ -48,6 +49,18 @@ final class RecordTemplateSubstitution {
         template.fields().forEach((name, field) -> substituted.put(name,
                 field(head, field, bindings, outer), template.fields().getAnnotations(name)));
         return AnnotatedMap.copyOf(substituted);
+    }
+
+    /**
+     * {@code template}'s fields with every parameter substituted by its closed argument, each the {@link RecordField}
+     * a member holds, in order and with their key annotations.
+     */
+    static AnnotatedMap<String, RecordField> closed(String head, RecordTemplateBody template,
+            Map<String, TypeArgument> bindings) {
+        AnnotatedMap<String, RecordField> closed = new AnnotatedMap<>();
+        template.fields().forEach((name, field) -> closed.put(name,
+                field(head, field, bindings, List.of()).closed(), template.fields().getAnnotations(name)));
+        return AnnotatedMap.copyOf(closed);
     }
 
     /** {@code template}'s parents as written, each argument substituted -- closing completes the chain from them. */

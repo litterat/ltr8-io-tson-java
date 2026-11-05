@@ -18,7 +18,6 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
-import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
@@ -816,14 +815,10 @@ final class TemplateMaterialiser {
      */
     private RecordBody closeRecordTemplate(String head, RecordTemplateBody template,
                                            Map<String, TypeArgument> bindings) {
-        AnnotatedMap<String, RecordTemplateField> substituted =
-                RecordTemplateSubstitution.fields(head, template, bindings, List.of());
+        AnnotatedMap<String, RecordField> substituted = RecordTemplateSubstitution.closed(head, template, bindings);
         AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
-        substituted.forEach((name, field) -> {
-            RecordField closed = field.closed();
-            fields.put(name, closed.withType(close(closed.type())).withPosition(Optional.empty()),
-                    substituted.getAnnotations(name));
-        });
+        substituted.forEach((name, field) -> fields.put(name,
+                field.withType(close(field.type())).withPosition(Optional.empty()), substituted.getAnnotations(name)));
         return new RecordBody(Ancestry.chainOf(RecordTemplateSubstitution.parents(template, bindings), namespace),
                 AnnotatedMap.copyOf(fields), template.groups(), closedExtension(template), List.of(),
                 template.nameType());

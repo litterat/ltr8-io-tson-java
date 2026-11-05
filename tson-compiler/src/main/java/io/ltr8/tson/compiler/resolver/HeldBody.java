@@ -142,11 +142,6 @@ public final class HeldBody {
                 + (open == null ? "null" : open.getClass().getSimpleName()));
     }
 
-    /** A held tree in hand, for a check that runs on a payload before it is bound. */
-    static HeldBody ofTree(List<String> parameters, DataValue application) {
-        return new HeldBody(List.copyOf(parameters), application);
-    }
-
     /** A field annotation's bound value back in wire form, for {@link WireForm#recordWire}. */
     static DataValue annotationValue(Object value) {
         return new TsonDataParser(WRITER.toTson(value)).parseDocument().root();

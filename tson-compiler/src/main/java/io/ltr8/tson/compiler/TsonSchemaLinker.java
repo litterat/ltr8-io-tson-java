@@ -24,6 +24,7 @@ import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.ConfusableNames;
+import io.ltr8.tson.schema.meta.RecordHead;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -334,15 +335,12 @@ public final class TsonSchemaLinker {
             // namespace check above has already reported them. A check here could never fire.
             // An enum whose members its own type refused has had its verdict: judging those members as names
             // too would report the one mistake twice.
-            List<String> names = switch (body) {
-                case RecordBody record when !refusedEnums.contains(name) ->
-                        List.copyOf(record.fields().keySet());
-                case RecordTemplateBody template when !refusedEnums.contains(name) ->
-                        List.copyOf(template.fields().keySet());
-                case EnumBody enumBody when !refusedEnums.contains(name) -> List.copyOf(enumBody.members());
-                default -> List.of();
+            Optional<RecordHead> head = RecordHead.of(body);
+            List<String> names = refusedEnums.contains(name) ? List.of() : switch (body) {
+                case EnumBody enumBody -> List.copyOf(enumBody.members());
+                default -> head.<List<String>>map(record -> List.copyOf(record.fieldNames())).orElse(List.of());
             };
-            String noun = body instanceof RecordBody || body instanceof RecordTemplateBody ? "field names" : "members";
+            String noun = head.isPresent() ? "field names" : "members";
             // An enum's members and a record's field names are names of its name type, an identifier family, and
             // are judged under that type's profile, whose added characters are its own.
             IdentifierProfile profile = NameType.profile(definition, constructorOf(name, definition, facts),

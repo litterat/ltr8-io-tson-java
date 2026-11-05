@@ -66,11 +66,7 @@ public final class FamilySelectors {
 
     /** The names a base states, whatever kind of base it is -- empty where it dispatches by tag or not at all. */
     public static List<String> namesOf(Top definition) {
-        return switch (definition) {
-            case RecordBody record -> record.discriminators();
-            case RecordTemplateBody template -> template.discriminators();
-            case null, default -> List.of();
-        };
+        return RecordHead.of(definition).map(RecordHead::discriminators).orElse(List.of());
     }
 
     /**

@@ -4,6 +4,7 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
@@ -21,6 +22,7 @@ import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
+import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -36,6 +38,7 @@ import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.base.SourcePosition;
 
 import java.util.ArrayList;
@@ -364,15 +367,15 @@ final class SchemaDesugarer {
                 // applies. Only a form mentioning one of the declaration's own parameters is left alone --
                 // see currentParameters.
                 StructuralDef body = structuralDef(structural.body());
-                // §5.2's own rewrite, applied where the body is written: a bare record body denotes
-                // `!meta.record { fields: { ... } }`, which `DefinitionResolver.openRecord` reads as the record
-                // template it is. See recordBinding.
+                // §5.2's own rewrite, applied where the body is written: a bare record body denotes a record
+                // construction, and with parameters that is the `!meta.record_template { ... }` written here,
+                // labelled while the parameters are in scope. See recordTemplate.
                 //
                 // Every parameterised record body takes this path, `~`-marked or not. A composition or
                 // refinement template is built one phase later (`DefinitionResolver.Built`), since both absorb
                 // fields from a source and the template is the flattened record. A bare record has none.
                 if (!structural.typeParams().isEmpty() && body instanceof RecordDef record) {
-                    yield instance(recordBinding(record), structural.typeParams());
+                    yield new RecordTemplateDef(structural.typeParams(), recordTemplate(record));
                 }
                 yield body == structural.body() ? structural
                         : new StructuralTypeDef(structural.typeParams(), body);
@@ -407,6 +410,11 @@ final class SchemaDesugarer {
                 TypeRef ref = argumentsOnly(reference.ref());
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
             }
+            // The explicit spelling of a record template, `<T> !meta.record { ... }`, takes the same labels the sugar
+            // body does, so the two reach the resolver as one payload.
+            case Instance instance when !instance.typeParams().isEmpty()
+                    && WireForm.RECORD.equals(instance.target()) ->
+                    new RecordTemplateDef(instance.typeParams(), labelled(instance.value(), instance.typeParams()));
             default -> typeDef;
         };
     }
@@ -540,6 +548,7 @@ final class SchemaDesugarer {
     static List<String> typeParams(TypeDef typeDef) {
         return switch (typeDef) {
             case Instance instance -> instance.typeParams();
+            case RecordTemplateDef template -> template.typeParams();
             case StructuralTypeDef structural -> structural.typeParams();
 
             case ReferenceTypeDef reference -> reference.typeParams();
@@ -737,22 +746,29 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code !meta.record { fields: { x => { type: T } ... } }} -- §5.2's own rewrite of a record template's bare
-     * body, applied where the body is written, so the template's explicit spelling and its sugar reach the resolver
-     * as one payload, as written.
+     * {@code !meta.record_template { fields: { x => { type_param: T } ... }  parameters: [ ... ] }} -- §5.2's own
+     * rewrite of a record template's bare body, applied where the body is written, so the template's explicit spelling
+     * ({@link #labelled}) and its sugar reach the resolver as one payload ({@link RecordTemplateDef}).
      *
      * <p><b>§5.2's rewrite is syntactic</b>, as fixed and as closed as the sugar table above, so it belongs beside it.
-     * The payload is source spelling: a parameter stands in it as the author wrote it, a bare name in a field's type
-     * or an unquoted token in its value, and the resolver labels each when it reads the payload as the {@code
-     * record_template} it denotes ({@code WireForm.recordTemplatePayload}). The role is the modifier's either way
-     * ({@link FieldModifiers}), so closing substitutes a value and changes no fact.
+     * Each field is classified here, once, by its source spelling while the parameters are in scope (§5.10's
+     * shadowing rule, {@link #label}): a bare parameter name in a field's type is its {@code type_param}, an unquoted
+     * parameter token in its value its {@code value_param}, and everything else is written as the author wrote it.
+     * The role is the modifier's either way ({@link FieldModifiers}), so closing substitutes a value and changes no
+     * fact.
      *
      * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
      * fixed on the {@code record} constructor and an unmarked field's facts are {@code meta.record_field}'s own
      * defaults, so neither is stated -- the same economy {@link #arrayBinding} makes with an unmarked element's
-     * {@code state}.
+     * {@code state}. The parameters close the payload, each provisionally a type parameter, its type derived once the
+     * schema has resolved.
      */
-    private Binding recordBinding(RecordDef record) {
+    private DataValue recordTemplate(RecordDef record) {
+        return recordTemplatePayload(recordBinding(record), currentParameters);
+    }
+
+    /** The bindings of a record template's body, its fields labelled -- see {@link #recordTemplate}. */
+    private List<RecordValue.Field> recordBinding(RecordDef record) {
         List<MapValue.MapEntry> fields = new ArrayList<>();
         List<DataValue> groups = new ArrayList<>();
         List<DataValue> discriminators = new ArrayList<>();
@@ -778,8 +794,9 @@ final class SchemaDesugarer {
                         // A group's members are ordinary optional fields of the record, voidable where the type
                         // says so, and the group records its options, their optional members and its own state
                         // (§5.11) -- the shape the resolver builds.
+                        CoreValue type = refValue(member.typeRef());
                         List<RecordValue.Field> memberFields = new ArrayList<>(List.of(
-                                new RecordValue.Field(WireForm.TYPE, WireForm.plain(refValue(member.typeRef())))));
+                                new RecordValue.Field(label(WireForm.TYPE, type), WireForm.plain(type))));
                         WireForm.addFacts(memberFields, true, member.voidable(), FieldRole.FREE);
                         fields.add(WireForm.fieldEntry(member.name(),
                                 WireForm.plain(new RecordValue(memberFields), member.annotations())));
@@ -800,7 +817,81 @@ final class SchemaDesugarer {
             binding.add(new RecordValue.Field(WireForm.DISCRIMINATORS,
                     WireForm.plain(new ArrayValue(discriminators))));
         }
-        return new Binding(WireForm.RECORD, binding);
+        return binding;
+    }
+
+    /**
+     * The explicit spelling, {@code <T> !meta.record { … }}, as the {@code !meta.record_template { … }} it denotes:
+     * each field of a written {@code fields} map labelled as {@link #recordTemplate} labels a sugar body's, a
+     * {@code !meta.record_field} tag read as {@code !meta.record_template_field}, and the parameters stated last.
+     * Every other slot is carried as written, for the resolver to answer in the author's terms -- a binding the
+     * record's vocabulary does not declare, or a parameter standing where §5.10 admits none. A positional field
+     * ({@code x => text}, {@code x => T}) is spelled out and labelled as its {@code type} would be, a template field
+     * having no positional form, so {@code item => T} is the template {@code item: T} and {@code item => { type: T }}
+     * are.
+     */
+    private static DataValue labelled(DataValue written, List<String> parameters) {
+        if (!(written.coreValue() instanceof RecordValue binding)) {
+            return new DataValue(written.annotations(), Optional.of(WireForm.RECORD_TEMPLATE), written.coreValue());
+        }
+        List<RecordValue.Field> fields = new ArrayList<>();
+        for (RecordValue.Field slot : binding.fields()) {
+            fields.add(WireForm.FIELDS.equals(slot.name()) && slot.value().coreValue() instanceof MapValue map
+                    ? new RecordValue.Field(WireForm.FIELDS, new DataValue(slot.value().annotations(),
+                            slot.value().typeRef(), new MapValue(map.entries().stream().map(entry ->
+                                    new MapValue.MapEntry(entry.key(), labelledField(entry.value(), parameters)))
+                            .toList())))
+                    : slot);
+        }
+        DataValue payload = recordTemplatePayload(fields, parameters);
+        return new DataValue(written.annotations(), payload.typeRef(), payload.coreValue());
+    }
+
+    /** One written {@code meta.record_field} as the {@code meta.record_template_field} it is in a template. */
+    private static DataValue labelledField(DataValue field, List<String> parameters) {
+        Optional<String> tag = field.typeRef().map(written -> WireForm.RECORD_FIELD.equals(written)
+                ? WireForm.RECORD_TEMPLATE_FIELD : written);
+        CoreValue members = switch (field.coreValue()) {
+            case RecordValue record -> new RecordValue(record.fields().stream().map(member -> new RecordValue.Field(
+                    label(member.name(), member.value().coreValue(), parameters), member.value())).toList());
+            case EmptyBrace empty -> empty;
+            default -> new RecordValue(List.of(new RecordValue.Field(label(WireForm.TYPE, field.coreValue(), parameters),
+                    WireForm.plain(field.coreValue()))));
+        };
+        return new DataValue(field.annotations(), tag, members);
+    }
+
+    /** A record template's {@code bindings}, its {@code parameters} stated last, each provisionally a type parameter. */
+    private static DataValue recordTemplatePayload(List<RecordValue.Field> bindings, List<String> parameters) {
+        List<RecordValue.Field> fields = new ArrayList<>(bindings);
+        fields.add(new RecordValue.Field(WireForm.PARAMETERS, WireForm.plain(new ArrayValue(parameters.stream()
+                .map(parameter -> WireForm.plain(new RecordValue(List.of(WireForm.nameField(WireForm.NAME, parameter),
+                        WireForm.nameField(WireForm.TYPE, TemplateParam.TYPE_REF.name())))))
+                .toList()))));
+        return new DataValue(List.of(), Optional.of(WireForm.RECORD_TEMPLATE), new RecordValue(fields));
+    }
+
+    /** {@link #label(String, CoreValue, List)} against the declaration's own parameters. */
+    private String label(String slot, CoreValue value) {
+        return label(slot, value, currentParameters);
+    }
+
+    /**
+     * The name a record template field's {@code slot} is written under: {@code type_param} for a {@code type} and
+     * {@code value_param} for a {@code value} that is an unquoted token naming one of {@code parameters} (§5.10's
+     * shadowing rule over the source spelling), and {@code slot} itself otherwise.
+     */
+    private static String label(String slot, CoreValue value, List<String> parameters) {
+        boolean parameter = value instanceof TokenValue token && token.form() == TokenForm.UNQUOTED
+                && parameters.contains(token.text());
+        if (!parameter) {
+            return slot;
+        }
+        return switch (slot) {
+            case WireForm.TYPE -> WireForm.TYPE_PARAM;
+            case WireForm.VALUE -> WireForm.VALUE_PARAM;
+            default -> slot;
+        };
     }
 
 
@@ -844,8 +935,8 @@ final class SchemaDesugarer {
     }
 
     /**
-     * One {@code meta.record_field}, with {@code state} and {@code value} written only where the author's marks
-     * say something the constructor's own defaults do not.
+     * One {@code meta.record_template_field}, with {@code state} and {@code value} written only where the author's
+     * marks say something the constructor's own defaults do not, and a parameter labelled ({@link #label}).
      *
      * <p>A field with no type-ref is a §5.7 tightening entry, which needs a source to elide toward and so
      * cannot appear in the fresh record body this builds -- {@link FieldModifiers} has no view of an
@@ -862,9 +953,11 @@ final class SchemaDesugarer {
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), field.omittable(), type.voidable(), field.modifier());
         List<RecordValue.Field> members = new ArrayList<>();
-        members.add(new RecordValue.Field(WireForm.TYPE, WireForm.plain(refValue(type.typeRef()))));
+        CoreValue written = refValue(type.typeRef());
+        members.add(new RecordValue.Field(label(WireForm.TYPE, written), WireForm.plain(written)));
         WireForm.addFacts(members, resolved.optional(), resolved.voidable(), resolved.role());
-        resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.plain(token))));
+        resolved.value().ifPresent(token -> members.add(new RecordValue.Field(label(WireForm.VALUE, token),
+                WireForm.plain(token))));
         return WireForm.plain(new RecordValue(members), field.annotations());
     }
 

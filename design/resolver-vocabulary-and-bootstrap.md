@@ -8,8 +8,9 @@ meta.tn, itself. Current form only; history lives in git.
 **Invariants**
 
 - There is one `WireForm`: a held body is written by one phase and read by four, and a second opinion about what an
-  application looks like is what makes one of them wrong. A record template has no held body: its source payload is
-  labelled here once (`recordTemplatePayload`) and it is substituted on the model (`RecordTemplateSubstitution`).
+  application looks like is what makes one of them wrong. A record template has no held body: `SchemaDesugarer`
+  writes its payload labelled, from `WireForm`'s member names, and it is substituted on the model
+  (`RecordTemplateSubstitution`).
 - `recordWire` builds a closed record's binding record directly, for a minted member's name — `TsonObjectWriter`
   output is fully quoted and writes every default, a different spelling from the one every other closed form is
   named by.
@@ -65,8 +66,7 @@ once.
 carrying arguments, as a `ReferenceValue`, the data grammar's reference ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12), and
 its inverse `applicationIn`, an `instanceof ReferenceValue`; `substituted`, which walks an application's argument tree,
 rewrites a parameter named among its arguments at any depth, and writes the application again as a `ReferenceValue`;
-`recordTemplatePayload`, which reads a record template's source payload as the `meta.record_template` it denotes; the
-closed-record writer `recordWire`, which spells `fields` as a map from each field's declared name to its
+the closed-record writer `recordWire`, which spells `fields` as a map from each field's declared name to its
 `meta.record_field` (`fieldMap`/`fieldEntry`) for a minted record's name; and §5.10 `substitute` over a held body. Every
 walk over a held body descends into a map's keys and values as it does into a record or an array, `fields` being one.
 

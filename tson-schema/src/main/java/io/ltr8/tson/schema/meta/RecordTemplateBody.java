@@ -7,6 +7,7 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +73,14 @@ public record RecordTemplateBody(TypeChain chain, AnnotatedMap<String, RecordTem
                         + "and the template declares " + names);
             });
         });
+    }
+
+    /**
+     * What this template states at the record level ({@link RecordHead}): each application's, but for the family's
+     * {@code discriminators}.
+     */
+    public RecordHead head() {
+        return new RecordHead(nameType, Collections.unmodifiableSet(fields.keySet()), discriminators, groups, extension);
     }
 
     /** The parameter names, in declaration order. */

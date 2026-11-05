@@ -4,13 +4,13 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.RecordHead;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.unicode.TextFamily;
@@ -62,12 +62,10 @@ public final class NameType {
      */
     public static Optional<Resolved> of(Top entry, Optional<String> constructor, Function<String, Top> local,
                                         Function<String, Top> structure) {
-        return switch (entry) {
-            case EnumBody body -> ofEnum(constructor, body, local, structure);
-            case RecordBody body -> ofRecord(body.nameType(), local, structure);
-            case RecordTemplateBody template -> ofRecord(template.nameType(), local, structure);
-            default -> Optional.empty();
-        };
+        if (entry instanceof EnumBody body) {
+            return ofEnum(constructor, body, local, structure);
+        }
+        return RecordHead.of(entry).flatMap(head -> ofRecord(head.nameType(), local, structure));
     }
 
     /**

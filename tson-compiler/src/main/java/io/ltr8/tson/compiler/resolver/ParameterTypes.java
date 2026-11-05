@@ -242,12 +242,18 @@ final class ParameterTypes {
     }
 
     /**
-     * The walk's own refusals, thrown, over a held payload not yet bound: a record template's parameters are
-     * confined to its field types and values before {@code record}'s reader is asked to bind them, so a parameter
-     * in a scalar slot is refused for where it stands ([TSON-SCHEMA] §5.10) rather than for the token it is.
+     * The walk's own refusals, thrown, over a record template's payload not yet bound: its parameters are confined
+     * to its field types and values before {@code record_template}'s reader is asked to bind them, so a parameter in
+     * a scalar slot is refused for where it stands ([TSON-SCHEMA] §5.10) rather than for the token it is. The payload
+     * is walked as the {@code record} construction the author wrote, so each slot is named as {@code record} and
+     * {@code record_field} name it; a field's {@code type_param} and {@code value_param} are where a parameter
+     * belongs, and the parameter list the desugarer stated is no slot of {@code record}'s.
      */
     static void checkSlots(List<String> parameters, DataValue payload, Function<String, Top> meta) {
-        Walk.over(HeldBody.ofTree(parameters, payload), new Occurrences(parameters, Map.of(), false), meta);
+        Walk walk = new Walk(new Occurrences(parameters, Map.of(), false), meta, true);
+        if (walk.resolve(RECORD) instanceof RecordBody vocabulary) {
+            walk.payload(payload.coreValue(), RECORD, vocabulary);
+        }
     }
 
     /**

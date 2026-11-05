@@ -16,16 +16,31 @@ lives in git.
 - **No `RecordBody` holds a parameter**, in output or inside the resolver. A record template is built as a
   `RecordTemplateBody` where its declaration resolves, and an application of it substitutes on that model into a
   `RecordBody`; nothing writes a template out and reads it back.
-- A record template is never held text: `HeldBody.held` refuses a `meta.record` head with `IllegalStateException`, and
+- A record template is never held text: `SchemaDesugarer` writes every one as a `RecordTemplateDef`, `HeldBody.held`
+  refuses a `meta.record` head with `IllegalStateException` (a caller resolving raw AST without that phase), and
   `HeldBody.of` takes a `TemplateBody` only. What §5.10's declaration-time checks ask of either shape -- the names it
   mentions, the applications it writes -- is `HeldBody.namesOf`/`applicationsOf`, which read a record template's
   labels and references (`RecordTemplateBody.references`). A held text that does not parse back is an
   `IllegalStateException`.
-- A record template's field is classified once, by its source spelling, where it is built: a bare parameter name in
-  its type slot is its `type_param`, an unquoted parameter token in its value slot its `value_param` (§5.10's shadowing
-  rule). After that the label is the fact: a parameter as an argument of an application in a `type` or a parent is
-  the only place a parameter is still recognised by its text, and a field taken from a closed source, an inherited
-  literal included, is never relabelled.
+- A record template's field is classified once, by its source spelling, where the parameters are in scope: a bare
+  parameter name in its type slot is its `type_param`, an unquoted parameter token in its value slot its
+  `value_param` (§5.10's shadowing rule). After that the label is the fact: a parameter as an argument of an
+  application in a `type` or a parent is the only place a parameter is still recognised by its text, and a field taken
+  from a closed source, an inherited literal included, is never relabelled.
+- **Recognising a parameter by its text is sound because two spellings are refused** (§5.10). A parameter spelled
+  like an entry the schema's namespace holds, a type or a value entry, its own or an import's, is refused at the
+  declaration, a held template
+  and a record template alike (`SchemaResolver.OnDemand.refuseShadowingParameters`; a lifted form's `p0` list is the
+  desugarer's and is not asked). And a record template's parameter spelled like a name or an unquoted token an
+  absorbed field's type writes among an application's arguments is refused where the field is absorbed
+  (`DefinitionResolver.refuseAbsorbedSpelling`): from a closed source every such name, from an open operand every name
+  but the operand's own parameters, which the absorber's arguments replace. With `pair => <V> { z: two<V, T> }`, `T`
+  an enum member, `t3 => <T> pair<T> & { … }` is refused naming `T` and `z: two<V, T>`; `pair` is valid. Without the
+  second rule `t3`'s `z` would become `two<T, T>`, one spelling for two meanings that no `record_template_field` can
+  tell apart. A literal `value` needs neither: `value`/`value_param` already says which it is. The second rule judges
+  the source as it is when absorbed: a closed source of the same schema is not yet materialised and still writes its
+  applications, so it is judged; an imported one is, each closed application already the bare name of its entry, so
+  there is no argument to collide with and nothing to refuse.
 - `HeldBody.held` is the only way a `TemplateBody` is minted, and it gives every parameter the provisional
   `meta.type_ref` (`TemplateParam.typeParameter`); `ParameterTypes` stamps the derived types later.
 - A held tree is a working value: built per call, never cached or stored on the entry. Callers outside `resolver`
@@ -75,25 +90,28 @@ is closed (§5.10). Neither kind has variance, since construction transfers kind
 edges in every application, a parameter list creates the one further edge (declared applications of a record IS-A
 its base), and an application nothing declares is its expansion.
 
-- **A record template is its own constructor, `record_template`, built directly.** Every slot it admits a parameter
-  in is a label or a reference — a field's `type_param` or `value_param`, an application's arguments — so the template
-  is a value of the vocabulary as it stands: a `RecordTemplateBody`, its chain keeping the parents as written.
-  `DefinitionResolver.openRecord` takes the desugared `!meta.record { … }` payload once `ParameterTypes.checkSlots` has
-  confined its parameters, labels each field as written (`WireForm.recordTemplatePayload`) and binds it through
-  `record_template`'s own reader. A composition or refinement template is the *flattened* record resolution builds
-  (`DefinitionResolver.Built`), its own entries labelled where they are resolved (`templateField`), a closed source's
-  fields absorbed as they are, and an open operand's substituted on the model with the absorbing declaration's
-  parameters as its arguments, landing as that declaration's labels. Either way `checked` refuses a selector typed by
-  a parameter (`refuseParameterTypedSelector`) and a literal value on a field typed by one (`refuseLiteralOnOpenType`:
-  a literal needs a closed type). An error placeholder for an open declaration is an empty record template
-  (`SchemaResolver.unresolved`), so it closes like any record template.
+- **A record template is its own constructor, `record_template`, built directly.** Every slot it admits a parameter in is a
+  label or a reference — a field's `type_param` or `value_param`, an application's arguments — so the template is a value of
+  the vocabulary as it stands: a `RecordTemplateBody`, its chain keeping the parents as written. `SchemaDesugarer` writes a
+  bare body or an explicit `<T> !meta.record { … }` as the labelled `!meta.record_template { … }` payload it denotes
+  (`RecordTemplateDef`), and `DefinitionResolver.openRecord` answers the author's spelling in `meta.record`'s terms (its
+  bindings, `ParameterTypes.checkSlots` confining the parameters) before binding it through `record_template`'s own reader. A
+  composition or refinement template is the *flattened* record resolution builds (`DefinitionResolver.Built`) over the
+  builder's own field type (`BuiltField`), its own entries labelled where they are resolved (`BuiltField.written`), a closed
+  source's fields absorbed as they are, and an open operand's substituted on the model with the
+  absorbing declaration's parameters as its arguments, landing as that declaration's labels. `Built.finish` makes a
+  `RecordField` of each for a closed declaration and a `RecordTemplateField` for a template, so a closed declaration builds
+  no template value. Either way `checked` refuses a selector typed by a parameter (`refuseParameterTypedSelector`) and a
+  literal value on a field typed by one (`refuseLiteralOnOpenType`: a literal needs a closed type). An error placeholder for
+  an open declaration is an empty record template (`SchemaResolver.unresolved`), so it closes like any record template.
   - **Why its own constructor and not a record with optional `parameters`.** A record is what readers and writers are
     built for, and a template is never read or written against: a position it types dispatches to a member. As one
     Java type the two could only be told apart by a runtime check at every reader, writer and dispatcher; as two, the
     dispatchers' "a template IS-A the base is no member" is the `instanceof RecordBody` they already make, and the
     compiler's choice between `AbstractTemplateReader` and a record reader is a pattern. In source,
     `!meta.record_template` is resolver vocabulary like `!meta.template`, and a construction applying it is refused
-    (`requireAuthorable`).
+    (`requireAuthorable`). The desugarer's own `!meta.record_template` payload is a `RecordTemplateDef`, the one
+    `TypeDef` no parser builds, so the type tells it from an author's `Instance` and the refusal needs no exception.
 - **Every other open entry is held text.** `set` resolves to `!meta.template { parameters: [{ name: T  type: meta.type_ref
   }]  template: "!meta.set_type { element_type: T }" }`. That covers an open instance (`<T, N> !meta.array { … }`), an
   open sugar form (`<T> [T]`, `<T> ( T | error )`), and §5.10's partial application, `uuid_pair => <B> pair<uuid, B>`,
@@ -242,10 +260,13 @@ sources of a use type. Beyond those:
     per declaration, none for a declaration that already failed.
   - **An application closed on demand infers its own template** (`ParameterTypes.inferOne`): the template has resolved
     by then, so only a parameter awaiting the cross-template fixed point is left undetermined.
-- **A record template confines its parameters to three places** (§5.10, `checkSlots`): a field's type
-  (`type_param`), a field's default or fixed value (`value_param`), and an argument of an application. A whole-token
-  parameter anywhere else in a body headed `meta.record` — a field name, a group member, `optional`, `voidable`,
-  `role`, `extension`, `name_type`, `discriminators`, a bare parent — is refused naming the slot (`parameter 'K'
-  stands at a key of record.fields`), since each would leave the family base without a shape its applications share.
-  The general kind check runs first, so `<T> !meta.record { fields: T }` keeps its "neither a kind of type nor a
-  scalar" verdict. A template over any other constructor keeps every scalar slot (`<V> !meta.tuple { … voidable: V }`).
+- **A record template confines its parameters to three places** (§5.10, `checkSlots`): a field's type (`type_param`), a
+  field's default or fixed value (`value_param`), and an argument of an application. A whole-token parameter anywhere else in
+  a body headed `meta.record` — a field name, a group member, `optional`, `voidable`, `role`, `extension`, `name_type`,
+  `discriminators`, a bare parent — is refused naming the slot (`parameter 'K' stands at a key of meta.record.fields`), since
+  each would leave the family base without a shape its applications share. The labelled payload is walked as the
+  `meta.record` construction the author wrote, so a slot is named in `record`'s and `record_field`'s terms, a label is where
+  a parameter belongs, and the stated parameter list is no slot of `record`'s. A positional field written with a parameter
+  (`a => T`) arrives labelled `type_param`, as `a => { type: T }` and the sugar `a: T` do. The general kind check runs
+  first, so `<T> !meta.record { fields: T }` keeps its "neither a kind of type nor a scalar" verdict. A template over any
+  other constructor keeps every scalar slot (`<V> !meta.tuple { … voidable: V }`).

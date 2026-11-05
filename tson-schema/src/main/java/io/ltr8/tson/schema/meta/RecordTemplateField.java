@@ -23,6 +23,8 @@ import java.util.Optional;
  * recognised there because its text resolves into the template's {@code parameters} (§5.10's shadowing rule). A
  * whole-type parameter is never spelled that way: {@code type: T} with {@code T} a parameter is
  * {@code type_param: T}, which is what lets {@code type} and {@code value} mean what they mean on a closed field.
+ * Reading a parameter by its text is sound because the resolver refuses the two spellings that would make it
+ * ambiguous: a parameter spelled like a schema type, and one spelled like a name an absorbed field's arguments write.
  *
  * <p><b>A literal {@code value} needs a closed type</b>, so a field whose type is a parameter, or an application
  * over one, takes {@code value_param} or nothing. {@link RecordTemplateBody} checks it against the template's
@@ -61,16 +63,9 @@ public record RecordTemplateField(Optional<TypeRef> type, @Field("type_param") O
         }
     }
 
-    /** A closed field as a template field: its type and value as they are, labelling nothing. */
-    public static RecordTemplateField of(RecordField field) {
-        return new RecordTemplateField(Optional.of(field.type()), Optional.empty(), field.optional(),
-                field.voidable(), field.role(), field.value(), Optional.empty(), field.annotations(),
-                field.position());
-    }
-
     /**
-     * This field as the closed {@link RecordField} it is once no parameter is left in it -- what a closed record's
-     * resolution and an application's substitution end in. A field still carrying a label is no record field.
+     * This field as the closed {@link RecordField} it is once no parameter is left in it -- what an application's
+     * substitution ends in. A field still carrying a label is no record field.
      */
     public RecordField closed() {
         if (typeParam.isPresent() || valueParam.isPresent()) {
@@ -78,16 +73,6 @@ public record RecordTemplateField(Optional<TypeRef> type, @Field("type_param") O
                     .orElseThrow() + "' is a record template's, and a record's fields carry no parameter");
         }
         return new RecordField(type.orElseThrow(), optional, voidable, role, value, annotations, position);
-    }
-
-    /** What this field yields when a document never writes it, as {@link RecordField#omitted} answers it. */
-    public RecordField.Omitted omitted(boolean groupMember) {
-        return RecordField.omitted(optional, value.isPresent() || valueParam.isPresent(), groupMember);
-    }
-
-    /** These facts in the words a diagnostic uses, as {@link RecordField#describe} says them. */
-    public String describe() {
-        return RecordField.describe(optional, role);
     }
 
     /**
@@ -102,18 +87,6 @@ public record RecordTemplateField(Optional<TypeRef> type, @Field("type_param") O
     public RecordTemplateField withType(TypeRef type) {
         return new RecordTemplateField(Optional.of(type), Optional.empty(), optional, voidable, role, value,
                 valueParam, annotations, position);
-    }
-
-    /** A copy of this field with its presence and role replaced -- every other component unchanged. */
-    public RecordTemplateField withFacts(boolean optional, boolean voidable, FieldRole role) {
-        return new RecordTemplateField(type, typeParam, optional, voidable, role, value, valueParam, annotations,
-                position);
-    }
-
-    /** A copy of this field with {@code annotations} replaced -- every other component unchanged. */
-    public RecordTemplateField withAnnotations(Annotations annotations) {
-        return new RecordTemplateField(type, typeParam, optional, voidable, role, value, valueParam, annotations,
-                position);
     }
 
     /** Excludes {@code annotations}/{@code position} -- neither changes a field's identity. */

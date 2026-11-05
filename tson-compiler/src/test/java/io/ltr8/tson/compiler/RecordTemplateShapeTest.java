@@ -14,6 +14,7 @@ import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.ValueEntry;
 
 import java.util.List;
 import java.util.Optional;
@@ -200,6 +201,102 @@ class RecordTemplateShapeTest {
         RecordBody u = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("u"));
         assertEquals(Optional.of("T"), u.fields().get("kind").value().map(Token::text));
         assertEquals(TypeRef.of("int32"), u.fields().get("v").type());
+    }
+
+    /**
+     * A record template's parameter spelled like a token an absorbed field's type writes among an application's
+     * arguments is refused at the template (§5.10): {@code base}'s {@code f: pick<T>} applies {@code pick} to the
+     * member {@code T}, and inside {@code t2} a parameter spelled {@code T} would be read first.
+     */
+    @Test
+    void aParameterSpelledLikeAnAbsorbedArgumentIsRefused() {
+        String refused = assertThrows(SchemaValidationException.class, () -> compile("""
+                  mode => !enum [T U]
+                  pick => <M> { m?: mode ~ M }
+                  base => { f: pick<T> }
+                  t2   => <T> base & { x: T }
+                """)).getMessage();
+
+        assertTrue(refused.contains("'t2': parameter 'T' is spelled like 'T' in the field 'f: pick<T>' it absorbs "
+                + "from 'base'"), refused);
+        assertTrue(refused.contains("Rename the parameter"), refused);
+    }
+
+    /**
+     * The same of an open operand's field, its own parameters aside: {@code pair}'s {@code V} is replaced by what
+     * {@code t3} writes, and its {@code T} is the member. {@code pair} itself is valid, and so is an absorber whose
+     * parameter is spelled otherwise (§5.10).
+     */
+    @Test
+    void aParameterSpelledLikeAnOperandsArgumentIsRefused() {
+        String operands = """
+                  mode => !enum [T U]
+                  two  => <A, M> { a: A  m?: mode ~ M }
+                  pair => <V> { z: two<V, T> }
+                """;
+        String refused = assertThrows(SchemaValidationException.class,
+                () -> compile(operands + "  t3 => <T> pair<T> & { x: T }")).getMessage();
+
+        assertTrue(refused.contains("'t3': parameter 'T' is spelled like 'T' in the field 'z: two<V, T>' it absorbs "
+                + "from 'pair'"), refused);
+        TsonCompiledSchema compiled = compile(operands + "  t4 => <X> pair<X> & { x: X }\n  u4 => t4<text>");
+        RecordBody u4 = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("u4"));
+        assertEquals(TypeRef.of("text"), u4.fields().get("x").type());
+        assertEquals(List.of(), read(compiled, "u4", "{ z: { a: \"a\"  m: T }  x: \"b\" }"));
+    }
+
+    /**
+     * A parameter spelled like an entry the schema's namespace holds -- a type or a value entry, its own or an
+     * import's -- is refused at the declaration (§5.10's shadowing rule), a record template and a held template alike.
+     */
+    @Test
+    void aParameterShadowingASchemaEntryIsRefused() {
+        String record = assertThrows(SchemaValidationException.class, () -> compile("""
+                  T    => { q: int32 }
+                  base => { f: T }
+                  t2   => <T> base & { x: T }
+                """)).getMessage();
+        String held = assertThrows(SchemaValidationException.class, () -> compile("""
+                  T  => { q: int32 }
+                  ts => <T> [T]
+                """)).getMessage();
+        String imported = assertThrows(SchemaValidationException.class,
+                () -> compile("  boxed => <text> { v: text }")).getMessage();
+
+        assertTrue(record.contains("'t2': parameter 'T' shadows the entry 'T' this schema's namespace holds"), record);
+        assertTrue(held.contains("'ts': parameter 'T' shadows the entry 'T'"), held);
+        assertTrue(imported.contains("'boxed': parameter 'text' shadows the entry 'text'"), imported);
+
+        String point = """
+                  point  => { x: int32  y: int32 }
+                  origin => !point { x: 0  y: 0 }
+                """;
+        assertInstanceOf(ValueEntry.class, compile(point).schema().entries().get("origin"));
+        String value = assertThrows(SchemaValidationException.class,
+                () -> compile(point + "  boxed => <origin> { v: origin }")).getMessage();
+        assertTrue(value.contains("'boxed': parameter 'origin' shadows the entry 'origin'"), value);
+    }
+
+    /**
+     * A positional field written with a parameter is labelled as its {@code type} would be: {@code item => T}, {@code
+     * item => { type: T }} and the sugar {@code item: T} are one template, and an application closes {@code item} to
+     * its argument.
+     */
+    @Test
+    void aPositionalFieldWrittenWithAParameterIsItsTypeParameter() {
+        TsonCompiledSchema compiled = compile("""
+                  box   => <T> !meta.record { fields: { item => T } }
+                  spelt => <T> !meta.record { fields: { item => { type: T } } }
+                  sugar => <T> { item: T }
+                  held  => box<int32>
+                """);
+
+        RecordTemplateBody box = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("box"));
+        assertEquals(Optional.of("T"), box.fields().get("item").typeParam());
+        assertEquals(box.fields(), ((RecordTemplateBody) compiled.schema().entries().get("spelt")).fields());
+        assertEquals(box.fields(), ((RecordTemplateBody) compiled.schema().entries().get("sugar")).fields());
+        RecordBody held = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("held"));
+        assertEquals(TypeRef.of("int32"), held.fields().get("item").type());
     }
 
     /** A literal needs a closed type: a field typed by a parameter, whole or as an argument, takes none (§5.10). */

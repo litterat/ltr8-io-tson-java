@@ -6,6 +6,7 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,9 +23,10 @@ import java.util.function.UnaryOperator;
  * <p><b>A record is closed, everywhere it exists</b>: no {@code RecordBody} holds a parameter token -- not in a field's
  * {@code type}, not in its {@code value}, not in an argument of an application or a parent -- in resolved output, in
  * a resolver's working values, or as the closing of an application. It is what readers and writers are built for.
- * A record declared with parameters is a {@link RecordTemplateBody} from the moment the resolver builds it, and an
+ * A record declared with parameters is a {@code meta.record_template} from the moment the resolver builds it, and an
  * application of one substitutes on that model into a {@code RecordBody}, so code that builds a reader or a writer
- * from a {@code RecordBody} is never handed a template.
+ * from a {@code RecordBody} is never handed a template. Nothing here names the template's Java type: dependencies
+ * run from templates to records.
  *
  * <p><b>{@code chain} is {@code chained}'s</b> (see {@link TypeChain}): the complete IS-A chain and its inverse,
  * computed by the resolver and the linker. A fresh record and a subtracted one ([TSON-SCHEMA] §5.9) have an empty
@@ -144,6 +146,11 @@ public record RecordBody(TypeChain chain, AnnotatedMap<String, RecordField> fiel
         AnnotatedMap<String, RecordField> mapped = new AnnotatedMap<>();
         fields.forEach((name, field) -> mapped.put(name, map.apply(field), fields.getAnnotations(name)));
         return AnnotatedMap.copyOf(mapped);
+    }
+
+    /** What this record states at the record level ({@link RecordHead}). */
+    public RecordHead head() {
+        return new RecordHead(nameType, Collections.unmodifiableSet(fields.keySet()), discriminators, groups, extension);
     }
 
     /** The name type's name, for a message: the one stated, or {@link #FIELD_NAME}. */
