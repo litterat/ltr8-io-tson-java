@@ -40,7 +40,7 @@ class BootstrapReferencesTest {
         TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         RecordField name = field(kernel.entries().get("meta.template_param"), "name");
-        assertEquals("meta.param_name", name.type().name());
+        assertEquals("meta.param_name", name.typeRef().name());
         assertTrue(name.type().annotations().isEmpty(), "nothing records where it points");
     }
 
@@ -50,7 +50,7 @@ class BootstrapReferencesTest {
         Top recordField = MetaKernelBootstrapResolver.getMetaKernelSchema()
                 .entries().get("meta.record_field");
 
-        assertEquals("meta.type_ref", field(recordField, "type").type().name());
+        assertEquals("meta.type_ref", field(recordField, "type").typeRef().name());
         assertTrue(field(recordField, "type").type().annotations().isEmpty());
     }
 

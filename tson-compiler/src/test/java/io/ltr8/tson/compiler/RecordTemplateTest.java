@@ -71,7 +71,7 @@ class RecordTemplateTest {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record);
         return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .type().name();
+                .typeRef().name();
     }
 
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
@@ -244,7 +244,7 @@ class RecordTemplateTest {
 
         assertEquals(2, instantiationsOf(compiled, "box").size());
         String outer = fieldType(compiled, "holder", "b");
-        String inner = fieldOf(compiled, outer, "v").type().name();
+        String inner = fieldOf(compiled, outer, "v").typeRef().name();
         assertEquals(TypeRef.of("text"), fieldOf(compiled, inner, "v").type());
     }
 
@@ -266,7 +266,7 @@ class RecordTemplateTest {
         // declaration names, is still minted.
         assertEquals(1, instantiationsOf(compiled, "box").size(),
                 () -> "the inner box is minted, the outer is `nested`: " + instantiationsOf(compiled, "box"));
-        assertEquals(instantiationsOf(compiled, "box").get(0), fieldOf(compiled, "nested", "v").type().name(),
+        assertEquals(instantiationsOf(compiled, "box").get(0), fieldOf(compiled, "nested", "v").typeRef().name(),
                 "the outer's field names the inner entry");
         assertEquals("3", fieldOf(compiled, "three", "n").value().orElseThrow().text());
     }
@@ -283,7 +283,7 @@ class RecordTemplateTest {
 
         List<String> made = instantiationsOf(compiled, "chain");
         assertEquals(1, made.size(), () -> "one entry, not an infinite family: " + made);
-        assertEquals(made.get(0), fieldOf(compiled, made.get(0), "tail").type().name(),
+        assertEquals(made.get(0), fieldOf(compiled, made.get(0), "tail").typeRef().name(),
                 "the tail references the entry it sits in");
     }
 

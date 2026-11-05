@@ -9,6 +9,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordTemplateField;
@@ -92,7 +93,7 @@ class RecordTemplateShapeTest {
         assertEquals(Optional.empty(), a.type());
         RecordTemplateField b = pair.fields().get("b");
         assertEquals(Optional.empty(), b.typeParam());
-        assertTrue(OpenEntry.parameterIn(b.type().orElseThrow(), pair.parameterNames()).isPresent(),
+        assertTrue(OpenEntry.parameterIn(RecordField.typeRef(b.type().orElseThrow()), pair.parameterNames()).isPresent(),
                 "the parameter rides an argument of the type: " + b.type());
         assertEquals(Optional.of("N"), pair.fields().get("c").valueParam());
         assertEquals(Optional.of("x"), pair.fields().get("d").value().map(Token::text));

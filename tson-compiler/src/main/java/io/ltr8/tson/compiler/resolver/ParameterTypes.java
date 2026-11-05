@@ -271,9 +271,10 @@ final class ParameterTypes {
         Walk walk = new Walk(occurrences, meta, true);
         template.fields().values().forEach(field -> {
             field.typeParam().ifPresent(parameter -> occurrences.observe(parameter, TemplateParam.TYPE_REF, false));
-            field.type().ifPresent(walk::application);
-            field.valueParam().ifPresent(parameter -> occurrences.observe(parameter,
-                    field.type().orElseGet(() -> TypeRef.of(field.typeParam().orElseThrow())), true));
+            // A sibling names a field, and writes no application a parameter could stand in.
+            field.type().filter(TypeRef.class::isInstance).map(TypeRef.class::cast).ifPresent(walk::application);
+            field.valueParam().ifPresent(parameter -> occurrences.observe(parameter, field.type()
+                    .map(RecordField::typeRef).orElseGet(() -> TypeRef.of(field.typeParam().orElseThrow())), true));
         });
         template.parents().forEach(walk::application);
     }
@@ -583,7 +584,7 @@ final class ParameterTypes {
             List<Map.Entry<String, RecordField>> unmarked = vocabulary.fields().entrySet().stream()
                     .filter(f -> !f.getValue().optional()).toList();
             if (unmarked.size() == 1) {
-                value(payload, unmarked.getFirst().getValue().type(),
+                value(payload, unmarked.getFirst().getValue().typeRef(),
                         constructor + "." + unmarked.getFirst().getKey());
             }
         }
@@ -598,7 +599,7 @@ final class ParameterTypes {
                     continue;
                 }
                 Optional.ofNullable(vocabulary.fields().get(written.name()))
-                        .ifPresent(field -> value(value, field.type(), constructor + "." + written.name()));
+                        .ifPresent(field -> value(value, field.typeRef(), constructor + "." + written.name()));
             }
         }
 

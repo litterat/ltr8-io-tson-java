@@ -96,7 +96,7 @@ class KindMembersTest {
                 }
                 """);
         RecordBody order = assertInstanceOf(RecordBody.class, linked.schema().entries().get("order"));
-        ReferenceBody inline = kind(linked, AliasChain.terminal(order.fields().get("id").type().name(),
+        ReferenceBody inline = kind(linked, AliasChain.terminal(order.fields().get("id").typeRef().name(),
                 linked.schema().entries()::get));
 
         assertEquals(new ReferenceBody("net.uuid_type"), inline);

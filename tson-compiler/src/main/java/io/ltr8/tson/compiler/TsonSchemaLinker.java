@@ -87,6 +87,7 @@ import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -352,13 +353,14 @@ public final class TsonSchemaLinker {
             switch (body) {
                 case RecordBody record -> checkFieldValues(receiver, schema, name, position,
                         record.fields().entrySet().stream().filter(f -> f.getValue().value().isPresent())
-                                .map(f -> new FieldValue(f.getKey(), f.getValue().type(), f.getValue().role(),
+                                .map(f -> new FieldValue(f.getKey(), f.getValue().typeRef(), f.getValue().role(),
                                         f.getValue().value().get())).toList(), merged, identifiers);
                 case RecordTemplateBody template -> checkFieldValues(receiver, schema, name, position,
                         template.fields().entrySet().stream()
                                 .filter(f -> f.getValue().value().isPresent() && f.getValue().type().isPresent())
-                                .map(f -> new FieldValue(f.getKey(), f.getValue().type().get(), f.getValue().role(),
-                                        f.getValue().value().get())).toList(), merged, identifiers);
+                                .map(f -> new FieldValue(f.getKey(), RecordField.typeRef(f.getValue().type().get()),
+                                        f.getValue().role(), f.getValue().value().get())).toList(), merged,
+                                identifiers);
                 default -> { }
             }
 
@@ -1289,8 +1291,11 @@ public final class TsonSchemaLinker {
             case RecordBody r -> {
                 // The chain is checked by validateEntry, its every member a bare name in a closed body.
                 for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
-                    validateTypeRef(field.getValue().type(), namespace, constructors, entryName,
-                            " field '" + field.getKey() + "'");
+                    switch (field.getValue().type()) {
+                        case TypeRef type -> validateTypeRef(type, namespace, constructors, entryName,
+                                " field '" + field.getKey() + "'");
+                        case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
+                    }
                     checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors);
                 }
                 for (FieldGroup group : r.groups()) {
@@ -1550,7 +1555,10 @@ public final class TsonSchemaLinker {
         }
         switch (body) {
             case RecordBody record -> record.fields().values().forEach(field -> {
-                collectNames(field.type(), into);
+                // A sibling names a field of this record, never an entry, so it contributes no name.
+                if (field.type() instanceof TypeRef type) {
+                    collectNames(type, into);
+                }
                 // A routed parameter rides `value` like any other token, so it is named here too -- which is
                 // what keeps `<S> base ^ { status: = S }` from reading as a template that never uses S.
                 field.value().map(Token::text).ifPresent(into::add);
@@ -1672,8 +1680,9 @@ public final class TsonSchemaLinker {
             for (Map.Entry<String, RecordField> inherited : source.fields().entrySet()) {
                 RecordField restated = record.fields().get(inherited.getKey());
                 if (restated != null && !narrows(inherited.getValue(), restated, namespace)) {
-                    violations.add("field '" + inherited.getKey() + "' is typed '" + shown.apply(restated.type().name())
-                            + "', which is not '" + shown.apply(inherited.getValue().type().name()) + "' or IS-A it");
+                    violations.add("field '" + inherited.getKey() + "' is typed '"
+                            + shown.apply(restated.typeRef().name()) + "', which is not '"
+                            + shown.apply(inherited.getValue().typeRef().name()) + "' or IS-A it");
                 }
             }
             if (!violations.isEmpty()) {
@@ -1685,8 +1694,14 @@ public final class TsonSchemaLinker {
 
     /** Whether {@code restated}'s type narrows {@code inherited}'s, as {@link #checkRestatedFieldTypes} states it. */
     private static boolean narrows(RecordField inherited, RecordField restated, Map<String, Top> namespace) {
-        TypeRef from = inherited.type();
-        TypeRef to = restated.type();
+        TypeRef from = switch (inherited.type()) {
+            case TypeRef type -> type;
+            case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
+        };
+        TypeRef to = switch (restated.type()) {
+            case TypeRef type -> type;
+            case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
+        };
         if (!from.arguments().isEmpty() || !to.arguments().isEmpty() || !namespace.containsKey(from.name())
                 || !namespace.containsKey(to.name())) {
             return true;
@@ -1737,13 +1752,13 @@ public final class TsonSchemaLinker {
         // The chain end is what has to be checked, not the hop: a field typed by an alias
         // (`a => text`, `f: a = hello`) states a value of whatever the alias names. Resolved output states
         // the chain rather than rewriting the use site past it, so the walk happens here.
-        String terminal = AliasChain.terminal(field.type().name(), namespace);
+        String terminal = AliasChain.terminal(field.typeRef().name(), namespace);
         Top target = namespace.get(terminal);
         // An unresolved reference is already reported by validateTypeRef; a target that is still open (or an
         // application of one) has no single body to check against until materialisation closes it. A body
         // still an Alias means the walk stopped on a cycle or an argument-bearing target, neither of
         // which has one either.
-        if (target == null || OpenEntry.isOpen(target) || !field.type().arguments().isEmpty()
+        if (target == null || OpenEntry.isOpen(target) || !field.typeRef().arguments().isEmpty()
                 || target instanceof Alias) {
             return;
         }
@@ -1771,7 +1786,7 @@ public final class TsonSchemaLinker {
             // so the author reads back their own line rather than a normalisation of it. The atom's own
             // message follows: it already states the rule and cites the section, so nothing here restates it.
             throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
-                    + "declared '" + field.type().name() + "', but its "
+                    + "declared '" + field.typeRef().name() + "', but its "
                     + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " "
                     + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
                     + "a field's fixed or default value a value of the field's own declared type");
@@ -1793,7 +1808,7 @@ public final class TsonSchemaLinker {
             return;
         }
         throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
-                + "declared '" + field.type().name() + "', but its "
+                + "declared '" + field.typeRef().name() + "', but its "
                 + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " " + asWritten(value)
                 + " is not a value of that type -- " + (namespace.get(value.text()) == null
                         ? "it names nothing in scope"
@@ -1821,7 +1836,7 @@ public final class TsonSchemaLinker {
     private static SchemaValidationException notAScalarType(String entryName, String fieldName, RecordField field,
                                                                  Token value, Top body) {
         return new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
-                + "declared '" + field.type().name() + "', which is " + describe(body) + ", so it cannot "
+                + "declared '" + field.typeRef().name() + "', which is " + describe(body) + ", so it cannot "
                 + "have " + (field.role() == FieldRole.DEFAULT ? "a default" : "a fixed value")
                 + " -- " + asWritten(value) + " is a token, and §5.2 admits only a bare token there. A "
                 + "fixed or default value is available on a field typed by an atom or an enum, and nowhere "

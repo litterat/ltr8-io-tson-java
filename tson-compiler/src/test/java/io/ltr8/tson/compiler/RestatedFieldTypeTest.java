@@ -94,9 +94,9 @@ class RestatedFieldTypeTest {
                 """);
 
         RecordBody staffed = assertInstanceOf(RecordBody.class, linked.schema().entries().get("staffed"));
-        assertEquals("employee", staffed.fields().get("lead").type().name());
+        assertEquals("employee", staffed.fields().get("lead").typeRef().name());
         RecordBody counted = assertInstanceOf(RecordBody.class, linked.schema().entries().get("counted"));
-        assertEquals("count", counted.fields().get("size").type().name());
+        assertEquals("count", counted.fields().get("size").typeRef().name());
     }
 
     @Test
@@ -123,9 +123,9 @@ class RestatedFieldTypeTest {
                 """);
 
         RecordBody namespace = assertInstanceOf(RecordBody.class, linked.schema().entries().get("meta.namespace"));
-        assertEquals("meta.identifier_ref", namespace.fields().get("key_type").type().name());
+        assertEquals("meta.identifier_ref", namespace.fields().get("key_type").typeRef().name());
         RecordBody map = assertInstanceOf(RecordBody.class, linked.schema().entries().get("meta.map"));
-        assertEquals("meta.type_ref", map.fields().get("key_type").type().name());
+        assertEquals("meta.type_ref", map.fields().get("key_type").typeRef().name());
     }
 
     /** No structural IS-A between two containers: two instances of `array` are unrelated (§7.2). */

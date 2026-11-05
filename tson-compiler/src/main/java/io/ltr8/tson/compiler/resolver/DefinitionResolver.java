@@ -606,7 +606,7 @@ final class DefinitionResolver {
      * relabelled. A closed declaration's fields are never labelled, so {@link #closed} is total for them; a template's
      * become {@link RecordTemplateField}s ({@link #template}).
      */
-    private record BuiltField(Optional<io.ltr8.tson.schema.meta.TypeRef> type, Optional<String> typeParam,
+    private record BuiltField(Optional<io.ltr8.tson.schema.meta.Reference> type, Optional<String> typeParam,
                               boolean optional, boolean voidable, FieldRole role, Optional<Token> value,
                               Optional<String> valueParam, Annotations annotations, Optional<SourcePosition> position) {
 
@@ -688,9 +688,12 @@ final class DefinitionResolver {
             return RecordField.describe(optional, role);
         }
 
-        /** The type as a message names it: the type's name, or the parameter standing for it. */
+        /** The type as a message names it: the type's name, the parameter standing for it, or the sibling's text. */
         String typeName() {
-            return typeParam.orElseGet(() -> type.orElseThrow().name());
+            return typeParam.orElseGet(() -> switch (type.orElseThrow()) {
+                case io.ltr8.tson.schema.meta.TypeRef reference -> reference.name();
+                case io.ltr8.tson.schema.meta.SiblingRef sibling -> sibling.text();
+            });
         }
     }
 
@@ -2092,10 +2095,17 @@ final class DefinitionResolver {
         };
     }
 
-    /** A closed record's field types, by field name. */
+    /**
+     * A closed record's field type references, by field name. A sibling reference names a field of the record, never
+     * a parameter, so it writes nothing {@link #refuseAbsorbedSpelling} judges.
+     */
     private static Map<String, io.ltr8.tson.schema.meta.TypeRef> typesOf(RecordBody record) {
         Map<String, io.ltr8.tson.schema.meta.TypeRef> types = new LinkedHashMap<>();
-        record.fields().forEach((field, declared) -> types.put(field, declared.type()));
+        record.fields().forEach((field, declared) -> {
+            if (declared.type() instanceof io.ltr8.tson.schema.meta.TypeRef type) {
+                types.put(field, type);
+            }
+        });
         return types;
     }
 
@@ -2222,7 +2232,11 @@ final class DefinitionResolver {
         }
         // The operand's own parameters are replaced by what this declaration writes; every other name stays.
         Map<String, io.ltr8.tson.schema.meta.TypeRef> written = new LinkedHashMap<>();
-        record.fields().forEach((field, open) -> open.type().ifPresent(type -> written.put(field, type)));
+        record.fields().forEach((field, open) -> open.type().ifPresent(type -> {
+            if (type instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
+                written.put(field, reference);
+            }
+        }));
         refuseAbsorbedSpelling(name, head, written, typeParams, templateParameters);
         // A closed declaration takes the member's fields, an open one its own template's, each applied argument
         // that is one of its parameters landing as its label.

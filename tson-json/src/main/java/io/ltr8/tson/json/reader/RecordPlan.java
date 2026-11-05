@@ -20,6 +20,8 @@ import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.HashMap;
 import java.util.List;
@@ -123,9 +125,14 @@ final class RecordPlan {
             names[i] = Nfc.of(declared);
             byName.put(nameForm.apply(names[i]), i);
             omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(declared)));
-            schemaReaders[i] = context.readers().resolve(field.type().name());
+            // A sibling reference's type is chosen per instance by its sibling's value, which no reader reads yet.
+            TypeRef type = switch (field.type()) {
+                case TypeRef reference -> reference;
+                case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
+            };
+            schemaReaders[i] = context.readers().resolve(type.name());
             if (field.value().isPresent()) {
-                stated[i] = FieldValue.of(context.linked(), field.type().name(), field.value().get());
+                stated[i] = FieldValue.of(context.linked(), type.name(), field.value().get());
             }
         }
         this.index = Map.copyOf(byName);

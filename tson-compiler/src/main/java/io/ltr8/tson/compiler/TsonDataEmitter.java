@@ -314,6 +314,13 @@ public final class TsonDataEmitter {
         return this;
     }
 
+    /** Writes {@code sibling} unquoted: its field's name and the sibling mark, {@code kind!}. */
+    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.SiblingRef sibling) {
+        startCoreValue();
+        emit(sibling.text());
+        return this;
+    }
+
     private void emitReference(io.ltr8.tson.schema.meta.TypeRef reference) {
         emit(reference.name());
         if (reference.arguments().isEmpty()) {

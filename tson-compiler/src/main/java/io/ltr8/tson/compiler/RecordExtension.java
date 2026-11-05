@@ -219,7 +219,7 @@ final class RecordExtension {
         Optional<AtomType<?>> parser = parserFor(field, merged, facts);
         if (parser.isEmpty()) {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + fieldName
-                    + "' is declared '" + field.type().name() + "', which is not an atom or an enum -- a "
+                    + "' is declared '" + field.typeRef().name() + "', which is not an atom or an enum -- a "
                     + "subtype pins it with a bare token (§12.1), so a type no token denotes has no pin to be "
                     + "told apart by (§5.2)"));
         }
@@ -345,10 +345,10 @@ final class RecordExtension {
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, Top> merged, Map<String,
             TsonSchema.EntryFacts> facts,
                                                    Map<String, Normalization> enumForms) {
-        if (!field.type().arguments().isEmpty()) {
+        if (!field.typeRef().arguments().isEmpty()) {
             return Optional.empty();
         }
-        String terminal = AliasChain.terminal(field.type().name(), merged);
+        String terminal = AliasChain.terminal(field.typeRef().name(), merged);
         Top target = merged.get(terminal);
         if (target == null || OpenEntry.isOpen(target) || target instanceof Alias) {
             return Optional.empty();

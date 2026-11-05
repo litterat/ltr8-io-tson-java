@@ -16,6 +16,7 @@ import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -149,6 +150,23 @@ class TsonSchemaLinkerTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
         assertTrue(thrown.getMessage().contains("'set' declares no type parameters"), thrown.getMessage());
+    }
+
+    /**
+     * A field typed by a sibling reference ({@code payload: kind!}) reaches no rule yet: the linker's field checks
+     * refuse it as this library's gap, never as the author's error.
+     */
+    @Test
+    void aFieldTypedBySiblingIsNotImplemented() {
+        Map<String, Top> entries = new LinkedHashMap<>();
+        entries.put("token", valueEntry());
+        entries.put("message", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("kind", RecordField.required(TypeRef.of("token"))),
+                Map.entry("payload", RecordField.required(SiblingRef.of("kind"))))));
+
+        UnsupportedOperationException gap = assertThrows(UnsupportedOperationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(gap.getMessage().contains("sibling reference ('kind!')"), gap.getMessage());
     }
 
     /** A one-parameter record template whose one field {@code field} is typed by the parameter ([TSON-SCHEMA] §5.10). */

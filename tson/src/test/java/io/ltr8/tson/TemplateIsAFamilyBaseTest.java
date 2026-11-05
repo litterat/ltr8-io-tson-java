@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
@@ -203,8 +204,9 @@ class TemplateIsAFamilyBaseTest {
 
     private static String fieldType(TsonLinkedSchema schema, String entry, String field) {
         return switch (schema.schema().entries().get(entry)) {
-            case RecordBody record -> record.fields().get(field).type().name();
-            case RecordTemplateBody template -> template.fields().get(field).type().orElseThrow().name();
+            case RecordBody record -> record.fields().get(field).typeRef().name();
+            case RecordTemplateBody template ->
+                    RecordField.typeRef(template.fields().get(field).type().orElseThrow()).name();
             default -> throw new AssertionError(entry + " is neither a record nor a record template");
         };
     }

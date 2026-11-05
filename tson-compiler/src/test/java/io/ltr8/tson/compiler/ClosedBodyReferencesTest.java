@@ -114,7 +114,7 @@ class ClosedBodyReferencesTest {
                 direct => { d: [box<text>] }""");
 
         ReferenceBody reference = assertInstanceOf(ReferenceBody.class, entry(linked, "r"));
-        String array = ((RecordBody) entry(linked, "direct")).fields().get("d").type().name();
+        String array = ((RecordBody) entry(linked, "direct")).fields().get("d").typeRef().name();
         assertEquals(array, reference.of(), "one entry for one form, whichever position names it");
         assertInstanceOf(ArrayBody.class, entry(linked, reference.of()));
     }
@@ -124,7 +124,7 @@ class ClosedBodyReferencesTest {
     void aReferenceAtAFieldFollowsTheMergeToo() {
         TsonLinkedSchema linked = clean("rec => { f: meta.ref<[box<text>]> }");
 
-        String minted = ((RecordBody) entry(linked, "rec")).fields().get("f").type().name();
+        String minted = ((RecordBody) entry(linked, "rec")).fields().get("f").typeRef().name();
         ReferenceBody reference = assertInstanceOf(ReferenceBody.class, entry(linked, minted));
         assertInstanceOf(ArrayBody.class, entry(linked, reference.of()), () -> "of names a live entry: " + reference);
     }

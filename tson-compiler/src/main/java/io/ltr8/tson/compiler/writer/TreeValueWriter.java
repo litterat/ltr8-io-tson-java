@@ -153,6 +153,11 @@ public final class TreeValueWriter {
             out.reference(reference);
             return;
         }
+        if (value instanceof io.ltr8.tson.schema.meta.SiblingRef sibling) {
+            node.typeRef().ifPresent(out::typeRef);
+            out.reference(sibling);
+            return;
+        }
         VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());
         if (vocab != null) {
             out.typeRef(node.typeRef().orElseGet(() -> vocab.typeRef(value))).quotedString(vocab.write(value));

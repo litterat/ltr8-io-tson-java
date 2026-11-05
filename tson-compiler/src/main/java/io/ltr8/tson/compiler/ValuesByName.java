@@ -272,7 +272,7 @@ final class ValuesByName {
                                     + "not present in the value";
                         }
                     }
-                    at = at.of(field.type().name());
+                    at = at.of(field.typeRef().name());
                 }
                 case MapBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
                         + reached + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "

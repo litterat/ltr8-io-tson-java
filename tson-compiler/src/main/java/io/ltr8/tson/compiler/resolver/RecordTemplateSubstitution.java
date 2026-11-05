@@ -10,6 +10,8 @@ import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.SiblingRef;
 
 import java.util.List;
 import java.util.Map;
@@ -86,7 +88,11 @@ final class RecordTemplateSubstitution {
 
     private static RecordTemplateField field(String head, RecordTemplateField field,
             Map<String, TypeArgument> bindings, List<String> outer) {
-        Optional<TypeRef> type = field.type().map(written -> reference(written, bindings));
+        // A sibling names a field of the record, never a parameter, so substitution leaves it as written.
+        Optional<Reference> type = field.type().map(written -> switch (written) {
+            case TypeRef reference -> reference(reference, bindings);
+            case SiblingRef sibling -> sibling;
+        });
         Optional<String> typeParam = Optional.empty();
         if (field.typeParam().isPresent()) {
             String parameter = field.typeParam().get();
@@ -122,8 +128,10 @@ final class RecordTemplateSubstitution {
             }
         }
         if (field.valueParam().isPresent() && value.isPresent()) {
-            Optional<String> open = typeParam.isPresent() ? typeParam
-                    : OpenEntry.parameterIn(type.orElseThrow(), outer);
+            Optional<String> open = typeParam.isPresent() ? typeParam : switch (type.orElseThrow()) {
+                case TypeRef reference -> OpenEntry.parameterIn(reference, outer);
+                case SiblingRef ignored -> Optional.<String>empty();
+            };
             if (open.isPresent()) {
                 // A literal needs a closed type, and the type the argument is a value of is still a parameter here.
                 throw new SchemaValidationException("'" + head + "<...>' binds '" + field.valueParam().get()

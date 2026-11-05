@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TupleElement;
 
@@ -43,7 +44,8 @@ import java.util.Optional;
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt.</li>
  *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
- * to judge, whatever the target holds. A {@code Ref} or {@code TypeRef} target at a reference-typed slot
+ * to judge, whatever the target holds. A {@code Reference} target reads as a {@code TypeRef} one does, a type
+ * reference being a reference. A {@code Ref} or {@code TypeRef} target at a reference-typed slot
  * ({@code meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives the
  * value when the schema links, a {@code TypeRef} the name alone. A {@code TypeRef} target at a kind-typed slot
  * ({@code meta.record_field.type} is {@code meta.type_ref}, a meta's {@code request: meta.ref<record>}) reads through
@@ -83,14 +85,15 @@ final class BindTargets {
                                 boolean top) {
         DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
         TsonTypeReader<?> bound;
-        boolean byName = payload.typeClass() == TypeRef.class || payload.typeClass() == Ref.class;
+        boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == Reference.class;
+        boolean byName = typeRef || payload.typeClass() == Ref.class;
         if (byName && readsARef(reader)) {
             // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
             // TypeRef -- so the atom's own bridge (Ref's name form) is not applied on top of it.
             TsonTypeReader<?> named = new ReferenceNameReader(expectedAt(reader, what), payload.typeClass() == Ref.class,
                     slotAtom(reader).slotType());
             return AnnotationBoxing.wrap(named, target, site.annotationTypes());
-        } else if (payload.typeClass() == TypeRef.class && readsAKind(reader)) {
+        } else if (typeRef && readsAKind(reader)) {
             // The same for a type's name or an application: the reader produces the TypeRef itself, so the atom's
             // own bridge (the reference's text form) is not applied on top of it.
             return AnnotationBoxing.wrap(new TypeNameSlotReader(slotAtom(reader), site.annotationTypes()), target,
