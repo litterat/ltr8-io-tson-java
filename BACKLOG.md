@@ -179,6 +179,38 @@ spec-required case:
   the annotating document's annotation scope beside the reader's own (`AnnotationTypes`), consulted where the reader's
   misses. `SPEC-FEEDBACK.md #15`, "Open".
 
+- [ ] **A field absorbed from a closed parent is rewritten where its type applies a name spelled like a parameter.**
+  With `T => { q: int32 }`, `box => <U> { item: U }`, `base => { f: box<T> }` and `t2 => <T> base & { x: T }`,
+  `t2<text>` closes `f` to `box<text>` while IS-A `base`, whose `f` is `box<T>` over the declared `T`.
+  `OpenEntry.parameterIn` and `RecordTemplateSubstitution.reference` recognise a parameter by its text in every
+  `type`, absorbed ones included. Give the builder field provenance (`DefinitionResolver.Built`), so a field taken
+  from a closed source holds no parameter however its names are spelled, and add a `schema/valid` vector.
+
+- [ ] **The closed-record builder runs over `RecordTemplateField`.** `DefinitionResolver.Built` and everything feeding
+  it -- composition, refinement, `resolveEntry`, the tightening rules -- build template fields for every record and
+  close them in `finish`. Give the builder its own field type, producing a `RecordField` or a `RecordTemplateField`
+  in `finish`, so the template's kernel value is no closed record's working value.
+
+- [ ] **The desugarer writes a record template as `!meta.record`, and `WireForm.recordTemplatePayload` relabels it.**
+  Write `!meta.record_template` with its labels directly where the parameters are in scope (`recordBinding`), and
+  label an explicit `<T> !meta.record { … }` there too; Part 2 §12's `instance` grammar comment changes with it.
+
+- [ ] **The family-base seam is spread across about twelve classes.** Give a family base one view -- selectors,
+  extension, discriminators, name type, members -- that every dispatcher, `RecordExtension` and both encodings'
+  `ValueReaderContext` take, and one IS-A edge rule in `Ancestry` in place of the three that add the edge to a base
+  (`DefinitionResolver.resolveComposition`, `SchemaResolver.familyBaseEdges`, `Ancestry.ofTemplate`). The text
+  side's two dispatch choosers (`RecordDispatch` and `AbstractTemplateReader`) become one, as the JSON side's is.
+
+- [ ] **Record and record-template arms are duplicated.** Promote `FieldNames.Shape` to a plain `RecordHead` value
+  both bodies produce -- name type, field names, discriminators, groups, extension; no shared interface, since a
+  record must never name a template -- and read it in `NameType`, the linker's name hygiene, `FieldNames`,
+  `EntryKind` and both `DiscriminationClass`es.
+
+- [ ] **A record template base's discriminator rules cannot fire.** `RecordExtension.familyBodyOf` builds the base
+  with no groups, and `FamilySelectors.selector` makes every selector required, not voidable and FREE, so a template
+  whose selector is a group member, voidable or optional-and-unpinned passes the checks a closed base fails.
+  Check them on the template's own fields, and add `link/invalid` vectors.
+
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@meta.disjoint` is the precedent both follow: an annotation with

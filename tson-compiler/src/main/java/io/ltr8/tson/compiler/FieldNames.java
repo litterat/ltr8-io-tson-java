@@ -39,12 +39,19 @@ final class FieldNames {
 
     /**
      * The definition {@code record}'s field names are read by, where its field name type is not the kernel's
-     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. Empty
-     * for the default, which every reader applies without being told, and for a type that resolves to nothing.
+     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. A record
+     * template's too: no reader reads a value against it, and its member dispatch matches the selectors' keys in
+     * the form its members read them. Empty for the default, which every reader applies without being told, and
+     * for a type that resolves to nothing.
      */
     static Optional<Top> readBy(Top record, Map<String, Top> merged,
                                            Function<String, Top> structure) {
-        if (!(record instanceof RecordBody body) || body.nameType().isEmpty()) {
+        Optional<String> stated = switch (record) {
+            case RecordBody body -> body.nameType();
+            case RecordTemplateBody template -> template.nameType();
+            case null, default -> Optional.empty();
+        };
+        if (stated.isEmpty()) {
             return Optional.empty();
         }
         return NameType.of(record, Optional.empty(), merged::get, structure).map(NameType.Resolved::definition);

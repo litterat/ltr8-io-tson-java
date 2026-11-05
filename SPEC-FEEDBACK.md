@@ -1206,7 +1206,10 @@ literal that happens to spell a parameter has no resolved form at all.
   type**, so a field typed by a parameter, whole or as an argument, takes `value_param` or no value: `<T> { v?: T ~ 5
   }` and `<M> { v?: capped<M> ~ 5 }` are refused at the declaration. Revision 38 accepts both and judges the literal
   per application (`box<int32>` and `box<text>` pass; `capped<3>` refuses `5`), so a template could be valid for
-  some arguments and not others; the rule makes the template's verdict its own.
+  some arguments and not others; the rule makes the template's verdict its own. The same rule reaches a literal
+  *argument*: with `pin2 => <T, P> { a?: T = P }`, `<X> pin2<X, 3> & { … }` and `<X> { f: pin2<X, 3> }` bind `P`, a
+  value of `T`'s argument, to `3` while that argument is the open `X`, and both are refused at the application,
+  naming `3`, `P` and `X`; `pin2<int8, 3>` is a closed application and its member pins `a` to `3`.
 - **Kinds follow the constructor.** A record template is a member of `meta.ref<meta.record_template>` and of no
   `meta.ref<meta.record>`, where §5.10 calls it "a member of `kind<record>`"; its declared applications are records.
   The kernel's `meta.ref<meta.map>` gains `meta.record_template_field_map` (`the-kind-of-map-holds-the-namespace-types`).
@@ -1246,3 +1249,32 @@ shared parent; if one is wanted, it is a `meta.product` refinement holding `chai
 - §1.3: a consumer recognises a record template by its constructor; §4.2's application-form list names
   `record_template_field.type`; §5.7's open modifiers: the parameter is the field's `value_param` while open.
 - §13.2: the kernel listing gains the three entries and `record` loses `parameters`.
+
+## 20. [TSON-SCHEMA] §5.8, §5.10, §8.1 — an applied parent reaches the head at a closed operand, not through a template
+
+**Problem.** §5.8 gives two answers to one question: does a type whose parent is an application of a record template
+take an IS-A edge to that template? For a closed declaration it does: an application at a composition operand "is
+subsumed where it stands", so `dog => pet<"dog", dog_type> & { … }` is the hand-written
+`dog => pet & { pet_type?: = "dog"  pet: dog_type }` "with one IS-A edge to `pet`", the head. For a template it does
+not: with `ok => <T> result<T> & { note: text }`, "`ok<text>` reaches an IS-A edge to `result<text>`", and §8.1's
+derived indexes add "`ok<text>` indexes `result<text>`, never a head name". So `ok_of => ok<text>` is IS-A `ok` and,
+only where a declaration names `result<text>`, `result<text>` — never `result`. Yet §8.1 also says "a template's
+expansion carries whatever chain the expansion's own `^` or `&` gives it", and `ok<text>` expands to
+`result<text> & { note: text }`, whose operand by §5.8's first answer earns the edge to `result`. The application and
+its hand-written expansion land in different families, and a position typed `result` admits the second and refuses
+the first.
+
+**What is running.** Both texts as written. A closed declaration composing an application is a declared member of the
+template and IS-A its head; a template's applied parent is substituted and closed, and the closed entry's chain
+reaches the entry its arguments name, so the template is IS-A nothing of `result`'s and `ok_of`'s supertypes are
+`[ok]` unless some declaration names `result<text>` (`SubtypeTemplateFamilyTest`).
+
+**Resolution, a proposal.** Make the expansion rule govern: a declared application of a template whose parent is an
+application of another record template is IS-A that template too, as its hand-written expansion is, and joins its
+family. §5.8's "never asked to carry the distinction" survives — the edge to `result<text>` still distinguishes
+instantiations, and the head edge says only "a member of the `result` family", as `dog`'s does. Two consequences to
+state with it: the member must pin the outer family's discriminators, which `ok`'s own pins (or its parameters'
+arguments) supply; and §8.1's "never a head name" narrows to "a parent application contributes the entry its
+arguments name, and a declared member additionally the head". The alternative, keeping the asymmetry, needs §8.1's
+expansion sentence to except applied parents, and the hand-written-expansion equivalence §5.8 states for `dog` to be
+said to hold only for closed declarations.

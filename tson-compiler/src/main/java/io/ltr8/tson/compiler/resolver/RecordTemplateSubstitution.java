@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.Token;
@@ -105,6 +106,17 @@ final class RecordTemplateSubstitution {
                         + "value parameter '" + parameter + "' to '" + ParameterTypes.spell(ref.ref()) + "', an "
                         + "application, where a field's value stands -- a value parameter's argument is a token "
                         + "(§5.10)");
+            }
+        }
+        if (field.valueParam().isPresent() && value.isPresent()) {
+            Optional<String> open = typeParam.isPresent() ? typeParam
+                    : OpenEntry.parameterIn(type.orElseThrow(), outer);
+            if (open.isPresent()) {
+                // A literal needs a closed type, and the type the argument is a value of is still a parameter here.
+                throw new SchemaValidationException("'" + head + "<...>' binds '" + field.valueParam().get()
+                        + "' to the literal '" + value.get().text() + "', whose type is '" + open.get() + "', still "
+                        + "open here -- a literal needs a closed type: pass a parameter for '"
+                        + field.valueParam().get() + "' too, or close '" + open.get() + "' (§5.10)");
             }
         }
         return new RecordTemplateField(type, typeParam, field.optional(), field.voidable(), field.role(), value,

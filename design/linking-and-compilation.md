@@ -36,7 +36,9 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   and each is merged through imports.
 - A namespace type resolves to a `NamespaceBody`, and a value of it is read as the map `NamespaceBody.read()` states:
   both compilers hand that map to the `map` factory, so neither factory table has a `namespace` entry.
-- `checkHeldArity` asks `HeldBody.applications()` only, never `HeldBody.names()`.
+- `checkHeldArity` asks `HeldBody.applicationsOf` only, never `HeldBody.namesOf`. It is the one place an entry's own
+  parameters are in scope: a closed entry holds none, so `validateTypeRef` and `checkFieldValue` resolve every name
+  in the schema's namespace.
 - `TsonSchemaRegistry` never overwrites an identity and exposes no way to remove or enumerate one: that *is* the
   "locked" guarantee.
 - Everything that asks what an entry IS-A asks its `TypeChain`: `computeSubtypes` credits a record template as it
@@ -183,6 +185,11 @@ Both are decidable at link and neither depends on anyone applying a template.
   and literals among them, so asking the zero-argument half of `names()` would refuse a correct schema whose field is
   called `box` beside a template of that name. That half runs on the entry materialisation mints, and an unapplied
   template gets no verdict (§5.10: "an unapplied template is checked no further and receives no verdict").
+  - **A literal argument whose type the body leaves open is refused here too** (`checkOpenLiterals`): with `pin2 =>
+    <T, P> { a?: T = P }`, `<X> { f: pin2<X, 3> }` binds `P`, a value of `T`'s argument, to `3` while that argument
+    is the open `X`. A literal needs a closed type (§5.10), and no argument of `X` changes that, so it is the
+    declaration's verdict, naming `3`, `P` and `X`. An operand applied the same way is refused where it is
+    substituted (`RecordTemplateSubstitution`), with the same words.
 
 ## The facts linking records (`TsonLinkedSchema`)
 

@@ -365,12 +365,12 @@ final class SchemaDesugarer {
                 // see currentParameters.
                 StructuralDef body = structuralDef(structural.body());
                 // §5.2's own rewrite, applied where the body is written: a bare record body denotes
-                // `!meta.record { fields: { ... } }`, which `DefinitionResolver.openRecord` binds into the open
-                // record it is. See recordBinding.
+                // `!meta.record { fields: { ... } }`, which `DefinitionResolver.openRecord` reads as the record
+                // template it is. See recordBinding.
                 //
                 // Every parameterised record body takes this path, `~`-marked or not. A composition or
-                // refinement template is opened one phase later (`DefinitionResolver.parameterised`), since both
-                // absorb fields from a source and the template is the flattened record. A bare record has none.
+                // refinement template is built one phase later (`DefinitionResolver.Built`), since both absorb
+                // fields from a source and the template is the flattened record. A bare record has none.
                 if (!structural.typeParams().isEmpty() && body instanceof RecordDef record) {
                     yield instance(recordBinding(record), structural.typeParams());
                 }
@@ -737,27 +737,20 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code !meta.record { fields: { x => { type: T } ... } }} -- §5.2's own rewrite of a bare record body,
-     * applied where the body is written so that a record template holds an application like every other open
-     * form.
+     * {@code !meta.record { fields: { x => { type: T } ... } }} -- §5.2's own rewrite of a record template's bare
+     * body, applied where the body is written, so the template's explicit spelling and its sugar reach the resolver
+     * as one payload, as written.
      *
-     * <p><b>Why here rather than in the resolver.</b> The alternative is to resolve the body and write the
-     * result back out, and it does not work: the wire form is what {@link DerivedName#ofBinding} hashes and what
-     * substitution walks, so a second producer of it is a second spelling of the same thing --
-     * {@code DataClassObjectWriter} quotes tokens this phase leaves bare, and a quoted token is a literal to
-     * substitution. §5.2's rewrite is syntactic, as fixed and as closed as the sugar table above, so it belongs beside it.
+     * <p><b>§5.2's rewrite is syntactic</b>, as fixed and as closed as the sugar table above, so it belongs beside it.
+     * The payload is source spelling: a parameter stands in it as the author wrote it, a bare name in a field's type
+     * or an unquoted token in its value, and the resolver labels each when it reads the payload as the {@code
+     * record_template} it denotes ({@code WireForm.recordTemplatePayload}). The role is the modifier's either way
+     * ({@link FieldModifiers}), so closing substitutes a value and changes no fact.
      *
      * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
      * fixed on the {@code record} constructor and an unmarked field's facts are {@code meta.record_field}'s own
-     * defaults, so neither is stated -- the same economy {@link #arrayBinding} makes
-     * with an unmarked element's {@code state}, and what keeps the held form the one the author would
-     * recognise.
-     *
-     * <p><b>A parameter rides the ordinary {@code value} slot</b>, with §8.1's shadowing rule to tell it from
-     * a literal. That is what a held body buys, and why the kernel's {@code meta.record_field} needs no separate
-     * parameter channel: a body read as constructor vocabulary at its declaration could not say which of the
-     * two a token is, and a held body is read as vocabulary only once its parameters are gone. The role is the
-     * modifier's either way ({@link FieldModifiers}), so closing substitutes a value and changes no fact.
+     * defaults, so neither is stated -- the same economy {@link #arrayBinding} makes with an unmarked element's
+     * {@code state}.
      */
     private Binding recordBinding(RecordDef record) {
         List<MapValue.MapEntry> fields = new ArrayList<>();

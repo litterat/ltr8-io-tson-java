@@ -118,7 +118,7 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
         return omitted(optional, value.isPresent(), groupMember);
     }
 
-    /** {@link #omitted(boolean)} over the facts it reads, for a template's field, whose value may be a parameter. */
+    /** {@link #omitted(boolean)} over the facts it reads: whether the field is optional, and whether it has a value. */
     static Omitted omitted(boolean optional, boolean valued, boolean groupMember) {
         if (!optional) {
             return Omitted.MISSING;

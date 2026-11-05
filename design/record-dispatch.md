@@ -44,7 +44,9 @@ play, so no family-base position reaches it.
   the failure lands before the record's shape is consulted. It selects among a record's subtypes and knows nothing
   of namespace types: resolved output's `myapi => !api { … }` is read at the schema map's `declared` position, whose
   reader delivers a `Namespace` (`DeclaredReader`, `design/declared-positions.md`, `design/meta-layer-namespaces.md`).
-- **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up.
+- **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up. Their
+  keys are matched in the base's name form (`TsonLinkedSchema.nameForm`), a record template base's included: its
+  members take its name type, and `FieldNames.readBy` records the template's as it records a record's.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
 it, so the member's own reader takes the whole data-value and does with it whatever that mode does everywhere

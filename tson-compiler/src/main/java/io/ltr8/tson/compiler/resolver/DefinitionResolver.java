@@ -110,8 +110,8 @@ import java.util.function.Predicate;
  *
  * <p><b>A declaration carrying type parameters (§5.10) is open.</b> A record template is a {@code
  * record_template}: the record resolution builds with the parameters standing as names and tokens, its fields
- * labelled ({@link #openRecord}, and {@link #parameterised} for a composition or refinement, which absorbs fields
- * from a source and so is a template in its flattened form). Any other open instance is held as written
+ * labelled ({@link #openRecord}, and {@link Built} for a composition or refinement, which absorbs fields from a
+ * source and so is a template in its flattened form). Any other open instance is held as written
  * ({@link #resolveInstanceTemplate}). Nothing is substituted here -- that is {@code TemplateMaterialiser}'s, over
  * the resolved form.
  *
@@ -518,9 +518,9 @@ final class DefinitionResolver {
             case StructuralTypeDef structural -> {
                 List<String> parameters = structural.typeParams();
                 yield (switch (structural.body()) {
-                    // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
-                    // desugar phase rewrote every real record template into the `!meta.record { ... }` §5.2 says it
-                    // denotes, which `openRecord` binds.
+                    // Only an error placeholder is both open and still a bare RecordDef here -- the desugar phase
+                    // rewrote every real record template into the `!meta.record { ... }` §5.2 says it denotes,
+                    // which `openRecord` reads as the template it is.
                     case RecordDef recordDef -> resolveRecordBody(recordDef.entries(), parameters);
                     case ConstructionDef construction -> resolveComposition(name, construction, parameters);
                     case RefinedDef refined -> resolveRefinement(name, refined, parameters);
@@ -723,8 +723,8 @@ final class DefinitionResolver {
         refuseAbstractHead(name, target, constructor);
         refuseWrittenChain(name, target, instance.value());
         // No check that the head's own body is a record: a chain reaching `top` is built only by composition and
-        // refinement, both of which build a `RecordBody` -- except where `parameterised` opens one for an open
-        // declaration, and a declaration with parameters is refused as a template above. Every other body shape
+        // refinement, both of which build a `RecordBody` -- or a `RecordTemplateBody` for an open declaration, which
+        // is refused as a template above. Every other body shape
         // comes with an empty chain, since IS-A stops at construction (§4.1), and so is read as a value entry.
         // Parameters empty and IS-A `top` therefore imply a record body.
         Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
@@ -954,7 +954,7 @@ final class DefinitionResolver {
      */
     private Top openRecord(String name, List<String> parameters, DataValue payload) {
         ParameterTypes.checkSlots(parameters, payload, metaDefinitions::definition);
-        if (!(bindAtomInstance(name, WireForm.recordTemplatePayload(payload, parameters))
+        if (!(bindAtomInstance(name, WireForm.recordTemplatePayload(payload, parameters), WireForm.RECORD)
                 instanceof RecordTemplateBody template)) {
             throw new IllegalStateException("'" + name + "': '!record_template { ... }' bound to something other "
                     + "than a record template");
@@ -1258,6 +1258,14 @@ final class DefinitionResolver {
      * directly -- no separate name→class table, no union-member scan.
      */
     private Top bindAtomInstance(String name, DataValue value) {
+        return bindAtomInstance(name, value, value.typeRef().orElse(null));
+    }
+
+    /**
+     * The same, a refusal naming {@code written} -- the constructor the author's spelling applies, where the payload
+     * read is the one it denotes ({@code !record} written, {@code !record_template} read).
+     */
+    private Top bindAtomInstance(String name, DataValue value, String written) {
         String constructorName = value.typeRef().orElseThrow(() -> new IllegalStateException(
                 "'" + name + "': normalized value has no type-ref naming its own constructor -- "
                         + "DefinitionResolver should never produce this"));
@@ -1265,7 +1273,7 @@ final class DefinitionResolver {
         try {
             body = definitionMetaReader.read(constructorName, value);
         } catch (ReadException e) {
-            throw bodyIsNotValidData(name, constructorName, e);
+            throw bodyIsNotValidData(name, written, e);
         } catch (BindMismatchException e) {
             // The constructor is a meta layer's own and the consumer never registered a class for it, or
             // registered one that disagrees. Either way it is their configuration, and it already says so --
@@ -1464,8 +1472,8 @@ final class DefinitionResolver {
      * supertype's own {@code supertypes} is already
      * its full transitive chain (by the same induction, computed when *that* entry was resolved), so
      * {@code direct + parent.supertypes} for every direct supertype, deduplicated, is the complete transitive
-     * chain -- no separate graph walk needed. A template's body keeps the parents as written instead
-     * ({@link #parameterised}), and closing it completes the chain the same way ({@link Ancestry}).
+     * chain -- no separate graph walk needed. A template keeps the parents as written as well ({@link Built#finish}),
+     * and closing it completes each application's chain the same way ({@link Ancestry}).
      * {@code parameters} (a template's own {@code <T, ...>} list, §5.10) threads straight through
      * from the declaration's {@code typeParams} into the result -- {@code array}'s own shape
      * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
@@ -1500,33 +1508,43 @@ final class DefinitionResolver {
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
                 }
-                // A *family base* is the one head that is itself a type (§5.10): its
-                // held body carries `extension`, so a value can stand at it and be a value of one of its
-                // members. Where this declaration takes no parameters of its own it is never held, so there
-                // is no later materialisation to close the application kept in the chain and mint
-                // the edge the way an open operand's gets one. So the edge is stated here, and to the base
-                // itself rather than to an instantiation nothing mints: `dog => pet<"dog"> & { … }` IS-A
-                // `pet`, which is what puts `dog` in `pet.subtypes` and lets a `pet` position dispatch.
+                // A *family base* -- a record template -- is the one head that is itself a type (§5.10), so a
+                // value can stand at it and be a value of one of its members. Where this declaration takes no
+                // parameters of its own it is closed already, so there is no later materialisation to close the
+                // application kept in the chain and mint the edge the way an open operand's gets one. So the
+                // edge is stated here, and to the base itself rather than to an instantiation nothing mints:
+                // `dog => pet<"dog"> & { … }` IS-A `pet` (§5.8), which puts `dog` in `pet.subtypes` and lets a
+                // `pet` position dispatch.
                 if (parameters.isEmpty()
                         && OpenEntry.isFamilyBase(namespaceDefinitions.definition(generic.name()))) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, generic.name());
                 }
-                // The application itself goes into the chain, arguments and all. It names no entry yet --
-                // `result` is a template and nothing is IS-A one -- but `supertypes` is a reference channel, so
-                // a template's held body substitutes and closes it with everything else it holds, and a closed
-                // declaration's is folded by SchemaResolver into the edge to the entry `result<text>` denotes.
+                // The application itself goes into the chain, arguments and all. It names no entry yet, and an
+                // applied parent reaches the entry its arguments name, never its head (§5.8): a template keeps it in
+                // `parents`, substituted when each application closes, and a closed declaration's is folded by
+                // SchemaResolver into the edge to the entry `result<text>` denotes.
                 // A removal revokes IS-A for every parent (§5.9), so nothing is kept.
                 if (construction.removal().isEmpty()) {
                     // Closed: the arguments go in as §5.10 classifies them, since this channel is validated
                     // and a value argument left as a reference is looked up as a type. Open: they stay as
                     // written, the argument being this declaration's own parameter and materialisation being
-                    // what classifies it when the held body closes.
+                    // what classifies it when an application closes.
                     directSupertypes.add(new io.ltr8.tson.schema.meta.TypeRef(generic.name(),
                             namesOwnParameter(generic, parameters)
                                     ? typeArguments(name, generic)
                                     : operand.arguments()));
                 }
                 absorb(name, operand.fields(), operand.groups(), fields, groups, seenFieldNames, inheritedFields);
+                // An applied operand states its template's name type, which every application keeps (§5.2).
+                if (nameTypeFrom == null) {
+                    nameType = operand.nameType();
+                    nameTypeFrom = generic.name();
+                } else {
+                    String firstFrom = nameTypeFrom;
+                    Optional<String> first = nameType;
+                    deferred.add(new Deferred(name, () -> requireOneNameType(name, firstFrom, first, generic.name(),
+                            operand.nameType())));
+                }
                 continue;
             }
             if (!(supertypeRef instanceof SimpleRef simple)) {
@@ -1998,11 +2016,11 @@ final class DefinitionResolver {
     }
 
     /**
-     * What an operand still open contributes to the declaration absorbing it: a field set, and the operand's
-     * own supertypes. Not the operand itself -- {@code box} is a template, and §5.10 makes a template no type,
-     * so nothing can be IS-A one. Its <em>ancestors</em> are types, and the fields arriving here came with
-     * them, so a declaration composing {@code box&lt;T&gt;} stands where {@code box}'s own {@code base} is
-     * expected.
+     * What an applied operand contributes to the declaration absorbing it: a field set, its groups and name type,
+     * and the operand's own supertypes. Not an edge to the operand's head -- an applied parent reaches the entry its
+     * arguments name, never its head (§5.8), except the one edge a closed declaration states to a family base
+     * itself. Its <em>ancestors</em> are types, and the fields arriving here came with them, so a declaration
+     * composing {@code box&lt;T&gt;} stands where {@code box}'s own {@code base} is expected.
      *
      * <p><b>Absorbing needs no closure, which is the whole of why this works.</b> The operand is a record template,
      * so its field set is known while the application is open: substituting its parameters with the arguments
@@ -2019,9 +2037,8 @@ final class DefinitionResolver {
      *
      * <p><b>The IS-A edge to the operand itself is minted one pass later, not here.</b> This declaration
      * cannot state it -- there is no instantiation of {@code box} yet to be IS-A -- so what it does instead
-     * is keep the application: {@code supertypes} is a reference channel, so {@code box&lt;T&gt;} is written
-     * into the held body as a parent and closes with everything else in it, and {@code SchemaResolver} folds the
-     * closed application into the edge to the entry it denotes.
+     * is keep the application in the template's {@code parents}, substituted when each application closes, and
+     * {@code SchemaResolver} folds the closed application into the edge to the entry it denotes.
      * That is why the parent is carried as a reference and not as the head name §5.8 describes: an edge to
      * {@code box} would hold of {@code box&lt;int32&gt;} as much as of {@code box&lt;text&gt;}, and only one
      * of those admits a {@code vip&lt;text&gt;}.

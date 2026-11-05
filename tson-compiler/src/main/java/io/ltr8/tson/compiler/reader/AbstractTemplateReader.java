@@ -12,8 +12,8 @@ import java.util.Set;
 /**
  * The reader a <b>family base</b> compiles to -- a record template ({@link RecordTemplateBody}, §5.10), the one
  * open entry that is a type. It takes the template's own Java type, so nothing else can be handed to it. A value
- * here is a value of one of the template's members, chosen by a tag (ABSTRACT) or by reading the discriminator
- * fields (SEALED), so the reader dispatches and never reads a record of its own.
+ * here is a value of one of the template's members, chosen by its tag, or by reading the discriminator fields where
+ * the template names some, so the reader dispatches and never reads a record of its own.
  *
  * <p><b>The peer of {@link OpenTemplateReader}, and the reason that one is now the narrower case.</b> "A
  * template is not a type" is a rule about <em>elimination</em>: a position typed {@code arr} would have to

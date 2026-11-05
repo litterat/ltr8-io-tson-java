@@ -76,10 +76,11 @@ class TemplateDiscriminatorTest {
             """;
 
     /**
-     * <b>The held body names the selector, because the template's field is the base's.</b> It is REQUIRED with
-     * the parameter standing in {@code value} (§5.7 fixes it downstream), so the statement belongs there --
-     * and without it a template family could never be sealed, the fact having been dropped between the
-     * declaration and anything able to read it.
+     * <b>The template names the selector, because the template's field is the base's.</b> The field is optional
+     * and FIXED to the parameter, its {@code value_param} (§5.7: the name's mark is the author's), and the base
+     * reads it required with the pin dropped -- so the statement belongs on the template, and without it a template
+     * family could never dispatch on its members, the fact having been dropped between the declaration and anything
+     * able to read it.
      */
     @Test
     void theHeldBodyNamesTheSelector() {

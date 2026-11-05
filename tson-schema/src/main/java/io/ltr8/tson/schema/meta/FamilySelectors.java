@@ -11,7 +11,7 @@ import java.util.SequencedMap;
 import java.util.function.Function;
 
 /**
- * The fields a SEALED family dispatches on, resolved from the base's {@code discriminators} list -- one
+ * The fields a member-dispatched family dispatches on, resolved from the base's {@code discriminators} list -- one
  * derivation both encodings read, so a schema-load check and a read can never disagree about what selects a
  * member.
  *

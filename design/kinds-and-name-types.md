@@ -175,9 +175,11 @@ way, once, its field names being every application's.
 - **A schema's own references to a field match its declared spelling exactly**, under a folding type too: a group
   member, a refinement's or removal's restated field, a discriminator. Only a document's names are matched in the
   type's form.
-- **Recorded for the readers.** Each record whose body states a name type is recorded in `TsonLinkedSchema.nameTypes`
-  with the definition it resolves to (`FieldNames.readBy`), because its readers judge a document's names by it and
-  cannot resolve it themselves.
+- **Recorded for the readers.** Each record or record template whose body states a name type is recorded in
+  `TsonLinkedSchema.nameTypes` with the definition it resolves to (`FieldNames.readBy`), because its readers judge a
+  document's names by it and cannot resolve it themselves. A template is read against by no reader, but its member
+  dispatch matches its selectors' keys in that form, as its members do; a composition takes an applied operand's
+  name type as it takes a closed supertype's.
 - **A duplicate field is refused by whichever layer can see it, and only by that one.** One spelling written twice
   in the explicit `!meta.record { fields: { … } }` form is `meta.field_map`'s duplicate key, `DUPLICATE_MAP_KEY` where the
   form is read as data and restated against the declaration where a schema writes it; the brace form's repeat is the

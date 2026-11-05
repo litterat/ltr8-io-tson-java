@@ -8,6 +8,8 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -19,6 +21,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -131,6 +134,74 @@ class RecordTemplateShapeTest {
         assertTrue(refused.contains("binds the value parameter 'N' to 'box<T>', an application"), refused);
     }
 
+    /**
+     * A literal argument is refused where its parameter's type is still open, wherever the application stands --
+     * an operand or a field's type -- naming the argument and the open type (§5.10). Applied with a closed type the
+     * same literal is the member's pin, and an out-of-range one is refused against the parameter's type.
+     */
+    @Test
+    void aLiteralArgumentWhoseTypeIsStillOpenIsRefusedAtTheApplication() {
+        String pin = "  pin2 => <T, P> { a?: T = P }\n";
+        String operand = assertThrows(SchemaValidationException.class,
+                () -> compile(pin + "  w => <X> pin2<X, 3> & { z: int32 }")).getMessage();
+        String field = assertThrows(SchemaValidationException.class,
+                () -> compile(pin + "  w => <X> { f: pin2<X 3>  z: int32 }")).getMessage();
+        for (String refused : List.of(operand, field)) {
+            assertTrue(refused.contains("binds 'P' to the literal '3', whose type is 'X', still open"), refused);
+        }
+
+        TsonCompiledSchema closed = compile(pin + "  ok => pin2<int8, 3>");
+        assertEquals(List.of(), read(closed, "ok", "{ a: 3 }"));
+        assertEquals(List.of(Diagnostic.Code.FIELD_FIXED),
+                read(closed, "ok", "{ a: 4 }").stream().map(Diagnostic::code).toList());
+        assertThrows(SchemaValidationException.class, () -> compile(pin + "  big => pin2<int8, 300>"));
+    }
+
+    /**
+     * An operand's arguments land where the operand's labels stand: reordered, the absorbing template's own parameters
+     * land as its labels in the operand's order; a closed argument lands as a type or a literal; and a literal for a
+     * value parameter whose field type is closed is that field's value (§5.10).
+     */
+    @Test
+    void anOperandsArgumentsLandAtItsLabels() {
+        TsonCompiledSchema compiled = compile("""
+                  pair  => <A, B> { first: A  second: B }
+                  swap  => <A, B> pair<B, A> & { tag: text }
+                  pv    => <A, N> { first: A  n?: int32 = N }
+                  mixed => <T> pv<T, 7> & { z: text }
+                  wrap  => <T> pair<T, text> & { w: T }
+                  swapped => swap<int32, text>
+                """);
+
+        RecordTemplateBody swap = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("swap"));
+        assertEquals(Optional.of("B"), swap.fields().get("first").typeParam());
+        assertEquals(Optional.of("A"), swap.fields().get("second").typeParam());
+        RecordTemplateBody mixed = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("mixed"));
+        assertEquals(Optional.of("T"), mixed.fields().get("first").typeParam());
+        assertEquals(Optional.of("7"), mixed.fields().get("n").value().map(Token::text));
+        assertEquals(Optional.empty(), mixed.fields().get("n").valueParam());
+        RecordTemplateBody wrap = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("wrap"));
+        assertEquals(Optional.of(TypeRef.of("text")), wrap.fields().get("second").type());
+
+        RecordBody swapped = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("swapped"));
+        assertEquals(TypeRef.of("text"), swapped.fields().get("first").type());
+        assertEquals(TypeRef.of("int32"), swapped.fields().get("second").type());
+    }
+
+    /** A member keeps an inherited literal spelled like its template's parameter: substitution reaches labels only. */
+    @Test
+    void aClosedMemberKeepsAnInheritedLiteralSpelledLikeAParameter() {
+        TsonCompiledSchema compiled = compile("""
+                  base => { kind?: text = T }
+                  t1   => <T> base & { v: T }
+                  u    => t1<int32>
+                """);
+
+        RecordBody u = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("u"));
+        assertEquals(Optional.of("T"), u.fields().get("kind").value().map(Token::text));
+        assertEquals(TypeRef.of("int32"), u.fields().get("v").type());
+    }
+
     /** A literal needs a closed type: a field typed by a parameter, whole or as an argument, takes none (§5.10). */
     @Test
     void aLiteralOnAParameterTypedFieldIsRefused() {
@@ -151,6 +222,16 @@ class RecordTemplateShapeTest {
         assertTrue(valueArgument.contains("typed by the parameter 'M' and carries the literal value '5'"),
                 valueArgument);
         assertTrue(argument.contains("typed by the parameter 'T' and carries the literal value 'x'"), argument);
+    }
+
+    /** A record template's body that is no valid record is refused in the author's terms -- a record, as written. */
+    @Test
+    void anInvalidTemplateBodyIsRefusedAsTheRecordWritten() {
+        String refused = assertThrows(SchemaValidationException.class,
+                () -> compile("  box => <T> { @doc:{ a: 1 } v: T }")).getMessage();
+
+        assertTrue(refused.contains("'box': the body is not valid data for 'meta.record'"), refused);
+        assertFalse(refused.contains("record_template"), refused);
     }
 
     /** {@code record_template} is resolver vocabulary, as {@code template} is: no source declaration applies it (§8.1). */

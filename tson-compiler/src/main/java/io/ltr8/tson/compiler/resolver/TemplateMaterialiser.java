@@ -919,7 +919,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * A closed member's own {@code extension}: the template's, except that <b>SEALED does not travel</b>.
+     * A closed member's own {@code extension}: the template's, except that <b>member dispatch does not travel</b>.
      *
      * <p>ABSTRACT is a claim about the marked type alone and holds of every instantiation identically, which
      * is how {@code abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}

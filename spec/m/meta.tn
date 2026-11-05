@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=b3d55438d3f71880b88230fcb8e1cba146e5f33a9184ef7cef16b811ab43bf2f"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=31e82b373c98431a4298e687c7d77a5184b5cae4a0ca38a2e5246c54373cb6a1"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -708,10 +708,11 @@
       `w?: T = P` an optional FIXED one, `w: T = P` is a FIXED field that is not
       optional, and `w: T ~ P` is refused.
 
-      A field the template's `discriminators` names may be FIXED to a parameter:
-      each application supplies its pin, and the base reads the field with that
-      pin dropped. Its type is never a parameter, so the base reads it without
-      an application.
+      A field the template's `discriminators` names may be FIXED to a parameter,
+      optional or not as its name is marked (`type?: text = T`): each
+      application supplies its pin, and the base reads the field required with
+      that pin dropped. Its type is never a parameter, so the base reads it
+      without an application.
       """
     record_template_field => {
       ( type: meta.type_ref | type_param: meta.param_name )

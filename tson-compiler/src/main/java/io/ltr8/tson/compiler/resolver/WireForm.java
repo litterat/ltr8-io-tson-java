@@ -321,8 +321,7 @@ final class WireForm {
         if (!groups.isEmpty()) {
             binding.add(new RecordValue.Field(GROUPS, plain(new ArrayValue(groups))));
         }
-        // The base's own statement about which fields select a member (§5.2). Without it a held body keeps
-        // each pin and loses what gives the pins meaning, so a template family could never be sealed.
+        // The base's own statement about which fields select a member (§5.2), written where a record states one.
         if (!discriminators.isEmpty()) {
             binding.add(new RecordValue.Field(DISCRIMINATORS, plain(new ArrayValue(
                     discriminators.stream()
@@ -332,21 +331,6 @@ final class WireForm {
             binding.add(nameField(EXTENSION, extension.name()));
         }
         return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(binding));
-    }
-
-    /** {@link #memberToken} for a caller in this package that reads a held field's own members. */
-    static String memberTokenOf(RecordValue record, String member) {
-        return memberToken(record, member);
-    }
-
-    /** One member's token text, or {@code null} where it is absent or is not a bare token. */
-    private static String memberToken(RecordValue record, String member) {
-        for (RecordValue.Field field : record.fields()) {
-            if (field.name().equals(member) && field.value().coreValue() instanceof TokenValue token) {
-                return token.text();
-            }
-        }
-        return null;
     }
 
     /** A resolved annotation carrier back in wire form, its bound value unbound by the caller's writer. */
