@@ -161,24 +161,29 @@ derives none: `array ^ { element_type: = T }` pins a constructor's facet and say
 
 **On a template**, `abstract` is admitted and `final` refused: every application is a subtype of the template by
 construction, so the claim is false before anything else is written (§5.2, §5.10). On a record template the mark
-sets the open record's own `extension`, which is each application's — the base itself is ABSTRACT by construction
+sets the template's own `extension`, which is each application's — the base itself is ABSTRACT by construction
 — and `WireForm.heldRecord` writes it into the held tree that closing reads back. The `=?`-forces-ABSTRACT rule is
 a closed record's alone. An open body applying anything but `record` has no `extension` and is refused, named by
 the constructor it applies.
 
 ## Record templates as family bases
 
-A record template is a `RecordBody` with `parameters`, ABSTRACT by construction (`OpenEntry.isFamilyBase`), and
-takes part in IS-A (§5.10). That is safe by *elimination*: no value is read against the template; a value at a
-position typed by it is a value of some member, selected by tag or discriminators, each member closed with its
-arguments fixed (`AbstractTemplateReader`, `design/class2-compilation.md`). A container, reference or
+A record template is a `RecordTemplateBody` (`meta.record_template`), ABSTRACT by construction
+(`FamilySelectors.extensionOf`), and takes part in IS-A (§5.10). Its fields are `RecordTemplateField`s, labelling
+a parameter that stands for the whole type (`type_param`) or the whole value (`value_param`); `asTemplate` builds
+it from the record resolution produced with the parameters standing as names and tokens, and refuses there a
+selector typed by a parameter and a literal value on a parameter-typed field. That is safe by *elimination*: no
+value is read against the template; a value at a position typed by it is a value of some member, selected by tag or
+discriminators, each member closed with its arguments fixed (`AbstractTemplateReader`,
+`design/class2-compilation.md`). A container, reference or
 constructor-application template is a `TemplateBody` with no such dispatch, and stays no type until applied.
 
 **Member dispatch does not travel to a member** (`TemplateMaterialiser.closedExtension`): closing pins the
 selectors and the member names none, so it is an ordinary concrete record. ABSTRACT without selectors does travel,
 which is how `abstract` reaches every instantiation (`AbstractTemplateFamilyTest`). `FamilySelectors.of` derives
-the selector fields from the base's own fields for either kind of base; a record template that IS-A a
-base is no member of it, so `RecordExtension`'s pin checks and both encodings' member dispatchers skip an open subtype.
+the selector fields from the base's own fields for either kind of base, a template's selector closed to a
+`RecordField` (its type names no parameter). A record template that IS-A a base is no member of it: a member is a
+`RecordBody`, so `RecordExtension`'s pin checks and both encodings' member dispatchers pass a template by type.
 
 **Two edges populate a family's `subtypes`, from two mechanisms.**
 

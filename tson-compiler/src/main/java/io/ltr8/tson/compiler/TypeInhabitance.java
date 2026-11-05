@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -117,6 +118,7 @@ final class TypeInhabitance {
             case ReferenceBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited);
             case TemplateBody ignored -> true; // open, answered above
+            case RecordTemplateBody ignored -> true; // open, answered above
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
             case ValueEntry ignored -> true; // a value, which nothing is typed by
@@ -299,6 +301,7 @@ final class TypeInhabitance {
             case Sum ignored -> null;
             case Atom ignored -> null;
             case TemplateBody ignored -> null;
+            case RecordTemplateBody ignored -> null;
             case ValueEntry ignored -> null;
         };
     }

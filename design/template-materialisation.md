@@ -12,8 +12,8 @@ derived — and the static check that runs before any of it.
 - A template that fails the regularity check, or whose parameter kinds cannot be inferred, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
   application's head resolves). The depth guard stays as a backstop for a hole in the check.
-- The pass runs over the **resolved** form. In an open record it closes only the field types that name none of its
-  parameters (`OpenEntry.parameterIn`, applied in `MetaRefs`); a held body maps nothing.
+- The pass runs over the **resolved** form. In a record template it closes only the field types that name none of
+  its parameters (`RecordTemplateField.parameterInType`, applied in `MetaRefs`); a held body maps nothing.
 - An application's arguments are dereferenced before it is closed, and only a reference is dereferenced — a
   refinement and a fresh instance keep their own applications.
 - A declaration naming an application **is** that entry (`closeApplicationInto`): no internal name is derived or
@@ -39,8 +39,8 @@ derived — and the static check that runs before any of it.
 - A composition operand never closes, open or closed: it is absorbed by value and mints nothing. A closed refinement
   source is closed on demand, through the same materialiser instance.
 - Which parents were applications is read off the **held** tree's chain `parents`, not off the closed one, whose
-  `supertypes` are bare names; a closed type keeps no `parents` once `closeChains` has run, and an open record keeps
-  its parents as written.
+  `supertypes` are bare names; a closed type keeps no `parents` once `closeChains` has run, and a record template
+  keeps its parents as written.
 - A minted record is a member of nothing: one whose chain names a declared type is refused when it is minted
   (`refuseMintedMember`), and the applied-parent fold skips synthetics.
 - Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written; a held template is
@@ -116,8 +116,10 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   cannot classify.
 - **Substitution changes no field fact.** A routed `= P` is FIXED where it is written and `~ P` DEFAULT, `optional`
   as the name was marked (§5.7), so `response<order, 201>` lands on exactly what the literal `status?: int32 = 201`
-  lands on. What closing changes is the record-level selector list: the member names none (`asMember`), its pins
-  being in place, and an ABSTRACT base that dispatches on members closes to OPEN (`closedExtension`).
+  lands on: the template's `value_param: S` becomes the member's `value: 201`, `type_param` becomes `type`, and
+  every member field is a closed `meta.record_field`. What closing changes is the record-level selector list: the
+  member names none (`asMember`), its pins being in place, and an ABSTRACT base that dispatches on members closes to
+  OPEN (`closedExtension`).
 - **A closed record is minted with no subtypes.** `subtypes` is linking's, derived over the closed namespace. Taking
   the template's list would hand each instantiation the whole family and, for a template imported already linked,
   itself — and an entry shaped by *which* schema closed it is not a function of its form, so two schemas closing one
@@ -164,9 +166,9 @@ resolves, before the batch pass runs. They are handled differently.
     `box<int32>`. `OpenOperandCompositionTest` pins it.
   - **Closed, on a declaration with no parameters** (`dog => pet<"dog"> & { breed: text }`): nothing later closes
     the declaration, so the edge to the family base is stated where the composition resolves. A record template is
-    a family base (`OpenEntry.isFamilyBase`), ABSTRACT by construction (§5.10), so `dog` lands in `pet.subtypes` and
-    a position typed `pet` dispatches to it. The application in the chain is folded like any other. A removal
-    empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
+    a family base (`OpenEntry.isFamilyBase`, a `RecordTemplateBody`), ABSTRACT by construction (§5.10), so `dog`
+    lands in `pet.subtypes` and a position typed `pet` dispatches to it. The application in the chain is folded
+    like any other. A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
 - **A closed refinement source is closed on demand** (`DefinitionResolver.closedApplication`, through the
   `ApplicationCloser` hook): `^` re-emits and tightens the source's whole field set, which lives on the entry the
   application denotes. The closing goes through `close`, so it reuses a declaration that owns the application or
@@ -205,8 +207,8 @@ resolves, before the batch pass runs. They are handled differently.
     the kind nor the chain does alone: `numeric.integer_type` is ATOM-kinded exactly like its instances.
 - **A held template is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes it not a type, so
   `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than ALIAS — a template whose
-  closure is a reference. It is not a base kind (§4.1). A record template is a type, the family base, and takes a
-  record's kind: PRODUCT, or the base kind its chain reaches.
+  closure is a reference. It is not a base kind (§4.1). A record template (`RecordTemplateBody`) is a type, the
+  family base, and takes a record's kind: PRODUCT, or the base kind its chain reaches.
   - **A closed entry's kind is its substituted value's**, §4.1's "construction transfers kind" asked of the
     construction — not the constructor's *name*.
   - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }` makes

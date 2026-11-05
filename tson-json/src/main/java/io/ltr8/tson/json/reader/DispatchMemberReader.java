@@ -118,9 +118,8 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         Map<String, Set<String>> deeper = new LinkedHashMap<>();
         Map<String, Route> table = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            // A record template IS-A the base is no member: its applications are, each pinned once closed.
-            if (!(entries.get(subtype) instanceof RecordBody record)
-                    || io.ltr8.tson.schema.meta.OpenEntry.isOpen(record)) {
+            // Only a record is a member: a record template IS-A the base is none, its applications are.
+            if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }
             List<Object> key = pinsOf(record);

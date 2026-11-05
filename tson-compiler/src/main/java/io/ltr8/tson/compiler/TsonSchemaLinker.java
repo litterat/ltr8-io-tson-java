@@ -61,6 +61,7 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.numeric.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.compiler.resolver.AliasChain;
@@ -340,10 +341,12 @@ public final class TsonSchemaLinker {
             List<String> names = switch (body) {
                 case RecordBody record when !refusedEnums.contains(name) ->
                         List.copyOf(record.fields().keySet());
+                case RecordTemplateBody template when !refusedEnums.contains(name) ->
+                        List.copyOf(template.fields().keySet());
                 case EnumBody enumBody when !refusedEnums.contains(name) -> List.copyOf(enumBody.members());
                 default -> List.of();
             };
-            String noun = body instanceof RecordBody ? "field names" : "members";
+            String noun = body instanceof RecordBody || body instanceof RecordTemplateBody ? "field names" : "members";
             // An enum's members and a record's field names are names of its name type, an identifier family, and
             // are judged under that type's profile, whose added characters are its own.
             IdentifierProfile profile = NameType.profile(definition, constructorOf(name, definition, facts),
@@ -1363,6 +1366,7 @@ public final class TsonSchemaLinker {
                 checkReferenceNarrows(entryName, reference, namespace);
             }
             case TemplateBody ignored -> { } // open, answered above
+            case RecordTemplateBody ignored -> { } // open, answered above
             case ValueType ignored -> {
             }
             case VoidType ignored -> {
@@ -1562,6 +1566,7 @@ public final class TsonSchemaLinker {
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Alias alias -> collectNames(alias.target(), into);
             case TemplateBody ignored -> { } // open, answered above
+            case RecordTemplateBody ignored -> { } // open, answered above
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
             case ValueEntry ignored -> { } // a value names no type of its own
@@ -1658,8 +1663,7 @@ public final class TsonSchemaLinker {
         for (String supertype : supertypes) {
             boolean nearest = supertypes.stream().noneMatch(other -> !other.equals(supertype)
                     && TypeChain.supertypesOf(namespace.get(AliasChain.terminal(other, namespace))).contains(supertype));
-            if (!nearest || !(namespace.get(AliasChain.terminal(supertype, namespace)) instanceof RecordBody source)
-                    || OpenEntry.isOpen(source)) {
+            if (!nearest || !(namespace.get(AliasChain.terminal(supertype, namespace)) instanceof RecordBody source)) {
                 continue;
             }
             List<String> violations = new ArrayList<>();

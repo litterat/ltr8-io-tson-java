@@ -118,11 +118,12 @@ class KindMembersTest {
     }
 
     /**
-     * A template over another constructor is no type and no member; a record template is a type, the family base
-     * its applications are IS-A (§5.10), so a kind of {@code record} holds it beside its applications.
+     * A template over another constructor is no type and no member. A record template is a type, the family base
+     * its applications are IS-A (§5.10), built with {@code record_template}: a kind of {@code record} holds its
+     * applications and not it, and a kind of {@code record_template} holds it.
      */
     @Test
-    void anInstantiationIsAMemberOfItsConstructorsKindAndSoIsARecordTemplate() {
+    void anInstantiationIsAMemberOfItsConstructorsKindAndARecordTemplateOfItsOwn() {
         TsonLinkedSchema linked = link("""
                 {
                   tags  => set<text>
@@ -130,6 +131,7 @@ class KindMembersTest {
                   boxed => <T> { v: T }
                   box_t => boxed<text>
                   recs  => !meta.reference { of: meta.record }
+                  tmpls => !meta.reference { of: meta.record_template }
                 }
                 """);
 
@@ -137,7 +139,9 @@ class KindMembersTest {
         List<String> sets = kind(linked, "sets").memberNames();
         assertTrue(sets.containsAll(List.of("tags", "meta.enum_set")) && !sets.contains("set"), sets.toString());
         List<String> recs = kind(linked, "recs").memberNames();
-        assertTrue(recs.containsAll(List.of("box_t", "boxed")), recs.toString());
+        assertTrue(recs.contains("box_t") && !recs.contains("boxed"), recs.toString());
+        List<String> templates = kind(linked, "tmpls").memberNames();
+        assertTrue(templates.contains("boxed") && !templates.contains("box_t"), templates.toString());
     }
 
     @Test

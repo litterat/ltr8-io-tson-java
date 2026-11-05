@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.unicode.TextFamily;
@@ -56,14 +57,15 @@ public final class NameType {
     /**
      * {@code entry}'s name type, given the constructor its value applies (an enum's decides whether its {@code
      * name_type} is the constructor's pin), and two lookups, the schema's own namespace and the one holding the
-     * constructor -- the same namespace, from the linker. Empty for a body
-     * that is neither an enum nor a record, and for a {@code name_type} that resolves in neither namespace.
+     * constructor -- the same namespace, from the linker. Empty for a body that is neither an enum nor a record or
+     * record template, and for a {@code name_type} that resolves in neither namespace.
      */
     public static Optional<Resolved> of(Top entry, Optional<String> constructor, Function<String, Top> local,
                                         Function<String, Top> structure) {
         return switch (entry) {
             case EnumBody body -> ofEnum(constructor, body, local, structure);
-            case RecordBody body -> ofRecord(body, local, structure);
+            case RecordBody body -> ofRecord(body.nameType(), local, structure);
+            case RecordTemplateBody template -> ofRecord(template.nameType(), local, structure);
             default -> Optional.empty();
         };
     }
@@ -204,10 +206,10 @@ public final class NameType {
      * A name type the record states was written by its author, so it resolves in the schema's own namespace first,
      * as an enum's does; the absent default is the kernel's {@code meta.field_name}, resolved in the structure first.
      */
-    private static Optional<Resolved> ofRecord(RecordBody body, Function<String, Top> local,
+    private static Optional<Resolved> ofRecord(Optional<String> nameType, Function<String, Top> local,
                                                Function<String, Top> structure) {
-        String name = body.nameTypeName();
-        Function<String, Top> first = body.nameType().isEmpty() ? structure : local;
+        String name = nameType.orElse(RecordBody.FIELD_NAME);
+        Function<String, Top> first = nameType.isEmpty() ? structure : local;
         Function<String, Top> second = first == structure ? local : structure;
         for (Function<String, Top> namespace : List.of(first, second)) {
             if (namespace.apply(name) != null) {

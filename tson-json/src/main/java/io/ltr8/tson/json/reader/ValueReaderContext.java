@@ -61,11 +61,15 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
         return subtypesOf(name, definition).stream()
                 .filter(subtype -> {
                     io.ltr8.tson.schema.meta.Top entry = schema().entries().get(subtype);
-                    if (entry == null || io.ltr8.tson.schema.meta.OpenEntry.isOpen(entry)) {
-                        return false;
-                    }
-                    return !(entry instanceof io.ltr8.tson.schema.meta.RecordBody record)
-                            || record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
+                    // A record template is ABSTRACT by construction, and a held template is no type.
+                    return switch (entry) {
+                        case io.ltr8.tson.schema.meta.RecordBody record ->
+                                record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
+                        case io.ltr8.tson.schema.meta.RecordTemplateBody ignored -> false;
+                        case io.ltr8.tson.schema.meta.TemplateBody ignored -> false;
+                        case null -> false;
+                        default -> true;
+                    };
                 })
                 .toList();
     }

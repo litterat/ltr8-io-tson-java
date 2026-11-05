@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
@@ -27,12 +27,13 @@ import java.util.Set;
 
 /**
  * An open entry's held tree -- the constructor application it holds, as a working value of the phases that need
- * one: a {@link TemplateBody}'s text parsed, or an open {@link RecordBody}'s tree written ({@link
+ * one: a {@link TemplateBody}'s text parsed, or a {@link RecordTemplateBody}'s tree written ({@link
  * WireForm#heldRecord}).
  *
  * <p><b>The tree is a working value, not part of the entry.</b> {@link TemplateBody} carries the application as
  * text because a parameter may stand in any slot of a constructor other than {@code record}; a record template is
- * the record value it is. Either way this builds the tree on demand for the four questions an open body is asked
+ * the {@code record_template} value it is, and its tree is the {@code !meta.record} application every member closes
+ * from. Either way this builds the tree on demand for the four questions an open body is asked
  * before it closes: which names it mentions (§5.10's unreferenced-parameter
  * rule), which applications it writes (§5.10.1's regularity rule and §5.10's arity rule), what substitution
  * rewrites at materialisation, and which constructor heads it applies. Nothing outside this package sees a
@@ -75,7 +76,7 @@ public final class HeldBody {
      */
     public static TemplateBody held(List<String> parameters, DataValue application) {
         if (WireForm.RECORD.equals(application.typeRef().orElse(null))) {
-            throw new IllegalStateException("a record template is a record with parameters, never held text "
+            throw new IllegalStateException("a record template is a record_template, never held text "
                     + "(§5.10): " + parameters);
         }
         // Every parameter starts as a type parameter: its type is derived from the body once the whole schema has
@@ -96,10 +97,9 @@ public final class HeldBody {
      */
     public static HeldBody of(Top open) {
         Objects.requireNonNull(open, "open");
-        if (OpenEntry.isFamilyBase(open)) {
-            // An open record is a value of the vocabulary as it stands, so its tree is written rather than parsed.
-            RecordBody record = (RecordBody) open;
-            return new HeldBody(record.parameterNames(), WireForm.heldRecord(record, HeldBody::annotationValue));
+        if (open instanceof RecordTemplateBody template) {
+            // A record template is a value of the vocabulary as it stands, so its tree is written, not parsed.
+            return new HeldBody(template.parameterNames(), WireForm.heldRecord(template, HeldBody::annotationValue));
         }
         if (!(open instanceof TemplateBody body)) {
             throw new IllegalStateException("only an open entry has a held body, and this one is closed: "

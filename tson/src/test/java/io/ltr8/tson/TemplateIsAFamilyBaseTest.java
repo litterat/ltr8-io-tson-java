@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
@@ -201,7 +202,11 @@ class TemplateIsAFamilyBaseTest {
     // ── A base names the entries its members name ────────────────────────
 
     private static String fieldType(TsonLinkedSchema schema, String entry, String field) {
-        return ((RecordBody) schema.schema().entries().get(entry)).fields().get(field).type().name();
+        return switch (schema.schema().entries().get(entry)) {
+            case RecordBody record -> record.fields().get(field).type().name();
+            case RecordTemplateBody template -> template.fields().get(field).type().orElseThrow().name();
+            default -> throw new AssertionError(entry + " is neither a record nor a record template");
+        };
     }
 
     /**
@@ -221,7 +226,8 @@ class TemplateIsAFamilyBaseTest {
 
         String closed = fieldType(schema, "cat", "kind");
         assertEquals(closed, fieldType(schema, "pet", "kind"), "the base names the member's entry");
-        assertEquals(closed, ((RecordBody) schema.schema().entries().get("pet")).parameters().getFirst().type().name(),
+        assertEquals(closed,
+                ((RecordTemplateBody) schema.schema().entries().get("pet")).parameters().getFirst().type().name(),
                 "and N's derived type is that entry too");
         assertEquals(List.of(), read("f14", declarations, "!holder { p: { kind: 4  name: \"rex\" } }"));
     }

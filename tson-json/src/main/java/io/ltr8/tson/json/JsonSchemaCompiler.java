@@ -9,9 +9,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Alias;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.LinkedHashMap;
@@ -132,16 +130,16 @@ public final class JsonSchemaCompiler {
     }
 
     /**
-     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries. An open entry
-     * reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape holds it, so it takes the template's reader. A
-     * value entry names the ordinary type it is a value of, which has no factory: nothing is typed by such an entry,
-     * and its reader is the refusal.
+     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, so a record
+     * template takes {@code record_template}'s reader and every other open entry {@code template}'s ([TSON-SCHEMA]
+     * §5.10). A value entry names the ordinary type it is a value of, which has no factory: nothing is typed by
+     * such an entry, and its reader is the refusal.
      */
     private static String constructorOf(Top body) {
         if (body instanceof ValueEntry value) {
             return value.type();
         }
-        Class<?> leaf = OpenEntry.isOpen(body) ? TemplateBody.class : body.getClass();
+        Class<?> leaf = body.getClass();
         Typename typename = leaf.getAnnotation(Typename.class);
         if (typename == null) {
             throw new IllegalStateException(leaf + " has no @Typename -- every Top leaf must carry one");

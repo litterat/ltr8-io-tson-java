@@ -66,7 +66,7 @@ import java.util.function.Supplier;
  * intermediate entry per alias hop"). See {@link #closeHeldAlias}.
  *
  * <p><b>So the three cases are told apart by the constructor head, not by the kernel shape.</b> Every open
- * entry has a {@link HeldBody} -- a record template's tree written from the open record, a sugar form's lift,
+ * entry has a {@link HeldBody} -- a record template's tree written from the template, a sugar form's lift,
  * an alias, and an error placeholder alike. {@code alias} closes to a name, everything else to a
  * synthetic.
  *
@@ -656,7 +656,7 @@ final class TemplateMaterialiser {
      */
     private String mintedRecord(String name, String canonical, Top closed) {
         List<RecordValue.Field> fields = closed instanceof RecordBody record
-                && WireForm.heldRecord(record, HeldBody::annotationValue).coreValue() instanceof RecordValue wire
+                && WireForm.recordWire(record, HeldBody::annotationValue).coreValue() instanceof RecordValue wire
                 ? wire.fields() : List.of();
         String formName = DerivedName.ofBinding(RECORD, fields);
         minted.claim(formName, DerivedName.canonicalBinding(RECORD, fields));

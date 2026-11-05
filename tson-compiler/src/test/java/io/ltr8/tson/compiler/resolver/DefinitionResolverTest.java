@@ -42,6 +42,8 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.unicode.RegexType;
@@ -104,8 +106,7 @@ class DefinitionResolverTest {
     private static final String EXPECTED_INTEGER_SIZE =
             "{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"bits\" => { type: integer optional: "
                     + "false voidable: false role: \"FREE\" } \"signed\" => { type: boolean optional: false "
-                    + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] "
-                    + "parameters: [] }";
+                    + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] }";
 
     /** Throws if ever actually invoked -- most tests below never reach {@code Instance}/{@code AtomRefinement} binding at all; the ones that do build their own {@link DefinitionResolver} wrapping a real compiled reader instead of using this field. */
     private static final DefinitionMetaReader NEVER_CALLED = (type, value) -> {
@@ -310,7 +311,7 @@ class DefinitionResolverTest {
         assertEquals(EntryKind.PRODUCT, EntryKind.of(top, n -> true));
         assertEquals(List.of(), TypeChain.supertypesOf(top));
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: {} groups: [] extension: \"ABSTRACT\" "
-                + "discriminators: [] parameters: [] }",
+                + "discriminators: [] }",
                 write(top));
     }
 
@@ -344,10 +345,10 @@ class DefinitionResolverTest {
         // atom, sum: empty trailing body, no fields inherited from type (which has none) -- just the composition itself.
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
                 + "\"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
-                + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(atom));
+                + "extension: \"ABSTRACT\" discriminators: [] }", write(atom));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
                 + "\"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } } groups: [] "
-                + "extension: \"ABSTRACT\" discriminators: [] parameters: [] }", write(sum));
+                + "extension: \"ABSTRACT\" discriminators: [] }", write(sum));
 
         // product: two brand-new fields added by the trailing body (type contributes none).
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" \"meta.type\" ] subtypes: [] } fields: { "
@@ -356,12 +357,12 @@ class DefinitionResolverTest {
                 + "{ type: meta.product_access_type optional: false voidable: false role: \"FREE\" } \"size_type\" => { "
                 + "type: "
                 + "meta.product_size_type optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
-                + "\"ABSTRACT\" discriminators: [] parameters: [] }", write(product));
+                + "\"ABSTRACT\" discriminators: [] }", write(product));
 
         // alias: one brand-new field.
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.top\" ] subtypes: [] } fields: { \"target\" => { "
                 + "type: meta.type_ref optional: false "
-                + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
+                + "voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] }",
                         write(alias));
     }
 
@@ -396,7 +397,7 @@ class DefinitionResolverTest {
                         + "true voidable: false role: \"FREE\" } } groups: [ { members: [ [ \"min\" ] [ "
                         + "\"exclusive_min\" ] ] optional_members: [] optional: true } { members: [ [ \"max\" ] [ "
                         + "\"exclusive_max\" ] ] optional_members: [] optional: true } ] extension: \"OPEN\" "
-                        + "discriminators: [] parameters: [] }",
+                        + "discriminators: [] }",
                 write(integerType));
     }
 
@@ -524,17 +525,18 @@ class DefinitionResolverTest {
     //    validation that a field actually uses each parameter.
 
     /**
-     * A record template is the record it is: {@code { first: A  second: B }} with its parameters stated, each
-     * field typed by the parameter it names. Its own {@code extension} is each application's, OPEN unless marked;
-     * the base is ABSTRACT by construction, with no discriminator in sight (§5.10).
+     * A record template is a {@code record_template}: {@code { first: A  second: B }} with its parameters stated,
+     * each field labelled with the parameter that types it. Its own {@code extension} is each application's, OPEN
+     * unless marked; the base is ABSTRACT by construction, with no discriminator in sight (§5.10).
      */
     @Test
-    void resolvesAFreshRecordTemplateAsAnOpenRecord() {
-        RecordBody pair = assertInstanceOf(RecordBody.class, resolveSnippet("pair => <A, B> { first: A  second: B }"));
+    void resolvesAFreshRecordTemplateAsARecordTemplate() {
+        RecordTemplateBody pair = assertInstanceOf(RecordTemplateBody.class,
+                resolveSnippet("pair => <A, B> { first: A  second: B }"));
 
         assertEquals(List.of("A", "B"), OpenEntry.parameterNames(pair));
-        assertEquals(TypeRef.of("A"), pair.fields().get("first").type());
-        assertEquals(TypeRef.of("B"), pair.fields().get("second").type());
+        assertEquals(Optional.of("A"), pair.fields().get("first").typeParam());
+        assertEquals(Optional.of("B"), pair.fields().get("second").typeParam());
         assertEquals(RecordExtensionType.OPEN, pair.extension(), "each application's");
         assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(pair), "the base's");
     }
@@ -546,17 +548,17 @@ class DefinitionResolverTest {
 
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"first\" => { type: text optional: "
                         + "false voidable: false role: \"FREE\" } \"second\" => { type: text optional: false voidable: "
-                        + "false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
+                        + "false role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] }",
                 write(pair));
     }
 
     /**
-     * A <b>composition</b> template is the <em>flattened</em> record with its parameters stated -- resolved
+     * A <b>composition</b> template is the <em>flattened</em> record as a template, its parameters stated -- resolved
      * against its supertypes first, since §5.8's absorption and §5.7's tightening both need a namespace. Its
      * chain keeps the parents as written beside the closed entries they reach.
      */
     @Test
-    void resolvesACompositionTemplateAsAFlattenedOpenRecord() {
+    void resolvesACompositionTemplateAsAFlattenedTemplate() {
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
@@ -565,12 +567,13 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
-        RecordBody box = assertInstanceOf(RecordBody.class, resolver.resolve(schemaMap.declarations().get("box")));
+        RecordTemplateBody box = assertInstanceOf(RecordTemplateBody.class,
+                resolver.resolve(schemaMap.declarations().get("box")));
 
         assertEquals(List.of("T"), OpenEntry.parameterNames(box));
         assertEquals(List.of("base"), TypeChain.supertypesOf(box), "a template is IS-A what its parents reach");
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "and keeps them as written");
-        assertEquals(TypeRef.of("T"), box.fields().get("value").type());
+        assertEquals(Optional.of("T"), box.fields().get("value").typeParam());
     }
 
     /**
@@ -612,7 +615,7 @@ class DefinitionResolverTest {
 
     /**
      * The flattening is the point, so it is pinned against a supertype that actually contributes: {@code id}
-     * is absorbed from {@code base} and stands in the open record beside the template's own field -- a §5.7
+     * is absorbed from {@code base} and stands in the template beside its own field -- a §5.7
      * tightening entry states a modifier and no type-ref, and is not a {@code meta.record_field} until the
      * inherited field gives it one.
      */
@@ -623,9 +626,9 @@ class DefinitionResolverTest {
                 box  => <T> base & { value: T }
                 """);
 
-        RecordBody box = assertInstanceOf(RecordBody.class, entries.get("box"));
+        RecordTemplateBody box = assertInstanceOf(RecordTemplateBody.class, entries.get("box"));
         assertEquals(List.of("id", "value"), List.copyOf(box.fields().keySet()));
-        assertEquals(TypeRef.of("text"), box.fields().get("id").type());
+        assertEquals(Optional.of(TypeRef.of("text")), box.fields().get("id").type());
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "closing completes the chain from these");
     }
 
@@ -642,7 +645,7 @@ class DefinitionResolverTest {
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"element_type\" => { type: "
                         + "meta.type_ref optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean "
                         + "optional: true voidable: false role: \"DEFAULT\" value: false } } groups: [] extension: "
-                        + "\"OPEN\" discriminators: [] parameters: [] }",
+                        + "\"OPEN\" discriminators: [] }",
                 write(tupleElement));
     }
 
@@ -662,7 +665,7 @@ class DefinitionResolverTest {
                         + "array_array_text_1_c67f2b5e_1_6504fe90 optional: false voidable: false role: \"FREE\" } "
                         + "\"optional_members\" => { type: array_text_1_c67f2b5e optional: true voidable: false role: "
                         + "\"FREE\" } \"optional\" => { type: boolean optional: true voidable: false role: \"DEFAULT\" "
-                        + "value: false } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
+                        + "value: false } } groups: [] extension: \"OPEN\" discriminators: [] }",
                 write(fieldGroup));
     }
 
@@ -674,14 +677,14 @@ class DefinitionResolverTest {
 
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } fields: { \"access_pattern\" => { type: "
                         + "meta.product_access_type optional: true voidable: false role: \"FIXED\" value: INDEX } } groups: "
-                        + "[] extension: \"OPEN\" discriminators: [] parameters: [] }",
+                        + "[] extension: \"OPEN\" discriminators: [] }",
                 write(pinned));
     }
 
     /**
-     * A parameter routed into a field's value rides the <b>ordinary {@code value} slot</b> of the open record.
-     * §8.1's shadowing rule tells it from a literal: inside a template a token that resolves into {@code
-     * parameters} is a parameter, and a closed record has no parameters for one to resolve into.
+     * A parameter routed into a field's value is the field's <b>{@code value_param}</b>. §5.10's shadowing rule
+     * tells it from a literal where it is written: inside a template an unquoted token that resolves into {@code
+     * parameters} is a parameter, and the label records which it was.
      *
      * <p>The field is FIXED where it is declared, as its literal spelling would be: the role is the modifier's,
      * and only the value waits for an application. Closing substitutes the value and changes no fact -- {@code
@@ -693,12 +696,13 @@ class DefinitionResolverTest {
      */
     @Test
     void aParametricFixedValueRidesTheValueSlotOfAFixedField() {
-        RecordBody sized = assertInstanceOf(RecordBody.class, resolveSnippet("sized => <T> { value: meta.type_ref = T }"));
-        RecordField value = sized.fields().get("value");
+        RecordTemplateBody sized = assertInstanceOf(RecordTemplateBody.class,
+                resolveSnippet("sized => <T> { value: meta.type_ref = T }"));
+        RecordTemplateField value = sized.fields().get("value");
 
         assertEquals(List.of("T"), OpenEntry.parameterNames(sized));
-        assertEquals(TypeRef.of("meta.type_ref"), value.type());
-        assertEquals("T", value.value().orElseThrow().text());
+        assertEquals(Optional.of(TypeRef.of("meta.type_ref")), value.type());
+        assertEquals(Optional.of("T"), value.valueParam());
         assertEquals(FieldRole.FIXED, value.role());
         assertFalse(value.optional());
         assertEquals(List.of("value"), sized.discriminators());
@@ -711,14 +715,14 @@ class DefinitionResolverTest {
      */
     @Test
     void aParametricDefaultValueIsPromotedToRequiredDefault() {
-        RecordBody retry = assertInstanceOf(RecordBody.class,
+        RecordTemplateBody retry = assertInstanceOf(RecordTemplateBody.class,
                 resolveSnippet("retry_policy => <N> { attempts?: integer ~ N }"));
-        RecordField attempts = retry.fields().get("attempts");
+        RecordTemplateField attempts = retry.fields().get("attempts");
 
-        assertEquals(TypeRef.of("integer"), attempts.type());
+        assertEquals(Optional.of(TypeRef.of("integer")), attempts.type());
         assertTrue(attempts.optional());
         assertEquals(FieldRole.DEFAULT, attempts.role());
-        assertEquals("N", attempts.value().orElseThrow().text());
+        assertEquals(Optional.of("N"), attempts.valueParam());
     }
 
     // ── Tightening (§5.7), via composition bodies: array, map ─────────────
@@ -754,7 +758,7 @@ class DefinitionResolverTest {
                         + "numeric.count optional: true voidable: false role: \"FREE\" } \"max_items\" => { "
                         + "type: numeric.count optional: true voidable: false role: \"FREE\" } } groups: [] "
                         + "extension: "
-                        + "\"OPEN\" discriminators: [] parameters: [] }",
+                        + "\"OPEN\" discriminators: [] }",
                 write(array));
     }
 
@@ -785,7 +789,7 @@ class DefinitionResolverTest {
                         + "role: \"DEFAULT\" value: false } \"min_items\" => { type: numeric.count optional: "
                         + "true voidable: false role: \"FREE\" } \"max_items\" => { type: numeric.count "
                         + "optional: true voidable: false role: \"FREE\" } } groups: [] extension: \"OPEN\" "
-                        + "discriminators: [] parameters: [] }",
+                        + "discriminators: [] }",
                 write(map));
     }
 
@@ -823,7 +827,7 @@ class DefinitionResolverTest {
         assertEquals("{ chain: { parents: [] supertypes: [ \"config\" ] subtypes: [] } fields: { \"host\" => { type: "
                         + "text optional: true voidable: false role: \"FIXED\" value: \"prod.example.com\" } \"port\" => "
                         + "{ type: integer optional: false voidable: false role: \"FREE\" } } groups: [] extension: "
-                        + "\"OPEN\" discriminators: [] parameters: [] }",
+                        + "\"OPEN\" discriminators: [] }",
                 write(production));
     }
 
@@ -884,7 +888,7 @@ class DefinitionResolverTest {
                         + "numeric.count optional: true voidable: false role: \"FREE\" } \"max_items\" => { "
                         + "type: numeric.count optional: true voidable: false role: \"FREE\" } } groups: [] "
                         + "extension: "
-                        + "\"OPEN\" discriminators: [] parameters: [] }",
+                        + "\"OPEN\" discriminators: [] }",
                 write(set));
     }
 
@@ -931,7 +935,7 @@ class DefinitionResolverTest {
                         + "\"name_type\" => { type: meta.identifier_ref optional: false voidable: false role: \"FREE\" } "
                         + "\"members\" => { type: meta.enum_set optional: false voidable: false role: \"FREE\" } } groups: "
                         + "[] "
-                        + "extension: \"OPEN\" discriminators: [] parameters: [] }",
+                        + "extension: \"OPEN\" discriminators: [] }",
                 write(enumType));
         // enum => enum_type ^ { name_type?: = meta.identifier }: a constructor tightening, `name_type` pinned and
         // injected, so `members` is the one unmarked field and `!enum [A B]` stays the positional form.
@@ -943,7 +947,7 @@ class DefinitionResolverTest {
                         + "\"FREE\" } \"name_type\" => { type: meta.identifier_ref optional: true voidable: false role: "
                         + "\"FIXED\" value: meta.identifier } \"members\" => { type: meta.enum_set optional: false "
                         + "voidable: false "
-                        + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] parameters: [] }",
+                        + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] }",
                 write(enumDef));
     }
 
@@ -1916,8 +1920,8 @@ class DefinitionResolverTest {
     /**
      * A parametric {@code = P} pins the field where it is written, as a literal would ([TSON-SCHEMA] §5.7).
      * Its type slot is elided, so it inherits the source's type -- here {@code integer}, the source being
-     * {@code bound?: integer} -- and the open record holds the flattened field with the parameter in the
-     * ordinary {@code value} slot.
+     * {@code bound?: integer} -- and the template holds the flattened field with the parameter as its {@code
+     * value_param}.
      */
     @Test
     void aParametricPinOnAnInheritedOptionalFieldIsRequiredAndFixed() {
@@ -1926,10 +1930,10 @@ class DefinitionResolverTest {
                 bounded => <MIN> base ^ { bound: = MIN }
                 """);
 
-        RecordBody open = assertInstanceOf(RecordBody.class, entries.get("bounded"));
-        RecordField bound = open.fields().get("bound");
-        assertEquals(TypeRef.of("integer"), bound.type(), "the type came from the source");
-        assertEquals("MIN", bound.value().orElseThrow().text(), "the parameter stands in the value slot");
+        RecordTemplateBody open = assertInstanceOf(RecordTemplateBody.class, entries.get("bounded"));
+        RecordTemplateField bound = open.fields().get("bound");
+        assertEquals(Optional.of(TypeRef.of("integer")), bound.type(), "the type came from the source");
+        assertEquals(Optional.of("MIN"), bound.valueParam(), "the parameter is the field's value parameter");
         // The name is unmarked, so the inherited optional did not survive; the pin is the modifier's.
         assertFalse(bound.optional());
         assertEquals(FieldRole.FIXED, bound.role());
@@ -2460,7 +2464,7 @@ class DefinitionResolverTest {
 
     /**
      * <b>A record template is a family base, and a selector makes it a member-dispatched one</b> (§5.10): the
-     * open record takes part in IS-A, {@code subtypes} holds its own instantiations, and {@code
+     * template takes part in IS-A, {@code subtypes} holds its own instantiations, and {@code
      * RecordExtension} judges the selector against the fields the way it does for a closed record.
      */
     @Test
@@ -2468,7 +2472,7 @@ class DefinitionResolverTest {
         Top box = resolveSnippetsAgainstMetaKernel(
                 "box => <T> { kind: text =?  v: T }");
 
-        RecordBody open = assertInstanceOf(RecordBody.class, box);
+        RecordTemplateBody open = assertInstanceOf(RecordTemplateBody.class, box);
         assertEquals(List.of("T"), open.parameterNames());
         // The base is ABSTRACT by construction; its own `extension` is each application's (§5.10).
         assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(box));
@@ -2493,14 +2497,14 @@ class DefinitionResolverTest {
      * <b>{@code abstract} is the one mark a template takes</b>, the asymmetry being the marks' own: it
      * constrains the marked type alone -- no direct instances -- which holds of every instantiation
      * identically, so {@code result => abstract <T> { … }} is meaningful and is what a host language spells
-     * {@code abstract class Result<T>}. It is the open record's own {@code extension}, each application's;
+     * {@code abstract class Result<T>}. It is the template's own {@code extension}, each application's;
      * {@code SubtypeTemplateFamilyTest} is where the closed end is checked.
      */
     @Test
-    void aTemplateIsAbstractByMarkingItsOpenRecord() {
+    void aTemplateIsAbstractByMarkingItsRecordTemplate() {
         Top box = resolveSnippetsAgainstMetaKernel("box => abstract <T> { v: T }");
 
-        assertEquals(RecordExtensionType.ABSTRACT, assertInstanceOf(RecordBody.class, box).extension());
+        assertEquals(RecordExtensionType.ABSTRACT, assertInstanceOf(RecordTemplateBody.class, box).extension());
     }
 
     /** Only a record has an extension fact to state; the mark has nowhere to land on anything else. */

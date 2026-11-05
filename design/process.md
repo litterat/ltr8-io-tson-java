@@ -64,7 +64,7 @@ conforming resolver produces. Keep them in step with the `.tn` beside them. A fi
 root is `!schema`, the kernel root's `schema`, an alias of `meta.schema`; nothing marks it resolved, so
 `ResolvedFixtureTest` reads it as one (`parseResolvedForm()`, or `withImports(imports).readAs(text, "meta.schema")`),
 the kernel's form, which imports nothing, under the pre-loaded kernel. The kernel's form, `meta-resolved.tn`, writes its
-six maps nested, each tagged `!meta.schema`, their members inside them, and its thirteen root names and six synthetics
+six maps nested, each tagged `!meta.schema`, their members inside them, and its thirteen root names and seven synthetics
 at the root; `numeric-resolved.tn`,
 `temporal-resolved.tn` and `net-resolved.tn` write their library's map the same way, with its instances at the root, and
 `core-resolved.tn` core.tn's author annotations. A fixture states its own document's entries only, never an import's members

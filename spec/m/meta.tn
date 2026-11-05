@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=93a1168733b1e78292b99ff5c899761030a7603d823d962790b31fdb7648b62c"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=b3d55438d3f71880b88230fcb8e1cba146e5f33a9184ef7cef16b811ab43bf2f"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -475,7 +475,7 @@
     @doc:"""
       Held body — the body of an entry that declares type parameters and applies
       any constructor but `record` ([TSON-SCHEMA] §5.10), a record template
-      being a `record` with `parameters`. `template` is the constructor
+      being a `record_template`. `template` is the constructor
       application as written, unread until materialisation substitutes the
       parameters away, and `parameters` lists what it binds, each a
       `meta.template_param`.
@@ -510,8 +510,9 @@
       value is not narrowable, and a value position is not a scope: it admits no
       directive.
 
-      Used for meta.record_field.value (the type of fixed/default values, which
-      must be the field's declared type).
+      Used for meta.record_field.value and meta.record_template_field.value
+      (the type of fixed/default values, which must be the field's declared
+      type).
       """
     value_type => meta.atom & {}
 
@@ -626,26 +627,16 @@
       at a field group's member, whose presence is the group's and which is
       never supplied.
 
-      In a record template it also carries a parameter, in `type` or in `value`,
-      and needs no label to do so: a token there is a parameter exactly when its
-      text resolves into the enclosing record's `parameters` ([TSON-SCHEMA]
-      §5.10's shadowing rule), in resolved output as in source.
-
-      A parametric modifier takes the facts its literal spelling takes
-      ([TSON-SCHEMA] §5.7): `w?: T ~ P` is an optional DEFAULT field and
-      `w?: T = P` an optional FIXED one, `w: T = P` is a FIXED field that is not
-      optional, and `w: T ~ P` is refused. The parameter stands in `value` until
-      an application substitutes its argument there, which changes no other
-      fact.
+      A record field is closed: its `type` names a type and its `value` is a
+      literal, never a parameter. A field that may carry one is a
+      `meta.record_template_field`, which only a record template holds.
 
       Which fields a member-dispatched family dispatches on is the enclosing
       record's own statement, `record.discriminators`, and no field says it of
       itself. A field it names is required and not voidable, no member of a
       field group, typed by an atom or an enum, and carries no value of its own;
       each subtype restates it FIXED, the pins pairwise distinct under the field
-      type's own equality. In a record template a field FIXED to a parameter is
-      named too: each application supplies its pin, and the base reads the field
-      with that pin dropped.
+      type's own equality.
 
       The two facts are the series' two kinds of nothing, and each has one name
       wherever it applies: a slot that may be missing is `optional`, on a record
@@ -696,29 +687,59 @@
     field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }
 
     @doc:"""
-      A record: named fields, fixed by the type, with the field groups over
-      them.
+      A field of a record template: a record field's four facts, where the type
+      and the value may each be a parameter of the enclosing template, and the
+      label says which. `type_param` names a parameter standing for the whole
+      type, `value_param` one standing for the whole value; `type` and `value`
+      are as on a record field. A parameter may also stand as an argument of an
+      application in `type`, `list<T>`, recognised there because its text
+      resolves into the template's `parameters` ([TSON-SCHEMA] §5.10's
+      shadowing rule). An application substitutes every parameter away, and
+      each of its fields is then a `meta.record_field`: `type_param` becomes
+      `type` and `value_param` becomes `value`, carrying the argument, and no
+      other fact changes.
 
-      `parameters`, where present, make the record a template ([TSON-SCHEMA]
-      §5.10) and a **family base**: a type a position may name, ABSTRACT by
-      construction, a value there being a value of one of its declared members,
-      each IS-A it. A parameter stands only in a field's `type`, a field's
-      `value`, or an argument of an application in either or in a parent; the
-      rest of the record is what every application shares. Its type and bound
-      are derived from where it stands, as `meta.template_param` says.
+      A literal `value` needs a closed type, so a field whose type is a
+      parameter, or an application over one, takes `value_param` or nothing.
+      A field of a closed type takes either.
+
+      A parametric modifier takes the facts its literal spelling takes
+      ([TSON-SCHEMA] §5.7): `w?: T ~ P` is an optional DEFAULT field and
+      `w?: T = P` an optional FIXED one, `w: T = P` is a FIXED field that is not
+      optional, and `w: T ~ P` is refused.
+
+      A field the template's `discriminators` names may be FIXED to a parameter:
+      each application supplies its pin, and the base reads the field with that
+      pin dropped. Its type is never a parameter, so the base reads it without
+      an application.
+      """
+    record_template_field => {
+      ( type: meta.type_ref | type_param: meta.param_name )
+      optional?: boolean ~ false
+      voidable?: boolean ~ false
+      role?:     meta.field_role ~ FREE
+      ( value: meta.value | value_param: meta.param_name )?
+    }
+
+    @doc:"""
+      The fields of a record template, as `meta.field_map` is a record's: each
+      field's name mapped to its facts, in declaration order.
+      """
+    record_template_field_map => !meta.map { key_type: text  value_type: meta.record_template_field  ordered: true }
+
+    @doc:"""
+      A record: named fields, fixed by the type, with the field groups over
+      them. A record is closed — no field carries a parameter — and it is what
+      readers and writers are built for; a record with parameters is a
+      `meta.record_template`.
 
       `extension` states how the record may be realised, and is OPEN unless the
-      record says otherwise; on a record with `parameters` it states how each
-      application is realised, the base's own being ABSTRACT whatever it says,
-      so `result => abstract <T> { ... }` makes `result<text>` abstract over its
-      own members. Of the constructors, only `record` carries it.
+      record says otherwise. Of the constructors, only `record` and
+      `record_template` carry it.
 
-      Its chain is `type`'s. On a record with `parameters` a parent may still be
-      open — `<T> result<T> & { ... }` — and it is substituted and closed with
-      every other reference the record holds, so `ok<text>` reaches an IS-A edge
-      to `result<text>` and not to `result<int32>`. `fields` is flattened: a
-      composition's fields are its operands' and its own, merged, so a consumer
-      that reads values against it never repeats the merge.
+      Its chain is `type`'s. `fields` is flattened: a composition's fields are
+      its operands' and its own, merged, so a consumer that reads values against
+      it never repeats the merge.
 
       `discriminators` names the fields this record's members are selected by,
       in the order their pins are compared as a tuple, and its presence is what
@@ -747,7 +768,49 @@
       extension?:      meta.record_extension_type ~ OPEN
       discriminators?: [text; 1..]
       name_type?:      meta.identifier_ref
-      parameters?:     [meta.template_param]
+    }
+
+    @doc:"""
+      A record template ([TSON-SCHEMA] §5.10): a record body over `parameters`,
+      whose fields are `meta.record_template_field`s and may carry them. Each
+      application substitutes its arguments for the parameters and closes to a
+      `meta.record`, its member.
+
+      A record template is a **family base**: a type a position may name,
+      ABSTRACT by construction, a value there being a value of one of its
+      members, each IS-A it. It takes part in IS-A as any abstract parent does,
+      and nothing reads or writes a value against it, so no reader or writer is
+      built for it: a reader at a position it types dispatches to a member and
+      reads against the member's closed record. That is why it is its own
+      constructor and not a record with an optional list of parameters.
+
+      A parameter stands only in a field's `type_param` or `value_param`, or as
+      an argument of an application in a field's `type` or in a parent; the
+      rest of the template is what every application shares. Its type and bound are derived
+      from where it stands, as `meta.template_param` says.
+
+      `extension` states how each application is realised, the template's own
+      being ABSTRACT whatever it says, so `result => abstract <T> { ... }` makes
+      `result<text>` abstract over its own members. `discriminators` is the
+      family's, as on an ABSTRACT record, and every field it names is typed by
+      no parameter, so the base reads each one without an application. `groups`
+      and `name_type` are each application's, unchanged by substitution.
+
+      Its chain is `type`'s. A parent may still be open —
+      `<T> result<T> & { ... }` — and it is substituted and closed with every
+      other reference the template holds, so `ok<text>` reaches an IS-A edge to
+      `result<text>` and not to `result<int32>`. `fields` is flattened, as a
+      record's is.
+      """
+    record_template => meta.product & {
+      access_pattern?: meta.product_access_type = NAMED
+      size_type?:      meta.product_size_type = FIXED
+      fields:          meta.record_template_field_map
+      groups?:         [meta.field_group]
+      extension?:      meta.record_extension_type ~ OPEN
+      discriminators?: [text; 1..]
+      name_type?:      meta.identifier_ref
+      parameters:      [meta.template_param; 1..]
     }
 
     @doc:"""
@@ -957,10 +1020,11 @@
       constructor, `top` or IS-A it, the values it admits are types, and a slot
       holds a type's name, which takes part in structural identity
       ([TSON-SCHEMA] §8.2). A record written in braces is built with `record`,
-      and so is a record template, `top` itself, and a constructor whose
-      declaration is a record, so `meta.ref<meta.record>` holds all of them; a
-      template over another constructor is no type, and an application of one is
-      the type it expands to. Where `of` is any other type, the values it admits
+      and so is `top` itself and a constructor whose declaration is a record, so
+      `meta.ref<meta.record>` holds all of them; a record template is built with
+      `record_template` and is not among them. A template over another
+      constructor is no type, and an application of one is the type it expands
+      to. Where `of` is any other type, the values it admits
       are values, and a slot holds a value's qualified name: the first segment
       resolves in the writer's namespace and names an entry, and each further
       segment selects a key of a namespace value or a field of a record value.

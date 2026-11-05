@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
-import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -168,14 +168,13 @@ class OpenEntryResolvedFormTest {
     // ── The biconditional an entry's parameters rest on ─────────────────
 
     /**
-     * <b>A record template is a record with parameters, and every other open entry is held.</b> [TSON-SCHEMA]
+     * <b>A record template is a {@code record_template}, and every other open entry is held.</b> [TSON-SCHEMA]
      * §5.10's two kinds of template, asked of every entry of every schema -- the three bundled ones and a schema
-     * exercising each template shape: an entry with parameters is either a {@code RecordBody} or a {@code
-     * TemplateBody}, a held body never applies {@code record}, and every {@code TemplateBody} declares
-     * parameters.
+     * exercising each template shape: an entry with parameters is either a {@code RecordTemplateBody} or a {@code
+     * TemplateBody}, a held body never applies {@code record}, and no other entry declares parameters.
      */
     @Test
-    void aRecordTemplateIsARecordAndEveryOtherTemplateIsHeld() {
+    void aRecordTemplateIsItsOwnShapeAndEveryOtherTemplateIsHeld() {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
@@ -206,9 +205,11 @@ class OpenEntryResolvedFormTest {
                 if (declares) {
                     open++;
                 }
-                boolean shape = definition instanceof TemplateBody held
-                        ? !held.template().startsWith("!record") && declares
-                        : !declares || definition instanceof RecordBody;
+                boolean shape = switch (definition) {
+                    case TemplateBody held -> !held.template().startsWith("!record") && declares;
+                    case RecordTemplateBody ignored -> declares;
+                    default -> !declares;
+                };
                 if (!shape) {
                     broken.add(id + "#" + entry.getKey() + ": parameters " + OpenEntry.parameterNames(definition)
                             + " with a " + definition.getClass().getSimpleName() + " body");
@@ -217,7 +218,8 @@ class OpenEntryResolvedFormTest {
         }
 
         int openEntries = open;
-        assertEquals(List.of(), broken, "§5.10: a record template is a record, every other template is held");
+        assertEquals(List.of(), broken,
+                "§5.10: a record template is a record_template, every other template is held");
         assertTrue(openEntries >= 8, () -> "not enough open entries to mean anything: " + openEntries);
     }
 

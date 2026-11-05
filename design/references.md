@@ -4,8 +4,9 @@ Design notes for every position in a schema that holds a name: which are referen
 judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape,
 one reference atom with a constructor an ordinary record type, is SPEC-FEEDBACK.md #11's; an application is a value
 of that atom, a reference carrying an argument list and written as data grammar ([TSON-DATA] §7.4), SPEC-FEEDBACK.md
-#12's. What extends this account, a channel of
-its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel entry.
+#12's. A record template's field names a whole-type or whole-value parameter under its own label (`type_param`,
+`value_param`, `meta.record_template_field`), so only an argument of an application is a parameter recognised by its
+text.
 
 **Invariants**
 
@@ -56,7 +57,7 @@ its own for a record template's parameter, is `BACKLOG.md`'s parameter-channel e
   entry. The grammar classifies an argument, a reference first; the head's parameters judge whether it binds a type or a
   value (§5.10), so `TypeArgument` compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
 - A reference carries arguments only where an application is still open: a record template's `chain.parents` and
-  field types, held text (`!meta.alias { target: pair<uuid B> }` inside `meta.template.template`), and the `application`
+  field `type`s, held text (`!meta.alias { target: pair<uuid B> }` inside `meta.template.template`), and the `application`
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
   resolution and arity, and its arguments by the head's parameters: only an argument at a type parameter is judged
   as a type's name (`TsonSchemaLinker.typeArguments`).

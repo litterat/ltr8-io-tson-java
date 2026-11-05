@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Alias;
@@ -240,9 +241,9 @@ final class RecordExtension {
         Map<List<Object>, String> seen = new LinkedHashMap<>();
         for (String subtype : new LinkedHashSet<>(TypeChain.subtypesOf(def))) {
             Top sub = merged.get(subtype);
-            // An undeclared member is refused on its own, and judging its pins too would report one mistake twice.
-            // A record template IS-A the base is no member: its applications are, each pinned once closed.
-            if (!(sub instanceof RecordBody record) || OpenEntry.isOpen(sub)
+            // Only a record is a member: a record template IS-A the base is not one, its applications are. An
+            // undeclared member is refused on its own, and judging its pins too would report one mistake twice.
+            if (!(sub instanceof RecordBody record)
                     || isUndeclaredMember(subtype, sub, facts, applications,
                     name -> TsonBundledSchemas.isKernel(origins.get(name)))) {
                 continue;
@@ -359,11 +360,11 @@ final class RecordExtension {
      * The record body whose family rules this entry is subject to, or {@code null} where it has none.
      *
      * <p><b>A record template is a family base and is judged as one</b> (§5.10). Its own fields may still
-     * name its parameters, so the body checked here is assembled from the facts it states as a base: ABSTRACT,
-     * the {@code discriminators} it names, and each selector at the type the base declares it. Skipping it
-     * instead -- a guard on {@code parameters().isEmpty()} alone -- would accept a marked template with no
-     * family check at all: no rule that every member pins every selector, and no
-     * rule that the pins are pairwise distinct. An unchecked family is worse than a refused one.
+     * carry its parameters, so the body checked here is assembled from the facts it states as a base: ABSTRACT,
+     * the {@code discriminators} it names, and each selector at the type the base declares it, which names no
+     * parameter. Skipping it would accept a template family with no family check at all: no rule that every
+     * member pins every selector, and no rule that the pins are pairwise distinct. An unchecked family is worse
+     * than a refused one.
      *
      * <p><b>The selector derivation is the reader's own</b> ({@code FamilySelectors}), so the check and the
      * dispatch cannot disagree about which fields a family is selected by -- a check that passed a family
@@ -373,13 +374,14 @@ final class RecordExtension {
      * instantiations are judged as the closed records they are.
      */
     private static RecordBody familyBodyOf(Top def) {
-        if (!OpenEntry.isFamilyBase(def)) {
-            return def instanceof RecordBody record && !OpenEntry.isOpen(def) ? record : null;
-        }
-        // The selectors come from `FamilySelectors`, the one derivation both encodings read.
-        return new RecordBody(RecordBody.fieldMap(FamilySelectors.of(def)), List.of(),
-                FamilySelectors.extensionOf(def).orElseThrow(), FamilySelectors.namesOf(def),
-                java.util.Optional.empty());
+        return switch (def) {
+            case RecordBody record -> record;
+            // The selectors come from `FamilySelectors`, the one derivation both encodings read.
+            case RecordTemplateBody template -> new RecordBody(RecordBody.fieldMap(FamilySelectors.of(template)),
+                    List.of(), FamilySelectors.extensionOf(template).orElseThrow(), template.discriminators(),
+                    java.util.Optional.empty());
+            case null, default -> null;
+        };
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */

@@ -77,8 +77,9 @@ that names values gets `namesTypes` false and no members.
   type, an alias stopping at an application, `meta.template` bodies and value entries excluded, then the constructor the
   value applies (its recorded tag, `EntryFacts.constructor`, else its body's `@Typename`) followed through a constructor
   template's held body until `of` or a constructor IS-A it is reached. So a record template is a member of
-  `meta.ref<meta.record>` (it is a type, §5.10), `set<text>` of `meta.ref<meta.set_type>` while the kernel's template `set`
-  is not, `meta.top` of `meta.type_ref`, `meta.ref<meta.product>` and `meta.ref<meta.record>`, and so is a constructor
+  `meta.ref<meta.record_template>` and not of `meta.ref<meta.record>`, being built with `record_template`; its
+  declared applications are records. `set<text>` is a member of `meta.ref<meta.set_type>` while the kernel's template
+  `set` is not, `meta.top` of `meta.type_ref`, `meta.ref<meta.product>` and `meta.ref<meta.record>`, and so is a constructor
   whose declaration is a record: membership is not `EntryKind.isConstructor`, which answers applicability.
 - **A kind is a member of itself where the walk says so.** `meta.type_ref` is built with `meta.reference`, which IS-A
   `meta.type`, so it lists itself. Nothing loops: the walk reads construction chains and never a kind's members.
@@ -162,7 +163,8 @@ atom, string-class like any other (`design/choice-disjointness.md`).
 
 `EnumLabels`' peer over field names: the type must be an identifier family, every name the record states (in `fields`,
 `discriminators` and its groups) must be a value of it, and no two fields may be one value under its equality. Where
-no kernel is in scope, the identifier grammar the default stands for applies.
+no kernel is in scope, the identifier grammar the default stands for applies. A record template is judged the same
+way, once, its field names being every application's.
 
 - **Supertypes decide.** A record with supertypes takes their one type, refuses two that disagree, and refuses a
   stated type that is not theirs; two are one when their alias chains end at one entry (`sameNameType`), so an

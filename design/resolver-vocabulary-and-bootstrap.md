@@ -69,7 +69,7 @@ held body. Every walk over a held body descends into a map's keys and values as 
 array, `fields` being one.
 
 - **Why one class and not a producer beside one phase and a consumer beside another.** A held tree is written
-  by two phases (`SchemaDesugarer` lifting a sugar form, `HeldBody.of` writing an open record's) and read by
+  by two phases (`SchemaDesugarer` lifting a sugar form, `HeldBody.of` writing a record template's) and read by
   four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
   declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterTypes`
   walking one for parameter kinds). `applicationIn`'s own contract is that a held body is written by one
@@ -81,7 +81,7 @@ array, `fields` being one.
 - **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
   gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
   `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
-  parameters at all. That is why `heldRecord` builds the wire tree directly, for an open record's held tree. A
+  parameters at all. That is why `heldRecord` builds the wire tree directly, for a record template's held tree. A
   held body of any other constructor is built by the desugar phase the same way. Once built, the tree is an
   AST, and `TsonObjectWriter` writes an AST as syntax rather than as a description of itself
   (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
@@ -105,7 +105,7 @@ entry it closed, and §8.2's synthetic merge renames onto a merged entry. No pas
 an alias chain — see "References are hops" below. Which body shape carries which references is a fact about the
 value model, so it is stated once, where the model is walked:
 
-- A record's field types (an open record's only where they name none of its parameters), an array's element, a
+- A record's field types (a record template's only where they name none of its parameters), an array's element, a
   map's and a namespace type's `key_type` and `value_type`, a tuple's elements, a choice's variants, and an alias's
   target, each a `TypeRef`, arguments and all.
 - A reference's `of`, as a bare name. `meta.ref<T>` closes its argument before substituting, so `of` names an entry,
@@ -240,7 +240,7 @@ annotation is: there is no author to resolve against, and the value is fixed.
   gave it.
 - **The bootstrap route attaches none, deliberately.** `MetaKernelBootstrapResolver` exists to be *just*
   enough to load the real kernel from its own file, and nothing in the pipeline reads this marker — it is
-  informational. The kernel's own six synthetics, minted at meta.tn's root, are marked anyway, because the entries
+  informational. The kernel's own seven synthetics, minted at meta.tn's root, are marked anyway, because the entries
   anything else sees come from ordinary resolution: the bootstrap output stands in only as the transient vocabulary the
   kernel's own ordinary resolution reads through.
 - Cross-checked against the spec's own output by `ResolvedFixtureTest.theSameEntriesAreMarkedSyntheticOnBothSides` — six keys

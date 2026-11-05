@@ -38,6 +38,8 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Sum;
@@ -105,9 +107,10 @@ import java.util.function.Predicate;
  *   built from them wherever the schema is ({@code SchemaPaths.synced}).</li>
  * </ul>
  *
- * <p><b>A declaration carrying type parameters (§5.10) is open.</b> A record template is the record it is, with
- * its parameters stated ({@link #openRecord}, and {@link #parameterised} for a composition or refinement, which
- * absorbs fields from a source and so is open in its flattened form). Any other open instance is held as written
+ * <p><b>A declaration carrying type parameters (§5.10) is open.</b> A record template is a {@code
+ * record_template}: the record resolution builds with the parameters standing as names and tokens, its fields
+ * labelled ({@link #openRecord}, and {@link #parameterised} for a composition or refinement, which absorbs fields
+ * from a source and so is a template in its flattened form). Any other open instance is held as written
  * ({@link #resolveInstanceTemplate}). Nothing is substituted here -- that is {@code TemplateMaterialiser}'s, over
  * the resolved form.
  *
@@ -210,6 +213,9 @@ final class DefinitionResolver {
 
     /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
     private static final String TEMPLATE = KernelNames.of("template");
+
+    /** The kernel's {@code record_template}: what a record with type parameters resolves to (§5.10). */
+    private static final String RECORD_TEMPLATE = KernelNames.of("record_template");
 
     /** {@code type}'s one field ([TSON-SCHEMA] §4.1): a type's IS-A chain, which no declaration writes. */
     private static final String CHAIN = "chain";
@@ -365,7 +371,7 @@ final class DefinitionResolver {
      * from whichever applications happen to have been written and a new one elsewhere would silently change
      * it. That is a schema error (§5.2).
      *
-     * <p><b>On a record template the mark is the instantiation's</b>, set on the open record's own {@code extension}:
+     * <p><b>On a record template the mark is the instantiation's</b>, set on the template's own {@code extension}:
      * the base is ABSTRACT by construction (§5.10), so the field is free to say how each application is realised,
      * and a second-level base is spelled {@code result => abstract <T> { … }}. Its {@code discriminators} are the
      * base's, so the selector rule above is a closed record's alone.
@@ -402,12 +408,12 @@ final class DefinitionResolver {
                         + "construction -- so the claim is false of '" + declaration.name() + "' whatever else "
                         + "the schema says. Mark a closed declaration instead ([TSON-SCHEMA] §5.2, §5.10)");
             }
-            if (!(resolved instanceof RecordBody record)) {
+            if (!(resolved instanceof RecordTemplateBody template)) {
                 String head = HeldBody.of(resolved).application().typeRef().orElse("?");
                 throw new SchemaValidationException("'" + declaration.name() + "': only a record states how it"
                         + " may be realised -- this entry's body applies '!" + head + "' ([TSON-SCHEMA] §5.2)");
             }
-            return record.withExtension(extension.get());
+            return template.withExtension(extension.get());
         }
         if (!(resolved instanceof RecordBody record)) {
             throw new SchemaValidationException("'" + declaration.name()
@@ -562,10 +568,11 @@ final class DefinitionResolver {
     }
 
     /**
-     * A composition or refinement template: the <em>flattened</em> record, with its parameters stated. Both absorb
+     * A composition or refinement template: the <em>flattened</em> record as its template, with its parameters
+     * stated. Both absorb
      * fields from a source (§5.8's supertypes, §5.7's refinement source), and a §5.7 tightening entry states a
      * modifier and no type-ref, which is not a {@code meta.record_field} until the inherited field supplies one -- so
-     * the open record is the one resolution builds, where a namespace is in hand.
+     * the template is built from the record resolution builds, where a namespace is in hand.
      *
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom body
      * has no parameters to state. The chain keeps the parents as written, one of which may be an application
@@ -578,8 +585,19 @@ final class DefinitionResolver {
         }
         // The template is IS-A what its parents reach, as any record is: its chain is the parents as written and
         // the closed entries they reach, and closing completes each instantiation's from the same parents.
-        return refuseParameterTypedSelector(
-                record.withChain(record.chain().withSubtypes(List.of())).withParameters(typeParameters(parameters)));
+        return asTemplate(record.withChain(record.chain().withSubtypes(List.of())), parameters);
+    }
+
+    /**
+     * {@code shape} -- the record resolution built with the parameters standing as names and tokens -- as the
+     * record template it is ({@link RecordTemplateBody#over}), each field labelled by §5.10's shadowing rule, and
+     * the two rules a template's fields answer to checked against its parameters.
+     */
+    private static RecordTemplateBody asTemplate(RecordBody shape, List<String> parameters) {
+        RecordTemplateBody template = refuseParameterTypedSelector(
+                RecordTemplateBody.over(shape, typeParameters(parameters)));
+        refuseLiteralOnOpenType(template);
+        return template;
     }
 
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
@@ -596,7 +614,8 @@ final class DefinitionResolver {
             return;
         }
         List<String> instantiable = TypeChain.subtypesOf(head).stream()
-                .filter(subtype -> !TEMPLATE.equals(subtype) && isInstantiable(metaDefinitions.definition(subtype)))
+                .filter(subtype -> !TEMPLATE.equals(subtype) && !RECORD_TEMPLATE.equals(subtype)
+                        && isInstantiable(metaDefinitions.definition(subtype)))
                 .toList();
         String terminal = AliasChain.terminal(target, metaDefinitions::definition);
         throw new SchemaValidationException("'" + name + "': '!" + target + "' names an abstract entry, which has no "
@@ -614,13 +633,13 @@ final class DefinitionResolver {
     }
 
     /**
-     * Refuses {@code template} as a construction head, closed or open: it is resolver vocabulary (§8.1).
-     * An open entry's body is derived from a declaration's parameter list, and nothing is ever typed by it, so
-     * a source declaration applying it directly is a resolver error. It IS-A {@code top}, since resolved output is
-     * typed by it, so it is applied as a constructor would be -- which is why it needs a check of its own:
-     * admitted, it would mint an open entry whose held body was hand-written, skipping every check §5.10 makes
-     * of a template's declaration. Tested at the end of the head's alias chain (§8.3), so an alias of
-     * {@code template} is refused as well.
+     * Refuses {@code template} and {@code record_template} as a construction head, closed or open: each is resolver
+     * vocabulary (§8.1), the body of an open entry, which the resolver derives from a declaration's parameter list,
+     * so a source declaration applying one directly is a resolver error. Each IS-A {@code top}, since resolved
+     * output is typed by it, so it is applied as a constructor would be -- which is why it needs a check of its
+     * own: admitted, it would mint an open entry whose body was hand-written, skipping every check §5.10 makes of a
+     * template's declaration. Tested at the end of the head's alias chain (§8.3), so an alias of either is refused
+     * as well.
      */
     private static void requireAuthorable(String name, String target, ConstructorHead head) {
         if (head.name().equals(TEMPLATE)) {
@@ -628,6 +647,12 @@ final class DefinitionResolver {
                     + "the body of an open entry, which the resolver derives from a declaration's parameter "
                     + "list, and a source declaration never applies it directly (§8.1). Name the parameters on "
                     + "the declaration instead: '" + name + " => <T> !C { ... }' (§5.10)");
+        }
+        if (head.name().equals(RECORD_TEMPLATE)) {
+            throw new SchemaValidationException("'" + name + "': '!" + target + "' is resolver vocabulary -- "
+                    + "the body of a record template, which the resolver derives from a record declared with "
+                    + "type parameters, and a source declaration never applies it directly (§8.1). Name the "
+                    + "parameters on the declaration instead: '" + name + " => <T> { ... }' (§5.10)");
         }
     }
 
@@ -899,10 +924,11 @@ final class DefinitionResolver {
     }
 
     /**
-     * A record template, as the record it is: its payload bound through {@code record}'s own reader with the
-     * parameters standing as names and tokens, which every slot a record template admits a parameter in already
-     * holds ([TSON-SCHEMA] §5.10). The slot rule runs first, on the payload as written, so a parameter in a
-     * scalar slot is refused for standing there rather than for not reading as a boolean.
+     * A record template: its payload bound through {@code record}'s own reader with the parameters standing as
+     * names and tokens, which every slot a record template admits a parameter in holds as written ([TSON-SCHEMA]
+     * §5.10), then labelled as the template it is ({@link #asTemplate}). The slot rule runs first, on the payload
+     * as written, so a parameter in a scalar slot is refused for standing there rather than for not reading as a
+     * boolean.
      */
     private Top openRecord(String name, List<String> parameters, DataValue payload) {
         ParameterTypes.checkSlots(parameters, payload, metaDefinitions::definition);
@@ -910,7 +936,25 @@ final class DefinitionResolver {
             throw new IllegalStateException("'" + name + "': '!record { ... }' bound to something other than a "
                     + "record");
         }
-        return refuseParameterTypedSelector(record.withParameters(typeParameters(parameters)));
+        return asTemplate(record, parameters);
+    }
+
+    /**
+     * A literal {@code value} needs a closed type ([TSON-SCHEMA] §5.10, SPEC-FEEDBACK.md #19): what a literal token
+     * means is decided by the type it is read as, and a field typed by a parameter, whole ({@code w?: T ~ 5}) or as
+     * an argument ({@code w?: box<T> ~ 5}), has a different type in every application. Such a field takes a value parameter
+     * or no value; a field of a closed type takes either.
+     */
+    private static void refuseLiteralOnOpenType(RecordTemplateBody template) {
+        template.fields().forEach((name, field) -> {
+            Optional<String> parameter = field.parameterInType(template.parameterNames());
+            if (parameter.isPresent() && field.value().isPresent()) {
+                throw new SchemaValidationException("field '" + name + "' is typed by the parameter '"
+                        + parameter.get() + "' and carries the literal value '" + field.value().get().text()
+                        + "' -- a literal needs a closed type, and this field's type differs in every "
+                        + "application. Supply the value as a parameter too, or write none (§5.10)");
+            }
+        });
     }
 
     /**
@@ -919,13 +963,13 @@ final class DefinitionResolver {
      * which member it has, so a type that varies per application is one it cannot read. The <em>pin</em>
      * varying is the whole point, and does (§5.10).
      */
-    private static RecordBody refuseParameterTypedSelector(RecordBody open) {
+    private static RecordTemplateBody refuseParameterTypedSelector(RecordTemplateBody open) {
         for (String name : open.discriminators()) {
-            RecordField field = open.fields().get(name);
+            RecordTemplateField field = open.fields().get(name);
             Optional<String> parameter = field == null ? Optional.empty()
-                    : OpenEntry.parameterIn(field.type(), open.parameterNames());
+                    : field.parameterInType(open.parameterNames());
             if (parameter.isPresent()) {
-                String typed = parameter.get().equals(field.type().name()) ? "typed by the type parameter '"
+                String typed = field.typeParam().isPresent() ? "typed by the type parameter '"
                         : "typed by an application of the parameter '";
                 throw new SchemaValidationException("discriminator field '" + name + "' is " + typed
                         + parameter.get() + "', and a position typed by this template reads a discriminator "
@@ -1922,7 +1966,7 @@ final class DefinitionResolver {
      * them, so a declaration composing {@code box&lt;T&gt;} stands where {@code box}'s own {@code base} is
      * expected.
      *
-     * <p><b>Absorbing needs no closure, which is the whole of why this works.</b> The operand is an open record,
+     * <p><b>Absorbing needs no closure, which is the whole of why this works.</b> The operand is a record template,
      * so its field set is known while the application is open: substituting its parameters with the arguments
      * <em>as written</em> -- which here are the absorbing declaration's own parameters -- is the same token
      * walk {@link TemplateMaterialiser#substitute} performs over its held tree when the arguments are concrete,

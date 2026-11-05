@@ -370,7 +370,7 @@ final class SchemaDesugarer {
                 //
                 // Every parameterised record body takes this path, `~`-marked or not. A composition or
                 // refinement template is opened one phase later (`DefinitionResolver.parameterised`), since both
-                // absorb fields from a source and the open record is the flattened one. A bare record has none.
+                // absorb fields from a source and the template is the flattened record. A bare record has none.
                 if (!structural.typeParams().isEmpty() && body instanceof RecordDef record) {
                     yield instance(recordBinding(record), structural.typeParams());
                 }

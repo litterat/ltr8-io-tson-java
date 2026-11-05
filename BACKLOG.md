@@ -158,11 +158,10 @@ spec-required case:
   which §4.2 says is that body, closes `of` to the expansion: `ReferenceBody.of` is a `String`, bound from the text,
   and nothing closes it. Hold `of` as a `TypeRef`, map it in `MetaRefs`' reference arm as the application it is, and
   add a `schema/valid` vector.
-- [ ] **A parameter in a record field's `value` has no channel of its own** ([TSON-SCHEMA] §5.10). It is an unquoted
-  token in `meta.record_field.value`, told from a literal by §5.10's shadowing rule, in resolved output as in source; at a
-  type position or among an application's arguments a parameter is its name, as the reference grammar reads one
-  (`SPEC-FEEDBACK.md #12`). Decide when `record_field.value`, the last `meta.value`-typed slot in the kernel, is
-  retyped, whether `value` gains a channel (`( value: meta.value | value_param: meta.param_name )`), and with it what
+- [ ] **A field's `value` is still typed `meta.value`** ([TSON-SCHEMA] §5.2, §5.10), on `meta.record_field` and
+  `meta.record_template_field` alike, the last `meta.value`-typed slots in the kernel. A record field is closed, its
+  value a literal of the field's own type, and a record template's value parameter has its own label
+  (`value_param`), so the slot no longer carries a parameter. Decide when `value` is retyped, and with it what
   `@meta.application` means on a declared entry that is no record.
 
 - [ ] **An annotation inside a value read through an imported type's reader resolves in the declaring schema's

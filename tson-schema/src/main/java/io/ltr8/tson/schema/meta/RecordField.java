@@ -24,12 +24,9 @@ import java.util.Optional;
  * would be admitted where the pin refuses it, and a DEFAULT on a field that is not optional, a value only
  * omission reaches.
  *
- * <p><b>{@code value} is one slot, and carries a parameter as readily as a literal.</b> Inside a template
- * body a token there is a parameter exactly when its text resolves into the enclosing entry's {@code
- * parameters} (§8.1's shadowing rule), and a closed entry has no parameters for one to resolve into -- so
- * the same slot is unambiguous at both ends and needs no label. The role beside it is the modifier's either
- * way: {@code = P} is {@link FieldRole#FIXED} where it is written, as {@code = 201} is, and closing substitutes
- * the value without changing a fact. So a {@link FieldRole#FREE} field never carries a value.
+ * <p><b>A record field is closed</b>: its {@code type} names a type and its {@code value} is a literal, never a
+ * parameter. A field that may carry one is a {@link RecordTemplateField}, which only a {@link RecordTemplateBody}
+ * holds, and an application turns each of those into one of these.
  *
  * <p><b>A field never says it is a discriminator.</b> Which fields a sealed family dispatches on is the
  * enclosing record's own statement ({@code record.discriminators}), because §5.8 flattens a base's fields

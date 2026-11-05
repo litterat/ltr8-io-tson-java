@@ -62,6 +62,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry atoms() {
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
         factories.put("meta.template", DispatchFactories.TEMPLATE);
+        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -85,6 +86,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
         factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
         factories.put("meta.template", DispatchFactories.TEMPLATE);
+        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -108,6 +110,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
         factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
         factories.put("meta.template", DispatchFactories.TEMPLATE);
+        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 

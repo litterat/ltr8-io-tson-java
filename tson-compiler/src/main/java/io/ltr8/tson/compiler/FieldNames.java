@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
@@ -54,20 +55,36 @@ final class FieldNames {
                                             Function<String, Top> structure) {
         List<EnumLabels.Violation> violations = new ArrayList<>();
         for (String name : localNames) {
-            if (merged.get(name) instanceof RecordBody body) {
-                check(name, body, body, merged, structure).ifPresent(violations::add);
-            }
+            Top definition = merged.get(name);
+            Optional<Shape> shape = switch (definition) {
+                case RecordBody body -> Optional.of(new Shape(body.nameType(), body.fields().keySet(),
+                        body.discriminators(), body.groups()));
+                // A template's field names are each application's, so they are judged once, here.
+                case RecordTemplateBody template -> Optional.of(new Shape(template.nameType(),
+                        template.fields().keySet(), template.discriminators(), template.groups()));
+                case null, default -> Optional.empty();
+            };
+            shape.flatMap(body -> check(name, definition, body, merged, structure)).ifPresent(violations::add);
         }
         return List.copyOf(violations);
     }
 
-    private static Optional<EnumLabels.Violation> check(String name, Top definition, RecordBody body,
+    /** What the check reads of a record or a record template: its name type and the names it declares or names. */
+    private record Shape(Optional<String> nameType, Set<String> fieldNames, List<String> discriminators,
+                         List<FieldGroup> groups) {
+
+        String nameTypeName() {
+            return nameType.orElse(RecordBody.FIELD_NAME);
+        }
+    }
+
+    private static Optional<EnumLabels.Violation> check(String name, Top definition, Shape body,
                                                         Map<String, Top> merged,
                                                         Function<String, Top> structure) {
         Optional<NameType.Resolved> resolved = NameType.of(definition, Optional.empty(), merged::get, structure);
         if (resolved.isEmpty() && body.nameType().isEmpty()) {
             // The default where no kernel is in scope to resolve it: the identifier grammar it stands for.
-            for (String field : body.fields().keySet()) {
+            for (String field : body.fieldNames()) {
                 Optional<String> violation = io.ltr8.tson.atom.IdentifierGrammar.validate(field);
                 if (violation.isPresent()) {
                     return Optional.of(new EnumLabels.Violation(name, "'" + name + "': field name '" + field
@@ -103,7 +120,7 @@ final class FieldNames {
         boolean identifier = NameType.isIdentifier(type, structure);
         String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameTypeName() + "'";
         Map<Object, String> seen = new HashMap<>();
-        for (String field : body.fields().keySet()) {
+        for (String field : body.fieldNames()) {
             Optional<EnumLabels.Violation> problem = read(name, ofType, parser.get(), field);
             if (problem.isPresent()) {
                 return problem;

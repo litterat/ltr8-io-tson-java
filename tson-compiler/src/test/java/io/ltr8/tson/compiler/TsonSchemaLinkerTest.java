@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.unicode.TextType;
@@ -147,9 +148,9 @@ class TsonSchemaLinkerTest {
         assertTrue(thrown.getMessage().contains("'set' declares no type parameters"), thrown.getMessage());
     }
 
-    /** A one-parameter record template: the record it is, with its parameter stated ([TSON-SCHEMA] §5.10). */
+    /** A one-parameter record template over {@code fields}, each labelled against the parameter ([TSON-SCHEMA] §5.10). */
     private static Top recordTemplate(String parameter, AnnotatedMap<String, RecordField> fields) {
-        return RecordBody.of(fields).withParameters(List.of(TemplateParam.typeParameter(parameter)));
+        return RecordTemplateBody.over(RecordBody.of(fields), List.of(TemplateParam.typeParameter(parameter)));
     }
 
     /**

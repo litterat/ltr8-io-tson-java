@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.numeric.FloatType;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -54,6 +55,7 @@ enum DiscriminationClass {
                     ? Optional.empty() : Optional.of(NUMBER);
             case EnumBody members -> ofEnum(members);
             case RecordBody ignored -> Optional.of(BRACE);
+            case RecordTemplateBody ignored -> Optional.of(BRACE); // every member is a record
             case MapBody map -> MapPlan.isObjectForm(schema, map) ? Optional.of(BRACE) : Optional.empty();
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);

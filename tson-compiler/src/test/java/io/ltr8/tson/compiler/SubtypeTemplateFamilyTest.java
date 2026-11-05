@@ -113,7 +113,7 @@ class SubtypeTemplateFamilyTest {
         assertTrue(TypeChain.subtypesOf(baseEntry).contains("box"),
                 () -> "the template is IS-A its parent too: " + TypeChain.subtypesOf(baseEntry));
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(compiled.schema().entries().get("box")),
-                "the open record keeps its parent as written, which closing completes");
+                "the record template keeps its parent as written, which closing completes");
     }
 
     /**

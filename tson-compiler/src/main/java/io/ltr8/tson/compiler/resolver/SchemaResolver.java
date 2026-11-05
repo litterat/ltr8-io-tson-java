@@ -32,6 +32,7 @@ import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TemplateParam;
@@ -1082,7 +1083,8 @@ public final class SchemaResolver {
      * the schema further, the actual fix being upstream at the declaration that failed. With the arity
      * intact the application closes against an empty body and says nothing.
      *
-     * <p><b>An empty record, because the point is to absorb rather than to be recognised</b> -- javac's model,
+     * <p><b>An empty record (an empty record template, for an open declaration), because the point is to absorb
+     * rather than to be recognised</b> -- javac's model,
      * where the error type answers every question, rather than Swift's, where every questioner must first ask
      * whether it is looking at one. A dependent that composes with a failed declaration ({@code parent =>
      * child & { ... }}) then resolves cleanly, contributing no fields, instead of failing a second time and
@@ -1091,9 +1093,10 @@ public final class SchemaResolver {
      * placeholder exists to prevent.
      */
     private static Top unresolved(List<String> parameters) {
-        // An open placeholder is an open record like any record template, so it closes by the one process.
-        return RecordBody.of(RecordBody.fieldMap())
-                .withParameters(parameters.stream().map(TemplateParam::typeParameter).toList());
+        RecordBody empty = RecordBody.of(RecordBody.fieldMap());
+        // An open placeholder is an empty record template, so it closes by the one process a template does.
+        return parameters.isEmpty() ? empty
+                : RecordTemplateBody.over(empty, parameters.stream().map(TemplateParam::typeParameter).toList());
     }
 
     /**

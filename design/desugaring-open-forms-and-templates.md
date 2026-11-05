@@ -16,8 +16,8 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
 - `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
   *unquoted*.
 - Only a *template* is normalised to a held body; a closed record or closed alias resolves at its declaration. A
-  record template's normalised `!meta.record { … }` payload is bound by the resolver into the open record it denotes
-  (`DefinitionResolver.openRecord`).
+  record template's normalised `!meta.record { … }` payload is bound by the resolver into the `meta.record_template`
+  it denotes (`DefinitionResolver.openRecord`), which labels each whole-type and whole-value parameter.
 - Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
   facts at their `meta.record_field` defaults.
 - §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
@@ -112,11 +112,12 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     form back out puts a *second producer* in front of a wire form two later phases read, and since
     `DerivedName.ofBinding` hashes what is written, a second spelling is a second entry for one type. One
     producer, one spelling: `WireForm.refValue` is the single place a type slot's shape is decided.
-  - **A parameter rides the ordinary `value` slot**, with §8.1's shadowing rule to tell it from a literal,
-    which is why the kernel declares one `value` slot and no labelled group. The role beside it is the
-    modifier's (`FieldModifiers`): `= P` is FIXED where it is written, and closing only substitutes the value.
-  - **A composition or refinement template is built one phase later**, as the *flattened* open record
-    (`DefinitionResolver.parameterised`), and every open record's held tree is written by `WireForm.heldRecord`
+  - **A parameter rides the ordinary `value` slot of this phase's payload**, written as the author wrote it,
+    unquoted; §5.10's shadowing rule tells it from a literal when the resolver labels the template's fields
+    (`value_param`, and `type_param` for a whole-type parameter). The role beside it is the modifier's
+    (`FieldModifiers`): `= P` is FIXED where it is written, and closing only substitutes the value.
+  - **A composition or refinement template is built one phase later**, as the *flattened* record template
+    (`DefinitionResolver.parameterised`), and every record template's held tree is written by `WireForm.heldRecord`
     (through `HeldBody.of`). Both absorb fields from a source, and a §5.7 tightening entry states a modifier and no
     type-ref, so it is not a `meta.record_field` at all until the inherited field supplies one. That needs a namespace
     this phase does not have, so the flattening happens in the resolver; the **spelling** is `WireForm`'s, which is
