@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.BindMismatchException;
@@ -57,7 +58,8 @@ class MapBindReaderTest {
                 ? type
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
+                ResolverBindContext.registerAbsent(
+                        DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;

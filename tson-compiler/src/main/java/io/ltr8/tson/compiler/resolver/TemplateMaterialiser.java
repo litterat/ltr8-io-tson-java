@@ -446,8 +446,8 @@ final class TemplateMaterialiser {
                     ? closeRecordTemplate(head, record, bindings)
                     : closeHeld(head, template, open, bindings).body();
             closedApplications.putIfAbsent(plain(application), declaredName);
-            closedApplications.putIfAbsent(new TypeRef(head, arguments), declaredName);
-            return instantiation(declaredName, closed, new TypeRef(head, arguments), application);
+            closedApplications.putIfAbsent(TypeRef.of(head, arguments), declaredName);
+            return instantiation(declaredName, closed, TypeRef.of(head, arguments), application);
         } finally {
             heads.remove(heads.size() - 1);
         }
@@ -477,9 +477,9 @@ final class TemplateMaterialiser {
         // A generated head's application is an open synthetic closing its own intermediate form: nobody wrote it.
         if (entry != null && !generated.contains(ref.name())) {
             closedApplications.putIfAbsent(plain(ref), entry);
-            closedApplications.putIfAbsent(new TypeRef(ref.name(), arguments), entry);
+            closedApplications.putIfAbsent(TypeRef.of(ref.name(), arguments), entry);
         }
-        return entry == null ? new TypeRef(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
+        return entry == null ? TypeRef.of(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
     }
 
     /**
@@ -523,7 +523,7 @@ final class TemplateMaterialiser {
             return ref; // an application, already closed above to the entry it denotes
         }
         String terminal = AliasChain.terminal(ref.name(), namespace::definition);
-        return terminal.equals(ref.name()) ? ref : new TypeRef(terminal, ref.arguments(), ref.annotations());
+        return terminal.equals(ref.name()) ? ref : TypeRef.of(terminal, ref.arguments(), ref.annotations());
     }
 
     /**
@@ -607,7 +607,7 @@ final class TemplateMaterialiser {
                     return mintedRecord(name, DerivedName.canonicalApplication(head, arguments), closed);
                 }
                 note(name, RECORD);
-                Top instantiation = instantiation(name, closed, new TypeRef(head, arguments), written);
+                Top instantiation = instantiation(name, closed, TypeRef.of(head, arguments), written);
                 materialised.put(name, instantiation);
                 publish.accept(name, instantiation);
                 return name;
@@ -634,7 +634,7 @@ final class TemplateMaterialiser {
                 // the synthetic, which the compiler collapses, so it costs nothing at read time.
                 Top alias = new Alias(TypeRef.of(formName));
                 note(name, ALIAS);
-                alias = instantiation(name, alias, new TypeRef(head, arguments), written);
+                alias = instantiation(name, alias, TypeRef.of(head, arguments), written);
                 materialised.put(name, alias);
                 publish.accept(name, alias);
                 return name;
@@ -869,12 +869,12 @@ final class TemplateMaterialiser {
                 case TypeArgument.Value literal -> literal;
             });
         }
-        return new TypeRef(reference.name(), arguments);
+        return TypeRef.of(reference.name(), arguments);
     }
 
     /** {@code reference} with nothing but its name and arguments: no annotations, no closure. */
     private static TypeRef plain(TypeRef reference) {
-        return new TypeRef(reference.name(), reference.arguments());
+        return TypeRef.of(reference.name(), reference.arguments());
     }
 
     /** Every application this pass closed, to the entry it closed to -- see {@link #closedApplications}. */

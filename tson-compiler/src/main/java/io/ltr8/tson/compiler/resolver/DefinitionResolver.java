@@ -6,28 +6,28 @@ import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
+import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
+import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
+import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
-import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
-import io.ltr8.tson.compiler.ast.schema.MapRef;
-import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
-import io.ltr8.tson.compiler.ast.schema.RemovalSet;
-import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.MapRef;
+import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
-import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
+import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
+import io.ltr8.tson.compiler.ast.schema.RefinedDef;
+import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
-import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
+import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
-import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
@@ -35,7 +35,6 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -57,7 +56,6 @@ import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -533,8 +531,8 @@ final class DefinitionResolver {
                 // materialisation's job, and until then the open form is what the entry records.
                 List<String> parameters = referenceTypeDef.typeParams();
                 yield switch (referenceTypeDef.ref()) {
-                    case SimpleRef simple -> openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
-                    case GenericRef generic -> resolveTemplateApplication(name, generic, parameters);
+                    case NameRef simple -> openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
+                    case ApplicationRef generic -> resolveTemplateApplication(name, generic, parameters);
                     // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a
                     // sized array into the `!meta.array { ... }` construction it denotes with min_items/max_items bound
                     // directly (§5.3), a size-less one into the same without them (§5.6), a voidable element as
@@ -1475,7 +1473,7 @@ final class DefinitionResolver {
      * of the arguments name parameters this declaration re-declares. That case threads through untouched --
      * what makes the entry a template is exactly that list, and the open form is the application itself.
      */
-    private Top resolveTemplateApplication(String name, GenericRef generic, List<String> parameters) {
+    private Top resolveTemplateApplication(String name, ApplicationRef generic, List<String> parameters) {
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArg arg : generic.args()) {
             try {
@@ -1485,7 +1483,7 @@ final class DefinitionResolver {
             }
         }
         io.ltr8.tson.schema.meta.TypeRef target =
-                new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments);
+                io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), arguments);
         if (parameters.isEmpty() && applicationCloser != null) {
             // Closed: this declaration owns the entry. A null answer means it cannot -- an unresolved head,
             // an arity mismatch, or a partial application -- and the reference form below is the fallback.
@@ -1574,7 +1572,7 @@ final class DefinitionResolver {
         Set<String> inheritedFields = new HashSet<>();
 
         for (TypeRef supertypeRef : construction.supertypes()) {
-            if (supertypeRef instanceof GenericRef generic) {
+            if (supertypeRef instanceof ApplicationRef generic) {
                 // §5.8's "Parameterized references", open end and closed alike: an application at an operand
                 // denotes no entry of its own, whether its arguments are this declaration's parameters or
                 // concrete. A template is a macro here -- it contributes its fields and its own ancestors,
@@ -1609,7 +1607,7 @@ final class DefinitionResolver {
                     // and a value argument left as a reference is looked up as a type. Open: they stay as
                     // written, the argument being this declaration's own parameter and materialisation being
                     // what classifies it when an application closes.
-                    directSupertypes.add(new io.ltr8.tson.schema.meta.TypeRef(generic.name(),
+                    directSupertypes.add(io.ltr8.tson.schema.meta.TypeRef.of(generic.name(),
                             namesOwnParameter(generic, parameters)
                                     ? typeArguments(name, generic)
                                     : operand.arguments()));
@@ -1627,7 +1625,7 @@ final class DefinitionResolver {
                 }
                 continue;
             }
-            if (!(supertypeRef instanceof SimpleRef simple)) {
+            if (!(supertypeRef instanceof NameRef simple)) {
                 // A choice or an inline array/tuple at a supertype position. §12.1 lets these through only
                 // because `construction-def` draws its operands from `type-ref` where `refined-def` takes a
                 // name -- nothing here could ever denote a record, so there is no field set to compose with
@@ -1896,17 +1894,17 @@ final class DefinitionResolver {
      * transitive chain's literal atom/product/sum name, not the source's own resolved kind).
      */
     private Built resolveRefinement(String name, RefinedDef refined, List<String> parameters) {
-        if (refined.target() instanceof GenericRef generic && namesOwnParameter(generic, parameters)) {
+        if (refined.target() instanceof ApplicationRef generic && namesOwnParameter(generic, parameters)) {
             // §5.7 against an open source: the same absorption composition does. The source names no entry
             // yet, but its own ancestors are types and its whole field set arrives, which is what `^` re-emits
             // and then tightens; the held body writes the source as its parent, and closing it reaches the
             // edge to the entry the closed application denotes.
             OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
             return refineOnto(name, refined, parameters,
-                    new io.ltr8.tson.schema.meta.TypeRef(generic.name(), typeArguments(name, generic)),
+                    io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), typeArguments(name, generic)),
                     new ArrayList<>(operand.ancestors()), operand.fields(), operand.groups(), operand.nameType());
         }
-        if (refined.target() instanceof SimpleRef simple) {
+        if (refined.target() instanceof NameRef simple) {
             refuseParameterOperand(name, simple.name(), parameters, "refinement source", "^");
         }
         io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target(), parameters);
@@ -2006,18 +2004,18 @@ final class DefinitionResolver {
     }
 
     /**
-     * A refinement's source ({@code target}) is always a {@link SimpleRef} or a {@link
-     * GenericRef} by grammar (see {@code RefinedDef}'s own Javadoc) -- a bare name resolves to a
+     * A refinement's source ({@code target}) is always a {@link NameRef} or an {@link
+     * ApplicationRef} by grammar (see {@code RefinedDef}'s own Javadoc) -- a bare name resolves to a
      * reference without arguments; a generic application (e.g. {@code box<T>}, {@code T} shadowing the
      * refining declaration's own parameter) resolves each argument the way every other application does
      * ({@link #typeArgument}).
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeRef target,
             List<String> typeParams) {
-        if (target instanceof SimpleRef simple) {
+        if (target instanceof NameRef simple) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
-        if (target instanceof GenericRef generic) {
+        if (target instanceof ApplicationRef generic) {
             // Closed, not carried, for the reason composition closes its supertypes: §5.7 re-emits the
             // source's whole field set, and this phase needs that field set to flatten. Carrying the
             // application instead copied the template's body with its parameters unbound, and the author was
@@ -2145,10 +2143,10 @@ final class DefinitionResolver {
      * level sent it down the closing path, where materialisation reported the author's own parameter as an
      * unresolved reference -- a wrong verdict on a schema that is not wrong.
      */
-    private static boolean namesOwnParameter(GenericRef application, List<String> typeParams) {
+    private static boolean namesOwnParameter(ApplicationRef application, List<String> typeParams) {
         return application.args().stream().anyMatch(arg -> arg instanceof TypeArg.Ref(TypeRef ref)
-                && (ref instanceof SimpleRef simple && typeParams.contains(simple.name())
-                        || ref instanceof GenericRef nested && namesOwnParameter(nested, typeParams)));
+                && (ref instanceof NameRef simple && typeParams.contains(simple.name())
+                        || ref instanceof ApplicationRef nested && namesOwnParameter(nested, typeParams)));
     }
 
     /**
@@ -2179,7 +2177,7 @@ final class DefinitionResolver {
      * {@code box} would hold of {@code box&lt;int32&gt;} as much as of {@code box&lt;text&gt;}, and only one
      * of those admits a {@code vip&lt;text&gt;}.
      */
-    private OpenOperand openOperand(String name, GenericRef application, List<String> typeParams, String position) {
+    private OpenOperand openOperand(String name, ApplicationRef application, List<String> typeParams, String position) {
         String head = application.name();
         Top template = namespaceDefinitions.definition(head);
         if (template == null) {
@@ -2260,7 +2258,7 @@ final class DefinitionResolver {
      * denotes no entry and goes to {@link #openOperand} instead, which absorbs its fields without closing
      * anything.
      */
-    private String closedApplication(String name, GenericRef application, List<String> typeParams, String position) {
+    private String closedApplication(String name, ApplicationRef application, List<String> typeParams, String position) {
         if (applicationCloser == null) {
             throw new UnsupportedOperationException("'" + name + "': closing the " + position + " '"
                     + application.name() + "<...>' needs a whole-schema materialiser, and this resolver was "
@@ -2268,14 +2266,14 @@ final class DefinitionResolver {
         }
         io.ltr8.tson.schema.meta.TypeRef resolved;
         try {
-            resolved = new io.ltr8.tson.schema.meta.TypeRef(application.name(), typeArguments(name, application));
+            resolved = io.ltr8.tson.schema.meta.TypeRef.of(application.name(), typeArguments(name, application));
         } catch (UnsupportedOperationException e) {
             throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
         }
         return applicationCloser.closeApplication(resolved);
     }
 
-    private List<TypeArgument> typeArguments(String name, GenericRef application) {
+    private List<TypeArgument> typeArguments(String name, ApplicationRef application) {
         List<TypeArgument> args = new ArrayList<>();
         for (TypeArg arg : application.args()) {
             args.add(typeArgument(arg));
@@ -2722,7 +2720,7 @@ final class DefinitionResolver {
      * this position, so it has no entry to name and is refused here in those terms.
      */
     io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeRef written) {
-        if (!(written instanceof SimpleRef) && !(written instanceof GenericRef)) {
+        if (!(written instanceof NameRef) && !(written instanceof ApplicationRef)) {
             throw new SchemaValidationException("parameter '" + parameter + "' is written with the type "
                     + written + ", and a parameter's written type names a declared type or an application of one "
                     + "(§5.10); declare the form under a name and write that name");
@@ -2732,7 +2730,7 @@ final class DefinitionResolver {
 
     /**
      * A field/group-member's type-ref, as one of the two shapes that reach resolution: a bare
-     * {@link SimpleRef}, or a {@link GenericRef} -- a §5.10 application, or a constructor's own generic
+     * {@link NameRef}, or an {@link ApplicationRef} -- a §5.10 application, or a constructor's own generic
      * vocabulary such as a field typed {@code set<T>}.
      *
      * <p><b>A container sugar form is the third case and a broken invariant</b>, because by this phase every one
@@ -2741,13 +2739,13 @@ final class DefinitionResolver {
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeRef ref) {
         return switch (ref) {
-            case SimpleRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-            case GenericRef generic -> {
+            case NameRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
+            case ApplicationRef generic -> {
                 List<TypeArgument> args = new ArrayList<>();
                 for (TypeArg arg : generic.args()) {
                     args.add(typeArgument(arg));
                 }
-                yield new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
+                yield io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), args);
             }
             case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _ -> throw unlifted("a type-ref position", ref);
         };

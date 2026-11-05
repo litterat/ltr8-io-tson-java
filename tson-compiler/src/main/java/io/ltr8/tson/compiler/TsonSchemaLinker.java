@@ -1463,7 +1463,7 @@ public final class TsonSchemaLinker {
                                                   Map<String, Top> namespace) {
         Map<TypeRef, String> seen = new LinkedHashMap<>();
         for (TypeRef variant : choice.variants()) {
-            TypeRef flattened = new TypeRef(AliasChain.terminal(variant.name(), namespace), variant.arguments());
+            TypeRef flattened = TypeRef.of(AliasChain.terminal(variant.name(), namespace), variant.arguments());
             String first = seen.putIfAbsent(flattened, variant.name());
             if (first == null) {
                 continue;

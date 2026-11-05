@@ -133,7 +133,7 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
                 closed.add(argument);
             }
         }
-        return Optional.ofNullable(applications.get(new TypeRef(reference.name(), closed)));
+        return Optional.ofNullable(applications.get(TypeRef.of(reference.name(), closed)));
     }
 
     /**

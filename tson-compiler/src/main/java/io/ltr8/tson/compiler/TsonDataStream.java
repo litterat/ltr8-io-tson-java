@@ -385,7 +385,7 @@ public final class TsonDataStream implements TsonEventSource {
             arguments.add(referenceArgument());
         }
         expect(TokenType.GREATER_THAN, "a reference's closing '>'");
-        return new io.ltr8.tson.schema.meta.TypeRef(head.text(), arguments);
+        return io.ltr8.tson.schema.meta.TypeRef.of(head.text(), arguments);
     }
 
     private io.ltr8.tson.schema.meta.TypeArgument referenceArgument() {

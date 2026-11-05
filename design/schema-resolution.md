@@ -364,7 +364,11 @@ component, mirroring the constructor's flattened shape (`type`'s field first);
 `Alias`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), one
 argument of a reference, because a record of two `Optional`s would not say that exactly one is present; it compares
 by its canonical text, the head's parameter and not the grammar deciding which it binds. `TypeRef` is the parsed form
-of a reference value, registered as an atom host type (`TypeRefTextBridge`, in `ResolverBindContext`).
+of a reference value, a sealed interface over `NameRef` (no arguments) and `ApplicationRef` (at least one), the
+variant chosen by `TypeRef.of`; it is registered as an atom host type, and each variant beside it, since a value
+written by its own class is described by the variant (`TypeRefTextBridge`, in `ResolverBindContext`). A context
+without those registrations describes `TypeRef` as a union of two records, so the schema model's classes bind only
+through a context that carries them (`ResolverBindContext.registerAbsent`, which `SchemaMetaNameBinder.over` applies).
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the
 model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtures are listed in
 `DefinitionResolverTest`'s Javadoc.

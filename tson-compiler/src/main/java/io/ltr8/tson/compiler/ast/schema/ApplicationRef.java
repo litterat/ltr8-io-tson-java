@@ -8,9 +8,9 @@ import java.util.List;
  * Whether {@code name} resolves to a constructor, a non-constructor template, or is a resolver
  * error is a later, semantic-layer question (§3.3.1, §5.10) -- not decided here.
  */
-public record GenericRef(String name, List<TypeArg> args) implements TypeRef {
+public record ApplicationRef(String name, List<TypeArg> args) implements TypeRef {
 
-    public GenericRef {
+    public ApplicationRef {
         args = List.copyOf(args);
     }
 }

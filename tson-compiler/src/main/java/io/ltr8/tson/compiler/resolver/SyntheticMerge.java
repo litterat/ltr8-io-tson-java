@@ -114,13 +114,13 @@ final class SyntheticMerge {
                 .map(argument -> argument instanceof TypeArgument.Ref nested
                         ? (TypeArgument) new TypeArgument.Ref(renamed(nested.ref(), renames)) : argument)
                 .toList();
-        return new TypeRef(renames.getOrDefault(ref.name(), ref.name()), arguments, ref.annotations());
+        return TypeRef.of(renames.getOrDefault(ref.name(), ref.name()), arguments, ref.annotations());
     }
 
     /** One type-ref rewritten, its own arguments included -- an application may name a merged form. */
     private static TypeRef rename(TypeRef ref, Map<String, String> renames) {
         String to = renames.get(ref.name());
-        return to == null ? ref : new TypeRef(to, ref.arguments(), ref.annotations());
+        return to == null ? ref : TypeRef.of(to, ref.arguments(), ref.annotations());
     }
 
     /**

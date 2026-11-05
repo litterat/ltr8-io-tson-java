@@ -4,27 +4,24 @@ import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
+import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
-import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.base.SourcePosition;
 import org.junit.jupiter.api.Test;
 
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -84,7 +81,7 @@ class SchemaDesugarerTest {
     private static String firstFieldType(SchemaDocument document, String declaration) {
         StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get(declaration).typeDef();
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(0);
-        return ((SimpleRef) field.type().orElseThrow().typeRef()).name();
+        return ((NameRef) field.type().orElseThrow().typeRef()).name();
     }
 
     private static Instance instanceOf(SchemaDocument document, String declaration) {
@@ -559,7 +556,7 @@ class SchemaDesugarerTest {
                 payload.fields().getFirst().value().coreValue());
 
         // `box` itself is `!record_template { ... }` by the time it leaves this phase (§5.2), so the field
-        // applying the lifted form is a reference inside its payload rather than a `GenericRef` in the AST.
+        // applying the lifted form is a reference inside its payload rather than an `ApplicationRef` in the AST.
         RecordTemplateDef boxTemplate =
                 assertInstanceOf(RecordTemplateDef.class, document.body().declarations().get("box").typeDef());
         assertEquals(Optional.of("meta.record_template"), boxTemplate.payload().typeRef());
@@ -623,7 +620,7 @@ class SchemaDesugarerTest {
 
         RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
                 .typeDef()).body();
-        assertEquals(new GenericRef("box", List.of(new TypeArg.Ref(new SimpleRef("text")))),
+        assertEquals(new ApplicationRef("box", List.of(new TypeArg.Ref(new NameRef("text")))),
                 ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
                 "the application is untouched");
     }
@@ -648,7 +645,7 @@ class SchemaDesugarerTest {
 
         RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
                 .typeDef()).body();
-        assertEquals(new GenericRef("box", List.of(new TypeArg.Ref(new SimpleRef("text")))),
+        assertEquals(new ApplicationRef("box", List.of(new TypeArg.Ref(new NameRef("text")))),
                 ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
                 "left for materialisation, arguments intact");
     }
@@ -746,7 +743,7 @@ class SchemaDesugarerTest {
 
     /** An application in a slot: the data grammar's reference, {@code head<arg>}. */
     private static CoreValue applicationValue(String head, String argument) {
-        return new ReferenceValue(new io.ltr8.tson.schema.meta.TypeRef(head,
+        return new ReferenceValue(io.ltr8.tson.schema.meta.TypeRef.of(head,
                 List.of(new io.ltr8.tson.schema.meta.TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(argument)))));
     }
 

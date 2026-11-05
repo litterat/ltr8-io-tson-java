@@ -6,22 +6,22 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
-import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
+import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
+import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
-import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleRef;
@@ -145,7 +145,7 @@ class TsonSchemaParserTest {
         assertEquals("geo.inner.deep", declarations.get("geo.inner.deep").name());
         assertNotNull(parser.declarationPositions().get(declarations.get("geo.address")));
         RecordDef place = (RecordDef) ((StructuralTypeDef) declarations.get("place").typeDef()).body();
-        assertEquals(new SimpleRef("geo.inner.deep"),
+        assertEquals(new NameRef("geo.inner.deep"),
                 ((FieldDef) place.entries().getFirst()).type().orElseThrow().typeRef());
     }
 
@@ -238,7 +238,7 @@ class TsonSchemaParserTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema { a => text  b => integer  a => uuid }""");
         assertEquals(List.of("a", "b"), List.copyOf(doc.body().declarations().keySet()));
-        assertEquals(new SimpleRef("uuid"),
+        assertEquals(new NameRef("uuid"),
                 ((ReferenceTypeDef) doc.body().declarations().get("a").typeDef()).ref());
     }
 
@@ -252,7 +252,7 @@ class TsonSchemaParserTest {
         assertEquals(2, record.entries().size());
         FieldDef name = assertInstanceOf(FieldDef.class, record.entries().get(0));
         assertEquals("name", name.name());
-        assertEquals(new SimpleRef("text"), name.type().orElseThrow().typeRef());
+        assertEquals(new NameRef("text"), name.type().orElseThrow().typeRef());
     }
 
     @Test
@@ -260,7 +260,7 @@ class TsonSchemaParserTest {
         TypeDef def = declOf("employee => person & contact & { department: text }").typeDef();
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
         ConstructionDef construction = assertInstanceOf(ConstructionDef.class, structural.body());
-        assertEquals(List.of(new SimpleRef("person"), new SimpleRef("contact")), construction.supertypes());
+        assertEquals(List.of(new NameRef("person"), new NameRef("contact")), construction.supertypes());
         assertTrue(construction.body().isPresent());
         assertEquals(1, construction.body().get().entries().size());
         assertTrue(construction.removal().isEmpty());
@@ -271,7 +271,7 @@ class TsonSchemaParserTest {
         TypeDef def = declOf("account_public => account - { password }").typeDef();
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
         ConstructionDef construction = assertInstanceOf(ConstructionDef.class, structural.body());
-        assertEquals(List.of(new SimpleRef("account")), construction.supertypes());
+        assertEquals(List.of(new NameRef("account")), construction.supertypes());
         assertTrue(construction.body().isEmpty());
         assertEquals(List.of("password"), construction.removal().orElseThrow().fieldNames());
     }
@@ -282,7 +282,7 @@ class TsonSchemaParserTest {
         TypeDef def = declOf("staff_public => account & user & { badge: text } - { password  ssn }").typeDef();
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
         ConstructionDef construction = assertInstanceOf(ConstructionDef.class, structural.body());
-        assertEquals(List.of(new SimpleRef("account"), new SimpleRef("user")), construction.supertypes());
+        assertEquals(List.of(new NameRef("account"), new NameRef("user")), construction.supertypes());
         assertEquals(1, construction.body().orElseThrow().entries().size());
         assertEquals(List.of("password", "ssn"), construction.removal().orElseThrow().fieldNames());
     }
@@ -292,7 +292,7 @@ class TsonSchemaParserTest {
         TypeDef def = declOf("production => config ^ { host: = \"prod.example.com\" }").typeDef();
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
         RefinedDef refined = assertInstanceOf(RefinedDef.class, structural.body());
-        assertEquals(new SimpleRef("config"), refined.target());
+        assertEquals(new NameRef("config"), refined.target());
         assertEquals(1, refined.body().entries().size());
     }
 
@@ -316,14 +316,14 @@ class TsonSchemaParserTest {
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
         assertEquals(List.of("T"), structural.typeParams());
         RefinedDef refined = assertInstanceOf(RefinedDef.class, structural.body());
-        assertEquals(new GenericRef("array", List.of(new TypeArg.Ref(new SimpleRef("T")))), refined.target());
+        assertEquals(new ApplicationRef("array", List.of(new TypeArg.Ref(new NameRef("T")))), refined.target());
     }
 
     @Test
     void plainTypeReference() {
         TypeDef def = declOf("id => uuid").typeDef();
         ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
-        assertEquals(new SimpleRef("uuid"), ref.ref());
+        assertEquals(new NameRef("uuid"), ref.ref());
     }
 
     @Test
@@ -331,7 +331,7 @@ class TsonSchemaParserTest {
         TypeDef def = declOf("scores => [integer; 1..]").typeDef();
         ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
         ArrayRef array = assertInstanceOf(ArrayRef.class, ref.ref());
-        assertEquals(new SimpleRef("integer"),
+        assertEquals(new NameRef("integer"),
                 array.elementType().typeRef());
         assertEquals(new SizeSpec.Min("1"), array.size().orElseThrow());
     }
@@ -349,7 +349,7 @@ class TsonSchemaParserTest {
         TypeDef def = declOf("contact_method => (email | phone | address)").typeDef();
         ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
         ChoiceRef choice = assertInstanceOf(ChoiceRef.class, ref.ref());
-        assertEquals(List.of(new SimpleRef("email"), new SimpleRef("phone"), new SimpleRef("address")), choice.variants());
+        assertEquals(List.of(new NameRef("email"), new NameRef("phone"), new NameRef("address")), choice.variants());
     }
 
     // ── The map sugar and §12.2's brace dispatch (§5.3, D1/D2) ───────────
@@ -359,8 +359,8 @@ class TsonSchemaParserTest {
     @Test
     void declarationLevelMap() {
         MapRef map = mapOf("translations => {text => text}");
-        assertEquals(new SimpleRef("text"), map.keyType());
-        assertEquals(new SimpleRef("text"), map.valueType().typeRef());
+        assertEquals(new NameRef("text"), map.keyType());
+        assertEquals(new NameRef("text"), map.valueType().typeRef());
         assertTrue(map.size().isEmpty());
     }
 
@@ -380,7 +380,7 @@ class TsonSchemaParserTest {
     @Test
     void aGenericKeyIsStillAMap() {
         MapRef map = mapOf("index => { pair<text> => integer }");
-        assertEquals(new GenericRef("pair", List.of(new TypeArg.Ref(new SimpleRef("text")))), map.keyType());
+        assertEquals(new ApplicationRef("pair", List.of(new TypeArg.Ref(new NameRef("text")))), map.keyType());
     }
 
     /** {@code map-value = container-def / type-ref}, so the declaration-level tier nests inside a map value. */
@@ -403,8 +403,8 @@ class TsonSchemaParserTest {
         FieldDef field = (FieldDef) ((RecordDef) ((StructuralTypeDef)
                 declOf("holder => { entries: {text => integer} }").typeDef()).body()).entries().get(0);
         MapRef map = assertInstanceOf(MapRef.class, field.type().orElseThrow().typeRef());
-        assertEquals(new SimpleRef("text"), map.keyType());
-        assertEquals(new SimpleRef("integer"), map.valueType().typeRef());
+        assertEquals(new NameRef("text"), map.keyType());
+        assertEquals(new NameRef("integer"), map.valueType().typeRef());
     }
 
     /** Every brace that is not {@code name "=>"} or {@code name "<"} commits to a record, {@code {}} included. */
@@ -475,7 +475,7 @@ class TsonSchemaParserTest {
         MapRef map = mapOf("m => {text => integer?}");
 
         assertTrue(map.valueType().voidable());
-        assertEquals(new SimpleRef("integer"), map.valueType().typeRef());
+        assertEquals(new NameRef("integer"), map.valueType().typeRef());
     }
 
     /** And §12.3's adjacency rule applies there like anywhere else. */
@@ -508,8 +508,8 @@ class TsonSchemaParserTest {
     void genericApplication() {
         TypeDef def = declOf("translations => map<text, text>").typeDef();
         ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
-        assertEquals(new GenericRef("map", List.of(
-                new TypeArg.Ref(new SimpleRef("text")), new TypeArg.Ref(new SimpleRef("text")))), ref.ref());
+        assertEquals(new ApplicationRef("map", List.of(
+                new TypeArg.Ref(new NameRef("text")), new TypeArg.Ref(new NameRef("text")))), ref.ref());
     }
 
     // ── Field marks (§5.2) ────────────────────────────────────────────────
@@ -852,7 +852,7 @@ class TsonSchemaParserTest {
         SchemaMap.Declaration declaration = declOf("vec => <T: text, N> !array { element_type: T  min_items: N }");
 
         assertEquals(List.of("T", "N"), ((Instance) declaration.typeDef()).typeParams());
-        assertEquals(Map.of("T", new SimpleRef("text")), declaration.parameterTypes());
+        assertEquals(Map.of("T", new NameRef("text")), declaration.parameterTypes());
     }
 
     /** A colon promises a type, so a list that stops after one is a parse error rather than an unbounded name. */
@@ -921,7 +921,7 @@ class TsonSchemaParserTest {
         FieldDef history = (FieldDef) taskBody.entries().get(6);
         assertTrue(history.type().orElseThrow().voidable());
         ArrayRef historyArray = assertInstanceOf(ArrayRef.class, history.type().get().typeRef());
-        GenericRef flaggedApplication = assertInstanceOf(GenericRef.class, historyArray.elementType().typeRef());
+        ApplicationRef flaggedApplication = assertInstanceOf(ApplicationRef.class, historyArray.elementType().typeRef());
         assertEquals("flagged", flaggedApplication.name());
         assertEquals(2, flaggedApplication.args().size());
     }

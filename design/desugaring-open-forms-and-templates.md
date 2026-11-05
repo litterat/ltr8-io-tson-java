@@ -59,7 +59,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     - **No slot refuses an application, because a slot that did would not fail where it decided.** A
       `choiceBinding` requiring a bare name per variant would leave `( box<text> | int32 )` unlifted *whole*, to
       reach `DefinitionResolver` as a `ChoiceRef` it has no case for — and, inside a template, to reach
-      `refValue`, whose two inputs are `SimpleRef` and `GenericRef`.
+      `refValue`, whose two inputs are `NameRef` and `ApplicationRef`.
     - **A closed construction writes the reference and lets materialisation close it.** Its body goes
       through the constructor's own reader, so the application has to survive a wire hop, and the resulting
       entry names something that is not an entry yet — for exactly the window an ordinary forward reference

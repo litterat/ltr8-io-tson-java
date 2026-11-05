@@ -5,10 +5,8 @@ package io.ltr8.tson.compiler.ast.schema;
  * (Part 2 §12.1) -- a reference to a type at any position one is legal: a declaration's own body, field
  * types, type arguments, choice variants, elements, composition/refinement targets.
  *
- * <p><b>One tier, not two.</b> The grammar used to split every container into a declaration-level form
- * admitting a size specifier and an element {@code ?} and an inline form admitting neither. Both are this
- * now, everywhere, and a declaration-level container arrives as {@code [type-params] type-ref} rather than
- * through a production of its own.
+ * <p><b>One tier.</b> A container admits a size specifier and an element {@code ?} wherever it stands, and a
+ * declaration-level container arrives as {@code [type-params] type-ref} rather than through a production of its own.
  */
-public sealed interface TypeRef permits ArrayRef, ChoiceRef, GenericRef, MapRef, SimpleRef, TupleRef {
+public sealed interface TypeRef permits ApplicationRef, ArrayRef, ChoiceRef, MapRef, NameRef, TupleRef {
 }

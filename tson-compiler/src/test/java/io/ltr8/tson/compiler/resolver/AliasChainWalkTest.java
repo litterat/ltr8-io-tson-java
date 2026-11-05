@@ -33,7 +33,7 @@ class AliasChainWalkTest {
         map.put("text", TextType.UNCONSTRAINED);
         map.put("hop", alias(TypeRef.of("text")));
         map.put("alias", alias(TypeRef.of("hop")));
-        map.put("applied", alias(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
+        map.put("applied", alias(TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
         map.put("loop_a", alias(TypeRef.of("loop_b")));
         map.put("loop_b", alias(TypeRef.of("loop_a")));
         return map;

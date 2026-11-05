@@ -348,7 +348,7 @@ final class WireForm {
                 case TypeArgument.Value value -> value;
             });
         }
-        return new TypeRef(application.name(), arguments, application.annotations());
+        return TypeRef.of(application.name(), arguments, application.annotations());
     }
 
     static Optional<CoreValue> field(RecordValue record, String name) {
@@ -430,7 +430,7 @@ final class WireForm {
                 default -> argument;
             });
         }
-        return new TypeRef(application.name(), arguments, application.annotations());
+        return TypeRef.of(application.name(), arguments, application.annotations());
     }
 
     private static TypeArgument argumentFor(String parameter, String head, Map<String, TypeArgument> bindings) {
