@@ -311,8 +311,8 @@ judged once its application closes it:
 
 Everything else that walks field types skips a dependent field: it is satisfiable for inhabitance whatever its
 sibling names (`TypeInhabitance`), carries no value to check (`checkFieldValue`), contributes no name to a name type
-or a parameter's type (`NameType`, `ParameterTypes`), and a value's qualified name going on past one is this library's
-gap (`ValuesByName`, `NOT_IMPLEMENTED`).
+or a parameter's type (`NameType`, `ParameterTypes`). A value's qualified name going on through one takes the type its
+sibling names in the value walked (`ValuesByName.dependentType`, `design/meta-layer-namespaces.md`).
 
 ## Field groups
 

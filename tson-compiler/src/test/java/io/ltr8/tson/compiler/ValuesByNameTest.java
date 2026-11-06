@@ -9,6 +9,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.consumer.Pairing;
+import io.ltr8.tson.compiler.consumer.PinnedSetting;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Top;
@@ -62,6 +63,16 @@ class ValuesByNameTest {
                   nowheres    => !meta.namespace { key_type: meta.identifier  value_type: filed_nowhere }
                   pairing     => { primary: method }
                   pairings    => !meta.namespace { key_type: meta.identifier  value_type: pairing }
+                  setting     => { kind: meta.type_ref  value?: kind! }
+                  settings    => !meta.namespace { key_type: meta.identifier  value_type: setting }
+                  pinned_setting    => { kind?: meta.type_ref = meta.identifier  value?: kind! }
+                  pinned_settings   => !meta.namespace { key_type: meta.identifier  value_type: pinned_setting }
+                  defaulted_setting => { kind?: meta.type_ref ~ meta.identifier  value?: kind! }
+                  defaulted_settings => !meta.namespace { key_type: meta.identifier  value_type: defaulted_setting }
+                  holder      => { inner?: setting }
+                  holders     => !meta.namespace { key_type: meta.identifier  value_type: holder }
+                  label       => { text: meta.ref<meta.identifier> }
+                  labels      => !meta.namespace { key_type: meta.identifier  value_type: label }
                 }
                 """);
         DOCUMENTS.put("https://example.test/orders.tn", orders("https://example.test/orders.tn", ""));
@@ -418,6 +429,79 @@ class ValuesByNameTest {
                 a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'net.uuid_type'");
         assertEquals(List.of(), problems(api("nowhere-right", """
                 a => !nowheres { x => { request: order } }""")));
+    }
+
+    // ── Through a dependent field ───────────────────────────────────────────────────────────────────
+
+    /**
+     * A segment selecting a dependent field reaches a value of the type its sibling names in the same value: {@code
+     * d.s.value} is a {@code meta.identifier} where {@code kind} names one, and an {@code int32} where it names that.
+     */
+    @Test
+    void aNameThroughADependentFieldHasTheTypeItsSiblingNames() {
+        assertEquals(List.of(), problems(api("dependent", """
+                d => !settings { s => { kind: meta.identifier  value: hello } }
+                l => !labels { x => { text: d.s.value } }""")));
+        refused(api("dependent-typed", """
+                d => !settings { s => { kind: int32  value: 12 } }
+                l => !labels { x => { text: d.s.value } }"""),
+                "'l' at /x/text wants a 'meta.identifier'", "'d.s.value' is an 'int32'");
+    }
+
+    /** A pinned sibling types its field by the pin, which the walk takes from the schema, not from the host. */
+    @Test
+    void aPinnedSiblingTypesTheFieldThoughTheHostHoldsNoComponentForIt() {
+        String id = api("dependent-pinned", """
+                p => !pinned_settings { x => { value: hello } }
+                l => !labels { x => { text: p.x.value } }""");
+        assertEquals(List.of(), problems(id));
+        assertInstanceOf(PinnedSetting.class,
+                ((Namespace<?>) valueOf(registry().resolveLinked(id).schema().entries().get("p"))).get("x"));
+    }
+
+    @Test
+    void aDefaultedSiblingTypesTheFieldWhereTheValueOmitsIt() {
+        assertEquals(List.of(), problems(api("dependent-defaulted", """
+                p => !defaulted_settings { x => { value: hello } }
+                l => !labels { x => { text: p.x.value } }""")));
+    }
+
+    /** The read path's rule: a template is no type a value can be read against, so the walk has none to go on with. */
+    @Test
+    void aSiblingNamingNoTypeIsRefusedAtTheName() {
+        List<Diagnostic> problems = problems(api("dependent-template", """
+                box => <T> { v: T }
+                d => !settings { s => { kind: box  value: 12 } }
+                l => !labels { x => { text: d.s.value } }"""));
+        assertTrue(problems.stream().anyMatch(p -> p.code() == Diagnostic.Code.SCHEMA_ERROR
+                && p.message().contains("'l' at /x/text names 'd.s.value', and 'd.s.value' is a dependent field, "
+                        + "typed by its sibling 'kind', which holds 'box', a template")), problems.toString());
+    }
+
+    /** Past a dependent field a segment selects a field of the type its sibling names, and no other. */
+    @Test
+    void aSegmentPastADependentFieldIsAFieldOfTheTypeItsSiblingNames() {
+        refused(api("dependent-no-field", """
+                d => !settings { s => { kind: pairing } }
+                routes => !bindings { b => { method: d.s.value.nope  verb: POST  route: "/" } }"""),
+                "'d.s.value' is a 'pairing', which has no field 'nope' -- it declares primary");
+    }
+
+    /**
+     * A dependent field the value does not hold is typed by its sibling all the same, and the name is judged by type
+     * before it is refused as reaching no value; past a field the value does not hold, a free sibling has no value to
+     * be read from, and the name is refused as reaching none.
+     */
+    @Test
+    void aNameThroughAnAbsentValueIsRefusedAsReachingNone() {
+        refused(api("dependent-absent", """
+                d => !settings { s => { kind: pairing } }
+                routes => !bindings { b => { method: d.s.value.primary  verb: POST  route: "/" } }"""),
+                "'d.s' is a 'setting' whose field 'value' is not present in the value, so the name reaches no value");
+        refused(api("dependent-unreached", """
+                h => !holders { x => { } }
+                l => !labels { x => { text: h.x.inner.value } }"""),
+                "'h.x' is a 'holder' whose field 'inner' is not present in the value, so the name reaches no value");
     }
 
     /** A value entry's value. */

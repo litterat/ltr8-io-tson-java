@@ -17,7 +17,7 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonAtom;
 
-import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * A dependent field's reader, {@code v?: kind!} ([TSON-SCHEMA] §5.2): the value is read against the type its sibling's
@@ -32,7 +32,9 @@ import java.util.Optional;
  * <p><b>The sibling's value names a type a value can be read against</b>, or the value is not read: a sibling
  * reference names a field and no type, a template is no type until it is applied and reading never starts a
  * materialisation, and an application the closure does not hold names nothing. Each is refused naming the sibling,
- * since that is the value the author has to change; the dependent value is skipped unjudged.
+ * since that is the value the author has to change; the dependent value is skipped unjudged. The rule is {@link
+ * #typeNamed}, which a value's qualified name going on through a dependent field is judged by too ({@code
+ * ValuesByName}).
  *
  * <p><b>In a schema document the value is held as written.</b> A default or pin is decoded against its field's type
  * once every reader exists and judged when the schema links (a held value orders nothing, [TSON-SCHEMA] §5.2), so the
@@ -41,7 +43,7 @@ import java.util.Optional;
  * {@code record_field} waits on no {@code meta.value}. A bound {@code Token} component never reaches here ({@code
  * RecordBindReader.tokenAware}).
  */
-final class DependentFieldReader implements TsonTypeReader<Object> {
+public final class DependentFieldReader implements TsonTypeReader<Object> {
 
     private final String field;
     private final String sibling;
@@ -75,12 +77,68 @@ final class DependentFieldReader implements TsonTypeReader<Object> {
     /** This reader within {@code record}, its sibling's reference found -- what the record reader holds. */
     DependentFieldReader forRecord(RecordBody record) {
         RecordField declared = record.fields().get(sibling);
-        if (declared == null || context == null || !(declared.type() instanceof TypeRef type)) {
+        if (declared == null || context == null) {
             return this;
         }
-        Top body = context.schema().entries().get(AliasChain.terminal(type.name(), context.schema().entries()::get));
         return new DependentFieldReader(field, sibling, readers, context, held,
-                body instanceof ReferenceBody reference ? reference : null);
+                siblingType(declared, context.schema().entries()::get));
+    }
+
+    /**
+     * The reference typing the sibling {@code declared}, past its alias hops in {@code entries}: what an application
+     * the sibling's value writes resolves through ({@link #typeNamed}). Null where the sibling is typed by no
+     * reference, which the linker refuses.
+     */
+    public static ReferenceBody siblingType(RecordField declared, Function<String, ? extends Top> entries) {
+        if (!(declared.type() instanceof TypeRef type)) {
+            return null;
+        }
+        return entries.apply(AliasChain.terminal(type.name(), entries)) instanceof ReferenceBody reference
+                ? reference : null;
+    }
+
+    /**
+     * What a sibling holding {@code named} types its dependent field by: the entry a value is read against, or why
+     * there is none. {@code siblingType} resolves an application ({@link #siblingType}), and {@code entries} is the
+     * namespace the entry is found in, null where none is known and the entry is taken as named.
+     */
+    public static TypeNamed typeNamed(Reference named, ReferenceBody siblingType,
+                                      Function<String, ? extends Top> entries) {
+        return switch (named) {
+            case SiblingRef reference -> new TypeNamed.None("the sibling reference '" + reference.text()
+                    + "', which names a field and no type");
+            case TypeRef reference -> {
+                String entry = reference.arguments().isEmpty() ? reference.name()
+                        : siblingType == null ? null : siblingType.entryOf(reference).orElse(null);
+                if (entry == null) {
+                    yield new TypeNamed.None("'" + reference.text() + "', which names no type this schema closes");
+                }
+                Top body = entries == null ? null : entries.apply(AliasChain.terminal(entry, entries));
+                if (entries != null && body == null) {
+                    yield new TypeNamed.None("'" + reference.text() + "', which names no type of this schema");
+                }
+                if (body != null && OpenEntry.isOpen(body)) {
+                    yield new TypeNamed.None("'" + reference.text() + "', a template, which no value is read "
+                            + "against until it is applied");
+                }
+                yield new TypeNamed.Entry(entry);
+            }
+        };
+    }
+
+    /** What a sibling's value types its dependent field by ({@link #typeNamed}). */
+    public sealed interface TypeNamed {
+
+        /** The entry the dependent value is read against. */
+        record Entry(String name) implements TypeNamed {
+        }
+
+        /**
+         * No type a value can be read against: {@code held} says what the sibling holds, in the words {@link
+         * RecordDiagnostics#siblingNamesNoType} takes.
+         */
+        record None(String held) implements TypeNamed {
+        }
     }
 
     /** The field this reader's type is taken from. */
@@ -107,48 +165,21 @@ final class DependentFieldReader implements TsonTypeReader<Object> {
             TsonReadContext.skipUnjudged(ctx);
             return null;
         }
-        Optional<String> refusal = Optional.empty();
-        String entry = null;
-        switch (named) {
-            case SiblingRef reference -> refusal = Optional.of("the sibling reference '" + reference.text()
-                    + "', which names a field and no type");
-            case TypeRef reference -> {
-                entry = entryOf(reference);
-                if (entry == null) {
-                    refusal = Optional.of("'" + reference.text() + "', which names no type this schema closes");
-                } else if (context != null) {
-                    Top body = context.schema().entries().get(AliasChain.terminal(entry,
-                            context.schema().entries()::get));
-                    if (body == null) {
-                        refusal = Optional.of("'" + reference.text() + "', which names no type of this schema");
-                    } else if (OpenEntry.isOpen(body)) {
-                        refusal = Optional.of("'" + reference.text() + "', a template, which no value is read "
-                                + "against until it is applied");
-                    }
-                }
+        return switch (typeNamed(named, siblingType, context == null ? null : context.schema().entries()::get)) {
+            case TypeNamed.Entry entry -> readers.resolve(entry.name()).read(ctx);
+            case TypeNamed.None none -> {
+                siblingCtx.report(rules.siblingNamesNoType(sibling, field, none.held(), named.text()));
+                TsonReadContext.skipUnjudged(ctx);
+                yield null;
             }
-        }
-        if (refusal.isPresent()) {
-            siblingCtx.report(rules.siblingNamesNoType(sibling, field, refusal.get(), named.text()));
-            TsonReadContext.skipUnjudged(ctx);
-            return null;
-        }
-        return readers.resolve(entry).read(ctx);
-    }
-
-    /** The entry {@code reference} names: a name is its own, an application the one the closure closed it to. */
-    private String entryOf(TypeRef reference) {
-        if (reference.arguments().isEmpty()) {
-            return reference.name();
-        }
-        return siblingType == null ? null : siblingType.entryOf(reference).orElse(null);
+        };
     }
 
     /**
      * The reference a sibling's read produced, in whichever form the read built it: a tree's atom, the reference
      * itself, or the canonical text a string component holds; null where the read produced nothing.
      */
-    static Reference referenceIn(Object decoded) {
+    public static Reference referenceIn(Object decoded) {
         if (decoded instanceof io.ltr8.tson.tree.TsonValue tree && !(tree instanceof TsonAtom)) {
             return null; // a tree's void or missing node: the read produced no reference
         }

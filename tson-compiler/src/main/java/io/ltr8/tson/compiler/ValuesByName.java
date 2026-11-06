@@ -8,12 +8,14 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.compiler.reader.DependentFieldReader;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -23,8 +25,10 @@ import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -78,6 +82,12 @@ import java.util.function.Function;
  * lives; it never reflects over the host's class itself. A value no class binds is held as a tree, and a segment
  * selects in the tree by key or field name. A field the record declares and the value does not hold is refused as
  * not present, after the referent's type is judged, so a name wrong by type is told so whatever the value holds.
+ *
+ * <p><b>A dependent field's type is the one its sibling names in the same value</b> ([TSON-SCHEMA] §5.2, {@link
+ * #dependentType}): the sibling's pin, else what the record value holds there, else its default, judged by the read
+ * path's rules ({@link DependentFieldReader#typeNamed}) and the walk going on with that type. A sibling the value does
+ * not hold, or one naming no type a value can be read against, is refused. Past a field the value does not hold, only
+ * a pin or default can type the field, and without one the name is refused as reaching no value.
  *
  * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed.
  */
@@ -263,6 +273,7 @@ final class ValuesByName {
                                 + "' is " + a(at.name()) + ", which has no field '" + segment + "' -- it declares "
                                 + String.join(", ", record.fields().keySet()));
                     }
+                    Object holder = value;
                     if (value != null) {
                         value = value instanceof TsonValue tree ? present(tree.get(segment))
                                 : fieldOf(value, segment, where + " names '" + name + "', and '" + reached + '.'
@@ -273,13 +284,14 @@ final class ValuesByName {
                         }
                     }
                     if (field.sibling().isPresent()) {
-                        // The field's type is the one its sibling's value names in this value: reading it from the
-                        // value is not implemented, so a name going on past a dependent field is this library's gap.
-                        throw new UnsupportedOperationException(where + " names '" + name + "', and '" + reached
-                                + "." + segment + "' is a dependent field, typed by its sibling ('"
-                                + field.type().text() + "'): a name going on past one is not implemented yet");
+                        String naming = where + " names '" + name + "', and '" + reached + "." + segment + "' is a "
+                                + "dependent field, typed by its sibling '" + field.sibling().get() + "'";
+                        String unreached = absent == null ? null : where + " names '" + name + "', and " + absent
+                                + ", so the name reaches no value";
+                        at = at.of(dependentType(naming, record, field.sibling().get(), holder, unreached));
+                    } else {
+                        at = at.of(field.typeRef().name());
                     }
-                    at = at.of(field.typeRef().name());
                 }
                 case MapBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
                         + reached + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "
@@ -345,6 +357,51 @@ final class ValuesByName {
         throw new SchemaValidationException(wants + entry + " is an entry whose body is built by '"
                 + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("nothing") + "', which is no '"
                 + slot.of() + "'");
+    }
+
+    /**
+     * The type a dependent field of {@code record} has in the value {@code holder}: the one its sibling {@code sibling}
+     * names there ([TSON-SCHEMA] §5.2), by the read path's rules ({@link DependentFieldReader}). The sibling's value is
+     * its pin wherever it is written, and otherwise the value {@code holder} holds, or its default where it holds none.
+     * Refused, opening with {@code naming}, where the sibling holds nothing or names no type a value can be read
+     * against; {@code holder} is null where an earlier segment reached no value, and a sibling with no pin or default
+     * then has no type to go on with, so the name is refused as reaching no value, in {@code unreached}'s words.
+     */
+    private String dependentType(String naming, RecordBody record, String sibling, Object holder, String unreached) {
+        RecordField declared = record.fields().get(sibling);
+        if (declared == null) {
+            throw new IllegalStateException(naming + ", which the record does not declare; the linker refuses one");
+        }
+        Object held = null;
+        if (declared.role() == FieldRole.FIXED) {
+            held = declared.value().map(Token::text).orElse(null);
+        } else if (holder != null) {
+            held = holder instanceof TsonValue tree ? present(tree.get(sibling)) : fieldOf(holder, sibling, naming);
+        }
+        if (held == null && declared.role() == FieldRole.DEFAULT) {
+            held = declared.value().map(Token::text).orElse(null);
+        }
+        if (held == null && holder == null) {
+            throw new SchemaValidationException(unreached);
+        }
+        Reference named = DependentFieldReader.referenceIn(held);
+        if (named == null) {
+            throw new SchemaValidationException(naming + ", which the value does not hold, so the name has no type "
+                    + "to go on through");
+        }
+        String refusal;
+        switch (DependentFieldReader.typeNamed(named, DependentFieldReader.siblingType(declared, merged::get),
+                merged::get)) {
+            case DependentFieldReader.TypeNamed.None none -> refusal = none.held();
+            case DependentFieldReader.TypeNamed.Entry entry -> {
+                if (!(AliasChain.terminalDefinition(entry.name(), merged).orElse(null) instanceof ValueEntry value)) {
+                    return entry.name();
+                }
+                refusal = "'" + named.text() + "', " + aValueNoType(value);
+            }
+        }
+        throw new SchemaValidationException(naming + ", which holds " + refusal + " -- so the name has no type to "
+                + "go on through");
     }
 
     /** What a value entry is, where a type is wanted: a value, which nothing can be typed by (§4.1). */

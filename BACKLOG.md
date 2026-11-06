@@ -123,6 +123,14 @@ spec-required case:
   component, so the host holds no value for it and `ValuesByName.fieldOf` finds no component to read. The value is the
   schema's own, the field's pinned value in the record type, so the walk should take it from the declared
   `RecordField` and continue; no test covers the case yet.
+- [ ] **A value entry's dependent field holds its value as written** ([TSON-SCHEMA] §5.2). In a schema document
+  `DependentFieldReader` holds a dependent field's value as a token, the rule for a default or pin (judged when the
+  schema links) and the kernel's `record_field.value`, and a value entry's payload gets it too. So `d => !settings { s
+  => { kind: int32  value: abc } }` links clean, its value never judged against `int32`, and a record or list there
+  (`kind: server  value: { port: 8080 }`) is refused as no token, a `SCHEMA_ERROR` for what is this library's gap;
+  a value by name going on past a dependent field therefore reaches no value beyond a token. Read or judge the value
+  against the type its sibling names in the schema's own namespace, which the governing layer's readers do not hold,
+  and add a `schema/valid` vector naming into such a record value.
 - [ ] **A data document's value at a reference-typed position is not read** ([TSON-SCHEMA] §4.2, §5.12). Any schema
   may declare `meta.ref<T>` (SPEC-FEEDBACK.md #7), and a data document's read reaches `AtomTypeReader`, which reports
   `NOT_IMPLEMENTED` there (and `tson-json`'s `AtomReader` compiles the position to an `ErrorReader`): a reference is
