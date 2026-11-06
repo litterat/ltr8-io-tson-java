@@ -1306,7 +1306,7 @@ arguments name, and a declared member additionally the head". The alternative, k
 expansion sentence to except applied parents, and the hand-written-expansion equivalence §5.8 states for `dog` to be
 said to hold only for closed declarations.
 
-## 21. [TSON-DATA] §2.5, §4, §7.2.5, §7.4, §7.5; [TSON-SCHEMA] §5.2, §5.7, §5.8, §8.1, §12 — dependent fields, `field!`
+## 21. [TSON-DATA] §2.5, §4, §7.2.5, §7.4, §7.5; [TSON-SCHEMA] §5.2, §5.7, §5.8, §5.12, §8.1, §12 — dependent fields
 
 **Problem.** A record field whose type is chosen per instance by another field of the same record has no spelling.
 The kernel's own `record_field.value` is one: its type is whatever `record_field.type` names, so §8.1 types it
@@ -1389,6 +1389,13 @@ field's type is a gap.
 - **JSON.** A sibling reference is a string holding the same text, `"kind!"`, read by the same production
   ([TSON-JSON] §5.6), and a dependent member is read with the text encoding's rules, the field-order exception
   included ([TSON-JSON] §6.1.6, edited in place).
+- **Values by name.** §5.12 judges a name reaching a record value's field "by the field's declared type", which a
+  dependent field has none of. Running: a segment selecting a dependent field reaches a value of the type its sibling
+  names in the same record value — the sibling's pin, else what the value holds there, else its default — and the
+  walk goes on with that type. A sibling naming no type a value can be read against, by the reading rule above, is a
+  resolver error at the slot holding the name, and so is one the value does not hold. With `setting => { kind:
+  meta.type_ref  value?: kind! }`, `d => !settings { s => { kind: meta.identifier  value: hello } }` makes
+  `d.s.value` a `meta.identifier` value, and `d.s.value.port` where `kind: server` is judged by `server`'s fields.
 
 **Resolution, a proposal.** The design above, as written in the spec:
 
@@ -1429,6 +1436,10 @@ rules and the declaration-order rule, all as listed above, and the reading.
 
 [TSON-SCHEMA] §5.7, §5.8: restating a dependent field only as itself, pinning a sibling in a refinement, flattening's
 order, and a sibling as a discriminator.
+
+[TSON-SCHEMA] §5.12, after "is judged by the field's declared type": a dependent field's is the type its sibling names
+in the same record value, its pin or default where the value states none (§5.2), and a sibling naming no type a value
+can be read against is refused at the name.
 
 [TSON-SCHEMA] §8.1: `meta.reference` renamed `meta.reference_type` with `allow_sibling`; `meta.field_type_ref`;
 `meta.type_ref` and `meta.ref<T>` setting `allow_sibling: false`; `record_field.type` and

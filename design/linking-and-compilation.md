@@ -264,8 +264,9 @@ descriptor, is `design/meta-layer-namespaces.md`'s; what is the linker's is belo
   referent, a list has no named members, and a map that is no namespace is not entered whatever its key type.
 - **The judgement is §7.2's IS-A, by canonical identity.** An entry's declared type is the constructor that built its
   body: its recorded tag where that names a constructor, else the kernel constructor its body's class mirrors
-  (`@Typename`). A field's declared type is its `type`, a map value's the map's `value_type`. An imported referent's
-  constructor is in its declaring schema's closure, which this one contains, so each is named in the one namespace
+  (`@Typename`). A field's declared type is its `type`, a dependent field's the one its sibling names in the value
+  walked, and a map value's the map's `value_type`. An imported referent's constructor is in its declaring schema's
+  closure, which this one contains, so each is named in the one namespace
   (`ValuesByName.Space`), and two types are one when their terminal entries share origin and name.
 - **Each refusal is its own `SCHEMA_ERROR` naming the step**, against the entry holding the name, at the slot's RFC
   6901 pointer. A qualified name at a kind-typed slot is refused where it reaches into a value or goes on past a

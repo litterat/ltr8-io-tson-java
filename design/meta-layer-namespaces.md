@@ -226,6 +226,17 @@ with, passed by `TsonCompiledMetaRegistry.link` to `TsonSchemaLinker.link`. A tr
 A FIXED field may have no component, its value being the schema's, and naming a value through one is the one field
 step reported as a gap.
 
+**A dependent field step takes the type its sibling names in the same value** ([TSON-SCHEMA] §5.2,
+`ValuesByName.dependentType`): the sibling's pin from the declared `RecordField` (so a host holding no component for
+a pinned sibling is never asked), else what the record value holds there, else the sibling's default, and the walk
+goes on with that type. What the sibling holds is judged by the read path's rule, `DependentFieldReader.typeNamed`: a
+sibling reference, a template or an application the closure does not hold names no type, and so does a value entry
+(`aValueNoType`); each, and a sibling the value does not hold, is a `SCHEMA_ERROR` naming the name, the dependent field
+and the sibling. Past a field the value does not hold there is no value to read the sibling from: a pin or default
+still types the field and the name is refused as reaching no value after its type is judged, as any such name is, and
+without one it is refused as reaching no value at once. In a schema document a dependent field's value is held as
+written, a token, so a name going on past one reaches no further value (`BACKLOG.md`).
+
 **Refusals and kinds.** A value by name may name a value entry: a slot holding a value is not a type position. A
 value entry named where a type is wanted is refused in one sentence wherever it is met: a value of its type, and
 nothing can be typed by it. `TypeInhabitance` calls a `ValueEntry` inhabited and `DiscriminationClass` gives it no

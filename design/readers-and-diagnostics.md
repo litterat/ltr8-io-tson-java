@@ -108,11 +108,13 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
 
   A sibling naming no type a value can be read against — a sibling reference, a template, an application the
   closure does not hold — is refused at the sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and
-  the value is skipped unjudged; a sibling whose own read reported leaves the value skipped and nothing more. **In a
-  schema document the value is held as written**, the token uninterpreted through a reader of the record's own mode
-  (not the kernel's `meta.value` entry, so `record_field` waits on nothing for it): a default or pin is judged when the
-  schema links, and the kernel's `record_field.value` is that case. In bind mode the component is an `Object`, which
-  receives what the named type reads to — the context registering `Object` as an atom so the binder takes it whole —
+  the value is skipped unjudged; a sibling whose own read reported leaves the value skipped and nothing more. What a
+  sibling's value names is one rule, `DependentFieldReader.typeNamed`, which a value's name walked through a dependent
+  field asks too (`ValuesByName`). **In a schema document the value is held as written**, the token uninterpreted
+  through a reader of the record's own mode (not the kernel's `meta.value` entry, so `record_field` waits on nothing
+  for it): a default or pin is judged when the schema links, and the kernel's `record_field.value` is that case. In
+  bind mode the component is an `Object`, which receives what the named type reads to — the context registering
+  `Object` as an atom so the binder takes it whole —
   and any narrower class is a `BindMismatchException` at compile (`BindTargets`); a `Token` component, the kernel's
   `RecordField.value`, holds the token as written (`RecordBindReader.tokenAware`). The JSON reader applies the same
   rules (`design/json-schema-directed-reading.md`).
