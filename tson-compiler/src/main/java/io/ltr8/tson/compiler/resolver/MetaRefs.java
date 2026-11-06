@@ -107,7 +107,7 @@ final class MetaRefs {
             // reference. It maps as the bare reference it is, as a chain's names do; an application written in
             // the body itself stays text and is refused at link. The index is carried, derived at link.
             case ReferenceBody reference -> new ReferenceBody(reference.chain(),
-                    map.apply(TypeRef.of(reference.of())).name(), reference.index());
+                    map.apply(TypeRef.of(reference.of())).name(), reference.allowSibling(), reference.index());
             // Every other atom's facets are values, never references; a declared type holds its chain alone.
             case Atom atom -> atom;
             case DeclaredType declared -> declared;

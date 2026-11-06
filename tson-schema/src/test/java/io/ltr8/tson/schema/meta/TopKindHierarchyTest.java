@@ -55,7 +55,7 @@ class TopKindHierarchyTest {
     /** A reference is an atom whose values are names (Part 2 §4.2), as an enum is: a set of names, not a sum. */
     @Test
     void aReferenceIsAnAtom() {
-        ReferenceBody reference = new ReferenceBody("uuid_type");
+        ReferenceBody reference = ReferenceBody.of("uuid_type");
         assertInstanceOf(Atom.class, reference);
         assertInstanceOf(Type.class, reference);
     }
@@ -67,22 +67,22 @@ class TopKindHierarchyTest {
      */
     @Test
     void aReferenceIsItsOf() {
-        ReferenceBody linked = new ReferenceBody("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
+        ReferenceBody linked = ReferenceBody.of("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
                 Map.of(), List.of("stock_id", "customer_id"));
 
-        assertEquals(new ReferenceBody("uuid_type"), linked);
+        assertEquals(ReferenceBody.of("uuid_type"), linked);
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
         assertTrue(linked.namesTypes());
-        assertEquals(List.of(), linked.constraintsCheck(new ReferenceBody("uuid_type")));
-        assertEquals(List.of(), linked.constraintsCheck(new ReferenceBody("text_type")));
+        assertEquals(List.of(), linked.constraintsCheck(ReferenceBody.of("uuid_type")));
+        assertEquals(List.of(), linked.constraintsCheck(ReferenceBody.of("text_type")));
         assertEquals(1, linked.constraintsCheck(new EnumBody(List.of("A"))).size());
 
         BiPredicate<String, String> isA = (sub, sup) -> sub.equals(sup)
                 || sub.equals("uuid_v4_type") && sup.equals("uuid_type");
-        assertEquals(List.of(), linked.ofNarrowing(new ReferenceBody("uuid_type"), isA));
-        assertEquals(List.of(), linked.ofNarrowing(new ReferenceBody("uuid_v4_type"), isA));
-        assertEquals(1, linked.ofNarrowing(new ReferenceBody("text_type"), isA).size());
-        assertEquals(1, new ReferenceBody("uuid_v4_type").ofNarrowing(new ReferenceBody("uuid_type"), isA).size());
+        assertEquals(List.of(), linked.ofNarrowing(ReferenceBody.of("uuid_type"), isA));
+        assertEquals(List.of(), linked.ofNarrowing(ReferenceBody.of("uuid_v4_type"), isA));
+        assertEquals(1, linked.ofNarrowing(ReferenceBody.of("text_type"), isA).size());
+        assertEquals(1, ReferenceBody.of("uuid_v4_type").ofNarrowing(ReferenceBody.of("uuid_type"), isA).size());
     }
 
     @Test

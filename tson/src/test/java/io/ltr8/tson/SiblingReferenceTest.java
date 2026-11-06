@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A sibling reference, {@code kind!} ([TSON-DATA] §7.4, [TSON-SCHEMA] §5.2, SPEC-FEEDBACK.md #21), end to end: the
  * reference atom reads one wherever a reference stands, and the position rule refuses it everywhere but a record
  * field's type -- in sugar where it is written, in an explicit instance at the slot reader, and in data at a field
- * typed by a type reference. At a field's type it reaches the model, where reading against it is not implemented yet.
+ * typed by a type reference. At a field's type it is a dependent field ({@code DependentFieldTest}).
  */
 class SiblingReferenceTest {
 
@@ -72,28 +72,16 @@ class SiblingReferenceTest {
 
     /**
      * At a record field's type, in every spelling -- sugar, an explicit {@code meta.record_field}, the positional form
-     * and a record template's field -- the sibling reaches the model and meets this library's gap, never the
-     * position rule.
+     * and a record template's field -- the sibling is a dependent field, never refused by the position rule.
      */
     @Test
-    void aSiblingAtAFieldsTypeReachesTheModel() {
+    void aSiblingAtAFieldsTypeIsADependentField() {
         for (String declaration : List.of(
                 "cell => { kind: meta.type_ref  v?: kind! }",
                 "cell => !meta.record { fields: { kind => meta.type_ref  v => !meta.record_field { type: kind! } } }",
                 "cell => !meta.record { fields: { kind => meta.type_ref  v => kind! } }",
                 "cell => <T> { kind: meta.type_ref  v?: kind!  w: T }\n  used => { c: cell<text> }")) {
-            // The linker's field checks throw the gap rather than report it, which is the next step's to replace.
-            List<String> gaps;
-            try {
-                gaps = Tson.standard().validateSchema(schema(declaration)).stream()
-                        .map(problem -> problem.code() + " " + problem.message()).toList();
-            } catch (UnsupportedOperationException gap) {
-                gaps = List.of(Diagnostic.Code.NOT_IMPLEMENTED + " " + gap.getMessage());
-            }
-            List<String> reported = gaps;
-            assertTrue(!reported.isEmpty() && reported.stream().allMatch(gap -> gap.startsWith("NOT_IMPLEMENTED ")
-                    && gap.contains("a sibling reference ('kind!') at a record field's type")),
-                    () -> declaration + " -> " + reported);
+            assertEquals(List.of(), Tson.standard().validateSchema(schema(declaration)), declaration);
         }
     }
 
@@ -106,7 +94,7 @@ class SiblingReferenceTest {
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(
                 SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, schema("typed => { t: meta.type_ref }"))))));
         Diagnostic sibling = only(tson.validate("!!import:\"" + ID + "\"\n!typed { t: kind! }"));
-        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, sibling.code());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, sibling.code());
         assertEquals(java.util.Optional.of("/t"), sibling.path());
         assertTrue(sibling.message().contains(refused("a position typed by a type reference")), sibling.message());
 

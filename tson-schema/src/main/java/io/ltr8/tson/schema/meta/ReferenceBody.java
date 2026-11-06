@@ -1,8 +1,10 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Unbound;
+import io.ltr8.tson.schema.atom.AtomNarrowing;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,10 +14,17 @@ import java.util.Optional;
 import java.util.function.BiPredicate;
 
 /**
- * An instance of the kernel's {@code reference} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom whose
+ * An instance of the kernel's {@code reference_type} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom whose
  * values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link #of}.
- * {@code meta.ref<record>} and {@code !meta.reference { of: record }} are one instance; the template is a spelling, and
- * the slot's meaning comes from {@link #of}.
+ * {@code meta.ref<record>} and {@code !meta.reference_type { of: record  allow_sibling: false }} are one instance; the
+ * template is a spelling, and the slot's meaning comes from {@link #of}.
+ *
+ * <p><b>{@link #allowSibling} says whether a sibling reference ({@code kind!}) is a value</b> ([TSON-SCHEMA] §5.2,
+ * §8.1). The grammar reads one wherever a reference stands, and the facet admits or refuses it, as {@code allow_nan}
+ * admits or refuses NaN at a {@code float_type}: true by default, the widest reading, and withdrawn by a refinement.
+ * Only {@code meta.field_type_ref}, which types a record field's {@code type}, keeps it; {@code meta.type_ref} and
+ * {@code meta.ref<T>} set it false. In bind mode the same rule is the component type: a {@link Reference} component
+ * holds a sibling reference, a {@link TypeRef} one never does.
  *
  * <p><b>What {@link #of} names decides what the slot holds.</b> Where it is a constructor ({@code top} or IS-A it),
  * the values it admits are types, and the slot holds a type's name, delivered to a host as a {@link TypeRef} that
@@ -32,12 +41,13 @@ import java.util.function.BiPredicate;
  * and it is IS-A its source. Whether one name IS-A another is the namespace's, so the rule ({@link #ofNarrowing}) takes
  * that relation from the linker.
  *
- * <p><b>Equality is {@link #of} and the chain, never the index.</b> Two schemas that both apply {@code meta.ref<uuid_type>}
- * hold one instance with different members, and an importer that re-derives an entry an import already minted unifies
- * with it rather than colliding (§8.2).
+ * <p><b>Equality is {@link #of}, {@link #allowSibling} and the chain, never the index.</b> Two schemas that both apply
+ * {@code meta.ref<uuid_type>} hold one instance with different members, and an importer that re-derives an entry an
+ * import already minted unifies with it rather than colliding (§8.2).
  */
-@Typename(name = "meta.reference")
-public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index> index) implements Atom {
+@Typename(name = "meta.reference_type")
+public record ReferenceBody(TypeChain chain, String of, @Field("allow_sibling") boolean allowSibling,
+                            @Unbound Optional<Index> index) implements Atom {
 
     /**
      * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are
@@ -65,14 +75,22 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
         index = index == null ? Optional.empty() : index;
     }
 
-    /** A reference as an author declares it, placed in no chain -- the linker derives its {@link #index}. */
-    public ReferenceBody(String of) {
-        this(TypeChain.EMPTY, of, Optional.empty());
+    /**
+     * A reference as an author declares it, placed in no chain -- the linker derives its {@link #index} -- admitting
+     * a sibling reference or refusing one as {@code allowSibling} says.
+     */
+    public ReferenceBody(String of, boolean allowSibling) {
+        this(TypeChain.EMPTY, of, allowSibling, Optional.empty());
+    }
+
+    /** A reference as {@code meta.ref<T>} declares it: {@code allow_sibling: false}. */
+    public static ReferenceBody of(String of) {
+        return new ReferenceBody(of, false);
     }
 
     @Override
     public ReferenceBody withChain(TypeChain chain) {
-        return new ReferenceBody(chain, of, index);
+        return new ReferenceBody(chain, of, allowSibling, index);
     }
 
     /**
@@ -81,8 +99,8 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
      */
     public ReferenceBody linked(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
                                 Map<String, Top> entries, List<String> shown) {
-        return new ReferenceBody(chain, of, Optional.of(new Index(namesTypes, members.stream().sorted().toList(),
-                applications, entries, shown.stream().sorted().toList())));
+        return new ReferenceBody(chain, of, allowSibling, Optional.of(new Index(namesTypes,
+                members.stream().sorted().toList(), applications, entries, shown.stream().sorted().toList())));
     }
 
     /**
@@ -149,14 +167,19 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
     /**
      * {@inheritDoc}
      *
-     * <p>A reference's one authored facet is {@link #of}, and whether a refinement's {@code of} narrows the source's
-     * is an IS-A question about two names, which only the namespace they resolve in answers: that half of the rule
-     * is {@link #ofNarrowing}, asked at link. Here a reference refines only a reference.
+     * <p>Whether a refinement's {@code of} narrows the source's is an IS-A question about two names, which only the
+     * namespace they resolve in answers: that half of the rule is {@link #ofNarrowing}, asked at link. Here a
+     * reference refines only a reference, and {@link #allowSibling} is a permission: a refinement may withdraw it,
+     * never grant it back.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
-        return refined instanceof ReferenceBody ? List.of()
-                : List.of("refines a reference with " + refined.getClass().getSimpleName());
+        if (!(refined instanceof ReferenceBody other)) {
+            return List.of("refines a reference with " + refined.getClass().getSimpleName());
+        }
+        List<String> violations = new ArrayList<>();
+        AtomNarrowing.checkOnlyWithdraws(violations, "allow_sibling", allowSibling, other.allowSibling);
+        return List.copyOf(violations);
     }
 
     /**
@@ -170,21 +193,22 @@ public record ReferenceBody(TypeChain chain, String of, @Unbound Optional<Index>
                 + "' or IS-A it, so the refinement admits names the source refuses -- a refinement narrows 'of' (§5.7)");
     }
 
-    /** Compares {@link #of} and the chain, never the index -- see this class's own Javadoc for why. */
+    /** Compares {@link #of}, {@link #allowSibling} and the chain, never the index -- see this class's Javadoc. */
     @Override
     public boolean equals(Object o) {
-        return o instanceof ReferenceBody other && of.equals(other.of) && chain.equals(other.chain);
+        return o instanceof ReferenceBody other && of.equals(other.of) && allowSibling == other.allowSibling
+                && chain.equals(other.chain);
     }
 
-    /** {@link #of} and the chain, as {@link #equals} compares them. */
+    /** {@link #of}, {@link #allowSibling} and the chain, as {@link #equals} compares them. */
     @Override
     public int hashCode() {
-        return 31 * of.hashCode() + chain.hashCode();
+        return 31 * (31 * of.hashCode() + Boolean.hashCode(allowSibling)) + chain.hashCode();
     }
 
-    /** {@link #of} and the chain, as {@link #equals} compares them: the derived index is no part of what this is. */
+    /** What {@link #equals} compares: the derived index is no part of what this is. */
     @Override
     public String toString() {
-        return "ReferenceBody[chain=" + chain + ", of=" + of + "]";
+        return "ReferenceBody[chain=" + chain + ", of=" + of + ", allowSibling=" + allowSibling + "]";
     }
 }

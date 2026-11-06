@@ -56,6 +56,8 @@ import java.util.Optional;
  * slot, which holds the record's value inline, and at any other atom, where a token is a literal and never a
  * reference.</li>
  * </ul>
+ * A dependent field ({@link DependentFieldReader}) binds to an {@code Object} component, which receives what the
+ * type its sibling names reads to, and to nothing narrower.
  * The target's bridge, then its {@code Annotated} box, wrap whatever comes out. Anything else -- a dispatcher, a
  * choice, a gap -- is read as it is.
  *
@@ -85,6 +87,16 @@ final class BindTargets {
     static TsonTypeReader<?> to(TsonTypeReader<?> reader, DataClass target, String what, String where, Site site,
                                 boolean top) {
         DataClass payload = target instanceof DataClassAnnotated boxed ? boxed.valueClass() : target;
+        if (reader instanceof DependentFieldReader) {
+            // A dependent field's value is of whichever type its sibling names in each instance, so the component
+            // holds what that type's reader builds: an Object, the one class every such value is.
+            if (payload.typeClass() != Object.class) {
+                site.mismatches().add(what + " is a dependent field, whose type its sibling's value names per "
+                        + "instance, and " + where + " holds a " + payload.typeClass().getSimpleName()
+                        + " -- declare it Object, which receives what the named type reads to");
+            }
+            return reader;
+        }
         TsonTypeReader<?> bound;
         boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == Reference.class;
         boolean byName = typeRef || payload.typeClass() == Ref.class;
@@ -97,8 +109,8 @@ final class BindTargets {
         } else if (typeRef && readsAKind(reader)) {
             // The same for a type's name or an application: the reader produces the TypeRef itself, so the atom's
             // own bridge (the reference's text form) is not applied on top of it.
-            return AnnotationBoxing.wrap(new TypeNameSlotReader(slotAtom(reader), site.annotationTypes(),
-                    payload.typeClass() == Reference.class ? null : what), target, site.annotationTypes());
+            return AnnotationBoxing.wrap(new TypeNameSlotReader(slotAtom(reader), site.annotationTypes(), what,
+                    payload.typeClass() == Reference.class), target, site.annotationTypes());
         } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
             site.mismatches().add(what + " is not a reference, and " + where + " holds a "
                     + payload.typeClass().getSimpleName() + " -- a value stands by name only at a position typed "
@@ -113,7 +125,7 @@ final class BindTargets {
                 AtomTypeReader<?> atom = slotAtom(reader);
                 TsonTypeReader<?> refusing = readsARef(reader)
                         ? new ReferenceNameReader(expectedAt(reader, what), false, atom.slotType())
-                        : new TypeNameSlotReader(atom, site.annotationTypes(), what);
+                        : new TypeNameSlotReader(atom, site.annotationTypes(), what, false);
                 bound = new RecordedNameReader(bound, atom.slotType(), refusing);
             }
         }

@@ -74,7 +74,7 @@ class KindMembersTest {
               customer_id => !net.uuid_type {}
               v4_stock_id => !stock_id ^ { version: 4 }
               sku         => text
-              any_id      => !meta.reference { of: net.uuid_type }
+              any_id      => !meta.reference_type { of: net.uuid_type }
             }
             """;
 
@@ -99,7 +99,7 @@ class KindMembersTest {
         ReferenceBody inline = kind(linked, AliasChain.terminal(order.fields().get("id").typeRef().name(),
                 linked.schema().entries()::get));
 
-        assertEquals(new ReferenceBody("net.uuid_type"), inline);
+        assertEquals(ReferenceBody.of("net.uuid_type"), inline);
         assertEquals(List.of("stock_id", "uuid"), inline.memberNames());
     }
 
@@ -109,7 +109,7 @@ class KindMembersTest {
                 {
                   pet     => abstract { name: text }
                   dog     => pet & { breed: text }
-                  records => !meta.reference { of: meta.record }
+                  records => !meta.reference_type { of: meta.record }
                 }
                 """), "records");
 
@@ -127,11 +127,11 @@ class KindMembersTest {
         TsonLinkedSchema linked = link("""
                 {
                   tags  => set<text>
-                  sets  => !meta.reference { of: meta.set_type }
+                  sets  => !meta.reference_type { of: meta.set_type }
                   boxed => <T> { v: T }
                   box_t => boxed<text>
-                  recs  => !meta.reference { of: meta.record }
-                  tmpls => !meta.reference { of: meta.record_template }
+                  recs  => !meta.reference_type { of: meta.record }
+                  tmpls => !meta.reference_type { of: meta.record_template }
                 }
                 """);
 
@@ -149,7 +149,7 @@ class KindMembersTest {
         ReferenceBody atoms = kind(link("""
                 {
                   stock_id => !net.uuid_type {}
-                  atoms    => !meta.reference { of: meta.atom }
+                  atoms    => !meta.reference_type { of: meta.atom }
                 }
                 """), "atoms");
 
@@ -164,7 +164,7 @@ class KindMembersTest {
                 {
                   stock_id => !net.uuid_type {}
                   sku_id   => stock_id
-                  ids      => !meta.reference { of: net.uuid_type }
+                  ids      => !meta.reference_type { of: net.uuid_type }
                 }
                 """), "ids");
 
@@ -181,8 +181,8 @@ class KindMembersTest {
         TsonLinkedSchema linked = link("""
                 {
                   shape => (text | int32)
-                  atoms => !meta.reference { of: meta.atom }
-                  kinds => !meta.reference { of: meta.reference }
+                  atoms => !meta.reference_type { of: meta.atom }
+                  kinds => !meta.reference_type { of: meta.reference_type }
                   ids   => meta.ref<net.uuid_type>
                 }
                 """);
@@ -225,7 +225,7 @@ class KindMembersTest {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
                   stock_id => !net.uuid_type {}
-                  any_id   => !meta.reference { of: net.uuid_type  members: [sku] }
+                  any_id   => !meta.reference_type { of: net.uuid_type  members: [sku] }
                   sku      => text
                 }
                 """));
@@ -248,7 +248,7 @@ class KindMembersTest {
         List<String> members = kind(kernel, "meta.type_ref").memberNames();
 
         assertTrue(members.containsAll(List.of("meta.field_map", "meta.schema", "meta.declared", "meta.set_type",
-                "meta.record", "meta.alias", "meta.namespace", "meta.reference", "meta.top")), members::toString);
+                "meta.record", "meta.alias", "meta.namespace", "meta.reference_type", "meta.top")), members::toString);
         assertFalse(members.contains("meta.kind") || members.contains("meta.ref"), members::toString);
     }
 
@@ -264,7 +264,7 @@ class KindMembersTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   api        => !meta.namespace { key_type: meta.identifier  value_type: text }
-                  namespaces => !meta.reference { of: meta.namespace }
+                  namespaces => !meta.reference_type { of: meta.namespace }
                 }
                 """, ""), "namespaces");
 
@@ -285,11 +285,11 @@ class KindMembersTest {
                 !schema {
                   api        => !meta.namespace { key_type: meta.identifier  value_type: text }
                   labels     => !meta.map { key_type: meta.identifier  value_type: text }
-                  types      => !meta.reference { of: meta.type }
-                  namespaces => !meta.reference { of: meta.namespace }
-                  records    => !meta.reference { of: meta.record }
-                  products   => !meta.reference { of: meta.product }
-                  maps       => !meta.reference { of: meta.map }
+                  types      => !meta.reference_type { of: meta.type }
+                  namespaces => !meta.reference_type { of: meta.namespace }
+                  records    => !meta.reference_type { of: meta.record }
+                  products   => !meta.reference_type { of: meta.product }
+                  maps       => !meta.reference_type { of: meta.map }
                 }
                 """, "");
 
@@ -316,21 +316,22 @@ class KindMembersTest {
         TsonLinkedSchema linked = link("""
                 {
                   api        => !meta.namespace { key_type: meta.identifier  value_type: text }
-                  products   => !meta.reference { of: meta.product }
+                  products   => !meta.reference_type { of: meta.product }
                   maps       => !products ^ { of: meta.map }
                   namespaces => !maps ^ { of: meta.namespace }
                   records    => !meta.type_ref ^ { of: meta.record }
                   same       => !products ^ {}
                   order      => { id: text }
                   big_order  => order ^ {}
-                  orders     => !meta.reference { of: order }
+                  orders     => !meta.reference_type { of: order }
                   big_orders => !orders ^ { of: big_order }
                 }
                 """);
 
         assertEquals(List.of("products"), TypeChain.supertypesOf(kind(linked, "maps")));
         assertEquals(List.of("maps", "products"), TypeChain.supertypesOf(kind(linked, "namespaces")));
-        assertEquals(List.of("meta.type_ref"), TypeChain.supertypesOf(kind(linked, "meta.identifier_ref")));
+        assertEquals(List.of("meta.field_type_ref", "meta.type_ref"),
+                TypeChain.supertypesOf(kind(linked, "meta.identifier_ref")));
         assertTrue(TypeChain.subtypesOf(kind(linked, "meta.type_ref")).contains("meta.identifier_ref"));
         assertEquals("meta.namespace", kind(linked, "namespaces").of());
         assertEquals("big_order", kind(linked, "big_orders").of());
@@ -344,7 +345,7 @@ class KindMembersTest {
     void aReferenceRefinementThatWidensOfIsRefused() {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 {
-                  maps => !meta.reference { of: meta.map }
+                  maps => !meta.reference_type { of: meta.map }
                   wide => !maps ^ { of: meta.product }
                 }
                 """));
@@ -358,7 +359,7 @@ class KindMembersTest {
     void aReferenceRefinementToAnUnrelatedOfIsRefused() {
         SchemaValidationException constructors = assertThrows(SchemaValidationException.class, () -> link("""
                 {
-                  maps => !meta.reference { of: meta.map }
+                  maps => !meta.reference_type { of: meta.map }
                   odd  => !maps ^ { of: meta.record }
                 }
                 """));
@@ -368,7 +369,7 @@ class KindMembersTest {
         SchemaValidationException types = assertThrows(SchemaValidationException.class, () -> link("""
                 {
                   order  => { id: text }
-                  orders => !meta.reference { of: order }
+                  orders => !meta.reference_type { of: order }
                   texts  => !orders ^ { of: text }
                 }
                 """));
@@ -397,7 +398,7 @@ class KindMembersTest {
         List<String> members = kind(link("""
                 {
                   order => { id: text }
-                  tops  => !meta.reference { of: meta.top }
+                  tops  => !meta.reference_type { of: meta.top }
                 }
                 """), "tops").memberNames();
 
@@ -405,7 +406,7 @@ class KindMembersTest {
     }
 
     /**
-     * A reference whose {@code of} is no constructor names values: {@code !meta.reference { of: stock_id }}, which
+     * A reference whose {@code of} is no constructor names values: {@code !meta.reference_type { of: stock_id }}, which
      * {@code meta.ref<stock_id>} spells, holds no type's name.
      */
     @Test
@@ -413,7 +414,7 @@ class KindMembersTest {
         ReferenceBody ids = kind(link("""
                 {
                   stock_id => !net.uuid_type {}
-                  ids      => !meta.reference { of: stock_id }
+                  ids      => !meta.reference_type { of: stock_id }
                 }
                 """), "ids");
 
@@ -452,7 +453,7 @@ class KindMembersTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                   pick_type => meta.atom & {}
-                  ids => !meta.reference { of: pick_type }
+                  ids => !meta.reference_type { of: pick_type }
                 }
                 """, ""));
 

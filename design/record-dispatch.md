@@ -22,6 +22,10 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
   it has no values, and its applications are the members. Both member dispatchers take only `RecordBody` subtypes,
   which passes a template by type rather than by a check, so a pin only the template states selects nothing and the
   refusal offers only pins a document could write (`CrossEncodingParityTest`).
+- A discriminator may be a dependent field's sibling (`slot => abstract { kind: meta.type_ref =?  v?: kind! }`,
+  [TSON-SCHEMA] §5.2): the selector scan finds it before any field is read, wherever the document writes it, and the
+  member it selects pins it, so the member's record reader reads the dependent field against the pin. Nothing here
+  knows of dependent fields; the order rule's exemption for a discriminator is this scan.
 - In a data document a bare token fills a record's one positional field (§5.6) whatever its type. In a schema
   document (`TsonReadContext.readsSchemaDocument()`) it does so only where that field is atom-typed; an unquoted
   token is otherwise a value by name, read only by a `TypeRef` component at a record-typed slot.

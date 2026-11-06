@@ -6,7 +6,7 @@ is why they are the linker's. Current form only; history lives in git.
 
 **Invariants**
 
-- A kind is the kernel's `meta.reference` atom (`ReferenceBody`; SPEC-FEEDBACK.md #11) over a constructor, `meta.top`
+- A kind is the kernel's `meta.reference_type` atom (`ReferenceBody`; SPEC-FEEDBACK.md #11) over a constructor, `meta.top`
   or IS-A it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling,
   which is one, `meta.ref<T>`: `meta.ref<meta.record>` holds type names, and `meta.ref<api>`, over a type that is no
   constructor, names values (`ValuesByName`, `design/references.md`).
@@ -16,7 +16,7 @@ is why they are the linker's. Current form only; history lives in git.
   names through `ReferenceBody.closure()`; and the members as a message shows them, a minted one by its application
   through `EntryDisplayName.authored`, one with no spelling left out) is recomputed for **every** reference in the
   closure, imports included (`TsonSchemaLinker.computeKinds`), and never trusted from a body. It is `@Unbound` and
-  never written: a resolved form states `!meta.reference { of: … }` alone, and a written `members:` is refused as an
+  never written: a resolved form states `!meta.reference_type { of: … }` alone, and a written `members:` is refused as an
   unknown field.
   `ReferenceBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
   unifies with it.
@@ -24,7 +24,7 @@ is why they are the linker's. Current form only; history lives in git.
   nothing, an open entry and a value entry (`KindMembers.ofRefusal`). A kind is not a bound.
 - A constructor is a member where the walk says so, as any type is: one whose declaration is a record (`net.uuid_type
   => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
-  `meta.ref<meta.product>` hold it, `meta.namespace` and `meta.reference` among them. A namespace type is built with
+  `meta.ref<meta.product>` hold it, `meta.namespace` and `meta.reference_type` among them. A namespace type is built with
   `meta.namespace`, a refinement of `meta.map`, so it is a member of `meta.type_ref`, `meta.ref<meta.product>`,
   `meta.ref<meta.map>` and `meta.ref<meta.namespace>`, and of no `meta.ref<meta.record>`. A value entry is a member of
   no kind: its tag names an ordinary type, which no walk reaches a constructor through.
@@ -66,7 +66,7 @@ schema's one namespace (SPEC-FEEDBACK.md #7), and the members are computed.
 
 ## The types built with a constructor (`KindMembers`, §4.2)
 
-A kind (`!meta.reference { of: net.uuid_type }`, or `meta.ref<net.uuid_type>` through the kernel's template) is an atom
+A kind (`!meta.reference_type { of: net.uuid_type }`, or `meta.ref<net.uuid_type>` through the kernel's template) is an atom
 whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a
 listed one. The kernel declares `meta.type_ref` and its refinement `meta.identifier_ref`, and types
 `meta.enum_type.name_type` and `meta.record.name_type` by the second. `computeKinds` derives every reference's index
@@ -81,7 +81,7 @@ that names values gets `namesTypes` false and no members.
   declared applications are records. `set<text>` is a member of `meta.ref<meta.set_type>` while the kernel's template
   `set` is not, `meta.top` of `meta.type_ref`, `meta.ref<meta.product>` and `meta.ref<meta.record>`, and so is a constructor
   whose declaration is a record: membership is not `EntryKind.isConstructor`, which answers applicability.
-- **A kind is a member of itself where the walk says so.** `meta.type_ref` is built with `meta.reference`, which IS-A
+- **A kind is a member of itself where the walk says so.** `meta.type_ref` is built with `meta.reference_type`, which IS-A
   `meta.type`, so it lists itself. Nothing loops: the walk reads construction chains and never a kind's members.
 - **A constructor is read in the schema's one namespace.** `KindMembers` and `NameType` take a `structure` lookup beside
   the entry's own, read first; the linker passes the merged namespace for both, and the second serves a caller holding a

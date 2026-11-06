@@ -37,7 +37,7 @@ meta.tn, itself. Current form only; history lives in git.
   is bare (`"text"`). The minted names' readable half reads a `meta.` path as its member (`InternalName.part`:
   `array_type_ref_…`, `record_…`); a path under the kernel's other maps keeps its first segment
   (`numeric_integer_type_…`).
-- The bootstrap hand-builds exactly the pre-loaded set — the instances and the one refinement on the kernel's one
+- The bootstrap hand-builds exactly the pre-loaded set — the instances and the two refinements on the kernel's one
   wait cycle (`SPEC-FEEDBACK.md #4`, rule 4) — and makes every other entry ready by `WaitOrder`, the one algorithm
   every schema's resolution runs. The order is the waits', never source order. `MetaKernelBootstrapResolverTest`
   holds the set to the measured cycle and the output to the kernel's ordinary resolution in any declaration order;
@@ -306,25 +306,32 @@ of the value is read against as the read reaches it; a reference and a held valu
 Its output is what ordinary resolution of the kernel against it produces, entry for entry and constructor for
 constructor, positions included (the bootstrap resolves with the parser's positions).
 
-- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the kernel's
-  one wait cycle, the one holding `meta.record`: `meta.value`, `boolean`, `meta.field_role`, `meta.enum_set`,
-  `integer`, `numeric.count`, `text`, `meta.type_ref`, `meta.field_map` (`PRE_LOADED`), and the
-  arrays lifted over `meta.type_ref`, `meta.field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a
-  lifted array is named by its content, so it is designated by what it holds; an entry the source declares is no lift,
-  so a declaration whose body is `[text]` is read, not built). `instanceBody` covers the shapes those apply —
-  a bare `{}` (each target's unconstrained constant), a bare token array (`enum`, the kernel's own enumeration constructor),
-  and a record of tokens (`meta.reference`, `meta.map` for `meta.field_map`, the `meta.array`/`meta.set_type` binding
-  records the desugar phase lifts, with their `min_items`/`max_items`) — and refuses any other target; `refinedBody` merges
-  the integer family's `min`, `max` and `size` (`numeric.count`'s `size: { bits: 64  signed: true }`).
-  `MetaKernelBootstrapResolverTest` measures the cycle with `WaitGraph` from
-  `spec/fixtures/meta-resolved.tn` (the six maps read as their members under their paths) and asserts the hand-built names
-  equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 85 entries (66
-  members of the six maps, 13 at the root and 6 synthetics; the maps themselves make the kernel's 91 resolved entries), one
-  cycle of 26, longest wait chain 4 — and `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel
-  contains the cycle's closure (70 entries, the root tag's `schema` among them: reading the document waits on the alias its
-  tag names) and the related concepts, pinning all three. Of the 26, 13 are hand-built (the 9 of `PRE_LOADED` and 4 lifted
-  arrays); the other 13 are records and compositions resolved from their grammar, and the 59 entries beyond the cycle are
-  made ready in wait order.
+- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the two refinements on the
+  kernel's one wait cycle, the one holding `meta.record`: `boolean`, `meta.field_role`, `meta.enum_set`, `integer`,
+  `numeric.count`, `text`, `meta.field_type_ref`, `meta.type_ref`, `meta.field_map` (`PRE_LOADED`), and the arrays
+  lifted over `meta.type_ref`, `meta.field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted
+  array is named by its content, so it is designated by what it holds; an entry the source declares is no lift, so a
+  declaration whose body is `[text]` is read, not built). `meta.field_type_ref => !meta.reference_type { of: meta.type
+  }` is on the cycle because reading its `of` waits on `meta.type_ref`, its own refinement. The kernel's `meta.value`
+  is not: `record_field.value` is typed `type!`, a dependent field, whose value a schema document holds as written
+  through a reader of its own (`DependentFieldReader`), so `record_field` waits on no entry for it. `instanceBody`
+  covers the shapes those apply — a bare `{}` (each target's unconstrained constant), a bare token array (`enum`, the
+  kernel's own enumeration constructor), and a record of tokens (`meta.reference_type` with its `of` and an
+  `allow_sibling` defaulting to true, `meta.map` for `meta.field_map`, the `meta.array`/`meta.set_type` binding records
+  the desugar phase lifts, with their `min_items`/`max_items`) — and refuses any other target; `refinedBody` merges
+  the integer family's `min`, `max` and `size` (`numeric.count`'s `size: { bits: 64  signed: true }`) and a
+  reference's `of` and `allow_sibling` (`meta.type_ref`'s `allow_sibling: false`). Once every entry is ready the
+  chains are closed transitively, as `SchemaResolver` closes a schema's (`completeChains`), so `meta.identifier_ref`,
+  a refinement of `meta.type_ref`, lists `meta.field_type_ref` too. `MetaKernelBootstrapResolverTest` measures the
+  cycle with `WaitGraph` from `spec/fixtures/meta-resolved.tn` (the six maps read as their members under their paths)
+  and asserts the hand-built names equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest`
+  prints the measurement — 90 entries (70 members of the six maps, 13 at the root and 7 synthetics; the maps
+  themselves make the kernel's 96 resolved entries), one cycle of 25, longest wait chain 4 — and
+  `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel contains the cycle's closure (66
+  entries, the root tag's `schema` among them: reading the document waits on the alias its tag names) and the related
+  concepts, `meta.value` and `meta.value_type` among them, pinning all three. Of the 25, 13 are hand-built (the 9 of
+  `PRE_LOADED` and 4 lifted arrays); the other 12 are records and compositions resolved from their grammar, and the
+  65 entries beyond the cycle are made ready in wait order.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies. Two refinements wait on the cycle

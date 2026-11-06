@@ -352,12 +352,14 @@ public final class TsonSchemaLinker {
             // is an argument's, judged where the application writes it.
             switch (body) {
                 case RecordBody record -> checkFieldValues(receiver, schema, name, position,
-                        record.fields().entrySet().stream().filter(f -> f.getValue().value().isPresent())
+                        record.fields().entrySet().stream()
+                                .filter(f -> f.getValue().value().isPresent() && f.getValue().sibling().isEmpty())
                                 .map(f -> new FieldValue(f.getKey(), f.getValue().typeRef(), f.getValue().role(),
                                         f.getValue().value().get())).toList(), merged, identifiers);
                 case RecordTemplateBody template -> checkFieldValues(receiver, schema, name, position,
                         template.fields().entrySet().stream()
-                                .filter(f -> f.getValue().value().isPresent() && f.getValue().type().isPresent())
+                                .filter(f -> f.getValue().value().isPresent()
+                                        && f.getValue().type().orElse(null) instanceof TypeRef)
                                 .map(f -> new FieldValue(f.getKey(), RecordField.typeRef(f.getValue().type().get()),
                                         f.getValue().role(), f.getValue().value().get())).toList(), merged,
                                 identifiers);
@@ -1289,14 +1291,14 @@ public final class TsonSchemaLinker {
         checkCoherent(body);
         switch (body) {
             case RecordBody r -> {
-                // The chain is checked by validateEntry, its every member a bare name in a closed body.
+                // The chain is checked by validateEntry, its every member a bare name in a closed body. A dependent
+                // field names a sibling, judged with its sibling by §5.2's rules, and carries no value.
+                DependentFields.check(entryName, r, namespace);
                 for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
-                    switch (field.getValue().type()) {
-                        case TypeRef type -> validateTypeRef(type, namespace, constructors, entryName,
-                                " field '" + field.getKey() + "'");
-                        case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
+                    if (field.getValue().type() instanceof TypeRef type) {
+                        validateTypeRef(type, namespace, constructors, entryName, " field '" + field.getKey() + "'");
+                        checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors);
                     }
-                    checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors);
                 }
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.memberNames()) {
@@ -1679,7 +1681,15 @@ public final class TsonSchemaLinker {
             List<String> violations = new ArrayList<>();
             for (Map.Entry<String, RecordField> inherited : source.fields().entrySet()) {
                 RecordField restated = record.fields().get(inherited.getKey());
-                if (restated != null && !narrows(inherited.getValue(), restated, namespace)) {
+                if (restated == null) {
+                    continue;
+                }
+                Optional<String> dependent = DependentFields.restates(inherited.getKey(), inherited.getValue(),
+                        restated);
+                if (dependent.isPresent()) {
+                    violations.add(dependent.get());
+                } else if (!(restated.type() instanceof SiblingRef) && !narrows(inherited.getValue(), restated,
+                        namespace)) {
                     violations.add("field '" + inherited.getKey() + "' is typed '"
                             + shown.apply(restated.typeRef().name()) + "', which is not '"
                             + shown.apply(inherited.getValue().typeRef().name()) + "' or IS-A it");
@@ -1694,14 +1704,8 @@ public final class TsonSchemaLinker {
 
     /** Whether {@code restated}'s type narrows {@code inherited}'s, as {@link #checkRestatedFieldTypes} states it. */
     private static boolean narrows(RecordField inherited, RecordField restated, Map<String, Top> namespace) {
-        TypeRef from = switch (inherited.type()) {
-            case TypeRef type -> type;
-            case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
-        };
-        TypeRef to = switch (restated.type()) {
-            case TypeRef type -> type;
-            case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
-        };
+        TypeRef from = inherited.typeRef();
+        TypeRef to = restated.typeRef();
         if (!from.arguments().isEmpty() || !to.arguments().isEmpty() || !namespace.containsKey(from.name())
                 || !namespace.containsKey(to.name())) {
             return true;

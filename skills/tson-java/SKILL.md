@@ -204,7 +204,14 @@ are a `TsonReference`, the references the grammar alone shows to be one; a bare 
 at a kind-typed position (`meta.ref<T>`, `meta.type_ref`) arrives in tree mode as an atom holding a `schema.meta.TypeRef`
 (`as(TypeRef.class)`), never a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names
 in the schema it was read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text,
-a type mismatch.
+a type mismatch. A record field's type (`meta.field_type_ref`, the reference whose `allow_sibling` is left true) may hold
+a sibling reference, read as a `schema.meta.SiblingRef`; every other reference refuses one.
+
+**A dependent field, `v?: kind!`, is read against the type its sibling names in each instance** (Part 2 §5.2): `{ kind:
+point  v: { x: 1  y: 2 } }`. Write a free sibling before its dependent field (a pinned or discriminator sibling may come
+anywhere); a sibling naming a template is refused at the sibling. In tree mode the value is whatever the named type reads
+to; in bind mode declare the component `Object` and register `Object` as an atom in the `DataBindContext`
+(`registerAtom(Object.class)`), and it receives what the named type binds to.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever
 cast (`isInstance`), so a test asserting *which host type a reader produced* must use `as(Class)`.

@@ -134,6 +134,10 @@ class CrossEncodingParityTest {
               customer_id => !net.uuid_type {}
               ided        => { id: meta.ref<net.uuid_type> }
               typed       => { t: meta.type_ref }
+              cell        => { kind: meta.type_ref  v?: kind! }
+              int_cell    => cell ^ { kind?: = int32 }
+              defaulted   => { kind?: meta.type_ref ~ int32  v?: kind! }
+              tmpl        => <T> { item: T }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -594,8 +598,35 @@ class CrossEncodingParityTest {
     void aSiblingReferenceAtAKindIsRefusedByBoth() {
         sameVerdict("typed", "{ t: kind! }", """
                 {"t": "kind!"}""");
-        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID),
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
                 tson("typed", "{ t: kind! }").stream().map(Verdict::code).toList());
+    }
+
+    /**
+     * A dependent field ([TSON-SCHEMA] §5.2) is read in both encodings against the type its sibling names in the same
+     * record -- the sibling as written, its default, or its pin -- and refused alike: a value of another type, a free
+     * sibling written after it, and a sibling naming a template, which is refused at the sibling.
+     */
+    @Test
+    void aDependentFieldIsReadAgainstItsSiblingByBoth() {
+        bothAccept("cell", "{ kind: int32  v: 5 }", """
+                {"kind": "int32", "v": 5}""");
+        bothAccept("defaulted", "{ v: 7 }", """
+                {"v": 7}""");
+        bothAccept("int_cell", "{ v: 7  kind: int32 }", """
+                {"v": 7, "kind": "int32"}""");
+        sameVerdict("cell", "{ kind: point  v: 5 }", """
+                {"kind": "point", "v": 5}""");
+        sameVerdict("cell", "{ v: 5  kind: int32 }", """
+                {"v": 5, "kind": "int32"}""");
+        sameVerdict("defaulted", "{ v: 5  kind: int32 }", """
+                {"v": 5, "kind": "int32"}""");
+        sameVerdict("cell", "{ kind: tmpl  v: { item: 5 } }", """
+                {"kind": "tmpl", "v": {"item": 5}}""");
+        assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/v")),
+                tson("cell", "{ v: 5  kind: int32 }"));
+        assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/kind")),
+                tson("cell", "{ kind: tmpl  v: { item: 5 } }"));
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

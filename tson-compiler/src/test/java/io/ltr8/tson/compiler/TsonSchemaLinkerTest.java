@@ -153,20 +153,21 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * A field typed by a sibling reference ({@code payload: kind!}) reaches no rule yet: the linker's field checks
-     * refuse it as this library's gap, never as the author's error.
+     * A dependent field ({@code payload: kind!}) is judged by [TSON-SCHEMA] §5.2's rules at link, an author's error
+     * where one breaks: here the sibling names no types, being typed by no reference.
      */
     @Test
-    void aFieldTypedBySiblingIsNotImplemented() {
+    void aDependentFieldsSiblingIsTypedByAReferenceToTypes() {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", valueEntry());
         entries.put("message", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("kind", RecordField.required(TypeRef.of("token"))),
                 Map.entry("payload", RecordField.required(SiblingRef.of("kind"))))));
 
-        UnsupportedOperationException gap = assertThrows(UnsupportedOperationException.class,
+        SchemaValidationException refused = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
-        assertTrue(gap.getMessage().contains("sibling reference ('kind!')"), gap.getMessage());
+        assertTrue(refused.getMessage().contains("'payload' takes its type from 'kind', which is typed 'token'"),
+                refused.getMessage());
     }
 
     /** A one-parameter record template whose one field {@code field} is typed by the parameter ([TSON-SCHEMA] §5.10). */

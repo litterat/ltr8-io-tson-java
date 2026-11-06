@@ -19,6 +19,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
@@ -273,8 +274,12 @@ final class ParameterTypes {
             field.typeParam().ifPresent(parameter -> occurrences.observe(parameter, TemplateParam.TYPE_REF, false));
             // A sibling names a field, and writes no application a parameter could stand in.
             field.type().filter(TypeRef.class::isInstance).map(TypeRef.class::cast).ifPresent(walk::application);
-            field.valueParam().ifPresent(parameter -> occurrences.observe(parameter, field.type()
-                    .map(RecordField::typeRef).orElseGet(() -> TypeRef.of(field.typeParam().orElseThrow())), true));
+            // A value parameter beside a sibling has no one type to be read as, and the closed member refuses it: a
+            // dependent field carries no value (§5.2).
+            if (field.valueParam().isPresent() && !(field.type().orElse(null) instanceof SiblingRef)) {
+                occurrences.observe(field.valueParam().get(), field.type().map(RecordField::typeRef)
+                        .orElseGet(() -> TypeRef.of(field.typeParam().orElseThrow())), true);
+            }
         });
         template.parents().forEach(walk::application);
     }
@@ -584,8 +589,8 @@ final class ParameterTypes {
             List<Map.Entry<String, RecordField>> unmarked = vocabulary.fields().entrySet().stream()
                     .filter(f -> !f.getValue().optional()).toList();
             if (unmarked.size() == 1) {
-                value(payload, unmarked.getFirst().getValue().typeRef(),
-                        constructor + "." + unmarked.getFirst().getKey());
+                unmarked.getFirst().getValue().namedType().ifPresent(type -> value(payload, type,
+                        constructor + "." + unmarked.getFirst().getKey()));
             }
         }
 
@@ -598,8 +603,8 @@ final class ParameterTypes {
                     routed(token.text(), wire);
                     continue;
                 }
-                Optional.ofNullable(vocabulary.fields().get(written.name()))
-                        .ifPresent(field -> value(value, field.typeRef(), constructor + "." + written.name()));
+                Optional.ofNullable(vocabulary.fields().get(written.name())).flatMap(RecordField::namedType)
+                        .ifPresent(type -> value(value, type, constructor + "." + written.name()));
             }
         }
 

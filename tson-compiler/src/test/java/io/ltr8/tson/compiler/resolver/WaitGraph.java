@@ -40,8 +40,9 @@ import java.util.TreeSet;
  *       {@code meta.identifier_ref}, any {@code !reference} instance)
  *       waits on the slot's own type and what reading that reaches, never on the entry the name names. This falls
  *       out of the walk: a kind is an atom, so reading against one reaches nothing further.</li>
- *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only, and a template's
- *       body text on {@code text} only -- again by the walk, both being atoms.</li>
+ *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only, a dependent
+ *       field's value ({@code record_field.value: type!}), held as written in a schema document, on nothing, and a
+ *       template's body text on {@code text} only -- again by the walk, both being atoms.</li>
  *   <li>A tagged value read at a position typed {@code P} waits on {@code P} and on its tag. An untagged value at a
  *       choice, or at an abstract record (a dispatch over its {@code subtypes}), waits on the one variant its form
  *       admits; where the form admits more than one, it waits on all of them, and {@link #overapproximations()}
@@ -383,7 +384,8 @@ final class WaitGraph {
                 case DECLARED -> problems.add(entry + ": an untagged value at the declared " + type + " (" + path + ")");
                 case ABSTRACT -> dispatch(core, type, subtypes(shape.declaration()), path);
                 case ATOM -> {
-                    if (!(core instanceof TokenValue) && !(core instanceof VoidValue)) {
+                    if (!(core instanceof TokenValue) && !(core instanceof VoidValue)
+                            && !(core instanceof io.ltr8.tson.compiler.ast.ReferenceValue)) {
                         problems.add(entry + ": a " + kind(core) + " at atom " + type + " (" + path + ")");
                     }
                 }
@@ -401,6 +403,14 @@ final class WaitGraph {
                         if (declared == null) {
                             problems.add(entry + ": " + shape.terminal() + " declares no field " + field.name()
                                     + " (" + path + ")");
+                            continue;
+                        }
+                        if (field(declared, "type") != null && field(declared, "type").coreValue()
+                                instanceof io.ltr8.tson.compiler.ast.ReferenceValue(
+                                        io.ltr8.tson.schema.meta.SiblingRef ignored)) {
+                            // A dependent field's value in a schema document is held as written, the token
+                            // uninterpreted, and so waits on nothing.
+                            annotations(field.value().annotations(), path + "." + field.name());
                             continue;
                         }
                         read(field.value(), token(field(declared, "type")), "field",
@@ -450,7 +460,8 @@ final class WaitGraph {
 
     private static boolean admits(Form form, CoreValue core) {
         return switch (form) {
-            case ATOM -> core instanceof TokenValue || core instanceof VoidValue;
+            case ATOM -> core instanceof TokenValue || core instanceof VoidValue
+                    || core instanceof io.ltr8.tson.compiler.ast.ReferenceValue;
             case RECORD -> core instanceof RecordValue || core instanceof EmptyBrace;
             case NAMESPACE, MAP -> core instanceof MapValue || core instanceof EmptyBrace;
             case ARRAY, TUPLE -> core instanceof ArrayValue;

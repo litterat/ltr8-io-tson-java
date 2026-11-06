@@ -77,7 +77,7 @@ public final class SchemaMetaNameBinder {
             Map.entry("meta.namespace", "meta.namespace_body"),
             Map.entry("meta.tuple", "meta.tuple_body"),
             Map.entry("meta.choice", "meta.choice_body"),
-            Map.entry("meta.reference", "meta.reference_body"),
+            Map.entry("meta.reference_type", "meta.reference_body"),
             Map.entry("meta.enum_type", "meta.enum_body"),
             Map.entry("meta.template", "meta.template_body"),
             Map.entry("temporal.datetime_type", "temporal.date_time_type"));

@@ -272,6 +272,13 @@ final class ValuesByName {
                                     + "not present in the value";
                         }
                     }
+                    if (field.sibling().isPresent()) {
+                        // The field's type is the one its sibling's value names in this value: reading it from the
+                        // value is not implemented, so a name going on past a dependent field is this library's gap.
+                        throw new UnsupportedOperationException(where + " names '" + name + "', and '" + reached
+                                + "." + segment + "' is a dependent field, typed by its sibling ('"
+                                + field.type().text() + "'): a name going on past one is not implemented yet");
+                    }
                     at = at.of(field.typeRef().name());
                 }
                 case MapBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"

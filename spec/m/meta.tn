@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=31e82b373c98431a4298e687c7d77a5184b5cae4a0ca38a2e5246c54373cb6a1"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=a59a053ce96af5642718fc37f9271476fef9489fef7bd4cce5341ea2c79c9d6e"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -510,9 +510,9 @@
       value is not narrowable, and a value position is not a scope: it admits no
       directive.
 
-      Used for meta.record_field.value and meta.record_template_field.value
-      (the type of fixed/default values, which must be the field's declared
-      type).
+      Used for meta.record_template_field.value, whose field's type may be a
+      parameter and so has no sibling to name (the type of a fixed or default
+      value, which must be the field's declared type).
       """
     value_type => meta.atom & {}
 
@@ -618,7 +618,9 @@
       `optional`, that the key may be missing; `voidable`, that the value may be
       void, the void sentinel `_` written in its place; `role`, what `value` is
       for; and `value`, a concrete default or fixed value read against the
-      field's declared type — for a `meta.type_ref` slot, a type name. Its name
+      field's declared type — for a `meta.type_ref` slot, a type name. `value`
+      is typed `type!`, a dependent field: each record field's `value` is read
+      against the type its own `type` names. Its name
       is not among them: a field is a value of `record.fields`, keyed by its
       name. Each fact is one mark of the spelling `name?: type? ~ value`: the
       name's `?`, the type's `?`, and `~` or `=` with its value. What omission
@@ -627,9 +629,19 @@
       at a field group's member, whose presence is the group's and which is
       never supplied.
 
-      A record field is closed: its `type` names a type and its `value` is a
-      literal, never a parameter. A field that may carry one is a
+      A record field is closed: its `type` names a type or a sibling, and its
+      `value` is a literal, never a parameter. A field that may carry one is a
       `meta.record_template_field`, which only a record template holds.
+
+      A field whose `type` is a sibling reference, `kind!`, is a dependent
+      field ([TSON-SCHEMA] §5.2): each instance's value is read against the
+      type that instance's `kind` names. The sibling is declared before it, is
+      typed by a reference whose `of` lies within `meta.type`, and is always
+      there to read: required, defaulted or pinned, never voidable and no
+      member of a field group, its default or pin naming a type a value can be
+      read against. A dependent field is never voidable, carries no value of
+      its own, and is restated only as itself; pinning its sibling fixes its
+      type.
 
       Which fields a member-dispatched family dispatches on is the enclosing
       record's own statement, `record.discriminators`, and no field says it of
@@ -645,11 +657,11 @@
       container's part is never missing, so a container has no `optional`.
       """
     record_field => {
-      type:      meta.type_ref
+      type:      meta.field_type_ref
       optional?: boolean ~ false
       voidable?: boolean ~ false
       role?:     meta.field_role ~ FREE
-      value?:    meta.value
+      value?:    type!
     }
 
     @doc:"""
@@ -715,7 +727,7 @@
       without an application.
       """
     record_template_field => {
-      ( type: meta.type_ref | type_param: meta.param_name )
+      ( type: meta.field_type_ref | type_param: meta.param_name )
       optional?: boolean ~ false
       voidable?: boolean ~ false
       role?:     meta.field_role ~ FREE
@@ -1060,21 +1072,46 @@
       so every name the refinement admits the source admits too, and the
       refinement is IS-A its source. `meta.identifier_ref` is `meta.type_ref`
       narrowed to the identifier families.
+
+      A value may instead be a sibling reference, `kind!` ([TSON-DATA] §7.4):
+      one identifier with an adjacent `!` followed by whitespace, naming the
+      field `kind` of the same record instance, whose value names the type
+      ([TSON-SCHEMA] §5.2). A reference is a name, an application or a sibling
+      reference, and `allow_sibling` says whether the last is admitted: as
+      `allow_nan` is of `numeric.float_type`, it is a permission, true by
+      default, and a refinement may withdraw it and never grant it back. It is
+      true only at a record field's type, `meta.field_type_ref`; every other
+      reference sets it false and refuses a sibling reference. Resolved output
+      writes a sibling reference as it is written.
       """
-    reference => meta.atom & {
-      of: meta.type_ref
+    reference_type => meta.atom & {
+      of:             meta.type_ref
+      allow_sibling?: boolean ~ true
     }
 
     @doc:"""
       The spelling of a reference: `meta.ref<T>` is
-      `!meta.reference { of: T }`. Where `T` is a constructor it holds the
-      names of the types built with it, `meta.ref<net.uuid_type>`, and
-      otherwise the names of values of `T`, `meta.ref<method>`.
+      `!meta.reference_type { of: T  allow_sibling: false }`. Where `T` is a
+      constructor it holds the names of the types built with it,
+      `meta.ref<net.uuid_type>`, and otherwise the names of values of `T`,
+      `meta.ref<method>`. It never holds a sibling reference.
       """
-    ref => <T> !meta.reference { of: T }
+    ref => <T> !meta.reference_type { of: T  allow_sibling: false }
 
-    @doc:"The names of the types a value can have."
-    type_ref => !meta.reference { of: meta.type }
+    @doc:"""
+      The type of a record field: the name of a type a value can have, or a
+      sibling reference, `kind!`, naming the field of the same record whose
+      value names the field's type ([TSON-SCHEMA] §5.2). `record_field.type`
+      and `record_template_field.type` are typed by it, and no other slot is.
+      """
+    field_type_ref => !meta.reference_type { of: meta.type }
+
+    @doc:"""
+      The names of the types a value can have: `meta.field_type_ref` without
+      the sibling reference, a refinement of it, so a type reference stands
+      wherever a field's type can.
+      """
+    type_ref => !meta.field_type_ref ^ { allow_sibling: false }
 
     @doc:"""
       The names of the identifier families, which a `name_type` names: a

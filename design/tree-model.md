@@ -13,7 +13,8 @@ only; history lives in git.
 - A schemaless read keeps a reference the grammar alone shows to be one as a `TsonReference`: an application
   (`TsonApplicationReference`) or a sibling reference (`TsonSiblingReference`). A bare name is a `TsonAtom` holding
   text. Neither variant carries a referent, there being no closure to resolve in. Under a schema a reference-typed
-  position delivers a `schema.meta.TypeRef` in a `TsonAtom` instead.
+  position delivers a `schema.meta.TypeRef` in a `TsonAtom` instead, and a record field's type, which admits a sibling
+  reference, a `schema.meta.SiblingRef`. A dependent field's node is whatever the type its sibling names reads to.
 - There is one no-value node, `TsonVoid`; `null` is a `TsonAtom` holding the string `null`, and a `void`
   position admits `_` and nothing else.
 - `as(Class)`/`asString`/… cast, `asInt`/`asLong`/`asDouble` convert — a test asserting which host type a

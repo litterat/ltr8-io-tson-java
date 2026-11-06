@@ -25,8 +25,9 @@ import java.util.Optional;
  * omission reaches.
  *
  * <p><b>{@code type} is a {@link Reference}</b>: a type reference, or a sibling reference ({@code kind!}) naming the
- * field of the same record whose value chooses the type ([TSON-SCHEMA] §5.2, proposed) -- the one slot besides a
- * template field's that may hold one. {@link #typeRef()} is the type reference, for a consumer that needs one.
+ * field of the same record whose value chooses the type ([TSON-SCHEMA] §5.2) -- the one slot besides a template
+ * field's that may hold one. A field so typed is a <em>dependent field</em>: each instance's value is read against the
+ * type that instance's sibling names. {@link #namedType()} is the type reference where there is one.
  *
  * <p><b>A record field is closed</b>: its {@code type} names no parameter and its {@code value} is a literal, never a
  * parameter. A field that may carry one is a {@code meta.record_template_field}, which only a record template holds,
@@ -109,8 +110,10 @@ public record RecordField(Reference type, boolean optional, boolean voidable, Fi
     }
 
     /**
-     * {@link #type} as the type it names. A sibling reference ({@code kind!}) is chosen per instance, and nothing that
-     * asks a field for its type reads one yet: {@link #siblingNotImplemented}.
+     * {@link #type} as the type it names -- for a consumer that holds a field already known to name one. A dependent
+     * field's type is chosen per instance by its sibling's value, so no single type is the answer, and asking for one
+     * is a broken invariant: a consumer that may meet a dependent field asks {@link #namedType()} or switches on
+     * {@link #type}.
      */
     public TypeRef typeRef() {
         return typeRef(type);
@@ -120,17 +123,22 @@ public record RecordField(Reference type, boolean optional, boolean voidable, Fi
     public static TypeRef typeRef(Reference type) {
         return switch (type) {
             case TypeRef reference -> reference;
-            case SiblingRef sibling -> throw siblingNotImplemented(sibling);
+            case SiblingRef sibling -> throw new IllegalStateException("a dependent field ('" + sibling.text()
+                    + "') names no type of its own: its type is the one its sibling's value names, per instance");
         };
     }
 
+    /** {@link #type} as the type it names, or empty for a dependent field ({@link #sibling()}). */
+    public Optional<TypeRef> namedType() {
+        return type instanceof TypeRef reference ? Optional.of(reference) : Optional.empty();
+    }
+
     /**
-     * The gap a consumer of a field's type reports for {@code sibling}: this library's, an {@link
-     * UnsupportedOperationException}, which travels as {@code NOT_IMPLEMENTED}.
+     * The sibling a dependent field takes its type from -- the field {@code kind} of {@code v?: kind!} -- or empty
+     * where {@link #type} names a type ([TSON-SCHEMA] §5.2).
      */
-    public static UnsupportedOperationException siblingNotImplemented(SiblingRef sibling) {
-        return new UnsupportedOperationException("a sibling reference ('" + sibling.text() + "') at a record field's "
-                + "type is not implemented yet");
+    public Optional<String> sibling() {
+        return type instanceof SiblingRef sibling ? Optional.of(sibling.field()) : Optional.empty();
     }
 
     /** What a field yields when a document never writes it -- see {@link #omitted}. */

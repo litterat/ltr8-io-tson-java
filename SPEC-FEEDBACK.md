@@ -1306,16 +1306,16 @@ arguments name, and a declared member additionally the head". The alternative, k
 expansion sentence to except applied parents, and the hand-written-expansion equivalence §5.8 states for `dog` to be
 said to hold only for closed declarations.
 
-## 21. [TSON-DATA] §4, §7.2.5, §7.4, §7.5; [TSON-SCHEMA] §5.2, §8.1, §12.1, §12.3 — a sibling reference, `field!`
+## 21. [TSON-DATA] §2.5, §4, §7.2.5, §7.4, §7.5; [TSON-SCHEMA] §5.2, §5.7, §5.8, §8.1, §12 — dependent fields, `field!`
 
 **Problem.** A record field whose type is chosen per instance by another field of the same record has no spelling.
 The kernel's own `record_field.value` is one: its type is whatever `record_field.type` names, so §8.1 types it
 `meta.value` and states the real type in prose. Spelling the dependency needs a reference that names a sibling field
-rather than a schema entry, which neither grammar has, and a rule saying where such a reference may stand.
+rather than a schema entry, which neither grammar has, a rule saying where such a reference may stand, the rules a
+sibling and its dependent field answer to, and how one is read.
 
-**What is running.** The spelling and the position rule, end to end through parsing. Reading a field against the type
-its sibling names is not: a field typed by a sibling reference reaches the schema model and is reported as this
-library's gap (`NOT_IMPLEMENTED`), and `meta.tn`'s `record_field.value` is still `meta.value`.
+**What is running.** All of it, end to end, in both encodings and every read mode; nothing about a sibling at a
+field's type is a gap.
 
 - **Data grammar.** `kind!` is one reference value, delivered whole as an application is (#13): an unquoted token of
   one segment, an identifier, with an adjacent `!` that is followed by whitespace. `a!b`, `kind!}`, `kind!]`,
@@ -1325,24 +1325,72 @@ library's gap (`NOT_IMPLEMENTED`), and `meta.tn`'s `record_field.value` is still
 - **Schema grammar.** `sibling-ref` is a `type-ref` alternative, picked by one token of lookahead after the name, with
   the same whitespace rule, so `[ kind! ]`, `box< kind! >`, `( kind! | text )` and `x => kind!` parse and `[kind!]`
   does not.
-- **The position rule.** A sibling reference stands only at a record field's type: `record_field.type` and
-  `record_template_field.type`, in sugar a field's type and a field group member's (a member is a field of the
-  record). Everywhere else it is refused, naming the slot: in sugar where it is written, before any lift (an alias
-  target, a refinement source, a composition operand, an array's element type, a map's key or value type, a tuple
-  element, a choice variant, a template argument); in an explicit instance at the slot (`!meta.array {
-  element_type: kind! }`, a schema error naming `element_type`); inside a data argument list as a parse error
-  (`!meta.record { fields: { v => box< kind! > } }`); and in data at a field typed `meta.type_ref`, where the
-  reference atom refuses it as a validation error (`!typed { t: kind! }`). The atom reads a sibling reference
-  wherever a reference stands; the rule, not the atom's type, decides where it is meaningful.
-- **Class 1.** A schemaless read keeps a sibling reference as a structured value, the field name and the mark,
-  resolving nothing, beside the structured application #13 keeps; the writers write it back as `kind!` followed by
-  whitespace.
-- **JSON.** A sibling reference is a string holding the same text, `"kind!"`, read by the same production
-  ([TSON-JSON] §5.6), and refused at a kind's position as the text encoding refuses it.
+- **The reference atom and its facet.** The kernel's reference constructor is `meta.reference_type` and gains a
+  permission facet, as `float_type` has `allow_nan`:
 
-**Resolution, a proposal.** Grammar, the position rule, and the Class 1 reading; the sibling's own rules (declared
-before the dependent field, typed by a reference to types, always present, a dependent field never voidable and
-carrying no default or pin) and the read order follow with the readers.
+  ```
+  reference_type => meta.atom & { of: meta.type_ref  allow_sibling?: boolean ~ true }
+  ref            => <T> !meta.reference_type { of: T  allow_sibling: false }
+  field_type_ref => !meta.reference_type { of: meta.type }
+  type_ref       => !meta.field_type_ref ^ { allow_sibling: false }
+  record_field   => { type: meta.field_type_ref  …  value?: type! }
+  ```
+
+  `record_template_field.type` is typed `meta.field_type_ref` too. A refinement may withdraw `allow_sibling` and never
+  grant it back (`!meta.type_ref ^ { allow_sibling: true }` is a resolver error); resolved output writes the facet
+  where it is false and leaves it out at its default, so `meta.ref<C>` resolves to `!meta.reference_type { of: C
+  allow_sibling: false }`. `meta.identifier_ref`, a refinement of `meta.type_ref`, is IS-A `meta.field_type_ref` too.
+- **The position rule.** A sibling reference stands only at a record field's type. Elsewhere it is refused, naming
+  the slot: in sugar where it is written, before any lift (an alias target, a refinement source, a composition
+  operand, an array's element type, a map's key or value type, a tuple element, a choice variant, a template
+  argument); in an explicit instance at the slot (`!meta.array { element_type: kind! }`, a schema error naming
+  `element_type`); inside a data argument list as a parse error; and in data at a field typed `meta.type_ref`, where
+  the facet refuses it as a validation error (`ATOM_CONSTRAINT_VIOLATION`: the value is well formed and breaks the
+  facet, as NaN breaks a `float_type` withdrawing `allow_nan`). A schema read as data against the kernel admits
+  `record_field.type: kind!`, and refuses `array.element_type: kind!`, in tree mode as in bind mode. A reference over
+  a type that is no constructor names values and never holds a sibling reference, whatever its `allow_sibling` says
+  (the choice is this implementation's; a sibling names a field, which is no value).
+- **The sibling's rules**, checked at the declaration against the flattened record, each a resolver error:
+  - the sibling is a field of the record declared before the dependent field (the fields are a telescope, so no cycle
+    can form; flattening puts inherited fields first, so a base's sibling precedes a subtype's dependent field);
+  - it is typed by a reference whose `of` is a constructor or `top`, past its alias hops: `meta.type_ref`,
+    `meta.field_type_ref`, a `meta.ref<C>` over a constructor, a refinement of one; `int32`, a value reference
+    (`meta.ref<method>`) and a dependent field are refused;
+  - it is required, defaulted or pinned, never voidable, and no field group's member;
+  - its pin or default names a type a value can be read against: a template, a record template among them, is
+    refused, and so is a sibling reference. An application cannot be written as a default or pin (§5.2's modifier
+    grammar admits a bare token), so the admission of an application the closure holds is never reached.
+  - the dependent field is never voidable and carries no default or pin;
+  - it is restated only as itself: a refinement may make it required, and `v?: int32` over `v?: kind!` is refused, as
+    is a typed field restated as a dependent one. Pinning the sibling is what fixes the type, and the materialised
+    body keeps `type: kind!` beside the pin;
+  - a sibling may be a discriminator, the family rules asking of it what they ask of any required atom-typed field.
+- **Reading.** A dependent field is read against the type its sibling's value names in the same instance, through
+  that type's reader (an application resolving through the sibling's reference to the entry the closure closed it
+  to). The type is known when the reader reaches the field in one of three ways: a pinned sibling's pin, wherever the
+  sibling is written or whether it is; a discriminator's, member dispatch selecting a member that pins it before any
+  field is read; and a free sibling's value, written before the field, or its default where it is not yet written. A
+  dependent field written before a free sibling with no default is a validation error at the field naming both, and so
+  is a defaulted free sibling written after a field read against its default, found when the sibling arrives; no
+  lookahead is added. A sibling naming no type a value can be read against — a sibling reference, a template, an
+  application the closure does not hold — is a validation error at the sibling, and the value is not read. A sibling
+  whose own read failed leaves the value unread with nothing more reported.
+- **Schema documents.** A schema document's dependent field holds its value as written, the token uninterpreted, and
+  the linker judges it — so the kernel's `record_field.value: type!` reads as `meta.value` did and waits on no entry.
+  `record_field` no longer waits on `meta.value`, and the kernel's wait cycle shrinks by `meta.value` and
+  `meta.value_type` and gains `meta.field_type_ref`, pre-loaded beside `meta.type_ref` (reading its `of` waits on
+  `meta.type_ref`, its own refinement). Read as data, a record field's `value` is read against its own `type`:
+  `!meta.record_field { type: boolean  optional: true  role: DEFAULT  value: 5 }` is a validation error at `/value`.
+- **Binding.** A user schema's dependent field binds to an `Object` component, which receives what the named type
+  binds to; any narrower class is a bind mismatch at compile. The binding library takes `Object` only where the
+  context registers it as an atom. The kernel's `RecordField.value` stays a held `Token`.
+- **Class 1.** A schemaless read keeps a sibling reference as a structured value, the field name and the mark,
+  resolving nothing; the writers write it back as `kind!` followed by whitespace.
+- **JSON.** A sibling reference is a string holding the same text, `"kind!"`, read by the same production
+  ([TSON-JSON] §5.6), and a dependent member is read with the text encoding's rules, the field-order exception
+  included ([TSON-JSON] §6.1.6, edited in place).
+
+**Resolution, a proposal.** The design above, as written in the spec:
 
 [TSON-DATA] §7.4, extending #13's production:
 
@@ -1356,6 +1404,8 @@ sibling-ref  = unquoted-token "!"
              ; token is one segment, an identifier: it contains no
              ; ".". A quoted token is never a reference. It is never
              ; a type-arg, and a tag ("!" qualified-name) is never one.
+             ; A reference atom reads it unless its allow_sibling is
+             ; false ([TSON-SCHEMA] §8.1).
 ```
 
 [TSON-DATA] §7.2.5: `!` keeps its prefix role and gains a postfix one; the lexer is unchanged, `kind!` lexing as an
@@ -1367,18 +1417,27 @@ token and MUST be followed by whitespace.
 
 [TSON-DATA] §4: a schemaless read keeps a sibling reference as a structured value, its field name and the mark.
 
+[TSON-DATA] §2.5: a record's field order is insignificant except that a dependent field's free sibling — neither
+pinned nor a discriminator — is written before the dependent field.
+
 [TSON-SCHEMA] §12.1: `type-ref` gains `/ sibling-ref`, one token of lookahead after the name (`!`, `<`, or neither)
 choosing the alternative.
 
-[TSON-SCHEMA] §5.2: the position rule above, stated once — a sibling reference stands only at a record field's type,
-and at every other slot holding a reference it is a resolver error naming the slot. In a data document at a field
-typed by `meta.type_ref` it is a validation error: the field holds a type's name.
+[TSON-SCHEMA] §5.2: the dependent field, the position rule stated once (a sibling reference stands only at a record
+field's type, a resolver error naming the slot elsewhere in a schema and a validation error in data), the sibling's
+rules and the declaration-order rule, all as listed above, and the reading.
 
-[TSON-SCHEMA] §8.1: `meta.reference`'s and `meta.type_ref`'s documentation say a reference is a name, an application
-or a sibling reference, and resolved output writes `kind!` as is.
+[TSON-SCHEMA] §5.7, §5.8: restating a dependent field only as itself, pinning a sibling in a refinement, flattening's
+order, and a sibling as a discriminator.
 
-[TSON-JSON]: a string holding the same text, read by the same production (edited in place, §5.6).
+[TSON-SCHEMA] §8.1: `meta.reference` renamed `meta.reference_type` with `allow_sibling`; `meta.field_type_ref`;
+`meta.type_ref` and `meta.ref<T>` setting `allow_sibling: false`; `record_field.type` and
+`record_template_field.type` typed `meta.field_type_ref`; `record_field.value?: type!`; `meta.value`'s documentation
+losing `record_field.value`; resolved output writing `kind!` as is.
 
 **Open.** Whether the end of the document counts as following whitespace (running: it does). Whether a field group
-member's type takes a sibling reference as a plain field's does (running: it parses and resolves as one, and meets
-the gap). The quoted-name gap: a field whose name needs quoting cannot be a sibling, and `"name"!` is refused.
+member's type takes a sibling reference as a plain field's does (running: it does, a member being a field). The
+quoted-name gap: a field whose name needs quoting cannot be a sibling, and `"name"!` is refused. Which host
+component a bound dependent field takes (running: `Object`, registered as an atom; a tree value or a type the
+binding names are the alternatives). A sibling in a template field typed by a parameter (`kind: meta.type_ref = T`)
+waits on whether a pin on a `meta.type_ref` slot may carry a type parameter.

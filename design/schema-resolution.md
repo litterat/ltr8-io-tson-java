@@ -52,6 +52,9 @@ facts and refinement, groups, subtraction, and the exception boundary.
 - An application of a family base minted at a use site is a member of nothing; only a declared one gains the edge to
   its base (`SchemaResolver.familyBaseEdges`).
 - Subtraction runs last and empties the chain (every supertype goes); nothing is kept in its place.
+- **A dependent field's rules are the link's, over the flattened record** (`DependentFields`, [TSON-SCHEMA] §5.2): the
+  sibling declared before it, typed by a reference to types, always there to read, its pin or default no template;
+  the dependent field never voidable, carrying no value, restated only as itself. Each is a `SchemaValidationException`.
 - A field's name is its key in `meta.record.fields` (`RecordBody.fields`, the kernel's `meta.field_map`) and never one of its
   facts; declaration order is part of the value, and `RecordBody.equals` compares it.
 - The exception's class picks the diagnostic code (`SchemaResolver.Problems.report`): `SchemaValidationException` →
@@ -279,6 +282,38 @@ repeatable — "the inherited `@doc`" names nothing when two were written. Resta
 the kernel declares changes how a value reads, so the ordering is pinned over resolved output
 (`RestatedFieldAnnotationsTest`).
 
+## Dependent fields (§5.2)
+
+A field typed by a sibling reference, `v?: kind!`, is a **dependent field**: each instance's value is read against the
+type that instance's `kind` names. Resolution keeps the sibling reference as written wherever a field's type flows —
+sugar (`SchemaDesugarer` passes one through at a field's type and refuses it elsewhere), `BuiltField`, composition and
+refinement flattening, a record template's substitution and an application's closing — so a pinned sibling's
+refinement still spells the field `type: kind!`, and resolved output writes it as the source does.
+
+The rules are checked when the record links, against its flattened fields (`DependentFields.check`, called from
+`TsonSchemaLinker.validateBody` before any field's type reference is validated), so a record template's member is
+judged once its application closes it:
+
+- **Declared before it.** The fields are a telescope, each depending only on those before it in `fields`' order, so
+  no cycle can form and none is looked for; flattening puts inherited fields first. A sibling naming no field of the
+  record is refused, a sibling reference never naming an entry.
+- **Typed by a reference to types**: past its alias hops a `ReferenceBody` whose `of` is a constructor or `top`
+  (`KindMembers.namesTypes`). One that allows a sibling, as `record_field.type` does, is admitted; a sibling
+  reference as its value is refused where the dependent field is read.
+- **Always there to read**: required, defaulted or pinned; never voidable and no field group's member.
+- **Its pin or default names a type a value can be read against**: a template, a record template among them, and a
+  sibling reference are refused. Membership of the sibling's reference is `checkKindValue`'s, as for any field value.
+- **The dependent field** is never voidable and carries no default or pin: its type is not fixed at its declaration.
+  It may be restated only as itself, its marks moving along §5.7's orders as any field's do; restating it with a named
+  type, or a typed field as a dependent one, is refused (`DependentFields.restates`, asked by
+  `checkRestatedFieldTypes`). A sibling may be a discriminator: the family rules ask of it what they ask of any
+  required atom-typed field, and a dependent field named as a discriminator is no atom-typed field and is refused.
+
+Everything else that walks field types skips a dependent field: it is satisfiable for inhabitance whatever its
+sibling names (`TypeInhabitance`), carries no value to check (`checkFieldValue`), contributes no name to a name type
+or a parameter's type (`NameType`, `ParameterTypes`), and a value's qualified name going on past one is this library's
+gap (`ValuesByName`, `NOT_IMPLEMENTED`).
+
 ## Field groups
 
 A group is options of members (`GroupDef`, the kernel's `meta.field_group`; §5.11): an option is chosen when any member is
@@ -373,20 +408,22 @@ position rule is enforced where a sibling is read**, so none reaches a `TypeRef`
 (`design/schema-grammar-and-desugaring.md`); in an explicit instance or a resolved form by the slot reader `BindTargets`
 picks by the component's class, a `TypeNameSlotReader` refusing one at its token where the component is a `TypeRef`
 (`TYPE_MISMATCH`, naming the slot, `!meta.array { element_type: kind! }`) and admitting it where it is a `Reference`
-(`record_field.type`, `record_template_field.type`, positional or not); inside an argument list by the data stream;
+at a reference whose `allow_sibling` admits one (`record_field.type`, `record_template_field.type`, positional or
+not); inside an argument list by the data stream;
 and wherever no component narrows the read (a tree-mode read, a field typed `meta.type_ref` in data) by the reference
-atom's parser, which reads a `TypeRef` through `ReferenceGrammar.parse` and refuses a sibling there
-(`ATOM_FORM_INVALID`). A model walk such as `MetaRefs` could not see a misplaced sibling, the Java type having no room
-for one. At a field's type a sibling reaches the model, where no rule or reader reads against it yet: a consumer that
-needs a field's type reference takes `RecordField.typeRef()`, or switches and throws
-`RecordField.siblingNotImplemented` (a gap, `NOT_IMPLEMENTED`); a rewrite of type names (`MetaRefs`, substitution,
-closing an application) keeps a sibling as written, name collection and §5.10's spelling checks skip it, and the
-writers write its text unquoted. `Reference`, `TypeRef` and each variant are registered as atom host types, since a
-value written by its own class is described by the variant (`TypeRefTextBridge` and its nested bridges, in
-`ResolverBindContext`; `ForReference` and `ForSibling` read a sibling through `ReferenceGrammar.parseReference`). A
-context without those registrations
-describes `TypeRef` as a union of two records, so the schema model's classes bind only through a context that carries
-them (`ResolverBindContext.registerAbsent`, which `SchemaMetaNameBinder.over` applies).
+atom's parser, which reads every variant through `ReferenceGrammar.parseReference` and admits a sibling only where the
+reference's `allow_sibling` does (`meta.field_type_ref`), refusing it elsewhere as a constraint the value breaks
+(`ATOM_CONSTRAINT_VIOLATION`). A model walk such as `MetaRefs` could not see a misplaced sibling, the Java type having
+no room for one. At a field's type a sibling makes the field a **dependent field**: a consumer that needs a field's type
+reference asks `RecordField.namedType()` (empty for a dependent field) or switches on the variant, and
+`RecordField.typeRef()` on a dependent field is a broken invariant (`IllegalStateException`); a rewrite of type names
+(`MetaRefs`, substitution, closing an application) keeps a sibling as written, name collection and §5.10's spelling
+checks skip it, and the writers write its text unquoted. `Reference`, `TypeRef` and each variant are registered as atom
+host types, since a value written by its own class is described by the variant (`TypeRefTextBridge` and its nested
+bridges, in `ResolverBindContext`; `ForReference` and `ForSibling` read a sibling through
+`ReferenceGrammar.parseReference`). A context without those registrations describes `TypeRef` as a union of two records,
+so the schema model's classes bind only through a context that carries them (`ResolverBindContext.registerAbsent`, which
+`SchemaMetaNameBinder.over` applies).
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the
 model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtures are listed in
 `DefinitionResolverTest`'s Javadoc.

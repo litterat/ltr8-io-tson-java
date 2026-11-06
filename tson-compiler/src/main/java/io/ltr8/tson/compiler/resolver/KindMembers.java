@@ -115,7 +115,7 @@ public final class KindMembers {
                 return current.equals(constructorOf);
             }
             if (next.get().definition() instanceof TemplateBody held) {
-                // A constructor template (`kind => <T> !meta.reference { of: T }`): built with what its body applies.
+                // A constructor template (`kind => <T> !meta.reference_type { of: T }`): built with what its body applies.
                 Optional<String> applied = HeldBody.of(held).application().typeRef();
                 if (applied.isEmpty()) {
                     return false;

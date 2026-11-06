@@ -29,13 +29,14 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Typed field names — `meta.record.name_type` names the identifier family a record's field names belong to, as
       `meta.enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
       judged under its own name type in both encodings (Part 2 §5.2)
-- [x] References ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — one atom, `!meta.reference { of: T }`, spelled `meta.ref<T>`
-      whatever `T` is, admits a name exactly when the named entry's value, past its alias hops, is of a type IS-A
-      `T`. Over a constructor (`meta.ref<net.uuid_type>`) its values are the names of the types in the schema's closure
-      built with it: computed at link, never listed or written, and judged by membership in both encodings. Over any other
-      type its values are qualified names of values. The kernel types `meta.enum_type.name_type` and `meta.record.name_type`
-      by its `meta.identifier_ref`, a refinement of `meta.type_ref`, and judges a name type by membership (Part 2
-      §4.2). A refinement narrows `of` to the source's or a type IS-A it, judged at link (Part 2 §5.7)
+- [x] References ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — one atom, `!meta.reference_type { of: T }`, spelled
+      `meta.ref<T>` (`allow_sibling: false`) whatever `T` is, admits a name exactly when the named entry's value, past
+      its alias hops, is of a type IS-A `T`. Over a constructor (`meta.ref<net.uuid_type>`) its values are the names of
+      the types in the schema's closure built with it: computed at link, never listed or written, and judged by
+      membership in both encodings. Over any other type its values are qualified names of values. The kernel types
+      `meta.enum_type.name_type` and `meta.record.name_type` by its `meta.identifier_ref`, a refinement of
+      `meta.type_ref`, and judges a name type by membership (Part 2 §4.2). A refinement narrows `of` to the source's or
+      a type IS-A it, judged at link (Part 2 §5.7)
 - [x] An application is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12) — a reference with arguments is
       data grammar ([TSON-DATA] §7.4), written unquoted (`t: set<text>`, `@meta.application:response<order 201>`, an open
       alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonApplicationReference`, and at a kind-typed
@@ -44,9 +45,15 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       a reference. In JSON the same text is a string
 - [x] A sibling reference is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #21) — `kind!` parses in data
       and in sugar, its `!` followed by whitespace, and in JSON the same text is a string; it stands only at a record
-      field's type and is refused elsewhere, naming the slot, in sugar, in an explicit instance and in data. A
-      schemaless read keeps one as a `TsonSiblingReference`. Reading a field against the type its sibling names is not
-      implemented yet (`NOT_IMPLEMENTED`)
+      field's type, the one slot whose type, `meta.field_type_ref`, keeps `meta.reference_type`'s `allow_sibling`, and
+      is refused elsewhere, naming the slot, in sugar, in an explicit instance and in data. A schemaless read keeps one
+      as a `TsonSiblingReference`
+- [x] Dependent fields (Part 2 §5.2, [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #21) — `v?: kind!` is read per instance
+      against the type its sibling's value names, in tree and bind mode (an `Object` component) and in JSON. The
+      sibling's rules are checked at the declaration against the flattened record: declared first, typed by a reference
+      to types, always there to read, its pin or default no template; the dependent field never voidable, carrying no
+      value, restated only as itself. A pinned sibling gives the field a fixed reader, a discriminator a member's, and a
+      free sibling is written before its dependent field. The kernel's `record_field.value` is `type!`
 - [x] Every `!schema` value declares ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #14) — `geo => !schema { address => { … }
       }` is a schema map nested as an entry, its members declarations that lift, mint, link and compile as root
       entries do, each named by its path from the root (`geo.address`). A nested map is open: several documents of a closure

@@ -19,6 +19,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -91,6 +92,18 @@ final class RecordPlan {
     /** Each field group, compiled to slots once ({@link GroupPlan}). */
     private final GroupPlan[] groups;
 
+    /**
+     * Each dependent field's sibling slot ([TSON-SCHEMA] §5.2), -1 at every other field; a dependent field's {@link
+     * #schemaReaders} entry is its {@link DependentReader}.
+     */
+    final int[] siblingOf;
+
+    /** Whether each field is the sibling of some dependent field, so a read keeps the reference it wrote. */
+    final boolean[] typesADependent;
+
+    /** Whether any field is a dependent one. */
+    final boolean hasDependents;
+
     /** What this record's rules say when a document breaks one -- shared with the TSON reader ([TSON-JSON] §9.4). */
     final RecordDiagnostics rules;
     private final SubsumptionDiagnostics subsumption;
@@ -108,6 +121,10 @@ final class RecordPlan {
         this.omitted = new RecordField.Omitted[count];
         this.schemaReaders = new JsonTypeReader<?>[count];
         this.stated = new FieldValue[count];
+        this.siblingOf = new int[count];
+        this.typesADependent = new boolean[count];
+        List<String> order = List.copyOf(body.fields().keySet());
+        boolean dependents = false;
         Map<String, Integer> byName = new HashMap<>();
         // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule, and
         // then put into the record's name type's form (§5.5), so a name the type holds equal to a field is it.
@@ -125,21 +142,44 @@ final class RecordPlan {
             names[i] = Nfc.of(declared);
             byName.put(nameForm.apply(names[i]), i);
             omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(declared)));
-            // A sibling reference's type is chosen per instance by its sibling's value, which no reader reads yet.
-            TypeRef type = switch (field.type()) {
-                case TypeRef reference -> reference;
-                case SiblingRef sibling -> throw RecordField.siblingNotImplemented(sibling);
-            };
-            schemaReaders[i] = context.readers().resolve(type.name());
-            if (field.value().isPresent()) {
-                stated[i] = FieldValue.of(context.linked(), type.name(), field.value().get());
+            siblingOf[i] = -1;
+            switch (field.type()) {
+                case TypeRef type -> {
+                    schemaReaders[i] = context.readers().resolve(type.name());
+                    if (field.value().isPresent()) {
+                        stated[i] = FieldValue.of(context.linked(), type.name(), field.value().get());
+                    }
+                }
+                // A dependent field's type is chosen per instance by its sibling's value, which the record hands it.
+                case SiblingRef sibling -> {
+                    int at = order.indexOf(sibling.field());
+                    if (at < 0) {
+                        throw new IllegalStateException("'" + name + "': dependent field '" + declared + "' names no "
+                                + "field '" + sibling.field() + "'; the linker refuses one");
+                    }
+                    siblingOf[i] = at;
+                    typesADependent[at] = true;
+                    dependents = true;
+                    schemaReaders[i] = new DependentReader(declared, sibling.field(), context,
+                            siblingType(body.fields().get(sibling.field()), context));
+                }
             }
         }
+        this.hasDependents = dependents;
         this.index = Map.copyOf(byName);
         this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName, nameForm))
                 .toArray(GroupPlan[]::new);
         this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().keySet()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
+    }
+
+    /** The reference typing a dependent field's {@code sibling}, past its alias hops, or null where it is none. */
+    private static ReferenceBody siblingType(RecordField sibling, ValueReaderContext context) {
+        if (!(sibling.type() instanceof TypeRef type)) {
+            return null;
+        }
+        return AliasChain.terminal(context.schema(), type.name()).map(AliasChain.Resolved::definition)
+                .filter(ReferenceBody.class::isInstance).map(ReferenceBody.class::cast).orElse(null);
     }
 
     /** The field slot an NFC member name fills, in the name type's form, or -1 where it names no field. */
