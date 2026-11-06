@@ -24,6 +24,7 @@ import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
+import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
@@ -537,7 +538,7 @@ final class DefinitionResolver {
                     // sized array into the `!meta.array { ... }` construction it denotes with min_items/max_items bound
                     // directly (§5.3), a size-less one into the same without them (§5.6), a voidable element as
                     // `voidable: true`, and a tuple into `!meta.tuple { ... }` -- so one here is that phase not having run.
-                    case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _ ->
+                    case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _, SiblingRef _ ->
                             throw unlifted("'" + name + "'", referenceTypeDef.ref());
                 };
             }
@@ -563,6 +564,11 @@ final class DefinitionResolver {
      * rather than a gap in it.
      */
     private static IllegalStateException unlifted(String where, TypeRef ref) {
+        if (ref instanceof SiblingRef) {
+            return new IllegalStateException(where + ": a sibling reference reached resolution off a field's type: "
+                    + ref + " -- SchemaDesugarer refuses one there (§5.2), so this declaration was resolved from raw "
+                    + "AST without that phase");
+        }
         return new IllegalStateException(where + ": a container sugar form reached resolution unlifted: " + ref
                 + " -- SchemaDesugarer lifts every sugar form to an entry before DefinitionResolver runs (§5.3), so "
                 + "this declaration was resolved from raw AST without that phase");
@@ -627,13 +633,14 @@ final class DefinitionResolver {
          * (§5.10): a type that is a bare parameter name is its {@code type_param}, an unquoted value token that is one
          * its {@code value_param}, and anything else its {@code type} or {@code value}.
          */
-        static BuiltField written(io.ltr8.tson.schema.meta.TypeRef type, List<String> parameters, boolean optional,
-                boolean voidable, FieldRole role, Optional<Token> value, Annotations annotations,
+        static BuiltField written(io.ltr8.tson.schema.meta.Reference type, List<String> parameters,
+                boolean optional, boolean voidable, FieldRole role, Optional<Token> value, Annotations annotations,
                 Optional<SourcePosition> position) {
-            boolean whole = type.arguments().isEmpty() && parameters.contains(type.name());
-            return new BuiltField(whole ? Optional.empty() : Optional.of(type),
-                    whole ? Optional.of(type.name()) : Optional.empty(), optional, voidable, role, Optional.empty(),
-                    Optional.empty(), annotations, position).valued(value, parameters);
+            Optional<String> whole = type instanceof io.ltr8.tson.schema.meta.TypeRef named
+                    && named.arguments().isEmpty() && parameters.contains(named.name())
+                    ? Optional.of(named.name()) : Optional.empty();
+            return new BuiltField(whole.isPresent() ? Optional.empty() : Optional.of(type), whole, optional, voidable,
+                    role, Optional.empty(), Optional.empty(), annotations, position).valued(value, parameters);
         }
 
         /**
@@ -2615,7 +2622,7 @@ final class DefinitionResolver {
                 FieldModifiers.of(field.name(), field.omittable(), voidable, field.modifier());
         Optional<Token> value = resolved.value().map(DefinitionResolver::toMetaToken);
         if (field.type().isPresent()) {
-            return BuiltField.written(resolveTypeRef(field.type().get().typeRef()), parameters, resolved.optional(),
+            return BuiltField.written(resolveFieldType(field.type().get().typeRef()), parameters, resolved.optional(),
                     resolved.voidable(), resolved.role(), value, Annotations.empty(), positions.of(field));
         }
         // An elided type is the inherited field's, a parameter it carries and what its names mean included.
@@ -2724,7 +2731,7 @@ final class DefinitionResolver {
      * governed by the group (§5.11), and voidable exactly where its type carries {@code ?}.
      */
     private BuiltField resolveGroupMember(GroupDef.Member member, List<String> parameters) {
-        return BuiltField.written(resolveTypeRef(member.typeRef()), parameters, true, member.voidable(), FieldRole.FREE,
+        return BuiltField.written(resolveFieldType(member.typeRef()), parameters, true, member.voidable(), FieldRole.FREE,
                 Optional.empty(), annotationsOf(member.name(), member.annotations()), Optional.empty());
     }
 
@@ -2734,6 +2741,10 @@ final class DefinitionResolver {
      * this position, so it has no entry to name and is refused here in those terms.
      */
     io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeRef written) {
+        if (written instanceof SiblingRef sibling) {
+            throw new SchemaValidationException(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field())
+                    .refusedAt("the type of parameter '" + parameter + "'"));
+        }
         if (!(written instanceof NameRef) && !(written instanceof ApplicationRef)) {
             throw new SchemaValidationException("parameter '" + parameter + "' is written with the type "
                     + written + ", and a parameter's written type names a declared type or an application of one "
@@ -2761,7 +2772,18 @@ final class DefinitionResolver {
                 }
                 yield io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), args);
             }
-            case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _ -> throw unlifted("a type-ref position", ref);
+            case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _, SiblingRef _ ->
+                    throw unlifted("a type-ref position", ref);
         };
+    }
+
+    /**
+     * A field's or group member's type-ref, as {@link #resolveTypeRef} resolves one, or the sibling reference it is
+     * ([TSON-SCHEMA] §5.2): the one position a sibling reaches the model, {@link SchemaDesugarer} having refused one
+     * anywhere else.
+     */
+    private io.ltr8.tson.schema.meta.Reference resolveFieldType(TypeRef ref) {
+        return ref instanceof SiblingRef sibling ? io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field())
+                : resolveTypeRef(ref);
     }
 }

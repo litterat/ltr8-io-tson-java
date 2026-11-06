@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom;
 
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -8,20 +10,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * [TSON-DATA] §7.4's reference production, read from text into the {@link TypeRef} it spells (SPEC-FEEDBACK.md
- * #12): what a JSON string at a reference-typed position holds, JSON having no unquoted form, and the text form
- * {@link TypeRef#text} writes. The TSON text reader builds the same tree from tokens ({@code TsonDataStream}).
+ * [TSON-DATA] §7.4's reference production, read from text into the {@link Reference} it spells (SPEC-FEEDBACK.md
+ * #12, #21): what a JSON string at a reference-typed position holds, JSON having no unquoted form, and the text form
+ * {@link Reference#text} writes. The TSON text reader builds the same tree from tokens ({@code TsonDataStream}).
  *
  * <pre>
- *   reference = qualified-name ["&lt;" ws type-args ws "&gt;"]   ; "&lt;" adjacent to the name
- *   type-args = type-arg *(separator type-arg) [ws ","]        ; separator = ws "," ws / ws1
- *   type-arg  = reference / token                              ; a qualified name is a reference, any other
- *                                                              ; token (a number, a quoted token) a value
+ *   reference   = sibling-ref / qualified-name ["&lt;" ws type-args ws "&gt;"]   ; "&lt;" adjacent to the name
+ *   sibling-ref = identifier "!"                                  ; one segment; the text ends at the "!"
+ *   type-args   = type-arg *(separator type-arg) [ws ","]         ; separator = ws "," ws / ws1
+ *   type-arg    = reference / token                               ; a qualified name is a reference, any other
+ *                                                                 ; token (a number, a quoted token) a value
  * </pre>
  *
  * <p>A quoted argument is {@code "} delimited, with {@code \"}, {@code \\}, {@code \n}, {@code \r}, {@code \t}
  * and {@code \}{@code uXXXX} escapes, and is never a reference. Whitespace inside an argument list is free, so
  * {@code result< T >} and {@code result<T>} parse to one reference.
+ *
+ * <p><b>Two entry points, one production.</b> {@link #parseReference} reads every variant, a sibling reference
+ * ({@code kind!}) among them, for the one slot that holds one, a record field's type. {@link #parse} reads a {@link
+ * TypeRef} and refuses a sibling reference by the position rule ([TSON-SCHEMA] §5.2): every other reference-typed
+ * position names a type. A sibling reference is never an argument, so one inside an argument list is refused by the
+ * same rule wherever the reference stands.
  *
  * <p>The grammar alone: what the head and each argument resolve to is the position's to judge.
  */
@@ -31,17 +40,39 @@ public final class ReferenceGrammar {
     }
 
     /**
-     * {@code text} as the reference it spells.
+     * {@code text} as the type reference it spells: a name or an application.
+     *
+     * @throws AtomParseException where it spells none, naming what failed, and where it spells a sibling reference,
+     *                            which stands only at a record field's type
+     */
+    public static TypeRef parse(String text) {
+        return switch (parseReference(text)) {
+            case TypeRef reference -> reference;
+            case SiblingRef sibling -> throw new AtomParseException(sibling.refusedAt("a position typed by a type "
+                    + "reference"), "a type's name");
+        };
+    }
+
+    /**
+     * {@code text} as the reference it spells: a name, an application or a sibling reference.
      *
      * @throws AtomParseException where it spells none, naming what failed
      */
-    public static TypeRef parse(String text) {
+    public static Reference parseReference(String text) {
         Cursor cursor = new Cursor(text);
-        TypeRef reference = cursor.reference();
+        Reference reference = cursor.reference();
         if (!cursor.atEnd()) {
             throw cursor.error("'" + cursor.rest() + "' follows the reference");
         }
         return reference;
+    }
+
+    /**
+     * Whether {@code field} may stand before a sibling reference's {@code !}: one identifier, a single segment
+     * ([TSON-DATA] §7.4). A dotted name would be a chained projection, which the grammar does not have.
+     */
+    public static boolean isSiblingField(String field) {
+        return !field.isEmpty() && field.indexOf('.') < 0 && IdentifierGrammar.validate(field).isEmpty();
     }
 
     /**
@@ -102,12 +133,15 @@ public final class ReferenceGrammar {
             return text.substring(at);
         }
 
-        TypeRef reference() {
+        Reference reference() {
             int start = at;
             String head = word();
             if (head.isEmpty()) {
                 throw error(atEnd() ? "a reference names something, and this is empty"
                         : "expected a name, found '" + text.charAt(at) + "'");
+            }
+            if (head.endsWith("!")) {
+                return sibling(head);
             }
             segments(head);
             int afterHead = at;
@@ -137,6 +171,22 @@ public final class ReferenceGrammar {
             }
         }
 
+        /**
+         * {@code head}, a word ending in {@code !}, as the sibling reference it spells: the text ends at the mark,
+         * and the field before it is one identifier.
+         */
+        private SiblingRef sibling(String head) {
+            String field = head.substring(0, head.length() - 1);
+            if (!isSiblingField(field)) {
+                throw error("'" + field + "' is no field name a sibling reference can mark -- the '!' follows one "
+                        + "identifier, a single segment");
+            }
+            if (!atEnd()) {
+                throw error("the '!' of a sibling reference ends it, and '" + rest() + "' follows");
+            }
+            return new SiblingRef(field, null);
+        }
+
         private TypeArgument argument() {
             if (text.charAt(at) == '"') {
                 return new TypeArgument.Value(new Token(quoted(), Token.Form.SINGLE_LINE_QUOTED));
@@ -146,6 +196,10 @@ public final class ReferenceGrammar {
             if (word.isEmpty()) {
                 throw error("expected an argument, found '" + text.charAt(at) + "'");
             }
+            if (word.endsWith("!") && isSiblingField(word.substring(0, word.length() - 1))) {
+                throw new AtomParseException(new SiblingRef(word.substring(0, word.length() - 1), null)
+                        .refusedAt("a template argument"), "a template argument");
+            }
             if (!isQualifiedName(word)) {
                 if (!atEnd() && text.charAt(at) == '<') {
                     throw error("'" + word + "' is no qualified name, so it takes no argument list");
@@ -153,7 +207,7 @@ public final class ReferenceGrammar {
                 return new TypeArgument.Value(new Token(word, Token.Form.UNQUOTED));
             }
             at = start;
-            return new TypeArgument.Ref(reference());
+            return new TypeArgument.Ref((TypeRef) reference());
         }
 
         /** Each {@code .}-separated segment of {@code head} an identifier, none empty. */

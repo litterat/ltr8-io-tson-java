@@ -611,7 +611,7 @@ final class ParameterTypes {
         private void routed(String parameter, RecordValue field) {
             Optional<CoreValue> declared = WireForm.field(field, WireForm.TYPE);
             TypeRef type = switch (declared.orElse(null)) {
-                case ReferenceValue applied -> applied.reference();
+                case ReferenceValue(TypeRef applied) -> applied;
                 case TokenValue token when token.form() == TokenForm.UNQUOTED -> TypeRef.of(token.text());
                 case null, default -> null;
             };
@@ -629,7 +629,7 @@ final class ParameterTypes {
                         token(token.text(), declared, type, slot);
                 case ArrayValue array -> elements(array, type, slot);
                 case MapValue map when type instanceof MapBody entries -> entries(map, entries, slot);
-                case ReferenceValue applied when typePosition(declared.name()) -> application(applied.reference());
+                case ReferenceValue(TypeRef applied) when typePosition(declared.name()) -> application(applied);
                 case RecordValue record when type instanceof RecordBody nested ->
                         record(record, declared.name(), nested);
                 default -> {

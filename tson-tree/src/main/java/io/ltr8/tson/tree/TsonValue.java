@@ -64,7 +64,9 @@ public sealed interface TsonValue
             case TsonArray n -> new TsonArray(n.elements(), n.typeRef(), merged);
             case TsonTuple n -> new TsonTuple(n.elements(), n.typeRef(), merged);
             case TsonAtom n -> new TsonAtom(n.value(), n.typeRef(), merged);
-            case TsonReference n -> new TsonReference(n.segments(), n.arguments(), n.typeRef(), merged);
+            case TsonApplicationReference n ->
+                    new TsonApplicationReference(n.segments(), n.arguments(), n.typeRef(), merged);
+            case TsonSiblingReference n -> new TsonSiblingReference(n.field(), n.typeRef(), merged);
             case TsonVoid n -> new TsonVoid(n.typeRef(), merged);
             case TsonMissing n -> n;
         };

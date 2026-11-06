@@ -25,7 +25,8 @@ JSON inputs are in `design/cli-config-hashing.md`.
   reading document's closure, whatever it imports (`AtomParsers.forType`). JSON has no unquoted form, so an
   application is a JSON string holding the TSON reference text, `"set<text>"`, parsed by `atom.ReferenceGrammar`
   into the same `TypeRef` and judged as TSON judges it: through the entry it denotes, an application nothing in the
-  closure closed being refused. A tree read keeps the `JsonString` as written.
+  closure closed being refused. A sibling reference's string, `"kind!"`, is refused there by the same production, a
+  sibling standing only at a record field's type ([TSON-JSON] §5.6). A tree read keeps the `JsonString` as written.
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
 - Every mode is all-or-nothing: no builder builds where anything was reported while its value was read.

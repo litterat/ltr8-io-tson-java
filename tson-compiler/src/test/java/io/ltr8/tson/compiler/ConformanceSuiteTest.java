@@ -339,8 +339,9 @@ class ConformanceSuiteTest {
                 assertEquals(expForm, actForm, "token form");
                 assertEquals(fieldText(payload, "text"), tv.text(), "token text");
             }
-            case "reference" -> assertReferenceMatches(payload,
-                    assertInstanceOf(ReferenceValue.class, actual, "core-value kind 'reference'").reference());
+            case "reference" -> assertReferenceMatches(payload, assertInstanceOf(io.ltr8.tson.schema.meta.TypeRef.class,
+                    assertInstanceOf(ReferenceValue.class, actual, "core-value kind 'reference'").reference(),
+                    "core-value kind 'reference'"));
             case "absent" -> assertInstanceOf(VoidValue.class, actual, "core-value kind 'absent'");
             case "empty-brace" -> assertInstanceOf(EmptyBrace.class, actual, "core-value kind 'empty-brace'");
             case "record" -> {
@@ -494,7 +495,8 @@ class ConformanceSuiteTest {
         switch (member.name()) {
             case "absent" -> assertInstanceOf(TsonVoid.class, actual, "reader-value 'absent'");
             case "reference" -> {
-                TsonReference reference = assertInstanceOf(TsonReference.class, actual, "reader-value 'reference'");
+                TsonApplicationReference reference = assertInstanceOf(TsonApplicationReference.class, actual,
+                        "reader-value 'reference'");
                 ArrayValue expSegments = (ArrayValue) fieldCore((RecordValue) payload, "segments");
                 assertEquals(expSegments.elements().stream().map(e -> ((TokenValue) e.coreValue()).text()).toList(),
                         reference.segments(), "reference segments");

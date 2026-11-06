@@ -16,8 +16,10 @@ form only; history lives in git.
 - NFC normalization applies to *unquoted* tokens only; `Pattern_White_Space` is the spec's fixed 11-character set,
   hardcoded.
 - `TsonDataStream` is the only thing that walks source text; `TsonDataParser` holds no grammar logic of its own.
-- A reference with arguments (§7.4) is one `ReferenceEvent`, one `ReferenceValue`, assembled by the stream with its
-  `<` adjacent to an unquoted name; a quoted token is never a reference, and the lexer knows nothing of either.
+- A reference that is no bare name (§7.4) is one `ReferenceEvent`, one `ReferenceValue`, holding a `Reference`
+  assembled by the stream: an application, its `<` adjacent to an unquoted name, or a sibling reference, `kind!`, its
+  `!` adjacent to one unquoted identifier and followed by whitespace or the end of the document. A quoted token is
+  never a reference, and the lexer knows nothing of either.
 - `_id` lexes as the void sentinel then `id`, and the lexer never refuses it: the failure is a parse error at whichever
   half the grammar trips on, which `TsonDataStream.mismatch`/`parseError` extend with "quote it" (`underscored`).
   Refusing in the lexer would move a parser-category error into the lexer's.
@@ -197,7 +199,24 @@ Key points:
     is no qualified name (`requireQualifiedName`, each `.`-separated segment a §7.7 identifier). A qualified head
     parses (`geo.address<T>`); what it names is the reader's or the resolver's to judge.
   - **Where it stands**: anywhere a core value does, a map key included, the stream looking one token past a
-    `{`'s first key for an adjacent `<` to frame the map. A `!` tag is a qualified name with no arguments, below.
+    `{`'s first key for an adjacent `<` or `!` to frame the map. A `!` tag is a qualified name with no arguments,
+    below.
+- **A sibling reference is data grammar too** ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #21): `sibling-ref =
+  unquoted-token "!"`. The lexer is unchanged, so `kind!` is an unquoted token and an adjacent `!`, and adjacency
+  tells it from a prefix `!`, which is adjacent to the token after it. `TsonDataStream` assembles it (`marksSibling`,
+  `siblingReference`) into a `ReferenceEvent` holding a `SiblingRef`, one value like an application.
+  - **The `!` is followed by whitespace or the end of the document (§7.5).** That is what leaves nothing to decide:
+    `a!b` (a sibling or a tag on `b`), `kind!}`, `kind!]`, `kind!,` and `kind!?` are parse errors naming the rule.
+    The writers always separate what follows a value by a space, so they never write one of these.
+  - **The token is one unquoted identifier, a single segment** (`ReferenceGrammar.isSiblingField`): `a.b!` would be a
+    chained projection, and `"kind"!` is refused because a quoted token is never a reference. A multi-line token's
+    end is past its closing line's terminator, so a `!` opening the next line is a prefix and never marks it.
+  - **Never an argument, never a tag.** `box<kind! >` is refused by the position rule (a sibling stands only at a
+    record field's type, [TSON-SCHEMA] §5.2) as the argument list is read, `TypeArgument.Ref` holding a type
+    reference; `!int32!` is refused by `parseTypeRefName`, a tag naming a type. Anywhere else a core value stands the
+    grammar admits one, and where it may stand is the reader's to judge: a slot reader whose component is a
+    `TypeRef` refuses it, and the reference atom's parser refuses it at a field typed by a type reference.
+  - **A schemaless read keeps it** as a `TsonSiblingReference`, the field and the mark (`design/tree-model.md`).
 - **§3.2's three type-expression forms are refused by name, not by the separation rule.** Array brackets,
   type arguments and the `?` suffix "exist only within the [TSON-SCHEMA] type-definition grammar, and their
   appearance after `!` in a data value is a parse error" — so `parseTypeRefName` checks for each and says

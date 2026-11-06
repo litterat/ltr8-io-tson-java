@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
@@ -72,8 +73,9 @@ final class DerivedName {
     /** The readable half of a derived name: every scalar the binding record holds, in order, under {@code _}. */
     private static void appendReadable(StringBuilder out, CoreValue value) {
         switch (value) {
-            case ReferenceValue applied ->
-                    appendReadable(out, applied.reference());
+            case ReferenceValue(TypeRef applied) ->
+                    appendReadable(out, applied);
+            case ReferenceValue(SiblingRef sibling) -> out.append('_').append(InternalName.part(sibling.field()));
             case TokenValue token -> out.append('_')
                     .append(InternalName.part(
                             NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
@@ -120,11 +122,12 @@ final class DerivedName {
     private static void appendValue(StringBuilder out, CoreValue value) {
         switch (value) {
             // An application in a slot is its parsed form, so two spellings of one are one binding (§8.2).
-            case ReferenceValue applied -> {
-                TypeRef application = applied.reference();
+            case ReferenceValue(TypeRef application) -> {
                 out.append('p');
                 appendRef(out, application);
             }
+            // A sibling reference is a third spelling of a slot, kept apart from a name and an application.
+            case ReferenceValue(SiblingRef sibling) -> appendText(out.append('s'), sibling.field());
             case TokenValue token -> {
                 // The form by name, not ordinal: inserting a TokenForm constant would renumber every ordinal
                 // invisibly, which is the same hazard as hashing a record's toString.

@@ -224,8 +224,11 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   leaf to it, as a token is: the stream delivered the reference whole.
 - **A reference-typed position reads a token or a `ReferenceEvent`** (`AtomTypeReader`, `KindSlotReader`), rolling
   either into one `TypeRef`, and refuses a quoted token holding `<` as `TYPE_MISMATCH`: a quoted token is never a
-  reference ([TSON-DATA] §7.4). Any other typed position meeting a `ReferenceEvent` reports it as it reports any
-  non-token, naming `the reference box<text>`; `DataValueEvents` replays a `ReferenceValue` as one event.
+  reference ([TSON-DATA] §7.4). A `ReferenceEvent` holding a sibling reference (`kind!`) is admitted only by a slot
+  reader whose component is a `Reference`, a record field's type; a `TypeRef` component's reader and the atom's own
+  parser refuse it by the position rule ([TSON-SCHEMA] §5.2, `design/schema-resolution.md`). Any other typed position
+  meeting a `ReferenceEvent` reports it as it reports any non-token, naming `the reference box<text>` or `the sibling
+  reference kind!`; `DataValueEvents` replays a `ReferenceValue` as one event.
 - **`ListEventSource`** replays a pre-built event list: a schema default (`settleHeldValues` wraps the literal `Token`
   as one synthetic event, under `IdentifierPolicy.none()` since the real stream already judged it), an annotation probe,
   and, via `DataValueEvents`, the resolver's replay of a resolved `DataValue` through a compiled reader.

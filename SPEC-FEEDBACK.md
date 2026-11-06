@@ -1305,3 +1305,80 @@ arguments) supply; and §8.1's "never a head name" narrows to "a parent applicat
 arguments name, and a declared member additionally the head". The alternative, keeping the asymmetry, needs §8.1's
 expansion sentence to except applied parents, and the hand-written-expansion equivalence §5.8 states for `dog` to be
 said to hold only for closed declarations.
+
+## 21. [TSON-DATA] §4, §7.2.5, §7.4, §7.5; [TSON-SCHEMA] §5.2, §8.1, §12.1, §12.3 — a sibling reference, `field!`
+
+**Problem.** A record field whose type is chosen per instance by another field of the same record has no spelling.
+The kernel's own `record_field.value` is one: its type is whatever `record_field.type` names, so §8.1 types it
+`meta.value` and states the real type in prose. Spelling the dependency needs a reference that names a sibling field
+rather than a schema entry, which neither grammar has, and a rule saying where such a reference may stand.
+
+**What is running.** The spelling and the position rule, end to end through parsing. Reading a field against the type
+its sibling names is not: a field typed by a sibling reference reaches the schema model and is reported as this
+library's gap (`NOT_IMPLEMENTED`), and `meta.tn`'s `record_field.value` is still `meta.value`.
+
+- **Data grammar.** `kind!` is one reference value, delivered whole as an application is (#13): an unquoted token of
+  one segment, an identifier, with an adjacent `!` that is followed by whitespace. `a!b`, `kind!}`, `kind!]`,
+  `kind!,`, `kind!?`, `a.b!` and `"kind"!` are parse errors; so is `!int32!`, a tag naming a type. The end of the
+  document counts as following whitespace, so a document that is only `kind!` parses (the choice is this
+  implementation's; the rule as drafted says "followed by whitespace").
+- **Schema grammar.** `sibling-ref` is a `type-ref` alternative, picked by one token of lookahead after the name, with
+  the same whitespace rule, so `[ kind! ]`, `box< kind! >`, `( kind! | text )` and `x => kind!` parse and `[kind!]`
+  does not.
+- **The position rule.** A sibling reference stands only at a record field's type: `record_field.type` and
+  `record_template_field.type`, in sugar a field's type and a field group member's (a member is a field of the
+  record). Everywhere else it is refused, naming the slot: in sugar where it is written, before any lift (an alias
+  target, a refinement source, a composition operand, an array's element type, a map's key or value type, a tuple
+  element, a choice variant, a template argument); in an explicit instance at the slot (`!meta.array {
+  element_type: kind! }`, a schema error naming `element_type`); inside a data argument list as a parse error
+  (`!meta.record { fields: { v => box< kind! > } }`); and in data at a field typed `meta.type_ref`, where the
+  reference atom refuses it as a validation error (`!typed { t: kind! }`). The atom reads a sibling reference
+  wherever a reference stands; the rule, not the atom's type, decides where it is meaningful.
+- **Class 1.** A schemaless read keeps a sibling reference as a structured value, the field name and the mark,
+  resolving nothing, beside the structured application #13 keeps; the writers write it back as `kind!` followed by
+  whitespace.
+- **JSON.** A sibling reference is a string holding the same text, `"kind!"`, read by the same production
+  ([TSON-JSON] §5.6), and refused at a kind's position as the text encoding refuses it.
+
+**Resolution, a proposal.** Grammar, the position rule, and the Class 1 reading; the sibling's own rules (declared
+before the dependent field, typed by a reference to types, always present, a dependent field never voidable and
+carrying no default or pin) and the read order follow with the readers.
+
+[TSON-DATA] §7.4, extending #13's production:
+
+```
+reference    = sibling-ref
+             / qualified-name ["<" ws type-args ws ">"]
+
+sibling-ref  = unquoted-token "!"
+             ; "!" adjacent to the token before it, and followed by
+             ; whitespace or the end of the document (§7.5). The
+             ; token is one segment, an identifier: it contains no
+             ; ".". A quoted token is never a reference. It is never
+             ; a type-arg, and a tag ("!" qualified-name) is never one.
+```
+
+[TSON-DATA] §7.2.5: `!` keeps its prefix role and gains a postfix one; the lexer is unchanged, `kind!` lexing as an
+unquoted token and an adjacent special token, and adjacency telling the two apart (a prefix `!` is adjacent to the
+token after it).
+
+[TSON-DATA] §7.5 and [TSON-SCHEMA] §12.3, one row: `!` (suffix, sibling reference) MUST be adjacent to the preceding
+token and MUST be followed by whitespace.
+
+[TSON-DATA] §4: a schemaless read keeps a sibling reference as a structured value, its field name and the mark.
+
+[TSON-SCHEMA] §12.1: `type-ref` gains `/ sibling-ref`, one token of lookahead after the name (`!`, `<`, or neither)
+choosing the alternative.
+
+[TSON-SCHEMA] §5.2: the position rule above, stated once — a sibling reference stands only at a record field's type,
+and at every other slot holding a reference it is a resolver error naming the slot. In a data document at a field
+typed by `meta.type_ref` it is a validation error: the field holds a type's name.
+
+[TSON-SCHEMA] §8.1: `meta.reference`'s and `meta.type_ref`'s documentation say a reference is a name, an application
+or a sibling reference, and resolved output writes `kind!` as is.
+
+[TSON-JSON]: a string holding the same text, read by the same production (edited in place, §5.6).
+
+**Open.** Whether the end of the document counts as following whitespace (running: it does). Whether a field group
+member's type takes a sibling reference as a plain field's does (running: it parses and resolves as one, and meets
+the gap). The quoted-name gap: a field whose name needs quoting cannot be a sibling, and `"name"!` is refused.

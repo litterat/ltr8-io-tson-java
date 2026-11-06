@@ -262,10 +262,11 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         if (e instanceof TokenEvent token) {
             text = token.text();
             form = token.form();
-            if (referenceTyped && form != TokenForm.UNQUOTED && text.indexOf('<') >= 0) {
-                // A quoted token is text, never a reference ([TSON-DATA] §7.4): an application is written unquoted.
+            if (referenceTyped && form != TokenForm.UNQUOTED && (text.indexOf('<') >= 0 || text.endsWith("!"))) {
+                // A quoted token is text, never a reference ([TSON-DATA] §7.4): an application and a sibling
+                // reference are written unquoted.
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a reference, found the quoted token \"" + text
-                        + "\" -- a quoted token is never a reference; write the application unquoted",
+                        + "\" -- a quoted token is never a reference; write the reference unquoted",
                         "a reference", "the quoted token \"" + text + "\"");
                 ctx.next();
                 return null;

@@ -19,6 +19,8 @@ import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -312,6 +314,14 @@ final class WireForm {
         return ref.arguments().isEmpty() ? new TokenValue(ref.name(), TokenForm.UNQUOTED) : new ReferenceValue(ref);
     }
 
+    /** A record field's type in the held spelling: a type reference as {@link #refValue(TypeRef)}, a sibling as itself. */
+    static CoreValue refValue(Reference ref) {
+        return switch (ref) {
+            case TypeRef reference -> refValue(reference);
+            case SiblingRef sibling -> new ReferenceValue(sibling);
+        };
+    }
+
     // ── Reading: the wire form back as the reference it spells ─────────────────────────────────
 
     /**
@@ -321,7 +331,7 @@ final class WireForm {
      * ParameterTypes} recognise an application by the same test that closes one.
      */
     static Optional<TypeRef> applicationIn(CoreValue value) {
-        return value instanceof ReferenceValue reference ? Optional.of(reference.reference()) : Optional.empty();
+        return value instanceof ReferenceValue(TypeRef reference) ? Optional.of(reference) : Optional.empty();
     }
 
     /** The names an application writes: its head and every reference among its arguments, at any depth. */
@@ -382,8 +392,8 @@ final class WireForm {
             case TokenValue token when token.form() == TokenForm.UNQUOTED
                     && parameters.contains(token.text()) ->
                     argumentValue(argumentFor(token.text(), head, bindings));
-            case ReferenceValue reference ->
-                    refValue(substituted(reference.reference(), head, parameters, bindings));
+            case ReferenceValue(TypeRef reference) ->
+                    refValue(substituted(reference, head, parameters, bindings));
             case ArrayValue array -> new ArrayValue(array.elements().stream()
                     .map(element -> rewritten(element, substitute(element.coreValue(), head, parameters,
                             bindings))).toList());

@@ -10,7 +10,8 @@ import io.ltr8.tson.tree.TsonAtom;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonMissing;
 import io.ltr8.tson.tree.TsonRecord;
-import io.ltr8.tson.tree.TsonReference;
+import io.ltr8.tson.tree.TsonApplicationReference;
+import io.ltr8.tson.tree.TsonSiblingReference;
 import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -47,9 +48,13 @@ public final class TreeValueWriter {
             case TsonArray array -> writeSequence(array.elements(), array.typeRef(), out);
             case TsonTuple tuple -> writeSequence(tuple.elements(), tuple.typeRef(), out);
             case TsonAtom atom -> writeAtom(atom, out);
-            case TsonReference reference -> {
+            case TsonApplicationReference reference -> {
                 reference.typeRef().ifPresent(out::typeRef);
                 out.reference(reference(reference));
+            }
+            case TsonSiblingReference sibling -> {
+                sibling.typeRef().ifPresent(out::typeRef);
+                out.reference(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()));
             }
             case TsonVoid voidNode -> {
                 voidNode.typeRef().ifPresent(out::typeRef);
@@ -65,11 +70,11 @@ public final class TreeValueWriter {
      * A schemaless reference as the reference it was read from: a string argument that is a qualified name a
      * reference, any other a quoted token, and every other value its text, unquoted.
      */
-    private static io.ltr8.tson.schema.meta.TypeRef reference(TsonReference reference) {
+    private static io.ltr8.tson.schema.meta.TypeRef reference(TsonApplicationReference reference) {
         List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new java.util.ArrayList<>();
         for (TsonValue argument : reference.arguments()) {
             arguments.add(switch (argument) {
-                case TsonReference nested -> new io.ltr8.tson.schema.meta.TypeArgument.Ref(reference(nested));
+                case TsonApplicationReference nested -> new io.ltr8.tson.schema.meta.TypeArgument.Ref(reference(nested));
                 case TsonAtom atom when atom.value() instanceof String text
                         && io.ltr8.tson.atom.ReferenceGrammar.isQualifiedName(text) ->
                         new io.ltr8.tson.schema.meta.TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(text));

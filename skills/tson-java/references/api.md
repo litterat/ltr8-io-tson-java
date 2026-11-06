@@ -474,7 +474,7 @@ everything, are fail-fast by design.
 - `io.ltr8.tson.compiler.ast.schema` — `SchemaDocument` and the schema-grammar nodes.
 - `io.ltr8.tson.compiler.stream` — the Tier 2 event vocabulary: `TsonEvent` (sealed) with
   `DocumentStart`/`End`, `RecordStart`/`End`, `MapStart`/`MapArrow`/`MapEnd`, `ArrayStart`/`End`,
-  `FieldName`, `TokenEvent`, `ReferenceEvent` (a reference with arguments, assembled whole), `VoidEvent`,
+  `FieldName`, `TokenEvent`, `ReferenceEvent` (an application or a sibling reference, assembled whole), `VoidEvent`,
   `EmptyBraceEvent`, `TypeRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`: the schema
@@ -523,11 +523,24 @@ public sealed interface TsonValue
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue { public static TsonAtom of(Object value[, String typeRef]); }
 
-// A reference with arguments read with no schema (map<text list<int32>>): no referent, nothing resolved.
-public record TsonReference(List<String> segments, List<TsonValue> arguments, Optional<String> typeRef,
-        List<TsonAnnotation> annotations) implements TsonValue {
+// A reference the grammar alone shows to be one, read with no schema: no referent, nothing resolved.
+// A bare name is a TsonAtom holding text.
+public sealed interface TsonReference extends TsonValue
+        permits TsonApplicationReference, TsonSiblingReference {
+    String text();                                   // what it reads as: box<text>, kind!
+}
+
+// An application (map<text list<int32>>), at least one argument.
+public record TsonApplicationReference(List<String> segments, List<TsonValue> arguments, Optional<String> typeRef,
+        List<TsonAnnotation> annotations) implements TsonReference {
     public String name();                            // segments joined by "."
     public String text();                            // canonical: one space between arguments
+}
+
+// A sibling reference (kind!): a record field's type taken from the field `field` of the same record.
+public record TsonSiblingReference(String field, Optional<String> typeRef, List<TsonAnnotation> annotations)
+        implements TsonReference {
+    public String text();                            // field + "!"
 }
 
 public record TsonDocument(Optional<String> id, List<String> imports, TsonValue root) {}

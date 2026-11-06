@@ -56,6 +56,16 @@ text.
   `result<T>`. A qualified head (`geo.box<T>`) names a member of a nested schema map as a bare head names a root
   entry. The grammar classifies an argument, a reference first; the head's parameters judge whether it binds a type or a
   value (§5.10), so `TypeArgument` compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
+- **A reference may be a sibling reference** (SPEC-FEEDBACK.md #21), `kind!`: a record field's type chosen per instance
+  by the value of the field `kind` of the same record. It is data grammar as well, `sibling-ref = unquoted-token "!"`,
+  the `!` adjacent to one identifier and followed by whitespace ([TSON-DATA] §7.4, §7.5); JSON holds the same text in
+  a string, read by the same production (`ReferenceGrammar.parseReference`). The reference atom reads one wherever a
+  reference stands, and **where it may stand is a position rule, not a type**: only a record field's type
+  (`record_field.type`, `record_template_field.type`), the two model slots typed `Reference`. Everywhere else it is
+  refused, naming the slot: in sugar by the desugar phase, in an explicit instance by the `TypeRef` component's slot
+  reader, in an argument list by the grammar, and at a field typed `meta.type_ref` in data by the atom's parser
+  (`ReferenceGrammar.parse`), which reads a `TypeRef` (`design/schema-resolution.md`). Identity is the variant and its
+  components: `kind`, `kind<T>` and `kind!` are three references.
 - A reference carries arguments only where an application is still open: a record template's `chain.parents` and
   field `type`s, held text (`!meta.alias { target: pair<uuid B> }` inside `meta.template.template`), and the `application`
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
@@ -141,7 +151,8 @@ text.
   the index's `entries`, and every nested argument carries the same closure, so each level's referent resolves. The
   closure is a component excluded from `equals`, `hashCode` and `toString`. A reference read in a schema document,
   built by hand, or at a slot naming values (`RefParser`) carries `Closure.NONE` and names nothing. A schemaless read
-  has no closure at all and keeps an application as a `TsonReference` (`design/tree-model.md`), with no referent.
+  has no closure at all and keeps an application or a sibling reference as a `TsonReference` (`design/tree-model.md`),
+  with no referent.
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter
 positions), `design/meta-layer-namespaces.md` (value entries' slots), `design/record-dispatch.md` (the positional form).

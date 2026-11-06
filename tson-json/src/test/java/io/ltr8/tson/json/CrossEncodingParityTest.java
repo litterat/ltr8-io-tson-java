@@ -585,6 +585,19 @@ class CrossEncodingParityTest {
                 tson("typed", "{ t: set<int32> }").stream().map(Verdict::code).toList());
     }
 
+    /**
+     * A sibling reference is a reference value, read by the same production in both encodings: unquoted in TSON, a
+     * string holding the same text in JSON. It stands only at a record field's type, so a field typed by a type
+     * reference refuses it, on the same code at the same pointer in both.
+     */
+    @Test
+    void aSiblingReferenceAtAKindIsRefusedByBoth() {
+        sameVerdict("typed", "{ t: kind! }", """
+                {"t": "kind!"}""");
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID),
+                tson("typed", "{ t: kind! }").stream().map(Verdict::code).toList());
+    }
+
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {
         assertEquals(List.of(), tson(rootType, tsonBody));
         assertEquals(List.of(), json(rootType, jsonBody));
