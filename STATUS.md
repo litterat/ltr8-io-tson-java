@@ -54,7 +54,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       to types, always there to read, its pin or default no template; the dependent field never voidable, carrying no
       value, restated only as itself. A pinned sibling gives the field a fixed reader, a discriminator a member's, and a
       free sibling is written before its dependent field. A value's qualified name going on through one takes the
-      type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` is `type!`
+      type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` is `type!`. A value
+      entry's dependent value, of any form, is held as written and judged when the schema links against the type
+      its sibling names in the schema's own namespace
 - [x] Every `!schema` value declares ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #14) — `geo => !schema { address => { … }
       }` is a schema map nested as an entry, its members declarations that lift, mint, link and compile as root
       entries do, each named by its path from the root (`geo.address`). A nested map is open: several documents of a closure

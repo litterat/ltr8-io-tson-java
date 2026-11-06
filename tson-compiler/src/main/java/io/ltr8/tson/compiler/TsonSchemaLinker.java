@@ -7,6 +7,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.CountingReceiver;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
@@ -115,8 +116,10 @@ import java.util.stream.Collectors;
  * original), computes each kind's members ({@link #computeKinds}), derives choice disjointness, checks that every
  * reference anywhere in the schema actually resolves, that a reference's refinement narrows its {@code of} ({@link
  * #checkReferenceNarrows}) and that a field a record restates narrows its type ({@link #checkRestatedFieldTypes}),
- * and resolves and judges every value a value entry holds
- * by name ({@code ValuesByName}). A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
+ * resolves and judges every value a value entry holds
+ * by name ({@code ValuesByName}), and judges every dependent field's value a value entry holds as written against the
+ * type its sibling names ({@code HeldValues}). A {@link TsonLinkedSchema} is the compile-time proof that all of that
+ * ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
  * link a schema before registering it, same as any other caller. Identities are canonicalized through
@@ -673,8 +676,11 @@ public final class TsonSchemaLinker {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
-                                             DiagnosticsReceiver receiver, IdentifierPolicy identifiers,
+                                             DiagnosticsReceiver given, IdentifierPolicy identifiers,
                                              DataBindContext values, Set<String> pending) {
+        // Counted, so the values held as written are judged only over a schema otherwise clean (HeldValues).
+        CountingReceiver counted = given == null ? null : new CountingReceiver(given);
+        DiagnosticsReceiver receiver = counted;
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
         Map<String, Top> nameTypes = new LinkedHashMap<>();
@@ -801,8 +807,39 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
         closure.set(annotated);
 
-        return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.imports(),
-                annotated, schema.bootstrap(), schema.valuesByName(), facts), origins, enumForms, nameTypes);
+        TsonLinkedSchema linked = new TsonLinkedSchema(new TsonSchema(schema.id(), schema.imports(), annotated,
+                schema.bootstrap(), schema.valuesByName(), schema.heldValues(), facts), origins, enumForms, nameTypes);
+        if (pending.isEmpty() && (counted == null || !counted.reported()) && HeldValues.anyHeld(schema, localNames)) {
+            checkHeldValues(linked, merged, facts, origins, localNames, identifiers, values, receiver);
+        }
+        return linked;
+    }
+
+    /**
+     * The dependent fields' values each local value entry holds as written, judged against the type each one's
+     * sibling names in this schema's namespace ([TSON-SCHEMA] §5.2, {@link HeldValues}), and the references those
+     * reads record by name judged as any value body's ({@link ValuesByName}). Each refusal is its own diagnostic,
+     * against the entry that holds the value. Runs last, over a schema whose link is otherwise clean, since the
+     * judgement reads through the schema compiled.
+     */
+    private static void checkHeldValues(TsonLinkedSchema linked, Map<String, Top> merged,
+                                        Map<String, TsonSchema.EntryFacts> facts, Map<String, String> origins,
+                                        Set<String> localNames, IdentifierPolicy identifiers,
+                                        DataBindContext values, DiagnosticsReceiver receiver) {
+        TsonSchema schema = linked.schema();
+        ValuesByName names = new ValuesByName(schema, merged, facts, origins, values);
+        HeldValues held = new HeldValues(linked, merged, identifiers);
+        for (String name : localNames) {
+            held.check(name, names,
+                    (entry, refused) -> reportOrThrow(receiver, schema, entry, facts, refused.getMessage(), refused),
+                    (entry, gap) -> {
+                        if (receiver == null) {
+                            throw gap;
+                        }
+                        receiver.report(TsonDiagnostics.ofSchemaGap(localIdentity(schema), entry, gap.getMessage(),
+                                at(facts, entry)));
+                    });
+        }
     }
 
     /**

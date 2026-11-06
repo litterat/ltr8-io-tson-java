@@ -1375,15 +1375,25 @@ field's type is a gap.
   lookahead is added. A sibling naming no type a value can be read against — a sibling reference, a template, an
   application the closure does not hold — is a validation error at the sibling, and the value is not read. A sibling
   whose own read failed leaves the value unread with nothing more reported.
-- **Schema documents.** A schema document's dependent field holds its value as written, the token uninterpreted, and
-  the linker judges it — so the kernel's `record_field.value: type!` reads as `meta.value` did and waits on no entry.
+- **Schema documents.** A schema document's dependent field holds its value as written, whatever its form (a token,
+  a record, a list, a map, an annotated or tagged value) and in either order of its fields, so the kernel's
+  `record_field.value: type!` reads as `meta.value` did and waits on no entry. The type a sibling names is one of the
+  reading schema's namespace, which the governing layer's readers do not hold, so a value entry's held value is judged
+  when the schema links, read through the reader of that type (the sibling's pin, the value it holds, or its default,
+  by the reading rule above), each refusal a resolver error naming the entry, the slot, the dependent field and its
+  sibling: `d => !settings { s => { kind: int32  value: abc } }` is refused, and `value: { port: 8080 }` under `kind:
+  server` is read by `server`'s reader. A default or pin is judged as any field value is. A resolved form read as
+  data, whose names resolve in the document read, holds the value as written too (the choice is this
+  implementation's: its types are the document's own, and a resolved form is judged at ingest).
   `record_field` no longer waits on `meta.value`, and the kernel's wait cycle shrinks by `meta.value` and
   `meta.value_type` and gains `meta.field_type_ref`, pre-loaded beside `meta.type_ref` (reading its `of` waits on
   `meta.type_ref`, its own refinement). Read as data, a record field's `value` is read against its own `type`:
   `!meta.record_field { type: boolean  optional: true  role: DEFAULT  value: 5 }` is a validation error at `/value`.
 - **Binding.** A user schema's dependent field binds to an `Object` component, which receives what the named type
   binds to; any narrower class is a bind mismatch at compile. The binding library takes `Object` only where the
-  context registers it as an atom. The kernel's `RecordField.value` stays a held `Token`.
+  context registers it as an atom, as the context this library builds for the schema model does, and a meta layer's
+  host class with an `Object` component then receives the value a schema document holds as written. The kernel's
+  `RecordField.value` stays a held `Token`.
 - **Class 1.** A schemaless read keeps a sibling reference as a structured value, the field name and the mark,
   resolving nothing; the writers write it back as `kind!` followed by whitespace.
 - **JSON.** A sibling reference is a string holding the same text, `"kind!"`, read by the same production
@@ -1395,7 +1405,8 @@ field's type is a gap.
   walk goes on with that type. A sibling naming no type a value can be read against, by the reading rule above, is a
   resolver error at the slot holding the name, and so is one the value does not hold. With `setting => { kind:
   meta.type_ref  value?: kind! }`, `d => !settings { s => { kind: meta.identifier  value: hello } }` makes
-  `d.s.value` a `meta.identifier` value, and `d.s.value.port` where `kind: server` is judged by `server`'s fields.
+  `d.s.value` a `meta.identifier` value, and `d.s.value.port` where `kind: server` is judged by `server`'s fields and
+  reaches what the held record holds there.
 
 **Resolution, a proposal.** The design above, as written in the spec:
 

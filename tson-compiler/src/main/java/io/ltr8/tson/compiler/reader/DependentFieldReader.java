@@ -36,12 +36,15 @@ import java.util.function.Function;
  * #typeNamed}, which a value's qualified name going on through a dependent field is judged by too ({@code
  * ValuesByName}).
  *
- * <p><b>In a schema document the value is held as written.</b> A default or pin is decoded against its field's type
- * once every reader exists and judged when the schema links (a held value orders nothing, [TSON-SCHEMA] §5.2), so the
- * kernel's own {@code record_field.value}, typed {@code type!}, reads the token uninterpreted, as {@code meta.value}
- * would, through a reader of its own rather than that entry's: holding the value waits on nothing, so the kernel's
- * {@code record_field} waits on no {@code meta.value}. A bound {@code Token} component never reaches here ({@code
- * RecordBindReader.tokenAware}).
+ * <p><b>In a schema document the value is held as written</b>, whatever its form -- a token, a record, a list, a map,
+ * an annotated or tagged value -- as the schemaless tree it is ({@link SchemalessTreeReader#preserving()}), and so it
+ * is wherever names resolve in the document being read ({@link TsonReadContext#readsSchemaNames()}), a resolved form
+ * read as data among them. The type its sibling names is one of that document's namespace, which the readers of the
+ * layer governing it do not hold, so a schema's value is judged when the schema links, against that type, as a
+ * default or pin is (a held value orders nothing, [TSON-SCHEMA] §5.2): the record reader hands its events to the
+ * read's sink ({@link TsonReadContext#heldAsWritten}). Holding the value waits on nothing, so the kernel's {@code
+ * record_field}, whose {@code value} is typed {@code type!}, waits on no {@code meta.value}. A bound {@code Token}
+ * component never reaches here ({@code RecordBindReader.tokenAware}), though its record hands the value on the same.
  */
 public final class DependentFieldReader implements TsonTypeReader<Object> {
 
@@ -50,8 +53,8 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
     private final TsonTypeReaderResolver readers;
     private final ValueReaderContext context;
 
-    /** What a schema document holds the value as: the token, uninterpreted, in the mode the record reads in. */
-    private final TsonTypeReader<?> held;
+    /** What a schema document holds the value as: the schemaless tree, its type-refs kept as written. */
+    private static final SchemalessTreeReader HELD = SchemalessTreeReader.preserving();
 
     /**
      * The reference typing the sibling, past its alias hops, which an application the sibling's value writes is
@@ -59,18 +62,16 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
      */
     private final ReferenceBody siblingType;
 
-    DependentFieldReader(String field, String sibling, TsonTypeReaderResolver readers, ValueReaderContext context,
-                         TsonTypeReader<?> held) {
-        this(field, sibling, readers, context, held, null);
+    DependentFieldReader(String field, String sibling, TsonTypeReaderResolver readers, ValueReaderContext context) {
+        this(field, sibling, readers, context, null);
     }
 
     private DependentFieldReader(String field, String sibling, TsonTypeReaderResolver readers,
-                                 ValueReaderContext context, TsonTypeReader<?> held, ReferenceBody siblingType) {
+                                 ValueReaderContext context, ReferenceBody siblingType) {
         this.field = field;
         this.sibling = sibling;
         this.readers = readers;
         this.context = context;
-        this.held = held;
         this.siblingType = siblingType;
     }
 
@@ -80,7 +81,7 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
         if (declared == null || context == null) {
             return this;
         }
-        return new DependentFieldReader(field, sibling, readers, context, held,
+        return new DependentFieldReader(field, sibling, readers, context,
                 siblingType(declared, context.schema().entries()::get));
     }
 
@@ -158,8 +159,8 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
      * own read was refused, which has been reported: the value is then skipped unjudged.
      */
     Object readAgainst(TsonReadContext ctx, Reference named, TsonReadContext siblingCtx, RecordDiagnostics rules) {
-        if (ctx.readsSchemaDocument()) {
-            return held.read(ctx);
+        if (ctx.readsSchemaNames()) {
+            return HELD.read(ctx);
         }
         if (named == null) {
             TsonReadContext.skipUnjudged(ctx);
@@ -177,7 +178,8 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
 
     /**
      * The reference a sibling's read produced, in whichever form the read built it: a tree's atom, the reference
-     * itself, or the canonical text a string component holds; null where the read produced nothing.
+     * itself, a token held as written, a host's {@code Ref}, or the canonical text a string component holds; null
+     * where the read produced nothing.
      */
     public static Reference referenceIn(Object decoded) {
         if (decoded instanceof io.ltr8.tson.tree.TsonValue tree && !(tree instanceof TsonAtom)) {
@@ -190,6 +192,8 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
         return switch (value) {
             case null -> null;
             case Reference reference -> reference;
+            case io.ltr8.tson.schema.meta.Token token -> referenceIn(token.text());
+            case io.ltr8.tson.schema.meta.Ref<?> ref -> referenceIn(ref.name());
             case CharSequence text -> {
                 try {
                     yield ReferenceGrammar.parseReference(text.toString());

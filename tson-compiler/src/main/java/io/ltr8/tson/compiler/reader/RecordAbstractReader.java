@@ -220,6 +220,19 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /** Whether any field is a dependent one, so a read keeps the state {@link #readFields} needs for it. */
     private final boolean hasDependents;
 
+    /**
+     * Each field's sibling index where the field is typed by a sibling reference, whatever reads it -- a {@link
+     * DependentFieldReader} or a bound {@code Token} component's reader -- and -1 elsewhere: a schema document holds
+     * every such value as written and hands it to the read's sink ({@link Held}).
+     */
+    private final int[] heldSiblingOf;
+
+    /** Whether each field is the sibling of some field {@link #heldSiblingOf} names. */
+    private final boolean[] typesAHeld;
+
+    /** Whether any field is typed by a sibling reference ({@link #heldSiblingOf}). */
+    private final boolean holdsAsWritten;
+
     RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
                           SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames) {
         this.name = name;
@@ -248,6 +261,17 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
         }
         this.hasDependents = dependents;
+        this.heldSiblingOf = new int[fields.size()];
+        this.typesAHeld = new boolean[fields.size()];
+        boolean held = false;
+        for (int i = 0; i < fields.size(); i++) {
+            heldSiblingOf[i] = fields.get(i).schema().sibling().map(order::indexOf).orElse(-1);
+            if (heldSiblingOf[i] >= 0) {
+                typesAHeld[heldSiblingOf[i]] = true;
+                held = true;
+            }
+        }
+        this.holdsAsWritten = held;
         this.fieldIndex = new HashMap<>();
         this.precomputedValue = new Object[fields.size()];
         this.omitted = new RecordField.Omitted[fields.size()];
@@ -309,22 +333,20 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
          * §5.5) -- so two fields typed {@code hexdigest} and {@code sha256} name two entries and resolve to
          * two readers by this rule alone.
          */
-        static FieldReaders byType(TsonTypeReaderResolver resolver, ValueReaderContext context,
-                                   TsonTypeReader<?> held) {
-            return (name, field) -> declared(resolver, context, name, field, held);
+        static FieldReaders byType(TsonTypeReaderResolver resolver, ValueReaderContext context) {
+            return (name, field) -> declared(resolver, context, name, field);
         }
 
         /**
          * The reader of {@code field}'s declared type, the one choice every {@link FieldReaders} falls back to. A
          * dependent field's type is chosen per instance by its sibling's value, so its reader is a {@link
-         * DependentFieldReader}, which the record hands that value; {@code held} is what a schema document holds the
-         * value as, the token uninterpreted in the record's mode.
+         * DependentFieldReader}, which the record hands that value.
          */
         static TsonTypeReader<?> declared(TsonTypeReaderResolver resolver, ValueReaderContext context, String name,
-                                          RecordField field, TsonTypeReader<?> held) {
+                                          RecordField field) {
             return switch (field.type()) {
                 case TypeRef type -> resolver.resolve(type.name());
-                case SiblingRef sibling -> new DependentFieldReader(name, sibling.field(), resolver, context, held);
+                case SiblingRef sibling -> new DependentFieldReader(name, sibling.field(), resolver, context);
             };
         }
     }
@@ -451,6 +473,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         // where it stands; under NFC the spellings are one and nothing is kept, so an ordinary read allocates none.
         FieldName[] firstGiven = matchIndex == fieldIndex ? null : new FieldName[fields.size()];
         Dependents dependents = hasDependents ? new Dependents(fields.size()) : null;
+        Held held = holdsAsWritten && ctx.readsSchemaDocument() ? new Held(fields.size()) : null;
         while (!(ctx.peek() instanceof RecordEnd)) {
             // A name [TSON-DATA] §8.2 refused was never read, so nothing here can hold a verdict about it:
             // reporting it unrecognised would be claiming to have looked it up, which this processor
@@ -508,20 +531,35 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 ctx.next();
                 decoded = valueForVoidField(schemaIndex, ctx);
             } else if (siblingOf[schemaIndex] >= 0) {
+                if (held != null) {
+                    held.capture(schemaIndex, ctx.schemaField(fieldName.name(), declaredName, declared.position()));
+                }
                 decoded = readDependent(ctx, schemaIndex, fieldName.name(), seen, dependents);
             } else {
+                TsonReadContext fieldCtx = ctx.schemaField(fieldName.name(), declaredName, declared.position());
+                if (held != null && heldSiblingOf[schemaIndex] >= 0) {
+                    held.capture(schemaIndex, fieldCtx);
+                }
                 int before = ctx.reported();
-                decoded = fields.get(schemaIndex).parser()
-                        .read(ctx.schemaField(fieldName.name(), declaredName, declared.position()));
+                decoded = fields.get(schemaIndex).parser().read(fieldCtx);
+                io.ltr8.tson.schema.meta.Reference named = null;
+                if (dependents != null && typesADependent[schemaIndex] || held != null && typesAHeld[schemaIndex]) {
+                    named = ctx.reported() > before ? null : DependentFieldReader.referenceIn(decoded);
+                }
                 if (dependents != null && typesADependent[schemaIndex]) {
-                    dependents.named[schemaIndex] = ctx.reported() > before ? null
-                            : DependentFieldReader.referenceIn(decoded);
+                    dependents.named[schemaIndex] = named;
+                }
+                if (held != null && typesAHeld[schemaIndex]) {
+                    held.named[schemaIndex] = named;
                 }
             }
             sink.accept(schemaIndex, decoded);
             seen[schemaIndex] = true;
         }
         ctx.next(); // RecordEnd
+        if (held != null) {
+            held.hand(this, seen);
+        }
         return seen;
     }
 
@@ -529,11 +567,19 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final boolean[] readPositional(TsonReadContext ctx, FieldSink sink) {
         boolean[] seen = new boolean[fields.size()];
         int index = positionalFieldIndex;
+        Held held = heldSiblingOf[index] >= 0 && ctx.readsSchemaDocument() ? new Held(fields.size()) : null;
+        if (held != null) {
+            held.capture(index, ctx.schemaField(fields.get(index).name(), fields.get(index).name(),
+                    fields.get(index).schema().position()));
+        }
         Object decoded = siblingOf[index] >= 0 ? readDependent(ctx, index, fields.get(index).name(), seen, null)
                 : fields.get(index).parser().read(ctx.schemaField(fields.get(index).name(), fields.get(index).name(),
                         fields.get(index).schema().position()));
         sink.accept(index, decoded);
         seen[index] = true;
+        if (held != null) {
+            held.hand(this, seen);
+        }
         return seen;
     }
 
@@ -554,12 +600,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             named = DependentFieldReader.referenceIn(precomputedValue[at]);
         } else if (seen[at]) {
             named = dependents == null ? null : dependents.named[at];
-        } else if (omitted[at] == RecordField.Omitted.VALUE && !ctx.readsSchemaDocument()) {
+        } else if (omitted[at] == RecordField.Omitted.VALUE && !ctx.readsSchemaNames()) {
             named = DependentFieldReader.referenceIn(precomputedValue[at]);
             if (dependents != null) {
                 dependents.readBefore[index] = written;
             }
-        } else if (ctx.readsSchemaDocument()) {
+        } else if (ctx.readsSchemaNames()) {
             named = null; // a schema document holds the value as written, whatever the order
         } else {
             fieldCtx.report(rules.writtenBeforeItsSibling(written, sibling.name()));
@@ -598,6 +644,57 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                             .report(record.rules.writtenBeforeItsSibling(readBefore[d], record.fields.get(at).name()));
                     readBefore[d] = null;
                 }
+            }
+        }
+    }
+
+    /**
+     * What one read of a record in a schema document keeps of the fields typed by a sibling reference: each such
+     * value's events, captured before it is read and held, where it stands, and each sibling's value as this instance
+     * wrote it. Handed to the read's sink once the record is read ({@link TsonReadContext#heldAsWritten}), since a
+     * schema document holds the value whatever the order its fields are written in, so the sibling may come after.
+     */
+    private static final class Held {
+
+        final List<List<TsonEvent>> written;
+        final TsonReadContext[] at;
+        final io.ltr8.tson.schema.meta.Reference[] named;
+
+        Held(int size) {
+            written = new ArrayList<>(java.util.Collections.nCopies(size, null));
+            at = new TsonReadContext[size];
+            named = new io.ltr8.tson.schema.meta.Reference[size];
+        }
+
+        /** Field {@code index}'s value, at {@code fieldCtx}'s cursor, before it is read. */
+        void capture(int index, TsonReadContext fieldCtx) {
+            written.set(index, TsonReadContext.asWritten(fieldCtx));
+            at[index] = fieldCtx;
+        }
+
+        /**
+         * Each captured value, with what its sibling holds in this instance: its pin wherever it is written, the value
+         * written, or its default; nothing where the sibling holds none, its own read or its absence reported.
+         */
+        void hand(RecordAbstractReader<?> record, boolean[] seen) {
+            for (int i = 0; i < written.size(); i++) {
+                if (written.get(i) == null) {
+                    continue;
+                }
+                int sibling = record.heldSiblingOf[i];
+                io.ltr8.tson.schema.meta.Reference holds;
+                if (record.fixedCheck[sibling] != null) {
+                    holds = DependentFieldReader.referenceIn(record.precomputedValue[sibling]);
+                } else if (seen[sibling]) {
+                    holds = named[sibling];
+                } else if (record.omitted[sibling] == RecordField.Omitted.VALUE) {
+                    holds = DependentFieldReader.referenceIn(record.precomputedValue[sibling]);
+                } else {
+                    holds = null;
+                }
+                CompiledField declared = record.fields.get(sibling);
+                at[i].heldAsWritten(record.fields.get(i).name(), declared.name(), declared.schema(), holds,
+                        written.get(i));
             }
         }
     }

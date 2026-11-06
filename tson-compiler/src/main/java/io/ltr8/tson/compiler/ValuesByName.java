@@ -389,19 +389,26 @@ final class ValuesByName {
             throw new SchemaValidationException(naming + ", which the value does not hold, so the name has no type "
                     + "to go on through");
         }
-        String refusal;
-        switch (DependentFieldReader.typeNamed(named, DependentFieldReader.siblingType(declared, merged::get),
-                merged::get)) {
-            case DependentFieldReader.TypeNamed.None none -> refusal = none.held();
-            case DependentFieldReader.TypeNamed.Entry entry -> {
-                if (!(AliasChain.terminalDefinition(entry.name(), merged).orElse(null) instanceof ValueEntry value)) {
-                    return entry.name();
-                }
-                refusal = "'" + named.text() + "', " + aValueNoType(value);
-            }
+        return switch (typeNamed(named, declared, merged)) {
+            case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
+            case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
+                    + ", which holds " + none.held() + " -- so the name has no type to go on through");
+        };
+    }
+
+    /**
+     * What a sibling declared {@code sibling} and holding {@code named} types its dependent field by in the namespace
+     * {@code merged}: the read path's rule ({@link DependentFieldReader#typeNamed}), the sibling's reference resolving
+     * an application, and a value entry naming no type either.
+     */
+    static DependentFieldReader.TypeNamed typeNamed(Reference named, RecordField sibling, Map<String, Top> merged) {
+        DependentFieldReader.TypeNamed typed = DependentFieldReader.typeNamed(named,
+                DependentFieldReader.siblingType(sibling, merged::get), merged::get);
+        if (typed instanceof DependentFieldReader.TypeNamed.Entry entry
+                && AliasChain.terminalDefinition(entry.name(), merged).orElse(null) instanceof ValueEntry value) {
+            return new DependentFieldReader.TypeNamed.None("'" + named.text() + "', " + aValueNoType(value));
         }
-        throw new SchemaValidationException(naming + ", which holds " + refusal + " -- so the name has no type to "
-                + "go on through");
+        return typed;
     }
 
     /** What a value entry is, where a type is wanted: a value, which nothing can be typed by (§4.1). */
@@ -521,7 +528,7 @@ final class ValuesByName {
     }
 
     /** A slot as an RFC 6901 pointer into the body, as a diagnostic path is written. */
-    private static String pointer(List<String> steps) {
+    static String pointer(List<String> steps) {
         StringBuilder pointer = new StringBuilder();
         for (String step : steps) {
             pointer.append('/').append(step.replace("~", "~0").replace("/", "~1"));

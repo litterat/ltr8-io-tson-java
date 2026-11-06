@@ -29,6 +29,12 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * consumer's data goes: a consumer's own classes bind through the context the consumer supplies, which carries
  * none of them.
  *
+ * <p>{@code Object} is registered as an atom in a context built here from nothing ({@link #registerDefaults}), so a
+ * meta layer's host class takes a dependent field ([TSON-SCHEMA] §5.2) whole: the component receives the value a
+ * schema document holds as written, of whichever type the field's sibling names. {@link #registerAbsent} leaves it to
+ * the consumer's context, as for their own data: registering it there would bind any component erased to {@code
+ * Object}, a type variable's among them, as whatever its value reads to, where it is otherwise refused.
+ *
  * <p>So the split is by what needs it rather than by module convenience.
  */
 public final class ResolverBindContext {
@@ -52,7 +58,8 @@ public final class ResolverBindContext {
                 .registerAtom(NameRef.class, new TypeRefTextBridge.ForName())
                 .registerAtom(ApplicationRef.class, new TypeRefTextBridge.ForApplication())
                 .registerAtom(Reference.class, new TypeRefTextBridge.ForReference())
-                .registerAtom(SiblingRef.class, new TypeRefTextBridge.ForSibling());
+                .registerAtom(SiblingRef.class, new TypeRefTextBridge.ForSibling())
+                .registerAtom(Object.class);
     }
 
     /**

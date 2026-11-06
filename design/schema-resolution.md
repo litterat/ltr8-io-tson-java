@@ -312,7 +312,9 @@ judged once its application closes it:
 Everything else that walks field types skips a dependent field: it is satisfiable for inhabitance whatever its
 sibling names (`TypeInhabitance`), carries no value to check (`checkFieldValue`), contributes no name to a name type
 or a parameter's type (`NameType`, `ParameterTypes`). A value's qualified name going on through one takes the type its
-sibling names in the value walked (`ValuesByName.dependentType`, `design/meta-layer-namespaces.md`).
+sibling names in the value walked (`ValuesByName.dependentType`, `design/meta-layer-namespaces.md`). A value entry's
+dependent value is held as written at the read and judged against that type when the schema links (`HeldValues`,
+`design/linking-and-compilation.md`).
 
 ## Field groups
 

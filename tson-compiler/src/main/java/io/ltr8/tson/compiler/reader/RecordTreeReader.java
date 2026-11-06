@@ -5,7 +5,6 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadContext.FieldNameRule;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonVoid;
@@ -33,9 +32,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
                             ValueReaderContext context, SchemaLocation schemaLocation, AnnotationTypes annotationTypes,
                             FieldNameRule fieldNames) {
         // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
-        super(name, displayName, body, FieldReaders.byType(resolver, context, new AtomTreeReader(
-                AtomTypeReader.of(name, ValueParser.INSTANCE, schemaLocation), "meta.value", annotationTypes)),
-                schemaLocation, fieldNames);
+        super(name, displayName, body, FieldReaders.byType(resolver, context), schemaLocation, fieldNames);
         this.annotationTypes = annotationTypes;
         CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }

@@ -235,7 +235,9 @@ sibling reference, a template or an application the closure does not hold names 
 and the sibling. Past a field the value does not hold there is no value to read the sibling from: a pin or default
 still types the field and the name is refused as reaching no value after its type is judged, as any such name is, and
 without one it is refused as reaching no value at once. In a schema document a dependent field's value is held as
-written, a token, so a name going on past one reaches no further value (`BACKLOG.md`).
+written, the schemaless tree, so a name going on past one walks that tree by field name (`d.s.value.port` reaches the
+`8080` that `value: { port: 8080 }` holds), and the value itself is judged against the type its sibling names when the
+schema links (`HeldValues`, `design/linking-and-compilation.md`).
 
 **Refusals and kinds.** A value by name may name a value entry: a slot holding a value is not a type position. A
 value entry named where a type is wanted is refused in one sentence wherever it is met: a value of its type, and

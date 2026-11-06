@@ -278,13 +278,29 @@ public interface TsonReadContext {
                     io.ltr8.tson.schema.meta.Ref<?> cell);
 
     /**
+     * Records the value of the dependent field this context is at, held as written in a schema document ([TSON-SCHEMA]
+     * §5.2), with the slot it fills: {@code sibling} is the field typing it, declared as {@code declared}, and {@code
+     * named} what the sibling holds in this instance, null where the read produced no reference there. {@code
+     * written} is the value's events ({@link #asWritten}). Only a schema document's read keeps it, handing it to the
+     * sink its factory was given ({@link #schemaDocument}), for the linker to judge against the type the sibling names
+     * in the reading schema's namespace.
+     */
+    void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.RecordField declared,
+                       io.ltr8.tson.schema.meta.Reference named, List<TsonEvent> written);
+
+    /**
      * Where a schema document's read hands each reference it produces by name: its slot, the slot's declared type,
-     * the name, and the host's {@code Ref} cell where the host holds one.
+     * the name, and the host's {@code Ref} cell where the host holds one -- and each dependent field's value it holds
+     * as written ({@link #heldAsWritten(TsonSchema.HeldValue)}).
      */
     @FunctionalInterface
     interface HeldByName {
         void held(List<String> slot, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.TypeRef reference,
                   io.ltr8.tson.schema.meta.Ref<?> cell);
+
+        /** A dependent field's value the read held as written ({@link TsonReadContext#heldAsWritten}). */
+        default void heldAsWritten(TsonSchema.HeldValue value) {
+        }
 
         /**
          * The read reached {@code declaration}: a reader began reading a part of the value against the entry it
@@ -387,6 +403,14 @@ public interface TsonReadContext {
      */
     static <T> T lookingAhead(TsonReadContext ctx, java.util.function.Function<TsonReadContext, T> lookahead) {
         return DefaultTsonReadContext.lookingAhead(ctx, lookahead);
+    }
+
+    /**
+     * The events of the one data-value at {@code ctx}'s cursor, looked ahead at and put back ({@link #lookingAhead}):
+     * a value held as written, which something reads again later against a type the read does not know.
+     */
+    static List<TsonEvent> asWritten(TsonReadContext ctx) {
+        return DefaultTsonReadContext.asWritten(ctx);
     }
 
     /**
