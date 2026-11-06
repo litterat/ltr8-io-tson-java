@@ -145,7 +145,7 @@ final class SyntheticMerge {
      */
     private static boolean holdsApplication(CoreValue value) {
         return switch (value) {
-            case ReferenceValue ignored -> true;
+            case ReferenceValue(TypeRef ignored) -> true;
             case RecordValue record ->
                     record.fields().stream().anyMatch(f -> holdsApplication(f.value().coreValue()));
             case ArrayValue array ->

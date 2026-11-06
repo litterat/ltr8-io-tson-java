@@ -36,6 +36,15 @@ public record SiblingRef(String field, Annotations annotations) implements Refer
         return field + "!";
     }
 
+    /**
+     * The position rule's refusal of this reference at {@code slot}, which names the position in a message's words
+     * ({@code "an array's element type"}): the one phrasing every place that states the rule uses.
+     */
+    public String refusedAt(String slot) {
+        return "a sibling reference ('" + text() + "') stands only at a record field's type ([TSON-SCHEMA] §5.2), "
+                + "not at " + slot;
+    }
+
     @Override
     public SiblingRef withAnnotations(Annotations annotations) {
         return new SiblingRef(field, annotations);

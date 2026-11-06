@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.DiagnosticsReceiver;
@@ -21,6 +22,7 @@ import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
+import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -450,7 +452,8 @@ public final class TsonSchemaParser extends TsonDataParser {
     /** The dispatch decision itself, with the {@code '{'} already consumed -- see {@link #braceTypeDef}. */
     private boolean braceOpensMap() {
         return check(TokenType.UNQUOTED)
-                && (peekSecond().type() == TokenType.MAP_ARROW || peekSecond().type() == TokenType.LESS_THAN);
+                && (peekSecond().type() == TokenType.MAP_ARROW || peekSecond().type() == TokenType.LESS_THAN
+                        || peekSecond().type() == TokenType.BANG && peek().adjacentTo(peekSecond()));
     }
 
     /**
@@ -498,6 +501,10 @@ public final class TsonSchemaParser extends TsonDataParser {
         advance();
         requireQualifiedName(name);
         String target = name.text();
+        if (check(TokenType.BANG) && name.adjacentTo(peek())) {
+            throw parseError("'!" + target + "!' marks a type's name as a sibling reference, and a tag names a type "
+                    + "([TSON-DATA] §7.4): a tag is '!' and a qualified name, never a reference to a field");
+        }
 
         // A nested schema map is tagged `!schema`, the kernel root's alias the root's tag names, or by its target's
         // path, `!meta.schema`, as resolved output writes it: one grammar for both (see nestedSchemaMap).
@@ -809,12 +816,24 @@ public final class TsonSchemaParser extends TsonDataParser {
                     + "position (§5.3); declare a named type instead (e.g. 'quantity_t => !integer ^ { min: 1 }') "
                     + "and reference it by name");
         }
+        if (check(TokenType.SINGLE_LINE_STRING) && peekSecond().type() == TokenType.BANG
+                && peek().adjacentTo(peekSecond())) {
+            throw parseError("a quoted token is never a reference, so '!' cannot mark it as a sibling reference "
+                    + "([TSON-DATA] §7.4): a sibling is a field named by one unquoted identifier");
+        }
         return parseTypeRefHead();
     }
 
-    /** {@code type-name ["<" type-args ">"]} -- the type-name-based tail shared by every type-ref position and by refinement/construction heads. */
+    /**
+     * {@code sibling-ref / type-name ["<" type-args ">"]} -- the name-based tail shared by every type-ref position and
+     * by refinement/construction heads. One token of lookahead after the name picks the alternative: an adjacent
+     * {@code !} a sibling reference, an adjacent {@code <} an application, neither a bare name.
+     */
     private TypeRef parseTypeRefHead() {
         Token head = expect(TokenType.UNQUOTED, "a type reference");
+        if (check(TokenType.BANG) && head.adjacentTo(peek())) {
+            return parseSiblingRef(head);
+        }
         requireQualifiedName(head);
         String name = head.text();
         if (check(TokenType.LESS_THAN)) {
@@ -828,6 +847,25 @@ public final class TsonSchemaParser extends TsonDataParser {
             return new ApplicationRef(name, args);
         }
         return new NameRef(name);
+    }
+
+    /**
+     * {@code sibling-ref = unquoted-token "!"} past its token, the {@code !} next at the cursor: the token one
+     * identifier, a single segment, and the {@code !} followed by whitespace (§12.3). The whitespace is what keeps a
+     * postfix {@code !} apart from a prefix one, so {@code a!b}, <code>kind!}</code>, {@code [kind!]} and {@code
+     * kind!?} do not parse. Where it may stand is §5.2's position rule, {@code SchemaDesugarer}'s to state.
+     */
+    private SiblingRef parseSiblingRef(Token head) {
+        if (!ReferenceGrammar.isSiblingField(head.text())) {
+            throw new ParseException("'" + head.text() + "!' is no sibling reference -- the '!' marks one field of "
+                    + "the same record, named by one identifier, a single segment ([TSON-DATA] §7.4)", head.start());
+        }
+        Token bang = advance();
+        if (!check(TokenType.EOF) && bang.adjacentTo(peek())) {
+            throw parseError("a sibling reference's '!' must be followed by whitespace (§12.3): write '"
+                    + head.text() + "! ' before " + describe(peek()));
+        }
+        return new SiblingRef(head.text());
     }
 
     private TypeRef parseChoiceRef() {

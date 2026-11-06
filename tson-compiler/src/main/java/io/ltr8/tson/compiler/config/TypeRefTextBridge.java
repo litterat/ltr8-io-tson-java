@@ -5,7 +5,6 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.schema.meta.ApplicationRef;
 import io.ltr8.tson.schema.meta.NameRef;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -82,8 +81,8 @@ public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
     }
 
     /**
-     * {@link Reference} as an atom host: the reference's text. Read as {@link TypeRefTextBridge} reads it, the
-     * grammar spelling a name or an application.
+     * {@link Reference} as an atom host: the reference's text, which spells a name, an application or a sibling
+     * reference ({@link ReferenceGrammar#parseReference}).
      */
     public static final class ForReference implements DataBridge<String, Reference> {
 
@@ -98,14 +97,11 @@ public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
 
         @Override
         public Reference toObject(String text) {
-            return ReferenceGrammar.parse(text);
+            return ReferenceGrammar.parseReference(text);
         }
     }
 
-    /**
-     * {@link SiblingRef} as an atom host: written as its text, {@code kind!}. The reference grammar does not read a
-     * sibling reference yet, so reading one is this library's gap ({@link RecordField#siblingNotImplemented}).
-     */
+    /** {@link SiblingRef} as an atom host: the reference's text, which must spell a sibling reference. */
     public static final class ForSibling implements DataBridge<String, SiblingRef> {
 
         /** The bridge; it holds nothing. */
@@ -119,8 +115,10 @@ public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
 
         @Override
         public SiblingRef toObject(String text) {
-            throw new UnsupportedOperationException("reading a sibling reference ('" + text + "') is not "
-                    + "implemented yet");
+            if (ReferenceGrammar.parseReference(text) instanceof SiblingRef sibling) {
+                return sibling;
+            }
+            throw new AtomParseException("'" + text + "' names a type, not a sibling field", "a sibling reference");
         }
     }
 }

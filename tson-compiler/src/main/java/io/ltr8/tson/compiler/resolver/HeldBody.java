@@ -197,8 +197,8 @@ public final class HeldBody {
      */
     private static void collectApplications(CoreValue value, List<TypeRef> into) {
         switch (value) {
-            case ReferenceValue applied ->
-                    into.add(applied.reference());
+            case ReferenceValue(TypeRef applied) ->
+                    into.add(applied);
             case RecordValue record -> record.fields()
                     .forEach(field -> collectApplications(field.value().coreValue(), into));
             case ArrayValue array -> array.elements()
@@ -215,8 +215,8 @@ public final class HeldBody {
     private static void collect(CoreValue value, Set<String> into) {
         switch (value) {
             case TokenValue token when token.form() == TokenForm.UNQUOTED -> into.add(token.text());
-            case ReferenceValue applied ->
-                    collect(applied.reference(), into);
+            case ReferenceValue(TypeRef applied) ->
+                    collect(applied, into);
             case ArrayValue array -> array.elements()
                     .forEach(element -> collect(element.coreValue(), into));
             case RecordValue record -> record.fields()

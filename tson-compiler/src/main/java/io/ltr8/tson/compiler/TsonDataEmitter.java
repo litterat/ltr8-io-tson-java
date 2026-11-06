@@ -314,11 +314,23 @@ public final class TsonDataEmitter {
         return this;
     }
 
-    /** Writes {@code sibling} unquoted: its field's name and the sibling mark, {@code kind!}. */
+    /**
+     * Writes {@code sibling} unquoted: its field's name and the sibling mark, {@code kind!}. Whatever follows is
+     * whitespace, as [TSON-DATA] §7.5 requires after the mark: this writer separates every element, a map's arrow and
+     * a scope's closing delimiter by a space, and ends an annotation's value with one.
+     */
     public TsonDataEmitter reference(io.ltr8.tson.schema.meta.SiblingRef sibling) {
         startCoreValue();
         emit(sibling.text());
         return this;
+    }
+
+    /** Writes {@code reference} as its variant is written -- {@link #reference(io.ltr8.tson.schema.meta.TypeRef)}. */
+    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.Reference reference) {
+        return switch (reference) {
+            case io.ltr8.tson.schema.meta.TypeRef named -> reference(named);
+            case io.ltr8.tson.schema.meta.SiblingRef sibling -> reference(sibling);
+        };
     }
 
     private void emitReference(io.ltr8.tson.schema.meta.TypeRef reference) {

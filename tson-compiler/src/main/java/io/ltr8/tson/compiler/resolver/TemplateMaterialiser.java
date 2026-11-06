@@ -965,8 +965,8 @@ final class TemplateMaterialiser {
      */
     private CoreValue closeApplications(CoreValue value) {
         return switch (value) {
-            case ReferenceValue applied ->
-                    new TokenValue(close(applied.reference()).name(), TokenForm.UNQUOTED);
+            case ReferenceValue(TypeRef applied) ->
+                    new TokenValue(close(applied).name(), TokenForm.UNQUOTED);
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> new RecordValue.Field(field.name(),
                             WireForm.rewritten(field.value(), closeApplications(field.value().coreValue()))))

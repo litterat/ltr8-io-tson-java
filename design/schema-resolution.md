@@ -365,16 +365,26 @@ component, mirroring the constructor's flattened shape (`type`'s field first);
 argument of a reference, because a record of two `Optional`s would not say that exactly one is present; it compares
 by its canonical text, the head's parameter and not the grammar deciding which it binds. `Reference` is the parsed
 form of a reference value, sealed over `TypeRef` and `SiblingRef` (`kind!`, a record field's type chosen per instance
-by a sibling field's value, [TSON-SCHEMA] §5.2 proposed); `TypeRef` is sealed in turn over `NameRef` (no arguments)
-and `ApplicationRef` (at least one), the variant chosen by `TypeRef.of`, which never builds a sibling. Only
+by a sibling field's value, [TSON-SCHEMA] §5.2, SPEC-FEEDBACK.md #21); `TypeRef` is sealed in turn over `NameRef`
+(no arguments) and `ApplicationRef` (at least one), the variant chosen by `TypeRef.of`, which never builds a sibling. Only
 `RecordField.type` and `RecordTemplateField.type` are typed `Reference`; every other slot holding a reference is
-typed `TypeRef`, so the position rule is the Java type and only the field-type consumers switch on the variant. No
-grammar reads a sibling yet: a consumer that needs a field's type reference takes `RecordField.typeRef()`, or switches
-and throws `RecordField.siblingNotImplemented` (a gap, `NOT_IMPLEMENTED`); a rewrite of type names (`MetaRefs`,
-substitution, closing an application) keeps a sibling as written, name collection and §5.10's spelling checks skip
-it, and the writers write its text unquoted. `Reference`, `TypeRef` and each variant are registered as atom host
-types, since a value written by its own class is described by the variant (`TypeRefTextBridge` and its nested
-bridges, in `ResolverBindContext`; reading a sibling from text is the gap). A context without those registrations
+typed `TypeRef`, so the position rule is the Java type and only the field-type consumers switch on the variant. **The
+position rule is enforced where a sibling is read**, so none reaches a `TypeRef` slot: in sugar by `SchemaDesugarer`
+(`design/schema-grammar-and-desugaring.md`); in an explicit instance or a resolved form by the slot reader `BindTargets`
+picks by the component's class, a `TypeNameSlotReader` refusing one at its token where the component is a `TypeRef`
+(`TYPE_MISMATCH`, naming the slot, `!meta.array { element_type: kind! }`) and admitting it where it is a `Reference`
+(`record_field.type`, `record_template_field.type`, positional or not); inside an argument list by the data stream;
+and wherever no component narrows the read (a tree-mode read, a field typed `meta.type_ref` in data) by the reference
+atom's parser, which reads a `TypeRef` through `ReferenceGrammar.parse` and refuses a sibling there
+(`ATOM_FORM_INVALID`). A model walk such as `MetaRefs` could not see a misplaced sibling, the Java type having no room
+for one. At a field's type a sibling reaches the model, where no rule or reader reads against it yet: a consumer that
+needs a field's type reference takes `RecordField.typeRef()`, or switches and throws
+`RecordField.siblingNotImplemented` (a gap, `NOT_IMPLEMENTED`); a rewrite of type names (`MetaRefs`, substitution,
+closing an application) keeps a sibling as written, name collection and §5.10's spelling checks skip it, and the
+writers write its text unquoted. `Reference`, `TypeRef` and each variant are registered as atom host types, since a
+value written by its own class is described by the variant (`TypeRefTextBridge` and its nested bridges, in
+`ResolverBindContext`; `ForReference` and `ForSibling` read a sibling through `ReferenceGrammar.parseReference`). A
+context without those registrations
 describes `TypeRef` as a union of two records, so the schema model's classes bind only through a context that carries
 them (`ResolverBindContext.registerAbsent`, which `SchemaMetaNameBinder.over` applies).
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the

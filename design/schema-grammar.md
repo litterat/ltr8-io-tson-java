@@ -13,6 +13,8 @@ history lives in git.
 - `type-name = meta.identifier`: every declared name and type parameter is matched against `IdentifierProfile`; a type
   reference's head and a `!` head are each a `qualified-name`, each segment so matched, with an argument list's `<`
   adjacent to a reference's head (§12.3). Field names are the one naming position the parser leaves alone.
+- A sibling reference (`kind!`) parses wherever a type-ref does, its `!` adjacent and followed by whitespace; where it
+  may stand is §5.2's position rule, stated by the desugar phase, never by the parser.
 - A document has one declaration map. `geo => !schema { … }` is a schema map nested as an entry: its members go into
   that map under their paths (`geo.address`), and `geo` itself is a `SchemaMapDef` of its members' own names.
 - `SchemaMap.declarations` is a `LinkedHashMap` and a duplicate name overwrites — the grammar layer doesn't dedupe.
@@ -81,6 +83,14 @@ materialization, no validation (those are the resolver's/linker's jobs).
   data grammar's is ([TSON-DATA] §7.5): `box <text>` is a parse error naming the rule; inside the list whitespace and commas
   are free. The schema grammar keeps a parser of its own for references rather than the data stream's, because its `type-arg`
   admits sugar (`box<[text]>`, `box<(text | int32)>`), which a data argument never holds.
+- **`sibling-ref` is a `type-ref` alternative** (§12.1, SPEC-FEEDBACK.md #21; `parseTypeRefHead`,
+  `parseSiblingRef`): one token of lookahead after the name picks it, an adjacent `!` a sibling reference, an adjacent
+  `<` an application, neither a bare name. It becomes an `ast.schema.SiblingRef`, which joins the sealed `TypeRef`, so
+  `[ kind! ]`, `box< kind! >`, `( kind! | text )`, `{ kind! => text }` (the brace dispatch takes an adjacent `!` after
+  the first name as a map key, as it does `<`) and `x => kind!` all parse. **The `!` is followed by whitespace**
+  (§12.3), so `[kind!]`, `kind!}`, `a!b` and `kind!?` are parse errors; the token is one identifier (`a.b!` is
+  refused), and a quoted token is never one (`"kind"!`). A `!` head is a qualified name, so `!int32!` is refused by
+  name in `parseAtomRefinementOrInstance`.
 - **A parameter may write a type after its name** (`type-param = param-name [ws ":" ws type-ref]`), on every
   type-def form alike. `parseTypeParamsOpt` still returns the names the type-def records; a written type goes to
   the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution

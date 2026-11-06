@@ -22,6 +22,7 @@ import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
+import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleRef;
@@ -1192,5 +1193,40 @@ class TsonSchemaParserTest {
 
         assertEquals(Optional.of("https://example.com/s.tn"), doc.id());
         assertEquals(List.of("https://tson.io/2026/39/m/meta.tn", "https://tson.io/2026/39/m/core.tn"), doc.imports());
+    }
+
+    // ── A sibling reference (§12.1, §12.3) ───────────────────────────────
+
+    /**
+     * {@code kind!} parses wherever a type-ref does -- a field's type, an element, a variant, an argument, a
+     * declaration's own body -- into a {@link SiblingRef}; where it may stand is the desugar phase's to say.
+     */
+    @Test
+    void aSiblingReferenceParsesWhereverATypeRefDoes() {
+        assertEquals(new SiblingRef("kind"), fieldTypeOf("cell => { kind: meta.type_ref  v?: kind!  w: text }", "v"));
+        assertEquals(new SiblingRef("kind"), assertInstanceOf(ArrayRef.class,
+                fieldTypeOf("cell => { v: [ kind! ] }", "v")).elementType().typeRef());
+        assertEquals(new SiblingRef("kind"), assertInstanceOf(ChoiceRef.class,
+                fieldTypeOf("cell => { v: ( kind! | text ) }", "v")).variants().getFirst());
+        assertEquals(new TypeArg.Ref(new SiblingRef("kind")), assertInstanceOf(ApplicationRef.class,
+                fieldTypeOf("cell => { v: box< kind! > }", "v")).args().getFirst());
+        assertEquals(new SiblingRef("kind"),
+                assertInstanceOf(ReferenceTypeDef.class, declOf("x => kind!").typeDef()).ref());
+        assertEquals(new SiblingRef("kind"), mapOf("x => { kind! => text }").keyType());
+    }
+
+    /**
+     * The {@code !} is followed by whitespace, the token before it is one unquoted identifier, and a tag names a
+     * type: <code>kind!}</code>, {@code [kind!]}, {@code a!b}, {@code kind!?}, {@code a.b!}, {@code "kind"!} and {@code
+     * !int32!} do not parse.
+     */
+    @Test
+    void aMalformedSiblingReferenceDoesNotParse() {
+        for (String declaration : List.of("cell => { k: meta.type_ref  v?: k!}", "cell => { v: [k!] }",
+                "cell => { a: meta.type_ref  v?: a!b }", "cell => { k: meta.type_ref  v?: k!? }",
+                "cell => { a: meta.type_ref  v?: a.b! }", "cell => { k: meta.type_ref  v?: \"k\"! }",
+                "small => !int32! ^ { max: 10 }", "cell => { v: box<k!> }")) {
+            assertThrows(ParseException.class, () -> declOf(declaration), declaration);
+        }
     }
 }

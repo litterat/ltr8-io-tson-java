@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom;
 
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -75,5 +77,33 @@ class ReferenceGrammarTest {
     void theNamesAReferenceWritesAreItsHeadAndItsReferenceArguments() {
         assertEquals(List.of("response", "box", "order"),
                 ReferenceGrammar.names(ReferenceGrammar.parse("response<box<order> 201>")));
+    }
+
+    /** {@code kind!} reads to the sibling reference it spells, and writes back as the same text. */
+    @Test
+    void aSiblingReferenceRoundTrips() {
+        Reference read = ReferenceGrammar.parseReference("kind!");
+        assertEquals(SiblingRef.of("kind"), read);
+        assertEquals("kind!", read.text());
+        assertEquals(TypeRef.of("box", List.of(ref("text"))), ReferenceGrammar.parseReference("box<text>"));
+    }
+
+    /** Every position but a record field's type reads a type reference, so {@link ReferenceGrammar#parse} refuses one. */
+    @Test
+    void aTypeReferenceIsNoSiblingReference() {
+        AtomParseException refused = assertThrows(AtomParseException.class, () -> ReferenceGrammar.parse("kind!"));
+        assertTrue(refused.getMessage().contains("stands only at a record field's type"), refused.getMessage());
+    }
+
+    /** One identifier and the mark, ending the text; never an argument. */
+    @Test
+    void aMalformedOrMisplacedSiblingReferenceIsRefused() {
+        for (String text : List.of("a.b!", "a!b", "kind! ", "kind!x", "!kind", "kind!!", "1x!", "box<kind!>",
+                "box<text kind!>")) {
+            assertThrows(AtomParseException.class, () -> ReferenceGrammar.parseReference(text), text);
+        }
+        AtomParseException argument = assertThrows(AtomParseException.class,
+                () -> ReferenceGrammar.parseReference("box<kind!>"));
+        assertTrue(argument.getMessage().contains("not at a template argument"), argument.getMessage());
     }
 }

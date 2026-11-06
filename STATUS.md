@@ -38,10 +38,15 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       §4.2). A refinement narrows `of` to the source's or a type IS-A it, judged at link (Part 2 §5.7)
 - [x] An application is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12) — a reference with arguments is
       data grammar ([TSON-DATA] §7.4), written unquoted (`t: set<text>`, `@meta.application:response<order 201>`, an open
-      alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonReference`, and at a kind-typed position
-      it reads to a `TypeRef` that resolves level by level, by structural identity, to the entry the schema closed
-      it to, its `referent()` that entry's value. An application the schema never closes is refused; a quoted token
-      is never a reference. In JSON the same text is a string
+      alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonApplicationReference`, and at a kind-typed
+      position it reads to a `TypeRef` that resolves level by level, by structural identity, to the entry the schema closed
+      it to, its `referent()` that entry's value. An application the schema never closes is refused; a quoted token is never
+      a reference. In JSON the same text is a string
+- [x] A sibling reference is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #21) — `kind!` parses in data
+      and in sugar, its `!` followed by whitespace, and in JSON the same text is a string; it stands only at a record
+      field's type and is refused elsewhere, naming the slot, in sugar, in an explicit instance and in data. A
+      schemaless read keeps one as a `TsonSiblingReference`. Reading a field against the type its sibling names is not
+      implemented yet (`NOT_IMPLEMENTED`)
 - [x] Every `!schema` value declares ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #14) — `geo => !schema { address => { … }
       }` is a schema map nested as an entry, its members declarations that lift, mint, link and compile as root
       entries do, each named by its path from the root (`geo.address`). A nested map is open: several documents of a closure

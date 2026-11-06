@@ -23,6 +23,7 @@ import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
+import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -341,12 +342,81 @@ final class SchemaDesugarer {
     }
 
     private SchemaMap.Declaration declaration(SchemaMap.Declaration declaration) {
+        siblingsAtFieldTypesOnly(declaration.typeDef());
         currentParameters = typeParams(declaration.typeDef());
         try {
             TypeDef typeDef = typeDef(declaration.typeDef());
             return typeDef == declaration.typeDef() ? declaration : declaration.withTypeDef(typeDef);
         } finally {
             currentParameters = List.of();
+        }
+    }
+
+    // ── §5.2's position rule: a sibling reference stands only at a record field's type ─────────────
+
+    /**
+     * Refuses a sibling reference ({@code kind!}) written in sugar anywhere but at a record field's type, naming the
+     * slot ([TSON-SCHEMA] §5.2). The grammar admits one wherever a type-ref stands, and it is refused here, before
+     * any lift: a lift would carry it into an entry outside the record, which has no sibling to read, so {@code
+     * [ kind! ]} would need an array chosen per value. A group member is a field of the record, and takes one as a
+     * field does. A construction's payload is data, read against its constructor, whose slot readers state the
+     * same rule.
+     */
+    private static void siblingsAtFieldTypesOnly(TypeDef typeDef) {
+        switch (typeDef) {
+            case ReferenceTypeDef reference -> siblingRefused(reference.ref(), "an alias target");
+            case StructuralTypeDef structural -> {
+                switch (structural.body()) {
+                    case RecordDef record -> siblingsAtFieldTypesOnly(record);
+                    case RefinedDef refined -> {
+                        siblingRefused(refined.target(), "a refinement source");
+                        siblingsAtFieldTypesOnly(refined.body());
+                    }
+                    case ConstructionDef construction -> {
+                        construction.supertypes().forEach(operand -> siblingRefused(operand, "a composition operand"));
+                        construction.body().ifPresent(SchemaDesugarer::siblingsAtFieldTypesOnly);
+                    }
+                }
+            }
+            default -> { } // a payload is data, judged by its constructor's slot readers
+        }
+    }
+
+    private static void siblingsAtFieldTypesOnly(RecordDef record) {
+        for (RecordEntry entry : record.entries()) {
+            switch (entry) {
+                case FieldDef field -> field.type().ifPresent(type -> siblingInside(type.typeRef()));
+                case GroupDef group -> group.members().forEach(member -> siblingInside(member.typeRef()));
+            }
+        }
+    }
+
+    /** A record field's type: a sibling reference itself stands here, and is refused anywhere inside the type. */
+    private static void siblingInside(TypeRef ref) {
+        if (!(ref instanceof SiblingRef)) {
+            siblingRefused(ref, "");
+        }
+    }
+
+    /** {@code ref}, standing at {@code slot}, refused where it is a sibling reference or holds one at any depth. */
+    private static void siblingRefused(TypeRef ref, String slot) {
+        switch (ref) {
+            case SiblingRef sibling -> throw new SchemaValidationException(
+                    io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()).refusedAt(slot));
+            case NameRef _ -> { }
+            case ApplicationRef application -> application.args().forEach(argument -> {
+                if (argument instanceof TypeArg.Ref nested) {
+                    siblingRefused(nested.ref(), "a template argument");
+                }
+            });
+            case ArrayRef array -> siblingRefused(array.elementType().typeRef(), "an array's element type");
+            case MapRef map -> {
+                siblingRefused(map.keyType(), "a map's key type");
+                siblingRefused(map.valueType().typeRef(), "a map's value type");
+            }
+            case TupleRef tuple -> tuple.elementTypes()
+                    .forEach(element -> siblingRefused(element.typeRef(), "a tuple element"));
+            case ChoiceRef choice -> choice.variants().forEach(variant -> siblingRefused(variant, "a choice variant"));
         }
     }
 
@@ -486,6 +556,7 @@ final class SchemaDesugarer {
     private TypeRef typeRef(TypeRef ref) {
         return switch (ref) {
             case NameRef simple -> simple;
+            case SiblingRef sibling -> sibling; // a field's type, as written: it names no entry to lift
             case ArrayRef _, TupleRef _, MapRef _ -> hoistOrKeep(binding(ref), ref);
             case ChoiceRef _ -> hoistOrKeep(binding(ref), ref);
             case ApplicationRef generic -> {
@@ -582,6 +653,10 @@ final class SchemaDesugarer {
      * token denotes.
      */
     private static CoreValue refValue(TypeRef ref) {
+        if (ref instanceof SiblingRef sibling) {
+            // A record template field's type, the one slot a sibling reference reaches here.
+            return WireForm.refValue(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()));
+        }
         return WireForm.refValue(reference(ref));
     }
 
@@ -1077,8 +1152,8 @@ final class SchemaDesugarer {
     /** Whether {@code value}, or anything nested inside it, is the bare token {@code text}. */
     private static boolean namesToken(CoreValue value, String text) {
         return switch (value) {
-            case ReferenceValue applied ->
-                    WireForm.namesIn(applied.reference()).contains(text);
+            case ReferenceValue(io.ltr8.tson.schema.meta.TypeRef applied) ->
+                    WireForm.namesIn(applied).contains(text);
             case TokenValue token -> token.text().equals(text);
             case ArrayValue array -> array.elements().stream()
                     .anyMatch(element -> namesToken(element.coreValue(), text));
@@ -1137,8 +1212,8 @@ final class SchemaDesugarer {
 
     private static CoreValue renameValue(CoreValue value, Map<String, String> substitution) {
         return switch (value) {
-            case ReferenceValue applied -> WireForm.refValue(
-                    WireForm.renamedArguments(applied.reference(), substitution));
+            case ReferenceValue(io.ltr8.tson.schema.meta.TypeRef applied) -> WireForm.refValue(
+                    WireForm.renamedArguments(applied, substitution));
             case TokenValue token -> substitution.containsKey(token.text())
                     ? new TokenValue(substitution.get(token.text()), token.form())
                     : token;

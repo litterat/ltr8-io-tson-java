@@ -17,6 +17,7 @@ import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
+import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -739,6 +740,50 @@ class SchemaDesugarerTest {
         RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().coreValue();
         return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()
                 .value().coreValue();
+    }
+
+    // ── §5.2's position rule: a sibling reference stands only at a record field's type ─────────────
+
+    /** At a record field's type, and a group member's, a sibling reference passes through as written. */
+    @Test
+    void aSiblingReferenceAtAFieldsTypeIsKeptAsWritten() {
+        SchemaDocument document = desugar("  cell => { kind: meta.type_ref  v?: kind!  ( a: kind! | b: text ) }");
+        StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get("cell").typeDef();
+        FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
+        assertEquals(new SiblingRef("kind"), field.type().orElseThrow().typeRef());
+    }
+
+    /** A record template's field carries it into the template's payload as the reference value it is. */
+    @Test
+    void aRecordTemplateFieldCarriesASiblingReference() {
+        RecordTemplateDef template = assertInstanceOf(RecordTemplateDef.class, desugar(
+                "  cell => <T> { kind: meta.type_ref  v?: kind!  w: T }").body().declarations().get("cell").typeDef());
+        RecordValue fields = (RecordValue) template.payload().coreValue();
+        MapValue map = (MapValue) fields.fields().get(0).value().coreValue();
+        RecordValue v = (RecordValue) map.entries().get(1).value().coreValue();
+        assertEquals(new ReferenceValue(io.ltr8.tson.schema.meta.SiblingRef.of("kind")),
+                v.fields().get(0).value().coreValue());
+    }
+
+    /** Anywhere else in sugar it is refused before any lift, naming the slot. */
+    @Test
+    void aSiblingReferenceOffAFieldsTypeIsRefusedNamingTheSlot() {
+        Map<String, String> slots = Map.of(
+                "  cell => { kind: meta.type_ref  v: [ kind! ] }", "an array's element type",
+                "  cell => { kind: meta.type_ref  v: { text => kind! } }", "a map's value type",
+                "  cell => { kind: meta.type_ref  v: { kind! => text } }", "a map's key type",
+                "  cell => { kind: meta.type_ref  v: ( kind! | text ) }", "a choice variant",
+                "  cell => { kind: meta.type_ref  v: [ kind! text ] }", "a tuple element",
+                "  box => <T> { v: T }\n  cell => { kind: meta.type_ref  v: box< kind! > }", "a template argument",
+                "  x => kind!", "an alias target",
+                "  x => kind! ^ {}", "a refinement source",
+                "  x => kind! & { note: text }", "a composition operand");
+        slots.forEach((declarations, slot) -> {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> desugar(declarations), declarations);
+            assertEquals("a sibling reference ('kind!') stands only at a record field's type ([TSON-SCHEMA] §5.2), "
+                    + "not at " + slot, thrown.getMessage(), declarations);
+        });
     }
 
     /** An application in a slot: the data grammar's reference, {@code head<arg>}. */

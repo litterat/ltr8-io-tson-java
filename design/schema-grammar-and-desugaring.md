@@ -21,6 +21,8 @@ The schema grammar itself is in `design/schema-grammar.md`.
 - A form an `!!import` already declares is referenced, not redeclared — and is not marked `@meta.synthetic` by this document.
 - An element, position or map-value `?` binds `state` directly; an unmarked one states nothing; a map key takes no `?`.
 - An invalid sugar form is reported per declaration through `DesugarFailureReporter`, not thrown.
+- A sibling reference (`kind!`) is refused anywhere but at a record field's or group member's type, before any lift,
+  naming the slot (`siblingsAtFieldTypesOnly`, [TSON-SCHEMA] §5.2); at a field's type it passes through as written.
 
 Related: `design/schema-grammar.md` (the parser producing the AST this rewrites),
 `design/desugaring-open-forms-and-templates.md` (open lifts, parameterised aliases, record templates),
@@ -28,6 +30,17 @@ Related: `design/schema-grammar.md` (the parser producing the AST this rewrites)
 `design/schema-side-diagnostics.md`.
 
 ## Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
+
+**The position rule for a sibling reference runs first, over the declaration as written** (SPEC-FEEDBACK.md #21). The
+grammar admits `kind!` wherever a type-ref stands; a lift would carry it into an entry outside the record, which has no
+sibling to read (`[ kind! ]` would need an array chosen per value, a template family the language does not have), so
+the phase refuses it where it is written, as a `SchemaValidationException` whose message is `SiblingRef.refusedAt`'s:
+an alias target (`x => kind!`), a refinement source, a composition operand, an array's element type, a map's key or
+value type, a tuple element, a choice variant, a template argument. A group member is a field of the record and takes
+one as a field does. A construction's payload is data, read against its constructor, whose slot readers state the same
+rule (`design/schema-resolution.md`). At a field's type the reference is carried as written: `typeRef` returns it, a
+record template's field writes it into the payload as a `ReferenceValue` holding the sibling, and
+`DefinitionResolver.resolveFieldType` hands `BuiltField` the model's `SiblingRef`.
 
 An AST→AST rewrite between parsing and resolution. Every sugar form — `[T]` and the sized forms, `[T, U]`,
 `{K => V}` (§5.3), `(A | B)` (§5.4) — becomes the `!C value` construction it denotes: at declaration position
