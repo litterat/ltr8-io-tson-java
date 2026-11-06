@@ -11,17 +11,18 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
-import io.ltr8.tson.compiler.ast.schema.ArrayRef;
+import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
-import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
+import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.DefinitionMark;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.MapRef;
+import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
+import io.ltr8.tson.compiler.ast.schema.Reference;
 import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
@@ -33,10 +34,10 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
-import io.ltr8.tson.compiler.ast.schema.TupleRef;
+import io.ltr8.tson.compiler.ast.schema.TupleExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
-import io.ltr8.tson.compiler.ast.schema.TypeRef;
+import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -115,7 +116,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     private String declarationPrefix = "";
 
     /** The types the declaration being parsed wrote in its parameter list, by parameter name ({@link #parseTypeParam}). */
-    private Map<String, TypeRef> parameterTypes = new LinkedHashMap<>();
+    private Map<String, TypeExpr> parameterTypes = new LinkedHashMap<>();
 
     public TsonSchemaParser(String source) {
         super(source);
@@ -416,7 +417,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             return new ReferenceTypeDef(typeParams, parseBracket());
         }
 
-        TypeRef head = parseTypeRefHead();
+        Reference head = parseTypeRefHead();
         if (check(TokenType.CARET)) {
             advance();
             return new StructuralTypeDef(typeParams, new RefinedDef(head, parseRecordDef()));
@@ -549,8 +550,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      * Javadoc; §12.1's {@code construction-def} draws its operands from {@code supertype-ref} and admits the
      * trailing {@code record-def} on each alternative.
      */
-    private ConstructionDef parseConstructionDefContinuation(TypeRef first) {
-        List<TypeRef> supertypes = new ArrayList<>();
+    private ConstructionDef parseConstructionDefContinuation(TypeExpr first) {
+        List<TypeExpr> supertypes = new ArrayList<>();
         supertypes.add(first);
         Optional<RecordDef> body = Optional.empty();
         while (check(TokenType.AMPERSAND)) {
@@ -641,7 +642,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
             modifier = Optional.of(parseFieldModifier());
         } else {
-            TypeRef ref = parseTypeRef();
+            TypeExpr ref = parseTypeRef();
             boolean voidable = consumeAdjacentQuestion();
             type = Optional.of(new FieldDef.FieldType(ref, voidable));
             if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
@@ -728,7 +729,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         // Optional once the member's option is chosen: the option, not the record, is what the mark is about.
         boolean omittable = consumeAdjacentQuestion();
         expect(TokenType.COLON, "a field group member's ':'");
-        TypeRef type = parseTypeRef();
+        TypeExpr type = parseTypeRef();
         boolean voidable = consumeAdjacentQuestion();
         if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
             // §5.11: a member's presence is the group's, and a group does not inject, so `~`, `=` and `=?`
@@ -801,7 +802,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * natural first attempt, and the grammar's answer (hoist it to its own declaration, reference it by name)
      * is a one-line fix an author cannot guess from a token-level complaint.
      */
-    private TypeRef parseTypeRef() {
+    private TypeExpr parseTypeRef() {
         if (check(TokenType.LPAREN)) {
             return parseChoiceRef();
         }
@@ -829,7 +830,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * by refinement/construction heads. One token of lookahead after the name picks the alternative: an adjacent
      * {@code !} a sibling reference, an adjacent {@code <} an application, neither a bare name.
      */
-    private TypeRef parseTypeRefHead() {
+    private Reference parseTypeRefHead() {
         Token head = expect(TokenType.UNQUOTED, "a type reference");
         if (check(TokenType.BANG) && head.adjacentTo(peek())) {
             return parseSiblingRef(head);
@@ -868,10 +869,10 @@ public final class TsonSchemaParser extends TsonDataParser {
         return new SiblingRef(head.text());
     }
 
-    private TypeRef parseChoiceRef() {
+    private TypeExpr parseChoiceRef() {
         Position start = peek().start();
         expect(TokenType.LPAREN, "a choice type's opening '('");
-        List<TypeRef> variants = new ArrayList<>();
+        List<TypeExpr> variants = new ArrayList<>();
         variants.add(parseTypeRef());
         if (!check(TokenType.PIPE)) {
             throw new ParseException("a choice type requires at least two variants separated by '|' (§5.4)", start);
@@ -881,12 +882,12 @@ public final class TsonSchemaParser extends TsonDataParser {
             variants.add(parseTypeRef());
         }
         expect(TokenType.RPAREN, "a choice type's closing ')'");
-        return new ChoiceRef(variants);
+        return new ChoiceExpr(variants);
     }
 
     /**
      * {@code bracket-type} (§12.1) -- the one bracket production, serving every position. One element with an
-     * optional size specifier is an {@link ArrayRef}; two or more are a {@link TupleRef}. Arity is all that
+     * optional size specifier is an {@link ArrayExpr}; two or more are a {@link TupleExpr}. Arity is all that
      * distinguishes them, which is why both alternatives share a first element.
      *
      * <p>There is no separate inline form, and no position where a size specifier or an element {@code ?} is
@@ -894,14 +895,14 @@ public final class TsonSchemaParser extends TsonDataParser {
      * lifts to an entry now, so the restriction protected nothing and is gone rather than relocated: §12.1
      * has one bracket production, and §5.3 makes both legal at every type-ref position.
      */
-    private TypeRef parseBracket() {
+    private TypeExpr parseBracket() {
         expect(TokenType.LBRACKET, "an array or tuple type's opening '['");
         ElementType first = parseElementType();
         if (check(TokenType.SEMICOLON)) {
             advance();
             SizeSpec size = parseSizeSpec(TokenType.RBRACKET);
             expect(TokenType.RBRACKET, "an array type's closing ']'");
-            return new ArrayRef(first, Optional.of(size));
+            return new ArrayExpr(first, Optional.of(size));
         }
         List<ElementType> elements = new ArrayList<>();
         elements.add(first);
@@ -909,11 +910,11 @@ public final class TsonSchemaParser extends TsonDataParser {
             elements.add(parseElementType());
         }
         expect(TokenType.RBRACKET, "an array or tuple type's closing ']'");
-        return elements.size() == 1 ? new ArrayRef(first, Optional.empty()) : new TupleRef(elements);
+        return elements.size() == 1 ? new ArrayExpr(first, Optional.empty()) : new TupleExpr(elements);
     }
 
     /** {@code map-type} (§12.1) including its opening brace -- {@link #braceTypeDef} reaches the body directly, having consumed one already. */
-    private TypeRef parseMap() {
+    private TypeExpr parseMap() {
         expect(TokenType.LBRACE, "a map type's opening '{'");
         requireMapBrace();
         return parseMapBody();
@@ -924,8 +925,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      * arguments, and never a bracket or paren form. That restriction is what holds {@link #braceOpensMap}'s
      * record/map decision to two tokens; a composite key type earns a named declaration instead.
      */
-    private TypeRef parseMapKey() {
-        TypeRef key = parseTypeRefHead();
+    private Reference parseMapKey() {
+        Reference key = parseTypeRefHead();
         rejectKeyQuestion();
         return key;
     }
@@ -1014,8 +1015,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      * both halves, and §7.6 makes an absent entry value conditional on the map's own value state rather than
      * unconditionally permitted.
      */
-    private MapRef parseMapBody() {
-        TypeRef key = parseMapKey();
+    private MapExpr parseMapBody() {
+        Reference key = parseMapKey();
         expect(TokenType.MAP_ARROW, "a map type's '=>'");
         ElementType value = parseElementType();
         Optional<SizeSpec> size = Optional.empty();
@@ -1025,7 +1026,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
         requireMapClose();
         expect(TokenType.RBRACE, "a map type's closing '}'");
-        return new MapRef(key, value, size);
+        return new MapExpr(key, value, size);
     }
 
     /**
@@ -1033,7 +1034,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * <em>is</em> a type-ref, so {@code [[T; 2]; 3]} is the recursion here and not a second production.
      */
     private ElementType parseElementType() {
-        TypeRef ref = parseTypeRef();
+        TypeExpr ref = parseTypeRef();
         return new ElementType(ref, consumeAdjacentQuestion());
     }
 

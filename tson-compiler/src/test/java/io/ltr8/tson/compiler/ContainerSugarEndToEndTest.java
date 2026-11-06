@@ -147,7 +147,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * <b>The open case, which failed worse than the closed one.</b> With the variant refused, the choice was
-     * never lifted, so holding {@code w}'s body handed the un-lifted {@code ChoiceRef} to the producer that
+     * never lifted, so holding {@code w}'s body handed the un-lifted {@code ChoiceExpr} to the producer that
      * spells a reference -- a {@code ClassCastException} out of the resolver, where the two shapes it
      * accepts are {@code NameRef} and {@code ApplicationRef}. Lifting the choice is what keeps that producer's
      * input to the two shapes it documents.

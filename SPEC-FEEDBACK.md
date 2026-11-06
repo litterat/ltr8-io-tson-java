@@ -1463,3 +1463,28 @@ quoted-name gap: a field whose name needs quoting cannot be a sibling, and `"nam
 component a bound dependent field takes (running: `Object`, registered as an atom; a tree value or a type the
 binding names are the alternatives). A sibling in a template field typed by a parameter (`kind: meta.type_ref = T`)
 waits on whether a pin on a `meta.type_ref` slot may carry a type parameter.
+
+## 22. [TSON-SCHEMA] §5.3, §8.1, §12.1 — `type-ref` names an expression, and `meta.type_ref` a reference
+
+**Problem.** §12.1's `type-ref` covers the structural forms as well as references: `type-ref = paren-type /
+bracket-type / map-type / type-name "<" type-args ">" / type-name` (and `/ sibling-ref` under #21). A choice, an
+array, a tuple and a map are not references to a type but expressions that denote one; the spec says as much
+elsewhere, §5.3 being titled "Type Expressions" and §12.1's compound forms sitting under "Compound Type Expressions".
+The kernel's `meta.type_ref` (§8.1) is the reference alone — the name of a type, with any arguments — and a structural
+form is never its value: resolution lifts every one to an entry and leaves a reference to it behind (§5.3). So one
+name means two things across the grammar and the kernel, and a reader of §12.1 who knows `meta.type_ref` takes
+`type-ref` for the narrower thing. The narrower production has no name of its own: `map-key`, `supertype-ref` and
+`refined-def`'s head each spell `type-name ["<" type-args ">"]` out in place.
+
+**What is running.** The grammar text unchanged, and the AST named by what each form is, mirroring the resolved model
+and the kernel: `TypeExpr` is what `type-ref` parses to; `TypeRef` is the reference, a name or an application (as
+`meta.type_ref` is), and with `SiblingRef` makes up `Reference`; the structural forms are `ChoiceExpr`, `ArrayExpr`,
+`TupleExpr` and `MapExpr`. A slot the grammar holds to a reference (a map's key, a refinement's source) is typed by
+the reference in the AST.
+
+**Resolution, a proposal.** Rename the production `type-expr` at every use (`field-type`, `group-member`,
+`element-type`, `paren-type`, `type-arg`, `type-param`, the reference-bodied `type-def` alternative), and keep
+`type-ref` for `type-name ["<" type-args ">"]`, which `map-key`, `supertype-ref` and `refined-def` then use instead of
+restating it. `type-expr`'s alternatives become the structural forms, `sibling-ref` (#21) and `type-ref`. No
+document's meaning changes; prose that says "type-ref" meaning any type position (§5.3's "every type-ref position",
+§5.7's "elided type-refs") reads "type expression".

@@ -140,7 +140,7 @@ rebuilt and called a cache.
   (`pair => [integer, text]` becomes `!meta.tuple { … }`, like `ids => [text]`, `entries => {text => integer}` and
   `contact => (A | B)`); inline, each is hoisted into its own declaration and referenced.
 - **A nested form desugars innermost-first**, and needs no machinery of its own: an element holds a
-  `TypeRef`, so `typeRef` recurses into it and the inner form is already a plain name by the time the
+  `TypeExpr`, so `typeRef` recurses into it and the inner form is already a plain name by the time the
   enclosing one is built. That reaches every nesting position alike — an array's element (`[[T]; 3]`), a
   tuple's positions (`[[T; 2], U]`) and a map's value (`{text => [order; 1..]}`) — to any depth, with no
   per-depth case and no second walk, there being one node family for a container wherever it stands.

@@ -20,7 +20,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
  */
 public sealed interface TypeArg {
 
-    record Ref(TypeRef ref) implements TypeArg {
+    record Ref(TypeExpr ref) implements TypeArg {
     }
 
     record Value(TokenValue value) implements TypeArg {

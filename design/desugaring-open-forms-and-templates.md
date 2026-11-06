@@ -58,7 +58,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     and a tuple's elements like any other reference.
     - **No slot refuses an application, because a slot that did would not fail where it decided.** A
       `choiceBinding` requiring a bare name per variant would leave `( box<text> | int32 )` unlifted *whole*, to
-      reach `DefinitionResolver` as a `ChoiceRef` it has no case for — and, inside a template, to reach
+      reach `DefinitionResolver` as a `ChoiceExpr` it has no case for — and, inside a template, to reach
       `refValue`, whose two inputs are `NameRef` and `ApplicationRef`.
     - **A closed construction writes the reference and lets materialisation close it.** Its body goes
       through the constructor's own reader, so the application has to survive a wire hop, and the resulting
