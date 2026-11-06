@@ -2,8 +2,10 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.Optional;
@@ -22,6 +24,12 @@ public record RefParser(ReferenceBody reference) implements AtomTypeParser<TypeR
 
     @Override
     public TypeRef read(String text) {
+        if (ReferenceGrammar.parseReference(text) instanceof SiblingRef sibling) {
+            // A sibling reference names a field and no value, so a reference that names values never holds one,
+            // whatever its allow_sibling says.
+            throw new AtomValidationException(sibling.refusedAt("a position typed by a reference that names values"),
+                    "a qualified name");
+        }
         TypeRef read = ReferenceGrammar.parse(text);
         if (!read.arguments().isEmpty()) {
             throw new AtomParseException("'" + text + "' is no qualified name -- a value is named, never applied, "

@@ -58,7 +58,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name), namesProfile(definition),
                     definition instanceof ReferenceBody kind && kind.namesTypes() ? kind.of() : null,
                     definition instanceof ReferenceBody reference && !reference.namesTypes() ? reference.of() : null,
-                    AtomParsers.inSchemaDocument(definition).orElse(null)))
+                    AtomParsers.inSchemaDocument(definition).orElse(null),
+                    definition instanceof ReferenceBody facet && facet.allowSibling()))
             .orElseThrow(() -> new IllegalStateException(
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition));
 
@@ -95,7 +96,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * {@code AtomParsers} declines it and {@link ValueParser} answers here.
      */
     static final ValueReaderFactory VALUE = (name, definition, context) ->
-            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name), null, null, null, null);
+            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name), null, null, null, null, false);
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a
@@ -142,6 +143,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     private final AtomType<T> inSchemaDocument;
 
+    /**
+     * Whether this reads a reference whose {@code allow_sibling} admits a sibling reference ({@code kind!}): {@code
+     * meta.field_type_ref}, the type of a record field's {@code type}, and nothing else the kernel declares.
+     */
+    private final boolean admitsSibling;
+
     /** {@code body}'s profile when it is an identifier family -- its constructor IS-A {@code identifier_type}. */
     private static IdentifierProfile namesProfile(Top body) {
         return body instanceof IdentifierType identifier ? identifier.profile() : null;
@@ -151,6 +158,11 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     /** Whether this reads a type's name -- a position a {@code TypeRef} target holds by name. */
     boolean readsAKind() {
         return kindOf != null;
+    }
+
+    /** Whether a sibling reference is a value here: the reference's {@code allow_sibling} ({@link #admitsSibling}). */
+    boolean admitsSibling() {
+        return admitsSibling;
     }
 
     /** Whether this reads a value's qualified name -- held by a {@code Ref} or a {@code TypeRef}. */
@@ -181,7 +193,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
-        return new AtomTypeReader<>(name, delegate, schemaLocation, null, null, null, null);
+        return new AtomTypeReader<>(name, delegate, schemaLocation, null, null, null, null, false);
     }
 
     /**
@@ -190,7 +202,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     @Override
     public TsonTypeReader<?> renamed(String displayName) {
-        return new AtomTypeReader<>(displayName, delegate, schemaLocation, names, kindOf, refOf, inSchemaDocument);
+        return new AtomTypeReader<>(displayName, delegate, schemaLocation, names, kindOf, refOf, inSchemaDocument,
+                admitsSibling);
     }
 
     /**
@@ -220,7 +233,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * the entry's own is {@code value}, which names the escape hatch rather than anything the author wrote.
      */
     TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
-        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null, null, null, null);
+        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null, null, null, null, false);
     }
 
     /**
@@ -235,12 +248,14 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
         return delegate.boundTo(wire).map(bound -> new AtomTypeReader<>(name, bound, schemaLocation, names, kindOf,
-                refOf, inSchemaDocument == null ? null : inSchemaDocument.boundTo(wire).orElse(null)));
+                refOf, inSchemaDocument == null ? null : inSchemaDocument.boundTo(wire).orElse(null), admitsSibling));
     }
 
     @SuppressWarnings("unchecked")
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation,
-                           IdentifierProfile names, String kindOf, String refOf, AtomType<?> inSchemaDocument) {
+                           IdentifierProfile names, String kindOf, String refOf, AtomType<?> inSchemaDocument,
+                           boolean admitsSibling) {
+        this.admitsSibling = admitsSibling;
         this.name = name;
         this.delegate = delegate;
         this.inSchemaDocument = (AtomType<T>) inSchemaDocument;
@@ -297,6 +312,11 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             // is recorded for that schema's link to judge.
             try {
                 T value = inSchemaDocument.read(tokenValue.text());
+                if (value instanceof io.ltr8.tson.schema.meta.SiblingRef) {
+                    // A sibling reference, admitted by the reference's allow_sibling, names a field of the record
+                    // holding it and no type: there is no member for the link to judge (§5.2).
+                    return value;
+                }
                 ctx.heldByName(value instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference
                         : io.ltr8.tson.schema.meta.TypeRef.of(text), slotType(), null);
                 return value;

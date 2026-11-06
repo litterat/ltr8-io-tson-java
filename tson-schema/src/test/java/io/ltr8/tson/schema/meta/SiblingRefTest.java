@@ -56,11 +56,14 @@ class SiblingRefTest {
     }
 
     @Test
-    void aFieldTypedBySiblingIsKeptAndItsTypeReferenceIsAGap() {
+    void aDependentFieldNamesItsSiblingAndNoTypeOfItsOwn() {
         RecordField field = RecordField.required(SiblingRef.of("kind"));
         assertEquals(SiblingRef.of("kind"), field.type());
-        UnsupportedOperationException gap = assertThrows(UnsupportedOperationException.class, field::typeRef);
-        assertTrue(gap.getMessage().contains("'kind!'"), gap.getMessage());
+        assertEquals(Optional.of("kind"), field.sibling());
+        assertEquals(Optional.empty(), field.namedType());
+        IllegalStateException asked = assertThrows(IllegalStateException.class, field::typeRef);
+        assertTrue(asked.getMessage().contains("'kind!'"), asked.getMessage());
+        assertEquals(Optional.of(TypeRef.of("text")), RecordField.required(TypeRef.of("text")).namedType());
         assertSame(field.type(), field.withAnnotations(Annotations.empty()).type());
         assertEquals(TypeRef.of("text"), RecordField.required(TypeRef.of("text")).typeRef());
     }

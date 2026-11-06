@@ -46,6 +46,16 @@ final class BindTargets {
      */
     static JsonTypeReader<?> to(JsonTypeReader<?> reader, DataClass target, String what, String where,
                                 List<String> mismatches) {
+        if (reader instanceof DependentReader) {
+            // A dependent field's value is of whichever type its sibling names per object, so the component holds
+            // what that type's reader builds: an Object, the one class every such value is.
+            if (target.typeClass() != Object.class) {
+                mismatches.add(what + " is a dependent field, whose type its sibling's value names per object, and "
+                        + where + " binds " + target.typeClass().getName() + " -- declare it Object, which receives "
+                        + "what the named type reads to");
+            }
+            return reader;
+        }
         if (reader instanceof AtomReader<?> atom) {
             if (!(target instanceof DataClassAtom bound)) {
                 mismatches.add(what + " is an atom, and " + where + " binds " + target.typeClass().getName()

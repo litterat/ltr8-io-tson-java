@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.atom.ValueParser;
+
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
@@ -227,7 +229,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 return AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
             }
             // Otherwise by the field's declared type, as tree mode does -- see FieldReaders.byType.
-            return FieldReaders.declared(resolver, field);
+            return FieldReaders.declared(resolver, context, fieldName, field,
+                    AtomTypeReader.of(name, ValueParser.INSTANCE, location));
         };
     }
 

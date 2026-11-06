@@ -22,6 +22,8 @@ applies, the continuation policy, and what a read leaves behind.
 - A map's count is validated in `MapAbstractReader.expectMapShape`, not in `readInto` — an empty brace never enters the
   entry loop.
 - Records are closed under their type and a repeated field or map key is an error, on the schemaless path too.
+- A dependent field is read through its record (`DependentFieldReader.readAgainst`), never on its own: the record
+  knows the sibling's value in this instance. A record with none keeps no per-read state for it.
 
 Related: `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`, `design/record-dispatch.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -91,6 +93,29 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   `checkFieldValue` is the one place a pin is judged, so a refusal through the built parser is an
   `IllegalStateException` (linker and reader disagree) and one through a rebound parser a `BindMismatchException`
   (the component cannot hold the schema's value), both failing the compile.
+- **A dependent field is read against the type its sibling's value names** ([TSON-SCHEMA] §5.2;
+  `DependentFieldReader`, built by `FieldReaders.declared` for a field typed `kind!`). It is `DeclaredReader`'s
+  dispatch with the tag taken from the sibling: the named entry's reader, in the mode the schema compiled in, reads
+  the value, an application resolving through the sibling's reference (`ReferenceBody.entryOf`). The type is known
+  when the reader reaches the field in one of three ways, and only the third orders the document:
+  - **a pinned sibling**: the pin types the field wherever the sibling is written, or whether it is;
+  - **a discriminator**: member dispatch selects a member before any field is read, and each member pins it;
+  - **a free sibling**: the value this instance wrote before the field, or its default where it is not yet written.
+    A dependent field written before a free sibling with no default is `VALIDATION_ERROR` at the field, naming both
+    (`RecordDiagnostics.writtenBeforeItsSibling`), and skipped; a defaulted one written after a field read against
+    its default is the same refusal, reported when the sibling arrives (`RecordAbstractReader.Dependents`), so no
+    lookahead and no held value is added.
+
+  A sibling naming no type a value can be read against — a sibling reference, a template, an application the
+  closure does not hold — is refused at the sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and
+  the value is skipped unjudged; a sibling whose own read reported leaves the value skipped and nothing more. **In a
+  schema document the value is held as written**, the token uninterpreted through a reader of the record's own mode
+  (not the kernel's `meta.value` entry, so `record_field` waits on nothing for it): a default or pin is judged when the
+  schema links, and the kernel's `record_field.value` is that case. In bind mode the component is an `Object`, which
+  receives what the named type reads to — the context registering `Object` as an atom so the binder takes it whole —
+  and any narrower class is a `BindMismatchException` at compile (`BindTargets`); a `Token` component, the kernel's
+  `RecordField.value`, holds the token as written (`RecordBindReader.tokenAware`). The JSON reader applies the same
+  rules (`design/json-schema-directed-reading.md`).
 - **A field is four facts, and each decision reads its own** (`RecordField`: `optional`, `voidable`, `role`, `value`).
   A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and `value`; a field never written
   reads `RecordField.omitted`, derived from `optional` and `value` — `MISSING` (`FIELD_REQUIRED`) where not optional,
@@ -224,9 +249,11 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   leaf to it, as a token is: the stream delivered the reference whole.
 - **A reference-typed position reads a token or a `ReferenceEvent`** (`AtomTypeReader`, `KindSlotReader`), rolling
   either into one `TypeRef`, and refuses a quoted token holding `<` as `TYPE_MISMATCH`: a quoted token is never a
-  reference ([TSON-DATA] §7.4). A `ReferenceEvent` holding a sibling reference (`kind!`) is admitted only by a slot
-  reader whose component is a `Reference`, a record field's type; a `TypeRef` component's reader and the atom's own
-  parser refuse it by the position rule ([TSON-SCHEMA] §5.2, `design/schema-resolution.md`). Any other typed position
+  reference ([TSON-DATA] §7.4). A `ReferenceEvent` holding a sibling reference (`kind!`) is admitted only where the
+  reference's `allow_sibling` admits one, a record field's type (`meta.field_type_ref`), and in bind mode only by a
+  slot reader whose component is a `Reference` besides; elsewhere the slot reader (`TYPE_MISMATCH`) and the atom's own
+  parser (`ATOM_CONSTRAINT_VIOLATION`) refuse it by the position rule ([TSON-SCHEMA] §5.2,
+  `design/schema-resolution.md`). Any other typed position
   meeting a `ReferenceEvent` reports it as it reports any non-token, naming `the reference box<text>` or `the sibling
   reference kind!`; `DataValueEvents` replays a `ReferenceValue` as one event.
 - **`ListEventSource`** replays a pre-built event list: a schema default (`settleHeldValues` wraps the literal `Token`

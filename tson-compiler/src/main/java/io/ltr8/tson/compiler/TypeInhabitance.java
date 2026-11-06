@@ -195,7 +195,8 @@ final class TypeInhabitance {
      */
     private static boolean satisfiable(RecordField field, Map<String, Top> namespace,
             Set<String> inhabited) {
-        if (field.voidable()) {
+        if (field.voidable() || field.sibling().isPresent()) {
+            // A dependent field is stated with a value of whichever type its sibling names (§5.2).
             return true;
         }
         return !AliasChain.resolvesToVoid(field.typeRef().name(), namespace)

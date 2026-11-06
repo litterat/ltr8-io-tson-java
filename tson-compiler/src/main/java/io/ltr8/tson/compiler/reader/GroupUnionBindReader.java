@@ -58,7 +58,8 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
             Class<?> component = member == null ? null : member.fields()[0].type();
             return component == io.ltr8.tson.schema.meta.Token.class
                     ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, schemaLocation)
-                    : FieldReaders.declared(resolver, field);
+                    : FieldReaders.declared(resolver, null, fieldName, field,
+                            AtomTypeReader.of(name, io.ltr8.tson.compiler.atom.ValueParser.INSTANCE, schemaLocation));
         }, schemaLocation, fieldNames);
         this.members = members;
         CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);

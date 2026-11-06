@@ -154,15 +154,15 @@ spec-required case:
   (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a deferred judgement there, or the inherited
   fields carried to link, would close all three without reporting a case the link already judges twice.
 - [ ] **A reference's `of` written as an application in the body is refused** ([TSON-SCHEMA] §4.2). `r =>
-  !meta.reference { of: box<text> }` reports "'r' of has an unresolved reference 'box<text>'", where `meta.ref<box<text>>`,
-  which §4.2 says is that body, closes `of` to the expansion: `ReferenceBody.of` is a `String`, bound from the text,
-  and nothing closes it. Hold `of` as a `TypeRef`, map it in `MetaRefs`' reference arm as the application it is, and
-  add a `schema/valid` vector.
-- [ ] **A field's `value` is still typed `meta.value`** ([TSON-SCHEMA] §5.2, §5.10), on `meta.record_field` and
-  `meta.record_template_field` alike, the last `meta.value`-typed slots in the kernel. A record field is closed, its
-  value a literal of the field's own type, and a record template's value parameter has its own label
-  (`value_param`), so the slot no longer carries a parameter. Decide when `value` is retyped, and with it what
-  `@meta.application` means on a declared entry that is no record.
+  !meta.reference_type { of: box<text> }` reports "'r' of has an unresolved reference 'box<text>'", where
+  `meta.ref<box<text>>`, which §4.2 says is that body, closes `of` to the expansion: `ReferenceBody.of` is a `String`,
+  bound from the text, and nothing closes it. Hold `of` as a `TypeRef`, map it in `MetaRefs`' reference arm as the
+  application it is, and add a `schema/valid` vector.
+- [ ] **A record template field's `value` is still typed `meta.value`** ([TSON-SCHEMA] §5.2, §5.10), the last
+  `meta.value`-typed field slot in the kernel; `meta.record_field.value` is `type!`, a dependent field. A template
+  field's type may be a parameter, so there is no sibling to name, and its value parameter has its own label
+  (`value_param`). Decide when `value` is retyped, and with it what `@meta.application` means on a declared entry that
+  is no record.
 - [ ] **An application argument where a value parameter stands is accepted when a record template closes**
   ([TSON-SCHEMA] §5.10). With `pin => <N> { v?: int32 = N }`, `<T> pin<box<T>> & { … }` is refused where the operand
   is substituted (`RecordTemplateSubstitution`), but `pin<box<text>>` is not: `TemplateMaterialiser` closes nested

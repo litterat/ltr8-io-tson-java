@@ -39,6 +39,7 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueType;
 
@@ -63,7 +64,7 @@ import java.util.Set;
  *
  * <ul>
  *   <li><b>The pre-loaded set is hand-built</b> ({@link #instanceBody}, {@link #refinedBody}): the instances and the
- *       one refinement on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED} and
+ *       two refinements on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED} and
  *       the arrays lifted over {@link #PRE_LOADED_ELEMENTS}. Rule 4 makes the set a measurement of the kernel, and
  *       {@code MetaKernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle
  *       fails there rather than here.</li>
@@ -97,13 +98,15 @@ import java.util.Set;
 public final class MetaKernelBootstrapResolver {
 
     /**
-     * The kernel's named instances and refinements on its one wait cycle, built by hand: {@code value}, the
-     * {@code boolean} and {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text}
-     * atoms, {@code meta.type_ref}, {@code field_map}, the map type a record's fields are a value of, and {@code
-     * numeric.count}, the one refinement.
+     * The kernel's named instances and refinements on its one wait cycle, built by hand: the {@code boolean} and
+     * {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text} atoms, {@code
+     * meta.field_type_ref}, the reference a record field's type is read by, {@code field_map}, the map type a
+     * record's fields are a value of, and the two refinements, {@code numeric.count} and {@code meta.type_ref}. The
+     * kernel's {@code value} is not among them: {@code record_field.value} is typed {@code type!}, a dependent field
+     * whose value a schema document holds as written, which waits on no entry.
      */
-    private static final Set<String> PRE_LOADED = Set.of("meta.value", "boolean", "meta.field_role", "meta.enum_set",
-            "integer", "numeric.count", "text", "meta.type_ref", "meta.field_map");
+    private static final Set<String> PRE_LOADED = Set.of("boolean", "meta.field_role", "meta.enum_set",
+            "integer", "numeric.count", "text", "meta.field_type_ref", "meta.type_ref", "meta.field_map");
 
     /**
      * The element types whose lifted arrays are on the cycle: {@code [meta.type_ref]}, {@code [meta.field_group]} and
@@ -236,6 +239,7 @@ public final class MetaKernelBootstrapResolver {
             resolver.judgeDeferred((name, error) -> {
                 throw error;
             });
+            completeChains();
             stampParameters();
             Map<String, Top> ordered = new LinkedHashMap<>();
             declarations.keySet().forEach(name -> ordered.put(name, entries.get(name)));
@@ -303,6 +307,34 @@ public final class MetaKernelBootstrapResolver {
         }
 
         /**
+         * Every chain transitively closed, as {@link SchemaResolver} closes a schema's once every entry is ready: an
+         * entry IS-A every entry its supertypes are, so {@code meta.identifier_ref}, refining {@code meta.type_ref},
+         * which refines {@code meta.field_type_ref}, IS-A both. The kernel applies no template in a chain, so the
+         * closure is over names alone, to a fixed point.
+         */
+        private void completeChains() {
+            for (int round = 0; round <= entries.size(); round++) {
+                boolean changed = false;
+                for (Map.Entry<String, Top> entry : entries.entrySet()) {
+                    if (!(entry.getValue() instanceof Type type)) {
+                        continue;
+                    }
+                    Set<String> chain = new LinkedHashSet<>(type.supertypes());
+                    for (String member : List.copyOf(chain)) {
+                        chain.addAll(Ancestry.closedNames(entries.get(member)));
+                    }
+                    if (chain.size() != type.supertypes().size()) {
+                        entry.setValue(TypeChain.withChain(type, type.chain().withSupertypes(List.copyOf(chain))));
+                        changed = true;
+                    }
+                }
+                if (!changed) {
+                    return;
+                }
+            }
+        }
+
+        /**
          * §5.10's parameter types, derived once every entry is ready, as {@link SchemaResolver} derives a schema's
          * -- a held body names its parameters and nothing about what each is read as.
          */
@@ -326,13 +358,17 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * The hand-written merge for the pre-loaded set's one atom refinement, {@code numeric.count}, bounded as {@link
-     * #instanceBody} is: it covers the integer family's {@code min}, {@code max} and {@code size} and refuses the rest
-     * by name rather than pretending to be general. Ordinary resolution merges through a {@code DataClassObjectWriter}
+     * The hand-written merge for the pre-loaded set's two atom refinements, bounded as {@link #instanceBody} is: for
+     * {@code numeric.count} the integer family's {@code min}, {@code max} and {@code size}, for {@code meta.type_ref}
+     * a reference's {@code of} and {@code allow_sibling} ({@link #refinedReference}), and the rest refused by name
+     * rather than pretending to be general. Ordinary resolution merges through a {@code DataClassObjectWriter}
      * round trip and the governing meta's compiled reader ({@code DefinitionResolver.resolveAtomRefinement}), which
      * is the reader being produced.
      */
     private static Type refinedBody(String name, AtomRefinement refinement, Top target) {
+        if (target instanceof ReferenceBody reference) {
+            return refinedReference(name, refinement, reference);
+        }
         if (!(target instanceof IntegerType source)) {
             throw new IllegalStateException("'" + name + "' refines '" + refinement.target() + "', whose body is a "
                     + target.getClass().getSimpleName() + "; the bootstrap merges a pre-loaded refinement of the "
@@ -352,6 +388,25 @@ public final class MetaKernelBootstrapResolver {
         }
         return new IntegerType(size, min, source.exclusiveMin(), max, source.exclusiveMax(),
                 source.multipleOf(), source.members());
+    }
+
+    /**
+     * The merge for the pre-loaded set's reference refinement, {@code meta.type_ref => !meta.field_type_ref ^ {
+     * allow_sibling: false }}: a reference's two authored facets, {@code of} and {@code allow_sibling}, and nothing
+     * else.
+     */
+    private static Type refinedReference(String name, AtomRefinement refinement, ReferenceBody source) {
+        String of = source.of();
+        boolean allowSibling = source.allowSibling();
+        for (RecordValue.Field binding : bindingFields(name, refinement)) {
+            switch (binding.name()) {
+                case "of" -> of = bindingText(name, binding);
+                case "allow_sibling" -> allowSibling = Boolean.parseBoolean(bindingText(name, binding));
+                default -> throw new IllegalStateException("'" + name + "' refines '" + refinement.target()
+                        + "' with '" + binding.name() + "'; the bootstrap merges of and allow_sibling only");
+            }
+        }
+        return new ReferenceBody(of, allowSibling);
     }
 
     /** A {@code size} binding, {@code { bits: N  signed: B }}: a record of two tokens, as {@code integer_size} reads. */
@@ -394,7 +449,7 @@ public final class MetaKernelBootstrapResolver {
      * The hand-written construction of a pre-loaded instance (see the class Javadoc). The pre-loaded set applies
      * its constructors in three shapes, each checked rather than assumed: a bare {@code {}} for {@code value_type},
      * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; a bare token array for
-     * {@code enum}; and a record of tokens for {@code reference}, for {@code map} and for the {@code
+     * {@code enum}; and a record of tokens for {@code reference_type}, for {@code map} and for the {@code
      * array}/{@code set_type} binding records {@link SchemaDesugarer} lifts.
      *
      * <p>Package-private so {@code MetaKernelBootstrapResolverTest} can reach the refusals the real kernel never
@@ -415,9 +470,10 @@ public final class MetaKernelBootstrapResolver {
                 yield TextType.UNCONSTRAINED;
             }
             case "enum" -> toEnumBody(instance.value());
-            // `!meta.reference { of: type }`: `of` is the one authored field, and the index is derived when the kernel
-            // links, as every reference's is.
-            case "meta.reference" -> new ReferenceBody(bindingField(instance.value(), "of"));
+            // `!meta.reference_type { of: type }`: `of` and `allow_sibling`, true where the instance leaves it out, are
+            // the authored fields, and the index is derived when the kernel links, as every reference's is.
+            case "meta.reference_type" -> new ReferenceBody(bindingField(instance.value(), "of"),
+                    fieldToken(instance.value(), "allow_sibling").map(Boolean::parseBoolean).orElse(true));
             // `field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }`.
             case "meta.map" -> new MapBody(TypeRef.of(bindingField(instance.value(), "key_type")),
                     TypeRef.of(bindingField(instance.value(), "value_type")),

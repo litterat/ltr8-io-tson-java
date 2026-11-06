@@ -25,7 +25,7 @@ class KindResolvedFormTest {
             !schema {
               stock_id    => !net.uuid_type {}
               customer_id => !net.uuid_type {}
-              any_id      => !meta.reference { of: net.uuid_type }
+              any_id      => !meta.reference_type { of: net.uuid_type }
             }""";
 
     private static Tson tson() {
@@ -40,10 +40,12 @@ class KindResolvedFormTest {
         assertEquals(List.of("customer_id", "stock_id", "uuid"), linked.memberNames());
 
         String written = tson.objectWriter().toTson(linked);
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: \"net.uuid_type\" }", written);
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: \"net.uuid_type\" allow_sibling: true }",
+                written);
 
         ReferenceBody read = assertInstanceOf(ReferenceBody.class,
-                tson.objectReader().withSchema(TsonBundledSchemas.CORE_ID).readAs(written, "meta.reference", Object.class));
+                tson.objectReader().withSchema(TsonBundledSchemas.CORE_ID).readAs(written, "meta.reference_type",
+                        Object.class));
         assertEquals(Optional.empty(), read.index());
         assertEquals(linked, read);
     }

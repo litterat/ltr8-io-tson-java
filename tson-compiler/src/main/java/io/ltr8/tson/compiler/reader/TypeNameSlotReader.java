@@ -32,9 +32,10 @@ import java.util.List;
  * spelling named ([TSON-SCHEMA] §5.6). In a data document the kind's reader judges an application through the entry the
  * closure closed it to, and refuses one nothing in the closure closed. A quoted token is never a reference.
  *
- * <p><b>The component's class states the position rule</b> ([TSON-SCHEMA] §5.2): a sibling reference ({@code kind!})
- * stands only at a record field's type, the one slot whose component is a {@code Reference}. There it is read as
- * written; at a {@code TypeRef} component it is refused at its token, naming the slot, and never reaches the model.
+ * <p><b>The component's class states the position rule</b> ([TSON-SCHEMA] §5.2), as the reference's {@code
+ * allow_sibling} states it in tree mode: a sibling reference ({@code kind!}) stands only at a record field's type, the
+ * one slot whose component is a {@code Reference} and whose type, {@code meta.field_type_ref}, allows one. There it is
+ * read as written; anywhere else it is refused at its token, naming the slot, and never reaches the model.
  */
 final class TypeNameSlotReader implements TsonTypeReader<Reference> {
 
@@ -45,13 +46,15 @@ final class TypeNameSlotReader implements TsonTypeReader<Reference> {
     private final String refusingSiblingAt;
 
     /**
-     * @param refusingSiblingAt the slot as a refusal names it, where the component is a {@code TypeRef}; null where
-     *                          it is a {@code Reference}, which holds a sibling reference
+     * @param slot              the slot as a refusal names it ({@code field 'element_type'})
+     * @param componentHoldsOne whether the component is a {@code Reference}, which holds a sibling reference; one is
+     *                          admitted where the reference's {@code allow_sibling} admits it as well
      */
-    TypeNameSlotReader(AtomTypeReader<?> kind, AnnotationTypes annotationTypes, String refusingSiblingAt) {
+    TypeNameSlotReader(AtomTypeReader<?> kind, AnnotationTypes annotationTypes, String slot,
+                       boolean componentHoldsOne) {
         this.kind = kind;
         this.annotationTypes = annotationTypes;
-        this.refusingSiblingAt = refusingSiblingAt;
+        this.refusingSiblingAt = componentHoldsOne && kind.admitsSibling() ? null : slot;
     }
 
     @Override

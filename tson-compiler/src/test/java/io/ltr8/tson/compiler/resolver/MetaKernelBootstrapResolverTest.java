@@ -167,7 +167,7 @@ class MetaKernelBootstrapResolverTest {
     void theFixtureDeclarationsResolveAlongsideSevenDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(95, schema.entries().size());
+        assertEquals(96, schema.entries().size());
         for (String head : List.of("array_array_text_1", "array_text_1", "array_type_ref",
                 "array_template_param", "array_template_param_1", "array_field_group", "array_tuple_element")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),

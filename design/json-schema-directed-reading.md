@@ -20,13 +20,20 @@ JSON inputs are in `design/cli-config-hashing.md`.
   inspecting a value.
 - A choice value may omit its tag only when the choice is disjoint; no member-shape matching, no trying variants in
   order. A missing required tag is `TYPE_MISMATCH`.
-- A kind (a `meta.reference` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and never
-  a discrimination case ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the
+- A kind (a `meta.reference_type` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and
+  never a discrimination case ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the
   reading document's closure, whatever it imports (`AtomParsers.forType`). JSON has no unquoted form, so an
   application is a JSON string holding the TSON reference text, `"set<text>"`, parsed by `atom.ReferenceGrammar`
   into the same `TypeRef` and judged as TSON judges it: through the entry it denotes, an application nothing in the
-  closure closed being refused. A sibling reference's string, `"kind!"`, is refused there by the same production, a
-  sibling standing only at a record field's type ([TSON-JSON] §5.6). A tree read keeps the `JsonString` as written.
+  closure closed being refused. A sibling reference's string, `"kind!"`, is read by the same production and admitted
+  only where the reference's `allow_sibling` admits it, a record field's type; elsewhere it is refused as a constraint
+  the value breaks, as the TSON reader refuses it ([TSON-JSON] §5.6). A tree read keeps the `JsonString` as written.
+- A dependent field (`v?: kind!`, [TSON-SCHEMA] §5.2) is read by `DependentReader` through its record, against the
+  type its sibling names in the same object, with TSON's rules (`design/readers-and-diagnostics.md`): the pin, the
+  sibling written before it, or the sibling's default; a free sibling written after the member is refused naming both
+  ([TSON-JSON] §6.1.6's one exception to member order), and a sibling naming no readable type is refused at the
+  sibling. The record keeps the sibling's written string, and the state, only where it has a dependent field. Bind
+  mode binds it to an `Object` component, as the TSON reader does.
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
 - Every mode is all-or-nothing: no builder builds where anything was reported while its value was read.

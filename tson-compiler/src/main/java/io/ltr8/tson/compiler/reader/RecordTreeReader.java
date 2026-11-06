@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadContext.FieldNameRule;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonVoid;
@@ -29,10 +30,12 @@ import java.util.Optional;
 final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     public RecordTreeReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
-                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes,
+                            ValueReaderContext context, SchemaLocation schemaLocation, AnnotationTypes annotationTypes,
                             FieldNameRule fieldNames) {
         // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
-        super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation, fieldNames);
+        super(name, displayName, body, FieldReaders.byType(resolver, context, new AtomTreeReader(
+                AtomTypeReader.of(name, ValueParser.INSTANCE, schemaLocation), "meta.value", annotationTypes)),
+                schemaLocation, fieldNames);
         this.annotationTypes = annotationTypes;
         CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }
@@ -49,7 +52,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
                 throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition);
             }
             RecordTreeReader ownParser = new RecordTreeReader(name, context.displayName(name, typeDefinition),
-                    body, resolver, context.locationOf(name),
+                    body, resolver, context, context.locationOf(name),
                     AnnotationTypes.of(context), fieldNameRule(name, body, context));
             if (context.subtypesOf(name, typeDefinition).isEmpty()) {
                 return ownParser;
