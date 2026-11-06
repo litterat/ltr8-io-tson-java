@@ -332,9 +332,9 @@ The LOCAL cell needs none of this — a value naming, by its tag, a type of the 
   drops `scoped-value`, and §1.5's Class 1 obligation to preserve `schema` directives concerns the header's.
 - [TSON-DATA] §9.1 drops the foreign-schemas row.
 
-A foreign type returns as a bundled constructor, `extern => atom & { schema: schema_identity  type:
-meta.type_name }`, applied in the schema that admits it and read in the foreign schema's own closure, loaded with the
-declaring schema rather than by the document. That is a later step and is not running.
+A foreign type is used by importing its schema. No schema-driven external form is proposed for this revision: a foreign
+schema that keeps its own names puts two namespaces in one document, so either a tag's meaning depends on its position
+or the data carries a prefix, and neither is taken.
 
 ## 7. [TSON-SCHEMA] §2.2.2, §2.2.3, §3.1, §3.3, §3.4, §6, §9 — one namespace per schema: the ladder's rules go
 
