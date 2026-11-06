@@ -359,12 +359,27 @@ final class DefaultTsonReadContext implements TsonReadContext {
         if (cursor.heldByName == null) {
             return;
         }
+        cursor.heldByName.held(slot(), type, reference, cell);
+    }
+
+    @Override
+    public void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.RecordField declared,
+                              io.ltr8.tson.schema.meta.Reference named, List<TsonEvent> written) {
+        if (cursor.heldByName == null) {
+            return;
+        }
+        cursor.heldByName.heldAsWritten(new TsonSchema.HeldValue(slot(), field, sibling, declared,
+                Optional.ofNullable(named), List.copyOf(written)));
+    }
+
+    /** The path this context has descended from the value's root: a field name, a key, or an index per step. */
+    private List<String> slot() {
         List<String> slot = new ArrayList<>();
         for (PathStep step = tail; step != null; step = step.parent()) {
             slot.add(step.name() != null ? step.name() : Integer.toString(step.index()));
         }
         Collections.reverse(slot);
-        cursor.heldByName.held(List.copyOf(slot), type, reference, cell);
+        return List.copyOf(slot);
     }
 
     /**
@@ -457,6 +472,15 @@ final class DefaultTsonReadContext implements TsonReadContext {
                 cursor.rewound.addFirst(consumed.get(i));
             }
         }
+    }
+
+    /** {@link TsonReadContext#asWritten}: the lookahead's own record of what it consumed is the value's events. */
+    static List<TsonEvent> asWritten(TsonReadContext ctx) {
+        Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
+        return lookingAhead(ctx, lookahead -> {
+            io.ltr8.tson.compiler.stream.EventSkip.dataValue(lookahead);
+            return List.copyOf(cursor.recording);
+        });
     }
 
     @Override

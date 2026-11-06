@@ -91,6 +91,8 @@ load-bearing, each step reading what an earlier one wrote:
 10. **`checkValuesByName`**, **`checkEveryEntryIsInhabited`**, **`checkRecordExtension`**.
 11. **`withNameAnnotations`**, then **`checkDisjointAssertions`**: an author's `@meta.disjoint` is read from both places §6
     puts it, the definition and the map key, so it runs last.
+12. **`checkHeldValues`**, only over a link otherwise clean and with nothing pending: each dependent field's value a
+    local value entry holds as written, read through the schema compiled in tree mode (`HeldValues`, below).
 
 ## Import merge (`mergeImports`, §2.2.3)
 
@@ -273,4 +275,29 @@ descriptor, is `design/meta-layer-namespaces.md`'s; what is the linker's is belo
   type. A field step needs the bind context its values were bound under (`TsonCompiledMetaRegistry.link` passes it);
   an overload without one throws `IllegalStateException` if a walk reaches a field. One step is a gap
   (`NOT_IMPLEMENTED`): a FIXED field with no component.
+
+## Dependent values held as written (`HeldValues`, §5.2)
+
+A value entry's payload is read by the governing layer's readers, and the type a dependent field's sibling names
+(`kind: server`) is one of the reading schema's namespace, which those readers do not hold. So the read holds the value
+as written, whatever its form, and the record reader hands its events, with what the sibling holds in that instance
+(pin, written value or default) and the sibling's declaration, to the read's sink (`TsonReadContext.heldAsWritten`,
+`TsonSchema.HeldValue`). The resolver keeps them for value entries only (`TsonSchema.heldValues`); a construction's,
+the kernel's `record_field.value` among them, is judged as a default or pin by `checkFieldValue`.
+
+- **Judged last, by a read.** Once the rest of the link has reported nothing, the linked schema is compiled in tree mode
+  (once, and only where a local value entry holds one) and each value is read again through the reader of the type its
+  sibling names, as a schema document's value. The type is `ValuesByName.typeNamed`, the read path's
+  `DependentFieldReader.typeNamed` with a value entry naming no type either. The first refusal of each value is a
+  `SCHEMA_ERROR` at the entry naming the slot, the dependent field, the sibling and the type; a `NOT_IMPLEMENTED` the
+  read reports stays a gap. The names the read records are judged by `ValuesByName`, and a dependent field inside the
+  value is held again and judged in turn, each slot from the entry's root.
+- **The held value stays as written.** The model holds the schemaless tree (`DependentFieldReader`), so a value by
+  name going on through the field walks it by field name; a default of the named type is not injected there. A meta
+  layer's host class takes it in an `Object` component where the context registers `Object` as an atom
+  (`ResolverBindContext.registerDefaults` does, a consumer's context where they register it); a `Token`
+  component (the kernel's `RecordField.value`) holds a token alone, and a compound value there is refused at the read
+  as no token.
+- **Opaque to the model.** `HeldValue.written` is an `Object` holding the read's `List<TsonEvent>`, as `ValueEntry`'s
+  payload is an `Object`: `tson-schema` names no compiler type.
 - **Local entries only**: an imported body's names were judged in its own namespace when its schema linked.

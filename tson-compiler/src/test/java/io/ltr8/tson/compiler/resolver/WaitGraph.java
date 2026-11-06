@@ -408,8 +408,8 @@ final class WaitGraph {
                         if (field(declared, "type") != null && field(declared, "type").coreValue()
                                 instanceof io.ltr8.tson.compiler.ast.ReferenceValue(
                                         io.ltr8.tson.schema.meta.SiblingRef ignored)) {
-                            // A dependent field's value in a schema document is held as written, the token
-                            // uninterpreted, and so waits on nothing.
+                            // A dependent field's value in a schema document is held as written, and so waits on
+                            // nothing.
                             annotations(field.value().annotations(), path + "." + field.name());
                             continue;
                         }

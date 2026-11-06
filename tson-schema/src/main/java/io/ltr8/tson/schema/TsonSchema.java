@@ -6,6 +6,8 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -84,10 +86,14 @@ import java.util.Optional;
  * slot records the name it read there whatever the host class holds, so the list depends on nothing the host
  * declares. The linker resolves each and judges it against the slot's declared type. A fact the
  * resolver hands the linker, never part of §8's output: no resolved document writes it.
+ *
+ * <p><b>{@link #heldValues()}</b> -- for each value entry, the dependent fields' values it holds as written
+ * ([TSON-SCHEMA] §5.2), which the linker judges against the type each one's sibling names in this schema's namespace
+ * ({@link HeldValue}). A fact the resolver hands the linker, as {@link #valuesByName()} is.
  */
 public record TsonSchema(String id, List<String> imports, Namespace<Top> entries,
                           boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
-                          Map<String, EntryFacts> facts) {
+                          Map<String, List<HeldValue>> heldValues, Map<String, EntryFacts> facts) {
 
     /**
      * An entry's facts beyond its value ({@link TsonSchema}'s own Javadoc). {@code position} is where the
@@ -187,6 +193,29 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     }
 
     /**
+     * A dependent field's value a value body holds as written ([TSON-SCHEMA] §5.2), to be judged when the schema
+     * links against the type its sibling names: that type is one of the reading schema's namespace, which the readers
+     * of the layer governing the document do not hold. {@code slot} is the path from the body to the value, as for
+     * {@link ValueByName}; {@code field} and {@code sibling} name the dependent field and its sibling, and {@code
+     * declared} is the sibling's declaration, whose reference resolves an application the sibling holds. {@code named}
+     * is what the sibling holds in this instance -- its pin, the value written, or its default -- and is empty where
+     * the read produced no reference there, a refusal it has reported. {@code written} is the value as written, opaque
+     * to this model: what the engine that read it replays to judge it.
+     */
+    public record HeldValue(List<String> slot, String field, String sibling, RecordField declared,
+                            Optional<Reference> named, Object written) {
+
+        public HeldValue {
+            slot = List.copyOf(slot);
+            Objects.requireNonNull(field, "field");
+            Objects.requireNonNull(sibling, "sibling");
+            Objects.requireNonNull(declared, "declared");
+            Objects.requireNonNull(named, "named");
+            Objects.requireNonNull(written, "written");
+        }
+    }
+
+    /**
      * The declared type of a slot holding a reference by name, in the namespace of the schema declaring the slot's
      * record, which the reading schema's closure contains: what the reader of that slot was built from, so the linker
      * judges the name without walking the path back through the declarations. {@code of} is the slot's reference's
@@ -233,6 +262,9 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
         Map<String, List<ValueByName>> held = new LinkedHashMap<>();
         valuesByName.forEach((name, values) -> held.put(name, List.copyOf(values)));
         valuesByName = Collections.unmodifiableMap(held);
+        Map<String, List<HeldValue>> asWritten = new LinkedHashMap<>();
+        heldValues.forEach((name, values) -> asWritten.put(name, List.copyOf(values)));
+        heldValues = Collections.unmodifiableMap(asWritten);
         Map<String, EntryFacts> kept = new LinkedHashMap<>();
         facts.forEach((name, fact) -> {
             if (!fact.isEmpty()) {
@@ -255,7 +287,14 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     public TsonSchema(String id, List<String> imports, AnnotatedMap<String, Top> entries,
                        boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
                        Map<String, EntryFacts> facts) {
-        this(id, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, facts);
+        this(id, imports, entries, bootstrap, valuesByName, Map.of(), facts);
+    }
+
+    /** The same, with the dependent fields' values each value entry holds as written ({@link #heldValues()}). */
+    public TsonSchema(String id, List<String> imports, AnnotatedMap<String, Top> entries,
+                       boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
+                       Map<String, List<HeldValue>> heldValues, Map<String, EntryFacts> facts) {
+        this(id, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, heldValues, facts);
     }
 
     /**
@@ -277,7 +316,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     /** This schema with {@code name}'s own annotations recorded -- everything else unchanged. */
     public TsonSchema withNameAnnotations(String name, Annotations annotations) {
         return new TsonSchema(id, imports, entries.withAnnotations(name, annotations), bootstrap, valuesByName,
-                facts);
+                heldValues, facts);
     }
 
     /**

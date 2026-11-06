@@ -504,6 +504,100 @@ class ValuesByNameTest {
                 "'h.x' is a 'holder' whose field 'inner' is not present in the value, so the name reaches no value");
     }
 
+    // ── A dependent field's value held as written, judged when the schema links ────────────────────────────────────
+
+    /** A token is judged against the type its sibling names, in the schema's own namespace. */
+    @Test
+    void aHeldTokenIsJudgedAgainstTheTypeItsSiblingNames() {
+        assertEquals(List.of(), problems(api("held-token", """
+                d => !settings { s => { kind: int32  value: 12 } }""")));
+        refused(api("held-token-refused", """
+                d => !settings { s => { kind: int32  value: abc } }"""),
+                "'d' at /s/value is the dependent field 'value', typed by its sibling 'kind'",
+                "read against 'int32'");
+    }
+
+    /** A record, a type of the schema being read, is read by that type's reader: the governing layer holds none. */
+    @Test
+    void aHeldRecordIsReadAgainstALocalType() {
+        assertEquals(List.of(), problems(api("held-record", """
+                server => { port: int32  host?: text }
+                d => !settings { s => { kind: server  value: { port: 8080  host: example } } }""")));
+        refused(api("held-record-type", """
+                server => { port: int32 }
+                d => !settings { s => { kind: server  value: { port: abc } } }"""),
+                "'d' at /s/value is the dependent field 'value'", "read against 'server'", "at /port");
+        refused(api("held-record-field", """
+                server => { port: int32 }
+                d => !settings { s => { kind: server  value: { port: 1  nope: 2 } } }"""),
+                "read against 'server'", "nope");
+    }
+
+    /** A list is held and judged as a record is. */
+    @Test
+    void aHeldListIsReadAgainstTheTypeItsSiblingNames() {
+        assertEquals(List.of(), problems(api("held-list", """
+                ports => [int32]
+                d => !settings { s => { kind: ports  value: [1 2 3] } }""")));
+        refused(api("held-list-refused", """
+                ports => [int32]
+                d => !settings { s => { kind: ports  value: [1 two 3] } }"""),
+                "read against 'ports'", "at /1");
+    }
+
+    /** A pinned sibling's pin, and a defaulted one's default, type the value the instance does not type. */
+    @Test
+    void aPinnedOrDefaultedSiblingTypesTheHeldValue() {
+        refused(api("held-pinned", """
+                p => !pinned_settings { x => { value: "not a name" } }"""),
+                "'p' at /x/value is the dependent field 'value', typed by its sibling 'kind'",
+                "read against 'meta.identifier'");
+        refused(api("held-defaulted", """
+                p => !defaulted_settings { x => { value: "not a name" } }"""),
+                "read against 'meta.identifier'");
+        assertEquals(List.of(), problems(api("held-defaulted-written", """
+                p => !defaulted_settings { x => { kind: int32  value: 12 } }""")));
+    }
+
+    /** A sibling refused at its own slot is refused once: the value it types is not judged on top of it. */
+    @Test
+    void aHeldValueWhoseSiblingIsRefusedIsNotJudged() {
+        refused(api("held-template", """
+                box => <T> { v: T }
+                d => !settings { s => { kind: box  value: { v: 1 } } }"""),
+                "'d' at /s/kind names 'box', and 'box' is an open entry");
+    }
+
+    /** A value by name goes on through a dependent field into the record it holds. */
+    @Test
+    void aNameGoesOnIntoAHeldRecordValue() {
+        assertEquals(List.of(), problems(api("held-walk", """
+                named => { name: meta.identifier }
+                d => !settings { s => { kind: named  value: { name: hello } } }
+                l => !labels { x => { text: d.s.value.name } }""")));
+        refused(api("held-walk-absent", """
+                named => { name?: meta.identifier }
+                d => !settings { s => { kind: named  value: { } } }
+                l => !labels { x => { text: d.s.value.name } }"""),
+                "'d.s.value' is a 'named' whose field 'name' is not present in the value");
+    }
+
+    /** A name a held value holds by name is judged as any value body's, at its slot from the entry's root. */
+    @Test
+    void aNameInsideAHeldValueIsJudged() {
+        refused(api("held-inner-name-refused", """
+                d => !settings { s => { kind: label  value: { text: nobody.here } } }"""),
+                "'d' at /s/value/text");
+    }
+
+    /** A value entry's payload is judged; a field's default or pin keeps its own token-level check. */
+    @Test
+    void aDefaultKeepsItsOwnCheck() {
+        refused(api("held-default-unchanged", """
+                rec => { n?: int32 ~ abc }"""),
+                "'rec': field 'n' is declared 'int32', but its default abc is not a value of that type");
+    }
+
     /** A value entry's value. */
     private static Object valueOf(Object entry) {
         return ((ValueEntry) entry).value();

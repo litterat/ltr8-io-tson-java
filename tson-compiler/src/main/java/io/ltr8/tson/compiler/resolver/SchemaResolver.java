@@ -325,10 +325,10 @@ public final class SchemaResolver {
             Top local = namespace.get(name);
             return local != null ? Optional.of(TsonSchema.constructorOf(local)) : vocabulary.constructorOf(name);
         };
-        // Each body a read produced, with the references it read by name ([TSON-SCHEMA] §5.12), keyed by the body
-        // itself: the read hooks know the constructor and the value, not the entry, and the body is the one thing
-        // that reaches the entry unchanged.
-        Map<Object, List<TsonSchema.ValueByName>> heldByName = new IdentityHashMap<>();
+        // Each body a read produced, with the references it read by name ([TSON-SCHEMA] §5.12) and the dependent
+        // fields' values it held as written (§5.2), keyed by the body itself: the read hooks know the constructor
+        // and the value, not the entry, and the body is the one thing that reaches the entry unchanged.
+        Map<Object, HeldInBody> heldByName = new IdentityHashMap<>();
         // One materialiser for the whole schema, created before the driving loop because resolution itself
         // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
@@ -644,19 +644,22 @@ public final class SchemaResolver {
             }
         });
         Map<String, List<TsonSchema.ValueByName>> valuesByName = new LinkedHashMap<>();
+        Map<String, List<TsonSchema.HeldValue>> heldValues = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> localFacts = new LinkedHashMap<>();
         localOnly.forEach((name, definition) -> {
-            List<TsonSchema.ValueByName> held = heldByName.get(
-                    definition instanceof ValueEntry value ? value.value() : definition);
-            if (held != null) {
-                valuesByName.put(name, held);
+            HeldInBody held = heldByName.get(definition instanceof ValueEntry value ? value.value() : definition);
+            if (held != null && !held.byName().isEmpty()) {
+                valuesByName.put(name, held.byName());
+            }
+            if (held != null && !held.asWritten().isEmpty() && definition instanceof ValueEntry) {
+                heldValues.put(name, held.asWritten());
             }
             TsonSchema.EntryFacts known = facts.get(name);
             if (known != null) {
                 localFacts.put(name, known);
             }
         });
-        return new TsonSchema(id, document.imports(), localOnly, false, valuesByName, localFacts);
+        return new TsonSchema(id, document.imports(), localOnly, false, valuesByName, heldValues, localFacts);
     }
 
     /**
@@ -1128,11 +1131,12 @@ public final class SchemaResolver {
     /**
      * One already-resolved {@code DataValue} replayed through a compiled reader, judging names under {@code names},
      * as a read of a schema document's value ({@link TsonReadContext#readsSchemaDocument()}): a bare name at a
-     * record position is a value by name here and nowhere else. The references the read produced by name are put in
-     * {@code heldByName} under the body it returns, for the schema to carry to the linker.
+     * record position is a value by name here and nowhere else. The references the read produced by name, and the
+     * dependent fields' values it held as written, are put in {@code heldByName} under the body it returns, for the
+     * schema to carry to the linker.
      */
     private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
-                               IdentifierPolicy names, Map<Object, List<TsonSchema.ValueByName>> heldByName,
+                               IdentifierPolicy names, Map<Object, HeldInBody> heldByName,
                                boolean valueBody) {
         return read(reader, value, names, heldByName, valueBody, null);
     }
@@ -1142,9 +1146,10 @@ public final class SchemaResolver {
      * entry of this document its parts are read against ({@link WaitOrder#reached}).
      */
     private static Object read(TsonTypeReader<?> reader, io.ltr8.tson.compiler.ast.DataValue value,
-                               IdentifierPolicy names, Map<Object, List<TsonSchema.ValueByName>> heldByName,
+                               IdentifierPolicy names, Map<Object, HeldInBody> heldByName,
                                boolean valueBody, WaitOrder waits) {
         List<TsonSchema.ValueByName> held = new ArrayList<>();
+        List<TsonSchema.HeldValue> asWritten = new ArrayList<>();
         Object body = reader.read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)), names,
                 new TsonReadContext.HeldByName() {
 
@@ -1156,16 +1161,28 @@ public final class SchemaResolver {
                     }
 
                     @Override
+                    public void heldAsWritten(TsonSchema.HeldValue value) {
+                        asWritten.add(value);
+                    }
+
+                    @Override
                     public void reached(SchemaLocation declaration) {
                         if (waits != null) {
                             waits.reached(declaration);
                         }
                     }
                 }, valueBody));
-        if (!held.isEmpty() && body != null) {
-            heldByName.put(body, List.copyOf(held));
+        if ((!held.isEmpty() || !asWritten.isEmpty()) && body != null) {
+            heldByName.put(body, new HeldInBody(List.copyOf(held), List.copyOf(asWritten)));
         }
         return body;
+    }
+
+    /**
+     * What one read of a schema document's value hands the linker: the references it read by name, and the dependent
+     * fields' values it held as written.
+     */
+    private record HeldInBody(List<TsonSchema.ValueByName> byName, List<TsonSchema.HeldValue> asWritten) {
     }
 
     /**
@@ -1241,7 +1258,7 @@ public final class SchemaResolver {
          * in object-binding mode, or in tree mode where {@code tree} is true.
          */
         Object instance(String name, io.ltr8.tson.compiler.ast.DataValue value,
-                        Map<Object, List<TsonSchema.ValueByName>> heldByName, boolean tree) {
+                        Map<Object, HeldInBody> heldByName, boolean tree) {
             if (isLocal(name)) {
                 return local.read(name, tree,
                         readers -> read(readers.get(name), value, IdentifierPolicy.none(), heldByName, false, local));
@@ -1253,7 +1270,7 @@ public final class SchemaResolver {
 
         /** An annotation's value, read against the type {@code name} under {@code names}. */
         Object annotation(String name, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
-                          Map<Object, List<TsonSchema.ValueByName>> heldByName) {
+                          Map<Object, HeldInBody> heldByName) {
             if (isLocal(name)) {
                 return local.read(name, readers -> read(readers.get(name), value, names, heldByName, false, local));
             }
@@ -1274,7 +1291,7 @@ public final class SchemaResolver {
          * §11.4's scopes cover and {@code TsonSchemaLinker} judges, and is read under no policy.
          */
         Object value(String type, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
-                     Map<Object, List<TsonSchema.ValueByName>> heldByName) {
+                     Map<Object, HeldInBody> heldByName) {
             if (isLocal(type)) {
                 try {
                     return local.read(type,

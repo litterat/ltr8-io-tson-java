@@ -110,11 +110,19 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   closure does not hold — is refused at the sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and
   the value is skipped unjudged; a sibling whose own read reported leaves the value skipped and nothing more. What a
   sibling's value names is one rule, `DependentFieldReader.typeNamed`, which a value's name walked through a dependent
-  field asks too (`ValuesByName`). **In a schema document the value is held as written**, the token uninterpreted
-  through a reader of the record's own mode (not the kernel's `meta.value` entry, so `record_field` waits on nothing
-  for it): a default or pin is judged when the schema links, and the kernel's `record_field.value` is that case. In
-  bind mode the component is an `Object`, which receives what the named type reads to — the context registering
-  `Object` as an atom so the binder takes it whole —
+  field asks too (`ValuesByName`). **In a schema document the value is held as written**, whatever its form, as the
+  schemaless tree (`SchemalessTreeReader.preserving()`, waiting on nothing, so `record_field` waits on no
+  `meta.value`), in either order of the fields, and so wherever names resolve in the document being read
+  (`readsSchemaNames`, a resolved form read as data among them): the type its sibling names is one of that document's
+  namespace, which the governing layer's readers do not hold. The record reader captures the value's events before reading it
+  (`TsonReadContext.asWritten`, a lookahead) for every field typed `kind!`, whatever reads it, a `Token` component's
+  reader included, and once the record is read hands each to the read's sink with what its sibling holds
+  (`RecordAbstractReader.Held`, `TsonReadContext.heldAsWritten`); the linker judges a value entry's
+  (`design/linking-and-compilation.md`). A default or pin is judged as a field value, and the kernel's
+  `record_field.value` is that case. In
+  bind mode the component is an `Object`, which receives what the named type reads to, or the tree held as written
+  — the context registering `Object` as an atom so the binder takes it whole, as a context built from nothing
+  for the schema model does (`ResolverBindContext.registerDefaults`), and a consumer's does where they register it —
   and any narrower class is a `BindMismatchException` at compile (`BindTargets`); a `Token` component, the kernel's
   `RecordField.value`, holds the token as written (`RecordBindReader.tokenAware`). The JSON reader applies the same
   rules (`design/json-schema-directed-reading.md`).
