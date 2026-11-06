@@ -374,7 +374,7 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
   position comes from `SchemaResolver`'s catch.
 - **`IllegalStateException`** is for an invariant only a malformed resolved value or a skipped phase could break —
   an applicable head with a non-record body, a constructor not record-shaped (§7.2), and a container sugar form
-  reaching resolution unlifted (`DefinitionResolver.unlifted`). `TypeDef`, `StructuralDef` and the AST `TypeRef`
+  reaching resolution unlifted (`DefinitionResolver.unlifted`). `TypeDef`, `StructuralDef` and the AST `TypeExpr`
   are sealed and `resolveTypeDef`/`resolveTypeRef` switch over them exhaustively, so the sugar case is the only
   arm left, and only a caller resolving raw AST without `SchemaDesugarer` reaches it
   (`DefinitionResolverTest.anUnliftedSugarFormIsABrokenInvariantNotAGap`).

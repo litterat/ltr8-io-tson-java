@@ -6,10 +6,10 @@ import java.util.Optional;
 /**
  * Supertype composition and/or subtraction (Part 2 §12.1, §5.8, §5.9): one or more {@code &}-joined
  * supertypes, an optional trailing {@code record-def} body, and an optional trailing {@code
- * removal-set}. {@code supertypes} always has at least one element -- a lone type-ref with neither
- * a body nor a removal is not a {@code ConstructionDef} at all, just a {@link StructuralTypeDef}
- * wrapping a plain {@link TypeRef} (§12.2's disambiguation: {@code name &}/{@code name -} enter
- * this production, bare {@code name} does not).
+ * removal-set}. {@code supertypes} always has at least one element -- a lone reference with neither
+ * a body nor a removal is not a {@code ConstructionDef} at all, just a {@link ReferenceTypeDef}
+ * holding it (§12.2's disambiguation: {@code name &}/{@code name -} enter this production, bare
+ * {@code name} does not).
  *
  * <p><b>The ABNF's {@code construction-def} alternative 1 doesn't literally admit a trailing body
  * after a multi-supertype chain</b> (its {@code record-def} slot has no leading {@code "&"}), even
@@ -18,7 +18,7 @@ import java.util.Optional;
  * builds it, follow it: {@code body} is reached through a {@code &} like any other supertype join, not
  * bolted on without one.
  */
-public record ConstructionDef(List<TypeRef> supertypes, Optional<RecordDef> body, Optional<RemovalSet> removal)
+public record ConstructionDef(List<TypeExpr> supertypes, Optional<RecordDef> body, Optional<RemovalSet> removal)
         implements StructuralDef {
 
     public ConstructionDef {

@@ -7,14 +7,14 @@ import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
-import io.ltr8.tson.compiler.ast.schema.ArrayRef;
+import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
-import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
+import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.MapRef;
+import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
@@ -26,10 +26,10 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
-import io.ltr8.tson.compiler.ast.schema.TupleRef;
+import io.ltr8.tson.compiler.ast.schema.TupleExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
-import io.ltr8.tson.compiler.ast.schema.TypeRef;
+import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.schema.meta.Atom;
@@ -190,10 +190,10 @@ import java.util.function.Predicate;
  * <p><b>{@code subtypes} is never populated here</b> -- it is a reverse index over the whole namespace (who
  * lists me as a supertype, transitively), imports included, so {@code TsonSchemaLinker} computes it.
  *
- * <p>Note the two {@code TypeRef}s in play: this class imports the grammar-layer {@link TypeRef} (a
- * source-text reference) for reading the AST, and refers to {@code io.ltr8.tson.schema.meta.TypeRef} (the
- * resolved reference it produces) by its fully-qualified name -- the two share a name but are different
- * concepts, so only one can be the unqualified import.
+ * <p>Note the two reference models in play: this class imports the grammar layer's ({@link TypeExpr}, and the
+ * references {@link NameRef}, {@link ApplicationRef} and {@link SiblingRef}) for reading the AST, and refers to the
+ * resolved model's ({@code io.ltr8.tson.schema.meta.TypeRef} and its variants, the references it produces) by
+ * fully-qualified name -- the two layers name their references alike, so only one can be the unqualified import.
  *
  * <p>Package-private, no {@code Tson} prefix -- internal machinery a consumer of this library never names.
  * {@link SchemaResolver} is the document-level counterpart: it validates a document's header directives,
@@ -538,7 +538,7 @@ final class DefinitionResolver {
                     // sized array into the `!meta.array { ... }` construction it denotes with min_items/max_items bound
                     // directly (§5.3), a size-less one into the same without them (§5.6), a voidable element as
                     // `voidable: true`, and a tuple into `!meta.tuple { ... }` -- so one here is that phase not having run.
-                    case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _, SiblingRef _ ->
+                    case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, SiblingRef _ ->
                             throw unlifted("'" + name + "'", referenceTypeDef.ref());
                 };
             }
@@ -563,7 +563,7 @@ final class DefinitionResolver {
      * writes can produce one here: it is a caller resolving raw AST without that phase, an invariant of the pipeline
      * rather than a gap in it.
      */
-    private static IllegalStateException unlifted(String where, TypeRef ref) {
+    private static IllegalStateException unlifted(String where, TypeExpr ref) {
         if (ref instanceof SiblingRef) {
             return new IllegalStateException(where + ": a sibling reference reached resolution off a field's type: "
                     + ref + " -- SchemaDesugarer refuses one there (§5.2), so this declaration was resolved from raw "
@@ -1581,7 +1581,7 @@ final class DefinitionResolver {
         Set<String> seenFieldNames = new HashSet<>();
         Set<String> inheritedFields = new HashSet<>();
 
-        for (TypeRef supertypeRef : construction.supertypes()) {
+        for (TypeExpr supertypeRef : construction.supertypes()) {
             if (supertypeRef instanceof ApplicationRef generic) {
                 // §5.8's "Parameterized references", open end and closed alike: an application at an operand
                 // denotes no entry of its own, whether its arguments are this declaration's parameters or
@@ -1642,9 +1642,9 @@ final class DefinitionResolver {
                 // and no implementation to wait for; §12.1's `supertype-ref` narrows the operands to named
                 // references, so this shape is the grammar's own error to refuse.
                 throw new SchemaValidationException("'" + name + "': a "
-                        + (supertypeRef instanceof ChoiceRef ? "choice" : "bracketed array/tuple")
+                        + (supertypeRef instanceof ChoiceExpr ? "choice" : "bracketed array/tuple")
                         + " cannot be a supertype -- '&' composes record types, and this form has "
-                        + (supertypeRef instanceof ChoiceRef ? "variants" : "elements") + ", not fields (§5.8)");
+                        + (supertypeRef instanceof ChoiceExpr ? "variants" : "elements") + ", not fields (§5.8)");
             }
             String supertypeName = simple.name();
             refuseParameterOperand(name, supertypeName, parameters, "supertype", "&");
@@ -2020,7 +2020,7 @@ final class DefinitionResolver {
      * refining declaration's own parameter) resolves each argument the way every other application does
      * ({@link #typeArgument}).
      */
-    private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeRef target,
+    private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeExpr target,
             List<String> typeParams) {
         if (target instanceof NameRef simple) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
@@ -2161,7 +2161,7 @@ final class DefinitionResolver {
      * unresolved reference -- a wrong verdict on a schema that is not wrong.
      */
     private static boolean namesOwnParameter(ApplicationRef application, List<String> typeParams) {
-        return application.args().stream().anyMatch(arg -> arg instanceof TypeArg.Ref(TypeRef ref)
+        return application.args().stream().anyMatch(arg -> arg instanceof TypeArg.Ref(TypeExpr ref)
                 && (ref instanceof NameRef simple && typeParams.contains(simple.name())
                         || ref instanceof ApplicationRef nested && namesOwnParameter(nested, typeParams)));
     }
@@ -2740,7 +2740,7 @@ final class DefinitionResolver {
      * type-ref. A written type names a type or an application of one; a container sugar form is not lifted at
      * this position, so it has no entry to name and is refused here in those terms.
      */
-    io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeRef written) {
+    io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeExpr written) {
         if (written instanceof SiblingRef sibling) {
             throw new SchemaValidationException(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field())
                     .refusedAt("the type of parameter '" + parameter + "'"));
@@ -2762,7 +2762,7 @@ final class DefinitionResolver {
      * of them is an entry: {@link SchemaDesugarer} lifts each to a declaration and leaves a bare reference behind
      * ({@link #unlifted}).
      */
-    private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeRef ref) {
+    private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
             case ApplicationRef generic -> {
@@ -2772,7 +2772,7 @@ final class DefinitionResolver {
                 }
                 yield io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), args);
             }
-            case ArrayRef _, TupleRef _, MapRef _, ChoiceRef _, SiblingRef _ ->
+            case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, SiblingRef _ ->
                     throw unlifted("a type-ref position", ref);
         };
     }
@@ -2782,7 +2782,7 @@ final class DefinitionResolver {
      * ([TSON-SCHEMA] §5.2): the one position a sibling reaches the model, {@link SchemaDesugarer} having refused one
      * anywhere else.
      */
-    private io.ltr8.tson.schema.meta.Reference resolveFieldType(TypeRef ref) {
+    private io.ltr8.tson.schema.meta.Reference resolveFieldType(TypeExpr ref) {
         return ref instanceof SiblingRef sibling ? io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field())
                 : resolveTypeRef(ref);
     }

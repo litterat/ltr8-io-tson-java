@@ -39,6 +39,14 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`extends TsonDataParser`, same package** — §12.1 imports Part 1's `annotation`/`data-value`/directive
   grammar directly, so `TsonSchemaParser` calls straight into package-private methods rather than
   re-implementing them, adding only the schema-only tokens (`~ ^ & | ( ) < > ? ; -`).
+- **The AST names a reference as the model does** (`ast.schema`). A reference is a `Reference`, sealed over `TypeRef`
+  and `SiblingRef`, and `TypeRef` over `NameRef` and `ApplicationRef` — the shape of `schema.meta`'s `Reference` and
+  of `meta.tn`'s `meta.type_ref`, so one name means one thing in the AST, the resolved model and the kernel. The
+  structural forms are expressions, not references: `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is
+  any of them, a reference or a structural form, and is what §12.1's `type-ref` production parses to (the production's
+  name says reference where it means expression, SPEC-FEEDBACK.md #22). A slot the grammar holds to a reference is
+  typed by it: `MapExpr.keyType` and `RefinedDef.target` are a `Reference` (`parseTypeRefHead`), a sibling there being
+  the desugar phase's to refuse.
 - **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
   takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
   the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's root `schema`, an
@@ -85,7 +93,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   admits sugar (`box<[text]>`, `box<(text | int32)>`), which a data argument never holds.
 - **`sibling-ref` is a `type-ref` alternative** (§12.1, SPEC-FEEDBACK.md #21; `parseTypeRefHead`,
   `parseSiblingRef`): one token of lookahead after the name picks it, an adjacent `!` a sibling reference, an adjacent
-  `<` an application, neither a bare name. It becomes an `ast.schema.SiblingRef`, which joins the sealed `TypeRef`, so
+  `<` an application, neither a bare name. It becomes an `ast.schema.SiblingRef`, a `Reference` and so a `TypeExpr`, so
   `[ kind! ]`, `box< kind! >`, `( kind! | text )`, `{ kind! => text }` (the brace dispatch takes an adjacent `!` after
   the first name as a map key, as it does `<`) and `x => kind!` all parse. **The `!` is followed by whitespace**
   (§12.3), so `[kind!]`, `kind!}`, `a!b` and `kind!?` are parse errors; the token is one identifier (`a.b!` is
@@ -140,12 +148,12 @@ materialization, no validation (those are the resolver's/linker's jobs).
   rejected at a type-ref position with the "declare a named type and reference it by name" correction
   (§5.3). An element `?` and a size specifier are legal at a type-ref position, so neither has a diagnostic
   of that kind.
-- **One production per container, reachable from `type-ref`** — `ArrayRef`, `TupleRef`, `MapRef`, each
+- **One production per container, reachable from `type-ref`** — `ArrayExpr`, `TupleExpr`, `MapExpr`, each
   admitting a size specifier after `;` and an element `?` at *every* position. §12.1 has one bracket
   production and one map production: every form lifts to an entry (§5.3), so a sized form needs no
   declaration-level tier to carry it, and `type-def` reaches each container through `type-ref` like anything
   else, with no tie-break between a declaration-level and an inline spelling to state.
-  - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeRef` — `[[T; 2]; 3]` and
+  - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeExpr` — `[[T; 2]; 3]` and
     `{text => [order; 1..]}` and `{text => {text => integer}}` need no second node family.
   - **An element's `?` and a field's own `?`s cannot collide**: a field is `field-name ["?"] ":" type-ref
     ["?"]`, so in `xs?: [T?]?` the first belongs to the name (the key may be omitted), the inner to

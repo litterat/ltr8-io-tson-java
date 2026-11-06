@@ -11,18 +11,19 @@ import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
-import io.ltr8.tson.compiler.ast.schema.ArrayRef;
-import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
+import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
+import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.MapRef;
+import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
+import io.ltr8.tson.compiler.ast.schema.Reference;
 import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
@@ -31,9 +32,10 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
-import io.ltr8.tson.compiler.ast.schema.TupleRef;
+import io.ltr8.tson.compiler.ast.schema.TupleExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
+import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -392,14 +394,14 @@ final class SchemaDesugarer {
     }
 
     /** A record field's type: a sibling reference itself stands here, and is refused anywhere inside the type. */
-    private static void siblingInside(TypeRef ref) {
+    private static void siblingInside(TypeExpr ref) {
         if (!(ref instanceof SiblingRef)) {
             siblingRefused(ref, "");
         }
     }
 
     /** {@code ref}, standing at {@code slot}, refused where it is a sibling reference or holds one at any depth. */
-    private static void siblingRefused(TypeRef ref, String slot) {
+    private static void siblingRefused(TypeExpr ref, String slot) {
         switch (ref) {
             case SiblingRef sibling -> throw new SchemaValidationException(
                     io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()).refusedAt(slot));
@@ -409,14 +411,14 @@ final class SchemaDesugarer {
                     siblingRefused(nested.ref(), "a template argument");
                 }
             });
-            case ArrayRef array -> siblingRefused(array.elementType().typeRef(), "an array's element type");
-            case MapRef map -> {
+            case ArrayExpr array -> siblingRefused(array.elementType().typeRef(), "an array's element type");
+            case MapExpr map -> {
                 siblingRefused(map.keyType(), "a map's key type");
                 siblingRefused(map.valueType().typeRef(), "a map's value type");
             }
-            case TupleRef tuple -> tuple.elementTypes()
+            case TupleExpr tuple -> tuple.elementTypes()
                     .forEach(element -> siblingRefused(element.typeRef(), "a tuple element"));
-            case ChoiceRef choice -> choice.variants().forEach(variant -> siblingRefused(variant, "a choice variant"));
+            case ChoiceExpr choice -> choice.variants().forEach(variant -> siblingRefused(variant, "a choice variant"));
         }
     }
 
@@ -475,7 +477,7 @@ final class SchemaDesugarer {
                             new RecordValue.Field(TARGET, WireForm.plain(refValue(reference.ref()))))),
                             reference.typeParams());
                 }
-                TypeRef ref = argumentsOnly(reference.ref());
+                TypeExpr ref = argumentsOnly(reference.ref());
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
             }
             // The explicit spelling of a record template, `<T> !meta.record { ... }`, takes the same labels the sugar
@@ -491,14 +493,16 @@ final class SchemaDesugarer {
         return switch (def) {
             case RecordDef record -> recordDef(record);
             case RefinedDef refined -> {
-                TypeRef target = argumentsOnly(refined.target()); // §5.7 refines a *named* source
+                // §5.7 refines a *named* source; only its arguments are expandable.
+                Reference target = refined.target() instanceof ApplicationRef generic
+                        ? applicationArguments(generic) : refined.target();
                 RecordDef body = recordDef(refined.body());
                 yield target == refined.target() && body == refined.body() ? refined
                         : new RefinedDef(target, body);
             }
             case ConstructionDef construction -> {
                 // §5.8 composes with named supertypes; only their arguments are expandable.
-                List<TypeRef> supertypes = mapShared(construction.supertypes(), this::argumentsOnly);
+                List<TypeExpr> supertypes = mapShared(construction.supertypes(), this::argumentsOnly);
                 Optional<RecordDef> body = construction.body().map(this::recordDef);
                 boolean bodyChanged = construction.body().isPresent()
                         && body.orElseThrow() != construction.body().orElseThrow();
@@ -520,7 +524,7 @@ final class SchemaDesugarer {
                     yield field; // modifier-only entry (a tightening body restating state, §5.7)
                 }
                 FieldDef.FieldType fieldType = field.type().orElseThrow();
-                TypeRef ref = typeRef(fieldType.typeRef());
+                TypeExpr ref = typeRef(fieldType.typeRef());
                 if (ref == fieldType.typeRef()) {
                     yield field;
                 }
@@ -542,7 +546,7 @@ final class SchemaDesugarer {
     }
 
     private GroupDef.Member groupMember(GroupDef.Member member) {
-        TypeRef ref = typeRef(member.typeRef());
+        TypeExpr ref = typeRef(member.typeRef());
         return ref == member.typeRef() ? member
                 : new GroupDef.Member(member.annotations(), member.name(), member.omittable(), ref,
                         member.voidable());
@@ -553,25 +557,23 @@ final class SchemaDesugarer {
      * nested form is already a plain name by the time the enclosing one is built (<code>{text =&gt;
      * [integer]}</code> injects the inner array, then the outer map referring to it).
      */
-    private TypeRef typeRef(TypeRef ref) {
+    private TypeExpr typeRef(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> simple;
             case SiblingRef sibling -> sibling; // a field's type, as written: it names no entry to lift
-            case ArrayRef _, TupleRef _, MapRef _ -> hoistOrKeep(binding(ref), ref);
-            case ChoiceRef _ -> hoistOrKeep(binding(ref), ref);
-            case ApplicationRef generic -> {
-                checkTemplateApplication(generic.name());
-                List<TypeArg> args = mapShared(generic.args(), this::typeArg);
-                yield args == generic.args() ? generic : new ApplicationRef(generic.name(), args);
-            }
+            case ArrayExpr _, TupleExpr _, MapExpr _ -> hoistOrKeep(binding(ref), ref);
+            case ChoiceExpr _ -> hoistOrKeep(binding(ref), ref);
+            case ApplicationRef generic -> applicationArguments(generic);
         };
     }
 
     /** Expands only within a reference's arguments, leaving its own head in place. */
-    private TypeRef argumentsOnly(TypeRef ref) {
-        if (!(ref instanceof ApplicationRef generic)) {
-            return ref;
-        }
+    private TypeExpr argumentsOnly(TypeExpr ref) {
+        return ref instanceof ApplicationRef generic ? applicationArguments(generic) : ref;
+    }
+
+    /** {@code generic} with its arguments expanded, the same node where none changes. */
+    private ApplicationRef applicationArguments(ApplicationRef generic) {
         checkTemplateApplication(generic.name());
         List<TypeArg> args = mapShared(generic.args(), this::typeArg);
         return args == generic.args() ? generic : new ApplicationRef(generic.name(), args);
@@ -581,7 +583,7 @@ final class SchemaDesugarer {
         if (!(arg instanceof TypeArg.Ref ref)) {
             return arg;
         }
-        TypeRef rewritten = typeRef(ref.ref());
+        TypeExpr rewritten = typeRef(ref.ref());
         return rewritten == ref.ref() ? arg : new TypeArg.Ref(rewritten);
     }
 
@@ -636,7 +638,7 @@ final class SchemaDesugarer {
     }
 
     /** One scalar type slot as the wire field a construction writes -- see {@link #refValue}. */
-    private static void refSlot(String slot, TypeRef ref, List<RecordValue.Field> fields) {
+    private static void refSlot(String slot, TypeExpr ref, List<RecordValue.Field> fields) {
         fields.add(new RecordValue.Field(slot, WireForm.plain(refValue(ref))));
     }
 
@@ -652,7 +654,7 @@ final class SchemaDesugarer {
      * are one application -- [TSON-SCHEMA] §8.2's rule exactly: recorded as written, compared as the value the
      * token denotes.
      */
-    private static CoreValue refValue(TypeRef ref) {
+    private static CoreValue refValue(TypeExpr ref) {
         if (ref instanceof SiblingRef sibling) {
             // A record template field's type, the one slot a sibling reference reaches here.
             return WireForm.refValue(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()));
@@ -661,7 +663,7 @@ final class SchemaDesugarer {
     }
 
     /** A grammar-level reference as the reference value it spells: a name, or an application of names and tokens. */
-    private static io.ltr8.tson.schema.meta.TypeRef reference(TypeRef ref) {
+    private static io.ltr8.tson.schema.meta.TypeRef reference(TypeExpr ref) {
         if (ref instanceof NameRef simple) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
@@ -682,7 +684,7 @@ final class SchemaDesugarer {
     }
 
     /** One position of a tuple after expansion: the type it names, and whether it is marked voidable. */
-    private record Position(TypeRef typeRef, boolean voidable) {
+    private record Position(TypeExpr typeRef, boolean voidable) {
     }
 
     /**
@@ -690,15 +692,15 @@ final class SchemaDesugarer {
      * this phase cannot reduce to a name -- which leaves the whole container unexpanded, since a partially
      * reduced one would be a differently-broken shape rather than a recognisable sugar form.
      */
-    private Optional<Binding> binding(TypeRef ref) {
+    private Optional<Binding> binding(TypeExpr ref) {
         return switch (ref) {
-            case ArrayRef array -> arrayBinding(elementRef(array.elementType()),
+            case ArrayExpr array -> arrayBinding(elementRef(array.elementType()),
                     array.elementType().voidable(), array.size(), shownElement(array.elementType()));
-            case MapRef map -> mapBinding(typeRef(map.keyType()), elementRef(map.valueType()),
+            case MapExpr map -> mapBinding(typeRef(map.keyType()), elementRef(map.valueType()),
                     map.valueType().voidable(), map.size());
-            case TupleRef tuple -> tupleBinding(tuple.elementTypes().stream()
+            case TupleExpr tuple -> tupleBinding(tuple.elementTypes().stream()
                     .map(e -> new Position(elementRef(e), e.voidable())).toList());
-            case ChoiceRef choice -> choiceBinding(mapShared(choice.variants(), this::typeRef));
+            case ChoiceExpr choice -> choiceBinding(mapShared(choice.variants(), this::typeRef));
             default -> Optional.empty();
         };
     }
@@ -712,7 +714,7 @@ final class SchemaDesugarer {
      * states nothing at all and lets §5.2's default injection supply it, exactly as an unmarked tuple
      * position omits its own {@code voidable}.
      */
-    private static Optional<Binding> arrayBinding(TypeRef element, boolean voidable, Optional<SizeSpec> size,
+    private static Optional<Binding> arrayBinding(TypeExpr element, boolean voidable, Optional<SizeSpec> size,
             String shown) {
         if (!isReference(element)) {
             return Optional.empty();
@@ -731,8 +733,8 @@ final class SchemaDesugarer {
      * arguments. Anything else is a sugar form the caller was supposed to have expanded first, and leaves the
      * enclosing container unexpanded rather than half-built.
      */
-    private static boolean isReference(TypeRef ref) {
-        return ref instanceof NameRef || ref instanceof ApplicationRef;
+    private static boolean isReference(TypeExpr ref) {
+        return ref instanceof TypeRef;
     }
 
     /**
@@ -743,7 +745,7 @@ final class SchemaDesugarer {
      * The key carries none -- a key is never void ([TSON-DATA] §2.9), so the parser refuses the marker
      * there rather than this table dropping it.
      */
-    private static Optional<Binding> mapBinding(TypeRef key, TypeRef value, boolean voidable,
+    private static Optional<Binding> mapBinding(TypeExpr key, TypeExpr value, boolean voidable,
             Optional<SizeSpec> size) {
         if (!isReference(key) || !isReference(value)) {
             return Optional.empty();
@@ -760,7 +762,7 @@ final class SchemaDesugarer {
     }
 
     /** How a map side is quoted back in the one diagnostic that shows the form. */
-    private static String shownRef(TypeRef ref) {
+    private static String shownRef(TypeExpr ref) {
         return ref instanceof NameRef simple ? simple.name() : ((ApplicationRef) ref).name() + "<...>";
     }
 
@@ -803,15 +805,15 @@ final class SchemaDesugarer {
      * rewritten to the entry it denotes one pass later ({@code MetaRefs.mapRefsKeepingChain}, which maps
      * a choice's variants like any other reference). Refusing the application here instead left the whole
      * choice unlifted, and a form the desugar table did not reduce reaches {@code DefinitionResolver} as a
-     * {@code ChoiceRef} it has no case for.
+     * {@code ChoiceExpr} it has no case for.
      *
      * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
      * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
      * after alias flattening, which this phase has no answer to.
      */
-    private static Optional<Binding> choiceBinding(List<TypeRef> variants) {
+    private static Optional<Binding> choiceBinding(List<TypeExpr> variants) {
         List<DataValue> members = new ArrayList<>();
-        for (TypeRef variant : variants) {
+        for (TypeExpr variant : variants) {
             members.add(WireForm.plain(refValue(variant)));
         }
         return Optional.of(new Binding(CHOICE,
@@ -1100,8 +1102,8 @@ final class SchemaDesugarer {
      * A binding hoisted into its own declaration and replaced by a reference to it, or {@code unexpanded} when
      * the form did not reduce.
      */
-    private TypeRef hoistOrKeep(Optional<Binding> binding, TypeRef unexpanded) {
-        return binding.<TypeRef>map(this::hoist).orElse(unexpanded);
+    private TypeExpr hoistOrKeep(Optional<Binding> binding, TypeExpr unexpanded) {
+        return binding.<TypeExpr>map(this::hoist).orElse(unexpanded);
     }
 
     /**
@@ -1113,7 +1115,7 @@ final class SchemaDesugarer {
      * parameters it uses, referenced by an application binding them straight back through. {@code <T> { a: [T]
      *  b: [order] }} therefore injects one of each, and only the first has to wait for materialisation.
      */
-    private TypeRef hoist(Binding binding) {
+    private TypeExpr hoist(Binding binding) {
         List<String> parameters = parametersIn(binding);
         if (parameters.isEmpty()) {
             String name = bindingName(binding);
@@ -1244,7 +1246,7 @@ final class SchemaDesugarer {
      * <p>Empty when the position holds a form this phase cannot build, which leaves the enclosing container
      * unexpanded and keeps its existing handling.
      */
-    private TypeRef elementRef(ElementType element) {
+    private TypeExpr elementRef(ElementType element) {
         return typeRef(element.typeRef());
     }
 

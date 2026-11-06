@@ -45,7 +45,7 @@ public record SchemaMap(List<Annotation> annotations, Map<String, Declaration> d
      */
     public record Declaration(List<Annotation> nameAnnotations, String name,
                                List<Annotation> typeDefAnnotations, Optional<DefinitionMark> mark,
-                               TypeDef typeDef, Map<String, TypeRef> parameterTypes) {
+                               TypeDef typeDef, Map<String, TypeExpr> parameterTypes) {
 
         /**
          * {@code parameterTypes} is what the parameter list wrote after each name -- {@code <T: text>} -- keyed

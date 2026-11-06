@@ -62,7 +62,7 @@ public record GroupDef(List<Annotation> annotations, List<List<Member>> options,
      * admits {@code _}, and a voidable member written {@code _} is present and chooses its option. A member
      * takes no value modifier, since a group never supplies a member.
      */
-    public record Member(List<Annotation> annotations, String name, boolean omittable, TypeRef typeRef,
+    public record Member(List<Annotation> annotations, String name, boolean omittable, TypeExpr typeRef,
                          boolean voidable) {
 
         public Member {

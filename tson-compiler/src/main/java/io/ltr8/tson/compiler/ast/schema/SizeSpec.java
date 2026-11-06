@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.ast.schema;
 
 /**
- * The size specifier after {@code ;} in an {@link ArrayRef} or a {@link MapRef} (Part 2 §12.1, §5.3):
+ * The size specifier after {@code ;} in an {@link ArrayExpr} or a {@link MapExpr} (Part 2 §12.1, §5.3):
  * {@code size-spec = size-bound [ws ".." ws [size-bound]] / ".." ws size-bound}.
  * Four surface spellings, kept structurally distinct here rather than collapsed -- collapsing
  * {@code N} into {@code N..N} is a resolution-time equivalence (§5.3: "two spellings of the same
