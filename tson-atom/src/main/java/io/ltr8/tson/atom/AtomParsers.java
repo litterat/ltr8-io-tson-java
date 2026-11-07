@@ -59,7 +59,6 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.net.IriType;
 import io.ltr8.tson.schema.net.UriType;
 import io.ltr8.tson.schema.net.UuidType;
-import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 import java.util.Optional;
 
@@ -95,11 +94,7 @@ public final class AtomParsers {
      * parser does not model (see {@code ComplexParser}), so the body selects the parser without configuring it.
      * Every other family is constructed from the body it was given.
      *
-     * <p><b>{@code value} and {@code void} yield nothing.</b> {@code void} is the type with no value, so no token
-     * is one, and {@code value} is read by base type resolution, which is the <em>encoding's</em> ([TSON-DATA]
-     * §4 for the text encoding, [TSON-JSON] §5.7 for JSON) rather than this vocabulary's -- reading it depends on
-     * how the token was written, which an {@link AtomType} deliberately cannot see. A caller holding an encoding
-     * supplies its own.
+     * <p><b>{@code void} yields nothing.</b> It is the type with no value, so no token is one.
      */
     public static Optional<AtomType<?>> forType(Top body) {
         return forType(body, Normalization.NONE);
@@ -151,7 +146,6 @@ public final class AtomParsers {
             return Optional.of(reference.namesTypes() ? new TypeNameRefParser(reference) : new RefParser(reference));
         }
         return Optional.ofNullable(switch (body) {
-            case ValueType ignored -> null;
             case VoidType ignored -> null;
             case IdentifierType t -> new IdentifierParser(t);
             case IntegerType t -> new IntegerParser(t);

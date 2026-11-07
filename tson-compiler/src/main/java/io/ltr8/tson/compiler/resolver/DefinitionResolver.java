@@ -1043,6 +1043,7 @@ final class DefinitionResolver {
                     new RecordValue(bindings.fields().subList(0, bindings.fields().size() - 1)));
         }
         ParameterTypes.checkSlots(template.typeParams(), payload, metaDefinitions::definition);
+        refuseLiteralOnParameter(payload);
         if (!(bindAtomInstance(name, payload, WireForm.RECORD) instanceof RecordTemplateBody built)) {
             throw new IllegalStateException("'" + name + "': '!record_template { ... }' bound to something other "
                     + "than a record template");
@@ -1067,12 +1068,49 @@ final class DefinitionResolver {
         template.fields().forEach((name, field) -> {
             Optional<String> parameter = field.parameterInType(template.parameterNames());
             if (parameter.isPresent() && field.value().isPresent()) {
-                throw new SchemaValidationException("field '" + name + "' is typed by the parameter '"
-                        + parameter.get() + "' and carries the literal value '" + field.value().get().text()
-                        + "' -- a literal needs a closed type, and this field's type differs in every "
-                        + "application. Supply the value as a parameter too, or write none (§5.10)");
+                throw literalOnOpenType(name, parameter.get(), field.value().get().text());
             }
         });
+    }
+
+    /**
+     * {@link #refuseLiteralOnOpenType}'s rule over the payload not yet bound, for a field whose whole type is a
+     * parameter: read against {@code record_template_field} its literal {@code value}, typed {@code type!}, has no
+     * sibling, which is the same verdict in words that say nothing of the parameter. So it is refused for where it
+     * stands before the reader is asked, as {@link ParameterTypes#checkSlots} refuses a parameter in a scalar slot.
+     */
+    private static void refuseLiteralOnParameter(DataValue payload) {
+        if (!(payload.coreValue() instanceof RecordValue bindings)) {
+            return;
+        }
+        for (RecordValue.Field binding : bindings.fields()) {
+            if (WireForm.FIELDS.equals(binding.name()) && binding.value().coreValue() instanceof MapValue fields) {
+                fields.entries().forEach(entry -> {
+                    if (entry.value().coreValue() instanceof RecordValue field && entry.key().coreValue()
+                            instanceof TokenValue name) {
+                        Optional<String> parameter = tokenAt(field, WireForm.TYPE_PARAM);
+                        Optional<String> literal = tokenAt(field, WireForm.VALUE);
+                        if (parameter.isPresent() && literal.isPresent()) {
+                            throw literalOnOpenType(name.text(), parameter.get(), literal.get());
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    /** The token {@code record} holds at {@code slot}, as written; empty where it holds none. */
+    private static Optional<String> tokenAt(RecordValue record, String slot) {
+        return record.fields().stream().filter(field -> slot.equals(field.name())).findFirst()
+                .filter(field -> field.value().coreValue() instanceof TokenValue)
+                .map(field -> ((TokenValue) field.value().coreValue()).text());
+    }
+
+    private static SchemaValidationException literalOnOpenType(String field, String parameter, String literal) {
+        return new SchemaValidationException("field '" + field + "' is typed by the parameter '" + parameter
+                + "' and carries the literal value '" + literal + "' -- a literal needs a closed type, and this "
+                + "field's type differs in every application. Supply the value as a parameter too, or write none "
+                + "(§5.10)");
     }
 
     /**

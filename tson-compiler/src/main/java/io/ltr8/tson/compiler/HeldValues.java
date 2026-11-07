@@ -93,7 +93,7 @@ final class HeldValues {
     private void judge(String where, TsonSchema.HeldValue value, List<TsonSchema.ValueByName> byName,
                        Deque<TsonSchema.HeldValue> work) {
         if (value.named().isEmpty()) {
-            return; // the sibling holds no reference: its read, or its absence, has been reported
+            return; // the sibling holds no reference: its read, or its absence, is refused at the read
         }
         String naming = where + " is the dependent field '" + value.field() + "', typed by its sibling '"
                 + value.sibling() + "'";

@@ -19,8 +19,6 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -327,9 +325,7 @@ final class RecordExtension {
                                  Map<String, Normalization> enumForms) {
         Optional<AtomType<?>> parser = parserFor(selector, merged, facts, enumForms);
         try {
-            return parser.get() instanceof io.ltr8.tson.compiler.atom.TokenAtomType<?> formSensitive
-                    ? formSensitive.read(new TokenValue(pin.text(), TokenForm.valueOf(pin.form().name())))
-                    : parser.get().read(pin.text());
+            return parser.get().read(pin.text());
         } catch (AtomTypeException notThisType) {
             return null;
         }

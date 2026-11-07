@@ -27,8 +27,10 @@ import java.util.Objects;
  * default or pin. The object's opening position is pinned for those, having no event of their own. The one exception
  * is a dependent field's free sibling ([TSON-SCHEMA] §5.2): a sibling neither pinned nor a discriminator is written
  * before the dependent member, or left out with its default applying, so a member is never held before it can be
- * typed; written after a member read against its default, it is the same refusal. A pinned sibling's pin types the
- * member wherever the sibling stands, and a discriminator's member dispatch has selected a member that pins it.
+ * typed; written after the member, it is the same refusal, found when it arrives. A sibling that never arrives is its
+ * own refusal: a required one the missing-field error, and a field group's member, absent where another option is
+ * chosen, reported at the member once the object closes. A pinned sibling's pin types the member wherever the sibling
+ * stands, and a discriminator's member dispatch has selected a member that pins it.
  *
  * <p><b>Closure is the whole answer.</b> A record absorbs nothing: a member matching no declared field is
  * §6.1.1's closure error, and open-ended data is carried by a declared map-typed field instead.
@@ -80,10 +82,11 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         JsonEvent.MemberName[] firstGiven = plan.folds() ? new JsonEvent.MemberName[slots.length] : null;
         boolean tagged = false;
         // A dependent field's state, kept only where the record has one: each sibling's reference as written, and
-        // each dependent member read against its sibling's default before the sibling was written.
+        // each dependent member reached before its sibling was written, by the name written and where it stands.
         io.ltr8.tson.schema.meta.Reference[] named = plan.hasDependents
                 ? new io.ltr8.tson.schema.meta.Reference[slots.length] : null;
         String[] readBefore = plan.hasDependents ? new String[slots.length] : null;
+        JsonReadContext[] readBeforeAt = plan.hasDependents ? new JsonReadContext[slots.length] : null;
         for (int position = 0; ; position++) {
             JsonEvent event = ctx.next();
             if (event instanceof JsonEvent.ObjectEnd) {
@@ -128,16 +131,19 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 continue;
             }
             if (plan.typesADependent[at]) {
-                siblingArrives(ctx, at, readBefore);
+                siblingArrives(at, readBefore, readBeforeAt);
                 String text = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
                 int before = ctx.reported();
                 slots[at] = readField(ctx, at, memberName);
                 named[at] = ctx.reported() > before ? null : DependentReader.referenceIn(text);
             } else if (plan.siblingOf[at] >= 0 && !(ctx.peek() instanceof JsonEvent.NullValue)) {
-                slots[at] = readDependent(ctx, at, memberName, slots, named, readBefore);
+                slots[at] = readDependent(ctx, at, memberName, slots, named, readBefore, readBeforeAt);
             } else {
                 slots[at] = readField(ctx, at, memberName);
             }
+        }
+        if (plan.hasDependents) {
+            refuseAbsentSiblings(slots, readBefore, readBeforeAt);
         }
         JsonReadContext closing = ctx.withPosition(opening.position());
         if (plan.hasGroups()) {
@@ -149,11 +155,13 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
 
     /**
      * A dependent member, read against the type its sibling names in this object: the pin, the sibling as written
-     * before it, or the sibling's default where it is not yet written -- and refused, naming both, where a free
-     * sibling with no default is not yet written ([TSON-SCHEMA] §5.2).
+     * before it, or the sibling's default where it is not yet written. A free sibling with no default that is not yet
+     * written leaves the member with no type: it is skipped unjudged, and refused when the sibling arrives, the order
+     * rule, or when the object closes without it ([TSON-SCHEMA] §5.2).
      */
     private Object readDependent(JsonReadContext ctx, int at, String memberName, Object[] slots,
-                                 io.ltr8.tson.schema.meta.Reference[] named, String[] readBefore) {
+                                 io.ltr8.tson.schema.meta.Reference[] named, String[] readBefore,
+                                 JsonReadContext[] readBeforeAt) {
         int sibling = plan.siblingOf[at];
         JsonReadContext fieldCtx = plan.field(ctx, at, memberName);
         io.ltr8.tson.schema.meta.Reference reference;
@@ -164,8 +172,10 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         } else if (plan.omitted[sibling] == RecordField.Omitted.VALUE && plan.stated[sibling] != null) {
             reference = DependentReader.referenceIn(plan.stated[sibling].text());
             readBefore[at] = memberName;
+            readBeforeAt[at] = fieldCtx.withPosition(fieldCtx.peek().position());
         } else {
-            fieldCtx.report(plan.rules.writtenBeforeItsSibling(memberName, plan.declaredNames[sibling]));
+            readBefore[at] = memberName;
+            readBeforeAt[at] = fieldCtx.withPosition(fieldCtx.peek().position());
             EventSkip.nextValue(fieldCtx);
             return Slots.REFUSED;
         }
@@ -175,18 +185,32 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
     }
 
     /**
-     * Sibling {@code at} is written: a free one after a dependent member read against its default is the order rule
-     * broken, reported at that member. A pinned sibling orders nothing.
+     * Sibling {@code at} is written: a free one after a dependent member reached before it is the order rule broken,
+     * reported at that member. A pinned sibling orders nothing.
      */
-    private void siblingArrives(JsonReadContext ctx, int at, String[] readBefore) {
+    private void siblingArrives(int at, String[] readBefore, JsonReadContext[] readBeforeAt) {
         if (plan.fields[at].role() == FieldRole.FIXED) {
             return;
         }
         for (int d = 0; d < readBefore.length; d++) {
             if (readBefore[d] != null && plan.siblingOf[d] == at) {
-                plan.field(ctx, d, readBefore[d]).report(plan.rules.writtenBeforeItsSibling(readBefore[d],
-                        plan.declaredNames[at]));
+                readBeforeAt[d].report(plan.rules.writtenBeforeItsSibling(readBefore[d], plan.declaredNames[at]));
                 readBefore[d] = null;
+            }
+        }
+    }
+
+    /**
+     * The object has closed: each dependent member still waiting on a sibling that never arrived, a field group's
+     * member, is refused where it was written, nothing having typed it. A sibling with a default typed the member, and
+     * a required one is the missing-field error.
+     */
+    private void refuseAbsentSiblings(Object[] slots, String[] readBefore, JsonReadContext[] readBeforeAt) {
+        for (int d = 0; d < readBefore.length; d++) {
+            if (readBefore[d] != null && slots[plan.siblingOf[d]] == null
+                    && plan.omitted[plan.siblingOf[d]] == RecordField.Omitted.NOTHING) {
+                readBeforeAt[d].report(plan.rules.writtenWithoutItsSibling(readBefore[d],
+                        plan.declaredNames[plan.siblingOf[d]]));
             }
         }
     }

@@ -101,10 +101,19 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   - **a pinned sibling**: the pin types the field wherever the sibling is written, or whether it is;
   - **a discriminator**: member dispatch selects a member before any field is read, and each member pins it;
   - **a free sibling**: the value this instance wrote before the field, or its default where it is not yet written.
-    A dependent field written before a free sibling with no default is `VALIDATION_ERROR` at the field, naming both
-    (`RecordDiagnostics.writtenBeforeItsSibling`), and skipped; a defaulted one written after a field read against
-    its default is the same refusal, reported when the sibling arrives (`RecordAbstractReader.Dependents`), so no
+    A dependent field reached before a free sibling with no default is skipped unjudged, for no stream can say yet
+    whether the sibling comes: arriving after it is `VALIDATION_ERROR` at the field, naming both
+    (`RecordDiagnostics.writtenBeforeItsSibling`), reported when the sibling arrives and pinned where the field stood
+    (`RecordAbstractReader.Dependents`), as is a defaulted sibling written after a field read against its default. No
     lookahead and no held value is added.
+
+  A sibling that never arrives is no order broken. A required one is the missing-field error, `FIELD_REQUIRED`, and
+  nothing more. A field group's member, absent because another option is chosen or none, is `VALIDATION_ERROR` at the
+  dependent field once the record closes (`RecordDiagnostics.writtenWithoutItsSibling`,
+  `RecordAbstractReader.refuseAbsentSiblings`), in tree and bind mode and in a schema document, which holds the value
+  as written and refuses it all the same: the check runs over every field typed `kind!`, whatever reads it, so a bound
+  `Token` component's slot answers to it (`record_template_field.value` beside `type_param`). `RecordReader` is the same
+  rule in JSON.
 
   A sibling naming no type a value can be read against — a sibling reference, a template, an application the
   closure does not hold — is refused at the sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and
@@ -112,7 +121,7 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   sibling's value names is one rule, `DependentFieldReader.typeNamed`, which a value's name walked through a dependent
   field asks too (`ValuesByName`). **In a schema document the value is held as written**, whatever its form, as the
   schemaless tree (`SchemalessTreeReader.preserving()`, waiting on nothing, so `record_field` waits on no
-  `meta.value`), in either order of the fields, and so wherever names resolve in the document being read
+  entry for it), in either order of the fields, and so wherever names resolve in the document being read
   (`readsSchemaNames`, a resolved form read as data among them): the type its sibling names is one of that document's
   namespace, which the governing layer's readers do not hold. The record reader captures the value's events before reading it
   (`TsonReadContext.asWritten`, a lookahead) for every field typed `kind!`, whatever reads it, a `Token` component's

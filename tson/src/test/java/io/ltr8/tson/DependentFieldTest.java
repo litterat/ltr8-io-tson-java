@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -48,7 +50,9 @@ class DependentFieldTest {
               slot      => abstract { kind: meta.type_ref =?  v?: kind! }
               int_slot  => slot & { kind?: = int32 }
               text_slot => slot & { kind?: = text }
-              rack      => { s: slot }""");
+              rack      => { s: slot }
+              grouped   => { ( kind: meta.type_ref | name: text )  v?: kind! }
+              labelled  => { ( kind: meta.type_ref | name: text )  ( v: kind! | w: text )? }""");
 
     private static Tson tson(String schema) {
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(
@@ -99,11 +103,29 @@ class DependentFieldTest {
     }
 
     @Test
-    void theSiblingIsAlwaysThereToRead() {
+    void theSiblingIsThereToReadWheneverItsDependentFieldIs() {
         assertTrue(refusal("cell => { kind?: meta.type_ref  v?: kind! }").contains("optional with no default"));
         assertTrue(refusal("cell => { kind: meta.type_ref?  v?: kind! }").contains("which is voidable"));
-        assertTrue(refusal("cell => { ( kind: meta.type_ref | name: text )  v?: kind! }")
-                .contains("a member of a field group"));
+    }
+
+    /** A group member beside an optional dependent field, a dependent group member being optional as declared. */
+    @Test
+    void aSiblingMayBeAFieldGroupMemberBesideAnOptionalDependentField() {
+        for (String declarations : List.of(
+                "cell => { ( kind: meta.type_ref | name: text )  v?: kind! }",
+                "cell => { ( kind: meta.type_ref | name: text )?  v?: kind! }",
+                "cell => { ( kind: meta.type_ref | name: text )  ( v: kind! | w: text )? }",
+                "cell => { ( kind: meta.type_ref | name: text )  ( v: kind! | w: text ) }")) {
+            assertEquals(List.of(), Tson.standard().validateSchema(schema(declarations)), declarations);
+        }
+    }
+
+    @Test
+    void aFieldGroupMemberIsNoSiblingOfARequiredDependentField() {
+        assertTrue(refusal("cell => { ( kind: meta.type_ref | name: text )  v: kind! }")
+                .contains("a member of a field group, and 'v' is required"));
+        assertTrue(refusal("cell => { ( kind: meta.type_ref | name: text )  v?: kind! }\n  must => cell ^ { v: kind! }")
+                .contains("a member of a field group, and 'v' is required"));
     }
 
     @Test
@@ -160,6 +182,42 @@ class DependentFieldTest {
         assertEquals(Optional.of("/s/v"), only(validate("!rack { s: { v: hello  kind: int32 } }")).path());
     }
 
+    /** A sibling that never arrives is no order broken: the refusal says it is absent, or is the missing field's. */
+    @Test
+    void aDependentFieldWrittenWithoutItsGroupMemberSiblingIsRefused() {
+        Diagnostic absent = only(validate("!grouped { name: x  v: 5 }"));
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, absent.code());
+        assertEquals(Optional.of("/v"), absent.path());
+        assertTrue(absent.message().contains("is written without 'kind'"), absent.message());
+        assertFalse(absent.message().contains("before"), absent.message());
+        assertEquals("!grouped { name: x  ".length() + 1, absent.dataPosition().orElseThrow().column(), "at the field");
+        Diagnostic member = only(validate("!labelled { name: x  v: 5 }"));
+        assertEquals(Optional.of("/v"), member.path());
+        assertTrue(member.message().contains("is written without 'kind'"), member.message());
+        Diagnostic required = only(validate("!cell { v: 5 }"));
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, required.code());
+        assertEquals(Optional.of("/kind"), required.path());
+    }
+
+    @Test
+    void aGroupMemberSiblingReadsAsAnyFreeSiblingDoes() {
+        assertEquals(List.of(), validate("!grouped { kind: int32  v: 5 }"));
+        assertEquals(List.of(), validate("!grouped { name: x }"));
+        assertEquals(List.of(), validate("!labelled { kind: text  v: hello }"));
+        assertEquals(List.of(), validate("!labelled { name: x  w: y }"));
+        assertEquals(Optional.of("/v"), only(validate("!grouped { kind: int32  v: hello }")).path());
+        Diagnostic early = only(validate("!grouped { v: 5  kind: int32 }"));
+        assertEquals(Optional.of("/v"), early.path());
+        assertTrue(early.message().contains("written before 'kind'"), early.message());
+        assertTrue(early.dataPosition().orElseThrow().column() < "!grouped { v: 5  kind".length(), "at the field");
+    }
+
+    @Test
+    void aValueEntryWritingADependentFieldWithoutItsSiblingDoesNotLoad() {
+        assertTrue(refusal("cell => { ( kind: meta.type_ref | name: text )  v?: kind! }\n  a => !cell { name: x  v: 5 }")
+                .contains("is written without 'kind'"));
+    }
+
     @Test
     void aSiblingNamingNoReadableTypeIsRefusedAtTheSibling() {
         assertEquals(Optional.of("/kind"), only(validate("!cell { kind: box  v: { item: 5 } }")).path());
@@ -179,6 +237,36 @@ class DependentFieldTest {
                 + "optional: true  role: DEFAULT  value: 5 }")).path());
         assertTrue(refusal("config => !meta.record { fields: { port => !meta.record_field { type: int32  "
                 + "optional: true  role: DEFAULT  value: \"nope\" } } }").contains("is not a value of that type"));
+    }
+
+    /** A template field's {@code value} is the same dependent field, its sibling a member of a field group. */
+    @Test
+    void theKernelsTemplateFieldValueIsReadAgainstItsType() {
+        Tson tson = Tson.standard();
+        String meta = "!!import:\"https://tson.io/2026/39/m/meta.tn\"\n";
+        assertEquals(List.of(), tson.validate(meta + "!meta.record_template_field { type: integer  optional: true  "
+                + "role: DEFAULT  value: 5 }"));
+        assertEquals(List.of(), tson.validate(meta + "!meta.record_template_field { type_param: T  optional: true  "
+                + "role: DEFAULT  value_param: V }"));
+        assertEquals(Optional.of("/value"), only(tson.validate(meta + "!meta.record_template_field { type: boolean  "
+                + "optional: true  role: DEFAULT  value: 5 }")).path());
+        Diagnostic literal = only(tson.validate(meta + "!meta.record_template_field { type_param: T  optional: true  "
+                + "role: DEFAULT  value: 5 }"));
+        assertEquals(Optional.of("/value"), literal.path());
+        assertTrue(literal.message().contains("is written without 'type'"), literal.message());
+    }
+
+    /** What a template's literal is judged by, and its refusals on an open type, are §5.10's as written. */
+    @Test
+    void aTemplateLiteralNeedsAClosedType() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema(
+                "box => <T> { n?: int32 ~ 5  w: T }\n  b => box<text>")));
+        assertTrue(refusal("box => <T> { n?: int32 ~ nope  w: T }\n  b => box<text>")
+                .contains("is not a value of that type"));
+        assertTrue(refusal("box => <T> { v?: T ~ 5 }")
+                .contains("typed by the parameter 'T' and carries the literal value '5'"));
+        assertTrue(refusal("box => <T> { v: T }\n  boxy => <T> { w?: box<T> = x }")
+                .contains("typed by the parameter 'T' and carries the literal value 'x'"));
     }
 
     /** {@code record_field.type} admits a sibling reference in a tree read; every other slot refuses it. */
@@ -227,6 +315,29 @@ class DependentFieldTest {
         tson.objectReader().withDiagnostics(problems)
                 .read("!!import:\"" + ID + "\"\n!cell { v: 5  kind: int32 }", Cell.class);
         assertEquals(Optional.of("/v"), only(problems.diagnostics()).path());
+    }
+
+    /** A bind target for {@code grouped}: each member of the group a component of its own. */
+    public record Grouped(Optional<TypeRef> kind, Optional<String> name, Object v) {
+    }
+
+    @Test
+    void aBoundDependentFieldWrittenWithoutItsGroupMemberSiblingIsRefused() {
+        DataNameBinder binder = name -> "grouped".equals(name) ? Grouped.class
+                : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, CELLS))))
+                .withDataBindContext(DataBindContext.builder().nameBinder(binder)
+                        .registerAtoms(AtomContext.hostTypes()).registerAtom(Object.class).build()));
+        String header = "!!import:\"" + ID + "\"\n";
+        Grouped grouped = tson.objectReader().read(header + "!grouped { kind: int32  v: 5 }", Grouped.class);
+        assertEquals(5, ((Number) grouped.v()).intValue());
+        io.ltr8.tson.base.DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
+        assertNull(tson.objectReader().withDiagnostics(problems)
+                .read(header + "!grouped { name: x  v: 5 }", Grouped.class));
+        Diagnostic absent = only(problems.diagnostics());
+        assertEquals(Optional.of("/v"), absent.path());
+        assertTrue(absent.message().contains("is written without 'kind'"), absent.message());
     }
 
     @Test

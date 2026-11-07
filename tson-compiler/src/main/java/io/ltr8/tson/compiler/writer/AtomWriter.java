@@ -34,8 +34,7 @@ public final class AtomWriter {
             case String s -> writer.quotedString(s);
             case Character c -> writer.quotedString(c.toString());
             // The one value that knows its own framing rather than having it inferred: a Token records the
-            // form it was written in, and at a `value`-typed slot that form is part of the value -- `3` and
-            // `"3"` are different values there ([TSON-DATA] §4 resolves them to a number and a string). Every
+            // form it was written in, which a default or pin keeps as §8's resolved form carries it. Every
             // other case here reads its framing off the host type because it has nothing better.
             case io.ltr8.tson.schema.meta.Token t -> {
                 switch (t.form()) {

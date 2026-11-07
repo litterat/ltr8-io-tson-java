@@ -37,7 +37,7 @@ import java.util.Optional;
 final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
-     * Every atom constructor but {@code value_type} and {@code void_type}. The family's parser comes from the
+     * Every atom constructor but {@code void_type}. The family's parser comes from the
      * resolved body -- {@code AtomParsers} is the one index both encodings ask, so there is never a
      * second opinion about which parser reads which body.
      */
@@ -57,10 +57,6 @@ final class AtomReader<T> implements JsonTypeReader<T> {
     /** {@code void_type}: the void sentinel and nothing else, read as [TSON-JSON] §5.7 states for JSON. */
     static final ValueReaderFactory VOID = (name, definition, context) ->
             new VoidReader(name, context.locationOf(name));
-
-    /** {@code value_type}: read by [TSON-JSON] §5.7's own base-type rule, which is the encoding's, not the vocabulary's. */
-    static final ValueReaderFactory VALUE = (name, definition, context) ->
-            new ValuePositionReader(name, context.locationOf(name));
 
     private final String name;
     private final AtomType<T> parser;

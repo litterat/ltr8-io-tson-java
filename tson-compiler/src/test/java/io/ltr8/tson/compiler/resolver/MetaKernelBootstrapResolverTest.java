@@ -17,7 +17,6 @@ import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.unicode.IdentifierType;
-import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.net.IriType;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -81,13 +80,12 @@ class MetaKernelBootstrapResolverTest {
     }
 
     @Test
-    void valueVoidAndIdentifierEachResolveToTheirOwnConstructorsBody() {
+    void voidAndIdentifierEachResolveToTheirOwnConstructorsBody() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        Map<String, Top> expected = Map.of("meta.value", new ValueType(), "void", new VoidType(),
-                "meta.identifier", IdentifierType.IDENTIFIER);
-        Map<String, String> constructors = Map.of("meta.value", "meta.value_type", "void", "meta.void_type",
-                "meta.identifier", "unicode.identifier_type");
+        Map<String, Top> expected = Map.of("void", new VoidType(), "meta.identifier", IdentifierType.IDENTIFIER);
+        Map<String, String> constructors = Map.of("void", "meta.void_type", "meta.identifier",
+                "unicode.identifier_type");
         expected.forEach((name, body) -> {
             Top resolved = schema.entries().get(name);
             assertEquals(EntryKind.ATOM, EntryKind.of(resolved, n -> true));
@@ -167,7 +165,7 @@ class MetaKernelBootstrapResolverTest {
     void theFixtureDeclarationsResolveAlongsideSevenDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(96, schema.entries().size());
+        assertEquals(94, schema.entries().size());
         for (String head : List.of("array_array_text_1", "array_text_1", "array_type_ref",
                 "array_template_param", "array_template_param_1", "array_field_group", "array_tuple_element")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),

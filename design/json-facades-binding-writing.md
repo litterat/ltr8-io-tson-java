@@ -148,7 +148,7 @@ storing a failed element's `null` into a primitive array throws out of `put`.
 ### Atoms: the target picks the parser
 
 `JsonAtoms.bind` dispatches on the **target** and guards on the leaf kind, never the other way round. That is §4.1 read
-literally — every position in this encoding is typed and base type resolution has no role (§4.1, §5.7) — and it is
+literally — every position in this encoding is typed and base type resolution has no role (§4.1) — and it is
 the only order that expresses §5.4, where one approximate family admits a JSON number *and* a JSON string (`".inf"`,
 `"-.inf"`, `".nan"`, [TSON-DATA] §7.6's productions) through one parser. Which families are approximate is this
 encoding's question, so it is answered by the four Java types `float`/`double` and their boxes rather than by asking

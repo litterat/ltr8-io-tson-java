@@ -27,8 +27,10 @@ import java.util.Optional;
  * ambiguous: a parameter spelled like a schema type, and one spelled like a name an absorbed field's arguments write.
  *
  * <p><b>A literal {@code value} needs a closed type</b>, so a field whose type is a parameter, or an application
- * over one, takes {@code value_param} or nothing. {@link RecordTemplateBody} checks it against the template's
- * parameters, which a field alone does not know.
+ * over one, takes {@code value_param} or nothing. The resolver checks it against the template's parameters, which a
+ * field alone does not know. The kernel types {@code value} {@code type!}, as on a record field, its sibling {@code
+ * type} a member of a field group: a {@code value} beside {@code type_param} has no type to be read against, and is
+ * refused where it is read.
  *
  * <p><b>An application substitutes every parameter away</b>, and each of its fields is then a {@link RecordField}:
  * {@code type_param} becomes {@code type} and {@code value_param} becomes {@code value}, carrying the argument, and

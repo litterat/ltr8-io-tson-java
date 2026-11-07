@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/meta.tn?sha256=a59a053ce96af5642718fc37f9271476fef9489fef7bd4cce5341ea2c79c9d6e"
+!!id:"https://tson.io/2026/39/m/meta.tn?sha256=c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 39 draft).
 
@@ -502,23 +502,6 @@
     }
 
     @doc:"""
-      Escape hatch primitive. `value` is the unconstrained instance of
-      value_type, an atom constructor with no constraint vocabulary: the token,
-      uninterpreted, read by the type the position hands it to. A value-typed
-      field is read by the declared type it stands for and never by base type
-      resolution, which applies only in schemaless documents ([TSON-DATA] §4).
-      value is not narrowable, and a value position is not a scope: it admits no
-      directive.
-
-      Used for meta.record_template_field.value, whose field's type may be a
-      parameter and so has no sibling to name (the type of a fixed or default
-      value, which must be the field's declared type).
-      """
-    value_type => meta.atom & {}
-
-    value => !meta.value_type {}
-
-    @doc:"""
       Void primitive. The instance of void_type, an atom constructor with no
       constraint vocabulary whose parsing contract admits only the void sentinel
       `_`. It binds no host value. void is the target type for bare annotations
@@ -636,12 +619,15 @@
       A field whose `type` is a sibling reference, `kind!`, is a dependent
       field ([TSON-SCHEMA] §5.2): each instance's value is read against the
       type that instance's `kind` names. The sibling is declared before it, is
-      typed by a reference whose `of` lies within `meta.type`, and is always
-      there to read: required, defaulted or pinned, never voidable and no
-      member of a field group, its default or pin naming a type a value can be
-      read against. A dependent field is never voidable, carries no value of
-      its own, and is restated only as itself; pinning its sibling fixes its
-      type.
+      typed by a reference whose `of` lies within `meta.type`, is never
+      voidable, and is there to read whenever the dependent field is: required,
+      defaulted, pinned, or a member of a field group with the dependent field
+      optional, a group's own member counting as optional. Its default or pin
+      names a type a value can be read against. A member is absent when another
+      option is chosen, and a dependent field written without its sibling is
+      refused where it is read. A dependent field is never voidable, carries no
+      value of its own, and is restated only as itself; pinning its sibling
+      fixes its type.
 
       Which fields a member-dispatched family dispatches on is the enclosing
       record's own statement, `record.discriminators`, and no field says it of
@@ -713,7 +699,9 @@
 
       A literal `value` needs a closed type, so a field whose type is a
       parameter, or an application over one, takes `value_param` or nothing.
-      A field of a closed type takes either.
+      A field of a closed type takes either. `value` is typed `type!`, as on a
+      record field: beside `type_param`, with `type` absent, it has no type to
+      be read against and is refused where it is read.
 
       A parametric modifier takes the facts its literal spelling takes
       ([TSON-SCHEMA] §5.7): `w?: T ~ P` is an optional DEFAULT field and
@@ -731,7 +719,7 @@
       optional?: boolean ~ false
       voidable?: boolean ~ false
       role?:     meta.field_role ~ FREE
-      ( value: meta.value | value_param: meta.param_name )?
+      ( value: type! | value_param: meta.param_name )?
     }
 
     @doc:"""

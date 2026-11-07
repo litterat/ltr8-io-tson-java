@@ -4,7 +4,6 @@ import io.ltr8.tson.atom.parser.BooleanParser;
 import io.ltr8.tson.atom.parser.BytesParser;
 import io.ltr8.tson.atom.parser.Cidr4Parser;
 import io.ltr8.tson.atom.parser.Cidr6Parser;
-import io.ltr8.tson.atom.parser.ComplexParser;
 import io.ltr8.tson.atom.parser.DateParser;
 import io.ltr8.tson.atom.parser.DateTimeParser;
 import io.ltr8.tson.atom.parser.DecimalParser;
@@ -17,11 +16,9 @@ import io.ltr8.tson.atom.parser.MediaTypeParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.PeriodParser;
-import io.ltr8.tson.atom.parser.RationalParser;
 import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.IriParser;
-import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.net.Host;
 import io.ltr8.net.MediaType;
@@ -52,52 +49,17 @@ import java.util.UUID;
  * name-&gt;{@link AtomType} table, keyed on the Java type a value arrives as rather than the name a schema
  * wrote.
  *
- * <p><b>It exists for the {@code value}-typed slot.</b> A slot typed {@code value} is decoded by [TSON-DATA] §4
- * base type resolution and by nothing else, which resolves three classes -- boolean, number, string -- so a
- * schema's {@code { slot: meta.value }} bound to a {@code UUID} component receives the string the token was,
- * and the component's own type is the only thing that says what it meant. This table is how {@code
- * tson-compiler}'s {@code ValueParser#read(TokenValue, Class)} asks.
- *
  * <p>{@code java.net.URI} answers with {@code iri_reference}, the widest of the four atoms it holds: every
  * URI, URI-reference and IRI is an IRI-reference, and the class holds any of them, so the class alone names
  * no narrower contract.
  *
  * <p>The entries are unconstrained instances, deliberately: a host class names a family and no refinement of
  * it, so the family's own instance is the whole contract the class implies.
- *
- * <p><b>Not the same table as the writers' own</b> ({@code VocabularyAtoms}), and the difference is the
- * numeric families. A writer must not annotate every {@code BigDecimal} it emits with {@code !number}, so it
- * carries no reverse entry for one; a reader asking "what should this slot's token have been" must answer
- * for {@code number} too, or a {@code value} slot bound to a {@code BigDecimal} has nothing to refuse {@code "abc"}
- * by. The two tables
- * answer different questions and only look alike.
  */
 public final class HostAtoms {
 
     private HostAtoms() {
     }
-
-    private static final Map<Class<?>, AtomType<?>> BY_HOST_TYPE = Map.ofEntries(
-            Map.entry(BigDecimal.class, DecimalParser.UNCONSTRAINED),
-            Map.entry(BigInteger.class, IntegerParser.UNCONSTRAINED),
-            Map.entry(LocalDate.class, DateParser.UNCONSTRAINED),
-            Map.entry(OffsetTime.class, TimeParser.UNCONSTRAINED),
-            Map.entry(OffsetDateTime.class, DateTimeParser.UNCONSTRAINED),
-            Map.entry(Duration.class, DurationParser.UNCONSTRAINED),
-            Map.entry(Period.class, PeriodParser.UNCONSTRAINED),
-            Map.entry(Rational.class, RationalParser.UNCONSTRAINED),
-            Map.entry(Complex.class, ComplexParser.UNCONSTRAINED),
-            Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
-            Map.entry(URI.class, IriParser.REFERENCE_AS_JAVA_URI),
-            Map.entry(Iri.class, IriParser.REFERENCE),
-            Map.entry(byte[].class, BytesParser.BASE64),
-            Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
-            Map.entry(HostName.class, HostnameParser.UNCONSTRAINED),
-            Map.entry(Host.class, HostParser.UNCONSTRAINED),
-            Map.entry(MediaType.class, MediaTypeParser.UNCONSTRAINED),
-            Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
-            Map.entry(CidrInet4Network.class, Cidr4Parser.UNCONSTRAINED),
-            Map.entry(CidrInet6Network.class, Cidr6Parser.UNCONSTRAINED));
 
     /**
      * The host classes of [TSON-JSON] §5.6's <b>string-content</b> families -- the ones whose wire form is a
@@ -168,7 +130,7 @@ public final class HostAtoms {
      * produces that class.
      *
      * <p>What an encoding whose kinds already do the classifying asks -- [TSON-JSON] §4.1 makes the
-     * position's type decide and §5.7 says outright that its decode "needs none of base type resolution".
+     * position's type decide, so a decode needs none of base type resolution.
      * <b>The text encoding does not ask</b>, and must not: [TSON-DATA] §4 makes base type resolution
      * normative for an untyped token there, so the token is classified first and the target is a narrowing
      * question afterwards ({@code AtomBinder}). Both readings are right for their own encoding, which is why
@@ -233,11 +195,6 @@ public final class HostAtoms {
      */
     public static Optional<AtomType<?>> forTypedPosition(Class<?> hostType) {
         return Optional.ofNullable(BY_TYPED_POSITION.get(hostType));
-    }
-
-    /** The built-in atom whose values are {@code hostType}, or empty where no built-in produces that class. */
-    public static Optional<AtomType<?>> forHostType(Class<?> hostType) {
-        return Optional.ofNullable(BY_HOST_TYPE.get(hostType));
     }
 
     /**

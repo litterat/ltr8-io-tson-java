@@ -20,9 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The record shapes bind mode reaches past a plain record -- a labelled choice bound to a sealed interface, a
- * component whose class is a bridged wrapper over a record, and a {@code value} slot read as its component's
- * class -- each read in JSON and checked against what the TSON reader binds from the same value.
+ * The record shapes bind mode reaches past a plain record -- a labelled choice bound to a sealed interface and a
+ * component whose class is a bridged wrapper over a record -- each read in JSON and checked against what the TSON
+ * reader binds from the same value.
  */
 class JsonBindRecordShapesTest {
 
@@ -38,20 +38,6 @@ class JsonBindRecordShapesTest {
               call     => { arg: argument }
               address  => { street: text  city: text }
               letter   => { to: address }
-            }
-            """;
-
-    private static final String FACETS = "https://example.test/bind-facets-1.tn";
-
-    /**
-     * {@code value} is meta.tn's, and an import stands at the importer's governing level (§2.2.3): a schema
-     * reaching the escape hatch is one the kernel governs.
-     */
-    private static final String FACETS_SCHEMA = """
-            !!id:"https://example.test/bind-facets-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !schema {
-              facet => { limit: meta.value  scale: meta.value  label: meta.value }
             }
             """;
 
@@ -78,11 +64,8 @@ class JsonBindRecordShapesTest {
     public record Letter(Recipient to) {
     }
 
-    public record Facet(Duration limit, BigDecimal scale, String label) {
-    }
-
     private static final Map<String, Class<?>> BINDINGS = Map.of("argument", Argument.class, "call", Call.class,
-            "address", Address.class, "letter", Letter.class, "facet", Facet.class);
+            "address", Address.class, "letter", Letter.class);
 
     private static ProcessorConfig config(Map<String, Class<?>> bindings) {
         DataBindContext binding = DataBindContext.builder().nameBinder(DataNameBinder.ofMap(bindings))
@@ -95,7 +78,6 @@ class JsonBindRecordShapesTest {
 
     static {
         TSON.resolve(SCHEMA);
-        TSON.resolve(FACETS_SCHEMA);
         JSON = Json.of(config(BINDINGS)).withSchemas(TSON.schemaRegistry());
     }
 
@@ -192,26 +174,5 @@ class JsonBindRecordShapesTest {
         Json json = Json.of(config(Map.of("address", Recipient.class))).withSchemas(TSON.schemaRegistry());
         assertEquals(new Recipient(new Address("1 Way", "Here")), json.objectReader().withSchema(ID)
                 .readAs("{\"street\": \"1 Way\", \"city\": \"Here\"}", "address", Recipient.class));
-    }
-
-    /**
-     * A {@code value} slot is decoded as a boolean, number or string, and read as what its component holds: a
-     * string where a {@code Duration} is held is a duration, and an integer where a {@code BigDecimal} is held is
-     * widened.
-     */
-    @Test
-    void aValueSlotIsReadAsTheClassItsComponentHolds() {
-        Facet facet = both(FACETS, "facet", Facet.class, "{ limit: \"PT30M\"  scale: 2  label: wide }",
-                "{\"limit\": \"PT30M\", \"scale\": 2, \"label\": \"wide\"}");
-        assertEquals(new Facet(Duration.ofMinutes(30), BigDecimal.valueOf(2), "wide"), facet);
-    }
-
-    @Test
-    void aValueSlotItsComponentsAtomRefusesIsReported() {
-        List<Diagnostic> problems = new ArrayList<>();
-        assertNull(JSON.objectReader().withDiagnostics(problems::add).withSchema(FACETS).readAs(
-                "{\"limit\": \"soon\", \"scale\": 2, \"label\": \"wide\"}", "facet", Facet.class));
-        assertEquals(1, problems.size(), problems.toString());
-        assertEquals("/limit", problems.getFirst().path().orElseThrow());
     }
 }

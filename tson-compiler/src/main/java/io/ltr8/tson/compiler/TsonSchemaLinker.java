@@ -4,7 +4,6 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
-import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.CountingReceiver;
@@ -17,11 +16,8 @@ import io.ltr8.tson.compiler.resolver.ImportedSynthetics;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.*;
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.ConfusableNames;
@@ -29,7 +25,6 @@ import io.ltr8.tson.schema.meta.RecordHead;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.binary.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -64,7 +59,6 @@ import io.ltr8.tson.schema.numeric.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
-import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.Alias;
@@ -84,15 +78,12 @@ import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.net.IriType;
 import io.ltr8.tson.schema.net.UriType;
 import io.ltr8.tson.schema.meta.VoidType;
-import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1414,8 +1405,6 @@ public final class TsonSchemaLinker {
             }
             case TemplateBody ignored -> { } // open, answered above
             case RecordTemplateBody ignored -> { } // open, answered above
-            case ValueType ignored -> {
-            }
             case VoidType ignored -> {
             }
             case IdentifierType ignored -> {
@@ -1814,13 +1803,7 @@ public final class TsonSchemaLinker {
             throw notAScalarType(entryName, fieldName, field, value, target);
         }
         try {
-            // The token is in hand and one of the two atoms cares which form it was (see TokenAtomType),
-            // so it is passed whole rather than reconstructed.
-            if (parser.get() instanceof TokenAtomType<?> formSensitive) {
-                formSensitive.read(new TokenValue(value.text(), TokenForm.valueOf(value.form().name())));
-            } else {
-                parser.get().read(value.text());
-            }
+            parser.get().read(value.text());
         } catch (AtomTypeException e) {
             // The field's two halves are what the author has to reconcile, so both are named, in the order
             // they are written, and the value is echoed as the schema spells it -- quoted if it was quoted,

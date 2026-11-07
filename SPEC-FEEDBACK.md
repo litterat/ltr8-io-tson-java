@@ -205,7 +205,7 @@ The rule is 1; the rest are its consequences.
    application among them (#12), is read by its atom's grammar alone; what it names is resolved and judged once every
    entry is ready (§4.2, §8.3). So `tree => { t: tree }`, mutual recursion, and a constructor whose facet is typed by
    its own instance (`decimal_type => atom & { min?: number }` beside `number => !decimal_type {}`) are sound.
-3. **A held value orders nothing.** A `value`-typed slot (a field's default or pin) and a
+3. **A held value orders nothing.** A field's default or pin, a dependent field (#21), and a
    template's body hold what a schemaless read gives ([TSON-DATA] §4), and bind as written: a pin or default is not
    decoded through its type when the reader carrying it is built, but judged against its type once every entry is
    ready, still at load (rule 6). Where a declaration names the type a form reads against, a read reaches that type
@@ -660,7 +660,7 @@ binds.
   the schema closes and is refused, as a name no member is.
 - **A message names a minted entry by its application**, as written: `'b<10>': '5' is less than the minimum 10`, and
   a kind's refusal lists `meta.ref<uuid_type>` where it would have listed the entry minted for it.
-- `value_type` stays: the libraries' facets and `meta.record_field.value` still use `value`.
+- This retires `value`'s argument slot. #17 retires its facets and #21 its last two slots, and `value_type` with them.
 
 **Resolution, a proposal.**
 
@@ -870,7 +870,7 @@ data format made a schema that wants dates reserve every network and numeric nam
 
   | Document | Imports | At the root | Under its maps |
   |---|---|---|---|
-  | meta.tn | nothing (pre-loaded) | `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`, `schema` | the other 66. `meta`, the type system (46): the kinds and constructors, `meta.schema` and `meta.field_map`, the map, tuple and choice constructors, `meta.template`, `meta.identifier` and its aliases (`meta.type_name`, `meta.field_name`, `meta.param_name`), the supporting records, sets and enums (`meta.type_chain`, `meta.record_field`, `meta.field_role`, …), the references (`meta.reference`, `meta.ref`, `meta.type_ref`, `meta.identifier_ref`), `meta.value`, `meta.declared`, the annotation machinery (`meta.annotation`, `meta.synthetic`, `meta.application`), the checked assertion `meta.disjoint` and the one-element tuple templates. `atom` (5): the ISO/IEC 11404 datatype properties `atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric` and the mixin `atom.specification`. `numeric` (4): `numeric.integer_type`, `numeric.integer_size`, `numeric.integer_member_set`, `numeric.count` (#16). `unicode` (6): `unicode.text_type`, `unicode.text_member_set`, `unicode.normalization`, `unicode.identifier_type`, `unicode.identifier_base`, `unicode.regex_type`. `net` (3): `net.iri_type`, `net.scheme_set`, `net.scheme_name`. `binary` (2): `binary.bytes_type`, `binary.bytes_encoding` |
+  | meta.tn | nothing (pre-loaded) | `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`, `schema` | the other 68. `meta`, the type system (48): the kinds and constructors, `meta.schema` and `meta.field_map`, the map, tuple and choice constructors, `meta.template`, `meta.identifier` and its aliases (`meta.type_name`, `meta.field_name`, `meta.param_name`), the supporting records, sets and enums (`meta.type_chain`, `meta.record_field`, `meta.field_role`, …), the references (`meta.reference_type`, `meta.ref`, `meta.field_type_ref`, `meta.type_ref`, `meta.identifier_ref`), `meta.declared`, the annotation machinery (`meta.annotation`, `meta.synthetic`, `meta.application`), the checked assertion `meta.disjoint` and the one-element tuple templates. `atom` (5): the ISO/IEC 11404 datatype properties `atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric` and the mixin `atom.specification`. `numeric` (4): `numeric.integer_type`, `numeric.integer_size`, `numeric.integer_member_set`, `numeric.count` (#16). `unicode` (6): `unicode.text_type`, `unicode.text_member_set`, `unicode.normalization`, `unicode.identifier_type`, `unicode.identifier_base`, `unicode.regex_type`. `net` (3): `net.iri_type`, `net.scheme_set`, `net.scheme_name`. `binary` (2): `binary.bytes_type`, `binary.bytes_encoding` |
   | numeric.tn | meta.tn | `number`, `rational`, `complex`, `int8`…`int256` but `int64`, `uint8`…`uint256`, `float32`, `float64` | `numeric`, beside the kernel's members: `numeric.decimal_type`, `numeric.float_type`, `numeric.rational_type`, `numeric.complex_type`, `numeric.ieee_format`, `numeric.complex_component`, `numeric.decimal_member_set` |
   | temporal.tn | meta.tn | `date`, `time`, `datetime`, `duration`, `period` | `temporal`: their five `*_type` constructors |
   | net.tn | meta.tn | `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `hostname`, `host`, `media_type`, `uri_reference`, `uri`, `uuid` | `net`, beside the kernel's members: their eleven `*_type` constructors |
@@ -908,14 +908,14 @@ data format made a schema that wants dates reserve every network and numeric nam
   every name its declarations reference, and the concepts that belong with them. A kind and a constructor are the
   kernel's by declaring document (§4.1), which is meta.tn alone, so the libraries' constructors are ordinary
   constructors of the documents that declare them.
-- **The kernel, measured.** Over `meta-resolved.tn`'s own declarations (no compiled reader consulted), the cycle is 26
-  entries: `meta.record`, `meta.array`, `meta.set_type`, `enum`, `meta.map`, `meta.field_map`, `meta.reference`,
-  `numeric.integer_type`, `unicode.text_type`, `meta.value_type`, `boolean`, `integer`, `text`, `numeric.count`,
-  `numeric.integer_size` (`count`'s resolved `size` is read against it, #16), `meta.value`, `meta.type_ref`,
+- **The kernel, measured.** Over `meta-resolved.tn`'s own declarations (no compiled reader consulted), the cycle is 25
+  entries: `meta.record`, `meta.array`, `meta.set_type`, `enum`, `meta.map`, `meta.field_map`, `meta.reference_type`,
+  `numeric.integer_type`, `unicode.text_type`, `boolean`, `integer`, `text`, `numeric.count`,
+  `numeric.integer_size` (`count`'s resolved `size` is read against it, #16), `meta.field_type_ref`, `meta.type_ref`,
   `meta.type_chain`, `meta.record_field`, `meta.field_group`, `meta.field_role`, `meta.enum_set` and four lifted arrays.
   Closing it under every name its declarations reference — every rule-1 wait, every field type and `of`, every
   annotation type its entries carry, and what reading the document itself waits on, its root tag's `schema`, an alias
-  of `meta.schema`, with that map's key and value types and the annotations on its keys — gives 70 entries, adding
+  of `meta.schema`, with that map's key and value types and the annotations on its keys — gives 66 entries, adding
   `schema`, `meta.namespace`, the base kinds,
   `meta.alias`, `meta.declared_type`, the identifier, iri and regex families with `atom.specification`,
   `meta.template_param`, `meta.declared`, `meta.type_name`, `doc`, `meta.annotation`, `meta.synthetic`,
@@ -926,15 +926,15 @@ data format made a schema that wants dates reserve every network and numeric nam
   that closure and the concepts that belong with it, which nothing in the closure names: `meta.tuple`,
   `meta.choice`, `meta.tuple_element` (with its lifted array), `meta.template`, `meta.application`,
   `meta.ref`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`, `meta.voidable_tuple1`, `set`, the octet sequence
-  (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) — 85 entries, 66 under its six maps, 13 at the root and six
-  synthetics, with the six maps themselves the 86th to 91st. A test holds the kernel to containing the closure, pins
-  the cycle at 26 and the closure at 70, and pins the related set, so an entry that drifts in either
+  (`binary.bytes_type`, `binary.bytes_encoding`, `bytes`) — 88 entries, 68 under its six maps, 13 at the root and seven
+  synthetics, with the six maps themselves the 89th to 94th. A test holds the kernel to containing the closure, pins
+  the cycle at 25 and the closure at 66, and pins the related set, so an entry that drifts in either
   direction fails it. The longest wait chain is 4 (`doc` → `meta.annotation` → `void` → `meta.void_type` →
   `[meta.type_ref]`). A schema importing meta.tn alone has every elided construction and `meta.ref<T>`.
-- **The bootstrap** builds by hand 13 of the cycle's 26 entries — its instances and its one refinement (`meta.value`,
-  `boolean`, `meta.field_role`, `meta.enum_set`, `integer`, `numeric.count`, `text`, `meta.type_ref`,
-  `meta.field_map`) and the four lifted arrays — resolves the other thirteen, records and compositions that read
-  nothing, from their grammar, and reads the 59 entries beyond the cycle in wait order (#4).
+- **The bootstrap** builds by hand 13 of the cycle's 25 entries — its instances and its refinements (`boolean`,
+  `meta.field_role`, `meta.enum_set`, `integer`, `numeric.count`, `text`, `meta.field_type_ref`, `meta.type_ref`,
+  `meta.field_map`) and the four lifted arrays — resolves the other twelve, records and compositions that read
+  nothing, from their grammar, and reads the 63 entries beyond the cycle in wait order (#4).
 - **Each library declares `<name> => !schema { … }`** and its instances at its root (`uuid => !net.uuid_type {}`,
   `int32 => !integer ^ { size: { bits: 32  signed: true } }`). The schema model binds the kernel's entries and each
   library's members under its own map, by declaring document, each by its last segment (`meta.record` to
@@ -1082,7 +1082,7 @@ range for any of them.
   can reach is met or never reached, never a schema error.
 - [TSON-DATA] §9.1, §11.5: a limit is a positive `int64`, and a processor holding one in a narrower type caps it.
 
-## 17. [TSON-SCHEMA] §4.2, §5.2, §5.5, §7.4, §13.2 — a facet is typed by its family's instance, and `value` keeps one slot
+## 17. [TSON-SCHEMA] §4.2, §5.2, §5.5, §7.4, §13.2 — a facet is typed by its family's instance
 
 **Problem.** §7.4's "Constraint fields typed as `value`" types every bound, step, member set and network list of the
 non-kernel atom constructors `value`, because "the constrained atom cannot be referenced at the point of declaration"
@@ -1116,9 +1116,9 @@ implementation choice inside it have nothing left to govern.
   is (§5.6 admits no based-integer `number`), where a `value`-typed slot decoded `0x10` by §4 and narrowed it. A
   refused bound carries its family reader's verdict (`'P1Y' is not a valid duration … a month is a period`), as the
   kernel's `integer`-typed bounds already do.
-- **`value` keeps one slot**: a field's default or pin (`meta.record_field.value`, and the same slot on #19's
-  `meta.record_template_field`), whose type is the field's declared type and is not expressible in the kernel without
-  dependent fields. `value => !meta.value_type {}` stays, and its `@doc` names that slot alone.
+- **`value` keeps no slot here.** What remained of it was a field's default or pin (`meta.record_field.value`, and the
+  same slot on #19's `meta.record_template_field`), whose type is the field's declared type: #21 types both `type!`,
+  and `value` and `value_type` are gone from the kernel.
 - The resolved fixtures (`spec/fixtures/numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn`) carry the
   typed facets; net.tn's lifted `[meta.value]` becomes two synthetics, `[cidr4]` and `[cidr6]`.
 
@@ -1127,9 +1127,8 @@ implementation choice inside it have nothing left to govern.
 - §13.2 and the constructor listings: type each facet as above.
 - §7.4: delete "Constraint fields typed as `value`" and the eager-conversion paragraph after it; what remains true is
   the ordinary rule that a field is read by its type at schema load, a value the type refuses being a resolver error.
-- §4.2's `value` entry: "the escape hatch for fields whose type the schema language cannot express at the point of
-  declaration" is `record_field.value` alone; say so. §5.2's eager-resolution paragraph keeps its reference to the
-  `value`-typed default, and drops "this matches §7.4's eager-conversion rule for constraint-field values".
+- §4.2's `value` entry goes, with #21. §5.2's eager-resolution paragraph drops its reference to the `value`-typed
+  default, and "this matches §7.4's eager-conversion rule for constraint-field values".
 - §5.5: a network list is a list of the family's network instance, and its coherence rule is the pair's emptiness.
 
 ## 18. [TSON-SCHEMA] §5.7, §5.8, §7.2 — a restated field's type narrows by IS-A, which no section states
@@ -1184,16 +1183,16 @@ literal that happens to spell a parameter has no resolved form at all.
   position may name, ABSTRACT by construction, IS-A its parents and parent of its declared applications, and never
   read or written against. `extension` is each application's, `discriminators` the family's, `groups` and
   `name_type` each application's, unchanged by substitution.
-- **A template's field labels a whole parameter.** `meta.record_template_field => { ( type: meta.type_ref | type_param:
-  meta.param_name )  optional?  voidable?  role?  ( value: meta.value | value_param: meta.param_name )? }`: `type_param`
-  names a parameter standing for the whole type, `value_param` one standing for the whole value, and `type` and
-  `value` are as on a record field. A parameter as an argument of an application in `type` (`items: box<T>`) or in a
-  parent stays where it is, recognised by its text resolving into `parameters` — the one place resolved output still
-  applies the shadowing rule. `<T, S> { status?: int32 = S  body: T }` resolves to `!meta.record_template { fields: {
-  status => !meta.record_template_field { type: int32  optional: true  role: FIXED  value_param: S }  body =>
-  !meta.record_template_field { type_param: T } } … }`, and its application `created => response<order, 201>` to an
-  ordinary `!meta.record` whose `status` is `value: 201`: substitution turns `type_param` into `type` and
-  `value_param` into `value`, and changes no other fact.
+- **A template's field labels a whole parameter.** `meta.record_template_field => { ( type: meta.field_type_ref |
+  type_param: meta.param_name )  optional?  voidable?  role?  ( value: type! | value_param: meta.param_name )? }`:
+  `type_param` names a parameter standing for the whole type, `value_param` one standing for the whole value, and
+  `type` and `value` are as on a record field, `value` a dependent field (#21). A parameter as an argument of an
+  application in `type` (`items: box<T>`) or in a parent stays where it is, recognised by its text resolving into
+  `parameters` — the one place resolved output still applies the shadowing rule. `<T, S> { status?: int32 = S  body: T
+  }` resolves to `!meta.record_template { fields: { status => !meta.record_template_field { type: int32  optional: true
+  role: FIXED  value_param: S }  body => !meta.record_template_field { type_param: T } } … }`, and its application
+  `created => response<order, 201>` to an ordinary `!meta.record` whose `status` is `value: 201`: substitution turns
+  `type_param` into `type` and `value_param` into `value`, and changes no other fact.
 - **The source spelling is unchanged, and the shadowing rule is spent where it is written.** The labels are the
   processor's: a token the template's own body writes is a parameter by §5.10's shadowing rule, and is labelled where
   the body is normalised, its parameters in scope. Nothing is classified after that. A field the template takes from
@@ -1306,7 +1305,7 @@ arguments name, and a declared member additionally the head". The alternative, k
 expansion sentence to except applied parents, and the hand-written-expansion equivalence §5.8 states for `dog` to be
 said to hold only for closed declarations.
 
-## 21. [TSON-DATA] §2.5, §4, §7.2.5, §7.4, §7.5; [TSON-SCHEMA] §5.2, §5.7, §5.8, §5.12, §8.1, §12 — dependent fields
+## 21. [TSON-DATA] §2.5, §4, §7.2.5, §7.4, §7.5; [TSON-SCHEMA] §4.2, §5.2–§5.12, §7.4, §8.1, §8.2, §9, §12 — dependent fields
 
 **Problem.** A record field whose type is chosen per instance by another field of the same record has no spelling.
 The kernel's own `record_field.value` is one: its type is whatever `record_field.type` names, so §8.1 types it
@@ -1334,9 +1333,11 @@ field's type is a gap.
   field_type_ref => !meta.reference_type { of: meta.type }
   type_ref       => !meta.field_type_ref ^ { allow_sibling: false }
   record_field   => { type: meta.field_type_ref  …  value?: type! }
+  record_template_field => { ( type: meta.field_type_ref | type_param: meta.param_name )  …
+                             ( value: type! | value_param: meta.param_name )? }
   ```
 
-  `record_template_field.type` is typed `meta.field_type_ref` too. A refinement may withdraw `allow_sibling` and never
+  A refinement may withdraw `allow_sibling` and never
   grant it back (`!meta.type_ref ^ { allow_sibling: true }` is a resolver error); resolved output writes the facet
   where it is false and leaves it out at its default, so `meta.ref<C>` resolves to `!meta.reference_type { of: C
   allow_sibling: false }`. `meta.identifier_ref`, a refinement of `meta.type_ref`, is IS-A `meta.field_type_ref` too.
@@ -1356,7 +1357,11 @@ field's type is a gap.
   - it is typed by a reference whose `of` is a constructor or `top`, past its alias hops: `meta.type_ref`,
     `meta.field_type_ref`, a `meta.ref<C>` over a constructor, a refinement of one; `int32`, a value reference
     (`meta.ref<method>`) and a dependent field are refused;
-  - it is required, defaulted or pinned, never voidable, and no field group's member;
+  - it is there to read whenever the dependent field is: required, defaulted, pinned, or a field group's member with
+    the dependent field optional. It is never voidable, and optional with no default it is refused. A member beside a
+    required dependent field is refused, as is a refinement making such a field required, the rule being asked of the
+    flattened record. A group's members are declared `optional`, so a dependent field that is itself a member counts as
+    optional, as `value` does on `record_template_field`;
   - its pin or default names a type a value can be read against: a template, a record template among them, is
     refused, and so is a sibling reference. An application cannot be written as a default or pin (§5.2's modifier
     grammar admits a bare token), so the admission of an application the closure holds is never reached.
@@ -1372,12 +1377,18 @@ field's type is a gap.
   field is read; and a free sibling's value, written before the field, or its default where it is not yet written. A
   dependent field written before a free sibling with no default is a validation error at the field naming both, and so
   is a defaulted free sibling written after a field read against its default, found when the sibling arrives; no
-  lookahead is added. A sibling naming no type a value can be read against — a sibling reference, a template, an
-  application the closure does not hold — is a validation error at the sibling, and the value is not read. A sibling
-  whose own read failed leaves the value unread with nothing more reported.
+  lookahead is added. A free sibling that never arrives is no order broken, so the two are told apart once the record
+  closes: a required one is the missing-field error and nothing more, and a field group's member, absent because
+  another option is chosen or none, leaves a dependent field written without it a validation error at that field,
+  saying the sibling is absent. A dependent field absent beside an absent sibling is checked for nothing. A sibling
+  naming no type a value can be read against — a sibling reference, a template, an application the closure does not hold
+  — is a validation error at the sibling, and the value is not read. A sibling whose own read failed leaves the value
+  unread with nothing more reported.
 - **Schema documents.** A schema document's dependent field holds its value as written, whatever its form (a token,
   a record, a list, a map, an annotated or tagged value) and in either order of its fields, so the kernel's
-  `record_field.value: type!` reads as `meta.value` did and waits on no entry. The type a sibling names is one of the
+  `record_field.value` and `record_template_field.value`, both `type!`, wait on no entry. A dependent field written
+  without its group-member sibling is refused in a schema document as in data, a holding read refusing it all the same.
+  The type a sibling names is one of the
   reading schema's namespace, which the governing layer's readers do not hold, so a value entry's held value is judged
   when the schema links, read through the reader of that type (the sibling's pin, the value it holds, or its default,
   by the reading rule above), each refusal a resolver error naming the entry, the slot, the dependent field and its
@@ -1385,10 +1396,16 @@ field's type is a gap.
   server` is read by `server`'s reader. A default or pin is judged as any field value is. A resolved form read as
   data, whose names resolve in the document read, holds the value as written too (the choice is this
   implementation's: its types are the document's own, and a resolved form is judged at ingest).
-  `record_field` no longer waits on `meta.value`, and the kernel's wait cycle shrinks by `meta.value` and
-  `meta.value_type` and gains `meta.field_type_ref`, pre-loaded beside `meta.type_ref` (reading its `of` waits on
+  The kernel's wait cycle holds `meta.field_type_ref`, pre-loaded beside `meta.type_ref` (reading its `of` waits on
   `meta.type_ref`, its own refinement). Read as data, a record field's `value` is read against its own `type`:
   `!meta.record_field { type: boolean  optional: true  role: DEFAULT  value: 5 }` is a validation error at `/value`.
+- **`value` and `value_type` are gone from the kernel.** Their last user was `record_template_field.value`. A literal
+  beside `type_param` has no sibling to be read against, which is §5.10's rule that a literal needs a closed type, read
+  off the kernel: `!meta.record_template_field { type_param: T  value: 5 }` is a validation error at `/value`, and
+  `box => <T> { v?: T ~ 5 }` keeps §5.10's own refusal, stated by the resolver before the body is read. A literal
+  under an application over a parameter (`w?: box<T> = x`) has its sibling, and is refused by §5.10 as before. A literal
+  under a closed type is held as written and judged when the template closes, against the closed field's type.
+  [TSON-DATA] §4's base type resolution stays, for a position nothing types; it no longer backs a typed position.
 - **Binding.** A user schema's dependent field binds to an `Object` component, which receives what the named type
   binds to; any narrower class is a bind mismatch at compile. The binding library takes `Object` only where the
   context registers it as an atom, as the context this library builds for the schema model does, and a meta layer's
@@ -1443,7 +1460,15 @@ choosing the alternative.
 
 [TSON-SCHEMA] §5.2: the dependent field, the position rule stated once (a sibling reference stands only at a record
 field's type, a resolver error naming the slot elsewhere in a schema and a validation error in data), the sibling's
-rules and the declaration-order rule, all as listed above, and the reading.
+rules and the declaration-order rule, all as listed above, and the reading. The rule a sibling answers to reads:
+
+> A sibling is there to read whenever its dependent field is. It is required, carries a default, is pinned, or is a
+> member of a field group with the dependent field optional; a member of a group is declared optional. A sibling that
+> is optional with no default, or voidable, is a resolver error, and so is a group member beside a required dependent
+> field. A group member is absent when another option is chosen: a dependent field written without it is a validation
+> error at the dependent field.
+
+[TSON-SCHEMA] §5.11: a member may be a sibling, as above.
 
 [TSON-SCHEMA] §5.7, §5.8: restating a dependent field only as itself, pinning a sibling in a refinement, flattening's
 order, and a sibling as a discriminator.
@@ -1454,15 +1479,24 @@ can be read against is refused at the name.
 
 [TSON-SCHEMA] §8.1: `meta.reference` renamed `meta.reference_type` with `allow_sibling`; `meta.field_type_ref`;
 `meta.type_ref` and `meta.ref<T>` setting `allow_sibling: false`; `record_field.type` and
-`record_template_field.type` typed `meta.field_type_ref`; `record_field.value?: type!`; `meta.value`'s documentation
-losing `record_field.value`; resolved output writing `kind!` as is.
+`record_template_field.type` typed `meta.field_type_ref`; `record_field.value?: type!`; `record_template_field`'s
+`( value: type! | value_param: meta.param_name )?`; resolved output writing `kind!` as is.
+
+[TSON-SCHEMA] §4.2: "Atoms with no constraint vocabulary" loses `value_type` and `value`, leaving `void_type` and
+`void`; §5.2's eager resolution and §5.10's routed value lose their mention of a `value`-typed field. §7.4: delete
+"Constraint fields typed as `value`" and the paragraph after it (#17). §8.2's table and §9's kernel listing and family
+pairs drop `value`, and the §5.4 discrimination text that excepts it follows.
 
 **Open.** Whether the end of the document counts as following whitespace (running: it does). Whether a field group
-member's type takes a sibling reference as a plain field's does (running: it does, a member being a field). The
-quoted-name gap: a field whose name needs quoting cannot be a sibling, and `"name"!` is refused. Which host
-component a bound dependent field takes (running: `Object`, registered as an atom; a tree value or a type the
-binding names are the alternatives). A sibling in a template field typed by a parameter (`kind: meta.type_ref = T`)
-waits on whether a pin on a `meta.type_ref` slot may carry a type parameter.
+member's type takes a sibling reference as a plain field's does (running: it does, a member being a field). Whether a
+sibling and its dependent field in two options of one group is refused (`( kind: meta.type_ref | v: kind! )`: running,
+it is admitted, the rule asking only that `v` is optional, and `v` can then be written in no document). Whether a
+literal under a closed type is judged on the template, where no application closes it (`box => <T> { n?: int32 ~ nope
+w: T }`: running, only its §8.2 hygiene is, and the value is judged once an application closes the field, so a template
+nothing applies loads). The quoted-name gap: a field whose name needs quoting cannot be a sibling, and `"name"!` is
+refused. Which host component a bound dependent field takes (running: `Object`, registered as an atom; a tree value or a
+type the binding names are the alternatives). A sibling in a template field typed by a parameter (`kind: meta.type_ref =
+T`) waits on whether a pin on a `meta.type_ref` slot may carry a type parameter.
 
 ## 22. [TSON-SCHEMA] §5.3, §8.1, §12.1 — `type-ref` names an expression, and `meta.type_ref` a reference
 

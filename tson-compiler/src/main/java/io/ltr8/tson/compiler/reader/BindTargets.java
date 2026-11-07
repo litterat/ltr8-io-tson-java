@@ -8,7 +8,6 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Ref;
@@ -30,8 +29,7 @@ import java.util.Optional;
  *
  * <ul>
  *   <li><b>An atom</b> is bound to the target's wire class ({@link AtomTypeReader#boundTo}) -- an {@code int32}
- *       into a {@code long} -- and the uninterpreted {@code value} atom is read as that class
- *       ({@link ValueParser#at}). A target that binds structurally cannot hold an atom.</li>
+ *       into a {@code long}. A target that binds structurally cannot hold an atom.</li>
  *   <li><b>An array, map or tuple</b> is read again for the target's own class, each element, key, value or
  *       position bound to the target's in turn -- so {@code List<Long>}, {@code long[]}, {@code List<int[]>}
  *       and {@code Map<String, SequencedMap<String, Long>>} each receive what they declare. A void element
@@ -195,16 +193,11 @@ final class BindTargets {
     }
 
     /**
-     * The uninterpreted {@code value} atom is read as the class the target holds, under the field's name, since
-     * the entry's own names the escape hatch rather than anything the author wrote. A position that reads the
-     * token itself is already specialised and stays as it is. Every other atom is bound to the target's wire
-     * class -- never the declared one, since a bridged class is reached by whatever its bridge takes.
+     * A position that reads the token itself is already specialised and stays as it is. Every other atom is bound to
+     * the target's wire class -- never the declared one, since a bridged class is reached by whatever its bridge takes.
      */
     private static TsonTypeReader<?> atom(AtomTypeReader<?> atom, DataClass target, String what, String where,
                                           Site site) {
-        if (atom.readsUninterpretedValue()) {
-            return atom.overAtom(site.field(), ValueParser.at(target.dataClass()));
-        }
         if (atom.readsTheTokenItself()) {
             return atom;
         }
