@@ -21,7 +21,6 @@ import io.ltr8.tson.schema.temporal.TimeType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.unicode.IdentifierType;
-import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -122,11 +121,6 @@ class AtomValueReaderTest {
     @Test
     void identifier() {
         assertEquals("order_id", readValue(IdentifierType.IDENTIFIER, "{ value: order_id }"));
-    }
-
-    @Test
-    void value() {
-        assertEquals("anything", readValue(new ValueType(), "{ value: anything }"));
     }
 
     /**

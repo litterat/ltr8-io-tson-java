@@ -256,33 +256,13 @@ class JsonAtomReadTest {
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("flag", "1").refusal().code());
     }
 
-    // ── §5.7 void and value ──────────────────────────────────────────────
+    // ── §5.7 void ──────────────────────────────────────────────
 
     /** §5.7: at a {@code void} position the void sentinel is the only conforming value, and null spells it. */
     @Test
     void voidTakesNullAndNothingElse() {
         assertNull(read("nothing", "null").accepted());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("nothing", "0").refusal().code());
-    }
-
-    /**
-     * §5.7: {@code value} classifies by JSON's own grammar and invokes none of [TSON-DATA] §4's base type
-     * resolution -- a number without fraction or exponent is an integer, with either a float, and a string's
-     * content is uninspected, so {@code "null"} is the four-character string.
-     */
-    @Test
-    void theValueEscapeHatchClassifiesByJsonsOwnGrammar() {
-        assertEquals(Boolean.TRUE, read(KERNEL, "meta.value", "true").accepted());
-        assertEquals(new BigInteger("7"), read(KERNEL, "meta.value", "7").accepted());
-        assertEquals(new BigDecimal("7.5"), read(KERNEL, "meta.value", "7.5").accepted());
-        assertEquals("null", read(KERNEL, "meta.value", "\"null\"").accepted());
-    }
-
-    /** §5.7: {@code value} admits scalars, so an object or array there is a validation error. */
-    @Test
-    void theValueEscapeHatchRefusesAContainer() {
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "meta.value", "{\"a\": 1}").refusal().code());
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "meta.value", "[1]").refusal().code());
     }
 
     /** {@code meta.identifier} is the third {@code unit} instance, and the one the shared vocabulary does answer for. */

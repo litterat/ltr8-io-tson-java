@@ -96,9 +96,11 @@ import java.util.stream.Collectors;
  * having selected the member before any field is read. A free sibling's is the value this instance wrote, which is
  * therefore written first, or its default where it is not written: a dependent field written before a free sibling is
  * refused naming both, the one exception to [TSON-DATA] §2.5's insignificant field order, so a reader never holds a
- * value it cannot yet type. A defaulted sibling the document writes after the dependent field read against its
- * default is the same refusal, found when the sibling arrives. Only a record with a dependent field keeps any
- * per-read state for it.
+ * value it cannot yet type. A sibling the document writes after the dependent field is the same refusal, found when
+ * the sibling arrives: a value a default could type is read against it, and one with no type yet is skipped unjudged.
+ * A sibling that never arrives is its own refusal: a required one is the missing-field error, and a field group's
+ * member, absent where another option is chosen, is reported at the dependent field once the record closes. Only a
+ * record with a dependent field keeps any per-read state for it.
  *
  * <p><b>In a schema document, a bare token is a positional fill only where the positional field is atom-typed</b>
  * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
@@ -233,6 +235,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /** Whether any field is typed by a sibling reference ({@link #heldSiblingOf}). */
     private final boolean holdsAsWritten;
 
+    /**
+     * Whether any field {@link #heldSiblingOf} names a sibling a document may leave absent with nothing to stand for it,
+     * a field group's member, so a read keeps where each field was written ({@link #refuseAbsentSiblings}).
+     */
+    private final boolean siblingMayBeAbsent;
+
     RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
                           SchemaLocation schemaLocation, TsonReadContext.FieldNameRule fieldNames) {
         this.name = name;
@@ -292,6 +300,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 solePositionalField = i;
             }
         }
+        boolean absentSibling = false;
+        for (int sibling : heldSiblingOf) {
+            absentSibling |= sibling >= 0 && omitted[sibling] == RecordField.Omitted.NOTHING;
+        }
+        this.siblingMayBeAbsent = absentSibling;
         this.nameForm = fieldNames.form();
         if (nameForm == io.ltr8.unicode.Normalization.NFC) {
             this.matchIndex = fieldIndex;
@@ -472,6 +485,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         // Under a folding name type a repeat may be another spelling, so its report names the first statement and
         // where it stands; under NFC the spellings are one and nothing is kept, so an ordinary read allocates none.
         FieldName[] firstGiven = matchIndex == fieldIndex ? null : new FieldName[fields.size()];
+        FieldName[] written = siblingMayBeAbsent ? new FieldName[fields.size()] : null;
         Dependents dependents = hasDependents ? new Dependents(fields.size()) : null;
         Held held = holdsAsWritten && ctx.readsSchemaDocument() ? new Held(fields.size()) : null;
         while (!(ctx.peek() instanceof RecordEnd)) {
@@ -513,8 +527,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             } else if (firstGiven != null) {
                 firstGiven[schemaIndex] = fieldName;
             }
+            if (written != null) {
+                written[schemaIndex] = fieldName;
+            }
             if (dependents != null && typesADependent[schemaIndex]) {
-                dependents.siblingArrives(this, ctx, schemaIndex);
+                dependents.siblingArrives(this, schemaIndex);
             }
             if (fixedCheck[schemaIndex] != null) {
                 // A FIXED field's value comes from the schema, never the data -- but the data may still
@@ -556,11 +573,34 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             sink.accept(schemaIndex, decoded);
             seen[schemaIndex] = true;
         }
+        if (written != null) {
+            refuseAbsentSiblings(ctx, seen, written);
+        }
         ctx.next(); // RecordEnd
         if (held != null) {
             held.hand(this, seen);
         }
         return seen;
+    }
+
+    /**
+     * Each field typed by a sibling reference that {@code seen} holds and whose sibling, a field group's member, it does
+     * not: nothing typed the value, so it is refused where it was {@code written}. A sibling with nothing to stand for
+     * it is known to be absent only here, at the record's close, a dependent field written first being a sibling that
+     * may yet arrive; a required one is the missing-field error instead. Whatever reads the field, a bound {@code
+     * Token}'s reader or a schema document's holding it as written among them, so a read that types nothing refuses
+     * this all the same.
+     */
+    private void refuseAbsentSiblings(TsonReadContext ctx, boolean[] seen, FieldName[] written) {
+        for (int i = 0; i < seen.length; i++) {
+            int sibling = heldSiblingOf[i];
+            if (seen[i] && sibling >= 0 && !seen[sibling] && omitted[sibling] == RecordField.Omitted.NOTHING) {
+                CompiledField field = fields.get(i);
+                ctx.schemaField(written[i].name(), field.name(), field.schema().position())
+                        .withPosition(Optional.<SourcePosition>of(written[i].position()))
+                        .report(rules.writtenWithoutItsSibling(written[i].name(), fields.get(sibling).name()));
+            }
+        }
     }
 
     /** {@link Shape#POSITIONAL} counterpart to {@link #readFields} -- reads whatever's at the cursor directly as {@link #positionalFieldIndex}'s own value, with no other field ever seen. */
@@ -603,12 +643,16 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         } else if (omitted[at] == RecordField.Omitted.VALUE && !ctx.readsSchemaNames()) {
             named = DependentFieldReader.referenceIn(precomputedValue[at]);
             if (dependents != null) {
-                dependents.readBefore[index] = written;
+                dependents.readBefore(index, written, fieldCtx);
             }
         } else if (ctx.readsSchemaNames()) {
             named = null; // a schema document holds the value as written, whatever the order
+        } else if (dependents == null) {
+            throw new IllegalStateException("'" + displayName + "': positional field '" + field.name() + "' has a "
+                    + "sibling '" + sibling.name() + "' that is neither pinned nor defaulted; the linker refuses one");
         } else {
-            fieldCtx.report(rules.writtenBeforeItsSibling(written, sibling.name()));
+            // The sibling is yet to come, the order rule broken, or is absent: only what follows says which.
+            dependents.readBefore(index, written, fieldCtx);
             TsonReadContext.skipUnjudged(ctx);
             return null;
         }
@@ -617,31 +661,38 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * What one read of a record with a dependent field keeps: each sibling's value as this instance wrote it, and
-     * each dependent field read against its sibling's default before the sibling was written, by the name written.
+     * each dependent field reached before its sibling was written, by the name written and where it stands.
      */
     private static final class Dependents {
 
         final io.ltr8.tson.schema.meta.Reference[] named;
         final String[] readBefore;
+        final TsonReadContext[] readBeforeAt;
 
         Dependents(int size) {
             named = new io.ltr8.tson.schema.meta.Reference[size];
             readBefore = new String[size];
+            readBeforeAt = new TsonReadContext[size];
+        }
+
+        /** Dependent field {@code index} is reached, at {@code fieldCtx}, before its sibling was written. */
+        void readBefore(int index, String written, TsonReadContext fieldCtx) {
+            readBefore[index] = written;
+            readBeforeAt[index] = fieldCtx.withPosition(fieldCtx.position());
         }
 
         /**
-         * Sibling {@code at} is written: a free one written after a dependent field read against its default is the
-         * order rule broken, reported at that field. A pinned sibling orders nothing, its pin typing the field.
+         * Sibling {@code at} is written: a free one written after a dependent field reached before it is the order
+         * rule broken, reported at that field. A pinned sibling orders nothing, its pin typing the field.
          */
-        void siblingArrives(RecordAbstractReader<?> record, TsonReadContext ctx, int at) {
+        void siblingArrives(RecordAbstractReader<?> record, int at) {
             if (record.fixedCheck[at] != null) {
                 return;
             }
             for (int d = 0; d < readBefore.length; d++) {
                 if (readBefore[d] != null && record.siblingOf[d] == at) {
-                    CompiledField field = record.fields.get(d);
-                    ctx.schemaField(readBefore[d], field.name(), field.schema().position())
-                            .report(record.rules.writtenBeforeItsSibling(readBefore[d], record.fields.get(at).name()));
+                    readBeforeAt[d].report(record.rules.writtenBeforeItsSibling(readBefore[d],
+                            record.fields.get(at).name()));
                     readBefore[d] = null;
                 }
             }

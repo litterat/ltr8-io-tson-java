@@ -33,11 +33,10 @@ encoding the vocabulary serves), `design/readers-and-diagnostics.md`.
 exactly as a TSON quoted token's text would be: which families a reader can bind, and what each produces, is the type
 system's, not an encoding's. `module-info.java` states the split by package.
 
-**`AtomType` takes a `String`.** Two atoms need the lexical form, and both are escape hatches rather than types: the
-kernel's `value`, decoded by §4 base type resolution whose §4.4 rule is that a quoted token is a string, and `Token`,
-which *is* the token because §8's resolved form records the spelling. Those two, `TokenAtomType` which describes them,
-`TokenValue`/`TokenForm` and `BaseTypeResolver` stay in `tson-compiler`. The form-dependent set is exactly where the
-two encodings legitimately differ: JSON has no token forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
+**`AtomType` takes a `String`.** What needs the lexical form is no atom of this vocabulary: §4 base type resolution,
+whose §4.4 rule is that a quoted token is a string (`ValueParser`, what an untyped position holds), and `Token`, which
+*is* the token because §8's resolved form records the spelling (`RawTokenParser`). Those two,
+`TokenValue`/`TokenForm` and `BaseTypeResolver` stay in `tson-compiler`, JSON having no token forms.
 
 **Three indices, three questions, and no fourth.** `BuiltinTypeVocabulary` maps a built-in *name* to a parser carrying
 the constraints §5 fixes; `AtomParsers` maps a resolved *body* to one carrying whatever the schema resolved, which is
@@ -45,14 +44,12 @@ what a user's own `!integer ^ { max: 100 }` needs; `HostAtoms` maps a *host clas
 it. `VocabularyAtoms` is the write direction. The compiled readers (`AtomTypeReader.ATOM`, one factory for every atom
 family) and the linker both ask `AtomParsers`, so there is no second opinion about which parser reads which body; a
 second table restating it entry for entry is what lets a family be present in one and missing from the other.
-`value_type` and `meta.void_type` are the *encoding's*: `AtomParsers` declines both, their readings depending on the
-lexical form and on a sentinel no token is.
+`meta.void_type` is the *encoding's*: `AtomParsers` declines it, its reading depending on a sentinel no token is.
 
 `HostAtoms` answers by **what may reach the position**. `forStringContentHostType` and `forNumberContentHostType` are
 [TSON-JSON] §5's per-family *kinds*, since JSON's grammar tells a string from a number and §5's table admits one or
 the other per family; `forTypedPosition` is their union plus `text` and `boolean`, for TSON, where a typed position
-never consults the form and `12` and `"12"` are one `int32` ([TSON-SCHEMA] §7.3). `forHostType` answers something
-else: what a `value`-typed slot meant (below).
+never consults the form and `12` and `"12"` are one `int32` ([TSON-SCHEMA] §7.3).
 
 ## Base type resolution (`tson-compiler/.../base/`, over `tson-atom`'s `atom.number`)
 
@@ -168,13 +165,12 @@ does narrow, such as a media type that must parse, is a type of its own.
   `regex` IS-A piece of text (§5.7), and a plain equatable `String` binds generically with no `DataBridge`. The text is
   validated by `IRegex.parse` (`unicode.regex_type`'s `spec` is fixed to RFC 9485; `java.util.regex`'s grammar is a superset)
   and matched by `IRegex.matches`, linear-time and ReDoS-safe.
-- **`value`, `void` and `meta.identifier` each have a constructor**, and are read by it: `value_type` by `ValueParser` (in
-  `tson-compiler`, base type resolution to the natural host), `meta.void_type` by `VoidReader` (the void sentinel `_`
-  alone), and `unicode.identifier_type` by `IdentifierParser` — the text put into its `normalization` form, matched against
-  the type's own `IdentifierProfile` (a profile failure is a parse failure), then `unicode.text_type`'s facets through
-  `TextParser`. So a naming convention is a `pattern`, a closed vocabulary of names is `members`, and an identifier is
-  string-class (§5.4). The kernel's `void` is `!meta.void_type {}`, so the linker's refusal of a `void` variant and the
-  inhabitance check ask the body (`AliasChain.resolvesToVoid`), not the name.
+- **`void` and `meta.identifier` each have a constructor**, and are read by it: `meta.void_type` by `VoidReader` (the
+  void sentinel `_` alone), and `unicode.identifier_type` by `IdentifierParser` — the text put into its `normalization`
+  form, matched against the type's own `IdentifierProfile` (a profile failure is a parse failure), then
+  `unicode.text_type`'s facets through `TextParser`. So a naming convention is a `pattern`, a closed vocabulary of names
+  is `members`, and an identifier is string-class (§5.4). The kernel's `void` is `!meta.void_type {}`, so the linker's
+  refusal of a `void` variant and the inhabitance check ask the body (`AliasChain.resolvesToVoid`), not the name.
 - **`unicode.identifier_type` is a UAX #31 profile**: `start`/`continue` bases (`XID`, `ID`, `ASCII`, `NONE`), `start_add`,
   `continue_add`, `medial` and `exclude` code-point sets, with `unicode.text_type`'s `normalization` defaulting to `NFC`.
   `IdentifierType.profile()` builds the `IdentifierProfile` on each call, and `IdentifierParser` holds the one it
@@ -233,19 +229,6 @@ does narrow, such as a media type that must parse, is a type of its own.
   and what lets the read, the tightening (`AtomNarrowing.checkSubset`) and the coherence check
   (`AtomCoherence.checkMembers`) share one identity. `numeric.float_type` carries no member set, on the
   rationale it carries no `multiple_of`: a step cannot hold on a binary grid.
-- **A `value`-typed slot is read under the atom of the position it stands in.** A slot typed `meta.value` is decoded by
-  §4, which resolves boolean, number and string and none of those is a duration, a date or a UUID, so a schema's `{ slot:
-  meta.value }` bound to a `UUID` component would otherwise receive a string. `ValueParser.read(token, target)` asks
-  `HostAtoms.forHostType` which built-in produces the position's own host type and re-reads the token under it;
-  `ValueParser.at(target)` is the same as a reader, which `reader.BindTargets` swaps in at a record field and at any depth
-  below it, beside `RecordBindReader.tokenAware`, which specialises the same slot on the same evidence. **The host type is
-  the class a component's bridge takes, never the one it declares** — a registered atom or a `@Transparent` wrapper is
-  reached through its wire type, the same class the ordinary atom branch binds against. **Additive by construction**: a value
-  the component can already hold, or that a numeric narrowing reaches, is returned untouched, so `0x10` at a `BigDecimal`
-  slot stays the integer 16 rather than being re-read under `number`, whose grammar admits no based-integer form. Only a
-  token the position could not hold under any narrowing reaches the atom — which is what makes `"abc"` at a `BigDecimal`
-  slot `number`'s own verdict rather than a cast failure reported as a library gap. The bundled constructors' facets are not
-  such slots: each is typed by its family's instance (`design/atom-refinement-and-coherence.md`).
 - **No facet counts written digits, because scale is not part of the value.** numeric.tn and temporal.tn say it for both
   families that carry a digit-count facet — `numeric.decimal_type`'s "`1`, `1.0` and `1.00` are one value", and
   `temporal.time_type`'s "`12:00:00.500` is admitted under `precision: 1`". So `precision: N` tests that the value is a whole

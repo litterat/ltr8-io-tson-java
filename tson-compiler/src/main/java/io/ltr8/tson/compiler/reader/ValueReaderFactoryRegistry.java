@@ -69,7 +69,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
-                AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, AtomTypeReader.VALUE, UnaryOperator.identity(),
+                AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, UnaryOperator.identity(),
                 ChoiceReader.FACTORY));
     }
 
@@ -83,19 +83,13 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry tree() {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
-                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, TREE_VALUE,
-                AtomTreeFactory::new,
+                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, AtomTreeFactory::new,
                 ChoiceReader.FACTORY));
     }
 
     /** Tree mode's {@code void_type} factory: {@link VoidTreeReader} over {@link AtomTypeReader#VOID}'s reader. */
     private static final ValueReaderFactory TREE_VOID = (name, definition, context) ->
             new VoidTreeReader(AtomTypeReader.VOID.create(name, definition, context), AnnotationTypes.of(context));
-
-    /** Tree mode's {@code value_type} factory: {@link AtomTreeReader} over {@link AtomTypeReader#VALUE}'s reader. */
-    private static final ValueReaderFactory TREE_VALUE = (name, definition, context) ->
-            new AtomTreeReader(AtomTypeReader.VALUE.create(name, definition, context), name,
-                    AnnotationTypes.of(context));
 
     /** The atom constructors the kernel and the three libraries declare, by path. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
@@ -113,11 +107,9 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
-            ValueReaderFactory voidFactory, ValueReaderFactory valueFactory, UnaryOperator<ValueReaderFactory> leaf,
-            ValueReaderFactory choice) {
+            ValueReaderFactory voidFactory, UnaryOperator<ValueReaderFactory> leaf, ValueReaderFactory choice) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
-        factories.put("meta.value_type", valueFactory);
         factories.put("meta.void_type", voidFactory);
         factories.put("meta.record", RecordDispatch.over(record));
         factories.put("meta.array", array);

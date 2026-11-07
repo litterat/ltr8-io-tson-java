@@ -44,6 +44,18 @@ public record RecordDiagnostics(String typeName, String declaredFields) {
     }
 
     /**
+     * [TSON-SCHEMA] §5.2, §5.11: {@code field} is written and its sibling {@code sibling}, a field group's member, is
+     * absent, another option being chosen or none, so the value has no type to be read against.
+     */
+    public Refusal writtenWithoutItsSibling(String field, String sibling) {
+        return new Refusal(Diagnostic.Code.VALIDATION_ERROR,
+                ("field '%s' on '%s' is written without '%s', the sibling whose value names its type -- '%s' is a "
+                        + "field group's member, supplied by no default or pin, so '%s' has no type to be read "
+                        + "against (§5.2, §5.11)").formatted(field, typeName, sibling, sibling, field),
+                "'" + sibling + "' written beside '" + field + "'", "'" + field + "' written without it");
+    }
+
+    /**
      * [TSON-SCHEMA] §5.2: {@code sibling} types the dependent field {@code field}, which is present, and holds
      * {@code held}, no type a value can be read against -- reported at the sibling, the value to change, as
      * {@code written}.

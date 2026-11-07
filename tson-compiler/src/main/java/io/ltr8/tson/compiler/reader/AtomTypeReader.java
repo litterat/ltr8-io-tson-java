@@ -16,9 +16,8 @@ import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ReferenceBody;
-import io.ltr8.tson.compiler.atom.TokenAtomType;
+import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
@@ -89,14 +88,6 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      */
     static final ValueReaderFactory VOID = (name, definition, context) ->
             new VoidReader(context.locationOf(name));
-
-    /**
-     * {@code value_type}: decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted token
-     * is a string. That depends on the lexical form, which an {@link AtomType} deliberately cannot see, so
-     * {@code AtomParsers} declines it and {@link ValueParser} answers here.
-     */
-    static final ValueReaderFactory VALUE = (name, definition, context) ->
-            new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name), null, null, null, null, false);
 
     /**
      * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a
@@ -207,33 +198,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     }
 
     /**
-     * Whether this reads the uninterpreted {@code value} atom -- the one slot {@code RecordBindReader} may
-     * specialise to the host type its component holds. False once something already has: {@code tokenAware}
-     * claims a {@code Token}-bound slot before the field loop runs, and that is a specialisation of the same
-     * kind rather than a case to redo.
-     */
-    boolean readsUninterpretedValue() {
-        return delegate == ValueParser.INSTANCE;
-    }
-
-    /**
-     * Whether this atom reads the token rather than its text -- {@code value} under §4.4's rule, and
-     * {@code Token}, which records the spelling §8's resolved form carries. Such a position is already
-     * specialised, by {@code tokenAware} or by {@link #overAtom}, and binding a target over it would hand
-     * the family the decoded text and lose the form that was the point of claiming it.
+     * Whether this atom reads the token rather than its text: {@code Token}, which records the spelling §8's resolved
+     * form carries. Such a position is already specialised, by {@code tokenAware}, and binding a target over it would
+     * hand the family the decoded text and lose the form that was the point of claiming it.
      */
     boolean readsTheTokenItself() {
-        return delegate instanceof TokenAtomType;
-    }
-
-    /**
-     * The same position, read by a different atom and under a different name -- the location is all that
-     * survives. {@code RecordBindReader} uses it for a {@code value}-typed slot, whose atom depends on what
-     * the bound component holds and so cannot be known when the factory runs. The name goes with it because
-     * the entry's own is {@code value}, which names the escape hatch rather than anything the author wrote.
-     */
-    TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
-        return new AtomTypeReader<>(displayName, replacement, schemaLocation, null, null, null, null, false);
+        return delegate instanceof RawTokenParser;
     }
 
     /**
@@ -241,10 +211,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * (§5.2). The family binds the target once, here, so a read carries no target and the
      * disagreement is a compile-time one -- see {@link AtomType#boundTo}.
      *
-     * <p><b>The name is kept, where {@link #overAtom}'s caller replaces it.</b> Binding a target changes
-     * what the position produces and not what the author wrote, so a diagnostic still names the declaration
-     * it came from -- {@code meta.type_name}, not the field that happens to hold one. A {@code value} slot is the
-     * case that does rename, its entry naming the escape hatch rather than anything in the schema.
+     * <p><b>The name is kept.</b> Binding a target changes what the position produces and not what the author wrote,
+     * so a diagnostic still names the declaration it came from -- {@code meta.type_name}, not the field that happens
+     * to hold one.
      */
     Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
         return delegate.boundTo(wire).map(bound -> new AtomTypeReader<>(name, bound, schemaLocation, names, kindOf,
@@ -331,13 +300,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             }
         }
         try {
-            // A form-sensitive atom keeps the token: `value` is decoded by §4 base type resolution, whose
-            // §4.4 rule is that a quoted token is a string, and `Token` records the spelling §8's resolved
-            // form carries. Every other family is a function of the text alone (§5.1).
-            if (delegate instanceof TokenAtomType) {
+            // `Token` keeps the token, recording the spelling §8's resolved form carries. Every family is a function
+            // of the text alone (§5.1).
+            if (delegate instanceof RawTokenParser raw) {
                 @SuppressWarnings("unchecked")
-                TokenAtomType<T> formSensitive = (TokenAtomType<T>) delegate;
-                return formSensitive.read(tokenValue);
+                T token = (T) raw.read(tokenValue);
+                return token;
             }
             T value = delegate.read(tokenValue.text());
             // Hygiene judges the name the value is, in its type's normalization form, not the spelling -- each name

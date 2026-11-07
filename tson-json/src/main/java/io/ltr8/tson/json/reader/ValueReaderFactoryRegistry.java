@@ -51,8 +51,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     }
 
     /**
-     * [TSON-JSON] §5's vocabulary alone, with no mode over it: every atom family, the enums, {@code value} and
-     * {@code void}, each reading to its family's natural host value. No container constructor is
+     * [TSON-JSON] §5's vocabulary alone, with no mode over it: every atom family, the enums and {@code void}, each
+     * reading to its family's natural host value. No container constructor is
      * registered, so a schema using one compiles to a gap.
      *
      * <p>This is what a mode's registry is built over rather than a mode of its own -- {@link #tree} wraps
@@ -117,7 +117,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     /** §5's atom constructors, each leaf passed through {@code leaf} so a mode can wrap what it produces. */
     private static Map<String, ValueReaderFactory> vocabulary(UnaryOperator<ValueReaderFactory> leaf) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
-        factories.put("meta.value_type", leaf.apply(AtomReader.VALUE));
         factories.put("meta.void_type", leaf.apply(AtomReader.VOID));
         factories.put("enum", leaf.apply(AtomReader.ENUM));
         for (String constructor : ATOM_CONSTRUCTORS) {

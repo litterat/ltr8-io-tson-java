@@ -227,7 +227,7 @@
   meta => !meta.schema {
     top => !meta.record {
       chain: {
-        subtypes: [binary.bytes_type enum meta.alias meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.record_template meta.reference_type meta.set_type meta.sum meta.template meta.tuple meta.type meta.value_type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.alias meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.record_template meta.reference_type meta.set_type meta.sum meta.template meta.tuple meta.type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {}
       extension: ABSTRACT
@@ -242,7 +242,7 @@
     type => !meta.record {
       chain: {
         supertypes: [meta.top]
-        subtypes: [binary.bytes_type enum meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.record_template meta.reference_type meta.set_type meta.sum meta.tuple meta.value_type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.record_template meta.reference_type meta.set_type meta.sum meta.tuple meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {
         chain => !meta.record_field { type: meta.type_chain  optional: true }
@@ -253,7 +253,7 @@
     atom => !meta.record {
       chain: {
         supertypes: [meta.top meta.type]
-        subtypes: [binary.bytes_type enum meta.enum_type meta.reference_type meta.value_type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.enum_type meta.reference_type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {
         chain => !meta.record_field { type: meta.type_chain  optional: true }
@@ -285,12 +285,6 @@
       parameters => !meta.record_field { type: array_template_param_xxhash }
       template   => !meta.record_field { type: text }
     } }
-
-    value_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
-      chain => !meta.record_field { type: meta.type_chain  optional: true }
-    } }
-
-    value => !meta.value_type {}
 
     void_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
       chain => !meta.record_field { type: meta.type_chain  optional: true }
@@ -340,7 +334,7 @@
       optional    => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       voidable    => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       role        => !meta.record_field { type: meta.field_role  optional: true  role: DEFAULT  value: FREE }
-      value       => !meta.record_field { type: meta.value  optional: true }
+      value       => !meta.record_field { type: type!  optional: true }
       value_param => !meta.record_field { type: meta.param_name  optional: true }
     }
     groups: [

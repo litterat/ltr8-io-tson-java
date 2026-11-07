@@ -64,15 +64,15 @@ text.
   reference stands, and **whether a slot admits one is the facet `allow_sibling`**, a permission as `allow_nan` is of
   `float_type`: true by default, withdrawn by a refinement and never granted back (`ReferenceBody.constraintsCheck`).
   Only `meta.field_type_ref` keeps it, the type of `record_field.type` and `record_template_field.type`, the two model
-  slots typed `Reference`; `meta.type_ref` and `meta.ref<T>` withdraw it. Everywhere else a sibling reference is
-  refused, naming the slot: in sugar by the desugar phase, in an explicit instance by the slot reader
-  (`TypeNameSlotReader`, admitting one only for a `Reference` component at a reference that allows one), in an
-  argument list by the grammar, and in a tree read by the atom's parser (`TypeNameRefParser`), whose refusal is a
-  constraint the value breaks, `ATOM_CONSTRAINT_VIOLATION`. A reference over a type that is no constructor names values,
-  and never holds one (`RefParser`). A sibling reference names a field and no type, so nothing records it for a
-  member's judgement (`AtomTypeReader`). Identity is the variant and its components: `kind`, `kind<T>` and `kind!`
-  are three references. The rules a sibling and its dependent field answer to, and the reading, are
-  `design/schema-resolution.md`'s and `design/readers-and-diagnostics.md`'s.
+  slots typed `Reference`, and each record's `value` is typed `type!` against it; `meta.type_ref` and `meta.ref<T>`
+  withdraw it. Everywhere else a sibling reference is refused, naming the slot: in sugar by the desugar phase, in an
+  explicit instance by the slot reader (`TypeNameSlotReader`, admitting one only for a `Reference` component at a
+  reference that allows one), in an argument list by the grammar, and in a tree read by the atom's parser
+  (`TypeNameRefParser`), whose refusal is a constraint the value breaks, `ATOM_CONSTRAINT_VIOLATION`. A reference over a
+  type that is no constructor names values, and never holds one (`RefParser`). A sibling reference names a field and no
+  type, so nothing records it for a member's judgement (`AtomTypeReader`). Identity is the variant and its components:
+  `kind`, `kind<T>` and `kind!` are three references. The rules a sibling and its dependent field answer to, and the
+  reading, are `design/schema-resolution.md`'s and `design/readers-and-diagnostics.md`'s.
 - A reference carries arguments only where an application is still open: a record template's `chain.parents` and
   field `type`s, held text (`!meta.alias { target: pair<uuid B> }` inside `meta.template.template`), and the `application`
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
@@ -222,7 +222,7 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 | `meta.template.template` | parameters and applications as parsed | `parameters`, then namespace | §5.10's shadowing rule | `HeldBody` |
 | `meta.record_field.type`, `meta.record_template_field.type` | reference, or a sibling reference | namespace; enclosing `fields` for a sibling | `meta.field_type_ref`; a sibling by §5.2's rules | `validateTypeRef`, `DependentFields` |
 | `meta.tuple_element.element_type`, `meta.array.element_type`, `meta.map.key_type`, `meta.map.value_type`, `meta.namespace.value_type`, `meta.choice.variants` | reference | namespace | `meta.type_ref`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
-| `meta.record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference (typed `type!`, so read against the field's own `type`) | namespace | member of the slot's kind | `checkKindValue` |
+| `meta.record_field.value`, `meta.record_template_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference (typed `type!`, so read against the field's own `type`) | namespace | member of the slot's kind | `checkKindValue` |
 | `meta.record.discriminators`, `meta.field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `meta.record.name_type`, `meta.enum_type.name_type` | reference | namespace | `meta.identifier_ref` | `NameType.admits` |
 | `meta.reference_type.of` | reference, `meta.type_ref` | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |

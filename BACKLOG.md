@@ -158,11 +158,6 @@ spec-required case:
   `meta.ref<box<text>>`, which §4.2 says is that body, closes `of` to the expansion: `ReferenceBody.of` is a `String`,
   bound from the text, and nothing closes it. Hold `of` as a `TypeRef`, map it in `MetaRefs`' reference arm as the
   application it is, and add a `schema/valid` vector.
-- [ ] **A record template field's `value` is still typed `meta.value`** ([TSON-SCHEMA] §5.2, §5.10), the last
-  `meta.value`-typed field slot in the kernel; `meta.record_field.value` is `type!`, a dependent field. A template
-  field's type may be a parameter, so there is no sibling to name, and its value parameter has its own label
-  (`value_param`). Decide when `value` is retyped, and with it what `@meta.application` means on a declared entry that
-  is no record.
 - [ ] **An application argument where a value parameter stands is accepted when a record template closes**
   ([TSON-SCHEMA] §5.10). With `pin => <N> { v?: int32 = N }`, `<T> pin<box<T>> & { … }` is refused where the operand
   is substituted (`RecordTemplateSubstitution`), but `pin<box<text>>` is not: `TemplateMaterialiser` closes nested

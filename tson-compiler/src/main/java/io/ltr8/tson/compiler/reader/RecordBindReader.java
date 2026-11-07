@@ -14,7 +14,6 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.*;
 
 import java.lang.reflect.RecordComponent;
@@ -210,11 +209,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * Field readers that give a slot whose bound component is a {@link io.ltr8.tson.schema.meta.Token} the
      * token itself rather than the value it denotes.
      *
-     * <p><b>Why a slot can want the raw token.</b> The kernel types every such slot {@code value}, whose
-     * reader decodes ([TSON-DATA] §4) -- {@code 3} to an integer, {@code "3"} to a string. A component
-     * declared {@code Token} wants what was written: {@code meta.record_field}'s own fixed and default values are
-     * read later by the field's declared type and compared against what a document writes. A decoded host
-     * object cannot fill one, and §8.2 wants the spelling kept.
+     * <p><b>Why a slot can want the raw token.</b> A component declared {@code Token} wants what was written: {@code
+     * meta.record_field}'s own fixed and default values are read later by the field's declared type and compared
+     * against what a document writes. A decoded host object cannot fill one, and §8.2 wants the spelling kept.
      *
      * <p>The choice has to be made before the read, and it is made per field, so two slots of one schema
      * type that bind different components each get what they want.

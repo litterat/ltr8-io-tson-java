@@ -43,8 +43,12 @@ import java.util.function.Function;
  * layer governing it do not hold, so a schema's value is judged when the schema links, against that type, as a
  * default or pin is (a held value orders nothing, [TSON-SCHEMA] §5.2): the record reader hands its events to the
  * read's sink ({@link TsonReadContext#heldAsWritten}). Holding the value waits on nothing, so the kernel's {@code
- * record_field}, whose {@code value} is typed {@code type!}, waits on no {@code meta.value}. A bound {@code Token}
- * component never reaches here ({@code RecordBindReader.tokenAware}), though its record hands the value on the same.
+ * record_field} and {@code record_template_field}, whose {@code value} is typed {@code type!}, wait on no entry for it.
+ * A bound {@code Token} component never reaches here ({@code RecordBindReader.tokenAware}), though its record hands the
+ * value on the same.
+ *
+ * <p><b>A sibling with no value to give</b> never reaches here either: a field group's member absent from the record
+ * leaves nothing to read against, and the record refuses the field once it closes ({@link RecordAbstractReader}).
  */
 public final class DependentFieldReader implements TsonTypeReader<Object> {
 

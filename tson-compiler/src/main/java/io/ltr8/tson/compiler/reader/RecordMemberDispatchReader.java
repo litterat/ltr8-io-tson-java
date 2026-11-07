@@ -9,9 +9,6 @@ import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.FieldName;
@@ -145,7 +142,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
                 return null; // the linker already refused this; the family is read without it
             }
             Token pin = field.get().value().get();
-            Object value = decode(selector, pin.text(), TokenForm.valueOf(pin.form().name()));
+            Object value = decode(selector, pin.text());
             if (value == null) {
                 return null;
             }
@@ -177,7 +174,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
                 EventSkip.dataValue(ctx);
                 return null;
             }
-            Object decoded = decode(selector, value.text(), value.form());
+            Object decoded = decode(selector, value.text());
             if (decoded == null) {
                 ctx.field(selector.name())
                         .report(extension.unmatchedDiscriminator(selector.name(), value.text(), pinned));
@@ -228,12 +225,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         return found;
     }
 
-    private Object decode(Selector selector, String text, TokenForm form) {
+    private Object decode(Selector selector, String text) {
         try {
-            Object value = selector.parser() instanceof TokenAtomType<?> formSensitive
-                    ? formSensitive.read(new TokenValue(text, form))
-                    : selector.parser().read(text);
-            return ValueIdentity.of(value);
+            return ValueIdentity.of(selector.parser().read(text));
         } catch (AtomTypeException notThisType) {
             return null;
         }

@@ -53,7 +53,7 @@ facts and refinement, groups, subtraction, and the exception boundary.
   its base (`SchemaResolver.familyBaseEdges`).
 - Subtraction runs last and empties the chain (every supertype goes); nothing is kept in its place.
 - **A dependent field's rules are the link's, over the flattened record** (`DependentFields`, [TSON-SCHEMA] §5.2): the
-  sibling declared before it, typed by a reference to types, always there to read, its pin or default no template;
+  sibling declared before it, typed by a reference to types, there to read whenever it is, its pin or default no template;
   the dependent field never voidable, carrying no value, restated only as itself. Each is a `SchemaValidationException`.
 - A field's name is its key in `meta.record.fields` (`RecordBody.fields`, the kernel's `meta.field_map`) and never one of its
   facts; declaration order is part of the value, and `RecordBody.equals` compares it.
@@ -300,7 +300,13 @@ judged once its application closes it:
 - **Typed by a reference to types**: past its alias hops a `ReferenceBody` whose `of` is a constructor or `top`
   (`KindMembers.namesTypes`). One that allows a sibling, as `record_field.type` does, is admitted; a sibling
   reference as its value is refused where the dependent field is read.
-- **Always there to read**: required, defaulted or pinned; never voidable and no field group's member.
+- **There to read whenever the dependent field is**: required, defaulted, pinned, or a field group's member with the
+  dependent field optional; never voidable, and never optional with no default. A group's members are declared
+  `optional`, so a dependent field that is a member counts as optional, as `value` does on
+  `meta.record_template_field` beside `( type | type_param )`, and a refinement making one required is judged on the
+  flattened record. A member is absent when another option is chosen, so a dependent field written without it is
+  refused where it is read (`design/readers-and-diagnostics.md`); nothing refuses a sibling and its dependent field
+  in two options of one group, where the field can be written in no document.
 - **Its pin or default names a type a value can be read against**: a template, a record template among them, and a
   sibling reference are refused. Membership of the sibling's reference is `checkKindValue`'s, as for any field value.
 - **The dependent field** is never voidable and carries no default or pin: its type is not fixed at its declaration.
@@ -315,6 +321,12 @@ or a parameter's type (`NameType`, `ParameterTypes`). A value's qualified name g
 sibling names in the value walked (`ValuesByName.dependentType`, `design/meta-layer-namespaces.md`). A value entry's
 dependent value is held as written at the read and judged against that type when the schema links (`HeldValues`,
 `design/linking-and-compilation.md`).
+
+**A template field's `value` is one too**, typed `type!` with `type` its sibling, a member of `( type | type_param )`.
+A literal is held as written and judged when the template closes, against the closed field's type (`checkFieldValue`),
+its §8.2 hygiene being judged on the template (`TsonSchemaLinker.checkFieldValues`). A literal beside `type_param` is
+refused by `openRecord` before the payload is bound, so the author reads §5.10's reason and not the reader's; a literal
+on an application over a parameter is refused after it (`refuseLiteralOnOpenType`), the sibling `type` being there.
 
 ## Field groups
 

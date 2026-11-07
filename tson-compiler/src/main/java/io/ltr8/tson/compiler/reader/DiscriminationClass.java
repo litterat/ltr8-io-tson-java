@@ -42,7 +42,6 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.net.IriType;
 import io.ltr8.tson.schema.net.UriType;
 import io.ltr8.tson.schema.net.UuidType;
-import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 
 import java.math.BigDecimal;
@@ -140,12 +139,11 @@ public enum DiscriminationClass {
 
     /**
      * [TSON-SCHEMA] §5.4's key test: whether the map's key type, at the end of its alias chain, is a type a
-     * single scalar token denotes by its content -- an atom-family instance or an enum, {@code value} and
-     * {@code void} excepted.
+     * single scalar token denotes by its content -- an atom-family instance or an enum, {@code void} excepted.
      */
     private static boolean hasScalarKey(MapBody map, Function<String, ? extends Top> namespace) {
         return AliasChain.terminalDefinition(map.keyType().name(), namespace)
-                .filter(key -> key instanceof Atom && !(key instanceof ValueType) && !(key instanceof VoidType))
+                .filter(key -> key instanceof Atom && !(key instanceof VoidType))
                 .isPresent();
     }
 

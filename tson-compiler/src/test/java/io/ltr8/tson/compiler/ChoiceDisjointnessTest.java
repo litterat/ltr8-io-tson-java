@@ -15,7 +15,6 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.unicode.IdentifierType;
-import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.Type;
@@ -242,22 +241,13 @@ class ChoiceDisjointnessTest {
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
         TypeRef point = product("point", RecordBody.of(RecordBody.fieldMap()));
         TypeRef colour = atom("colour", new EnumBody(List.of("red", "green")));
-        TypeRef value = atom("value", new ValueType());
         TypeRef nothing = atom("void", new VoidType());
         namespace.put("text_alias", new io.ltr8.tson.schema.meta.Alias(TypeRef.of("text")));
         assertFalse(disjoint(mapKeyedBy("by_point", point), i));
         assertTrue(disjoint(mapKeyedBy("by_text", TypeRef.of("text")), i));
         assertTrue(disjoint(mapKeyedBy("by_alias", TypeRef.of("text_alias")), i));
         assertTrue(disjoint(mapKeyedBy("by_colour", colour), i));
-        assertFalse(disjoint(mapKeyedBy("by_value", value), i));
         assertFalse(disjoint(mapKeyedBy("by_void", nothing), i));
-    }
-
-    @Test
-    void aValueVariantMakesTheChoiceNotDisjoint() {
-        TypeRef value = atom("value", new ValueType());
-        TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
-        assertFalse(disjoint(value, i));
     }
 
     /** An identifier is a text family, so it is string-class and apart from a number. */

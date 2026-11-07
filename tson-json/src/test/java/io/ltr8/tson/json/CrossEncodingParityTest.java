@@ -137,6 +137,7 @@ class CrossEncodingParityTest {
               cell        => { kind: meta.type_ref  v?: kind! }
               int_cell    => cell ^ { kind?: = int32 }
               defaulted   => { kind?: meta.type_ref ~ int32  v?: kind! }
+              grouped     => { ( kind: meta.type_ref | name: text )  v?: kind! }
               tmpl        => <T> { item: T }
               marks      => {
                 nickname?: text
@@ -627,6 +628,34 @@ class CrossEncodingParityTest {
                 tson("cell", "{ v: 5  kind: int32 }"));
         assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/kind")),
                 tson("cell", "{ kind: tmpl  v: { item: 5 } }"));
+    }
+
+    /**
+     * A sibling that is a field group's member is absent when another option is chosen: a dependent field written
+     * beside that option has no type, refused alike and at the same pointer, and in words that say it is absent. A
+     * required sibling that never arrives is the missing-field error alone.
+     */
+    @Test
+    void aDependentFieldWithoutItsSiblingIsRefusedByBoth() {
+        bothAccept("grouped", "{ kind: int32  v: 5 }", """
+                {"kind": "int32", "v": 5}""");
+        bothAccept("grouped", "{ name: x }", """
+                {"name": "x"}""");
+        sameVerdict("grouped", "{ name: x  v: 5 }", """
+                {"name": "x", "v": 5}""");
+        sameVerdict("grouped", "{ v: 5  kind: int32 }", """
+                {"v": 5, "kind": "int32"}""");
+        sameVerdict("cell", "{ v: 5 }", """
+                {"v": 5}""");
+        assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/v")),
+                json("grouped", """
+                        {"name": "x", "v": 5}"""));
+        assertEquals(List.of(new Verdict(Diagnostic.Code.FIELD_REQUIRED, "/kind")),
+                json("cell", """
+                        {"v": 5}"""));
+        String message = jsonDiagnostics("grouped", """
+                {"name": "x", "v": 5}""").getFirst().message();
+        assertTrue(message.contains("is written without 'kind'"), message);
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

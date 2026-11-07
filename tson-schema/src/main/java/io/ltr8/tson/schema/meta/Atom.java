@@ -30,14 +30,14 @@ import java.util.List;
 
 /**
  * The kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
- * Top} variant IS-A this. {@link ValueType} and {@link VoidType} back {@code value} and {@code void}, the
- * two atoms with no constraint vocabulary; {@link EnumBody} backs {@code boolean} and the kernel's other
+ * Top} variant IS-A this. {@link VoidType} backs {@code void}, the atom with no constraint vocabulary; {@link
+ * EnumBody} backs {@code boolean} and the kernel's other
  * internal enumerations, a listed set of names; {@link ReferenceBody} backs {@code reference}, a computed one -- the
  * names of the entries whose values are of one type; the remaining variants are the atom constraint-vocabulary
  * families, one per {@code *_type} constructor. {@link DeclaredType} is the sibling SUM-kind case -- see {@link
  * Sum}, not here.
  */
-public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody, ReferenceBody, IntegerType,
+public sealed interface Atom extends Type permits VoidType, EnumBody, ReferenceBody, IntegerType,
         TextType,
         IdentifierType,
         UriType, IriType, RegexType,
@@ -57,7 +57,7 @@ public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody,
      * min_length}/{@code max_length} -- so the rule lives on the family rather than in a generic
      * field-by-field comparison, which cannot tell a tightened bound from a replaced one. The
      * default admits everything, which is correct for a family carrying no orderable facet at all
-     * ({@link ValueType}, {@link VoidType}); every family that has one overrides it.
+     * ({@link VoidType}); every family that has one overrides it.
      *
      * <p>{@code refined} is the fully merged result of applying a refinement body to this atom, not
      * the body alone (see {@code DefinitionResolver}'s own atom-refinement path), so a facet the
@@ -99,7 +99,7 @@ public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody,
      *
      * <p>The same fragment convention as {@link #constraintsCheck} -- each element names one problem,
      * so a body with several reports them all in one pass -- and the same "only where it is decidable
-     * by ordinary value comparison" limit. A family carrying no orderable facet at all ({@link ValueType},
+     * by ordinary value comparison" limit. A family carrying no orderable facet at all ({@link VoidType},
      * and every selector-only family) keeps the default; a family whose bounds are unparsed text
      * ({@link DurationType}) records why it does the same.
      */

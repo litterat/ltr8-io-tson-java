@@ -33,8 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>The schemaless readers get this from {@code ltr8-bind}, which collects a record's constructor
  * arguments through their bridges. A schema-driven read builds its own arguments from the compiled field
- * readers, so it applies the bridge itself, in the same field-wiring step that rebinds a {@code value} slot
- * and a container -- {@code RecordBindReader} over {@code ElementBridging}, the wrapper an array's and a
+ * readers, so it applies the bridge itself, in the same field-wiring step that rebinds a container -- {@code
+ * RecordBindReader} over {@code ElementBridging}, the wrapper an array's and a
  * map's elements already take for the identical reason.
  *
  * <p>A value the family refuses at such a position is an ordinary located diagnostic rather than the
@@ -79,22 +79,6 @@ class AtomBoundClassUnderSchemaTest {
     }
 
     public record BridgedInvoice(Money total) {
-    }
-
-    /** A consumer's own type whose wire form is a {@link UUID} -- a host type [TSON-DATA] §4 never produces. */
-    public record Ticket(UUID id) {
-    }
-
-    public static class TicketBridge implements DataBridge<UUID, Ticket> {
-        @Override
-        public UUID toData(Ticket t) {
-            return t.id();
-        }
-
-        @Override
-        public Ticket toObject(UUID id) {
-            return new Ticket(id);
-        }
     }
 
     // ── Route 2: @Transparent, the same idea with no bridge to write ─────
@@ -177,83 +161,5 @@ class AtomBoundClassUnderSchemaTest {
         TsonValue value = tson.treeReader().read(DOC);
         assertEquals("12.34", value.get("total").asString().orElseThrow());
         assertTrue(tson.validate(DOC).isEmpty());
-    }
-
-    // ── The `value` escape hatch, which reaches a bridged component too ──
-
-    /**
-     * A schema reaching {@code value} imports meta.tn, which is why this is a meta-layer facility
-     * rather than something a consumer adopts: an import stands at the importer's governing level (§2.2.3),
-     * so a schema reaching the escape hatch is one the kernel governs.
-     */
-    private static final String VALUE_SCHEMA = """
-            !!id:"https://example.test/holder-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !schema {
-              holder => { slot: meta.value }
-            }
-            """;
-
-    private static final String VALUE_DOC = """
-            !!import:"https://example.test/holder-1.tn"
-            !holder { slot: "%s" }""";
-
-    public record UuidHolder(UUID slot) {
-    }
-
-    public record MoneyHolder(Money slot) {
-    }
-
-    public record TicketHolder(Ticket slot) {
-    }
-
-    private static Tson valueTson(Class<?> bound) {
-        DataNameBinder binder = name -> "holder".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        return tson(VALUE_SCHEMA, DataBindContext.builder().nameBinder(binder)
-                .registerAtoms(AtomContext.hostTypes())
-                .registerAtom(Money.class, new MoneyBridge())
-                .registerAtom(Ticket.class, new TicketBridge()).build());
-    }
-
-    /**
-     * The slot's own rebind: the component is typed {@link UUID}, {@code ValueParser.at} finds the family
-     * that produces one, and the slot reads as a UUID rather than as §4's string.
-     */
-    @Test
-    void aValueSlotLetsABuiltinHostTypePickTheAtom() {
-        UUID id = UUID.fromString("f81d4fae-7dec-11d0-a765-00a0c91e6bf6");
-        UuidHolder holder = valueTson(UuidHolder.class).objectReader()
-                .read(VALUE_DOC.formatted(id), UuidHolder.class);
-        assertEquals(id, holder.slot());
-    }
-
-    /** And a failure there is an ordinary classified read error, located at the field. */
-    @Test
-    void aValueSlotReportsAClassifiedErrorRatherThanACast() {
-        ReadException e = assertThrows(ReadException.class, () -> valueTson(UuidHolder.class).objectReader()
-                .read(VALUE_DOC.formatted("not-a-uuid"), UuidHolder.class));
-        assertTrue(e.getMessage().contains("slot"), "names the field: " + e.getMessage());
-    }
-
-    /** A bridged component reaches a {@code value} slot too: the rebind asks by the class the bridge takes. */
-    @Test
-    void aValueSlotReachesABridgedComponentThroughTheFieldsOwnBridge() {
-        MoneyHolder holder = valueTson(MoneyHolder.class).objectReader()
-                .read(VALUE_DOC.formatted("12.34"), MoneyHolder.class);
-        assertEquals(new Money("12.34"), holder.slot());
-    }
-
-    /**
-     * The wire class is what picks the family, and only a bridge crossing something §4 does not resolve to
-     * can show it: {@code Money}'s is {@code String}, which §4 produces anyway, so the slot would read the
-     * same either way. {@code Ticket}'s is a {@link UUID}, so asking by the declared component class finds no
-     * family, leaves §4's string, and hands the bridge a value it cannot take.
-     */
-    @Test
-    void aValueSlotAsksByTheClassTheBridgeTakesRatherThanTheOneTheComponentDeclares() {
-        UUID id = UUID.fromString("f81d4fae-7dec-11d0-a765-00a0c91e6bf6");
-        TicketHolder holder = valueTson(TicketHolder.class).objectReader()
-                .read(VALUE_DOC.formatted(id), TicketHolder.class);
-        assertEquals(new Ticket(id), holder.slot());
     }
 }

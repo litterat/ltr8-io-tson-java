@@ -312,9 +312,9 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   lifted over `meta.type_ref`, `meta.field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted
   array is named by its content, so it is designated by what it holds; an entry the source declares is no lift, so a
   declaration whose body is `[text]` is read, not built). `meta.field_type_ref => !meta.reference_type { of: meta.type
-  }` is on the cycle because reading its `of` waits on `meta.type_ref`, its own refinement. The kernel's `meta.value`
-  is not: `record_field.value` is typed `type!`, a dependent field, whose value a schema document holds as written
-  through a reader of its own (`DependentFieldReader`), so `record_field` waits on no entry for it. `instanceBody`
+  }` is on the cycle because reading its `of` waits on `meta.type_ref`, its own refinement. `record_field.value` and
+  `record_template_field.value` are typed `type!`, a dependent field, whose value a schema document holds as written
+  through a reader of its own (`DependentFieldReader`), so neither record waits on any entry for it. `instanceBody`
   covers the shapes those apply — a bare `{}` (each target's unconstrained constant), a bare token array (`enum`, the
   kernel's own enumeration constructor), and a record of tokens (`meta.reference_type` with its `of` and an
   `allow_sibling` defaulting to true, `meta.map` for `meta.field_map`, the `meta.array`/`meta.set_type` binding records
@@ -325,13 +325,13 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   a refinement of `meta.type_ref`, lists `meta.field_type_ref` too. `MetaKernelBootstrapResolverTest` measures the
   cycle with `WaitGraph` from `spec/fixtures/meta-resolved.tn` (the six maps read as their members under their paths)
   and asserts the hand-built names equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest`
-  prints the measurement — 90 entries (70 members of the six maps, 13 at the root and 7 synthetics; the maps
-  themselves make the kernel's 96 resolved entries), one cycle of 25, longest wait chain 4 — and
+  prints the measurement — 88 entries (68 members of the six maps, 13 at the root and 7 synthetics; the maps
+  themselves make the kernel's 94 resolved entries), one cycle of 25, longest wait chain 4 — and
   `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel contains the cycle's closure (66
   entries, the root tag's `schema` among them: reading the document waits on the alias its tag names) and the related
-  concepts, `meta.value` and `meta.value_type` among them, pinning all three. Of the 25, 13 are hand-built (the 9 of
+  concepts, pinning all three. Of the 25, 13 are hand-built (the 9 of
   `PRE_LOADED` and 4 lifted arrays); the other 12 are records and compositions resolved from their grammar, and the
-  65 entries beyond the cycle are made ready in wait order.
+  63 entries beyond the cycle are made ready in wait order.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
   the pre-loaded set first, so the first compile holds every head a read applies. Two refinements wait on the cycle

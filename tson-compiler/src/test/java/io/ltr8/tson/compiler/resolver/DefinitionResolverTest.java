@@ -50,11 +50,11 @@ import io.ltr8.tson.schema.unicode.RegexType;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.ValueType;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.EntryKind;
@@ -241,11 +241,11 @@ class DefinitionResolverTest {
     //    diverges, structurally faithfully, from meta-resolved.tn's own text) ──
 
     @Test
-    void writesAValueTypeBody() throws DataBindException {
-        // Structurally: meta.value => !value_type {}
-        Top value = new ValueType();
+    void writesAVoidTypeBody() throws DataBindException {
+        // Structurally: void => !void_type {}
+        Top voidBody = new VoidType();
 
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } }", write(value));
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } }", write(voidBody));
     }
 
     @Test
@@ -692,7 +692,7 @@ class DefinitionResolverTest {
      *
      * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
      * extra claim: one value per application is one value per member, so the base dispatches on
-     * {@code [meta.value]} with no {@code =?} written (§5.2, §5.10).
+     * {@code [value]} with no {@code =?} written (§5.2, §5.10).
      */
     @Test
     void aParametricFixedValueRidesTheValueSlotOfAFixedField() {

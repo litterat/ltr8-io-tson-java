@@ -41,7 +41,6 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.ValueType;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -102,8 +101,8 @@ public final class MetaKernelBootstrapResolver {
      * {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text} atoms, {@code
      * meta.field_type_ref}, the reference a record field's type is read by, {@code field_map}, the map type a
      * record's fields are a value of, and the two refinements, {@code numeric.count} and {@code meta.type_ref}. The
-     * kernel's {@code value} is not among them: {@code record_field.value} is typed {@code type!}, a dependent field
-     * whose value a schema document holds as written, which waits on no entry.
+     * {@code value} of {@code record_field} and {@code record_template_field} is not among them: it is typed {@code
+     * type!}, a dependent field whose value a schema document holds as written, which waits on no entry.
      */
     private static final Set<String> PRE_LOADED = Set.of("boolean", "meta.field_role", "meta.enum_set",
             "integer", "numeric.count", "text", "meta.field_type_ref", "meta.type_ref", "meta.field_map");
@@ -447,7 +446,7 @@ public final class MetaKernelBootstrapResolver {
 
     /**
      * The hand-written construction of a pre-loaded instance (see the class Javadoc). The pre-loaded set applies
-     * its constructors in three shapes, each checked rather than assumed: a bare {@code {}} for {@code value_type},
+     * its constructors in three shapes, each checked rather than assumed: a bare {@code {}} for
      * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; a bare token array for
      * {@code enum}; and a record of tokens for {@code reference_type}, for {@code map} and for the {@code
      * array}/{@code set_type} binding records {@link SchemaDesugarer} lifts.
@@ -457,10 +456,6 @@ public final class MetaKernelBootstrapResolver {
      */
     static Top instanceBody(String name, Instance instance) {
         return switch (instance.target()) {
-            case "meta.value_type" -> {
-                requireEmptyBody(instance);
-                yield new ValueType();
-            }
             case "numeric.integer_type" -> {
                 requireEmptyBody(instance);
                 yield IntegerType.UNCONSTRAINED;

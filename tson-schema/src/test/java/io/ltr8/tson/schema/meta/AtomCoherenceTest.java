@@ -99,7 +99,6 @@ class AtomCoherenceTest {
         assertCoherent(MacType.UNCONSTRAINED);
         assertCoherent(UuidType.UNCONSTRAINED);
         assertCoherent(ComplexType.UNCONSTRAINED);
-        assertCoherent(new ValueType());
         assertCoherent(new VoidType());
         assertCoherent(IdentifierType.IDENTIFIER);
     }

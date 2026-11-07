@@ -56,8 +56,7 @@ class KernelWaitGraphTest {
      * them), and every entry a declaration of that set names, closed to a fixed point -- and the concepts that belong
      * with them, which nothing in the closure names: the tuple and choice constructors, the tuple's element and
      * the one-element tuple templates, held template bodies, record templates with their fields, the parameters both
-     * bind and the {@code application} annotation, the uninterpreted {@code value} atom a record template field's value
- * is held as, the {@code ref} reference with {@code field_name}, the {@code set}
+     * bind and the {@code application} annotation, the {@code ref} reference with {@code field_name}, the {@code set}
      * template, the {@code disjoint} assertion, and the octet-sequence constructor with its encodings and instance. The
      * measurement: a cycle of 25, a closure of 66.
      */
@@ -91,7 +90,7 @@ class KernelWaitGraphTest {
                 "binary.bytes_encoding", "binary.bytes_type", "meta.choice", "meta.disjoint",
                 "meta.field_name", "meta.param_name", "meta.record_template", "meta.record_template_field",
                 "meta.record_template_field_map", "meta.ref", "meta.template", "meta.template_param", "meta.tuple",
-                "meta.tuple1", "meta.tuple_element", "meta.value", "meta.value_type", "meta.voidable_tuple1", "set")),
+                "meta.tuple1", "meta.tuple_element", "meta.voidable_tuple1", "set")),
                 new java.util.TreeSet<>(related.stream().filter(name -> !name.startsWith("array_")).toList()),
                 "the related concepts");
     }

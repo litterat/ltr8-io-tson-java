@@ -5,7 +5,6 @@ import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.resolver.KindMembers;
-import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -36,8 +35,11 @@ import java.util.Optional;
  *       {@code meta.ref<C>} over a constructor, or a refinement) whose {@code of} is a constructor or {@code top}, so
  *       every value it holds names a type. One that allows a sibling reference is admitted, as {@code
  *       record_field.type} is; a sibling reference as its value is refused where the dependent field is read.</li>
- *   <li><b>The sibling is always there to read</b>: required, defaulted or pinned, never voidable, and no member of a
- *       field group.</li>
+ *   <li><b>The sibling is there to read whenever the dependent field is</b>: required, defaulted, pinned, or a member
+ *       of a field group with the dependent field optional, a group's own member being declared optional. A member is
+ *       absent when another option is chosen, so a dependent field written without it is refused where it is read.
+ *       A sibling that is optional with no default, or voidable, is refused, as is a member beside a required
+ *       dependent field.</li>
  *   <li><b>A sibling's default or pin names a type a value can be read against</b>: a template, which no value is read
  *       against until it is applied, is refused, a record template among them, and so is a sibling reference. That it
  *       is a member of the sibling's reference is the field-value check's ({@code TsonSchemaLinker}).</li>
@@ -90,7 +92,7 @@ final class DependentFields {
         }
     }
 
-    /** The rules a dependent field's sibling answers to: typed by a reference to types, and always there to read. */
+    /** The rules a dependent field's sibling answers to: typed by a reference to types, and there to read. */
     private static void checkSibling(String entryName, String dependent, SiblingRef sibling, RecordBody record,
                                      Map<String, Top> namespace) {
         RecordField field = record.fields().get(sibling.field());
@@ -108,20 +110,21 @@ final class DependentFields {
         }
         if (field.voidable()) {
             throw new SchemaValidationException(about + ", which is voidable -- '_' names no type, so a '" + dependent
-                    + "' written beside it would have none to be read against; a sibling is always there to read "
-                    + "(§5.2)");
+                    + "' written beside it would have none to be read against; a sibling is there to read whenever "
+                    + "its dependent field is (§5.2)");
         }
-        for (FieldGroup group : record.groups()) {
-            if (group.hasMember(sibling.field())) {
-                throw new SchemaValidationException(about + ", which is a member of a field group -- a member is "
-                        + "present only when its option is chosen and is never supplied, so '" + dependent + "' could "
-                        + "have no type to be read against; a sibling is always there to read (§5.2, §5.11)");
-            }
+        boolean member = record.groups().stream().anyMatch(group -> group.hasMember(sibling.field()));
+        if (member && !record.fields().get(dependent).optional()) {
+            throw new SchemaValidationException(about + ", which is a member of a field group, and '" + dependent
+                    + "' is required -- a member is present only when its option is chosen and is never supplied, so "
+                    + "'" + dependent + "' could have no type to be read against; a group member is the sibling of an "
+                    + "optional dependent field alone (§5.2, §5.11)");
         }
-        if (field.optional() && field.value().isEmpty()) {
+        if (!member && field.optional() && field.value().isEmpty()) {
             throw new SchemaValidationException(about + ", which is optional with no default -- a '" + dependent
-                    + "' written without it would have no type; a sibling is always there to read: required, "
-                    + "defaulted or pinned (§5.2)");
+                    + "' written without it would have no type; a sibling is there to read whenever its dependent "
+                    + "field is: required, defaulted, pinned, or a field group's member beside an optional dependent "
+                    + "field (§5.2)");
         }
         field.value().ifPresent(value -> checkSiblingValue(about, field, value, namespace));
     }

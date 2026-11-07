@@ -84,10 +84,9 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the same terms as `tson-compiler`'s
   own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint record), `tson-base` and `ltr8-regex`.
   **What deliberately stayed behind is everything that depends on *how* a token was written**: `AtomType` takes a `String`,
-  and the two atoms needing the lexical form — the kernel's `value`, whose §4.4 rule is that a quoted token is a string, and
-  `Token`, which records the spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and
-  `BaseTypeResolver`. That those two are exactly where the encodings legitimately differ is no coincidence: JSON has no token
-  forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
+  and what needs the lexical form — §4 base type resolution, whose §4.4 rule is that a quoted token is a string, and
+  `Token`, which records the spelling §8's resolved form carries — stays in `tson-compiler` with `TokenValue` and
+  `BaseTypeResolver`, JSON having no token forms.
 - **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
   true leaf: depends on **nothing** (not even `ltr8-annotation` — the nodes aren't bind targets, they're
@@ -133,7 +132,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   so the engines above read `Nfc`, `Normalization` and `IdentifierProfile` without naming a second module, and a
   consumer naming a level names `RestrictionLevel`, since the levels are Unicode's.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the token-side atom glue
-  (`atom`: `RawTokenParser`, `TokenAtomType`, `ValueParser` — the vocabulary itself is `tson-atom`'s),
+  (`atom`: `RawTokenParser`, `ValueParser` — the vocabulary itself is `tson-atom`'s),
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades
   (`TsonTreeReader`/`TsonObjectReader`) over their schemaless `reader`-package engines
   (`SchemalessTreeReader`/`DataClassObjectReader`), the `TsonTreeWriter`/`TsonObjectWriter` writers over

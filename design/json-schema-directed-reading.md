@@ -31,9 +31,10 @@ JSON inputs are in `design/cli-config-hashing.md`.
 - A dependent field (`v?: kind!`, [TSON-SCHEMA] §5.2) is read by `DependentReader` through its record, against the
   type its sibling names in the same object, with TSON's rules (`design/readers-and-diagnostics.md`): the pin, the
   sibling written before it, or the sibling's default; a free sibling written after the member is refused naming both
-  ([TSON-JSON] §6.1.6's one exception to member order), and a sibling naming no readable type is refused at the
-  sibling. The record keeps the sibling's written string, and the state, only where it has a dependent field. Bind
-  mode binds it to an `Object` component, as the TSON reader does.
+  ([TSON-JSON] §6.1.6's one exception to member order), a field group's member that never arrives is refused at the
+  member once the object closes, and a sibling naming no readable type is refused at the sibling. The record keeps the
+  sibling's written string, and the state, only where it has a dependent field. Bind mode binds it to an `Object`
+  component, as the TSON reader does.
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
 - Every mode is all-or-nothing: no builder builds where anything was reported while its value was read.
@@ -252,11 +253,10 @@ standalone array or tuple binds to an unmodifiable `List` of its values' natural
 unmodifiable `Map`; a record field declaring `long[]`, `List<Long>`, `Set<UUID>`, an `@Tuple` class or
 `Map<LocalDate, BigDecimal>` reads the same position again for that class. A tuple binds by its component and not by
 its schema name because an inline tuple's entry name is minted, and no binding map can hold it. `BindTargets` is the
-one place that meets a component — an atom through `AtomReader.boundTo`, a `value` slot through
-`ValuePositionReader.boundTo`, a container rebuilt over the component's class with every element, key and value
-bound in turn, a record checked against it — and every disagreement joins the record's one `BindMismatchException`.
-So an element of a `List<Long>` over `[int32]` is a `Long`, where `tson-compiler` reads it at the family's natural
-class.
+one place that meets a component — an atom through `AtomReader.boundTo`, a container rebuilt over the component's class
+with every element, key and value bound in turn, a record checked against it — and every disagreement joins the record's
+one `BindMismatchException`. So an element of a `List<Long>` over `[int32]` is a `Long`, where `tson-compiler` reads it
+at the family's natural class.
 
 ## Discrimination: one condition, and the table is built at schema load
 
