@@ -1,12 +1,12 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
 
@@ -28,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * That is the right default with nothing else known, but §5.10 has the argument "read by the position it
  * lands in", and once the parameter's kind is inferred that position is known at the application. The kind
  * comes from the declared type of the slot the parameter stands in, read from the constructor's own
- * vocabulary -- which §9 makes general rather than a table of kernel names, since a slot holding a type
- * reference MUST be typed {@code type_ref}.
+ * vocabulary -- which §9 makes general rather than a table of kernel names, since a slot holding a type's
+ * name is typed {@code meta.type_ref}.
  */
 class ParameterKindTest {
 
@@ -38,9 +38,9 @@ class ParameterKindTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/kinds.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -50,8 +50,8 @@ class ParameterKindTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -59,11 +59,11 @@ class ParameterKindTest {
         return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
-    /** An entry's body with every {@code REFERENCE} hop followed. */
+    /** An entry's body with every {@code ALIAS} hop followed. */
     private static Top bodyOf(TsonCompiledSchema compiled, String name) {
         Top body = compiled.schema().entries().get(name);
-        while (body instanceof Reference reference) {
-            body = compiled.schema().entries().get(reference.target().name());
+        while (body instanceof Alias alias) {
+            body = compiled.schema().entries().get(alias.target().name());
         }
         return body;
     }
@@ -72,7 +72,7 @@ class ParameterKindTest {
      * §5.10's own example, verbatim: "in an enum's member list it is a member -- {@code e => <M> !enum [a b
      * M]} applied as {@code e<c>} admits {@code c} without any special spelling".
      *
-     * <p>{@code enum.members} is a set of {@code identifier}, an atom, so {@code M} is a value parameter and
+     * <p>{@code enum.members} is a set of {@code meta.identifier}, an atom, so {@code M} is a value parameter and
      * {@code c} is the token it always was. Before the kinds existed the argument stayed on the reference
      * channel and the linker asked the namespace for a type called {@code c}.
      */
@@ -108,11 +108,11 @@ class ParameterKindTest {
         assertEquals("c", assertInstanceOf(TypeArgument.Value.class, argument).value().text());
     }
 
-    /** A parameter at a {@code type_ref} slot stays a type parameter, and its argument stays a reference. */
+    /** A parameter at a {@code meta.type_ref} slot stays a type parameter, and its argument stays a reference. */
     @Test
     void anArgumentBindingATypeParameterIsStillAReference() {
         TsonCompiledSchema compiled = compile("""
-                  arr => <T> !array { element_type: T }
+                  arr => <T> !meta.array { element_type: T }
                   use => arr<int32>""");
 
         // `use => head<args>` is the instantiation entry itself (#15), and it is the entry whose facts
@@ -136,7 +136,7 @@ class ParameterKindTest {
     @Test
     void aParameterStandingForACollectionIsRefusedAtTheDeclaration() {
         for (String declaration : List.of("  bad => <T> !enum { members: T }",
-                                           "  bad => <T> !record { fields: T }")) {
+                                           "  bad => <T> !meta.record { fields: T }")) {
             String message = rejected(declaration);
 
             assertTrue(message.contains("parameter 'T' stands where"), message);
@@ -164,7 +164,7 @@ class ParameterKindTest {
      * template it is declared on -- classifies, and its argument stays a reference.
      *
      * <p>[TSON-SCHEMA] §5.10 makes such a parameter a resolver error instead. Reading it as forced is what
-     * leaves {@code loop => <T> loop<T>} to be judged on what is actually wrong with it: a reference
+     * leaves {@code loop => <T> loop<T>} to be judged on what is actually wrong with it: an alias
      * template's body <em>is</em> the application, so there is no second slot a concrete use could go in, and
      * the useful verdict is that it applies itself forever.
      */
@@ -175,18 +175,18 @@ class ParameterKindTest {
                   use   => { w: weird<text> }""");
 
         String instantiation = ((RecordBody) compiled.schema().entries().get("use"))
-                .fields().values().iterator().next().type().name();
+                .fields().values().iterator().next().typeRef().name();
         TypeArgument argument = compiled.schema().applicationOf(instantiation).orElseThrow()
                 .arguments().getFirst();
 
         assertEquals("text", assertInstanceOf(TypeArgument.Ref.class, argument).ref().name());
     }
 
-    /** And the self-applying reference template is judged on the loop, not on its parameter's kind. */
+    /** And the self-applying alias template is judged on the loop, not on its parameter's kind. */
     @Test
-    void aSelfApplyingReferenceTemplateStillReportsTheLoop() {
+    void aSelfApplyingAliasTemplateStillReportsTheLoop() {
         assertTrue(rejected("  loop => <T> loop<T>\n  holder => { p: loop<text> }")
-                .contains("reference template whose own body applies it again"));
+                .contains("alias template whose own body applies it again"));
     }
 
     /**

@@ -40,18 +40,18 @@ class MintedEntryUnificationTest {
 
     private static final String LEFT = """
             !!id:"https://example.test/left.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               box      => <V> { item: V }
               left_use => { x: box<text> }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static final String RIGHT = """
             !!id:"https://example.test/right.tn"
-            !!meta:"%s"
+            !!import:"%s"
             !!import:"https://example.test/left.tn"
-            {
+            !schema {
               right_use => { y: box<text> }
             }""".formatted(TsonBundledSchemas.META_ID);
 

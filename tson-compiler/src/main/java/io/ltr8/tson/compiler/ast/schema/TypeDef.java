@@ -7,21 +7,24 @@ package io.ltr8.tson.compiler.ast.schema;
  * one variant per top-level ABNF alternative:
  *
  * <ul>
- *   <li>{@link AtomRefinement} -- {@code "!" type-name ws "^" ws record-def} (§5.5)</li>
- *   <li>{@link Instance} -- {@code [type-params] "!" type-name ws core-value} (§5.5, constructor
+ *   <li>{@link AtomRefinement} -- {@code "!" qualified-name ws "^" ws record-def} (§5.5)</li>
+ *   <li>{@link Instance} -- {@code [type-params] "!" qualified-name ws core-value} (§5.5, constructor
  *       application; a parameter list makes it a template and leaves the payload untouched, since an open
  *       entry's body is held rather than read -- see {@link Instance}'s own Javadoc)</li>
  *   <li>{@link StructuralTypeDef} -- {@code [type-params] ["~"] structural-def} (§5.7-§5.9)</li>
  *   <li>{@link ReferenceTypeDef} -- {@code [type-params] type-ref} (§8.3): a plain reference, or any
  *       container form, since a declaration-level container reaches this through {@code type-ref} like
  *       every other position</li>
+ *   <li>{@link SchemaMapDef} -- {@code "!schema" ws schema-map}: a schema map nested as an entry, whose members
+ *       are declarations of the document under their paths</li>
+ *   <li>{@link RecordTemplateDef} -- a record template as {@code SchemaDesugarer} normalises it, the one variant no
+ *       parser builds</li>
  * </ul>
  *
- * <p>Every variant has an ABNF alternative behind it -- each is parsed, never synthesised. §5.3's sized sugar
- * is no exception: {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its
- * bindings denote -- the sugar names {@code array} and binds its fields directly, with no size template in
- * between.
+ * <p>Every other variant has an ABNF alternative behind it and is parsed. §5.3's sized sugar is no exception:
+ * {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its bindings denote -- the
+ * sugar names {@code array} and binds its fields directly, with no size template in between.
  */
 public sealed interface TypeDef
-        permits AtomRefinement, Instance, StructuralTypeDef, ReferenceTypeDef {
+        permits AtomRefinement, Instance, StructuralTypeDef, ReferenceTypeDef, SchemaMapDef, RecordTemplateDef {
 }

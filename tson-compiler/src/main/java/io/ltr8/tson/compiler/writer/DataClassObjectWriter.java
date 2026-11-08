@@ -17,14 +17,19 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.SchemaPaths;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Ref;
-import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -152,21 +157,52 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof Ref<?> reference) {
-                // A value held by name writes as the name, a bare token, as a type_ref does: resolved output states
-                // the reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not what is wanted.
+                // A value held by name writes as the name, a bare token, as a type's name does: resolved output
+                // states the reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not wanted.
                 writeAnnotations(value, dataClass, writer);
                 writer.unquotedToken(reference.name());
                 return;
             }
+            if (value instanceof ValueEntry entry) {
+                // A value entry names its type under its tag, the entry's and no Java class's, `!api { ... }`, and
+                // its value is written as the value of that type it is: a namespace's map, a bound record, or the
+                // tree a value no class binds is held as.
+                writeValueEntry(entry, writer);
+                return;
+            }
             if (value instanceof Namespace<?> namespace) {
-                // A namespace value is an instance of its constructor, written as the map it is. Where the position
-                // admits more than one constructor (a schema entry, typed `top`) the value names its own under the
-                // tag, which is the value's and no Java class's: `!api { get_orders => ... }`. A position its host
-                // types as a Namespace is a named one, `fields: { ... }`, whose type already says which.
+                // A namespace value is the map it is. Where the position admits more than one type (a declared
+                // one) the value names its own under the tag, which is the value's and no Java class's. A
+                // position its host types as a Namespace is a named one, `fields: { ... }`, whose type already
+                // says which.
                 if (dataClass == null || dataClass.typeClass() != Namespace.class) {
                     writer.typeRef(namespace.type());
                 }
                 writeNamespace(namespace, writer);
+                return;
+            }
+            if (value instanceof TypeRef reference) {
+                // A reference is data grammar, written unquoted with the annotations written on it ahead: a name
+                // one token, an application its name and argument list. A name that is no qualified name reads
+                // back only quoted.
+                writeAnnotations(reference.annotations(), writer);
+                if (typeRef != null) {
+                    writer.typeRef(typeRef);
+                }
+                if (qualified(reference)) {
+                    writer.reference(reference);
+                } else {
+                    writer.quotedString(reference.text());
+                }
+                return;
+            }
+            if (value instanceof SiblingRef sibling) {
+                // A sibling reference is data grammar as well: its field's name and the mark, unquoted.
+                writeAnnotations(sibling.annotations(), writer);
+                if (typeRef != null) {
+                    writer.typeRef(typeRef);
+                }
+                writer.reference(sibling);
                 return;
             }
             if (dataClass.bridge().isPresent()) {
@@ -219,8 +255,6 @@ public final class DataClassObjectWriter {
         try {
             switch (dataClass) {
                 case DataClassAtom atom -> writeAtom(value, writer);
-                case DataClassRecord record when value instanceof TypeRef reference && bare(reference) ->
-                        writer.unquotedToken(reference.name());
                 case DataClassRecord record -> writeRecord(value, record, writer);
                 case DataClassArray array -> writeArray(value, array, writer);
                 case DataClassMap map -> writeMap(value, map, writer);
@@ -240,17 +274,15 @@ public final class DataClassObjectWriter {
     }
 
     /**
-     * Whether {@code reference} writes as its bare name: no arguments, and a name every {@code .}-separated segment
-     * of which is an identifier, so the token reads back as written. [TSON-SCHEMA] §8.1 writes an argument-free
-     * {@code type_ref} positionally, and a value written by name ([TSON-SCHEMA] §5.12) has only that spelling; an
-     * application keeps the explicit record, which carries its arguments.
+     * Whether {@code reference} reads back unquoted as written: its name a qualified name, every {@code .}-separated
+     * segment an identifier, and the name of each reference among its arguments the same ([TSON-DATA] §7.4).
      */
-    private static boolean bare(TypeRef reference) {
-        if (!reference.arguments().isEmpty()) {
+    private static boolean qualified(TypeRef reference) {
+        if (!ReferenceGrammar.isQualifiedName(reference.name())) {
             return false;
         }
-        for (String segment : reference.name().split("\\.", -1)) {
-            if (segment.isEmpty() || IdentifierGrammar.validate(segment).isPresent()) {
+        for (TypeArgument argument : reference.arguments()) {
+            if (argument instanceof TypeArgument.Ref nested && !qualified(nested.ref())) {
                 return false;
             }
         }
@@ -321,11 +353,12 @@ public final class DataClassObjectWriter {
     }
 
     /**
-     * The descriptor {@code value} is written through: its class's, and for a {@link Namespace}, which no class
-     * describes, {@link Top}'s -- the union it is a member of, the value naming its own constructor.
+     * The descriptor {@code value} is written through: its class's, and none for a {@link Namespace} or a {@link
+     * ValueEntry}, which no class describes and which name their own type ({@link #write}).
      */
     private DataClass descriptorOf(Object value) throws DataBindException {
-        return context.getDescriptor(value instanceof Namespace<?> ? Top.class : value.getClass());
+        return value instanceof Namespace<?> || value instanceof ValueEntry ? null
+                : context.getDescriptor(value.getClass());
     }
 
     // ── Records ──────────────────────────────────────────────────────────
@@ -386,16 +419,37 @@ public final class DataClassObjectWriter {
         writer.endMap();
     }
 
+    /** A value entry: its type as the tag, then its value. */
+    private void writeValueEntry(ValueEntry entry, TsonDataEmitter writer) throws Throwable {
+        Object held = entry.value();
+        if (held instanceof Namespace<?> namespace) {
+            writer.typeRef(entry.type());
+            writeNamespace(namespace, writer);
+        } else if (held instanceof TsonValue node) {
+            if (node.typeRef().isEmpty()) {
+                writer.typeRef(entry.type());
+            }
+            treeWriter.write(node, writer);
+        } else {
+            write(held, context.getDescriptor(held.getClass()), writer, entry.type());
+        }
+    }
+
     /**
      * A namespace value's entries, in the order held: each key with its annotations, as its bare name where it is an
      * identifier and quoted otherwise, and each value as its own class writes it, under the tag its {@link Typename}
      * names where it carries one -- a value of a subtype of the namespace's value type is selected by it on the way
-     * back in.
+     * back in. A schema map keys a nested map's members under their paths as well ({@link SchemaPaths}), and writes
+     * them inside the nested map alone.
      */
     private void writeNamespace(Namespace<?> namespace, TsonDataEmitter writer) throws Throwable {
+        boolean schemaMap = TsonSchema.SCHEMA.equals(namespace.type());
         writer.beginMap();
         for (Map.Entry<? extends io.ltr8.annotation.Annotated<String>, ?> entry
                 : namespace.entries().annotatedEntrySet()) {
+            if (schemaMap && SchemaPaths.isPath(entry.getKey().value())) {
+                continue; // a nested map's member, written inside its map
+            }
             writer.beforeMapEntry();
             writeAnnotations(entry.getKey().annotations(), writer);
             String key = entry.getKey().value();
@@ -437,8 +491,8 @@ public final class DataClassObjectWriter {
      * flexibility doesn't obligate a writer to be equally flexible about its own single output.
      */
     private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer) throws Throwable {
-        if (value instanceof Namespace<?>) {
-            write(value, dataClass, writer, null); // names its own constructor, which no class does
+        if (value instanceof Namespace<?> || value instanceof ValueEntry) {
+            write(value, dataClass, writer, null); // names its own type, which no class does
             return;
         }
         Class<?> memberClass = value.getClass();

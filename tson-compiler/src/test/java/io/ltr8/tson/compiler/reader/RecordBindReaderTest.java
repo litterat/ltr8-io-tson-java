@@ -6,18 +6,17 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Type;
@@ -35,95 +34,56 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Proves object-binding mode ({@link ValueReaderFactoryRegistry#bind}) genuinely produces real,
  * bound {@code schema.meta} Java objects -- not {@code Map<String, Object>} -- reading against the
- * real, registered {@code meta-kernel.tn} schema, mirroring {@link MetaKernelEndToEndTest}'s own
- * DOM-mode bootstrap pattern. {@link SchemaMetaNameBinder} (a {@code Class.forName}-based lookup,
+ * real, registered {@code meta.tn} schema, mirroring {@link MetaKernelEndToEndTest}'s own
+ * DOM-mode bootstrap pattern. {@link SchemaModelNameBinder} (a {@code Class.forName}-based lookup,
  * not a scan of any sealed hierarchy) resolves every real {@code record}-shaped entry in the
- * schema, including nested helper records like {@code integer_size} -- so {@code integer_type}
- * itself compiles cleanly (its own {@code size: integer_size?} field is not a {@link
+ * schema, including nested helper records like {@code numeric.integer_size} -- so {@code integer_type}
+ * itself compiles cleanly (its own {@code size: numeric.integer_size?} field is not a {@link
  * io.ltr8.tson.schema.meta.Top} leaf, which a sealed-hierarchy scan couldn't have resolved at all).
  */
 class RecordBindReaderTest {
 
     private static TsonCompiledSchema compiled() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
         return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.bind(context));
-    }
-
-    /**
-     * The kernel's {@code type_argument} is an <b>untagged labelled choice</b>: a record whose fields form one
-     * REQUIRED group, bound onto a sealed interface. There is no {@code !typeName} to dispatch on -- §5.6
-     * gives the record no positional form precisely because a bare token could not say which member it was --
-     * so the member is chosen by which field arrived ({@code GroupUnionBindReader}).
-     */
-    @Test
-    void anUntaggedLabelledChoiceBindsTheMemberThePresentFieldSelects() {
-        TsonCompiledSchema compiled = compiled();
-
-        assertEquals(new TypeArgument.Ref(TypeRef.of("text")),
-                compiled.get("type_argument").read(TestDocuments.document("{ name: text }")));
-    }
-
-    /** The group is REQUIRED, so neither zero members nor two of them is a reading of one. */
-    @Test
-    void anUntaggedLabelledChoiceStillObeysItsGroupRule() {
-        TsonCompiledSchema compiled = compiled();
-
-        assertThrows(ReadException.class,
-                () -> compiled.get("type_argument").read(TestDocuments.document("{}")));
-        assertThrows(ReadException.class, () -> compiled.get("type_argument")
-                .read(TestDocuments.document("{ name: text  value: 3 }")));
-    }
-
-    /**
-     * The whole point of making it readable: a {@code type_ref} carrying arguments has one, so an application
-     * can survive the wire hop a closed container's binding record makes through its constructor's reader.
-     */
-    @Test
-    void aTypeRefCarryingArgumentsReadsBecauseItsArgumentsDo() {
-        TsonCompiledSchema compiled = compiled();
-
-        TypeRef read = (TypeRef) compiled.get("type_ref")
-                .read(TestDocuments.document("{ name: box  arguments: [ { name: text } ] }"));
-
-        assertEquals(new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text")))), read);
     }
 
     @Test
     void textTypeNarrowsTheSchemasArbitraryPrecisionIntegerDownToTheRealFieldsIntWidth() {
         // min_length/max_length are the schema's own unconstrained `integer` atom (natural host
-        // type BigInteger), but TextType.minLength/maxLength are Optional<Integer> -- this is
+        // type BigInteger), but TextType.minLength/maxLength are Optional<Long> -- this is
         // exactly the narrowing path NumberNarrowing exists for.
         //
         // A standalone schema with "text_type"'s own real field shape but no subtypes -- the real
-        // meta-kernel entry also carries uri_type/regex_type/email_type as subtypes (see
+        // the kernel entry also carries uri_type/regex_type/email_type as subtypes (see
         // constructorFlaggedTypeWithRealSubtypesDispatchesToTheNamedSubtype below for that
         // dispatch itself); this test isolates the narrowing behavior specifically.
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", IntegerType.UNCONSTRAINED);
         entries.put("text", TextType.UNCONSTRAINED);
-        entries.put("text_member_set", ArrayBody.of(TypeRef.of("text")));
+        entries.put("unicode.text_member_set", ArrayBody.of(TypeRef.of("text")));
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
-        entries.put("text_type", RecordBody.of(RecordBody.fieldMap(
+        entries.put("unicode.text_type", RecordBody.of(RecordBody.fieldMap(
                 KernelChainFields.chainField(entries),
                 Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
-                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("unicode.text_member_set"))),
                 Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
                         new Token("NONE", Token.Form.UNQUOTED))))));
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));
 
-        Object result = compiled.get("text_type").read(TestDocuments.document("{ min_length: 3 max_length: 10 }"));
+        Object result = compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 3 max_length: 10 }"));
 
         TextType textType = assertInstanceOf(TextType.class, result);
-        assertEquals(new TextType(Optional.of(3), Optional.of(10), Optional.empty(), Optional.empty()), textType);
+        assertEquals(new TextType(Optional.of(3L), Optional.of(10L), Optional.empty(), Optional.empty()), textType);
     }
 
     /**
@@ -138,52 +98,52 @@ class RecordBindReaderTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", IntegerType.UNCONSTRAINED);
         entries.put("text", TextType.UNCONSTRAINED);
-        entries.put("text_member_set", ArrayBody.of(TypeRef.of("text")));
+        entries.put("unicode.text_member_set", ArrayBody.of(TypeRef.of("text")));
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
-        entries.put("text_type", RecordBody.of(RecordBody.fieldMap(
+        entries.put("unicode.text_type", RecordBody.of(RecordBody.fieldMap(
                 KernelChainFields.chainField(entries),
                 Map.entry("min_length", RecordField.fixed(TypeRef.of("integer"), new io.ltr8.tson.schema.meta.Token("3",
                         io.ltr8.tson.schema.meta.Token.Form.UNQUOTED))),
                 Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
-                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("unicode.text_member_set"))),
                 Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
                         new Token("NONE", Token.Form.UNQUOTED))))));
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 new TsonLinkedSchema(new TsonSchema("https://example.test/s.tn",
-                        "https://example.test/meta.tn", List.of(), entries)),
-                ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()));
+                        List.of(), entries)),
+                ValueReaderFactoryRegistry.bind(SchemaModelNameBinder.defaultContext()));
 
         // stating the fixed value is fine, and the bound field still gets the narrowed Integer
         TextType stated = assertInstanceOf(TextType.class,
-                compiled.get("text_type").read(TestDocuments.document("{ min_length: 3 }")));
-        assertEquals(Optional.of(3), stated.minLength());
+                compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 3 }")));
+        assertEquals(Optional.of(3L), stated.minLength());
         // omitting it injects the same thing
         TextType omitted = assertInstanceOf(TextType.class,
-                compiled.get("text_type").read(TestDocuments.document("{}")));
-        assertEquals(Optional.of(3), omitted.minLength());
+                compiled.get("unicode.text_type").read(TestDocuments.document("{}")));
+        assertEquals(Optional.of(3L), omitted.minLength());
         // and contradicting it is still caught
         ReadException thrown = assertThrows(ReadException.class,
-                () -> compiled.get("text_type").read(TestDocuments.document("{ min_length: 4 }")));
+                () -> compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 4 }")));
         assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
     }
 
     @Test
     void integerTypeCompilesAndReadsWithSizeLeftAbsent() {
-        // integer_type's own `size: integer_size?` field previously had no Class binding at all
-        // under a sealed-hierarchy scan (integer_size isn't a Top leaf) -- SchemaMetaNameBinder has
+        // integer_type's own `size: numeric.integer_size?` field previously had no Class binding at all
+        // under a sealed-hierarchy scan (numeric.integer_size isn't a Top leaf) -- SchemaModelNameBinder has
         // no such restriction (a plain Class.forName lookup), so integer_type compiles cleanly.
         //
         // `size` is left absent in the data here, deliberately -- not to route around anything, but
-        // because integer_size.signed is a primitive boolean sourced from the schema's own
+        // because numeric.integer_size.signed is a primitive boolean sourced from the schema's own
         // `boolean => !enum [true false]`, which resolves to the String "true"/"false", not a real
         // Java boolean -- an already-documented, permanent limit of generic binding (see
         // MetaKernelEndToEndTest's own "text, not a Java boolean" note), unrelated to this test.
         TsonCompiledSchema compiled = compiled();
 
-        Object result = compiled.get("integer_type").read(TestDocuments.document("{ min: -5 max: 100 }"));
+        Object result = compiled.get("numeric.integer_type").read(TestDocuments.document("{ min: -5 max: 100 }"));
 
         IntegerType integerType = assertInstanceOf(IntegerType.class, result);
         assertEquals(new IntegerType(Optional.empty(), Optional.of(BigInteger.valueOf(-5)), Optional.empty(),
@@ -193,17 +153,17 @@ class RecordBindReaderTest {
     @Test
     void theWholeRealMetaKernelSchemaCompilesCleanlyInBindMode() {
         // Every one of the real, registered entries -- including the 5 pure marker roots
-        // (atom/product/sum/top/type_argument, which resolve to real but deliberately non-record
+        // (atom/product/sum/top, which resolve to real but deliberately non-record
         // sealed interfaces) -- gets a compiled reader; TsonSchemaCompiler's own eager walk builds
         // the whole schema regardless of whether any given entry is ever actually read.
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         TsonCompiledSchema compiled = compiled();
 
         for (String name : linked.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(77, linked.schema().entries().size());
+        assertEquals(94, linked.schema().entries().size());
     }
 
     @Test
@@ -217,48 +177,50 @@ class RecordBindReaderTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", IntegerType.UNCONSTRAINED);
         entries.put("text", TextType.UNCONSTRAINED);
-        entries.put("text_member_set", ArrayBody.of(TypeRef.of("text")));
+        entries.put("unicode.text_member_set", ArrayBody.of(TypeRef.of("text")));
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
-        entries.put("text_type", ((Type) (RecordBody.of(RecordBody.fieldMap(
+        entries.put("unicode.text_type", ((Type) (RecordBody.of(RecordBody.fieldMap(
                         KernelChainFields.chainField(entries),
                         Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
-                        Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                        Map.entry("members", RecordField.optionalVoidable(TypeRef.of("unicode.text_member_set"))),
                         Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
                                 new Token("NONE",
-                                        Token.Form.UNQUOTED))))))).withSubtypes(List.of("email_type")));
+                                        Token.Form.UNQUOTED))))))).withSubtypes(List.of("net.email_type")));
         // Both bodies carry the constructor's whole resolved field shape. An abbreviated stand-in used to
         // compile and silently bind null into the components it left out; the binding check refuses it now,
         // which is the same trap CLAUDE.md records against UriType/RegexType, caught at the fixture instead.
-        entries.put("email_type", ((Type) (RecordBody.of(RecordBody.fieldMap(
+        entries.put("net.email_type", ((Type) (RecordBody.of(RecordBody.fieldMap(
                         KernelChainFields.chainField(entries),
                         Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                         Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
-                        Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                        Map.entry("members", RecordField.optionalVoidable(TypeRef.of("unicode.text_member_set"))),
                         Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
                                 new Token("NONE", Token.Form.UNQUOTED))),
                         Map.entry("spec",
-                                RecordField.optionalVoidable(TypeRef.of("text"))))))).withSupertypes(List.of("text_type")));
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
+                                RecordField.optionalVoidable(TypeRef.of("text")))))))
+                .withSupertypes(List.of("unicode.text_type")));
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));
 
         // No type-ref -- reads against text_type's own body, same as before the fix.
-        Object ownResult = compiled.get("text_type").read(TestDocuments.document("{ min_length: 3 }"));
+        Object ownResult = compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 3 }"));
         TextType textType = assertInstanceOf(TextType.class, ownResult);
         assertEquals(3, textType.minLength().orElseThrow());
 
         // An explicit !email_type value at the same text_type-typed position now dispatches to
         // email_type's own compiled reader, producing a real EmailType, not a TextType.
-        Object subtypeResult = compiled.get("text_type").read(TestDocuments.document("!email_type { min_length: 5 }"));
-        io.ltr8.tson.schema.meta.EmailType emailType =
-                assertInstanceOf(io.ltr8.tson.schema.meta.EmailType.class, subtypeResult);
+        Object subtypeResult = compiled.get("unicode.text_type")
+                .read(TestDocuments.document("!net.email_type { min_length: 5 }"));
+        io.ltr8.tson.schema.net.EmailType emailType =
+                assertInstanceOf(io.ltr8.tson.schema.net.EmailType.class, subtypeResult);
         assertEquals(5, emailType.minLength().orElseThrow());
     }
 
@@ -270,6 +232,6 @@ class RecordBindReaderTest {
         // of its own -- fails, since there's no Java object "just a top" could construct.
         TsonCompiledSchema compiled = compiled();
 
-        assertThrows(ReadException.class, () -> compiled.get("top").read(TestDocuments.document("{}")));
+        assertThrows(ReadException.class, () -> compiled.get("meta.top").read(TestDocuments.document("{}")));
     }
 }

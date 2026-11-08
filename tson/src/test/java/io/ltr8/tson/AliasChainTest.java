@@ -1,0 +1,128 @@
+package io.ltr8.tson;
+import io.ltr8.tson.base.ProcessorConfig;
+
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.Alias;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * [TSON-SCHEMA] §8.3: an alias is a hop, not a rewrite.
+ *
+ * <p>Resolved output states the chain as the author wrote it. A type position naming an {@code ALIAS}
+ * entry keeps that name, no annotation records where it "really" points, and the chain stays walkable end to
+ * end — which it had to anyway, since {@code alias.target} was never flattened and the entries never
+ * left the namespace.
+ *
+ * <p><b>A processor collapses the chain when it compiles readers</b> — after linking, once per entry, where
+ * the whole namespace is present ({@code TsonSchemaCompiler}). That is an implementation's choice of moment,
+ * not a property of resolved output: the walk happened either way, and rewriting the output as well left two
+ * representations to keep in step and a summary ({@code @alias}) that dropped the intermediate hops. §8.3
+ * states both halves: a processor MAY collapse after linking, when it compiles for reading, and MUST NOT
+ * collapse in resolved output.
+ */
+class AliasChainTest {
+
+    private static Tson tson() {
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaModelNameBinder.defaultContext()));
+    }
+
+    private static TypeRef fieldType(Top definition, String field) {
+        return assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
+                .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
+                .typeRef();
+    }
+
+    private static Top kernelEntry(String name) {
+        return tson().bindRegistry().core()
+                .resolveLinked(TsonBundledSchemas.META_ID).schema().entries().get(name);
+    }
+
+    /** The kernel's own case: {@code meta.template_param.name} is declared {@code meta.param_name} and stays it. */
+    @Test
+    void aKernelAliasAtAFieldTypeNamesWhatWasWritten() {
+        TypeRef name = fieldType(kernelEntry("meta.template_param"), "name");
+        assertEquals("meta.param_name", name.name());
+        assertTrue(name.annotations().isEmpty(), "nothing is attached to record where it points");
+    }
+
+    /** A position naming something that is not an alias is unaffected, as it always was. */
+    @Test
+    void aNonAliasIsUnaffected() {
+        assertEquals("meta.field_type_ref", fieldType(kernelEntry("meta.record_field"), "type").name());
+    }
+
+    private static final String CHAIN = """
+              a => !text ^ { max_length: 3 }
+              b => a
+              holder => { f: b }""";
+
+    private static Top resolve(String body, String entry) {
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaModelNameBinder.defaultContext()))
+                .resolve(schema(body)).schema().entries().get(entry);
+    }
+
+    private static List<Diagnostic> validate(String document) {
+        Tson tson = Tson.standard();
+        tson.resolve(schema(CHAIN));
+        return tson.validate("!!import:\"https://example.test/chain.tn\"\n" + document);
+    }
+
+    private static String schema(String body) {
+        return """
+                !!id:"https://example.test/chain.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema { %s }
+                """.formatted(body);
+    }
+
+    /** Every hop is stated: the use site names {@code b}, {@code b} names {@code a}, {@code a} is the type. */
+    @Test
+    void aChainIsStatedAsWritten() {
+        assertEquals("b", fieldType(resolve(CHAIN, "holder"), "f").name());
+        assertEquals(TypeRef.of("a"), assertInstanceOf(Alias.class,
+                resolve(CHAIN, "b")).target());
+        assertInstanceOf(io.ltr8.tson.schema.unicode.TextType.class, resolve(CHAIN, "a"));
+    }
+
+    /** An argument list is no different -- a lifted synthetic's element type names what was written too. */
+    @Test
+    void aNestedArgumentNamesWhatWasWritten() {
+        Top holder = resolve("  a => text\n  holder => { f: [a] }", "holder");
+        Top injected = resolve("  a => text\n  holder => { f: [a] }",
+                fieldType(holder, "f").name());
+        assertEquals("a", assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
+                injected).elementType().name());
+    }
+
+    /**
+     * The behavioural half, and the reason none of the above costs anything: a read still reaches the end of
+     * the chain, because the reader for an {@code ALIAS} entry <em>is</em> its target's reader. The
+     * constraint at the end of the chain applies at a position two hops in front of it.
+     */
+    @Test
+    void aReadStillReachesTheEndOfTheChain() {
+        List<Diagnostic> ok = validate("!holder { f: abc }");
+        assertTrue(ok.isEmpty(), ok.toString());
+        assertEquals(1, validate("!holder { f: abcd }").size());
+    }
+
+    /**
+     * And it is named for the hop the author wrote, not the type at the end. The chain here ends in
+     * {@code text}, which the author never mentions at this position.
+     */
+    @Test
+    void aDiagnosticNamesTheHopTheAuthorWrote() {
+        Diagnostic problem = validate("!holder { f: abcd }").getFirst();
+        assertTrue(problem.message().contains("'b'"), problem.message());
+    }
+}

@@ -8,9 +8,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SequencedMap;
+import java.util.function.Function;
 
 /**
- * The fields a SEALED family dispatches on, resolved from the base's {@code discriminators} list -- one
+ * The fields a member-dispatched family dispatches on, resolved from the base's {@code discriminators} list -- one
  * derivation both encodings read, so a schema-load check and a read can never disagree about what selects a
  * member.
  *
@@ -19,9 +20,9 @@ import java.util.SequencedMap;
  * <em>type</em> as well: a pin is a bare token (§12.1) and only the type says which parser reads it. So the
  * names are resolved back to the base's own fields here.
  *
- * <p><b>Every base declares them itself, a family base included.</b> Its selector field names none of its
- * parameters ({@code DefinitionResolver} refuses one that does), and an open record's field types that name no
- * parameter are closed in place ({@code MetaRefs}), so a family base's selector types are the entries its
+ * <p><b>Every base declares them itself, a family base included.</b> A record template's selector field is typed by
+ * none of its parameters ({@code DefinitionResolver} refuses one that is), and a template's field types that name
+ * no parameter are closed in place ({@code MetaRefs}), so a family base's selector types are the entries its
  * members' selectors name. A family with no declared member has a table like any other, with nothing in it to
  * select.
  */
@@ -35,7 +36,12 @@ public final class FamilySelectors {
      * discriminators} states -- which is the order their pins are compared as a tuple.
      */
     public static SequencedMap<String, RecordField> of(Top definition) {
-        return definition instanceof RecordBody record ? declared(record) : Collections.emptyNavigableMap();
+        return switch (definition) {
+            case RecordBody record -> declared(record.discriminators(), record.fields(), Optional::of);
+            case RecordTemplateBody template -> declared(template.discriminators(), template.fields(),
+                    field -> selector(field, template.parameterNames()));
+            case null, default -> Collections.emptyNavigableMap();
+        };
     }
 
     /**
@@ -50,19 +56,17 @@ public final class FamilySelectors {
 
     /** The {@code extension} a base states, whichever kind of body holds it. */
     public static Optional<RecordExtensionType> extensionOf(Top definition) {
-        if (OpenEntry.isOpen(definition)) {
-            // A family base is ABSTRACT by construction (§5.10); any other open entry is no type at all.
-            return OpenEntry.isFamilyBase(definition) ? Optional.of(RecordExtensionType.ABSTRACT) : Optional.empty();
-        }
-        return definition instanceof RecordBody record ? Optional.of(record.extension()) : Optional.empty();
+        return switch (definition) {
+            case RecordBody record -> Optional.of(record.extension());
+            // A family base is ABSTRACT by construction (§5.10), whatever its applications are.
+            case RecordTemplateBody ignored -> Optional.of(RecordExtensionType.ABSTRACT);
+            case null, default -> Optional.empty();
+        };
     }
 
     /** The names a base states, whatever kind of base it is -- empty where it dispatches by tag or not at all. */
     public static List<String> namesOf(Top definition) {
-        return switch (definition) {
-            case RecordBody record -> record.discriminators();
-            default -> List.of();
-        };
+        return RecordHead.of(definition).map(RecordHead::discriminators).orElse(List.of());
     }
 
     /**
@@ -70,31 +74,36 @@ public final class FamilySelectors {
      * linker reports that as the author's error, and a reader built over a schema that failed to load is not a
      * case this has to serve.
      */
-    private static SequencedMap<String, RecordField> declared(RecordBody record) {
+    private static <F> SequencedMap<String, RecordField> declared(List<String> discriminators,
+            Map<String, F> fields, Function<F, Optional<RecordField>> asSelector) {
         SequencedMap<String, RecordField> selectors = new LinkedHashMap<>();
-        for (String name : record.discriminators()) {
-            field(record, name).ifPresent(found -> selectors.put(found.getKey(),
-                    OpenEntry.isFamilyBase(record) ? selector(found.getValue()) : found.getValue()));
+        for (String name : discriminators) {
+            field(fields, name).ifPresent(found -> asSelector.apply(found.getValue())
+                    .ifPresent(selector -> selectors.put(found.getKey(), selector)));
         }
         return Collections.unmodifiableSequencedMap(selectors);
     }
 
     /**
      * A family base's selector as dispatch reads it: its type and annotations, required and unpinned. The
-     * base's own field is pinned to a parameter (§5.7), which is what each member supplies and what the
-     * dispatch compares, and is no value to read.
+     * template's own field is pinned to a parameter (§5.7), which is what each member supplies and what the
+     * dispatch compares, and is no value to read. A selector typed by a parameter yields nothing, the resolver
+     * having refused it.
      */
-    private static RecordField selector(RecordField field) {
-        return new RecordField(field.type(), false, false, FieldRole.FREE, Optional.empty(), field.annotations(),
-                Optional.empty());
+    private static Optional<RecordField> selector(RecordTemplateField field, List<String> parameters) {
+        if (field.parameterInType(parameters).isPresent()) {
+            return Optional.empty();
+        }
+        return Optional.of(new RecordField(field.type().orElseThrow(), false, false, FieldRole.FREE,
+                Optional.empty(), field.annotations(), Optional.empty()));
     }
 
     /**
      * One field by name with its declared spelling, compared as §2.5 compares a field name -- NFC-normalised,
      * never by spelling.
      */
-    private static Optional<Map.Entry<String, RecordField>> field(RecordBody record, String name) {
+    private static <F> Optional<Map.Entry<String, F>> field(Map<String, F> fields, String name) {
         String wanted = Nfc.of(name);
-        return record.fields().entrySet().stream().filter(f -> Nfc.of(f.getKey()).equals(wanted)).findFirst();
+        return fields.entrySet().stream().filter(f -> Nfc.of(f.getKey()).equals(wanted)).findFirst();
     }
 }

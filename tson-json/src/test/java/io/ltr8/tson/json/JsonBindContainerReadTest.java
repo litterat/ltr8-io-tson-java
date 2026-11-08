@@ -45,9 +45,9 @@ class JsonBindContainerReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/bind-containers-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               address => { street: text  city: text }
               names   => [text]
               bag     => {
@@ -70,7 +70,7 @@ class JsonBindContainerReadTest {
                 byPoint:  {point => text}
               }
               sorted => { tags: set<text> }
-              ranked => !map { key_type: text  value_type: int32  ordered: true }
+              ranked => !meta.map { key_type: text  value_type: int32  ordered: true }
               league => { table: ranked }
             }
             """;

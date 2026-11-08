@@ -4,6 +4,8 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -27,6 +29,13 @@ import java.util.Objects;
  * schema exactly once, at the end of the walk. Binding <b>replaces</b> the delegate rather than adding to
  * it, which is the point: the compilation becomes unreachable the moment the schema exists, and what every
  * reader retains from then on is one reference to an immutable map.
+ *
+ * <p><b>It also says when every reader exists.</b> A reader that holds a value written in the schema -- a record
+ * field's default or pin -- decodes it through the field's reader, and that reader may still be under
+ * construction when the record is built (a {@link DeferredTypeReader} for an entry on the build stack). So a
+ * reader hands that work to {@link #afterEveryReader} rather than doing it while it is built, and {@link #settle}
+ * runs it once the walk has built every entry, before the schema is handed out ([TSON-SCHEMA] §5.2; a held value
+ * orders nothing). Building a reader resolves the readers of its parts and reads through none of them.
  */
 public final class CompiledReaders implements TsonTypeReaderResolver {
 
@@ -37,6 +46,12 @@ public final class CompiledReaders implements TsonTypeReaderResolver {
      * TsonCompiledSchema} the bound delegate closes over, not for correctness of the switch itself.
      */
     private volatile TsonTypeReaderResolver delegate;
+
+    /**
+     * The work readers handed to {@link #afterEveryReader} while the walk runs, in the order they were built;
+     * {@code null} once {@link #settle} has run, after which such work runs at once.
+     */
+    private volatile List<Runnable> waiting = new ArrayList<>();
 
     /** Starts out resolving through {@code whileCompiling} -- the compilation's own recursive, cycle-aware build. */
     public CompiledReaders(TsonTypeReaderResolver whileCompiling) {
@@ -49,12 +64,47 @@ public final class CompiledReaders implements TsonTypeReaderResolver {
     }
 
     /**
+     * Runs {@code work} once every reader of the compilation exists: queued while the walk runs, at once after
+     * {@link #settle}, and at once wherever {@code readers} is not a compilation's handle, since a reader built
+     * against a plain resolver is built against readers that already exist.
+     */
+    static void afterEveryReader(TsonTypeReaderResolver readers, Runnable work) {
+        if (readers instanceof CompiledReaders compiled) {
+            List<Runnable> queued = compiled.waiting;
+            if (queued != null) {
+                queued.add(work);
+                return;
+            }
+        }
+        work.run();
+    }
+
+    /**
+     * Runs the work readers deferred to {@link #afterEveryReader}, once, after the walk has built every entry. A
+     * failure propagates and fails the compile: it is a held value no reader can decode, which nothing after the
+     * load could repair.
+     */
+    public void settle() {
+        List<Runnable> queued = waiting;
+        if (queued == null) {
+            throw new IllegalStateException("this CompiledReaders has already settled its held values");
+        }
+        waiting = null;
+        queued.forEach(Runnable::run);
+    }
+
+    /**
      * Switches resolution over to the finished schema, releasing the compilation. Called once, by {@code
      * TsonSchemaCompiler}, as the last step of a compile -- a second call is a programming error, since two
      * different schemas answering for one set of readers would be silently wrong rather than obviously so.
+     * Settles first where {@link #settle} has not run, so no reader reaches the finished schema holding a value
+     * it has not decoded.
      */
     public void bind(TsonCompiledSchema compiled) {
         Objects.requireNonNull(compiled, "compiled");
+        if (waiting != null) {
+            settle();
+        }
         if (!(delegate instanceof CompiledSchemaResolver)) {
             delegate = new CompiledSchemaResolver(compiled);
             return;

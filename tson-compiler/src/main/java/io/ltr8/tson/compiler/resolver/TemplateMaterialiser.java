@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
@@ -10,12 +11,17 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -24,6 +30,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.SiblingRef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -48,25 +55,25 @@ import java.util.function.Supplier;
  * entry it produces is named from what the closing produced. Doing it over the AST instead would reuse {@code
  * SchemaDesugarer}'s injection machinery and put type-level work back into a phase that is purely syntactic.
  *
- * <p><b>A held body closes by one process, whatever wrote it.</b> {@code <T> [T]} and {@code <T> { x: T }}
- * are both an application with a parameter standing in a slot -- {@code !array { element_type: T }} and
- * {@code !record { fields: [ { name: x  type: T } ] }} -- so both substitute by the same walk and are read
- * back through their own constructor's reader. See {@link #closeHeld}. <b>An application nothing declares is
- * its expansion</b> (§5.10): the closure is a closed <em>synthetic</em> named for its binding record, a record
+ * <p><b>A record template closes on the model; a held body by text.</b> {@code <T> { x: T }} is a {@code
+ * record_template} whose field labels {@code T}, so applying it substitutes the argument into that field and the
+ * result is a record with nothing to read back ({@link #closeRecordTemplate}). {@code <T> [T]} is held text,
+ * {@code !meta.array { element_type: T }}, whose parameter may stand anywhere a token stands, so it substitutes by
+ * the token walk and is read back through its constructor's reader ({@link #closeHeld}). <b>An application nothing
+ * declares is its expansion</b> (§5.10): the closure is a closed <em>synthetic</em> named for its binding record, a record
  * ({@link #mintedRecord}) like any other form ({@link #closeHeldTemplate}), so two applications closing to one
  * form are one entry. A declaration naming an application is that entry under its own name ({@link
  * #closeApplicationInto}).
  *
  * <p><b>An alias closes by a third path and mints nothing.</b> §5.10's partial application,
- * {@code uuid_pair => <B> pair<uuid, B>}, holds {@code !reference { target: pair<uuid, B> }} like any other
+ * {@code uuid_pair => <B> pair<uuid, B>}, holds {@code !meta.alias { target: pair<uuid, B> }} like any other
  * open entry, but it <em>is</em> the application it names with some arguments still open -- so closing it
  * composes the two argument lists and hands back what that denotes, minting no entry of its own (§5.10: "no
  * intermediate entry per alias hop"). See {@link #closeHeldAlias}.
  *
- * <p><b>So the three cases are told apart by the constructor head, not by the kernel shape.</b> Every open
- * entry has a {@link HeldBody} -- a record template's tree written from the open record, a sugar form's lift,
- * an alias, and an error placeholder alike. {@code reference} closes to a name, everything else to a
- * synthetic.
+ * <p><b>So the three cases are told apart by the template's shape, then by the held head.</b> A record template
+ * (an error placeholder for an open declaration included) closes to a record; a held body headed {@code alias}
+ * closes to a name, and every other held body to a synthetic.
  *
  * <p><b>Knot-tying, and the one instantiation entry.</b> The memo entry is registered <em>before</em> the body
  * is substituted, under a name derived from the application ({@link DerivedName#ofApplication}), so a
@@ -74,7 +81,7 @@ import java.util.function.Supplier;
  * {@code tree<text>} once {@code T} is bound) finds the entry under construction and references it by name
  * rather than recursing forever. Such an expansion names itself, so its content cannot be written without a
  * name: it keeps the instantiation entry the knot was tied on, keyed on the application and recording it
- * ({@code @application}, §8.2) -- the record itself, or a reference to the synthetic for any other form.
+ * ({@code @meta.application}, §8.2) -- the record itself, or a reference to the synthetic for any other form.
  */
 final class TemplateMaterialiser {
 
@@ -88,13 +95,13 @@ final class TemplateMaterialiser {
     private final DefinitionGetter namespace;
 
 
-    /** The constructor a record template's tree applies. */
-    private static final String RECORD = "record";
+    /** The constructor a record template's members are built with. */
+    private static final String RECORD = KernelNames.of("record");
 
     /** The constructor a held alias carries -- §5.10's partial application, which mints no entry. */
-    private static final String REFERENCE = "reference";
+    private static final String ALIAS = KernelNames.of("alias");
 
-    /** {@code reference}'s own member, the one an alias closes through. */
+    /** {@code alias}'s own member, the one an alias closes through. */
     private static final String TARGET = "target";
 
     /** The entries produced, keyed by their derived internal name, in creation order. */
@@ -116,8 +123,8 @@ final class TemplateMaterialiser {
     /** The constructor an entry's value applies, through the schema's facts and then its own class. */
     private final Function<String, Optional<String>> localConstructors;
 
-    /** The same, of an entry of the governing meta. */
-    private final Function<String, Optional<String>> metaConstructors;
+    /** The same, of an imported entry. */
+    private final Function<String, Optional<String>> importedConstructors;
 
     /** §8.2's freshness MUST over the names this class mints -- see {@link MintedNames}. */
     private final MintedNames minted = new MintedNames();
@@ -127,7 +134,7 @@ final class TemplateMaterialiser {
      * closed forms {@link #closeHeldTemplate} mints, which are indistinguishable from the entry a
      * directly-written {@code [pixel; 1920]} lifts to and are the same entry when both appear (§8.2).
      *
-     * <p>§8.2 marks only these: an instantiation entry carries no {@code @synthetic}, it being the closure of
+     * <p>§8.2 marks only these: an instantiation entry carries no {@code @meta.synthetic}, it being the closure of
      * an application where a synthetic is a constructor's instance. The caller reads this set to put the
      * marker on the right keys.
      */
@@ -175,10 +182,25 @@ final class TemplateMaterialiser {
 
     /**
      * The same, keyed on §8.2's canonical application, for the applications no entry records: a minted
-     * expansion carries no {@code @application}, so the applied-parent fold reads the edge {@code & box<int32>}
+     * expansion carries no {@code @meta.application}, so the applied-parent fold reads the edge {@code & box<int32>}
      * reaches from here ({@link #expansionsByApplication}).
      */
     private final Map<String, String> expansionsByApplication = new LinkedHashMap<>();
+
+    /**
+     * Every application this pass closed, as it was met and with its arguments closed, to the entry it closed to --
+     * an expansion's included, which records no {@code @meta.application}. Held beside the entries, never written: it is
+     * what lets a data read resolve an application to the entry by structural identity ({@link
+     * #closedApplications}).
+     */
+    private final Map<TypeRef, String> closedApplications = new LinkedHashMap<>();
+
+    /**
+     * Each instantiation entry's application as it was written, its nested arguments unreduced ({@code foo<bar<text>>}
+     * where {@link #applications} holds {@code foo<bar_text_…>}): what {@code @meta.application} states on the entry's key,
+     * so a reader and a message see the reference the author wrote.
+     */
+    private final Map<String, TypeRef> writtenApplications = new LinkedHashMap<>();
 
     /**
      * The applications whose closing reached themselves -- the knot tied on the application-derived name while
@@ -219,11 +241,11 @@ final class TemplateMaterialiser {
 
     /**
      * How a closed held body becomes an ordinary constructor body -- the constructor's own
-     * compiled reader, the same one a written {@code !array { ... }} binds through. Using it is what makes
+     * compiled reader, the same one a written {@code !meta.array { ... }} binds through. Using it is what makes
      * {@code min_items: "two"} an ordinary read error rather than a check this class would have to grow: the
      * bindings a template defers are exactly the ones a closed instance has always had checked for it.
      */
-    private final DefinitionMetaReader metaReader;
+    private final ConstructionReader constructionReader;
 
     /**
      * The entry names desugaring generated rather than the author writing them.
@@ -251,11 +273,11 @@ final class TemplateMaterialiser {
      */
     private final Map<String, Map<String, ParameterTypes.Kind>> kindsOnDemand = new LinkedHashMap<>();
 
-    /** Whether a name is the meta-kernel's own, for telling a constructor from a family member. */
+    /** Whether a name is the kernel's own, for telling a constructor from a family member. */
     private final Predicate<String> kernel;
 
-    /** The governing meta's entries, which is where a slot's declared type is read from. */
-    private final Function<String, Top> metaTypes;
+    /** The imported entries, where a constructor and the type its slot declares are read from. */
+    private final Function<String, Top> importedTypes;
 
     /** The local declaration resolution is inside, or {@code null} -- who an early check answers to. */
     private final Supplier<String> resolving;
@@ -275,21 +297,22 @@ final class TemplateMaterialiser {
     }
 
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, Top> publish,
-            DefinitionMetaReader metaReader, Set<String> generated,
-            Function<String, Top> metaTypes, Supplier<String> resolving,
-            Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
-            Function<String, Optional<String>> localConstructors, Function<String, Optional<String>> metaConstructors,
-            Predicate<String> kernel) {
+                         ConstructionReader constructionReader, Set<String> generated,
+                         Function<String, Top> importedTypes, Supplier<String> resolving,
+                         Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
+                         Function<String, Optional<String>> localConstructors,
+                         Function<String, Optional<String>> importedConstructors,
+                         Predicate<String> kernel) {
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.applications = Objects.requireNonNull(applications, "applications");
         this.localConstructors = Objects.requireNonNull(localConstructors, "localConstructors");
-        this.metaConstructors = Objects.requireNonNull(metaConstructors, "metaConstructors");
+        this.importedConstructors = Objects.requireNonNull(importedConstructors, "importedConstructors");
         this.publish = Objects.requireNonNull(publish, "publish");
-        this.metaReader = Objects.requireNonNull(metaReader, "metaReader");
+        this.constructionReader = Objects.requireNonNull(constructionReader, "constructionReader");
         this.generated = Objects.requireNonNull(generated, "generated");
-        this.metaTypes = Objects.requireNonNull(metaTypes, "metaTypes");
+        this.importedTypes = Objects.requireNonNull(importedTypes, "importedTypes");
         this.resolving = Objects.requireNonNull(resolving, "resolving");
     }
 
@@ -353,7 +376,7 @@ final class TemplateMaterialiser {
 
     /**
      * The subset of what {@link #materialise} returned that is a synthetic entry, whose key carries the
-     * derived {@code @synthetic} marker (§8.2). Everything else it returned is an instantiation entry, which
+     * derived {@code @meta.synthetic} marker (§8.2). Everything else it returned is an instantiation entry, which
      * deliberately carries none.
      */
     Set<String> syntheticNames() {
@@ -383,13 +406,13 @@ final class TemplateMaterialiser {
      * claimed in {@link #minted}, whose ledger is §8.2's freshness MUST over <em>internal</em> names.
      *
      * <p>Every shape but two closes here. A <b>record</b> template's closure is a record, so {@link
-     * #closeHeldRecord} answers directly. Every other held form -- an open instance such as {@code arr
-     * => <T> !array { element_type: T }} -- substitutes to a construction the declaration simply <em>is</em>,
+     * #closeRecordTemplate} answers directly. Every other held form -- an open instance such as {@code arr
+     * => <T> !meta.array { element_type: T }} -- substitutes to a construction the declaration simply <em>is</em>,
      * with no synthetic standing between them. §5.10's partial application
      * and an unresolvable or mis-applied head return {@code null} for the caller to handle.
      */
     Top closeApplicationInto(String declaredName, TypeRef application) {
-        String head = application.name();
+        String head = templateHead(application.name());
         Top template = namespace.definition(head);
         if (!OpenEntry.isOpen(template)) {
             return null; // unresolved, or a head taking no parameters -- reported through the ordinary path
@@ -398,13 +421,13 @@ final class TemplateMaterialiser {
         if (parameters.isEmpty() || parameters.size() != application.arguments().size()) {
             return null; // arity is `instantiate`'s to report, in its own words
         }
-        HeldBody open = HeldBody.of(template);
-        String constructor = open.application().typeRef().orElseThrow();
-        if (REFERENCE.equals(constructor)) {
+        HeldBody open = template instanceof TemplateBody held ? HeldBody.of(held) : null;
+        String constructor = open == null ? RECORD : open.application().typeRef().orElseThrow();
+        if (ALIAS.equals(constructor)) {
             return null; // §5.10: an alias hop mints no entry, so there is none for a declaration to own
         }
         // §8.2 keys an instantiation on the *canonical* application -- "arguments compared after following
-        // reference chains" -- so an argument naming a pure rename is replaced by the entry at the end of it
+        // alias chains" -- so an argument naming a pure rename is replaced by the entry at the end of it
         // before anything is derived from the list. `close` does this for a minted entry; without it here,
         // `by_alias => box<user_id>` and `by_target => box<uuid>` would record two applications for one type,
         // and the name, the ownership key and the recorded application would each disagree with the minted path.
@@ -421,9 +444,12 @@ final class TemplateMaterialiser {
         try {
             Map<String, TypeArgument> bindings = bind(parameters, arguments);
             note(declaredName, constructor);
-            Top closed = RECORD.equals(constructor) ? closeHeldRecord(head, template, open, bindings)
+            Top closed = template instanceof RecordTemplateBody record
+                    ? closeRecordTemplate(head, record, bindings)
                     : closeHeld(head, template, open, bindings).body();
-            return instantiation(declaredName, closed, new TypeRef(head, arguments));
+            closedApplications.putIfAbsent(plain(application), declaredName);
+            closedApplications.putIfAbsent(TypeRef.of(head, arguments), declaredName);
+            return instantiation(declaredName, closed, TypeRef.of(head, arguments), application);
         } finally {
             heads.remove(heads.size() - 1);
         }
@@ -437,7 +463,7 @@ final class TemplateMaterialiser {
      * bare head. The list is the evidence the author supplied arguments, and the linker reports on what it is
      * handed: a head stripped of its arguments is found as a bare name and then faulted for supplying no
      * arguments, which is the opposite of what the author wrote. Keeping them lets the honest verdict through:
-     * a name the type-name namespace does not hold is an unresolved reference, applied or not.
+     * a name the schema's namespace does not hold is an unresolved reference, applied or not.
      */
     private TypeRef close(TypeRef ref) {
         if (ref.arguments().isEmpty()) {
@@ -449,8 +475,24 @@ final class TemplateMaterialiser {
                     ? new TypeArgument.Ref(dereferenced(close(nested.ref())))
                     : argument);
         }
-        String entry = instantiate(ref.name(), arguments);
-        return entry == null ? new TypeRef(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
+        String entry = instantiate(templateHead(ref.name()), arguments, ref);
+        // A generated head's application is an open synthetic closing its own intermediate form: nobody wrote it.
+        if (entry != null && !generated.contains(ref.name())) {
+            closedApplications.putIfAbsent(plain(ref), entry);
+            closedApplications.putIfAbsent(TypeRef.of(ref.name(), arguments), entry);
+        }
+        return entry == null ? TypeRef.of(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
+    }
+
+    /**
+     * The template an application's head names: the head itself, or, where it is an alias of a template ({@code
+     * ref_of => ref}), the template at the end of its alias chain, the alias being the same entry under
+     * another name ([TSON-SCHEMA] §8.3). Identity is the template's, so {@code ref_of<order>} and {@code
+     * meta.ref<order>} close to one entry.
+     */
+    private String templateHead(String head) {
+        String terminal = AliasChain.terminal(head, namespace::definition);
+        return !terminal.equals(head) && OpenEntry.isOpen(namespace.definition(terminal)) ? terminal : head;
     }
 
     /**
@@ -459,14 +501,14 @@ final class TemplateMaterialiser {
      *
      * <p><b>Because a reference is a pure rename, and an application of one denotes the same type.</b>
      * {@code user_id => uuid} makes {@code user_id} and {@code uuid} interchangeable at every position (§7.2
-     * compares "after reference flattening of both"), so {@code box<user_id>} and {@code box<uuid>} are one
+     * compares "after alias flattening of both"), so {@code box<user_id>} and {@code box<uuid>} are one
      * type and must be one entry. Without this they were two, which left the model saying the arguments were
      * the same type while the applications were not -- interchangeable at a scalar position and refused one
      * layer of application up.
      *
      * <p><b>An author who wants two boxes told apart has two spellings that say so</b>, and this is what
      * makes them mean something: {@code user_id => !uuid ^ {}} is a refinement, IS-A {@code uuid} and not its
-     * siblings, and {@code user_id => !uuid_type {}} is a fresh type related to neither. Both are ordinary
+     * siblings, and {@code user_id => !net.uuid_type {}} is a fresh type related to neither. Both are ordinary
      * entries rather than references, so neither is dereferenced here.
      *
      * <p><b>What this normalises is identity, not provenance.</b> The minted entry is keyed on the canonical
@@ -482,8 +524,8 @@ final class TemplateMaterialiser {
         if (!ref.arguments().isEmpty()) {
             return ref; // an application, already closed above to the entry it denotes
         }
-        String terminal = ReferenceChain.terminal(ref.name(), namespace::definition);
-        return terminal.equals(ref.name()) ? ref : new TypeRef(terminal, ref.arguments(), ref.annotations());
+        String terminal = AliasChain.terminal(ref.name(), namespace::definition);
+        return terminal.equals(ref.name()) ? ref : TypeRef.of(terminal, ref.arguments(), ref.annotations());
     }
 
     /**
@@ -491,7 +533,7 @@ final class TemplateMaterialiser {
      * when the head names nothing in scope -- that is {@code TsonSchemaLinker}'s verdict to give as an
      * unresolved reference, not this pass's to guess at.
      */
-    private String instantiate(String head, List<TypeArgument> arguments) {
+    private String instantiate(String head, List<TypeArgument> arguments, TypeRef written) {
         Top template = namespace.definition(head);
         if (template == null) {
             return null; // unresolved head -- the linker's verdict, not this pass's
@@ -521,9 +563,9 @@ final class TemplateMaterialiser {
             return expansion;
         }
         if (aliasClosing.contains(name)) {
-            throw new SchemaValidationException("'" + head + "<...>' is a reference template whose own "
+            throw new SchemaValidationException("'" + head + "<...>' is an alias template whose own "
                     + "body applies it again, so composing it never reaches a type with a body (§5.10). The "
-                    + "chain begins " + chain() + ". A reference template must eventually name a declared "
+                    + "chain begins " + chain() + ". An alias template must eventually name a declared "
                     + "type; recursion belongs in a record, tuple or choice body, where a field can carry it");
         }
         if (materialised.containsKey(name) || !closing.add(name)) {
@@ -558,26 +600,26 @@ final class TemplateMaterialiser {
             // than making one, and why it is the head that tells the three cases apart rather than the body.
             // The held body is parsed once here and reused by all three branches: this is the only place a
             // closure needs the tree, and the parse is thrown away with it.
-            if (OpenEntry.isOpen(template)) {
-                HeldBody open = HeldBody.of(template);
+            // A record template's closure is a record, named for its content like every other closed form
+            // unless it names its own application -- see closeRecordTemplate and mintedRecord.
+            if (template instanceof RecordTemplateBody record) {
+                RecordBody closed = closeRecordTemplate(head, record, bind(parameters, arguments));
+                refuseMintedMember(head, arguments, closed);
+                if (!tied.contains(name)) {
+                    return mintedRecord(name, DerivedName.canonicalApplication(head, arguments), closed);
+                }
+                note(name, RECORD);
+                Top instantiation = instantiation(name, closed, TypeRef.of(head, arguments), written);
+                materialised.put(name, instantiation);
+                publish.accept(name, instantiation);
+                return name;
+            }
+            if (template instanceof TemplateBody held) {
+                HeldBody open = HeldBody.of(held);
                 String constructor = open.application().typeRef().orElseThrow();
-                if (REFERENCE.equals(constructor)) {
+                if (ALIAS.equals(constructor)) {
                     aliasClosing.add(name);
                     return closeHeldAlias(head, template, open, bind(parameters, arguments));
-                }
-                // A record template's closure is a record, named for its content like every other closed form
-                // unless it names its own application -- see closeHeldRecord and mintedRecord.
-                if (RECORD.equals(constructor)) {
-                    Top closed = closeHeldRecord(head, template, open, bind(parameters, arguments));
-                    refuseMintedMember(head, arguments, closed);
-                    if (!tied.contains(name)) {
-                        return mintedRecord(name, DerivedName.canonicalApplication(head, arguments), closed);
-                    }
-                    note(name, RECORD);
-                    Top instantiation = instantiation(name, closed, new TypeRef(head, arguments));
-                    materialised.put(name, instantiation);
-                    publish.accept(name, instantiation);
-                    return name;
                 }
                 String formName = closeHeldTemplate(head, template, open, bind(parameters, arguments));
                 if (generated.contains(head)) {
@@ -592,20 +634,18 @@ final class TemplateMaterialiser {
                 }
                 // The expansion names this application, so it is named by the application: a reference to
                 // the synthetic, which the compiler collapses, so it costs nothing at read time.
-                Top alias = new Reference(TypeRef.of(formName));
-                note(name, REFERENCE);
-                alias = instantiation(name, alias, new TypeRef(head, arguments));
+                Top alias = new Alias(TypeRef.of(formName));
+                note(name, ALIAS);
+                alias = instantiation(name, alias, TypeRef.of(head, arguments), written);
                 materialised.put(name, alias);
                 publish.accept(name, alias);
                 return name;
             }
-            // Every open entry has a held tree (OpenEntry, HeldBody.of) -- a record template, a sugar form's
-            // lift, an alias, and an error placeholder alike. The three branches above are the whole of
-            // §12.1's open form, told apart by the head they carry rather than by which kernel shape holds the
-            // entry. So this is a broken invariant, not an author error and not a gap.
+            // An open entry is a record template or a held body (OpenEntry), so this is a broken invariant, not an
+            // author error and not a gap.
             throw new IllegalStateException("'" + head + "' declares type parameters but its body is a "
-                    + template.getClass().getSimpleName() + " -- every open entry has a held tree, and "
-                    + "nothing else can be substituted into");
+                    + template.getClass().getSimpleName() + " -- every open entry is a record template or a "
+                    + "held body, and nothing else can be substituted into");
         } finally {
             closing.remove(name);
             aliasClosing.remove(name);
@@ -621,7 +661,7 @@ final class TemplateMaterialiser {
      */
     private String mintedRecord(String name, String canonical, Top closed) {
         List<RecordValue.Field> fields = closed instanceof RecordBody record
-                && WireForm.heldRecord(record, HeldBody::annotationValue).coreValue() instanceof RecordValue wire
+                && WireForm.recordWire(record, HeldBody::annotationValue).coreValue() instanceof RecordValue wire
                 ? wire.fields() : List.of();
         String formName = DerivedName.ofBinding(RECORD, fields);
         minted.claim(formName, DerivedName.canonicalBinding(RECORD, fields));
@@ -705,7 +745,7 @@ final class TemplateMaterialiser {
      * (§8.2), so {@code [text]} written directly and {@code [T]} closed to {@code text} are one entry. An
      * application nothing declares is that expansion, and the use site names the synthetic. The one exception
      * is an expansion that names its own application -- {@code nested => <T> ( T | [nested<T>] )} -- whose
-     * content cannot be written without a name: {@link #instantiate} then keeps a reference entry under the
+     * content cannot be written without a name: {@link #instantiate} then keeps an alias entry under the
      * application-derived name, which the knot was tied on.
      */
     private String closeHeldTemplate(String head, Top template, HeldBody open,
@@ -753,35 +793,41 @@ final class TemplateMaterialiser {
         CoreValue target = closed instanceof RecordValue record ? WireForm.field(record, TARGET).orElse(null) : null;
         if (!(target instanceof TokenValue token)) {
             throw new IllegalStateException("'" + head + "<...>' is an alias whose target did not close to a "
-                    + "name: " + target + " -- SchemaDesugarer writes `!reference { target: <type_ref> }` and "
+                    + "name: " + target + " -- SchemaDesugarer writes `!alias { target: <reference> }` and "
                     + "closeApplications reduces an application there to the entry it denotes");
         }
         return token.text();
     }
 
     /**
-     * A <b>record</b> template's closure: the record body itself, which a declaration owns under its name and
-     * which {@link #mintedRecord} names for its content where nothing declares it.
+     * A record template applied: its fields and parents substituted on the model ({@link
+     * RecordTemplateSubstitution}), each field closed to a {@link RecordField} with the applications in its type
+     * closed, and taken as a member -- no {@code discriminators}, its pins being in place, and an extension that
+     * does not carry member dispatch ({@link #closedExtension}). The chain is completed from the parents as written
+     * ({@link Ancestry#chainOf}): a parent applied to the template's own parameter stays in {@code parents} beside its
+     * template's ancestors, for {@code SchemaResolver}'s fold to turn into the edge to the entry the closed
+     * application denotes -- {@code ok<text>} IS-A {@code result<text>} and not {@code result<int32>}, whatever order
+     * the declarations were written in. Parents are substituted and not closed: an operand denotes no entry (§8.2).
      *
-     * <p><b>It is minted with no subtypes, like every resolved entry.</b> {@code subtypes} is linking's,
-     * derived one phase later over the closed namespace ({@code TsonSchemaLinker}), which is the invariant
-     * {@code SchemaResolver}'s own merge rests on. Taking the template's list instead would hand each
-     * instantiation the whole family -- {@code box<text>} claiming {@code box<int32>} -- and, where the
-     * template arrived already linked through an {@code !!import}, itself. That last is what makes it
-     * load-bearing rather than untidy: §8.2 names a minted entry by a function of its resolved form alone,
-     * so two schemas closing one application mint one entry and §2.2.3 unifies them. An entry shaped by
-     * *which* schema closed it is not a function of the form, and the unification fails as a name collision.
+     * <p><b>It is minted with no subtypes, like every resolved entry.</b> {@code subtypes} is linking's, derived one
+     * phase later over the closed namespace ({@code TsonSchemaLinker}). Taking the template's list instead would hand
+     * each instantiation the whole family, and §8.2 names a minted entry by a function of its resolved form alone, so
+     * two schemas closing one application must mint one entry. A member's field carries no source position, the
+     * template's being no member's.
      */
-    private Top closeHeldRecord(String head, Top template, HeldBody open, Map<String, TypeArgument> bindings) {
-        Closed closed = closeHeld(head, template, open, bindings);
-        Top body = asMember(closed.body());
-        // A held body's chain is the parents as written, so closing it is where the chain is completed
-        // (Ancestry). A parent applied to the template's own parameter stays in `parents` beside its template's
-        // ancestors, for SchemaResolver's fold to turn into the edge to the entry the closed application
-        // denotes -- `ok<text>` IS-A `result<text>` and not `result<int32>`, whatever order the declarations
-        // were written in. A declaration carrying a removal wrote no parent, its chain being empty (§5.9).
-        return body instanceof RecordBody record
-                ? record.withChain(Ancestry.chainOf(record.parents(), namespace)) : body;
+    private RecordBody closeRecordTemplate(String head, RecordTemplateBody template,
+                                           Map<String, TypeArgument> bindings) {
+        AnnotatedMap<String, RecordField> substituted = RecordTemplateSubstitution.closed(head, template, bindings);
+        AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
+        substituted.forEach((name, field) -> fields.put(name,
+                field.withType(switch (field.type()) {
+                    case TypeRef reference -> close(reference);
+                    // A sibling names a field of the record, and has no application to close.
+                    case SiblingRef sibling -> sibling;
+                }).withPosition(Optional.empty()), substituted.getAnnotations(name)));
+        return new RecordBody(Ancestry.chainOf(RecordTemplateSubstitution.parents(template, bindings), namespace),
+                AnnotatedMap.copyOf(fields), template.groups(), closedExtension(template), List.of(),
+                template.nameType());
     }
 
     /** Records the constructor {@code name}'s value applies -- the tag resolved output writes. */
@@ -793,11 +839,58 @@ final class TemplateMaterialiser {
     /**
      * {@code value} as the instantiation of {@code application} (§8.2), whatever kind of entry it is: a record
      * template's member, a namespace entry, the hop to the synthetic a non-record template closes to. Recorded in
-     * {@link #applications}, which {@code SchemaResolver} writes onto the entry's key as {@code @application}.
+     * {@link #applications}, with {@code written}, the application as written, which {@code SchemaResolver} writes
+     * onto the entry's key as {@code @meta.application}.
      */
-    private Top instantiation(String name, Top value, TypeRef application) {
+    private Top instantiation(String name, Top value, TypeRef application, TypeRef written) {
         applications.put(name, application);
+        writtenApplications.put(name, asWritten(written));
         return value;
+    }
+
+    /**
+     * {@code reference} as {@code @meta.application} states it: as written, a nested application unreduced and itself
+     * stated this way, each argument a value where its parameter binds one, and a bare name followed through its
+     * alias chain, since §8.2 compares arguments after alias flattening.
+     */
+    private TypeRef asWritten(TypeRef reference) {
+        if (reference.arguments().isEmpty()) {
+            return plain(dereferenced(reference));
+        }
+        String head = templateHead(reference.name());
+        Top template = namespace.definition(head);
+        List<String> parameters = template == null ? List.of() : OpenEntry.parameterNames(template);
+        Map<String, ParameterTypes.Kind> kinds = parameters.isEmpty() ? null
+                : Optional.ofNullable(parameterKinds.get(head)).orElseGet(() -> kindsOnDemand
+                        .computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, importedTypes)));
+        List<TypeArgument> arguments = new ArrayList<>(reference.arguments().size());
+        for (int i = 0; i < reference.arguments().size(); i++) {
+            TypeArgument argument = reference.arguments().get(i);
+            boolean value = kinds != null && parameters.size() == reference.arguments().size()
+                    && kinds.get(parameters.get(i)) == ParameterTypes.Kind.VALUE;
+            arguments.add(switch (argument) {
+                case TypeArgument.Ref ref when value && ref.ref().arguments().isEmpty() ->
+                        new TypeArgument.Value(new Token(ref.ref().name(), Token.Form.UNQUOTED));
+                case TypeArgument.Ref ref -> new TypeArgument.Ref(asWritten(ref.ref()));
+                case TypeArgument.Value literal -> literal;
+            });
+        }
+        return TypeRef.of(reference.name(), arguments);
+    }
+
+    /** {@code reference} with nothing but its name and arguments: no annotations, no closure. */
+    private static TypeRef plain(TypeRef reference) {
+        return TypeRef.of(reference.name(), reference.arguments());
+    }
+
+    /** Every application this pass closed, to the entry it closed to -- see {@link #closedApplications}. */
+    Map<TypeRef, String> closedApplications() {
+        return new LinkedHashMap<>(closedApplications);
+    }
+
+    /** The application {@code name}'s entry closes, as written, where it is an instantiation entry. */
+    Optional<TypeRef> writtenApplication(String name) {
+        return Optional.ofNullable(writtenApplications.get(name));
     }
 
     /** A held body substituted, its inner applications closed, and read back through its constructor. */
@@ -810,9 +903,9 @@ final class TemplateMaterialiser {
         // vocabulary in the first place.
         CoreValue substituted = WireForm.substitute(open.application().coreValue(), head,
                 OpenEntry.parameterNames(template), bindings);
-        CoreValue wire = closeApplicationsOutsideSupertypes(substituted);
+        CoreValue wire = closeApplications(substituted);
         try {
-            return new Closed(wire, metaReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
+            return new Closed(wire, constructionReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
         } catch (ReadException e) {
             // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
             // fine declaration, and `vector<text, "two">` is where it stops being one.
@@ -822,53 +915,12 @@ final class TemplateMaterialiser {
         }
     }
 
-    /**
-     * The held body's applications closed -- <b>except the ones standing in its chain's {@code parents}</b>,
-     * which are left exactly as written.
-     *
-     * <p>A composition operand denotes no entry (§8.2, and {@code
-     * DefinitionResolver}'s own supertype branch): composition needs the operand's <em>fields</em>, which
-     * substitution has already produced, and nothing else. Closing it here would mint the entry that branch
-     * exists to avoid -- {@code vip => <T> customer & box<T>} closed at {@code vip<text>} would produce a
-     * {@code box<text>} nothing named, beside the {@code text_box} a declaration may well have named.
-     *
-     * <p><b>The resolved-form walk exempts this channel too</b> ({@code
-     * MetaRefs.mapRefsKeepingChain}), and the two walks must agree: the operand is kept as written,
-     * and resolving it to the entry it denotes belongs to {@code SchemaResolver}'s fold, which runs after every
-     * declaration and so cannot make the answer depend on declaration order.
-     */
-    private CoreValue closeApplicationsOutsideSupertypes(CoreValue value) {
-        if (!(value instanceof RecordValue record)) {
-            return closeApplications(value);
-        }
-        return new RecordValue(record.fields().stream()
-                .map(field -> WireForm.CHAIN.equals(field.name()) ? field
-                        : new RecordValue.Field(field.name(), WireForm.rescope(field.value(),
-                                closeApplications(field.value().value().coreValue()))))
-                .toList());
-    }
-
     /** A closed held body, and the wire form it was read from -- the one an entry name derives from. */
     private record Closed(CoreValue wire, Top body) {
     }
 
     /**
-     * A closed record template as its member: <b>where a family's selectors stop.</b> Which fields a family
-     * dispatches <em>on</em> is the base's statement ({@code record.discriminators}), and whoever pins them is a
-     * member and carries the values instead. The template's list is the base's; the application closing it has
-     * pinned them, substitution having put each argument in the {@code value} of a field already FIXED where it
-     * was written (§5.7), so the member names none.
-     */
-    private static Top asMember(Top body) {
-        if (!(body instanceof RecordBody record)) {
-            return body;
-        }
-        return new RecordBody(record.chain(), record.fields(), record.groups(), closedExtension(record),
-                java.util.List.of(), record.nameType());
-    }
-
-    /**
-     * A closed member's own {@code extension}: the template's, except that <b>SEALED does not travel</b>.
+     * A closed member's own {@code extension}: the template's, except that <b>member dispatch does not travel</b>.
      *
      * <p>ABSTRACT is a claim about the marked type alone and holds of every instantiation identically, which
      * is how {@code abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
@@ -878,9 +930,9 @@ final class TemplateMaterialiser {
      * concrete record, exactly as in a hand-written family, and a base that dispatches on members closes to
      * OPEN rather than carrying its abstractness into every one of them.
      */
-    private static RecordExtensionType closedExtension(RecordBody record) {
-        return record.extension() == RecordExtensionType.ABSTRACT && !record.discriminators().isEmpty()
-                ? RecordExtensionType.OPEN : record.extension();
+    private static RecordExtensionType closedExtension(RecordTemplateBody template) {
+        return template.extension() == RecordExtensionType.ABSTRACT && !template.discriminators().isEmpty()
+                ? RecordExtensionType.OPEN : template.extension();
     }
 
     /**
@@ -904,7 +956,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * Every application still written in {@code type_ref}'s record form, closed to a bare reference to the
+     * Every application still written in a slot ({@link WireForm#applicationIn}), closed to a bare reference to the
      * entry it denotes -- the inverse of the shape {@code SchemaDesugarer} writes when a slot holds one.
      *
      * <p>It runs on the wire value rather than on the body read from it because the <em>name</em> depends on
@@ -914,21 +966,21 @@ final class TemplateMaterialiser {
      */
     private CoreValue closeApplications(CoreValue value) {
         return switch (value) {
-            case RecordValue record when WireForm.isApplication(record) ->
-                    new TokenValue(close(WireForm.typeRefOf(record)).name(), TokenForm.UNQUOTED);
+            case ReferenceValue(TypeRef applied) ->
+                    new TokenValue(close(applied).name(), TokenForm.UNQUOTED);
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> new RecordValue.Field(field.name(),
-                            WireForm.rescope(field.value(), closeApplications(field.value().value().coreValue()))))
+                            WireForm.rewritten(field.value(), closeApplications(field.value().coreValue()))))
                     .toList());
             case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> WireForm.rescope(element, closeApplications(element.value().coreValue()))).toList());
+                    .map(element -> WireForm.rewritten(element, closeApplications(element.coreValue()))).toList());
             // A map slot holds applications like any other: `{ S => [box<text>] }` writes one in the array
             // its value names, and a key type could take one too. Both halves descend, as they do in
             // WireForm.substitute, which walks the same shape one step earlier.
             case MapValue map -> new MapValue(map.entries().stream()
                     .map(entry -> new MapValue.MapEntry(
                             WireForm.retyped(entry.key(), closeApplications(entry.key().coreValue())),
-                            WireForm.rescope(entry.value(), closeApplications(entry.value().value().coreValue()))))
+                            WireForm.rewritten(entry.value(), closeApplications(entry.value().coreValue()))))
                     .toList());
             default -> value;
         };
@@ -969,7 +1021,7 @@ final class TemplateMaterialiser {
                                           List<String> parameters, List<TypeArgument> arguments) {
         Map<String, ParameterTypes.Kind> kinds = parameterKinds.get(head);
         if (kinds == null) {
-            kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, metaTypes));
+            kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, importedTypes));
         }
         if (kinds == null || kinds.isEmpty()) {
             checkArguments(head, template, arguments);
@@ -987,7 +1039,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * Each argument against the parameter it binds ({@code template_param}, [TSON-SCHEMA] §5.10): a type argument
+     * Each argument against the parameter it binds ({@code meta.template_param}, [TSON-SCHEMA] §5.10): a type argument
      * must name a type that IS-A the parameter's {@code bound}, and a value argument must be a value of the
      * parameter's {@code type} -- or of the type an earlier parameter's argument names, where the type is that
      * parameter.
@@ -1017,13 +1069,13 @@ final class TemplateMaterialiser {
     }
 
     private void checkBound(String head, TemplateParam parameter, String argument, String bound) {
-        String terminal = ReferenceChain.terminal(argument, this::lookup);
+        String terminal = AliasChain.terminal(argument, this::lookup);
         Top target = lookup(terminal);
         if (target == null) {
             return; // an unresolved argument -- the linker's verdict
         }
         // By name, so a core type and the kernel original it copies are one bound, as they are at the declaration.
-        String boundTerminal = ReferenceChain.terminal(bound, this::lookup);
+        String boundTerminal = AliasChain.terminal(bound, this::lookup);
         List<String> chain = TypeChain.supertypesOf(target);
         boolean admitted = terminal.equals(boundTerminal) || chain.contains(boundTerminal) || chain.contains(bound);
         if (!admitted) {
@@ -1047,21 +1099,21 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * {@code argument} as a value of {@code type}, read in the structure namespace where the template applies a meta
-     * constructor ({@link ParameterTypes#readsInStructure}) -- so a schema's own entry under a meta type's name never
-     * stands in for the type the constructor's slot declares -- and in the schema's namespace otherwise.
+     * {@code argument} as a value of {@code type}, read among the imported entries where the template applies a
+     * constructor ({@link ParameterTypes#readsInStructure}) -- the constructor's reader reads the argument, and its
+     * slot's type is in its declaring schema's closure -- and in the schema's namespace otherwise.
      */
     private void checkValue(String head, TemplateParam parameter, String argument, String type, boolean structural) {
         if (type == null) {
             return;
         }
-        Function<String, Top> resolve = structural ? metaTypes : this::lookup;
-        String terminal = ReferenceChain.terminal(type, resolve::apply);
+        Function<String, Top> resolve = structural ? importedTypes : this::lookup;
+        String terminal = AliasChain.terminal(type, resolve::apply);
         Top definition = resolve.apply(terminal);
-        // An enum's argument is matched in its name type's form, which the governing meta may hold.
+        // An enum's argument is matched in its name type's form, which an import may hold.
         Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition,
-                NameType.form(definition, (structural ? metaConstructors : localConstructors).apply(terminal),
-                        namespace::definition, metaTypes));
+                NameType.form(definition, (structural ? importedConstructors : localConstructors).apply(terminal),
+                        namespace::definition, importedTypes));
         if (parser.isEmpty()) {
             return; // no scalar reading -- the substituted body's own position judges it
         }
@@ -1073,10 +1125,10 @@ final class TemplateMaterialiser {
         }
     }
 
-    /** A name in the schema's own namespace first, then in the governing meta's -- a slot type is the meta's. */
+    /** A name in the schema's own namespace first, then among its imported entries. */
     private Top lookup(String name) {
         Top local = namespace.definition(name);
-        return local != null ? local : metaTypes.apply(name);
+        return local != null ? local : importedTypes.apply(name);
     }
 
 }

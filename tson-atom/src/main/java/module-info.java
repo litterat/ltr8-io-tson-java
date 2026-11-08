@@ -25,11 +25,9 @@
  * </ul>
  *
  * <p><b>What is deliberately not here</b> is everything that depends on <em>how</em> a token was written.
- * {@code AtomType} takes a {@code String}, and the two atoms that need the lexical form -- the kernel's
- * {@code value}, whose §4.4 rule is that a quoted token is a string, and {@code Token}, which records the
- * spelling §8's resolved form carries -- stay in {@code tson-compiler} with {@code TokenValue} itself.
- * That those two are exactly the positions where the encodings legitimately differ is not a coincidence:
- * JSON has no token forms and reads a {@code value} position by [TSON-JSON] §5.7's own rule.
+ * {@code AtomType} takes a {@code String}, and what needs the lexical form -- §4's base type resolution, whose §4.4
+ * rule is that a quoted token is a string, and {@code Token}, which records the spelling §8's resolved form carries --
+ * stays in {@code tson-compiler} with {@code TokenValue} itself: JSON has no token forms.
  */
 module io.ltr8.tson.atom {
     exports io.ltr8.tson.atom;

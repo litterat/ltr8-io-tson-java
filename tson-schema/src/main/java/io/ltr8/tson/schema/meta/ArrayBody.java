@@ -3,14 +3,14 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.schema.atom.AtomCoherence;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code array} constructor's own vocabulary, resolved (Part 2 §4.2, §5.3,
+ * The kernel's {@code array} constructor's own vocabulary, resolved (Part 2 §4.2, §5.3,
  * §8.1) -- {@code access_pattern}/{@code size_type} are fixed ({@code INDEX}/{@code VARIABLE}) and
  * never appear in output. Also backs {@code set_type}, whose refinement resolves to this same shape with
  * different field values: it pins {@code voidable: false}, {@code ordered: false} and {@code unique_items: true}.
@@ -24,12 +24,12 @@ import java.util.Optional;
  * <p>{@code ordered} says whether element order is part of the value; output keeps the order written either way
  * ([TSON-SCHEMA] §7.5).
  */
-@Typename(name = "array")
+@Typename(name = "meta.array")
 public record ArrayBody(TypeChain chain,
         @Field("element_type") TypeRef elementType, boolean voidable, boolean ordered,
                          @Field("unique_items") boolean uniqueItems,
-                         @Field("min_items") Optional<BigInteger> minItems,
-                         @Field("max_items") Optional<BigInteger> maxItems) implements Product {
+                         @Field("min_items") Optional<Long> minItems,
+                         @Field("max_items") Optional<Long> maxItems) implements Product {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public ArrayBody {
@@ -38,7 +38,7 @@ public record ArrayBody(TypeChain chain,
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public ArrayBody(TypeRef elementType, boolean voidable, boolean ordered, boolean uniqueItems,
-            Optional<BigInteger> minItems, Optional<BigInteger> maxItems) {
+            Optional<Long> minItems, Optional<Long> maxItems) {
         this(TypeChain.EMPTY, elementType, voidable, ordered, uniqueItems, minItems, maxItems);
     }
 

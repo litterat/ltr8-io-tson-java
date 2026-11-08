@@ -9,8 +9,8 @@ import java.nio.file.Path;
  * a matching data file ({@code person-data.tn}) to disk, so a newcomer can validate, edit, and re-run
  * entirely from the shell without writing any Java or hand-authoring a first schema. The example is a
  * short tour of TSON: a record, an enum, an optional field, built-in types (uuid/date), a nested
- * record, an array, and a field group ("one of"). The data file is self-describing -- a {@code
- * !!schema} header naming the schema plus a root {@code !person} type-ref -- so {@code tson validate}
+ * record, an array, and a field group ("one of"). The data file is self-describing -- an {@code
+ * !!import} header naming the schema plus a root {@code !person} type-ref -- so {@code tson validate}
  * needs no {@code --type}. The two files are the starting point the README's Getting Started section
  * walks through.
  *
@@ -22,11 +22,10 @@ import java.nio.file.Path;
 final class InitCommand {
 
     private static final String SCHEMA = """
-            !!id:"https://example.com/2026/38/getting-started/person.tn?sha256=8d177993481b8351bac99dd6e5d6230118953283d50e67f2d21934e48d1ee904"
-            !!meta:"https://tson.io/2026/38/m/meta.tn?sha256=62dde2f344853848cd0ce4f722a0305d979e5883c0dcd14308959ad6a01bff47"
-            !!import:"https://tson.io/2026/38/m/core.tn?sha256=95f66505cf74dd2d64d0b6cffd07538fa45b8c7096c556c87423b56b03423497"
+            !!id:"https://example.com/2026/39/getting-started/person.tn?sha256=de13379825dada812daea91cb4fed0f197ff691d2fee97ff91b8382b112e5cde"
+            !!import:"https://tson.io/2026/39/m/core.tn?sha256=4e8d9c43cbbabf6a73548b819ac74e06e18859b573d05ce99988ae9d4d9a562e"
             @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
-            {
+            !schema {
               role => !enum [admin member guest]
 
               address => {
@@ -50,7 +49,7 @@ final class InitCommand {
             """;
 
     private static final String DATA = """
-            !!schema:"https://example.com/2026/38/getting-started/person.tn"
+            !!import:"https://example.com/2026/39/getting-started/person.tn"
             !person {
               id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
               name: "Ada Lovelace"

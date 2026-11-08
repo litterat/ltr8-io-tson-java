@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.temporal.DurationType;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Duration;
@@ -45,7 +45,7 @@ public record DurationParser(DurationType constraints) implements AtomTypeParser
     /** §5.5's built-in annotation name -- {@code !duration}. */
     public static final String TYPENAME = "duration";
 
-    /** {@code duration => !duration_type {}} -- the unconstrained duration. */
+    /** {@code duration => !temporal.duration_type {}} -- the unconstrained duration. */
     public static final DurationParser UNCONSTRAINED = new DurationParser(DurationType.UNCONSTRAINED);
 
     public DurationParser(Optional<Duration> min, Optional<Duration> max) {
@@ -158,7 +158,7 @@ public record DurationParser(DurationType constraints) implements AtomTypeParser
         // not on the spelling -- so PT0.50S is a whole number of tenths and `precision: 1` admits it, the
         // same rule and the same wording time_type's own @doc already carries.
         constraints.precision().ifPresent(precision -> {
-            if (BigInteger.valueOf(Math.max(seconds.stripTrailingZeros().scale(), 0)).compareTo(precision) > 0) {
+            if (Math.max(seconds.stripTrailingZeros().scale(), 0) > precision) {
                 throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + precision
                         + " seconds, which is the resolution this duration admits",
                         "a whole number of 10^-" + precision + " seconds");

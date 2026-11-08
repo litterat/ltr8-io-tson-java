@@ -7,15 +7,19 @@ only; history lives in git.
 **Invariants**
 
 - `tson-tree` requires nothing; `TsonValue` stays a pure value and the header lives on a wrapper.
-- `TsonScopedValue` is transparent to navigation, and only a genuine scope push produces one.
 - `TsonAtom.toString()` renders its value alone — it reaches a `Diagnostic`'s `expected`/`actual`.
 - `get`/`at` never throw; a `TsonMissing` carries the pointer of the step that failed, and the first failure
   sticks. "Missing" and "absent" stay distinct kinds.
+- A schemaless read keeps a reference the grammar alone shows to be one as a `TsonReference`: an application
+  (`TsonApplicationReference`) or a sibling reference (`TsonSiblingReference`). A bare name is a `TsonAtom` holding
+  text. Neither variant carries a referent, there being no closure to resolve in. Under a schema a reference-typed
+  position delivers a `schema.meta.TypeRef` in a `TsonAtom` instead, and a record field's type, which admits a sibling
+  reference, a `schema.meta.SiblingRef`. A dependent field's node is whatever the type its sibling names reads to.
 - There is one no-value node, `TsonVoid`; `null` is a `TsonAtom` holding the string `null`, and a `void`
   position admits `_` and nothing else.
 - `as(Class)`/`asString`/… cast, `asInt`/`asLong`/`asDouble` convert — a test asserting which host type a
   reader produced must use `as(Class)`.
-- `TsonDocument` has no `meta` component; `TsonObjectDocument<T>` is a distinct type carrying `rootType`.
+- `TsonDocument` is `(id, imports, root)`; `TsonObjectDocument<T>` is a distinct type carrying `rootType`.
 - No node carries a `Node` suffix, and the model is read-side only: no builders, no transforms.
 
 Related: `design/facades-and-tree.md` (the readers producing a tree), `design/writers-and-document-header.md`
@@ -25,40 +29,22 @@ Related: `design/facades-and-tree.md` (the readers producing a tree), `design/wr
 ## Tree model: `TsonValue` (`tson-tree` module)
 
 What every tree read hands back — the compiled tree readers (`design/class2-compilation.md`) and the
-schemaless `TsonTreeReader` alike. A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/
-`TsonMap`/`TsonArray`/`TsonTuple`/`TsonAtom`/`TsonVoid`/`TsonMissing`/`TsonScopedValue`),
-**structure-preserving** — TSON's
+schemaless `TsonTreeReader` alike. A sealed `TsonValue` over eight pure immutable node kinds (`TsonRecord`/
+`TsonMap`/`TsonArray`/`TsonTuple`/`TsonAtom`/`TsonReference`/`TsonVoid`/`TsonMissing`, `TsonReference` itself sealed
+over two records), **structure-preserving** — TSON's
 record-vs-map and array-vs-tuple distinctions survive into the model, where JSON's would collapse — and
 annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
-
-- **`TsonScopedValue` is a wrapper because the directive belongs to the position, not to the value.**
-  [TSON-DATA] §2.3's grammar is `scoped-value = [ schema-directive ws ] data-value`: the same record means
-  the same thing with or without one, so a nested `!!schema` ([TSON-SCHEMA] §7.8's scope push) attaches
-  *around* the value rather than as a ninth component on each of the other seven. That is the argument
-  `TsonDocument` makes at document level, and the reason the two are separate types rather than one — a
-  document also carries `!!id`, is not itself a value, and cannot stand at a field position.
-  - **Transparent to navigation.** Every kind predicate, accessor and step delegates to the value it
-    governs, so `tree.at("/attachments/0/claim_id")` reads the same whether or not a scope was pushed, and
-    a consumer that does not care about scopes never unwraps one. Asking for the scope is what surfaces it:
-    `v instanceof TsonScopedValue s` then `s.schema()`.
-  - **Only a genuine push produces one.** A value whose type came from the governing namespace carries no
-    directive and is read as its own node. So a tree round-trips through `TsonTreeWriter` with its
-    directives exactly where the author put them — the writer emits the scope first and then the value it
-    governs, §2.3's own order, which is also why the scoped case sits ahead of `writeNode`'s switch rather
-    than in it: every branch of that switch is already past the annotations, and a directive precedes them.
-  - **Bind mode has no counterpart**, deliberately: a bound object has nowhere to carry a URI and inventing
-    somewhere would change what a consumer's own class means. `TsonVoid` makes the same asymmetry for
-    §2.9.
 
 - **`TsonDocument` is the model's document, and `TsonValue` stays a pure value.** [TSON-DATA] §2.2 —
   "Header directives are properties of the document, not of the body's root value" — is why the header is a
   wrapper rather than two more components on every node, and it makes the tree model the counterpart of the
-  parser's own `ast.Document(id, schema, root)` rather than a value model with a hole where the document
+  parser's own `ast.Document(id, imports, root)` rather than a value model with a hole where the document
   should be. It needs no dependency, so `tson-tree` still requires nothing.
-  - **No `meta` component**, deliberately: a document carrying `!!meta` is a *schema* document, whose value
-    model is `schema.meta`. `TsonDocumentHeader` is the type that holds all three, and it answers a different
-    question — classifying a document from its opening bytes (`isSchemaDocument()`) before deciding how to
-    read it. Same reason `ast.Document` carries only the two.
+  - **Nothing says it is a data document**, because a data read is what produced it: a root tagged `!schema` is
+    a *schema* document, whose value model is the schema model (`schema.meta` and its sibling packages), and a
+    Class 1 read refuses one. Classifying a document before deciding how to read it is
+    `TsonDocumentPeek.isSchemaDocument()`'s question, answered from
+    the root's tag, never from the header.
   - **`readDocument` sits beside `read`, which still hands back the root value.** Changing what a read
     hands back, and every caller with it, would be a cost of *replacing* `read`, not of the wrapper.
     `TsonTreeWriter.toTson(TsonDocument)` closes the loop from the other end, the document's own directives
@@ -69,7 +55,7 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
     fourth component, `rootType`, because a `TsonValue` carries its own `typeRef()` and a bound object
     carries nothing. Two arities are not siblings, so they are not named as such.
     - **What it carries is what the *read* established.** The class plus its bind context already fix which
-      schema governs an object — one context per schema version is the design — so `schema` is the weakest
+      schema governs an object — one context per schema version is the design — so `imports` is the weakest
       of the three. The other two are not recoverable from anything the caller holds: `!!id` is
       per-document data (§2.2 makes it a property of the document, so a class modelling it as a field would
       misstate its own shape), and `rootType` is a name a `DataNameBinder` cannot hand back, mapping name to
@@ -101,6 +87,22 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
   same node rather than extending its pointer. "Missing" (not in the tree) and "absent" (written, but
   holding no value) stay distinct kinds.
+- **`TsonReference` is a reference read with no schema** ([TSON-DATA] §4, §7.4), a sealed interface whose `text()`
+  is what it reads as and whose `isReference()` is true. **A tree reference is one the grammar alone shows to be a
+  reference**: an application by its `<…>`, a sibling reference by its trailing `!`. A qualified name with no
+  arguments is a token, a `TsonAtom` like any other, since a schemaless read cannot tell a bare name from any other
+  token. Code that needs only "a reference" switches on the interface; code that needs the parts, on the two records.
+  - **`TsonApplicationReference`**: `segments`, `arguments` (at least one), `typeRef`, `annotations`. A Class 1 read
+    keeps `map<text list<int32>>` as the structured value it is, each argument read by the ordinary schemaless rule,
+    so in `response<order 201>` the `201` is a number and `order` a string, and a nested application is another
+    `TsonApplicationReference`. `text()` (and `toString()`) recreates the canonical text, one space between
+    arguments, a string argument that is a qualified name bare and any other quoted.
+  - **`TsonSiblingReference`**: `field`, `typeRef`, `annotations`; `text()` is `kind!` ([TSON-DATA] §7.4). What
+    it names is per record instance and a schema's to give, only at a record field's type.
+  - **Neither offers a referent**: what a reference names is a closure's question, and a schemaless read has none.
+  Under a schema a reference-typed position delivers the schema model's `TypeRef` instead, whose `referent()` answers it
+  (`design/references.md`, `design/facades-and-tree.md`). The node lives here rather than reusing `TypeRef` because
+  `tson-tree` depends on nothing.
 - **There is one no-value node, `TsonVoid`, because there is one no-value spelling**: the `_` sentinel. A read that
   failed leaves no node at all — every read is all-or-nothing — so a `TsonVoid` in a tree always means the document
   wrote `_`. `null` is not one — §4 resolves boolean, number and string, so the unquoted token is a `TsonAtom` holding

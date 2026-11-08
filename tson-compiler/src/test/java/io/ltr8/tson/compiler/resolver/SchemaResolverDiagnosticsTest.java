@@ -2,12 +2,12 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -43,9 +43,9 @@ class SchemaResolverDiagnosticsTest {
      */
     private static final String FOUR_BROKEN = """
             !!id:"https://example.test/broken.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               widens => !uint8 ^ { min: -10  max: 300 }
               fine => int32
               widens_too => !int32 ^ { max: 99999999999 }
@@ -55,15 +55,14 @@ class SchemaResolverDiagnosticsTest {
             """;
 
     private static TsonCompiledSchemaLoader standardLibrary() {
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, TsonBundledSchemas::fetch);
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
+        TsonCompiledVocabularyRegistry registry = new TsonCompiledVocabularyRegistry(context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         SchemaDocument metaKernel = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        registry.register(new SchemaResolver(loader).resolveSchema(metaKernel),
-                loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
-        loader.loadMeta(TsonBundledSchemas.META_ID);
+                TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
+        registry.register(new SchemaResolver(loader).resolveSchema(metaKernel));
+        loader.loadVocabulary(TsonBundledSchemas.META_ID);
         loader.resolveLinked(TsonBundledSchemas.CORE_ID);
         return loader;
     }
@@ -129,9 +128,9 @@ class SchemaResolverDiagnosticsTest {
     void aDeclarationThatFailsWhileNestedIsReportedOnceAndAgainstItself() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   child => !uint8 ^ { min: -10 }
                   parent => child & { extra: int32 }
                   fine => int32
@@ -143,7 +142,7 @@ class SchemaResolverDiagnosticsTest {
 
     /**
      * A body the constructor's own vocabulary rejects reaches the resolver as a {@code ReadException}
-     * from the governing meta's compiled reader, one layer below every other error here. It is collected
+     * from the constructor's compiled vocabulary reader, one layer below every other error here. It is collected
      * like the rest only because {@code DefinitionResolver} restates it as a schema error first: while it
      * wore an {@code UnsupportedOperationException}, one such declaration aborted the entire run -- no
      * diagnostics at all, exit 70, and a stack trace under a "this is a bug in tson" banner.
@@ -152,9 +151,9 @@ class SchemaResolverDiagnosticsTest {
     void aBodyTheConstructorsVocabularyRejectsJoinsTheOtherDiagnostics() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   bad_min => !integer ^ { min: "abc" }
                   bad_max => !integer ^ { max: "xyz" }
                   fine => int32
@@ -164,7 +163,7 @@ class SchemaResolverDiagnosticsTest {
         assertEquals(List.of("/bad_max", "/bad_min"),
                 diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
         for (Diagnostic diagnostic : diagnostics) {
-            assertTrue(diagnostic.message().contains("not valid data for 'integer_type'"), diagnostic.message());
+            assertTrue(diagnostic.message().contains("not valid data for 'numeric.integer_type'"), diagnostic.message());
             assertTrue(diagnostic.schemaPosition().isPresent(), diagnostic.schemaPointer().orElseThrow());
         }
     }
@@ -187,9 +186,9 @@ class SchemaResolverDiagnosticsTest {
     void everyInvalidSugarFormIsReportedInOnePass() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   vacuous => [int32; 0..]
                   inverted => [int32; 5..3]
                   fine => int32
@@ -215,9 +214,9 @@ class SchemaResolverDiagnosticsTest {
     void aSugarFormErrorAndAResolutionErrorAreBothReported() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   vacuous => [int32; 0..]
                   widens => !uint8 ^ { min: -10  max: 300 }
                   fine => int32
@@ -240,9 +239,9 @@ class SchemaResolverDiagnosticsTest {
     void aDependentOfAFailedSugarFormDoesNotReportAConsequence() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   vacuous => [int32; 0..]
                   user => vacuous & { extra: int32 }
                   fine => int32
@@ -257,9 +256,9 @@ class SchemaResolverDiagnosticsTest {
     void withoutAReceiverAnInvalidSugarFormStillThrows() {
         TsonSchemaParser parser = new TsonSchemaParser("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   vacuous => [int32; 0..]
                   fine => int32
                 }

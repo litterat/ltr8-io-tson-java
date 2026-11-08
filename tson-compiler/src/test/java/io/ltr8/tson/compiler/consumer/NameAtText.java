@@ -4,7 +4,7 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
- * A meta-layer record that declares a {@link TypeRef} at a {@code text}-typed field -- the binding mistake
+ * A vocabulary record that declares a {@link TypeRef} at a {@code text}-typed field -- the binding mistake
  * {@code ValuesByNameTest} refuses at compile: at an atom-typed position a token is a literal, never a reference.
  */
 @Typename(name = "name_at_text")

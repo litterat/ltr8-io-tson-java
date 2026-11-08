@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.net.EmailType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -66,7 +66,7 @@ class EmailParserTest {
 
     // ── The text_type facets email_type composes ─────────────────────────
 
-    private static EmailParser withMaxLength(int max) {
+    private static EmailParser withMaxLength(long max) {
         return new EmailParser(new EmailType(EmailType.UNCONSTRAINED.spec(), Optional.empty(),
                 Optional.of(max), Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE));
     }

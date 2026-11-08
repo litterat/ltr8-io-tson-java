@@ -40,8 +40,9 @@ class OutputFormatTest {
                     + "\"max_numeric_literal_length\":4096,\"max_binary_size\":16777216,"
                     + "\"max_document_size\":16777216,\"max_elements\":1048576,\"max_entries\":1048576,"
                     + "\"max_fields\":65536,\"max_annotations\":64,\"max_values\":16777216,"
-                    + "\"max_foreign_schemas\":16,\"max_import_closure\":64,\"max_schema_entries\":65536,"
-                    + "\"max_reference_chain\":64,\"max_supertype_chain\":64,\"max_materialisation_depth\":64}}";
+                    + "\"max_import_closure\":64,\"max_schema_entries\":65536,"
+                    + "\"max_alias_chain\":64,\"max_supertype_chain\":64,\"max_materialisation_depth\":64,"
+                    + "\"max_wait_depth\":64}}";
 
     @Test
     void parseAcceptsTheThreeKnownFormatsCaseInsensitively() {
@@ -361,16 +362,35 @@ class OutputFormatTest {
                 "max fields:                 65536",
                 "max annotations:            64",
                 "max values:                 16777216",
-                "max foreign schemas:        16",
                 "max import closure:         64",
                 "max schema entries:         65536",
-                "max reference chain:        64",
+                "max alias chain:            64",
                 "max supertype chain:        64",
-                "max materialisation depth:  64"), text);
+                "max materialisation depth:  64",
+                "max wait depth:             64"), text);
 
-        Object reread = DiagnosticsSchema.compiled().get("policy")
+        Object reread = DiagnosticsSchema.compiled().get("policy.processor")
                 .read(TestDocuments.document(OutputFormat.TSON.render(POLICY)));
         assertEquals(POLICY, reread);
+    }
+
+    /**
+     * A report states the limits its producer ran under, each a {@code policy.limit}, an {@code int64}: a limit past
+     * {@code int} binds, and renders back as written.
+     */
+    @Test
+    void aPolicyStatingALimitPastIntBinds() {
+        String rendered = OutputFormat.TSON.render(POLICY);
+        String wide = rendered.replaceFirst("max_depth: *64", "max_depth: 3000000000")
+                .replaceFirst("max_wait_depth: *64", "max_wait_depth: 9223372036854775807");
+        assertTrue(wide.contains("3000000000") && wide.contains("9223372036854775807"), wide);
+
+        CliPolicy reread = (CliPolicy) DiagnosticsSchema.compiled().get("policy.processor")
+                .read(TestDocuments.document(wide));
+        assertEquals(3_000_000_000L, reread.limits().maxDepth());
+        assertEquals(Long.MAX_VALUE, reread.limits().maxWaitDepth());
+        assertTrue(OutputFormat.JSON.render(new ValidationReport(Outcome.ACCEPTED, reread, List.of()))
+                .contains("\"max_depth\":3000000000"));
     }
 
     /** The same distinction in {@code --output json}, where it is the code a consumer reads. */

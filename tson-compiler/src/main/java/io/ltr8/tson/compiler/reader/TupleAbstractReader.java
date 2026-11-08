@@ -131,15 +131,11 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
                     ctx.report(rules.tooManyElements());
                     reportedExtra = true;
                 }
-                EventSkip.scopedValue(ctx);
+                EventSkip.dataValue(ctx);
                 index++;
                 continue;
             }
             CompiledSlot slot = slots.get(index);
-            SchemaRef push = ScopePush.notAdmitted(ctx, slot.parser());
-            if (push != null) {
-                ScopePush.refuse(ctx.index(index), slot.schema().elementType().name(), push);
-            }
             result[index] = ctx.peek() instanceof VoidEvent ? defaultOrRequire(slot, index, ctx)
                     : slot.parser().read(ctx.index(index));
             index++;

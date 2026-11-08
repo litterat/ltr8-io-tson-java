@@ -19,7 +19,7 @@ history lives in git.
 - A base-syntax exception keeps its position out of `getMessage()`, and a base-syntax failure goes to the receiver —
   a collecting read never throws for a bad document.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/processor-policy.md`,
 `design/schema-side-diagnostics.md`.
 
@@ -55,8 +55,8 @@ document stated something and is not missing it, and the message reports the rul
 broke. Sharing the prose is what keeps the two readers from choosing different rules for one document.
 
 **Five families state their rules here**: records, arrays and sets (one class, a set being an array that
-refuses a repeat), tuples, and maps. Choices and scoped positions do not: `tson-compiler` states its dispatch
-diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a scoped position, while
+refuses a repeat), tuples, and maps. Choices and declared positions do not: `tson-compiler` states its dispatch
+diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a declared position, while
 `tson-json` words each in its own dispatcher (`BACKLOG.md`).
 
 **Two boundary calls are finer than "the schema's nouns":**
@@ -153,7 +153,7 @@ such an overload is how a diagnostic ends up with a blank structured half). `mes
 is free to do what a template could not: cite the spec, or name the fix.
 
 ```
-annotation '@title' is written bare, which §6 treats as '@title:_', but 'title' does not admit the void sentinel
+annotation '@doc' is written bare, which §6 treats as '@doc:_', but 'doc' does not admit the void sentinel
 'contact' has no variant matching this untagged value -- expected a value of one of
     (email, phone), or an explicit type annotation
 ```
@@ -184,7 +184,7 @@ Three reasons this is the receiver's business rather than the caller's:
   problem has already been reported. Throwing past the receiver would leave a caller holding a populated
   collector *and* an exception, with nothing saying the two belong to one document, and `Tson.validate`
   either discarding the collector or losing the syntax error.
-- **It is the same shape the facade uses** for an unreachable `!!schema` (`readAgainstSchema`):
+- **It is the same shape the facade uses** for an unreachable `!!import` (`readAgainstSchema`):
   report once, abandon the value. "Nothing can continue past a document that will not parse" is an argument
   for not continuing, not for not reporting.
 - **A caller could not classify it themselves**: `LexException` is in the unexported `lexer` package, so

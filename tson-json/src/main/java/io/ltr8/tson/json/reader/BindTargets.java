@@ -6,6 +6,8 @@ import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.json.JsonTypeReader;
+import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +21,9 @@ import java.util.Optional;
  * <ul>
  *   <li><b>An atom</b> is bound to the target's wire class ({@link AtomReader#boundTo}) -- an {@code int32} into a
  *       {@code long} -- and through the target's bridge where it has one. A target that binds structurally
- *       cannot hold an atom.</li>
+ *       cannot hold an atom. A reference's {@code TypeRef} or {@code Ref} target is bound to the family's own
+ *       production, never through a bridge from its name, so the {@code TypeRef} keeps its referent and the {@code
+ *       Ref} receives the value its name reaches ({@link AtomReader#readsAReference}).</li>
  *   <li><b>An array or set</b> is read again for the target's own collection or array class, its element bound to
  *       the target's element in turn -- so {@code List<Long>}, {@code long[]} and {@code Set<UUID>} each receive
  *       what they declare.</li>
@@ -28,8 +32,6 @@ import java.util.Optional;
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt -- except where the target is a bridged wrapper over that class ({@code ToData}, or
  *       {@code @Transparent} over a record), which the record's value is carried through.</li>
- *   <li><b>A {@code value} slot</b> is read as the target's wire class ({@link ValuePositionReader#boundTo}),
- *       and through its bridge where it has one.</li>
  * </ul>
  * Anything else -- a dispatcher, a choice, a gap -- is read as it is.
  */
@@ -46,11 +48,29 @@ final class BindTargets {
      */
     static JsonTypeReader<?> to(JsonTypeReader<?> reader, DataClass target, String what, String where,
                                 List<String> mismatches) {
+        if (reader instanceof DependentReader) {
+            // A dependent field's value is of whichever type its sibling names per object, so the component holds
+            // what that type's reader builds: an Object, the one class every such value is.
+            if (target.typeClass() != Object.class) {
+                mismatches.add(what + " is a dependent field, whose type its sibling's value names per object, and "
+                        + where + " binds " + target.typeClass().getName() + " -- declare it Object, which receives "
+                        + "what the named type reads to");
+            }
+            return reader;
+        }
         if (reader instanceof AtomReader<?> atom) {
             if (!(target instanceof DataClassAtom bound)) {
                 mismatches.add(what + " is an atom, and " + where + " binds " + target.typeClass().getName()
                         + " structurally");
                 return reader;
+            }
+            if (atom.readsAReference() && (bound.typeClass() == TypeRef.class || bound.typeClass() == Ref.class)) {
+                // The reference itself, carrying what it names, or the cell holding the value it reaches: a bridge
+                // from the name would drop both.
+                Optional<AtomReader<?>> direct = atom.boundTo(bound.typeClass());
+                if (direct.isPresent()) {
+                    return direct.get();
+                }
             }
             Optional<AtomReader<?>> atTarget = atom.boundTo(bound.dataClass());
             if (atTarget.isEmpty()) {
@@ -61,14 +81,6 @@ final class BindTargets {
             return bound.bridge().isPresent()
                     ? BridgedReader.ofAtom(atTarget.get(), bound.bridge().get(), bound.typeClass())
                     : atTarget.get();
-        }
-        if (reader instanceof ValuePositionReader value) {
-            // What `value` decodes to is the component's own choice, so there is nothing for it to disagree with:
-            // a class no built-in produces takes the natural value and its constructor decides.
-            ValuePositionReader bound = value.boundTo(target.dataClass());
-            return target.bridge().isPresent()
-                    ? BridgedReader.ofAtom(bound, target.bridge().get(), target.typeClass())
-                    : bound;
         }
         if (reader instanceof ArrayReader array) {
             if (!(target instanceof DataClassArray collection)) {

@@ -6,12 +6,12 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code void_type} constructor: an atom with no constraint vocabulary, whose parsing
+ * The kernel's {@code void_type} constructor: an atom with no constraint vocabulary, whose parsing
  * contract admits only the void sentinel {@code _}. Its instances are the kernel's {@code void} and core's
- * sibling of the same name, both {@code !void_type {}} -- two type entities, one contract, recognised by this
+ * sibling of the same name, both {@code !meta.void_type {}} -- two type entities, one contract, recognised by this
  * body rather than by either name.
  */
-@Typename(name = "void_type")
+@Typename(name = "meta.void_type")
 public record VoidType(TypeChain chain) implements Atom {
 
     /** The chain normalised: absent and empty are one list. */

@@ -11,7 +11,7 @@ import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -37,13 +37,13 @@ class SkeletonDistinctnessPolicyTest {
     private static final String ID = "https://example.test/skeletons-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/skeletons-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
-              identifier => !identifier_type { continue_add: "-" }
-              handlers => { identifier => text }
-              registry => { handlers: { identifier => text } }
-              team => { roles: set<identifier> }
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
+              slug => !unicode.identifier_type { continue_add: "-" }
+              handlers => { slug => text }
+              registry => { handlers: { slug => text } }
+              team => { roles: set<slug> }
             }
             """;
 
@@ -63,7 +63,7 @@ class SkeletonDistinctnessPolicyTest {
                 .withIdentifierPolicy(identifiers)
                 .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("registry", Registry.class))
-                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                                .orElse(SchemaModelNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
     }
 
@@ -85,9 +85,9 @@ class SkeletonDistinctnessPolicyTest {
                 "pass => text  " + CYRILLIC_PASS + " => text")) {
             String schema = """
                     !!id:"https://example.test/skeletons-2.tn"
-                    !!meta:"https://tson.io/2026/38/m/meta.tn"
-                    !!import:"https://tson.io/2026/38/m/core.tn"
-                    { %s }
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !schema { %s }
                     """.formatted(declarations);
             assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES),
                     codes(tson(IdentifierPolicy.defaults()).validateSchema(schema)), declarations);
@@ -97,7 +97,7 @@ class SkeletonDistinctnessPolicyTest {
 
     @Test
     void theKeysOfAnIdentifierKeyedMap() {
-        String document = "!!schema:\"" + ID + "\"\n!handlers { pass => a  " + CYRILLIC_PASS + " => b }";
+        String document = "!!import:\"" + ID + "\"\n!handlers { pass => a  " + CYRILLIC_PASS + " => b }";
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(tson(IdentifierPolicy.defaults())
                 .validate(document)));
         assertEquals(List.of(), tson(LOOK_ALIKES).validate(document));
@@ -105,7 +105,7 @@ class SkeletonDistinctnessPolicyTest {
 
     @Test
     void theElementsOfASetOfNames() {
-        String document = "!!schema:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }";
+        String document = "!!import:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }";
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(tson(IdentifierPolicy.defaults())
                 .validate(document)));
         assertEquals(List.of(), tson(LOOK_ALIKES).validate(document));
@@ -113,7 +113,7 @@ class SkeletonDistinctnessPolicyTest {
 
     @Test
     void theSameKeysBoundToAnObject() {
-        String document = "!!schema:\"" + ID + "\"\n!registry { handlers: { pass => a  " + CYRILLIC_PASS
+        String document = "!!import:\"" + ID + "\"\n!registry { handlers: { pass => a  " + CYRILLIC_PASS
                 + " => b } }";
         DiagnosticsCollector strict = new DiagnosticsCollector();
         tson(IdentifierPolicy.defaults()).objectReader().withDiagnostics(strict).read(document, Registry.class);

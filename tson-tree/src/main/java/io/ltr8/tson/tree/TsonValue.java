@@ -29,8 +29,7 @@ import java.util.stream.Stream;
  * {@code "person"}) and {@link #annotations()}.
  */
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonVoid, TsonMissing,
-                TsonScopedValue {
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonReference, TsonVoid, TsonMissing {
 
     /** This value's own type-ref (e.g. {@code "int32"}, {@code "uuid"}, {@code "person"}), if the wire or schema gave one. */
     Optional<String> typeRef();
@@ -65,10 +64,11 @@ public sealed interface TsonValue
             case TsonArray n -> new TsonArray(n.elements(), n.typeRef(), merged);
             case TsonTuple n -> new TsonTuple(n.elements(), n.typeRef(), merged);
             case TsonAtom n -> new TsonAtom(n.value(), n.typeRef(), merged);
+            case TsonApplicationReference n ->
+                    new TsonApplicationReference(n.segments(), n.arguments(), n.typeRef(), merged);
+            case TsonSiblingReference n -> new TsonSiblingReference(n.field(), n.typeRef(), merged);
             case TsonVoid n -> new TsonVoid(n.typeRef(), merged);
             case TsonMissing n -> n;
-            // The annotations belong to the value the directive governs, not to the scope around it.
-            case TsonScopedValue n -> new TsonScopedValue(n.schema(), n.root().withAnnotations(leading));
         };
     }
 
@@ -79,6 +79,7 @@ public sealed interface TsonValue
     default boolean isArray()     { return false; }
     default boolean isTuple()     { return false; }
     default boolean isAtom()      { return false; }
+    default boolean isReference() { return false; }
     default boolean isVoid()    { return false; }
     default boolean isMissing()   { return false; }
     default boolean isContainer() { return isRecord() || isMap() || isArray() || isTuple(); }

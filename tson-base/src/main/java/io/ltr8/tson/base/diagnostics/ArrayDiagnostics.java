@@ -3,7 +3,6 @@ package io.ltr8.tson.base.diagnostics;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.unicode.ConfusableNames;
 
-import java.math.BigInteger;
 
 /**
  * What an array's or a set's rules say when a document breaks one -- stated once, for every encoding. See
@@ -72,7 +71,7 @@ public record ArrayDiagnostics(String typeName) {
      * ({@code >= 2}), rather than prose, because it is the machine-readable half and a consumer reading
      * {@code expected} across families should not meet two conventions.
      */
-    public Refusal tooFewElements(BigInteger min, int size) {
+    public Refusal tooFewElements(long min, int size) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 subject("%d elements, fewer than the minimum %s".formatted(size, min), "has "),
                 ">= " + min, String.valueOf(size));
@@ -89,7 +88,7 @@ public record ArrayDiagnostics(String typeName) {
     }
 
     /** §5.3's {@code max_items}, on the same terms. */
-    public Refusal tooManyElements(BigInteger max, int size) {
+    public Refusal tooManyElements(long max, int size) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 subject("%d elements, more than the maximum %s".formatted(size, max), "has "),
                 "<= " + max, String.valueOf(size));

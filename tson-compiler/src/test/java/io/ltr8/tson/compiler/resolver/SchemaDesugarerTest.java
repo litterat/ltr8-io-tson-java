@@ -4,26 +4,25 @@ import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
+import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
-import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
+import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.compiler.ast.schema.SimpleRef;
+import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.base.SourcePosition;
 import org.junit.jupiter.api.Test;
 
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * denotes before resolution, so {@code DefinitionResolver} only ever sees a bare reference or {@code !C
  * value}.
  *
- * <p>No governing meta appears in any fixture, and that is the point of the phase's current shape: the sugar
+ * <p>No fixture's desugaring consults an import, and that is the point of the phase's current shape: the sugar
  * set is closed and grammar-supplied, so the head each form desugars to and the vocabulary field each
  * argument fills are a fixed table (§5.3), not something read off a constructor's parameter list.
  *
@@ -55,8 +54,8 @@ class SchemaDesugarerTest {
 
     private static SchemaDocument parse(String declarations) {
         return new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations)).parseSchemaDocument();
@@ -83,7 +82,7 @@ class SchemaDesugarerTest {
     private static String firstFieldType(SchemaDocument document, String declaration) {
         StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get(declaration).typeDef();
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(0);
-        return ((SimpleRef) field.type().orElseThrow().typeRef()).name();
+        return ((NameRef) field.type().orElseThrow().typeRef()).name();
     }
 
     private static Instance instanceOf(SchemaDocument document, String declaration) {
@@ -100,8 +99,8 @@ class SchemaDesugarerTest {
     @Test
     void aRewrittenDeclarationKeepsItsSourcePosition() {
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   plain => { a: text }
 
                   sugared => { tags: [text] }
@@ -137,7 +136,7 @@ class SchemaDesugarerTest {
         assertEquals(firstFieldType(document, "holder"), injected.name(),
                 "the use site refers to the injected declaration by name");
         Instance instance = (Instance) injected.typeDef();
-        assertEquals("array", instance.target());
+        assertEquals("meta.array", instance.target());
         assertEquals("{ element_type: text }", instanceBody(instance));
     }
 
@@ -155,7 +154,7 @@ class SchemaDesugarerTest {
         assertEquals(firstFieldType(document, "holder"), injected.name());
         assertTrue(injected.name().startsWith("map_text_integer_"), injected.name());
         Instance instance = (Instance) injected.typeDef();
-        assertEquals("map", instance.target());
+        assertEquals("meta.map", instance.target());
         assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
     }
 
@@ -248,8 +247,8 @@ class SchemaDesugarerTest {
      */
     @Test
     void derivedNamesDoNotRideOnTheAstsOwnStringForms() {
-        assertEquals("array_text_4cc4a482", onlyInjected(desugar("  holder => { xs: [text] }"), "array").name());
-        assertEquals("map_text_integer_5c4af9ec",
+        assertEquals("array_text_621f8dcb", onlyInjected(desugar("  holder => { xs: [text] }"), "array").name());
+        assertEquals("map_text_integer_d32c99ee",
                 onlyInjected(desugar("  holder => { m: {text => integer} }"), "map").name());
     }
 
@@ -257,7 +256,7 @@ class SchemaDesugarerTest {
     void aFormAnImportAlreadyDeclaresIsReferencedNotRedeclared() {
         // The name is derived from the binding record, so an identical form in an imported schema has already
         // produced this type. Redeclaring it would be rejected as a local-vs-import collision -- which is how
-        // this surfaced: meta.tn imports the meta-kernel and repeats several of its forms.
+        // this surfaced: meta.tn imports the kernel and repeats several of its forms.
         String name = onlyInjected(desugar("  holder => { xs: [text] }"), "array").name();
 
         SchemaDocument reusing = desugar("  holder => { xs: [text] }", Set.of(name));
@@ -274,7 +273,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  ids => [text]");
 
         Instance instance = instanceOf(document, "ids");
-        assertEquals("array", instance.target());
+        assertEquals("meta.array", instance.target());
         assertEquals("{ element_type: text }", instanceBody(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
@@ -284,7 +283,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  entries => {text => integer}");
 
         Instance instance = instanceOf(document, "entries");
-        assertEquals("map", instance.target());
+        assertEquals("meta.map", instance.target());
         assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
@@ -355,7 +354,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  pair => [integer, text]");
 
         Instance instance = instanceOf(document, "pair");
-        assertEquals("tuple", instance.target());
+        assertEquals("meta.tuple", instance.target());
         assertEquals("[ { element_type: integer } { element_type: text } ]", tupleElements(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
@@ -377,7 +376,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = desugar("  contact => (text | integer)");
 
         Instance instance = instanceOf(document, "contact");
-        assertEquals("choice", instance.target());
+        assertEquals("meta.choice", instance.target());
         assertEquals("{ variants: [text integer] }", variantsOf(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
@@ -549,20 +548,19 @@ class SchemaDesugarerTest {
                 .filter(declaration -> declaration.name().startsWith("array_p0_")).findFirst().orElseThrow();
         Instance template = assertInstanceOf(Instance.class, lifted.typeDef());
         assertEquals(List.of("p0"), template.typeParams());
-        assertEquals("array", template.target());
+        assertEquals("meta.array", template.target());
         // The open form is the closed form: one binding record, with the parameter simply standing where a
         // concrete element type would. There is no per-slot quotation to assert against.
         RecordValue payload = assertInstanceOf(RecordValue.class, template.value().coreValue());
         assertEquals(List.of("element_type"), payload.fields().stream().map(RecordValue.Field::name).toList());
         assertEquals(new TokenValue("p0", TokenForm.UNQUOTED),
-                payload.fields().getFirst().value().value().coreValue());
+                payload.fields().getFirst().value().coreValue());
 
-        // `box` itself is `!record { ... }` by the time it leaves this phase (§5.2), so the field applying
-        // the lifted form is a `type_ref` record inside the held binding record rather than a `GenericRef`
-        // in the AST.
-        Instance boxTemplate =
-                assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
-        assertEquals("record", boxTemplate.target());
+        // `box` itself is `!record_template { ... }` by the time it leaves this phase (§5.2), so the field
+        // applying the lifted form is a reference inside its payload rather than an `ApplicationRef` in the AST.
+        RecordTemplateDef boxTemplate =
+                assertInstanceOf(RecordTemplateDef.class, document.body().declarations().get("box").typeDef());
+        assertEquals(Optional.of("meta.record_template"), boxTemplate.payload().typeRef());
         assertEquals(applicationValue(lifted.name(), "T"), fieldSlot(boxTemplate, 0, "type"));
     }
 
@@ -586,7 +584,7 @@ class SchemaDesugarerTest {
         Instance template = assertInstanceOf(Instance.class,
                 document.body().declarations().get("vector").typeDef());
         assertEquals(List.of("T"), template.typeParams(), "the declaration's own parameters, as written");
-        assertEquals("array", template.target());
+        assertEquals("meta.array", template.target());
     }
 
     /** A concrete form inside a template still lifts closed: D5 has one rule, and the parameters do not enter it. */
@@ -601,9 +599,9 @@ class SchemaDesugarerTest {
 
     /**
      * A record <b>template</b> is normalised here -- §5.2's own rewrite, {@code { v: T }} into the
-     * {@code !record { fields: [ ... ] }} it denotes -- so that every open body is a held application and one
-     * process closes them all. The <b>application</b> of it still passes through untouched: substitution
-     * happens over the resolved open form ({@code TemplateMaterialiser}), not over the AST, so this phase
+     * {@code !record_template { fields: { ... }  parameters: [ ... ] }} it denotes, a whole parameter labelled while
+     * the parameters are in scope. The <b>application</b> of it still passes through untouched: substitution
+     * happens over the resolved template ({@code TemplateMaterialiser}), not over the AST, so this phase
      * leaves {@code box<text>}'s head and arguments alone.
      */
     @Test
@@ -612,17 +610,18 @@ class SchemaDesugarerTest {
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
 
-        Instance box = assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
-        assertEquals("record", box.target());
+        RecordTemplateDef box = assertInstanceOf(RecordTemplateDef.class,
+                document.body().declarations().get("box").typeDef());
+        assertEquals(Optional.of("meta.record_template"), box.payload().typeRef());
         assertEquals(List.of("T"), box.typeParams(), "the declaration's own list, as written");
         assertEquals(new TokenValue("v", TokenForm.UNQUOTED), fieldKey(box, 0),
-                "the field's name is its key in the held field map");
-        assertEquals(new TokenValue("T", TokenForm.UNQUOTED), fieldSlot(box, 0, "type"),
-                "the parameter stands in the slot, as it does in every other held form");
+                "the field's name is its key in the field map");
+        assertEquals(new TokenValue("T", TokenForm.UNQUOTED), fieldSlot(box, 0, "type_param"),
+                "a whole-type parameter is labelled where it is written");
 
         RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
                 .typeDef()).body();
-        assertEquals(new GenericRef("box", List.of(new TypeArg.Ref(new SimpleRef("text")))),
+        assertEquals(new ApplicationRef("box", List.of(new TypeArg.Ref(new NameRef("text")))),
                 ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
                 "the application is untouched");
     }
@@ -647,7 +646,7 @@ class SchemaDesugarerTest {
 
         RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
                 .typeDef()).body();
-        assertEquals(new GenericRef("box", List.of(new TypeArg.Ref(new SimpleRef("text")))),
+        assertEquals(new ApplicationRef("box", List.of(new TypeArg.Ref(new NameRef("text")))),
                 ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
                 "left for materialisation, arguments intact");
     }
@@ -701,13 +700,13 @@ class SchemaDesugarerTest {
      */
     private static String tupleElements(Instance instance) {
         var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
-        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().value().coreValue();
+        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().coreValue();
         StringBuilder out = new StringBuilder("[");
         for (var element : elements.elements()) {
-            var members = (io.ltr8.tson.compiler.ast.RecordValue) element.value().coreValue();
+            var members = (io.ltr8.tson.compiler.ast.RecordValue) element.coreValue();
             StringBuilder rendered = new StringBuilder("{");
             for (var member : members.fields()) {
-                var token = (io.ltr8.tson.compiler.ast.TokenValue) member.value().value().coreValue();
+                var token = (io.ltr8.tson.compiler.ast.TokenValue) member.value().coreValue();
                 rendered.append(' ').append(member.name()).append(": ").append(token.text()).append(' ');
             }
             out.append(' ').append(rendered.append('}').toString().replace("  }", " }"));
@@ -718,43 +717,83 @@ class SchemaDesugarerTest {
     /** Renders {@code !choice { variants: [...] }} as {@code { variants: [a b] }}. */
     private static String variantsOf(Instance instance) {
         var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
-        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().value().coreValue();
+        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().coreValue();
         return "{ variants: [" + elements.elements().stream()
-                .map(e -> ((io.ltr8.tson.compiler.ast.TokenValue) e.value().coreValue()).text())
+                .map(e -> ((io.ltr8.tson.compiler.ast.TokenValue) e.coreValue()).text())
                 .reduce((a, b) -> a + " " + b).orElse("") + "] }";
     }
 
-    /** The {@code fields} map of a held {@code !record} binding record. */
-    private static MapValue heldFields(Instance template) {
-        RecordValue binding = (RecordValue) template.value().coreValue();
+    /** The {@code fields} map of a record template's payload. */
+    private static MapValue heldFields(RecordTemplateDef template) {
+        RecordValue binding = (RecordValue) template.payload().coreValue();
         return (MapValue) binding.fields().stream().filter(f -> f.name().equals("fields"))
-                .findFirst().orElseThrow().value().value().coreValue();
+                .findFirst().orElseThrow().value().coreValue();
     }
 
-    /** The key -- the field's name -- of the {@code n}th entry in a held {@code !record}'s {@code fields}. */
-    private static CoreValue fieldKey(Instance template, int n) {
+    /** The key -- the field's name -- of the {@code n}th entry in a record template's {@code fields}. */
+    private static CoreValue fieldKey(RecordTemplateDef template, int n) {
         return heldFields(template).entries().get(n).key().coreValue();
     }
 
-    /** One member of the {@code n}th {@code record_field} in a held {@code !record} binding record. */
-    private static CoreValue fieldSlot(Instance template, int n, String member) {
-        RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().value().coreValue();
+    /** One member of the {@code n}th field in a record template's payload. */
+    private static CoreValue fieldSlot(RecordTemplateDef template, int n, String member) {
+        RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().coreValue();
         return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()
-                .value().value().coreValue();
+                .value().coreValue();
     }
 
-    /** {@code type_ref}'s record form, {@code { name: head  arguments: [ { name: arg } ] }}. */
+    // ── §5.2's position rule: a sibling reference stands only at a record field's type ─────────────
+
+    /** At a record field's type, and a group member's, a sibling reference passes through as written. */
+    @Test
+    void aSiblingReferenceAtAFieldsTypeIsKeptAsWritten() {
+        SchemaDocument document = desugar("  cell => { kind: meta.type_ref  v?: kind!  ( a: kind! | b: text ) }");
+        StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get("cell").typeDef();
+        FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
+        assertEquals(new SiblingRef("kind"), field.type().orElseThrow().typeRef());
+    }
+
+    /** A record template's field carries it into the template's payload as the reference value it is. */
+    @Test
+    void aRecordTemplateFieldCarriesASiblingReference() {
+        RecordTemplateDef template = assertInstanceOf(RecordTemplateDef.class, desugar(
+                "  cell => <T> { kind: meta.type_ref  v?: kind!  w: T }").body().declarations().get("cell").typeDef());
+        RecordValue fields = (RecordValue) template.payload().coreValue();
+        MapValue map = (MapValue) fields.fields().get(0).value().coreValue();
+        RecordValue v = (RecordValue) map.entries().get(1).value().coreValue();
+        assertEquals(new ReferenceValue(io.ltr8.tson.schema.meta.SiblingRef.of("kind")),
+                v.fields().get(0).value().coreValue());
+    }
+
+    /** Anywhere else in sugar it is refused before any lift, naming the slot. */
+    @Test
+    void aSiblingReferenceOffAFieldsTypeIsRefusedNamingTheSlot() {
+        Map<String, String> slots = Map.of(
+                "  cell => { kind: meta.type_ref  v: [ kind! ] }", "an array's element type",
+                "  cell => { kind: meta.type_ref  v: { text => kind! } }", "a map's value type",
+                "  cell => { kind: meta.type_ref  v: { kind! => text } }", "a map's key type",
+                "  cell => { kind: meta.type_ref  v: ( kind! | text ) }", "a choice variant",
+                "  cell => { kind: meta.type_ref  v: [ kind! text ] }", "a tuple element",
+                "  box => <T> { v: T }\n  cell => { kind: meta.type_ref  v: box< kind! > }", "a template argument",
+                "  x => kind!", "an alias target",
+                "  x => kind! ^ {}", "a refinement source",
+                "  x => kind! & { note: text }", "a composition operand");
+        slots.forEach((declarations, slot) -> {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> desugar(declarations), declarations);
+            assertEquals("a sibling reference ('kind!') stands only at a record field's type ([TSON-SCHEMA] §5.2), "
+                    + "not at " + slot, thrown.getMessage(), declarations);
+        });
+    }
+
+    /** An application in a slot: the data grammar's reference, {@code head<arg>}. */
     private static CoreValue applicationValue(String head, String argument) {
-        CoreValue argumentRecord = new RecordValue(List.of(new RecordValue.Field("name",
-                scoped(new TokenValue(argument, TokenForm.UNQUOTED)))));
-        CoreValue arguments = new ArrayValue(List.of(scoped(argumentRecord)));
-        return new RecordValue(List.of(
-                new RecordValue.Field("name", scoped(new TokenValue(head, TokenForm.UNQUOTED))),
-                new RecordValue.Field("arguments", scoped(arguments))));
+        return new ReferenceValue(io.ltr8.tson.schema.meta.TypeRef.of(head,
+                List.of(new io.ltr8.tson.schema.meta.TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(argument)))));
     }
 
-    private static ScopedValue scoped(CoreValue value) {
-        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
+    private static DataValue plain(CoreValue value) {
+        return new DataValue(List.of(), Optional.empty(), value);
     }
 
     /** Renders an {@code Instance}'s binding record as {@code { field: value  ... }} for readable assertions. */
@@ -762,7 +801,7 @@ class SchemaDesugarerTest {
         var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
         StringBuilder out = new StringBuilder("{");
         for (var field : record.fields()) {
-            var token = (io.ltr8.tson.compiler.ast.TokenValue) field.value().value().coreValue();
+            var token = (io.ltr8.tson.compiler.ast.TokenValue) field.value().coreValue();
             out.append(' ').append(field.name()).append(": ").append(token.text()).append(' ');
         }
         return out.append('}').toString().replace("  }", " }");

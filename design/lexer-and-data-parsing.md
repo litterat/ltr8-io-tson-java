@@ -16,14 +16,18 @@ form only; history lives in git.
 - NFC normalization applies to *unquoted* tokens only; `Pattern_White_Space` is the spec's fixed 11-character set,
   hardcoded.
 - `TsonDataStream` is the only thing that walks source text; `TsonDataParser` holds no grammar logic of its own.
+- A reference that is no bare name (§7.4) is one `ReferenceEvent`, one `ReferenceValue`, holding a `Reference`
+  assembled by the stream: an application, its `<` adjacent to an unquoted name, or a sibling reference, `kind!`, its
+  `!` adjacent to one unquoted identifier and followed by whitespace or the end of the document. A quoted token is
+  never a reference, and the lexer knows nothing of either.
 - `_id` lexes as the void sentinel then `id`, and the lexer never refuses it: the failure is a parse error at whichever
   half the grammar trips on, which `TsonDataStream.mismatch`/`parseError` extend with "quote it" (`underscored`).
   Refusing in the lexer would move a parser-category error into the lexer's.
 - Neither tier dedupes fields or keys, resolves `EmptyBrace`, or interprets token text — intentional gaps (§1.2). A name
   is the exception: type-ref, annotation and field names are matched against `IdentifierProfile`, after NFC
   normalisation for a field name.
-- The stream judges no document kind: it reads §2.2's header once, leaves a directive the header does not admit
-  unconsumed, and frames the root value on first demand, not with the header.
+- The stream judges no document kind: it reads §2.2's header (`[!!id] *!!import`) once, refusing anything else there,
+  reports the root's tag on request (`rootTag()`), and frames the root value on first demand, not with the header.
 
 Related: `design/base-types-and-atom-vocabulary.md` (base type resolution, the atom vocabulary),
 `design/schema-grammar.md` (the schema grammar built on this parser), `design/readers-and-diagnostics.md`.
@@ -101,7 +105,7 @@ fixed rather than kept.
   `Xid.UNICODE_VERSION` declares the version, as §7.1 asks.
 - **`Xid` is the shared property, and neither profile is it.** `Xid.isStart`/`isContinue` are exactly
   `XID_Start`/`XID_Continue`, joiners included; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts
-  nothing, and the kernel's `identifier` contract (`IdentifierProfile`) adds only `-`, requires NFC and applies
+  nothing, and the kernel's `meta.identifier` contract (`IdentifierProfile`) adds only `-`, requires NFC and applies
   the contextual joiner rule below. Keeping the property in one place is what stops the two drifting.
 - **ZWNJ/ZWJ continue a token; whether they may appear in a *name* is decided one layer up.** U+200C and
   U+200D are in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), and §7.1 admits them on that basis,
@@ -151,13 +155,13 @@ grammar, split by role, not duplicated:
 
 - **`TsonDataStream` (Tier 2)** is the only thing that walks source text: a lazy, pull-based
   `TsonEventSource` (`stream` package — `hasNext()`/`next()`/`peek()` over a sealed `TsonEvent` hierarchy:
-  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`SchemaRef`/`TokenEvent`/`VoidEvent`/... each carrying
+  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`TokenEvent`/`ReferenceEvent`/`VoidEvent`/... each carrying
   its own `Position`). Driven off `Lexer.nextToken()` with an explicit frame stack (memory is proportional
   to open-container depth, never document size) and at most two tokens of lookahead (only to disambiguate
   `{}` record-vs-map).
 - **`TsonDataParser` (Tier 3)** builds the full AST — the sealed `CoreValue` hierarchy in `ast`
-  (`RecordValue`/`MapValue`/`ArrayValue`/`EmptyBrace`/`VoidValue`/`TokenValue`) — by reducing the flat
-  event sequence back into a tree. It holds no grammar logic of its own.
+  (`RecordValue`/`MapValue`/`ArrayValue`/`EmptyBrace`/`VoidValue`/`TokenValue`/`ReferenceValue`) — by reducing
+  the flat event sequence back into a tree. It holds no grammar logic of its own.
 
 Key points:
 
@@ -178,66 +182,100 @@ Key points:
   rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets
   `TokenValue` text as boolean/number/string (base type resolution,
   `design/base-types-and-atom-vocabulary.md`). These are intentional gaps, not omissions.
+- **A reference is data grammar** ([TSON-DATA] §7.4): `reference = qualified-name "<" ws
+  type-args ws ">"`, each `type-arg` a reference or a token, a qualified name being a reference and any other token,
+  a number or a quoted token, a value argument. The lexer is unchanged, `<` and `>` lexing as single-character
+  special tokens, so `map<text list<int32>>` arrives as eight tokens and `>>` is two. `TsonDataStream` assembles one
+  whole (`opensArguments`, `referenceArguments`) into a single `ReferenceEvent` holding the parsed `TypeRef`, the
+  arguments classified as the grammar reads them, and `TsonDataParser` reduces it to a `ReferenceValue`; a qualified
+  name with no argument list stays a `TokenEvent`.
+  - **One event, not a container.** An argument is a reference or a token, never a structure, so a reference is
+    small; delivering it whole keeps every reader, skip (`EventSkip`, a leaf) and replay treating it as the one value
+    it is. A reader at a reference-typed position rolls a `ReferenceEvent` or a name token into one `TypeRef`; at any
+    other typed position a `ReferenceEvent` is a type mismatch.
+  - **The `<` is adjacent to the name (§7.5)**, and only an unquoted token takes one: `box <text>` and `"box"<text>`
+    are parse errors naming the rule, so **a quoted token is never a reference**, and `"box<text>"` is text. Inside the
+    list whitespace and commas are free, separated as an array's elements are; `box<>` is refused, as is a head that
+    is no qualified name (`requireQualifiedName`, each `.`-separated segment a §7.7 identifier). A qualified head
+    parses (`geo.address<T>`); what it names is the reader's or the resolver's to judge.
+  - **Where it stands**: anywhere a core value does, a map key included, the stream looking one token past a
+    `{`'s first key for an adjacent `<` or `!` to frame the map. A `!` tag is a qualified name with no arguments,
+    below.
+- **A sibling reference is data grammar too** ([TSON-DATA] §7.4): `sibling-ref =
+  unquoted-token "!"`. The lexer is unchanged, so `kind!` is an unquoted token and an adjacent `!`, and adjacency
+  tells it from a prefix `!`, which is adjacent to the token after it. `TsonDataStream` assembles it (`marksSibling`,
+  `siblingReference`) into a `ReferenceEvent` holding a `SiblingRef`, one value like an application.
+  - **The `!` is followed by whitespace or the end of the document (§7.5).** That is what leaves nothing to decide:
+    `a!b` (a sibling or a tag on `b`), `kind!}`, `kind!]`, `kind!,` and `kind!?` are parse errors naming the rule.
+    The writers always separate what follows a value by a space, so they never write one of these.
+  - **The token is one unquoted identifier, a single segment** (`ReferenceGrammar.isSiblingField`): `a.b!` would be a
+    chained projection, and `"kind"!` is refused because a quoted token is never a reference. A multi-line token's
+    end is past its closing line's terminator, so a `!` opening the next line is a prefix and never marks it.
+  - **Never an argument, never a tag.** `box<kind! >` is refused by the position rule (a sibling stands only at a
+    record field's type, [TSON-SCHEMA] §5.2) as the argument list is read, `TypeArgument.Ref` holding a type
+    reference; `!int32!` is refused by `parseTypeRefName`, a tag naming a type. Anywhere else a core value stands the
+    grammar admits one, and where it may stand is the reader's to judge: a slot reader whose component is a
+    `TypeRef` refuses it, and the reference atom's parser refuses it at a field typed by a type reference.
+  - **A schemaless read keeps it** as a `TsonSiblingReference`, the field and the mark (`design/tree-model.md`).
 - **§3.2's three type-expression forms are refused by name, not by the separation rule.** Array brackets,
   type arguments and the `?` suffix "exist only within the [TSON-SCHEMA] type-definition grammar, and their
   appearance after `!` in a data value is a parse error" — so `parseTypeRefName` checks for each and says
   which one was written and what to do instead. Left to the separation rule, `!paged<order>` reads as an
   adjacency problem ("expected whitespace before `'<'`"), whose advice produces a second error one column
-  later and never states the rule that stopped it: a data type-ref is a bare name, and an application is
+  later and never states the rule that stopped it: a data type-ref is a name without arguments, and an application is
   named in the schema (`my_type => paged<order>`) and referenced as `!my_type`. Argument lists are refused
   whether or not a space precedes them, since an adjacency message sends authors to the spaced spelling;
   `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
   unchanged and still catches everything else (`!int32"5"`).
-- **A name position takes an `identifier`, not merely a bare token, and the check sits in the grammar.**
-  `type-ref = "!" identifier` and `annotation = "@" identifier` (§7.4): `TsonDataStream` matches each name's
-  text in full against `IdentifierProfile` once adjacency is settled, which is §7.6's own two-layer shape —
+- **A name position takes an `meta.identifier`, not merely a bare token, and the check sits in the grammar.**
+  `type-ref = "!" qualified-name` and `annotation = "@" qualified-name` (§3.1, §3.2, §7.4): `TsonDataStream`
+  matches each `.`-separated segment of a tag's or an annotation's name (`requireQualifiedName`, none empty) in full
+  against `IdentifierProfile`
+  once adjacency is settled, which is §7.6's own two-layer shape —
   the lexer produces a token, and a production that is no part of the token-stream grammar then matches its
   decoded text, exactly as a number is matched. It has to be the profile and not the token class, because
   token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
-  because names and values share one lexical class. So `!42x` and `@x.y` are syntax errors rather than a
-  reference to an undeclared type and an annotation carrying a name the format reserves — the dot being
-  reserved as a future identifier separator. **`field-name` does not reach that check** ([TSON-DATA] §2.5,
-  [TSON-SCHEMA] §5.2): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`, narrower than
-  the map key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because what a
-  field name may be is its record's to say. The stream NFC-normalises the name and delivers it; `DefaultTsonReadContext`
-  judges each freshly pulled `FieldName` by the record's name type. A schemaless record's is the identifier, and a
-  failure there is `ATOM_FORM_INVALID`, a resolver error; under a schema a name the type refuses is the record
-  reader's `UNRECOGNIZED_FIELD` (`design/name-hygiene-read-path.md`). So schemaless
-  `{"first name": 1}` parses and is refused, and the diagnostic names the remedy the format already has: a key that
-  is not a name belongs in a map. A name declared in a schema is read by the same production
-  (`expectDeclaredFieldName`) and judged at link by its record's name type, a resolver error.
-  **Normalisation runs before the match**, which is the one thing the profile does not decide here.
-  `IdentifierProfile` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a
-  field name its identity by NFC-normalised comparison — a decomposed spelling is the same name, and a
-  duplicate rather than a malformed one. The lexer already normalises the unquoted spelling, so refusing the
-  form here would make the quoted spelling the stricter of the two, which is the asymmetry the rule removes.
-  **Quoting buys the lexical accidents of the unquoted form** — a name that would otherwise resolve as a number — and
-  never a key that is not a name; a key that is not a name is what a map is for, and the diagnostic says so. A map key
-  keeps all three token forms.
-- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `ParseException`** (`tson-base`'s,
-  which is what a malformed document raises) — and the
-  throw is `parseDocument`'s, on the `DocumentStart` the stream hands it, never the stream's own. This is a
-  Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
-  parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic). The
-  *stream* judges nothing: it reads §2.2's header once, for everyone, and `TsonSchemaParser` sits on the same
-  stream and requires the very directive this parser refuses -- taking its own `!!id`/`!!meta` off the same
-  `DocumentStart`, through `TsonDataParser.documentStart()`, so the grammar has one implementation and each
-  parser applies only its own rule on top.
-  - **`DocumentStart` carries all three of §2.2's directives**, so classifying a schema document (§7.1) is an answer
-    the events give. Whether one may be *read* is a conformance-class question one tier up — `TsonDataParser` and both
-    read facades raise `TsonUnsupportedDocumentException` on it, while `TsonSchemaParser` requires the directive. What
-    stays with each parser is its own rule: §12.1 requires exactly one `!!meta` where §2.2 merely permits it, and a
-    schema document governed by `!!schema` is told which directive it needs.
-- **A directive §2.2 does not admit in a header is left unconsumed**, not refused by the stream. `!!import`
-  is a schema document's and `TsonSchemaParser` reads it; a data document carrying one is an error, but the
-  wording that names the broken rule belongs to the parser that knows which kind of document was expected.
-  A refusal in the stream could only say *"expected `!!schema`, `!!meta` or the start of the document's value"*,
-  to a schema document whose actual problem was a missing `!!meta`. What the stream keeps is the
-  **value-position** rule (`notAValue`), which names the directive rather than saying "found `!!`" — true
-  whoever is reading, because nothing spelled `!!` can start a value.
+  because names and values share one lexical class. So `!42x`, `!x..y` and `@x..y` are syntax errors rather than a
+  reference to an undeclared type and an annotation carrying a name the format reserves. A dotted tag,
+  `!geo.address { … }`, names a member of a nested schema map, resolved by the reading schema's walk, and a dotted
+  annotation, `@atom.ordering`, names one the same way; a schemaless read keeps either as written, as it keeps any tag
+  (`preservingUnknownTypeRefs`). **`field-name` does not reach that check**
+  ([TSON-DATA] §2.5, [TSON-SCHEMA] §5.2): its production `unquoted-token / single-line-token` (`isFieldNameTokenType`,
+  narrower than the map key's `isBareTokenType`, a key being a value and not a name, §2.6) is the whole grammar rule, because
+  what a field name may be is its record's to say. The stream NFC-normalises the name and delivers it;
+  `DefaultTsonReadContext` judges each freshly pulled `FieldName` by the record's name type. A schemaless record's is the
+  identifier, and a failure there is `ATOM_FORM_INVALID`, a resolver error; under a schema a name the type refuses is the
+  record reader's `UNRECOGNIZED_FIELD` (`design/name-hygiene-read-path.md`). So schemaless `{"first name": 1}` parses and is
+  refused, and the diagnostic names the remedy the format already has: a key that is not a name belongs in a map. A name
+  declared in a schema is read by the same production (`expectDeclaredFieldName`) and judged at link by its record's name
+  type, a resolver error. **Normalisation runs before the match**, which is the one thing the profile does not decide here.
+  `IdentifierProfile` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a field name its
+  identity by NFC-normalised comparison — a decomposed spelling is the same name, and a duplicate rather than a malformed
+  one. The lexer already normalises the unquoted spelling, so refusing the form here would make the quoted spelling the
+  stricter of the two, which is the asymmetry the rule removes. **Quoting buys the lexical accidents of the unquoted form** —
+  a name that would otherwise resolve as a number — and never a key that is not a name; a key that is not a name is what a
+  map is for, and the diagnostic says so. A map key keeps all three token forms.
+- **A root tagged `!schema` throws `TsonUnsupportedDocumentException`, not `ParseException`** (`tson-base`'s,
+  which is what a malformed document raises) — and the throw is `parseDocument`'s, on the stream's `rootTag()`,
+  never the stream's own. This is a Class 1 processor; a schema document isn't malformed input, it's a well-formed
+  document of a kind this parser doesn't implement, and §8.1 requires that distinction be visible (a categorized
+  diagnostic). `parseResolvedForm()` reads the same document without the refusal: a resolved form is a data
+  document rooted `!schema`, and the caller says it is one. The *stream* judges nothing: `TsonSchemaParser` sits
+  on the same stream and requires the very tag this parser refuses, taking its `!!id`/`!!import`s off the same
+  `DocumentStart` through `TsonDataParser.documentStart()`, so the grammar has one implementation and each parser
+  applies only its own rule on top.
+  - **`rootTag()` looks past the root's leading annotations to its tag, consuming nothing** — the root is framed as
+    the first read would frame it and stepped only until the tag (or its absence) is known, so a schema map's sugar,
+    which no data frame reads, is never parsed to classify it. The annotations' values are: they stand before the
+    tag.
+- **The header grammar is judged in the stream, in full**, since it is one for every document: `!!meta` and
+  `!!schema` are refused naming their replacement (`!!import`, and the root's `!schema` tag), an unknown directive
+  and an `!!id` after an `!!import` naming §2.2's order. A directive past the header falls to the **value-position**
+  rule (`notAValue`), which names the directive rather than saying "found `!!`" — true whoever is reading, because
+  nothing spelled `!!` can start a value.
 - **The root value is framed on first demand, not with the header.** `fill()` pushes `RootFrame`/
   `DataValueFrame` the first time an event past `DocumentStart` is wanted, so reading only the header costs
-  nothing and leaves an empty frame stack — which is what lets a schema parser take `!!id`/`!!meta` off the
+  nothing and leaves an empty frame stack — which is what lets a schema parser take `!!id`/`!!import` off the
   event and then drive `drain` over a stack the header never touched. The stream therefore never needs to
   know what kind of document it holds: a schema document simply never asks for a value. `TsonDataStreamTest`
   pins both halves.

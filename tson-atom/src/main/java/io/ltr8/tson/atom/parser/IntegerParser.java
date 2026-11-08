@@ -9,24 +9,22 @@ import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.atom.number.NumberNarrowing;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import java.math.BigInteger;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Parses and validates against meta-kernel's {@code integer_type} constructor (§5.6's integer
+ * Parses and validates against the kernel's {@code integer_type} constructor (§5.6's integer
  * atoms; not yet {@code number}, {@code float32}/{@code float64}, {@code rational}, or {@code
  * complex} -- those are backed by different constructors, {@code decimal_type}/{@code float_type}/
  * {@code rational_type}/{@code complex_type}, and are separate work). Holds a {@link
- * io.ltr8.tson.schema.meta.IntegerType} -- the pure constraint *values* {@code integer_type}
+ * io.ltr8.tson.schema.numeric.IntegerType} -- the pure constraint *values* {@code integer_type}
  * declares in the schema ({@code size}/{@code min}/{@code exclusive_min}/{@code max}/{@code
  * exclusive_max}/{@code multiple_of}/{@code members}), unchanged by this split -- rather than declaring
  * those fields itself; this class contributes only the parsing/validation *behavior* that consumes them.
- * Every other built-in vocabulary constructor to come follows the same split (a {@code schema.meta}
+ * Every other built-in vocabulary constructor to come follows the same split (a schema-model
  * values class plus a {@code vocab} compiler holding it), not a one-off for the integer family.
  *
  * <p>Accepts only the {@code integer}/{@code based-integer} grammar forms (§7.6) -- §5.6's table is
@@ -48,6 +46,10 @@ import java.util.stream.Collectors;
  * short}), {@code NumberNarrowing} itself throws {@code ArithmeticException}, which is the caller's
  * problem to translate (mirroring how {@code TsonObjectReader}'s {@code AtomBinder} already handles the
  * same failure mode for untyped numbers, via the same shared narrowing code).
+ *
+ * <p>A width's range is judged by bit length ({@link IntegerSize#admits}) and never materialised, so a read
+ * under any {@code bits} a schema states is exact and allocates no bound: a {@code size} of three billion bits
+ * reads every value its range holds, into a {@link BigInteger}.
  */
 public record IntegerParser(IntegerType constraints) implements AtomTypeParser<Number> {
 
@@ -105,14 +107,11 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
      * are the same either way.
      */
     private void validate(BigInteger value, String text) {
-        if (constraints.size().isPresent()) {
+        if (constraints.size().isPresent() && !constraints.size().get().admits(value)) {
             IntegerSize s = constraints.size().get();
-            BigInteger[] bounds = bounds(s);
-            if (value.compareTo(bounds[0]) < 0 || value.compareTo(bounds[1]) > 0) {
-                throw new AtomValidationException("'" + text + "' is out of range for a "
-                        + (s.signed() ? "signed" : "unsigned") + " " + s.bits() + "-bit integer ["
-                        + bounds[0] + ", " + bounds[1] + "]", ">= " + bounds[0] + " and <= " + bounds[1]);
-            }
+            String[] range = range(s);
+            throw new AtomValidationException("'" + text + "' is out of range for a " + s.describe() + " integer ["
+                    + range[0] + ", " + range[1] + "]", ">= " + range[0] + " and <= " + range[1]);
         }
         if (constraints.min().isPresent() && value.compareTo(constraints.min().get()) < 0) {
             BigInteger m = constraints.min().get();
@@ -146,43 +145,26 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
     }
 
     /**
-     * {@code {min, max}} for {@code size} -- from {@link #STANDARD_BOUNDS} where the width is one the
-     * vocabulary declares, computed where it is not.
+     * {@code {min, max}} for {@code size}, as a refusal states them: a value's range is judged by
+     * {@link IntegerSize#admits}, never by these. A width up to {@link #SPELLED_BITS} is spelled out, a wider
+     * one by its power of two, so a refusal under any {@code bits} costs no more than its message.
      */
-    private static BigInteger[] bounds(IntegerSize size) {
-        BigInteger[] standard = STANDARD_BOUNDS.get(size);
-        return standard != null ? standard : new BigInteger[] {minValue(size), maxValue(size)};
-    }
-
-    /**
-     * The width bounds precomputed, because they are constants of the type and were being rebuilt on every
-     * value validated: {@code BigInteger.TWO.pow(bits)} per bound per integer read, which profiling put at
-     * 5% of everything a bind read allocated. Keyed by {@link IntegerSize} and covering the ladder core.tn
-     * declares; an exotic width falls through to {@link #bounds} computing its own, so nothing here grows
-     * with what a schema declares.
-     */
-    private static final Map<IntegerSize, BigInteger[]> STANDARD_BOUNDS = standardBounds();
-
-    private static Map<IntegerSize, BigInteger[]> standardBounds() {
-        Map<IntegerSize, BigInteger[]> table = new HashMap<>();
-        for (int bits : new int[] {8, 16, 32, 64, 128}) {
-            for (boolean signed : new boolean[] {true, false}) {
-                IntegerSize size = new IntegerSize(BigInteger.valueOf(bits), signed);
-                table.put(size, new BigInteger[] {minValue(size), maxValue(size)});
-            }
+    private static String[] range(IntegerSize size) {
+        BigInteger bits = size.bits();
+        if (bits.compareTo(BigInteger.valueOf(SPELLED_BITS)) <= 0) {
+            int n = bits.intValue();
+            return size.signed()
+                    ? new String[] {BigInteger.ONE.shiftLeft(n - 1).negate().toString(),
+                            BigInteger.ONE.shiftLeft(n - 1).subtract(BigInteger.ONE).toString()}
+                    : new String[] {"0", BigInteger.ONE.shiftLeft(n).subtract(BigInteger.ONE).toString()};
         }
-        return Map.copyOf(table);
+        return size.signed()
+                ? new String[] {"-2^" + bits.subtract(BigInteger.ONE), "2^" + bits.subtract(BigInteger.ONE) + " - 1"}
+                : new String[] {"0", "2^" + bits + " - 1"};
     }
 
-    private static BigInteger minValue(IntegerSize size) {
-        int bits = size.bits().intValueExact();
-        return size.signed() ? BigInteger.TWO.pow(bits - 1).negate() : BigInteger.ZERO;
-    }
-
-    private static BigInteger maxValue(IntegerSize size) {
-        int bits = size.bits().intValueExact();
-        return size.signed() ? BigInteger.TWO.pow(bits - 1).subtract(BigInteger.ONE) : BigInteger.TWO.pow(bits).subtract(BigInteger.ONE);
-    }
+    /** The widest width {@link #range} spells digit by digit: 256 bits is 78 digits. */
+    private static final int SPELLED_BITS = 256;
 
     /**
      * The narrowest standard boxed integer type that holds every value this size admits --
@@ -193,44 +175,26 @@ public record IntegerParser(IntegerType constraints) implements AtomTypeParser<N
      * signed or not, have no primitive that fits and fall through to {@link BigInteger}.
      */
     private static Class<?> hostType(IntegerSize size) {
-        Class<?> standard = STANDARD_HOSTS.get(size);
-        return standard != null ? standard : computeHostType(size);
-    }
-
-    /**
-     * {@link #hostType} for the ladder core.tn declares, computed once: {@link #read} asks it for every value,
-     * and deriving it means both width bounds, which is what {@link #STANDARD_BOUNDS} exists to avoid.
-     */
-    private static final Map<IntegerSize, Class<?>> STANDARD_HOSTS = standardHosts();
-
-    private static Map<IntegerSize, Class<?>> standardHosts() {
-        Map<IntegerSize, Class<?>> table = new HashMap<>();
-        STANDARD_BOUNDS.keySet().forEach(size -> table.put(size, computeHostType(size)));
-        return Map.copyOf(table);
-    }
-
-    private static Class<?> computeHostType(IntegerSize size) {
-        BigInteger[] bounds = bounds(size);
-        BigInteger min = bounds[0];
-        BigInteger max = bounds[1];
-        if (fits(min, max, Byte.MIN_VALUE, Byte.MAX_VALUE)) {
+        if (size.within(INT8)) {
             return Byte.class;
         }
-        if (fits(min, max, Short.MIN_VALUE, Short.MAX_VALUE)) {
+        if (size.within(INT16)) {
             return Short.class;
         }
-        if (fits(min, max, Integer.MIN_VALUE, Integer.MAX_VALUE)) {
+        if (size.within(INT32)) {
             return Integer.class;
         }
-        if (fits(min, max, Long.MIN_VALUE, Long.MAX_VALUE)) {
+        if (size.within(INT64)) {
             return Long.class;
         }
         return BigInteger.class;
     }
 
-    private static boolean fits(BigInteger min, BigInteger max, long primitiveMin, long primitiveMax) {
-        return min.compareTo(BigInteger.valueOf(primitiveMin)) >= 0 && max.compareTo(BigInteger.valueOf(primitiveMax)) <= 0;
-    }
+    /** The signed widths of Java's integral primitives, which {@link #hostType} fits a width into. */
+    private static final IntegerSize INT8 = new IntegerSize(Byte.SIZE, true);
+    private static final IntegerSize INT16 = new IntegerSize(Short.SIZE, true);
+    private static final IntegerSize INT32 = new IntegerSize(Integer.SIZE, true);
+    private static final IntegerSize INT64 = new IntegerSize(Long.SIZE, true);
 
     /**
      * The numeric targets narrowsIntegral reaches, and no text one: a number's wire form is a number,

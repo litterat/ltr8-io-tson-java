@@ -49,9 +49,9 @@ class CrossEncodingParityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/parity-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               person => {
                 name:   text
                 tries?: int32 ~ 0
@@ -60,9 +60,10 @@ class CrossEncodingParityTest {
               }
               sized  => [text; 2..3]
               unique => set<text>
+              label  => text
               stamps => set<datetime>
               pair   => [text, int32]
-              bounded => {
+              capped => {
                 value: int32
                 ( min: int32 | max: int32 )
               }
@@ -80,10 +81,10 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
-              port_label  => !text_type { members: ["80" "443"] }
+              port_label  => !unicode.text_type { members: ["80" "443"] }
               port_slot   => ( port_label | int32 )
               ported      => { p: port_slot }
-              answer      => !text_type { members: ["true" "false"] }
+              answer      => !unicode.text_type { members: ["true" "false"] }
               answer_slot => ( answer | boolean )
               answered    => { a: answer_slot }
               port_text   => ( port_label | text )
@@ -113,27 +114,38 @@ class CrossEncodingParityTest {
               int_box    => box<int32>
               text_box   => box<text>
               crate      => { b: box }
-              local_box  => { v: declared }
-              extern_box => { v: extern }
+              local_box  => { v: meta.declared }
               fragment   => { ( include: text | name?: text  type?: text ) }
               endpoint   => { ( host: text  port: int32 | socket: text )? }
               contact    => { ( email: text | phone: text )+ }
-              header_name => !identifier_type { start: NONE  continue: NONE
+              header_name => !unicode.identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: NFKC_CASEFOLD }
               headers     => { header_name => text }
-              field_name  => !identifier_type { start: NONE  continue: NONE
+              folded_name  => !unicode.identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
                 normalization: ASCII_CASEFOLD }
-              fields      => { field_name => text }
+              fields      => { folded_name => text }
               pinned      => { h: header_name = Idempotency-Key }
-              charset     => !text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
+              charset     => !unicode.text_type { members: [UTF-8 us-ascii]  normalization: NFKC_CASEFOLD }
               encoded     => { c: charset }
-              safe_header => !enum_type { name_type: header_name  members: [Accept content-type] }
+              safe_header => !meta.enum_type { name_type: header_name  members: [Accept content-type] }
               screened    => { h: safe_header }
-              stock_id    => !uuid_type {}
-              customer_id => !uuid_type {}
-              ided        => { id: kind<uuid_type> }
+              stock_id    => !net.uuid_type {}
+              customer_id => !net.uuid_type {}
+              ided        => { id: meta.ref<net.uuid_type> }
+              typed       => { t: meta.type_ref }
+              cell        => { kind: meta.type_ref  v?: kind! }
+              int_cell    => cell ^ { kind?: = int32 }
+              defaulted   => { kind?: meta.type_ref ~ int32  v?: kind! }
+              grouped     => { ( kind: meta.type_ref | name: text )  v?: kind! }
+              tmpl        => <T> { item: T }
+              order       => { id: text }
+              customer    => { name: text }
+              o1          => !order { id: A-1 }
+              c1          => !customer { name: Ada }
+              order_ref   => meta.ref<order>
+              order_pick  => { which: order_ref  also?: meta.ref<order> ~ o1 }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -157,7 +169,7 @@ class CrossEncodingParityTest {
     }
 
     private static List<Verdict> tson(String rootType, String body) {
-        return Verdict.of(TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, body)));
+        return Verdict.of(TSON.validate("!!import:\"%s\"\n!%s %s".formatted(ID, rootType, body)));
     }
 
     private static List<Verdict> json(String rootType, String body) {
@@ -213,7 +225,7 @@ class CrossEncodingParityTest {
      * here is right, that component being data rather than prose.
      */
     private static void sameRule(String rootType, String tsonBody, String jsonBody) {
-        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
+        List<Diagnostic> fromTson = TSON.validate("!!import:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
         assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
         List<Diagnostic> fromJson = jsonDiagnostics(rootType, jsonBody);
         assertEquals(fromTson.stream().map(Rule::of).toList(), fromJson.stream().map(Rule::of).toList(),
@@ -222,7 +234,7 @@ class CrossEncodingParityTest {
 
     /** Both encodings refuse on the same codes at the same pointers; the JSON diagnostics, for what is left. */
     private static List<Diagnostic> sameCodeAndPath(String rootType, String tsonBody, String jsonBody) {
-        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
+        List<Diagnostic> fromTson = TSON.validate("!!import:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
         assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
         List<Diagnostic> fromJson = jsonDiagnostics(rootType, jsonBody);
         assertEquals(fromTson.stream().map(d -> d.code() + " " + d.path()).toList(),
@@ -270,7 +282,7 @@ class CrossEncodingParityTest {
     @Test
     void bothTreesKeepWhichSpellingOfAVoidValueArrived() {
         TsonRecord text = (TsonRecord) TSON.treeReader().read("""
-                !!schema:"%s"
+                !!import:"%s"
                 !marks { from: _  timeout: _  version: "2.0" }""".formatted(ID));
         JsonObject json = (JsonObject) jsonTree("marks", """
                 {"from": null, "timeout": null, "version": "2.0"}""");
@@ -395,7 +407,7 @@ class CrossEncodingParityTest {
      */
     @Test
     void aTagContradictingTheDiscriminatorIsRefusedInBothAndStatedDifferently() {
-        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!kennel %s".formatted(ID,
+        List<Diagnostic> fromTson = TSON.validate("!!import:\"%s\"\n!kennel %s".formatted(ID,
                 "{ p: !cat { pet_type: dog  name: Rex  breed: corgi } }"));
         assertEquals(List.of(new Rule(Diagnostic.Code.TYPE_MISMATCH, "/p", "dog", fromTson.getFirst().message())),
                 fromTson.stream().map(Rule::of).toList());
@@ -459,7 +471,7 @@ class CrossEncodingParityTest {
      * The same family over a <b>template</b>: {@code outcome<text>} is abstract and {@code won<text>} is its
      * one member. Every entry in it is minted, and §8.2 makes a minted name non-normative -- so the alias is
      * the only name either document has for the member, and both encodings have to flatten it (§7.2's "after
-     * reference flattening of both"). TSON text did not, and the two stacks disagreed about every value in
+     * alias flattening of both"). TSON text did not, and the two stacks disagreed about every value in
      * such a family.
      */
     @Test
@@ -520,17 +532,17 @@ class CrossEncodingParityTest {
                 {"b": {"$type": "box", "v": 1}}""");
     }
 
-    // ── §8.5 scoped positions: the value names its own type ──────────────────
+    // ── §8.5 declared positions: the value names its own type ────────────────
 
     @Test
-    void aScopedValueNamingAGoverningTypeIsAcceptedByBoth() {
+    void aDeclaredValueNamingAGoverningTypeIsAcceptedByBoth() {
         bothAccept("local_box", "{ v: !robot { serial: R2 } }", """
                 {"v": {"$type": "robot", "serial": "R2"}}""");
     }
 
     /** A value naming no type has nothing to be read as, in either encoding. */
     @Test
-    void anUntypedValueAtAScopedPositionIsRefusedInBoth() {
+    void anUntypedValueAtADeclaredPositionIsRefusedInBoth() {
         sameVerdict("local_box", "{ v: { serial: R2 } }", """
                 {"v": {"serial": "R2"}}""");
     }
@@ -539,15 +551,6 @@ class CrossEncodingParityTest {
     void aNameTheGoverningSchemaDoesNotHoldIsRefusedInBoth() {
         sameVerdict("local_box", "{ v: !nowhere { serial: R2 } }", """
                 {"v": {"$type": "nowhere", "serial": "R2"}}""");
-    }
-
-    /** A cell the instance does not hold: a scope push at `declared`, and a bare type at `extern`. */
-    @Test
-    void aCellTheInstanceDoesNotHoldIsRefusedInBoth() {
-        sameVerdict("local_box", "{ v: !!schema:\"https://example.test/other.tn\" !robot { serial: R2 } }", """
-                {"v": {"$schema": "https://example.test/other.tn", "$type": "robot", "serial": "R2"}}""");
-        sameVerdict("extern_box", "{ v: !robot { serial: R2 } }", """
-                {"v": {"$type": "robot", "serial": "R2"}}""");
     }
 
     // ── Kind positions ([TSON-SCHEMA] §4.2): an atom whose values are member names ───────────────────
@@ -570,6 +573,128 @@ class CrossEncodingParityTest {
     void aValueOfAMemberAtAKindIsRefusedByBoth() {
         sameVerdict("ided", "{ id: \"7d3e5f8a-1b2c-4d5e-8f90-a1b2c3d4e5f6\" }", """
                 {"id": "7d3e5f8a-1b2c-4d5e-8f90-a1b2c3d4e5f6"}""");
+    }
+
+    /**
+     * A kind may hold an applied type, judged through the entry the closure closed it to: {@code unique =>
+     * set<text>} is a type, and no type built with {@code uuid_type} ([TSON-SCHEMA] §4.2, §7.4). TSON writes the
+     * reference unquoted, as data grammar; JSON, having no unquoted form, writes the same text as a string.
+     */
+    @Test
+    void anApplicationAtAKindIsJudgedThroughItsEntryByBoth() {
+        bothAccept("typed", "{ t: set< text > }", """
+                {"t": "set<text>"}""");
+        sameVerdict("ided", "{ id: set<text> }", """
+                {"id": "set<text>"}""");
+    }
+
+    /**
+     * An argument is compared past its alias chain ([TSON-SCHEMA] §8.2): over {@code label => text}, {@code set<label>}
+     * is {@code set<text>}, which the schema closes as {@code unique}, in either encoding.
+     */
+    @Test
+    void anAliasedArgumentAtAKindIsJudgedThroughItsEntryByBoth() {
+        bothAccept("typed", "{ t: set<label> }", """
+                {"t": "set<label>"}""");
+    }
+
+    /**
+     * A reference over a type that is no constructor names a value of the governing schema, judged by what the name
+     * reaches ([TSON-SCHEMA] §4.2, §5.12): TSON writes the name unquoted, JSON the same text as a string. A name
+     * reaching nothing, a value of another type or a type is refused by both, on the same code at the same pointer,
+     * and a default written inline is the value both hold where the field is omitted.
+     */
+    @Test
+    void aValueByNameIsJudgedByWhatItReachesInBoth() {
+        bothAccept("order_pick", "{ which: o1 }", """
+                {"which": "o1"}""");
+        bothAccept("order_pick", "{ which: o1  also: o1 }", """
+                {"which": "o1", "also": "o1"}""");
+        for (String refused : List.of("nope", "c1", "order")) {
+            sameVerdict("order_pick", "{ which: " + refused + " }", """
+                    {"which": "%s"}""".formatted(refused));
+            assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/which")),
+                    tson("order_pick", "{ which: " + refused + " }"), refused);
+        }
+        sameVerdict("order_pick", "{ which: o1  also: c1 }", """
+                {"which": "o1", "also": "c1"}""");
+    }
+
+    /** An application nothing in the closure closed names no type the schema closes, and is refused by both. */
+    @Test
+    void anUnclosedApplicationAtAKindIsRefusedByBoth() {
+        sameVerdict("typed", "{ t: set<int32> }", """
+                {"t": "set<int32>"}""");
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
+                tson("typed", "{ t: set<int32> }").stream().map(Verdict::code).toList());
+    }
+
+    /**
+     * A sibling reference is a reference value, read by the same production in both encodings: unquoted in TSON, a
+     * string holding the same text in JSON. It stands only at a record field's type, so a field typed by a type
+     * reference refuses it, on the same code at the same pointer in both.
+     */
+    @Test
+    void aSiblingReferenceAtAKindIsRefusedByBoth() {
+        sameVerdict("typed", "{ t: kind! }", """
+                {"t": "kind!"}""");
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
+                tson("typed", "{ t: kind! }").stream().map(Verdict::code).toList());
+    }
+
+    /**
+     * A dependent field ([TSON-SCHEMA] §5.2) is read in both encodings against the type its sibling names in the same
+     * record -- the sibling as written, its default, or its pin -- and refused alike: a value of another type, a free
+     * sibling written after it, and a sibling naming a template, which is refused at the sibling.
+     */
+    @Test
+    void aDependentFieldIsReadAgainstItsSiblingByBoth() {
+        bothAccept("cell", "{ kind: int32  v: 5 }", """
+                {"kind": "int32", "v": 5}""");
+        bothAccept("defaulted", "{ v: 7 }", """
+                {"v": 7}""");
+        bothAccept("int_cell", "{ v: 7  kind: int32 }", """
+                {"v": 7, "kind": "int32"}""");
+        sameVerdict("cell", "{ kind: point  v: 5 }", """
+                {"kind": "point", "v": 5}""");
+        sameVerdict("cell", "{ v: 5  kind: int32 }", """
+                {"v": 5, "kind": "int32"}""");
+        sameVerdict("defaulted", "{ v: 5  kind: int32 }", """
+                {"v": 5, "kind": "int32"}""");
+        sameVerdict("cell", "{ kind: tmpl  v: { item: 5 } }", """
+                {"kind": "tmpl", "v": {"item": 5}}""");
+        assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/v")),
+                tson("cell", "{ v: 5  kind: int32 }"));
+        assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/kind")),
+                tson("cell", "{ kind: tmpl  v: { item: 5 } }"));
+    }
+
+    /**
+     * A sibling that is a field group's member is absent when another option is chosen: a dependent field written
+     * beside that option has no type, refused alike and at the same pointer, and in words that say it is absent. A
+     * required sibling that never arrives is the missing-field error alone.
+     */
+    @Test
+    void aDependentFieldWithoutItsSiblingIsRefusedByBoth() {
+        bothAccept("grouped", "{ kind: int32  v: 5 }", """
+                {"kind": "int32", "v": 5}""");
+        bothAccept("grouped", "{ name: x }", """
+                {"name": "x"}""");
+        sameVerdict("grouped", "{ name: x  v: 5 }", """
+                {"name": "x", "v": 5}""");
+        sameVerdict("grouped", "{ v: 5  kind: int32 }", """
+                {"v": 5, "kind": "int32"}""");
+        sameVerdict("cell", "{ v: 5 }", """
+                {"v": 5}""");
+        assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/v")),
+                json("grouped", """
+                        {"name": "x", "v": 5}"""));
+        assertEquals(List.of(new Verdict(Diagnostic.Code.FIELD_REQUIRED, "/kind")),
+                json("cell", """
+                        {"v": 5}"""));
+        String message = jsonDiagnostics("grouped", """
+                {"name": "x", "v": 5}""").getFirst().message();
+        assertTrue(message.contains("is written without 'kind'"), message);
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {
@@ -694,7 +819,7 @@ class CrossEncodingParityTest {
 
     @Test
     void aRequiredGroupWithNoMemberPresent() {
-        sameRule("bounded", """
+        sameRule("capped", """
                 { value: 1 }""", """
                 {"value": 1}""");
     }
@@ -899,7 +1024,7 @@ class CrossEncodingParityTest {
 
     @Test
     void aRequiredGroupWithTwoMembersPresent() {
-        sameRule("bounded", """
+        sameRule("capped", """
                 { value: 1  min: 0  max: 9 }""", """
                 {"value": 1, "min": 0, "max": 9}""");
     }

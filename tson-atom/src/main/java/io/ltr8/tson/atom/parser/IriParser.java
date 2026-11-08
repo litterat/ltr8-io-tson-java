@@ -4,14 +4,14 @@ import io.ltr8.net.Iri;
 import io.ltr8.net.IriSyntaxException;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.schema.meta.IriType;
+import io.ltr8.tson.schema.net.IriType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * Parses and validates against the meta-kernel's {@code iri_type} constructor (§5.5's {@code iri} and {@code
+ * Parses and validates against the kernel's {@code iri_type} constructor (§5.5's {@code iri} and {@code
  * iri_reference} atoms), RFC 3987.
  *
  * <p><b>The grammar is RFC 3987's own, through {@link Iri}</b>: every character beyond US-ASCII is a {@code
@@ -36,7 +36,7 @@ public record IriParser(IriType constraints) implements AtomTypeParser<Iri> {
     /** {@code iri => !iri_reference ^ { allow_relative: false }} -- §5.5's {@code !iri}, which has a scheme. */
     public static final IriParser UNCONSTRAINED = new IriParser(IriType.IRI);
 
-    /** {@code iri_reference => !iri_type {}} -- §5.5's {@code !iri_reference}, an IRI or a relative reference. */
+    /** {@code iri_reference => !net.iri_type {}} -- §5.5's {@code !iri_reference}, an IRI or a relative reference. */
     public static final IriParser REFERENCE = new IriParser(IriType.REFERENCE);
 
     /** {@link #REFERENCE} bound to {@code java.net.URI}, the reading a {@code URI} component gets. */

@@ -5,7 +5,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -16,8 +16,6 @@ import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
-
-import java.math.BigInteger;
 
 import java.util.List;
 import java.util.Optional;
@@ -49,9 +47,9 @@ class RecordTemplateTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/template.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -61,8 +59,8 @@ class RecordTemplateTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -71,7 +69,7 @@ class RecordTemplateTest {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record);
         return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .type().name();
+                .typeRef().name();
     }
 
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
@@ -244,7 +242,7 @@ class RecordTemplateTest {
 
         assertEquals(2, instantiationsOf(compiled, "box").size());
         String outer = fieldType(compiled, "holder", "b");
-        String inner = fieldOf(compiled, outer, "v").type().name();
+        String inner = fieldOf(compiled, outer, "v").typeRef().name();
         assertEquals(TypeRef.of("text"), fieldOf(compiled, inner, "v").type());
     }
 
@@ -266,7 +264,7 @@ class RecordTemplateTest {
         // declaration names, is still minted.
         assertEquals(1, instantiationsOf(compiled, "box").size(),
                 () -> "the inner box is minted, the outer is `nested`: " + instantiationsOf(compiled, "box"));
-        assertEquals(instantiationsOf(compiled, "box").get(0), fieldOf(compiled, "nested", "v").type().name(),
+        assertEquals(instantiationsOf(compiled, "box").get(0), fieldOf(compiled, "nested", "v").typeRef().name(),
                 "the outer's field names the inner entry");
         assertEquals("3", fieldOf(compiled, "three", "n").value().orElseThrow().text());
     }
@@ -283,7 +281,7 @@ class RecordTemplateTest {
 
         List<String> made = instantiationsOf(compiled, "chain");
         assertEquals(1, made.size(), () -> "one entry, not an infinite family: " + made);
-        assertEquals(made.get(0), fieldOf(compiled, made.get(0), "tail").type().name(),
+        assertEquals(made.get(0), fieldOf(compiled, made.get(0), "tail").typeRef().name(),
                 "the tail references the entry it sits in");
     }
 
@@ -415,8 +413,8 @@ class RecordTemplateTest {
         ArrayBody closed = (ArrayBody) compiled.schema().entries()
                 .get(fieldType(compiled, fieldType(compiled, "holder", "t"), "xs"));
 
-        assertEquals(Optional.of(BigInteger.TWO), closed.minItems());
-        assertEquals(Optional.of(BigInteger.TWO), closed.maxItems());
+        assertEquals(Optional.of(2L), closed.minItems());
+        assertEquals(Optional.of(2L), closed.maxItems());
     }
 
     /** A declaration's own body is the construction, not a reference to a lifted one -- unchanged by R2. */
@@ -497,18 +495,17 @@ class RecordTemplateTest {
 
     /**
      * A composition operand that is an application is absorbed by value, never closed, and absorbing it
-     * resolves the head through {@code SchemaResolver}'s namespace getter -- which is also the memo the
-     * circular-composition guard rides on. A cycle reached *through* an application must still be caught there
-     * rather than recursing.
+     * resolves the head through the resolution's wait order -- which is also where an entry waiting on itself is
+     * refused. A cycle reached *through* an application must still be caught there rather than recursing.
      */
     @Test
-    void aCycleThroughAnApplicationIsStillCaughtAsACircularComposition() {
+    void aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           a => b<text> & { x: text }
                           b => <T> a & { y: T }"""));
 
-        assertTrue(thrown.getMessage().contains("circular composition/refinement chain"), thrown.getMessage());
+        assertTrue(thrown.getMessage().startsWith("'a' waits on 'b' waits on 'a'"), thrown.getMessage());
     }
 
     // ── Author errors, reported at the application site ──────────────────
@@ -523,14 +520,9 @@ class RecordTemplateTest {
     }
 
     /**
-     * A literal applied where the body uses the parameter as a <b>type</b> is still refused -- the substituted
-     * token stands in a type position, and nothing declares a type called {@code 3}.
-     *
-     * <p><b>The verdict arrives as an unresolved reference rather than as a kind error</b>, because a held
-     * body has no slot types: §5.10's argument-kind rule ("a reference argument binds a type parameter, a
-     * literal binds a value parameter") is enforced by knowing what the slot expected, and holding is
-     * precisely not knowing that until materialisation. What survives is the consequence -- a literal in a
-     * type position resolves to nothing -- which is why this half is caught and its converse below is not.
+     * A literal applied where the template uses the parameter as a <b>type</b> is a kind error: {@code T} is the
+     * field's {@code type_param}, so its argument names a type, and {@code 3} is no name -- refused where the
+     * argument is substituted for the label, at the application (§5.10).
      */
     @Test
     void applyingAValueWhereTheBodyUsesAParameterAsATypeIsAnError() {
@@ -538,14 +530,14 @@ class RecordTemplateTest {
                 () -> compile("""
                           box => <T> { v: T }
                           holder => { b: box<3> }"""));
-        assertTrue(thrown.getMessage().contains("'3': U+0033 at index 0 cannot start an identifier"),
-                thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'box<...>' binds the type parameter 'T' to '3', which is no type -- "
+                + "'3': U+0033 at index 0 cannot start an identifier"), thrown.getMessage());
     }
 
     /**
      * <b>The converse is caught at the application.</b> A type name applied where the body routes the parameter
      * into a field's <em>value</em> binds {@code N}, whose recorded type is the field's own {@code int32}
-     * ({@code template_param.type}, §5.10), so {@code text} is refused as an argument that is not an
+     * ({@code meta.template_param.type}, §5.10), so {@code text} is refused as an argument that is not an
      * {@code int32} value -- at {@code retry<text>}, before substitution puts it in the {@code value} slot where
      * §5.2's value conformance would otherwise be the first rule to see it.
      */
@@ -627,7 +619,7 @@ class RecordTemplateTest {
     }
 
     /**
-     * §5.10 is explicit that a reference template composes during substitution with "no intermediate entry
+     * §5.10 is explicit that an alias template composes during substitution with "no intermediate entry
      * per alias hop", so a chain of them lands on the one entry the innermost application denotes.
      */
     @Test
@@ -645,9 +637,9 @@ class RecordTemplateTest {
         assertEquals(instantiationsOf(compiled, "pair").get(0), fieldType(compiled, "holder", "p"));
     }
 
-    /** The degenerate reference template: its body <em>is</em> the parameter, so applying it is the argument. */
+    /** The degenerate alias template: its body <em>is</em> the parameter, so applying it is the argument. */
     @Test
-    void aReferenceTemplateWhoseBodyIsTheParameterClosesToTheArgument() {
+    void anAliasTemplateWhoseBodyIsTheParameterClosesToTheArgument() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: T }
                   ident  => <T> T
@@ -671,8 +663,8 @@ class RecordTemplateTest {
         ArrayBody array = assertInstanceOf(ArrayBody.class,
                 compiled.schema().entries().get(synthetic));
         assertEquals(TypeRef.of("int32"), array.elementType());
-        assertEquals(Optional.of(BigInteger.valueOf(3)), array.minItems());
-        assertEquals(Optional.of(BigInteger.valueOf(3)), array.maxItems());
+        assertEquals(Optional.of(3L), array.minItems());
+        assertEquals(Optional.of(3L), array.maxItems());
     }
 
     /** Arity is the <b>alias's</b> own parameter list, not the arity of the application it names. */
@@ -688,17 +680,17 @@ class RecordTemplateTest {
     }
 
     /**
-     * A reference template that applies itself never reaches a body, and -- unlike a recursive record --
+     * An alias template that applies itself never reaches a body, and -- unlike a recursive record --
      * mints no entry a knot could be tied on. Diagnosed as the author's error rather than handing a field
      * the name of an entry nothing defines.
      */
     @Test
-    void aSelfApplyingReferenceTemplateIsASchemaError() {
+    void aSelfApplyingAliasTemplateIsASchemaError() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
                   loop   => <T> loop<T>
                   holder => { p: loop<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("reference template whose own body applies it again"),
+        assertTrue(thrown.getMessage().contains("alias template whose own body applies it again"),
                 thrown.getMessage());
     }
 

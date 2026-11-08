@@ -7,7 +7,7 @@ import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.unicode.RestrictionLevel;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 
 import java.io.IOException;
@@ -16,9 +16,9 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Compiles this module's own {@code diagnostics.tn} (a small schema, governed by meta.tn and
- * importing core.tn, declaring {@code diagnostic}/{@code policy}/{@code
- * validation_report}/{@code file_report}/{@code validation_run}), *compiled* in object-binding mode --
+ * Compiles this module's own {@code diagnostics.tn} (a small schema, importing core.tn and
+ * policy.tn, declaring {@code diagnostic}/{@code validation_report}/{@code file_report}/{@code
+ * validation_run} over policy.tn's {@code policy.processor}), *compiled* in object-binding mode --
  * bound directly to {@link CliDiagnostic}/{@link CliPolicy}/{@link ValidationReport}/{@link
  * FileReport}/{@link ValidationRun} via
  * {@link #BINDER} -- what {@link OutputFormat#TSON} reads a written report back through, to prove
@@ -38,14 +38,14 @@ final class DiagnosticsSchema {
         case "file_report" -> FileReport.class;
         case "validation_report" -> ValidationReport.class;
         case "diagnostic" -> CliDiagnostic.class;
-        case "policy" -> CliPolicy.class;
-        case "identifier_policy" -> CliPolicy.CliIdentifierPolicy.class;
-        case "script_policy" -> CliPolicy.CliScriptPolicy.class;
-        case "limits" -> CliPolicy.CliLimits.class;
+        case "policy.processor" -> CliPolicy.class;
+        case "policy.identifier_policy" -> CliPolicy.CliIdentifierPolicy.class;
+        case "policy.script_policy" -> CliPolicy.CliScriptPolicy.class;
+        case "policy.limits" -> CliPolicy.CliLimits.class;
         case "diagnostic_code" -> Diagnostic.Code.class;
         case "outcome" -> Outcome.class;
-        case "restriction_level" -> RestrictionLevel.class;
-        default -> SchemaMetaNameBinder.INSTANCE.resolve(name);
+        case "policy.restriction_level" -> RestrictionLevel.class;
+        default -> SchemaModelNameBinder.INSTANCE.resolve(name);
     };
 
     private DiagnosticsSchema() {

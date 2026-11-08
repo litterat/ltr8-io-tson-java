@@ -2,7 +2,7 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.Cidr6Type;
+import io.ltr8.tson.schema.net.Cidr6Type;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -25,7 +25,8 @@ class Cidr6ParserTest {
 
     private static Cidr6Parser withPrefixBounds(Integer min, Integer max) {
         return new Cidr6Parser(new Cidr6Type("https://www.rfc-editor.org/rfc/rfc4291",
-                Optional.ofNullable(min), Optional.ofNullable(max), List.of(), List.of()));
+                Optional.ofNullable(min).map(Integer::longValue), Optional.ofNullable(max).map(Integer::longValue),
+                List.of(), List.of()));
     }
 
     @ParameterizedTest

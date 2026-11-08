@@ -27,9 +27,9 @@ class JsonContainerReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/containers-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               person => {
                 name:     text
                 nickname?: text?
@@ -45,7 +45,7 @@ class JsonContainerReadTest {
                 version:   text = "2.0"
               }
 
-              bounded => {
+              capped => {
                 value: int32
                 ( min: int32 | max: int32 )
               }
@@ -63,7 +63,7 @@ class JsonContainerReadTest {
               maybe_pair => [text?, int32]
               nested     => { who: person  labels: [text] }
 
-              answer     => !text_type { members: ["true" "false"] }
+              answer     => !unicode.text_type { members: ["true" "false"] }
               survey     => { reply?: answer ~ "true"  agreed?: boolean ~ true }
             }
             """;
@@ -286,11 +286,11 @@ class JsonContainerReadTest {
 
     @Test
     void aRequiredGroupTakesExactlyOneMember() {
-        read("bounded", """
+        read("capped", """
                 {"value": 1, "min": 0}""").accepted();
-        assertEquals(Diagnostic.Code.FIELD_GROUP, read("bounded", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("capped", """
                 {"value": 1}""").refusal().code());
-        assertEquals(Diagnostic.Code.FIELD_GROUP, read("bounded", """
+        assertEquals(Diagnostic.Code.FIELD_GROUP, read("capped", """
                 {"value": 1, "min": 0, "max": 9}""").refusal().code());
     }
 

@@ -4,7 +4,6 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.TsonSchema;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,13 +34,13 @@ class EntryDisplayNameTest {
         return EntryDisplayName.of(name, value, TsonSchema.EntryFacts.NONE, Optional.empty());
     }
 
-    private static ArrayBody array(Optional<BigInteger> min, Optional<BigInteger> max) {
+    private static ArrayBody array(Optional<Long> min, Optional<Long> max) {
         return new ArrayBody(TypeRef.of("order"), false, true, false, min, max);
     }
 
     @Test
     void aDeclarationKeepsItsOwnNameWhateverItsShape() {
-        Top declared = array(Optional.of(BigInteger.ONE), Optional.empty());
+        Top declared = array(Optional.of(1L), Optional.empty());
 
         assertEquals("tag_list", EntryDisplayName.of("tag_list", declared,
                 TsonSchema.EntryFacts.at(Optional.of(SOMEWHERE)), Optional.empty()));
@@ -50,17 +49,17 @@ class EntryDisplayNameTest {
     @Test
     void anArrayRendersAsItsSugarWithEverySizeForm() {
         assertEquals("[order]", minted("x", array(Optional.empty(), Optional.empty())));
-        assertEquals("[order; 1..]", minted("x", array(Optional.of(BigInteger.ONE), Optional.empty())));
-        assertEquals("[order; ..5]", minted("x", array(Optional.empty(), Optional.of(BigInteger.valueOf(5)))));
-        assertEquals("[order; 1..2]", minted("x", array(Optional.of(BigInteger.ONE), Optional.of(BigInteger.TWO))));
+        assertEquals("[order; 1..]", minted("x", array(Optional.of(1L), Optional.empty())));
+        assertEquals("[order; ..5]", minted("x", array(Optional.empty(), Optional.of(5L))));
+        assertEquals("[order; 1..2]", minted("x", array(Optional.of(1L), Optional.of(2L))));
         assertEquals("[order; 3]",
-                minted("x", array(Optional.of(BigInteger.valueOf(3)), Optional.of(BigInteger.valueOf(3)))));
+                minted("x", array(Optional.of(3L), Optional.of(3L))));
     }
 
     @Test
     void aMapRendersAsItsSugar() {
         MapBody body = new MapBody(TypeRef.of("text"), TypeRef.of("order"), false, false,
-                Optional.of(BigInteger.ONE), Optional.empty());
+                Optional.of(1L), Optional.empty());
 
         assertEquals("{text => order; 1..}", minted("x", body));
     }
@@ -81,7 +80,7 @@ class EntryDisplayNameTest {
      */
     @Test
     void anInstantiationEntryRendersAsTheApplication() {
-        TypeRef application = new TypeRef("paged", List.of(new TypeArgument.Ref(TypeRef.of("order")),
+        TypeRef application = TypeRef.of("paged", List.of(new TypeArgument.Ref(TypeRef.of("order")),
                 new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED))));
 
         assertEquals("paged<order, 3>", EntryDisplayName.of("paged_order_3_abc", RecordBody.of(RecordBody.fieldMap()),

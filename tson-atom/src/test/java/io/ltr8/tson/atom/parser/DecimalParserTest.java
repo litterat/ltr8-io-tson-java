@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
 import org.junit.jupiter.api.Test;
-import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.numeric.DecimalType;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -18,7 +18,7 @@ class DecimalParserTest {
     }
 
     private static DecimalParser decimalType(Optional<BigDecimal> min, Optional<BigDecimal> multipleOf,
-                                             Optional<Integer> totalDigits, Optional<Integer> fractionDigits) {
+                                             Optional<Long> totalDigits, Optional<Long> fractionDigits) {
         return new DecimalParser(min, Optional.empty(), Optional.empty(), Optional.empty(),
                 multipleOf, totalDigits, fractionDigits);
     }
@@ -78,14 +78,14 @@ class DecimalParserTest {
 
     @Test
     void totalDigitsRejectsTooManySignificantDigits() {
-        DecimalParser type = decimalType(Optional.empty(), Optional.empty(), Optional.of(3), Optional.empty());
+        DecimalParser type = decimalType(Optional.empty(), Optional.empty(), Optional.of(3L), Optional.empty());
         assertEquals(new BigDecimal("123"), type.read(token("123")));
         assertThrows(AtomValidationException.class, () -> type.read(token("1234")));
     }
 
     @Test
     void fractionDigitsRejectsTooManyDecimalPlaces() {
-        DecimalParser type = decimalType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(2));
+        DecimalParser type = decimalType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(2L));
         assertEquals(new BigDecimal("1.23"), type.read(token("1.23")));
         assertThrows(AtomValidationException.class, () -> type.read(token("1.234")));
     }
@@ -130,11 +130,11 @@ class DecimalParserTest {
 
     @Test
     void aTrailingZeroChangesNeitherMembershipNorTheDigitCounts() {
-        // meta.tn: "scale is not part of the value -- 1, 1.0 and 1.00 are one value", so no facet may see
+        // numeric.tn: "scale is not part of the value -- 1, 1.0 and 1.00 are one value", so no facet may see
         // the difference. 2.500 is the member 2.50, is a whole number of tenths, and has three significant
         // digits rather than four.
         DecimalParser type = new DecimalParser(new DecimalType(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(3), Optional.of(1),
+                Optional.empty(), Optional.empty(), Optional.of(3L), Optional.of(1L),
                 Optional.of(List.of(new BigDecimal("2.50")))));
         assertEquals(new BigDecimal("2.500"), type.read(token("2.500")));
     }

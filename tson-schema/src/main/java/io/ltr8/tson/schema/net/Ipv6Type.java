@@ -1,0 +1,88 @@
+package io.ltr8.tson.schema.net;
+
+import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Typename;
+import io.ltr8.tson.schema.atom.AtomCoherence;
+import io.ltr8.tson.schema.atom.AtomNarrowing;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.TypeChain;
+
+import io.ltr8.net.CidrInet6Network;
+
+import java.util.List;
+
+/**
+ * net.tn's {@code net.ipv6_type} constructor (IPv6 address constraint vocabulary, RFC 4291) --
+ * {@link Ipv4Type}'s exact IPv6 counterpart, same shape, different RFC citation, each list entry a {@code
+ * cidr6}. Pure constraint values, no parsing/validation behavior -- {@code tson-atom}'s {@code Ipv6Parser} does
+ * the actual reading/writing. See {@link Cidr4Type}'s own Javadoc for why {@code spec} is a flat {@link String}
+ * and {@code within}/{@code excluding} are bare lists with a defensive compact constructor.
+ */
+@Typename(name = "net.ipv6_type")
+public record Ipv6Type(TypeChain chain,
+        String spec, List<CidrInet6Network> within, List<CidrInet6Network> excluding) implements Atom {
+
+    @Record
+
+    public Ipv6Type {
+        chain = TypeChain.orEmpty(chain);
+        within = within != null ? List.copyOf(within) : List.of();
+        excluding = excluding != null ? List.copyOf(excluding) : List.of();
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public Ipv6Type(String spec, List<CidrInet6Network> within, List<CidrInet6Network> excluding) {
+        this(TypeChain.EMPTY, spec, within, excluding);
+    }
+
+    @Override
+    public Ipv6Type withChain(TypeChain chain) {
+        return new Ipv6Type(chain, spec, within, excluding);
+    }
+
+    /** {@code ipv6 => !net.ipv6_type {}} -- the unconstrained IPv6 address, net.tn's own {@code !ipv6}. */
+    public static final Ipv6Type UNCONSTRAINED =
+            new Ipv6Type("https://www.rfc-editor.org/rfc/rfc4291", List.of(), List.of());
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Two list facets pulling in opposite directions. {@code within} admits only addresses inside the
+     * networks it names, so a refinement narrows by <b>shrinking</b> it to a subset; {@code excluding}
+     * removes addresses, so a refinement narrows by <b>growing</b> it. {@code spec} is fixed by the
+     * constructor and has nothing to compare.
+     *
+     * <p><b>Both are compared by entry</b>, a network equal to a network, rather than by containment, so a
+     * refinement naming a strictly smaller network than the source's is refused here even though it narrows.
+     * That is the conservative direction -- it refuses a legal refinement rather than admitting an illegal
+     * one -- and it is what a stated relation would replace. The containment arithmetic to decide it properly does exist
+     * now ({@code io.ltr8.net.CidrNetwork}); what is missing is the spec rule saying which way a set facet
+     * narrows, which [TSON-SCHEMA] §5.7 requires.
+     */
+    @Override
+    public java.util.List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof Ipv6Type other)) {
+            return java.util.List.of("refines an ipv6 with " + refined.getClass().getSimpleName());
+        }
+        java.util.List<String> violations = new java.util.ArrayList<>();
+        AtomNarrowing.checkSubset(violations, "within", within, other.within);
+        AtomNarrowing.checkSuperset(violations, "excluding", excluding, other.excluding);
+        return java.util.List.copyOf(violations);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Every entry is a network already, the facets being typed {@code [cidr6]}, so what is left is to
+     * judge the two <b>together</b>: an {@code excluding} list covering every network {@code
+     * within} permits admits no address, and the emptiness question is exactly what this check is for. Cover
+     * over a prefix tree is decidable exactly -- see {@code AtomCoherence.checkAdmitsAValue} -- so nothing is
+     * approximated and no pair is left undecided.
+     */
+    @Override
+    public java.util.List<String> coherenceCheck() {
+        java.util.List<String> violations = new java.util.ArrayList<>();
+        AtomCoherence.checkAdmitsAValue(violations, "address", within, excluding, 128);
+        return java.util.List.copyOf(violations);
+    }
+}

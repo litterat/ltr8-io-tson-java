@@ -3,12 +3,12 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -40,7 +40,7 @@ class MultiErrorCollectionTest {
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
+        TsonCompiledVocabularyRegistry core = new TsonCompiledVocabularyRegistry(SchemaModelNameBinder.defaultContext());
         return TsonCompiledSchemaRegistry.tree(core).compile(linkedSchema);
     }
 
@@ -54,7 +54,7 @@ class MultiErrorCollectionTest {
                 Map.entry("tag", RecordField.required(TypeRef.of("integer"))),
                 Map.entry("items", RecordField.required(TypeRef.of("numbers"))))));
         TsonSchema schema = new TsonSchema("https://example.test/multi-error.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         String dataSource = """

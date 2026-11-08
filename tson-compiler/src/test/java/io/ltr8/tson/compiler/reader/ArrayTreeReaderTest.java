@@ -10,7 +10,7 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -46,7 +46,7 @@ class ArrayTreeReaderTest {
         entries.put("integer", integerEntry());
         entries.putAll(extraEntries);
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
@@ -75,7 +75,7 @@ class ArrayTreeReaderTest {
     @Test
     void minItemsRejectsAShorterArray() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
-                Optional.of(BigInteger.TWO), Optional.empty());
+                Optional.of(2L), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
@@ -85,7 +85,7 @@ class ArrayTreeReaderTest {
     @Test
     void maxItemsRejectsALongerArray() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), false, true, false,
-                Optional.empty(), Optional.of(BigInteger.TWO));
+                Optional.empty(), Optional.of(2L));
         TsonCompiledSchema compiled = compile(Map.of("numbers", body));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));

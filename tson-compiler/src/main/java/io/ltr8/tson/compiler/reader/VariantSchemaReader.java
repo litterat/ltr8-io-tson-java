@@ -21,7 +21,7 @@ import java.util.Set;
  * RecordBindReader.Factory} specifically when the declaration's own bound Java class is a real
  * {@code DataClassRecord} rather than a marker {@code DataClassUnion} -- {@code text_type} is the
  * one real fixture case (composing with {@code uri_type}/{@code regex_type}/{@code email_type} on
- * top of it, but itself directly instantiable as a plain {@link io.ltr8.tson.schema.meta.TextType}).
+ * top of it, but itself directly instantiable as a plain {@link io.ltr8.tson.schema.unicode.TextType}).
  * A pure marker root with no data of its own (bound to a Java sealed interface, e.g. {@code
  * top}/{@code atom}) still goes through {@link VariantBindReader} instead, whose {@code ownParser} is
  * a stand-in that always throws.
@@ -30,7 +30,7 @@ import java.util.Set;
  * value with no type-ref, or one naming this declaration itself, reads via {@code ownParser}
  * unconditionally; only a value naming something else dispatches by resolving that name against
  * {@code resolver}, the same compiled-schema path every other dispatch in this codebase uses (e.g.
- * an explicit {@code !uri_type {...}} value at a {@code text_type}-typed position dispatches straight
+ * an explicit {@code !net.uri_type {...}} value at a {@code text_type}-typed position dispatches straight
  * to {@code uri_type}'s own already-compiled reader, producing a real {@code UriType}, not a
  * {@code TextType}).
  *
@@ -53,7 +53,7 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
     /**
      * {@code selfNames} are the written names that mean <em>this</em> type and so read through
      * {@code ownParser} rather than dispatching: the entry's own name, plus any alias that flattens to it.
-     * §7.2 compares "after reference flattening of both", so an alias is not a different type to be
+     * §7.2 compares "after alias flattening of both", so an alias is not a different type to be
      * dispatched to -- resolving it would arrive back here and recurse.
      */
     VariantSchemaReader(String name, Collection<String> selfNames, TsonTypeReader<?> ownParser,

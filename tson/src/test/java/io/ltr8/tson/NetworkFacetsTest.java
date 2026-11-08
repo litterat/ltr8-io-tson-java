@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * §5.5's {@code within} and {@code excluding}, which were declared by four constructors and applied by none.
  *
- * <p><b>The two families read them differently, and meta.tn says so.</b> For an <em>address</em>: it "must
+ * <p><b>The two families read them differently, and net.tn says so.</b> For an <em>address</em>: it "must
  * lie inside at least one {@code within} network when the field is present, and inside no {@code excluding}
  * network — {@code excluding} carves holes out of {@code within}". For a <em>network</em>: the value "must be
  * a subnet of at least one" {@code within}, and "must not overlap any listed" {@code excluding} — "overlap,
@@ -31,10 +31,10 @@ class NetworkFacetsTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            !!import:"https://tson.io/2026/38/m/net.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/39/m/net.tn"
+            !schema {
               private_v4 => !ipv4 ^ { within: ["10.0.0.0/8" "192.168.0.0/16"]  excluding: ["10.1.0.0/16"] }
               subnet     => !cidr4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.1.0.0/16"] }
               v6         => !ipv6 ^ { within: ["2001:db8::/32"] }
@@ -45,7 +45,7 @@ class NetworkFacetsTest {
     private static List<Diagnostic> read(String field, String value) {
         Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
-        return tson.validate("!!schema:\"" + ID + "\"\n!holder { " + field + ": \"" + value + "\" }");
+        return tson.validate("!!import:\"" + ID + "\"\n!holder { " + field + ": \"" + value + "\" }");
     }
 
     private static void accepts(String field, String value) {
@@ -112,22 +112,21 @@ class NetworkFacetsTest {
 
     /**
      * A malformed entry is refused at schema load rather than surfacing as every value failing against a
-     * constraint the author believes they wrote. The facets are typed {@code [value]}, so nothing in the
-     * vocabulary catches it.
+     * constraint the author believes they wrote. The facets are typed {@code [cidr4]}, so the entry is read by
+     * {@code cidr4} like any other value of it, and refused by that reader.
      */
     @Test
     void aMalformedNetworkInTheListIsRefusedAtSchemaLoad() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/bad-network.tn"
-                        !!meta:"https://tson.io/2026/38/m/meta.tn"
-                        !!import:"https://tson.io/2026/38/m/core.tn"
-                        !!import:"https://tson.io/2026/38/m/net.tn"
-                        { oops => !ipv4 ^ { within: ["10.0.0.0" "not-a-network"] } }
+                        !!import:"https://tson.io/2026/39/m/meta.tn"
+                        !!import:"https://tson.io/2026/39/m/core.tn"
+                        !!import:"https://tson.io/2026/39/m/net.tn"
+                        !schema { oops => !ipv4 ^ { within: ["10.0.0.0" "not-a-network"] } }
                         """));
 
-        assertTrue(thrown.getMessage().contains("not-a-network"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("10.0.0.0"), "every bad entry is named: " + thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'10.0.0.0' is not a valid IPv4 network"), thrown.getMessage());
     }
 
     /**
@@ -140,10 +139,10 @@ class NetworkFacetsTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/empty-network-pair.tn"
-                        !!meta:"https://tson.io/2026/38/m/meta.tn"
-                        !!import:"https://tson.io/2026/38/m/core.tn"
-                        !!import:"https://tson.io/2026/38/m/net.tn"
-                        { oops => !ipv4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.0.0.0/9" "10.128.0.0/9"] } }
+                        !!import:"https://tson.io/2026/39/m/meta.tn"
+                        !!import:"https://tson.io/2026/39/m/core.tn"
+                        !!import:"https://tson.io/2026/39/m/net.tn"
+                        !schema { oops => !ipv4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.0.0.0/9" "10.128.0.0/9"] } }
                         """));
 
         assertTrue(thrown.getMessage().contains("admit no address"), thrown.getMessage());
@@ -159,10 +158,10 @@ class NetworkFacetsTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/empty-network-bound.tn"
-                        !!meta:"https://tson.io/2026/38/m/meta.tn"
-                        !!import:"https://tson.io/2026/38/m/core.tn"
-                        !!import:"https://tson.io/2026/38/m/net.tn"
-                        { oops => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]
+                        !!import:"https://tson.io/2026/39/m/meta.tn"
+                        !!import:"https://tson.io/2026/39/m/core.tn"
+                        !!import:"https://tson.io/2026/39/m/net.tn"
+                        !schema { oops => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]
                                              max_prefix: 24 } }
                         """));
 
@@ -175,13 +174,13 @@ class NetworkFacetsTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/inhabited-network-bound.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                !!import:"https://tson.io/2026/38/m/net.tn"
-                { ok => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]  max_prefix: 25 }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/net.tn"
+                !schema { ok => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]  max_prefix: 25 }
                   holder => { n?: ok? } }
                 """);
-        String document = "!!schema:\"https://example.test/inhabited-network-bound.tn\"\n"
+        String document = "!!import:\"https://example.test/inhabited-network-bound.tn\"\n"
                 + "!holder { n: \"10.0.0.128/25\" }";
         assertTrue(tson.validate(document).isEmpty(), () -> "the surviving block reads: " + tson.validate(document));
     }

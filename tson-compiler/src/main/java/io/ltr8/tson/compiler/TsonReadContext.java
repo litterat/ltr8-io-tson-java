@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -8,7 +9,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.stream.FieldName;
@@ -54,7 +55,7 @@ import java.util.function.BiConsumer;
  * SchemaLocation} explains: a record re-anchors the identity and position on itself because it declares the
  * field the pointer ends with, while an atom's or container's own declaration is only a seed, taken when
  * nothing encloses it. So a diagnostic from inside the {@code int32} reader for {@code person}'s {@code age}
- * field carries person.tn's {@code /person/age}, not core.tn's {@code int32}; the same atom read at the root
+ * field carries person.tn's {@code /person/age}, not numeric.tn's {@code int32}; the same atom read at the root
  * of a document still carries its own.
  *
  * <p>The pointer itself is accumulated on descent, not claimed: {@link #schemaField} steps both the data path
@@ -204,8 +205,8 @@ public interface TsonReadContext {
      */
     record FieldNameRule(String typeName, AtomType<?> type, IdentifierProfile profile, Normalization form) {
 
-        /** The kernel's {@code field_name}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
-        public static final FieldNameRule FIELD_NAME = new FieldNameRule("field_name",
+        /** The kernel's {@code meta.field_name}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
+        public static final FieldNameRule FIELD_NAME = new FieldNameRule("meta.field_name",
                 AtomParsers.forType(IdentifierType.IDENTIFIER).orElseThrow(), IdentifierGrammar.PROFILE,
                 Normalization.NFC);
 
@@ -241,8 +242,9 @@ public interface TsonReadContext {
     IdentifierPolicy identifierPolicy();
 
     /**
-     * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a data
-     * entry's body, replayed through the governing meta's readers by the resolver ({@link #schemaDocument}).
+     * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a value
+     * entry's payload, replayed through the readers of the schema declaring its head by the resolver ({@link
+     * #schemaDocument}).
      * There, and only there, a bare name at a record position is a value written by name rather than §5.6's
      * positional fill ([TSON-SCHEMA] §5.6): a schema has a namespace to resolve the name in, and a data document
      * has none. False for every data document, so a data read is unchanged by the rule.
@@ -250,8 +252,17 @@ public interface TsonReadContext {
     boolean readsSchemaDocument();
 
     /**
-     * Whether this reads a value body in a schema document -- an instance of a namespace type, whose values the
-     * resolver never lifts or mints -- rather than one of the kernel's own bodies, where a
+     * Whether a name at a kind- or reference-typed position here resolves in the document being read rather than
+     * in the closure this read's readers were compiled over: a schema document's value, which the resolver reads
+     * ({@link #readsSchemaDocument()}), or a value of the kernel's {@code schema} read as data, a resolved form.
+     * Such a name is read by its grammar alone, and what it names is judged where that schema links, or at ingest
+     * ([TSON-SCHEMA] §4.2, §8.1). False for every data document, whose kinds are judged by membership.
+     */
+    boolean readsSchemaNames();
+
+    /**
+     * Whether this reads a value body in a schema document -- a value entry's payload, a value of an ordinary type,
+     * which the resolver never lifts or mints in -- rather than a construction's binding record, where a
      * sugar lift may leave an application in a slot for the closer to mint.
      */
     boolean readsValueBody();
@@ -267,13 +278,37 @@ public interface TsonReadContext {
                     io.ltr8.tson.schema.meta.Ref<?> cell);
 
     /**
+     * Records the value of the dependent field this context is at, held as written in a schema document ([TSON-SCHEMA]
+     * §5.2), with the slot it fills: {@code sibling} is the field typing it, declared as {@code declared}, and {@code
+     * named} what the sibling holds in this instance, null where the read produced no reference there. {@code
+     * written} is the value's events ({@link #asWritten}). Only a schema document's read keeps it, handing it to the
+     * sink its factory was given ({@link #schemaDocument}), for the linker to judge against the type the sibling names
+     * in the reading schema's namespace.
+     */
+    void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.RecordField declared,
+                       io.ltr8.tson.schema.meta.Reference named, List<TsonEvent> written);
+
+    /**
      * Where a schema document's read hands each reference it produces by name: its slot, the slot's declared type,
-     * the name, and the host's {@code Ref} cell where the host holds one.
+     * the name, and the host's {@code Ref} cell where the host holds one -- and each dependent field's value it holds
+     * as written ({@link #heldAsWritten(TsonSchema.HeldValue)}).
      */
     @FunctionalInterface
     interface HeldByName {
         void held(List<String> slot, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.TypeRef reference,
                   io.ltr8.tson.schema.meta.Ref<?> cell);
+
+        /** A dependent field's value the read held as written ({@link TsonReadContext#heldAsWritten}). */
+        default void heldAsWritten(TsonSchema.HeldValue value) {
+        }
+
+        /**
+         * The read reached {@code declaration}: a reader began reading a part of the value against the entry it
+         * locates ({@link #inRecord}, {@link #underDeclaration}). What a resolution counts as a wait of the entry it
+         * is making ready ([TSON-SCHEMA] §3.4.1: a read waits on each type a part of the value is read against).
+         */
+        default void reached(SchemaLocation declaration) {
+        }
     }
 
     /**
@@ -335,7 +370,7 @@ public interface TsonReadContext {
 
     /**
      * {@link #throwing} for a value inside a schema document, which {@link #readsSchemaDocument()} answers true
-     * for -- the resolver's replay of a constructor's binding record or a namespace entry's map, and nothing else.
+     * for -- the resolver's replay of a constructor's binding record or a value entry's payload, and nothing else.
      * Each reference the read produces by name reaches {@code heldByName} with its slot ({@link #heldByName}).
      */
     static TsonReadContext schemaDocument(TsonEventSource events, IdentifierPolicy identifierPolicy,
@@ -371,7 +406,15 @@ public interface TsonReadContext {
     }
 
     /**
-     * Skips the scoped value at {@code ctx}'s cursor -- a record field's, any {@code !!schema} directive included --
+     * The events of the one data-value at {@code ctx}'s cursor, looked ahead at and put back ({@link #lookingAhead}):
+     * a value held as written, which something reads again later against a type the read does not know.
+     */
+    static List<TsonEvent> asWritten(TsonReadContext ctx) {
+        return DefaultTsonReadContext.asWritten(ctx);
+    }
+
+    /**
+     * Skips the data value at {@code ctx}'s cursor -- a record field's --
      * holding no name in it to a name rule: the value of a field its record does not declare, which is reported
      * once, at the field, and read no further. No type governs it, so judging its names by the schemaless rule
      * would hand down verdicts its producer's schema might not share, beside the one problem that is real; the

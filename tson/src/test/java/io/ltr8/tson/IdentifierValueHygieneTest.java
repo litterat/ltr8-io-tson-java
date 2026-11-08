@@ -12,7 +12,7 @@ import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -42,19 +42,19 @@ class IdentifierValueHygieneTest {
     private static final String ID = "https://example.test/names-2.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/names-2.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
-              identifier => !identifier_type { continue_add: "-" }
-              js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
-              handlers => { identifier => text }
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
+              slug => !unicode.identifier_type { continue_add: "-" }
+              js_name => !unicode.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+              handlers => { slug => text }
               bindings => { js_name => text }
               labels => { text => text }
-              route => { name: identifier }
-              registry => { handlers: { identifier => text } }
-              team => { roles: set<identifier> }
-              ranked => !array { element_type: identifier  unique_items: true }
-              lists => { path: [identifier]  tags: set<text>  counts: set<int32> }
+              route => { name: slug }
+              registry => { handlers: { slug => text } }
+              team => { roles: set<slug> }
+              ranked => !meta.array { element_type: slug  unique_items: true }
+              lists => { path: [slug]  tags: set<text>  counts: set<int32> }
             }
             """;
 
@@ -78,7 +78,7 @@ class IdentifierValueHygieneTest {
                 .withIdentifierPolicy(identifiers)
                 .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("registry", Registry.class, "team", Team.class))
-                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                                .orElse(SchemaModelNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
     }
 
@@ -87,7 +87,7 @@ class IdentifierValueHygieneTest {
     }
 
     private static List<Diagnostic> validate(IdentifierPolicy identifiers, String body) {
-        return tson(identifiers).validate("!!schema:\"" + ID + "\"\n" + body);
+        return tson(identifiers).validate("!!import:\"" + ID + "\"\n" + body);
     }
 
     /** The one diagnostic {@code body} draws, asserting it is the only one. */
@@ -172,23 +172,39 @@ class IdentifierValueHygieneTest {
     @Test
     void aSchemasOwnIdentifierTypedValueIsAName() {
         List<Diagnostic> refused = tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
-                "account => { role?: identifier ~ " + MIXED + " }"));
+                "account => { role?: slug ~ " + MIXED + " }"));
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(refused).code());
         assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, only(tson(IdentifierPolicy.defaults())
-                .validateSchema(schemaWith("account => { kind: identifier = a\u0132b }"))).code());
+                .validateSchema(schemaWith("account => { kind: slug = a\u0132b }"))).code());
 
         assertEquals(List.of(), tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
-                "account => { role?: identifier ~ admin  bind?: js_name ~ \"$scope\"  tag?: text ~ " + MIXED + " }")));
+                "account => { role?: slug ~ admin  bind?: js_name ~ \"$scope\"  tag?: text ~ " + MIXED + " }")));
+    }
+
+    /**
+     * A record template's literal value is every application's, so it is judged once, at the template, against the
+     * template's own declaration -- applied or not. A value parameter is no literal of the template's and is judged
+     * where an application writes its argument.
+     */
+    @Test
+    void aRecordTemplatesIdentifierTypedValueIsAName() {
+        Diagnostic refused = only(tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
+                "acct => <T> { kind: slug = a\u0132b  v: T }")));
+        assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, refused.code());
+        assertEquals(Optional.of("/acct"), refused.schemaPointer());
+
+        assertEquals(List.of(), tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
+                "acct => <T, K> { kind: slug = K  v: T }")));
     }
 
     private static String schemaWith(String declaration) {
         return """
                 !!id:"https://example.test/names-3.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
-                  identifier => !identifier_type { continue_add: "-" }
-                  js_name => !identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
+                  slug => !unicode.identifier_type { continue_add: "-" }
+                  js_name => !unicode.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
                   %s
                 }
                 """.formatted(declaration);
@@ -199,7 +215,7 @@ class IdentifierValueHygieneTest {
     void bindingRefusesTheSameKeys() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
         Tson tson = tson(IdentifierPolicy.defaults());
-        tson.objectReader().withDiagnostics(problems).read("!!schema:\"" + ID + "\"\n!registry { handlers: { pass => a  "
+        tson.objectReader().withDiagnostics(problems).read("!!import:\"" + ID + "\"\n!registry { handlers: { pass => a  "
                 + CYRILLIC_PASS + " => b } }", Registry.class);
         assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, only(problems.diagnostics()).code());
     }
@@ -235,7 +251,7 @@ class IdentifierValueHygieneTest {
     void bindingRefusesTheSameElements() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
         tson(IdentifierPolicy.defaults()).objectReader().withDiagnostics(problems)
-                .read("!!schema:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }", Team.class);
+                .read("!!import:\"" + ID + "\"\n!team { roles: [pass " + CYRILLIC_PASS + "] }", Team.class);
         assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, only(problems.diagnostics()).code());
     }
 
@@ -251,7 +267,7 @@ class IdentifierValueHygieneTest {
 
         DiagnosticsCollector problems = new DiagnosticsCollector();
         tson(IdentifierPolicy.defaults()).objectReader().withDiagnostics(problems)
-                .read("!!schema:\"" + ID + "\"\n!team { roles: [admin " + MIXED + "] }", Team.class);
+                .read("!!import:\"" + ID + "\"\n!team { roles: [admin " + MIXED + "] }", Team.class);
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, only(problems.diagnostics()).code());
     }
 }

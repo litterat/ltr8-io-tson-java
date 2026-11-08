@@ -2,14 +2,13 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
-import java.math.BigInteger;
 import java.util.Optional;
 
 /**
  * The {@code precision} facet of the temporal atom families (§5.5), shared by {@link TimeParser} and
  * {@link DateTimeParser} because it is one rule stated once for both.
  *
- * <p><b>It is a constraint on the value, not on the spelling</b>, which meta.tn's own {@code @doc} for
+ * <p><b>It is a constraint on the value, not on the spelling</b>, which temporal.tn's own {@code @doc} for
  * {@code time_type} states and gives the example for: {@code precision: N} admits a value that is a whole
  * number of 10⁻ᴺ seconds, and reading "admits any spelling of an admitted value, trailing zeros included, so
  * {@code 12:00:00.500} is admitted under {@code precision: 1}". So the test is on the
@@ -72,13 +71,13 @@ final class FractionalSeconds {
      * @param text      the token as written, for the diagnostic
      * @param atom      the atom's name, for the diagnostic
      */
-    static void check(Optional<BigInteger> precision, int nanoOfSecond, String text, String atom) {
+    static void check(Optional<Long> precision, int nanoOfSecond, String text, String atom) {
         precision.ifPresent(allowed -> {
             // At nine digits and beyond the grid is finer than the value can be, so everything is on it.
-            if (allowed.compareTo(BigInteger.valueOf(NANOS_PER_SECOND_DIGITS)) >= 0) {
+            if (allowed >= NANOS_PER_SECOND_DIGITS) {
                 return;
             }
-            int step = (int) Math.pow(10, NANOS_PER_SECOND_DIGITS - allowed.intValueExact());
+            int step = (int) Math.pow(10, NANOS_PER_SECOND_DIGITS - allowed.intValue());
             if (nanoOfSecond % step != 0) {
                 throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + allowed
                         + " seconds, which is the resolution this " + atom + " admits",

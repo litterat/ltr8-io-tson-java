@@ -4,17 +4,16 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 
 import java.util.List;
 import java.util.Set;
 
 /**
- * The reader a <b>family base</b> compiles to -- a template whose held body carries {@code extension}
- * (§5.10). A value here is a value of one of the template's instantiations, chosen by
- * a tag (ABSTRACT) or by reading the discriminator fields (SEALED), so the reader dispatches and never reads
- * a record of its own.
+ * The reader a <b>family base</b> compiles to -- a record template ({@link RecordTemplateBody}, §5.10), the one
+ * open entry that is a type. It takes the template's own Java type, so nothing else can be handed to it. A value
+ * here is a value of one of the template's members, chosen by its tag, or by reading the discriminator fields where
+ * the template names some, so the reader dispatches and never reads a record of its own.
  *
  * <p><b>The peer of {@link OpenTemplateReader}, and the reason that one is now the narrower case.</b> "A
  * template is not a type" is a rule about <em>elimination</em>: a position typed {@code arr} would have to
@@ -22,7 +21,7 @@ import java.util.Set;
  * payload -- ill-defined, since an empty array determines nothing and two instantiations accept one document.
  * None of that reaches a marked template: every member is a closed entry with its arguments already fixed, so
  * the existential is eliminated by dispatch. {@link OpenTemplateReader} keeps every template that has no such
- * dispatch -- a container, a constructor application, a reference template.
+ * dispatch -- a container, a constructor application, an alias template.
  *
  * <p><b>The template itself is the base, and nothing is minted for it.</b> So the name a diagnostic prints,
  * the name a binding map is keyed on, and the entry {@code subtypes} hangs off are all the one the author
@@ -43,12 +42,8 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
     private final TsonTypeReader<Object> dispatcher;
 
     @SuppressWarnings("unchecked")
-    public AbstractTemplateReader(String name, Top definition, ValueReaderContext context,
+    public AbstractTemplateReader(String name, RecordTemplateBody definition, ValueReaderContext context,
                                    TsonTypeReaderResolver readers) {
-        if (!OpenEntry.isFamilyBase(definition)) {
-            throw new IllegalStateException("'" + name + "' is not a family base: only a record template "
-                    + "dispatches, and OpenTemplateReader is what every other template compiles to (§5.10)");
-        }
         // Reported under the template's own name: the author wrote this one, which is the whole point of the
         // template being the base -- naming `pet_base<…>` would name something the schema never declares.
         Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
@@ -63,8 +58,7 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
                         FamilySelectors.of(definition),
                         Set.copyOf(context.subtypesOf(name, definition)), context, readers)
                 : new RecordTagDispatchReader(selfNames, name, admitted,
-                        context.instantiableSubtypesOf(name, definition),
-                        RecordTagDispatchReader.namespaces(admitted, context), readers));
+                        context.instantiableSubtypesOf(name, definition), readers));
     }
 
     @Override

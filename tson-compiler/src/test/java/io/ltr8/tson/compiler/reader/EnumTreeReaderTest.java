@@ -4,8 +4,7 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
-import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
@@ -27,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * Java-object binding (its members collide with TSON's own boolean-literal shape, see {@code
  * EnumParser}'s own Javadoc), but fine here, since DOM mode never routes a token through {@code
  * BaseTypeResolver} identification at all. Uses {@code boolean}'s own *real*, {@code
- * MetaKernelBootstrapResolver}-resolved {@link io.ltr8.tson.schema.meta.EnumBody} -- not a
+ * KernelBootstrapResolver}-resolved {@link io.ltr8.tson.schema.meta.EnumBody} -- not a
  * hand-built stand-in -- as the field type of a small local record, then reads real TSON data
  * source text through the real compiled reader. Object-binding mode's own contrasting
  * behavior (real {@code Boolean} values, via the vocabulary's own {@code BooleanParser}) is covered
@@ -37,21 +36,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class EnumTreeReaderTest {
 
     private static TsonCompiledSchema compiled() {
-        // The whole real meta-kernel closure, not a hand-picked subset -- "boolean"'s own source
+        // The whole real kernel closure, not a hand-picked subset -- "boolean"'s own source
         // names "enum", "enum" composes with "atom", and so on transitively; cherry-picking just
-        // "boolean" drags in most of meta-kernel anyway via SchemaValidator's own reference checks,
+        // "boolean" drags in most of the kernel anyway via SchemaValidator's own reference checks,
         // so there's nothing simpler about trying to trim it down. One extra local entry on top.
         Map<String, Top> entries =
-                new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries().entries());
+                new LinkedHashMap<>(KernelBootstrapResolver.kernelSchema().entries().entries());
         entries.put("flag_holder", RecordBody.of(RecordBody.fieldMap(Map.entry("flag",
                 RecordField.required(TypeRef.of("boolean"))))));
-        // !!meta must be the real meta-kernel identity, not a placeholder -- this schema's own
-        // locals are meta-kernel's real constructor vocabulary verbatim, plus one extra entry, so
-        // TsonSchemaLinker's own "only a meta-kernel-governed schema may declare constructors" check
-        // requires it (the placeholder "meta.tn" this used to point at was never registered in
-        // schemaRegistry below, so it was already functionally inert either way).
+        // The schema imports nothing: its own entries, the kernel's verbatim plus one, are its whole namespace.
         TsonSchema schema = new TsonSchema("https://example.test/flag.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of(), entries);
+                List.of(), entries);
 
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry));

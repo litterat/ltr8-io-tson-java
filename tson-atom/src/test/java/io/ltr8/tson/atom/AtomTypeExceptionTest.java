@@ -9,10 +9,10 @@ import io.ltr8.tson.atom.parser.IntegerParser;
 import io.ltr8.tson.atom.parser.MacParser;
 import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.UuidParser;
-import io.ltr8.tson.schema.meta.BytesType;
+import io.ltr8.tson.schema.binary.BytesType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IntegerSize;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -84,9 +84,9 @@ class AtomTypeExceptionTest {
 
     @Test
     void aLengthFacetCountsCharacters() {
-        TextParser exact = new TextParser(Optional.empty(), Optional.empty(), Optional.of(5), Optional.empty());
-        TextParser atLeast = new TextParser(Optional.of(3), Optional.empty(), Optional.empty(), Optional.empty());
-        TextParser atMost = new TextParser(Optional.empty(), Optional.of(3), Optional.empty(), Optional.empty());
+        TextParser exact = new TextParser(Optional.empty(), Optional.empty(), Optional.of(5L), Optional.empty());
+        TextParser atLeast = new TextParser(Optional.of(3L), Optional.empty(), Optional.empty(), Optional.empty());
+        TextParser atMost = new TextParser(Optional.empty(), Optional.of(3L), Optional.empty(), Optional.empty());
 
         assertEquals("exactly 5 characters", rejecting(exact, "hi").expected());
         assertEquals("at least 3 characters", rejecting(atLeast, "ab").expected());
@@ -97,7 +97,7 @@ class AtomTypeExceptionTest {
     @Test
     void aBinaryLengthCountsBytes() {
         BytesParser type = new BytesParser(new BytesType(BytesType.Encoding.HEX, Optional.empty(),
-                Optional.of(4), Optional.empty()));
+                Optional.of(4L), Optional.empty()));
         assertEquals("at least 4 bytes", rejecting(type, "aabb").expected());
     }
 

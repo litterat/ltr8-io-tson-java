@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
@@ -13,7 +14,6 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.*;
 
 import java.lang.reflect.RecordComponent;
@@ -27,10 +27,10 @@ import java.util.*;
  *
  * <p><b>{@code targetField}</b> (schema position -> bound {@code DataClassField}, or {@code null} if
  * the target class doesn't declare this schema field) is built once, right after {@link
- * RecordAbstractReader}'s own constructor returns, which is also where every inherited {@link
- * #precomputedValue} entry is decoded again through the field's now-bound parser -- {@link
- * RecordTreeReader} leaves those as that class computed them, a plain {@code Map} having no target to
- * decode toward.
+ * RecordAbstractReader}'s own constructor returns, which is also where each field is rebound to what its
+ * component holds -- so every inherited {@link #precomputedValue} entry, decoded once every reader exists, is
+ * decoded through the field's bound parser. {@link RecordTreeReader} keeps the natural value, a plain {@code
+ * Map} having no target to decode toward.
  *
  * <p><b>No separate "already filled" tracker is needed at all.</b>
  * {@link RecordAbstractReader#readFields}'s forward, single-pass, overwrite-on-duplicate design (see its own
@@ -120,11 +120,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                     "field '" + field.name() + "'", "component '" + target.name() + "'",
                     new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches), true);
             if (rebound != field.parser()) {
-                field = new CompiledField(field.name(), field.schema(), rebound);
-                fields.set(i, field);
-            }
-            if (field.schema().value().isPresent()) {
-                precomputedValue[i] = readSchemaDefault(fields.get(i));
+                fields.set(i, new CompiledField(field.name(), field.schema(), rebound));
             }
         }
         {
@@ -145,6 +141,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                         + "which fields it takes rather than dropping whatever it does not name");
             }
         }
+        // After the rebinding above, so each default and pin is decoded through the reader its field binds with.
+        CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }
 
     /** Whether any schema field of this type binds to {@code classField}. */
@@ -211,12 +209,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * Field readers that give a slot whose bound component is a {@link io.ltr8.tson.schema.meta.Token} the
      * token itself rather than the value it denotes.
      *
-     * <p><b>Why a slot can want the raw token.</b> The kernel types every such slot {@code value}, whose
-     * reader decodes ([TSON-DATA] §4) -- {@code 3} to an integer, {@code "3"} to a string. A component
-     * declared {@code Token} wants what was written: [TSON-SCHEMA] §5.10 calls a type argument's literal a
-     * bare token rather than the value it denotes, and {@code record_field}'s own fixed and default values
-     * are compared against what a document writes. A decoded host object cannot fill either, and §8.2 wants
-     * the spelling kept: a value argument is "recorded as written" and compared as the value it denotes.
+     * <p><b>Why a slot can want the raw token.</b> A component declared {@code Token} wants what was written: {@code
+     * meta.record_field}'s own fixed and default values are read later by the field's declared type and compared
+     * against what a document writes. A decoded host object cannot fill one, and §8.2 wants the spelling kept.
      *
      * <p>The choice has to be made before the read, and it is made per field, so two slots of one schema
      * type that bind different components each get what they want.
@@ -230,7 +225,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 return AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
             }
             // Otherwise by the field's declared type, as tree mode does -- see FieldReaders.byType.
-            return resolver.resolve(field.type().name());
+            return FieldReaders.declared(resolver, context, fieldName, field);
         };
     }
 
@@ -349,7 +344,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * real Java object "just {@code top}" could construct, so every genuine value at such a position
      * must carry an explicit subtype type-ref. A {@link DataClassRecord} instead -- {@code text_type}
      * is the one real fixture case, directly instantiable as a plain {@link
-     * io.ltr8.tson.schema.meta.TextType} *and* composed on top of by {@code uri_type}/{@code
+     * io.ltr8.tson.schema.unicode.TextType} *and* composed on top of by {@code uri_type}/{@code
      * regex_type}/{@code email_type} -- means {@code ownParser} is a real, reachable {@link
      * RecordBindReader} for the declaration's own body; dispatch to a named subtype is bounded by the
      * schema's own {@code subtypes()} list, not by any Java type, via {@link VariantSchemaReader} (see
@@ -501,7 +496,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
             }
             throw new MissingBindingException("no bound Java class for '" + tried + "': nothing in this "
-                    + "bind context resolves that schema type name. Map it (ProcessorConfig.bindings) or give "
+                    + "bind context resolves that schema type name. Map it (ProcessorConfig.withDataBindContext) or give "
                     + "the context a DataNameBinder that can find it -- "
                     + (first == null ? "" : first.getMessage()), first);
         }

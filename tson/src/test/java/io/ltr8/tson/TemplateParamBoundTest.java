@@ -24,19 +24,19 @@ class TemplateParamBoundTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/bounds-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema
             """;
 
     private static final String SCHEMA = HEADER + """
             {
               non_empty_text       => !text ^ { min_length: 1 }
-              non_negative_integer => !integer ^ { min: 0 }
               boxed      => <T: text> { a: T }
-              vec        => <T: text, N> !array { element_type: T  min_items: N }
+              vec        => <T: text, N> !meta.array { element_type: T  min_items: N }
               rebox      => <T> boxed<T>
               narrower   => <T: non_empty_text> boxed<T>
-              counted    => <N: non_negative_integer> !array { element_type: text  min_items: N }
+              counted    => <N: numeric.count> !meta.array { element_type: text  min_items: N }
               typed_by   => <T, N> { w?: T ~ N }
             }
             """;
@@ -52,7 +52,7 @@ class TemplateParamBoundTest {
     }
 
     private static TemplateParam bounded(String name, String bound) {
-        return new TemplateParam(name, TemplateParam.TYPE_KIND, Optional.of(TypeRef.of(bound)));
+        return new TemplateParam(name, TemplateParam.TYPE_REF, Optional.of(TypeRef.of(bound)));
     }
 
     private static List<Diagnostic> problems(String declarations) {
@@ -74,7 +74,7 @@ class TemplateParamBoundTest {
 
     @Test
     void anInstanceConstructionNarrowsOneParameterAndKeepsTheOthersDerivedType() {
-        assertEquals(List.of(bounded("T", "text"), new TemplateParam("N", TypeRef.of("non_negative_integer"))),
+        assertEquals(List.of(bounded("T", "text"), new TemplateParam("N", TypeRef.of("numeric.count"))),
                 parameters().get("vec"));
     }
 
@@ -88,10 +88,11 @@ class TemplateParamBoundTest {
         assertEquals(List.of(bounded("T", "non_empty_text")), parameters().get("narrower"));
     }
 
-    /** Core's non_negative_integer copies the kernel's, which the slot is typed by: the same type, so it narrows. */
+    /** The kernel's numeric.count, which the slot is typed by: the same type, so it narrows. */
     @Test
     void aValueParametersWrittenTypeNarrowsItsType() {
-        assertEquals(List.of(new TemplateParam("N", TypeRef.of("non_negative_integer"))), parameters().get("counted"));
+        assertEquals(List.of(new TemplateParam("N", TypeRef.of("numeric.count"))),
+                parameters().get("counted"));
     }
 
     // ── Refused at the declaration ─────────────────────────────────────────
@@ -105,8 +106,8 @@ class TemplateParamBoundTest {
 
     @Test
     void aWrittenValueTypeThePositionsDoNotReadAsIsRefused() {
-        assertRefused("  bad => <N: text> !array { element_type: text  min_items: N }",
-                "read it as non_negative_integer");
+        assertRefused("  bad => <N: text> !meta.array { element_type: text  min_items: N }",
+                "read it as numeric.count");
     }
 
     @Test
@@ -115,12 +116,12 @@ class TemplateParamBoundTest {
     }
 
     /**
-     * A bound names a type, in the type-name namespace. A name found only among the governing meta's constructors
-     * is structure vocabulary (§3.3.1), which no argument could satisfy -- a type argument names a type.
+     * A bound names a type in the schema's namespace. A constructor is no type (§4.1), so a bound naming one is
+     * refused: no argument could satisfy it -- a type argument names a type.
      */
     @Test
-    void aWrittenBoundNamesATypeInTheTypeNamespace() {
-        assertRefused("  boxed => <T: text_type> { a: T }", "'text_type' is a constructor of the governing meta");
+    void aWrittenBoundNamesAType() {
+        assertRefused("  boxed => <T: unicode.text_type> { a: T }", "'unicode.text_type' is a constructor, not a type");
         assertRefused("  boxed => <T: no_such_type> { a: T }", "'no_such_type' names no type");
         assertRefused("  boxed => <T: no_such<text>> { a: T }", "'no_such' names no type");
     }
@@ -164,9 +165,9 @@ class TemplateParamBoundTest {
     @Test
     void aValueArgumentMustBeAValueOfTheParametersType() {
         assertRefused("""
-                  vec    => <T, N> !array { element_type: T  min_items: N }
+                  vec    => <T, N> !meta.array { element_type: T  min_items: N }
                   holder => { v: vec<text, "two"> }""", "binds 'N' to 'two', which is not a value of "
-                + "non_negative_integer");
+                + "numeric.count");
     }
 
     @Test

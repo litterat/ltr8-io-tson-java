@@ -1,26 +1,25 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.Scoped;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.RefBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -106,21 +105,23 @@ final class TypeInhabitance {
             case MapBody map -> isEmptyAllowed(map.minItems())
                     || (refInhabited(map.keyType(), namespace, inhabited)
                             && refInhabited(map.valueType(), namespace, inhabited));
+            case io.ltr8.tson.schema.meta.NamespaceBody ignored -> true; // the empty map is a value of it
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .allMatch(element -> positionInhabited(element, namespace, inhabited));
             // A sum needs one good variant, where a product needs all its parts -- the one place the walk
             // branches rather than conjoins, and the reason `(leaf | node)` survives a non-productive `node`.
             case ChoiceBody choice -> choice.variants().stream()
                     .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
-            // A kind's values are the names of its members, whatever the types they name admit, so it is
-            // inhabited exactly when linking found a member.
-            case KindBody kind -> !kind.memberNames().isEmpty();
-            case RefBody ignored -> true; // a name; what it reaches is the linker's judgement
-            case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
+            // A reference that names types admits the names of its members, whatever the types they name admit,
+            // so it is inhabited exactly when linking found a member. One that names values admits a name whose
+            // referent only the linker judges.
+            case ReferenceBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
+            case Alias alias -> refInhabited(alias.target(), namespace, inhabited);
             case TemplateBody ignored -> true; // open, answered above
+            case RecordTemplateBody ignored -> true; // open, answered above
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
-            case Scoped ignored -> true; // a scope's values name their own types
-            case Namespace<?> ignored -> true; // a value, which nothing is typed by
+            case DeclaredType ignored -> true; // its values name their own types
+            case ValueEntry ignored -> true; // a value, which nothing is typed by
         };
     }
 
@@ -194,11 +195,12 @@ final class TypeInhabitance {
      */
     private static boolean satisfiable(RecordField field, Map<String, Top> namespace,
             Set<String> inhabited) {
-        if (field.voidable()) {
+        if (field.voidable() || field.sibling().isPresent()) {
+            // A dependent field is stated with a value of whichever type its sibling names (§5.2).
             return true;
         }
-        return !ReferenceChain.resolvesToVoid(field.type().name(), namespace)
-                && refInhabited(field.type(), namespace, inhabited);
+        return !AliasChain.resolvesToVoid(field.typeRef().name(), namespace)
+                && refInhabited(field.typeRef(), namespace, inhabited);
     }
 
     private static boolean positionInhabited(TupleElement element, Map<String, Top> namespace,
@@ -212,8 +214,8 @@ final class TypeInhabitance {
      * is satisfied by {@code []} whatever {@code tree} turns out to be; {@code [tree; 1..]} is satisfied only
      * if {@code tree} is. That single distinction is what separates ordinary recursion from the runaway kind.
      */
-    private static boolean isEmptyAllowed(Optional<BigInteger> minItems) {
-        return minItems.isEmpty() || minItems.get().signum() <= 0;
+    private static boolean isEmptyAllowed(Optional<Long> minItems) {
+        return minItems.isEmpty() || minItems.get() <= 0;
     }
 
     /**
@@ -266,7 +268,7 @@ final class TypeInhabitance {
             RecordField field = entry.getValue();
             if (!grouped.contains(entry.getKey()) && !demandsNothing(field)
                     && !satisfiable(field, namespace, inhabited)) {
-                return field.type().name();
+                return field.typeRef().name();
             }
         }
         return record.groups().stream()
@@ -275,7 +277,7 @@ final class TypeInhabitance {
                 .flatMap(group -> group.memberNames().stream())
                 .flatMap(member -> java.util.Optional.ofNullable(record.fields().get(member)).stream())
                 .filter(field -> !satisfiable(field, namespace, inhabited))
-                .map(field -> field.type().name()).findFirst().orElse(null);
+                .map(field -> field.typeRef().name()).findFirst().orElse(null);
     }
 
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */
@@ -290,16 +292,18 @@ final class TypeInhabitance {
                     ? null : array.elementType().name();
             case MapBody map -> refInhabited(map.valueType(), namespace, inhabited)
                     ? null : map.valueType().name();
+            case io.ltr8.tson.schema.meta.NamespaceBody ignored -> null;
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
                     .map(element -> element.elementType().name()).findFirst().orElse(null);
-            case Reference reference -> refInhabited(reference.target(), namespace, inhabited)
-                    ? null : reference.target().name();
+            case Alias alias -> refInhabited(alias.target(), namespace, inhabited)
+                    ? null : alias.target().name();
             // A choice fails on every variant at once, so no single link continues the chain; the rest name none.
             case Sum ignored -> null;
             case Atom ignored -> null;
             case TemplateBody ignored -> null;
-            case Namespace<?> ignored -> null;
+            case RecordTemplateBody ignored -> null;
+            case ValueEntry ignored -> null;
         };
     }
 }

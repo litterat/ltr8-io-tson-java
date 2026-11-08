@@ -18,7 +18,7 @@ import java.util.Optional;
  *
  * <p>The linker ({@code TsonSchemaLinker}, in {@code tson-compiler}) is what calls this: once per {@code
  * !!import}, merging the loaded schema's whole namespace -- its own imports included -- into the importer's
- * (Part 2 §2.2.3), and once for the governing {@code !!meta}, whose namespace it consults and never merges.
+ * (Part 2 §2.2.3).
  */
 @FunctionalInterface
 public interface TsonSchemaLoader {

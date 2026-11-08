@@ -1,0 +1,551 @@
+!!id:"https://tson.io/2026/39/m/meta-resolved.tn"
+@doc:"""
+  Resolver-output fixture for meta.tn, the kernel (2026 Revision 39
+  draft). Parse the source schema, run the resolver, canonicalise,
+  compare.
+
+  A resolved form's header is its source's, and the kernel imports nothing,
+  so this one carries its `!!id` alone and is read under the pre-loaded
+  kernel. Nothing in the document marks it resolved; a processor reads it
+  as a resolved form because its caller says so ([TSON-SCHEMA] Section
+  8.1). The kernel's machinery is six schema maps nested as the root's
+  entries `numeric`, `unicode`, `net`, `atom`, `meta` and `binary`, each
+  written nested and tagged by its type's path, `!meta.schema`, each
+  member named by its path (`meta.record`, `unicode.text_type`,
+  `atom.ordering`); the vocabulary an author writes (`text`, `integer`,
+  `bytes`, `doc`, `enum`, `set`, ...) and the synthetics it mints are the
+  root's.
+
+  Conventions:
+  - Every entry is its value: a name maps to the body it resolves
+    to, `!meta.record { ... }`, `!numeric.integer_type { ... }`,
+    `!meta.alias { ... }`, `!meta.template { ... }`. Output is source with sugar
+    expanded, bodies flattened and chains computed, and an entry
+    written as a constructor application resolves to itself.
+  - Fields at their default values are omitted (`optional: false`,
+    `voidable: false`, `role: FREE`), and so are empty chains.
+  - A type body carries `meta.type`'s one field, `chain`, a `meta.type_chain`.
+    `supertypes` is the complete IS-A chain, every element a bare
+    name, closed to a fixed point through applied parents; `subtypes`
+    is its inverse over the entries of this map only (inverse edges
+    from schemas that import this one are not represented here);
+    `parents` is a record template's, the parents as written. Both
+    name lists are written lexically sorted; a resolver's native
+    ordering is implementation-defined, so comparison tools
+    canonicalise both lists before comparing. Set-typed fields are
+    compared as written, in source declaration order (Part 2
+    Sections 7.5, 8). An empty chain is omitted.
+  - An `!meta.alias` and a `!meta.template` compose `meta.top` and carry no
+    chain.
+  - A record's `fields` are flattened: a composition's fields are
+    its operands' and its own, merged, so every record composing
+    `meta.type` (through `atom`, `product` or `sum`) states `chain` among
+    its fields first.
+  - `meta.top`, `meta.type` and the three base kinds are `abstract`, so each
+    states `extension: ABSTRACT`.
+  - Source annotations are preserved in their authored positions,
+    except `@doc`: a conforming resolver carries every source @doc
+    verbatim, and these fixtures, which exist to be compared, leave
+    entry docs out and substitute this conventions note for the
+    document-level one.
+  - Alias-kind names at type positions are stated as written: an
+    alias is a hop, not a rewrite, so a use site naming an alias
+    names the alias. A processor collapses the chain when it compiles
+    readers, after linking, not in resolved output.
+  - A slot that names a type (`meta.record_field.type`,
+    `meta.tuple_element.element_type`, a container's type slots, choice
+    variants, a parameter's `meta.type` and `bound`) is typed `meta.type_ref`,
+    the kind of the types, and holds a bare name: a type's name,
+    judged a member of the kind when the schema links. An
+    application is a reference with an argument list, written
+    unquoted in its canonical text, `result<T>`: no whitespace, and
+    one space between arguments. A closed one lifts to an entry and is
+    named bare, so one stands only where an application is still
+    open: a record template's `parents` and field types, held text,
+    and the `application` annotation.
+  - The container constructors carry no parameters: their type
+    slots are plain required `meta.type_ref`-typed fields, filled by the
+    construction (or by a sugar form's desugaring) like any other
+    required field. A record field is closed: its `type` names a
+    type and its `value` is a literal. A record template's field is a
+    `meta.record_template_field`, which labels a parameter standing
+    for the whole type (`type_param`) or the whole value
+    (`value_param`); a parameter that is an argument of an
+    application in `type` is recognised by its text resolving into
+    the template's `parameters` (Part 2 Section 5.10's shadowing
+    rule). A parametric `= P` is FIXED and `~ P` DEFAULT where it is
+    written, the parameter in `value_param`; materialisation
+    substitutes the argument, `type_param` becoming `type` and
+    `value_param` becoming `value`, and changes no other fact, and
+    `optional` is the name's mark as written (Part 2 Section 5.7).
+  - An argument is a reference or a token, positional against the
+    head's parameters and typed where it lands: in a template body a
+    parameter of either kind stands as its name, read against
+    `parameters`.
+  - An open entry is one of two values (Part 2 Sections 5.10, 8.1).
+    A record template is a `!meta.record_template`, read as the
+    vocabulary and not held: a parameter stands at a field's
+    `type_param` or `value_param` or an application's argument, and
+    its `chain` holds `parents` as written, one of which may be an
+    application.
+    Every other open entry is held: a `!meta.template` carrying its
+    `parameters` and, as text in `template`, the constructor
+    application as written — a container as
+    `!meta.array`/`!meta.map`/`!meta.tuple`/`!meta.choice`, an atom constructor as
+    `!numeric.integer_type`, an alias as `!meta.alias` — unread until
+    materialisation substitutes the parameters away. An entry that
+    closes a template application carries the derived `@meta.application`
+    at its schema-map key, the application it is the instantiation
+    of, read as stated on ingest; none appear here, as nothing in
+    this schema applies a non-constructor template.
+  - Synthetic entries — the closed forms the sugar lifts to (Part 2
+    Section 5.3) — are instances of the constructor they build, are
+    referenced by the field that wrote the sugar, and carry the
+    derived `@meta.synthetic` marker at their schema-map keys (Part 2
+    Sections 6, 8.2); on ingest the marker is discarded and
+    recomputed. Their internal names here follow the
+    convention `<constructor>_<operands>_xxhash`, where the trailing
+    `xxhash` is a placeholder for a content hash of the resolved
+    binding record: the *shape* of the data — one internally named,
+    `@meta.synthetic`-marked entry per distinct concrete form — is the
+    conformance point; the hash spelling is an implementation's own
+    business and the placeholder is deliberately not a real digest.
+  - Bare parameter names (e.g. T) in bodies are read against the
+    enclosing entry's `parameters` list.
+  """
+!schema {
+  numeric => !meta.schema {
+    integer_size => !meta.record { fields: {
+      bits   => !meta.record_field { type: integer }
+      signed => !meta.record_field { type: boolean }
+    } }
+
+    integer_member_set => !meta.set_type { element_type: integer  min_items: 1 }
+
+    integer_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
+      chain         => !meta.record_field { type: meta.type_chain  optional: true }
+      size          => !meta.record_field { type: numeric.integer_size  optional: true }
+      min           => !meta.record_field { type: integer  optional: true }
+      exclusive_min => !meta.record_field { type: integer  optional: true }
+      max           => !meta.record_field { type: integer  optional: true }
+      exclusive_max => !meta.record_field { type: integer  optional: true }
+      multiple_of   => !meta.record_field { type: integer  optional: true }
+      members       => !meta.record_field { type: numeric.integer_member_set  optional: true }
+    }
+    groups: [
+      !meta.field_group { members: [[min] [exclusive_min]]  optional: true }
+      !meta.field_group { members: [[max] [exclusive_max]]  optional: true }
+    ] }
+
+    count => !numeric.integer_type {
+      chain: { supertypes: [int64 integer] }  size: { bits: 64  signed: true }  min: 0
+    }
+  }
+
+  unicode => !meta.schema {
+    text_member_set => !meta.set_type { element_type: text  min_items: 1 }
+
+    text_type => !meta.record {
+      chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [net.iri_type unicode.identifier_type unicode.regex_type] }
+      fields: {
+      chain         => !meta.record_field { type: meta.type_chain  optional: true }
+      min_length    => !meta.record_field { type: numeric.count  optional: true }
+      max_length    => !meta.record_field { type: numeric.count  optional: true }
+      length        => !meta.record_field { type: numeric.count  optional: true }
+      pattern       => !meta.record_field { type: regex    optional: true }
+      members       => !meta.record_field { type: unicode.text_member_set  optional: true }
+      normalization => !meta.record_field { type: unicode.normalization  optional: true  role: DEFAULT  value: NONE }
+    } }
+
+    identifier_base => !enum { members: [XID ID ASCII NONE] }
+
+    normalization => !enum { members: [NONE NFC NFKC NFKC_CASEFOLD ASCII_CASEFOLD] }
+
+    identifier_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
+      chain         => !meta.record_field { type: meta.type_chain  optional: true }
+      min_length    => !meta.record_field { type: numeric.count  optional: true }
+      max_length    => !meta.record_field { type: numeric.count  optional: true }
+      length        => !meta.record_field { type: numeric.count  optional: true }
+      pattern       => !meta.record_field { type: regex    optional: true }
+      members       => !meta.record_field { type: unicode.text_member_set  optional: true }
+      normalization => !meta.record_field { type: unicode.normalization  optional: true  role: DEFAULT  value: NFC }
+      spec          => !meta.record_field { type: iri   optional: true  role: FIXED  value: "https://www.unicode.org/reports/tr31/" }
+      start         => !meta.record_field { type: unicode.identifier_base  optional: true  role: DEFAULT  value: XID }
+      continue      => !meta.record_field { type: unicode.identifier_base  optional: true  role: DEFAULT  value: XID }
+      start_add     => !meta.record_field { type: text  optional: true }
+      continue_add  => !meta.record_field { type: text  optional: true }
+      medial        => !meta.record_field { type: text  optional: true }
+      exclude       => !meta.record_field { type: text  optional: true }
+    } }
+
+    regex_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
+      chain         => !meta.record_field { type: meta.type_chain  optional: true }
+      min_length    => !meta.record_field { type: numeric.count  optional: true }
+      max_length    => !meta.record_field { type: numeric.count  optional: true }
+      length        => !meta.record_field { type: numeric.count  optional: true }
+      pattern       => !meta.record_field { type: regex  optional: true }
+      members       => !meta.record_field { type: unicode.text_member_set  optional: true }
+      normalization => !meta.record_field { type: unicode.normalization  optional: true  role: FIXED  value: NONE }
+      spec          => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
+    } }
+  }
+
+  net => !meta.schema {
+    scheme_set => !meta.set_type { element_type: net.scheme_name  min_items: 1 }
+
+    scheme_name => !unicode.identifier_type { start: ASCII  continue: ASCII  continue_add: "+-."  exclude: "_"  normalization: ASCII_CASEFOLD }
+
+    iri_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      min_length     => !meta.record_field { type: numeric.count  optional: true }
+      max_length     => !meta.record_field { type: numeric.count  optional: true }
+      length         => !meta.record_field { type: numeric.count  optional: true }
+      pattern        => !meta.record_field { type: regex    optional: true }
+      members        => !meta.record_field { type: unicode.text_member_set  optional: true }
+      normalization  => !meta.record_field { type: unicode.normalization  optional: true  role: FIXED  value: NONE }
+      spec           => !meta.record_field { type: iri      optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
+      schemes        => !meta.record_field { type: net.scheme_set  optional: true }
+      allow_relative => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+      allow_fragment => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+    } }
+  }
+
+  atom => !meta.schema {
+    specification => !meta.record { chain: { subtypes: [net.iri_type unicode.identifier_type unicode.regex_type] }  fields: {
+      spec => !meta.record_field { type: iri }
+    } }
+
+    ordering => @meta.annotation !enum { members: [NONE PARTIAL TOTAL] }
+
+    bounded => @meta.annotation !meta.alias { target: boolean }
+
+    exact => @meta.annotation !meta.alias { target: boolean }
+
+    numeric => @meta.annotation !meta.alias { target: void }
+  }
+
+  meta => !meta.schema {
+    top => !meta.record {
+      chain: {
+        subtypes: [binary.bytes_type enum meta.alias meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.record_template meta.reference_type meta.set_type meta.sum meta.template meta.tuple meta.type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+      }
+      fields: {}
+      extension: ABSTRACT
+    }
+
+    type_chain => !meta.record { fields: {
+      parents    => !meta.record_field { type: array_type_ref_xxhash  optional: true }
+      supertypes => !meta.record_field { type: array_type_ref_xxhash  optional: true }
+      subtypes   => !meta.record_field { type: array_type_ref_xxhash  optional: true }
+    } }
+
+    type => !meta.record {
+      chain: {
+        supertypes: [meta.top]
+        subtypes: [binary.bytes_type enum meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.record_template meta.reference_type meta.set_type meta.sum meta.tuple meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+      }
+      fields: {
+        chain => !meta.record_field { type: meta.type_chain  optional: true }
+      }
+      extension: ABSTRACT
+    }
+
+    atom => !meta.record {
+      chain: {
+        supertypes: [meta.top meta.type]
+        subtypes: [binary.bytes_type enum meta.enum_type meta.reference_type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+      }
+      fields: {
+        chain => !meta.record_field { type: meta.type_chain  optional: true }
+      }
+      extension: ABSTRACT
+    }
+
+    product => !meta.record { chain: { supertypes: [meta.top meta.type]  subtypes: [meta.array meta.map meta.namespace meta.record meta.record_template meta.set_type meta.tuple] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type }
+      size_type      => !meta.record_field { type: meta.product_size_type }
+    }  extension: ABSTRACT }
+
+    sum => !meta.record { chain: { supertypes: [meta.top meta.type]  subtypes: [meta.choice meta.declared_type] }  fields: {
+      chain => !meta.record_field { type: meta.type_chain  optional: true }
+    }  extension: ABSTRACT }
+
+    alias => !meta.record { chain: { supertypes: [meta.top] }  fields: {
+      target => !meta.record_field { type: meta.type_ref }
+    } }
+
+    template_param => !meta.record { fields: {
+      name  => !meta.record_field { type: meta.param_name }
+      type  => !meta.record_field { type: meta.type_ref }
+      bound => !meta.record_field { type: meta.type_ref  optional: true }
+    } }
+
+    template => !meta.record { chain: { supertypes: [meta.top] }  fields: {
+      parameters => !meta.record_field { type: array_template_param_xxhash }
+      template   => !meta.record_field { type: text }
+    } }
+
+    void_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
+      chain => !meta.record_field { type: meta.type_chain  optional: true }
+    } }
+
+    identifier => !unicode.identifier_type { continue_add: "-" }
+
+    type_name => !meta.alias { target: meta.identifier }
+
+    field_name => !meta.alias { target: meta.identifier }
+
+    param_name => !meta.alias { target: meta.identifier }
+
+    product_access_type => !enum { members: [INDEX NAMED] }
+
+    product_size_type => !enum { members: [FIXED VARIABLE] }
+
+    field_role => !enum { members: [FREE DEFAULT FIXED] }
+
+    record_extension_type => !enum { members: [ABSTRACT FINAL OPEN] }
+
+    annotation => !meta.alias { target: void }
+
+    synthetic => @meta.annotation !meta.alias { target: void }
+
+    application => @meta.annotation !meta.alias { target: meta.type_ref }
+
+    record_field => !meta.record { fields: {
+      type     => !meta.record_field { type: meta.field_type_ref }
+      optional => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      voidable => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      role     => !meta.record_field { type: meta.field_role  optional: true  role: DEFAULT  value: FREE }
+      value    => !meta.record_field { type: type!  optional: true }
+    } }
+
+    field_group => !meta.record { fields: {
+      members          => !meta.record_field { type: array_array_text_1_c67f2b5e_1_xxhash }
+      optional_members => !meta.record_field { type: array_text_1_xxhash  optional: true }
+      optional         => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+    } }
+
+    field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }
+
+    record_template_field => !meta.record { fields: {
+      type        => !meta.record_field { type: meta.field_type_ref  optional: true }
+      type_param  => !meta.record_field { type: meta.param_name  optional: true }
+      optional    => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      voidable    => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      role        => !meta.record_field { type: meta.field_role  optional: true  role: DEFAULT  value: FREE }
+      value       => !meta.record_field { type: type!  optional: true }
+      value_param => !meta.record_field { type: meta.param_name  optional: true }
+    }
+    groups: [
+      !meta.field_group { members: [[type] [type_param]] }
+      !meta.field_group { members: [[value] [value_param]]  optional: true }
+    ] }
+
+    record_template_field_map => !meta.map { key_type: text  value_type: meta.record_template_field  ordered: true }
+
+    record => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
+      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
+      fields         => !meta.record_field { type: meta.field_map }
+      groups         => !meta.record_field { type: array_field_group_xxhash  optional: true }
+      extension      => !meta.record_field { type: meta.record_extension_type  optional: true  role: DEFAULT  value: OPEN }
+      discriminators => !meta.record_field { type: array_text_1_xxhash  optional: true }
+      name_type      => !meta.record_field { type: meta.identifier_ref  optional: true }
+    } }
+
+    record_template => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
+      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
+      fields         => !meta.record_field { type: meta.record_template_field_map }
+      groups         => !meta.record_field { type: array_field_group_xxhash  optional: true }
+      extension      => !meta.record_field { type: meta.record_extension_type  optional: true  role: DEFAULT  value: OPEN }
+      discriminators => !meta.record_field { type: array_text_1_xxhash  optional: true }
+      name_type      => !meta.record_field { type: meta.identifier_ref  optional: true }
+      parameters     => !meta.record_field { type: array_template_param_1_xxhash }
+    } }
+
+    array => !meta.record { chain: { supertypes: [meta.product meta.top meta.type]  subtypes: [meta.set_type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
+      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
+      element_type   => !meta.record_field { type: meta.type_ref }
+      voidable       => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+      unique_items   => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      min_items      => !meta.record_field { type: numeric.count  optional: true }
+      max_items      => !meta.record_field { type: numeric.count  optional: true }
+    } }
+
+    set_type => !meta.record { chain: { supertypes: [meta.array meta.product meta.top meta.type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
+      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
+      element_type   => !meta.record_field { type: meta.type_ref }
+      voidable       => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
+      ordered        => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
+      unique_items   => !meta.record_field { type: boolean  optional: true  role: FIXED  value: true }
+      min_items      => !meta.record_field { type: numeric.count  optional: true }
+      max_items      => !meta.record_field { type: numeric.count  optional: true }
+    } }
+
+    map => !meta.record { chain: { supertypes: [meta.product meta.top meta.type]  subtypes: [meta.namespace] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
+      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
+      key_type       => !meta.record_field { type: meta.type_ref }
+      value_type     => !meta.record_field { type: meta.type_ref }
+      voidable       => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      min_items      => !meta.record_field { type: numeric.count  optional: true }
+      max_items      => !meta.record_field { type: numeric.count  optional: true }
+    } }
+
+    namespace => !meta.record { chain: { supertypes: [meta.map meta.product meta.top meta.type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
+      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
+      key_type       => !meta.record_field { type: meta.identifier_ref }
+      value_type     => !meta.record_field { type: meta.type_ref }
+      voidable       => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
+      ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      min_items      => !meta.record_field { type: numeric.count  optional: true }
+      max_items      => !meta.record_field { type: numeric.count  optional: true }
+    } }
+
+    tuple_element => !meta.record { fields: {
+      element_type => !meta.record_field { type: meta.type_ref }
+      voidable     => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+    } }
+
+    tuple => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
+      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
+      elements       => !meta.record_field { type: array_tuple_element_xxhash }
+    } }
+
+    tuple1 => !meta.template { parameters: [{ name: T  type: meta.type_ref }]  template: "!meta.tuple { elements: [{ element_type: T }] }" }
+
+    voidable_tuple1 => !meta.template {
+      parameters: [{ name: T  type: meta.type_ref }]
+      template: "!meta.tuple { elements: [{ element_type: T  voidable: true }] }"
+    }
+
+    enum_set => !meta.set_type { element_type: text  min_items: 1 }
+
+    enum_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [enum] }  fields: {
+      chain     => !meta.record_field { type: meta.type_chain  optional: true }
+      name_type => !meta.record_field { type: meta.identifier_ref }
+      members   => !meta.record_field { type: meta.enum_set }
+    } }
+
+    choice => !meta.record { chain: { supertypes: [meta.sum meta.top meta.type] }  fields: {
+      chain    => !meta.record_field { type: meta.type_chain  optional: true }
+      variants => !meta.record_field { type: array_type_ref_xxhash }
+      disjoint => !meta.record_field { type: boolean  optional: true }
+    } }
+
+    disjoint => @meta.annotation !meta.alias { target: void }
+
+    declared_type => !meta.record { chain: { supertypes: [meta.sum meta.top meta.type] }  fields: {
+      chain => !meta.record_field { type: meta.type_chain  optional: true }
+    } }
+
+    declared => !meta.declared_type {}
+
+    reference_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
+      chain         => !meta.record_field { type: meta.type_chain  optional: true }
+      of            => !meta.record_field { type: meta.type_ref }
+      allow_sibling => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+    } }
+
+    ref => !meta.template {
+      parameters: [{ name: T  type: meta.type_ref }]
+      template: "!meta.reference_type { of: T  allow_sibling: false }"
+    }
+
+    field_type_ref => !meta.reference_type { chain: { subtypes: [meta.identifier_ref meta.type_ref] }  of: meta.type }
+
+    type_ref => !meta.reference_type {
+      chain: { supertypes: [meta.field_type_ref]  subtypes: [meta.identifier_ref] }
+      of: meta.type
+      allow_sibling: false
+    }
+
+    identifier_ref => !meta.reference_type {
+      chain: { supertypes: [meta.field_type_ref meta.type_ref] }
+      of: unicode.identifier_type
+      allow_sibling: false
+    }
+
+    schema => !meta.namespace { key_type: meta.type_name  value_type: meta.declared }
+  }
+
+  binary => !meta.schema {
+    bytes_encoding => !enum { members: [BASE64 BASE64URL BASE32 HEX] }
+
+    bytes_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
+      chain      => !meta.record_field { type: meta.type_chain  optional: true }
+      encoding   => !meta.record_field { type: binary.bytes_encoding  optional: true  role: DEFAULT  value: BASE64 }
+      length     => !meta.record_field { type: numeric.count  optional: true }
+      min_length => !meta.record_field { type: numeric.count  optional: true }
+      max_length => !meta.record_field { type: numeric.count  optional: true }
+    } }
+  }
+
+  void => !meta.void_type {}
+
+  boolean => !enum { members: [true false] }
+
+  @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
+  integer => !numeric.integer_type { chain: { subtypes: [int64 numeric.count] } }
+
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int64 => !numeric.integer_type {
+    chain: { supertypes: [integer]  subtypes: [numeric.count] }  size: { bits: 64  signed: true }
+  }
+
+  @atom.ordering:NONE @atom.bounded:false
+  text => !unicode.text_type {}
+
+  @atom.ordering:NONE @atom.bounded:false
+  bytes => !binary.bytes_type {}
+
+  @atom.ordering:NONE @atom.bounded:false
+  iri_reference => !net.iri_type { chain: { subtypes: [iri] } }
+
+  @atom.ordering:NONE @atom.bounded:false
+  iri => !net.iri_type { chain: { supertypes: [iri_reference] }  allow_relative: false }
+
+  @atom.ordering:NONE @atom.bounded:false
+  regex => !unicode.regex_type {}
+
+  doc => @meta.annotation !meta.alias { target: text }
+
+  enum => !meta.record { chain: { supertypes: [meta.atom meta.enum_type meta.top meta.type] }  fields: {
+    chain     => !meta.record_field { type: meta.type_chain  optional: true }
+    name_type => !meta.record_field { type: meta.identifier_ref  optional: true  role: FIXED  value: meta.identifier }
+    members   => !meta.record_field { type: meta.enum_set }
+  } }
+
+  set => !meta.template { parameters: [{ name: T  type: meta.type_ref }]  template: "!meta.set_type { element_type: T }" }
+
+  schema => !meta.alias { target: meta.schema }
+
+  @meta.synthetic array_template_param_xxhash => !meta.array { element_type: meta.template_param }
+
+  @meta.synthetic array_template_param_1_xxhash => !meta.array { element_type: meta.template_param  min_items: 1 }
+
+  @meta.synthetic array_type_ref_xxhash => !meta.array { element_type: meta.type_ref }
+
+  @meta.synthetic array_array_text_1_c67f2b5e_1_xxhash => !meta.array { element_type: array_text_1_xxhash  min_items: 1 }
+
+  @meta.synthetic array_text_1_xxhash => !meta.array { element_type: text  min_items: 1 }
+
+  @meta.synthetic array_field_group_xxhash => !meta.array { element_type: meta.field_group }
+
+  @meta.synthetic array_tuple_element_xxhash => !meta.array { element_type: meta.tuple_element }
+}

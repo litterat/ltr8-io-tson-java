@@ -3,14 +3,15 @@ package io.ltr8.tson.schema.meta;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code product => type & { access_pattern: ... size_type: ... } }} base kind
- * (Part 2 §4.1) -- every PRODUCT-kind {@link Top} variant IS-A this: {@link RecordBody},
- * {@link ArrayBody} (and {@code set}, which refines it), {@link MapBody}, and {@link TupleBody} --
- * exactly {@code record}/{@code array}/
- * {@code set}/{@code map}/{@code tuple}, the kernel's own structural-type family (Part 2 §4.1: "record,
- * array, set, map, and tuple compose with product, fixing access_pattern and size_type").
+ * The kernel's {@code product => type & { access_pattern: ... size_type: ... } }} base kind
+ * (Part 2 §4.1) -- every PRODUCT-kind {@link Top} variant IS-A this: {@link RecordBody}, {@link RecordTemplateBody},
+ * {@link ArrayBody} (and {@code set}, which refines it), {@link MapBody} (and {@link NamespaceBody}, whose
+ * constructor refines it), and {@link TupleBody} -- exactly {@code record}/{@code array}/{@code set}/{@code
+ * map}/{@code namespace}/{@code tuple} and {@code record_template}, the kernel's own structural-type family (Part 2
+ * §4.1: "record, array, set, map, and tuple compose with product, fixing access_pattern and size_type").
  */
-public sealed interface Product extends Type permits RecordBody, ArrayBody, MapBody, TupleBody {
+public sealed interface Product extends Type
+        permits RecordBody, RecordTemplateBody, ArrayBody, MapBody, TupleBody, NamespaceBody {
 
     /**
      * Reports how this body's own structural facets contradict <em>each other</em> -- an empty list means it
@@ -19,12 +20,13 @@ public sealed interface Product extends Type permits RecordBody, ArrayBody, MapB
      * own fields form a range, so the rule lives here rather than in a generic comparison.
      *
      * <p>The default admits everything, which is correct for a family with no orderable facet at all
-     * ({@link RecordBody}, {@link TupleBody}); {@link ArrayBody} and {@link MapBody} carry the {@code
-     * min_items}/{@code max_items} pair and override it. That pair is one rule over two families, which is
-     * why they share {@link AtomCoherence}'s own comparison rather than each spelling it.
+     * ({@link RecordBody}, {@link RecordTemplateBody}, {@link TupleBody}); {@link ArrayBody}, {@link MapBody} and
+     * {@link NamespaceBody} carry the {@code min_items}/{@code max_items} pair and override it. That pair is one
+     * rule over every container, which is why they share {@code AtomCoherence}'s own comparison rather than each
+     * spelling it.
      *
      * <p><b>Stated here rather than where a container is written.</b> [TSON-SCHEMA] §5.3's size specifier and
-     * the explicit {@code !array { ... min_items: ... }} body denote the same type, and a rule that lived
+     * the explicit {@code !meta.array { ... min_items: ... }} body denote the same type, and a rule that lived
      * with either spelling would refuse one and admit the other. §8.2's materialisation-time check has the
      * same need from a third direction -- bounds that were parameters when the template was written -- and
      * reaches the same rule here.

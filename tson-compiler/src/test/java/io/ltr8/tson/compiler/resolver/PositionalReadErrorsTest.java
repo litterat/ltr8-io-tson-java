@@ -3,14 +3,14 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.Position;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.SourcePosition;
@@ -49,7 +49,7 @@ class PositionalReadErrorsTest {
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
+        TsonCompiledVocabularyRegistry core = new TsonCompiledVocabularyRegistry(SchemaModelNameBinder.defaultContext());
         return TsonCompiledSchemaRegistry.tree(core).compile(linkedSchema);
     }
 
@@ -57,8 +57,8 @@ class PositionalReadErrorsTest {
     void missingRequiredFieldErrorCarriesBothDataAndSchemaLocations() {
         String schemaSource = """
                 !!id:"https://tson.io/test-suite/scratch/position-demo.tn"
-                !!meta:"https://tson.io/test-suite/scratch/fake-meta.tn"
-                {
+                !!import:"https://tson.io/test-suite/scratch/fake-meta.tn"
+                !schema {
                   placeholder => {}
 
                   my_record => {
@@ -82,7 +82,7 @@ class PositionalReadErrorsTest {
         Position myRecordPosition = declarationPositions.get(myRecordDeclaration);
         entries.put("my_record", resolver.resolve(myRecordDeclaration, Optional.of(myRecordPosition)));
 
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(),
+        TsonSchema schema = new TsonSchema("test-schema", List.of(),
                 io.ltr8.annotation.AnnotatedMap.of(entries), false, Map.of(),
                 Map.of("my_record", resolver.factsOf("my_record")));
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));

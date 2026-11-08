@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §8.2's derived {@code @synthetic} marker: every entry the resolver materialised from a sugar
+ * [TSON-SCHEMA] §8.2's derived {@code @meta.synthetic} marker: every entry the resolver materialised from a sugar
  * form carries it at its schema-map key, and nothing else does.
  *
  * <p><b>Why the marker, when the names are already distinctive.</b> A synthetic entry is named by derivation
@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * pattern-matching the name is not a way to recognise one. The marker is, and it is what lets a consumer of
  * resolver output fold these entries back into the nested form the author actually wrote.
  *
- * <p><b>Two families, one marked.</b> §8.2: "The instantiation entry carries no {@code @synthetic} marker:
+ * <p><b>Two families, one marked.</b> §8.2: "The instantiation entry carries no {@code @meta.synthetic} marker:
  * the two families are distinguishable (an instantiation closes an application; a synthetic is a bare
  * constructor's instance), and only synthetics are the fold-back-into-display case the marker serves." Both
  * halves are asserted here, because marking too much is as wrong as marking too little.
@@ -47,9 +47,9 @@ class SyntheticEntryMarkerTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/marker.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               @doc:"An order." order => { id: text }
               paged => <T> { items: [T; 1..] }
               order_response => paged<order>
@@ -68,15 +68,15 @@ class SyntheticEntryMarkerTest {
 
     private static final String IMPORTER = """
             !!id:"https://example.test/importer.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
             !!import:"https://example.test/marker.tn"
-            {
+            !schema {
               shipment => { of: order }
             }
             """;
 
-    private static TsonCompiledMetaRegistry registry() {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), uri -> {
+    private static TsonCompiledVocabularyRegistry registry() {
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
@@ -110,7 +110,7 @@ class SyntheticEntryMarkerTest {
     }
 
     private static boolean marked(Namespace<Top> entries, String name) {
-        return entries.getAnnotations(name).has("synthetic");
+        return entries.getAnnotations(name).has(TsonSchema.SYNTHETIC);
     }
 
     /** An inline sugar form lifts to an entry of its own (§5.3), and that entry is a synthetic one. */
@@ -148,7 +148,7 @@ class SyntheticEntryMarkerTest {
     void aDeclarationWhoseOwnBodyIsASugarFormIsNotSynthetic() {
         Namespace<Top> entries = entriesOf(ID);
 
-        assertEquals(Optional.of("array"), factsOf(ID, "tag_list").constructor());
+        assertEquals(Optional.of("meta.array"), factsOf(ID, "tag_list").constructor());
         assertFalse(marked(entries, "tag_list"), "the declaration is the construction, not a lift of one");
     }
 
@@ -182,8 +182,8 @@ class SyntheticEntryMarkerTest {
     /** The marker is the key's, not the definition's -- §6 forbids hoisting between the two positions. */
     @Test
     void theDefinitionValueNeverCarriesTheMarker() {
-        localEntries().forEach((name, definition) -> assertFalse(factsOf(ID, name).annotations().has("synthetic"),
-                name + " carries @synthetic on its definition, where §6 puts declaration metadata on the key"));
+        localEntries().forEach((name, definition) -> assertFalse(factsOf(ID, name).annotations().has(TsonSchema.SYNTHETIC),
+                name + " carries @meta.synthetic on its definition, where §6 puts declaration metadata on the key"));
     }
 
     /**
@@ -197,7 +197,7 @@ class SyntheticEntryMarkerTest {
         Namespace<Top> importing = entriesOf(IMPORTER_ID);
 
         Set<String> synthetics = new TreeSet<>();
-        declaring.keySet().forEach(name -> {
+        localEntries().keySet().forEach(name -> {
             if (marked(declaring, name)) {
                 synthetics.add(name);
             }

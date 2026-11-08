@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * eliminated by dispatch, never by inference.
  *
  * <p>So the test is the parent's existence, which {@code template.extension} states: present for a record
- * body, absent for a container, a constructor application and a reference template alike.
+ * body, absent for a container, a constructor application and an alias template alike.
  *
  * <p><b>What this test covers is whether the schema loads</b>, which is the half the parent's existence
  * decides. Reading such a position is {@code TemplateIsAFamilyBaseTest}'s: a value there dispatches to a
@@ -33,8 +33,9 @@ class TemplateAtATypePositionTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static List<Diagnostic> validate(String id, String declarations) {
@@ -88,14 +89,14 @@ class TemplateAtATypePositionTest {
     @Test
     void aConstructorApplicationTemplateIsStillRefused() {
         assertTrue(refusal("t5", """
-                  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
                   holder => { p: vector }
                 """).contains("a template is not a type until it is applied"));
     }
 
     /** A reference is indirection, not a type of its own, so there is nothing for a parent to hold. */
     @Test
-    void aReferenceTemplateIsStillRefused() {
+    void anAliasTemplateIsStillRefused() {
         assertTrue(refusal("t6", """
                   pair      => <A, B> { first: A  second: B }
                   uuid_pair => <B> pair<uuid, B>

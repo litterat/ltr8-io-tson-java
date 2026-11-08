@@ -96,6 +96,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Whether the document is a value body ({@link TsonReadContext#readsValueBody()}). */
         final boolean valueBody;
 
+        /** Depth of {@link #readingSchemaNames} reads the cursor is inside; {@code 0} for a data document's read. */
+        int schemaNames;
+
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy,
                TsonReadContext.HeldByName heldByName,
                boolean valueBody) {
@@ -223,7 +226,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     /**
      * [TSON-DATA] §8.2's <b>restricted-character and restricted-script</b> rules over the three names a Class 1
      * document carries -- a type-ref name, an annotation name and a record's field names, every position §7.4
-     * marks {@code identifier}.
+     * marks {@code meta.identifier}.
      *
      * <p>A field name reaches the same rules as the other two because it is the same thing: §2.5 makes it an
      * identifier at every layer, so there is one name rule and no per-conformance-class exception to it. The
@@ -327,6 +330,26 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
+    public boolean readsSchemaNames() {
+        return cursor.heldByName != null || cursor.schemaNames > 0;
+    }
+
+    /**
+     * Runs {@code read} with names at kind- and reference-typed positions resolving in the document ({@link
+     * TsonReadContext#readsSchemaNames()}): the read of a value of the kernel's {@code schema}. The cast cannot fail
+     * for a context this library made (see {@link #lookingAhead}).
+     */
+    static <T> T readingSchemaNames(TsonReadContext ctx, java.util.function.Supplier<T> read) {
+        Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
+        cursor.schemaNames++;
+        try {
+            return read.get();
+        } finally {
+            cursor.schemaNames--;
+        }
+    }
+
+    @Override
     public boolean readsValueBody() {
         return cursor.valueBody;
     }
@@ -336,12 +359,27 @@ final class DefaultTsonReadContext implements TsonReadContext {
         if (cursor.heldByName == null) {
             return;
         }
+        cursor.heldByName.held(slot(), type, reference, cell);
+    }
+
+    @Override
+    public void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.RecordField declared,
+                              io.ltr8.tson.schema.meta.Reference named, List<TsonEvent> written) {
+        if (cursor.heldByName == null) {
+            return;
+        }
+        cursor.heldByName.heldAsWritten(new TsonSchema.HeldValue(slot(), field, sibling, declared,
+                Optional.ofNullable(named), List.copyOf(written)));
+    }
+
+    /** The path this context has descended from the value's root: a field name, a key, or an index per step. */
+    private List<String> slot() {
         List<String> slot = new ArrayList<>();
         for (PathStep step = tail; step != null; step = step.parent()) {
             slot.add(step.name() != null ? step.name() : Integer.toString(step.index()));
         }
         Collections.reverse(slot);
-        cursor.heldByName.held(List.copyOf(slot), type, reference, cell);
+        return List.copyOf(slot);
     }
 
     /**
@@ -397,7 +435,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     /** {@link TsonReadContext#skipUnjudged}'s implementation, which carries the contract. */
     static void skipUnjudged(TsonReadContext ctx) {
-        unjudged(ctx, io.ltr8.tson.compiler.stream.EventSkip::scopedValue);
+        unjudged(ctx, io.ltr8.tson.compiler.stream.EventSkip::dataValue);
     }
 
     private static void unjudged(TsonReadContext ctx, java.util.function.Consumer<TsonReadContext> skip) {
@@ -434,6 +472,15 @@ final class DefaultTsonReadContext implements TsonReadContext {
                 cursor.rewound.addFirst(consumed.get(i));
             }
         }
+    }
+
+    /** {@link TsonReadContext#asWritten}: the lookahead's own record of what it consumed is the value's events. */
+    static List<TsonEvent> asWritten(TsonReadContext ctx) {
+        Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
+        return lookingAhead(ctx, lookahead -> {
+            io.ltr8.tson.compiler.stream.EventSkip.dataValue(lookahead);
+            return List.copyOf(cursor.recording);
+        });
     }
 
     @Override
@@ -510,6 +557,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public TsonReadContext inRecord(SchemaLocation declaration) {
+        reached(declaration);
         // The pointer survives, the anchor does not: this record declares the field the pointer now ends
         // with, so it is what a reader following the pointer needs opened. Only an outermost record, with no
         // pointer to extend, contributes its own name as the path's root.
@@ -522,9 +570,17 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public TsonReadContext underDeclaration(SchemaLocation declaration) {
+        reached(declaration);
         return schemaRoot != null
                 ? this
                 : anchoredOn(declaration.pointer(), declaration.schemaId(), declaration.position());
+    }
+
+    /** A schema document's read tells its sink each declaration a reader reads against ({@link HeldByName#reached}). */
+    private void reached(SchemaLocation declaration) {
+        if (cursor.heldByName != null) {
+            cursor.heldByName.reached(declaration);
+        }
     }
 
     private TsonReadContext anchoredOn(String root, String id, Optional<SourcePosition> position) {

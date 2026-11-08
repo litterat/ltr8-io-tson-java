@@ -10,7 +10,6 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.compiler.lexer.Token;
@@ -22,23 +21,18 @@ import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.net.CidrNetwork;
 import io.ltr8.tson.base.atom.Complex;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
-import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.atom.Rational;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonVoid;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
-import org.junit.jupiter.api.io.TempDir;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -61,6 +55,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import static io.ltr8.tson.suite.Sidecar.fieldCore;
 import static io.ltr8.tson.suite.Sidecar.fieldText;
+import static io.ltr8.tson.suite.Sidecar.fieldTextArray;
 import static io.ltr8.tson.suite.Sidecar.fieldTextOrAbsent;
 import static io.ltr8.tson.suite.Sidecar.fieldValue;
 import static io.ltr8.tson.suite.Sidecar.hasField;
@@ -139,15 +134,16 @@ class ConformanceSuiteTest {
 
     /**
      * [TSON-DATA] §2.2.1 over the subject's first directive: an {@code !!id} is a document's own name and must be
-     * written canonically ({@link CanonicalIdentity#validate}); a {@code !!schema} is a reference, read in any
+     * written canonically ({@link CanonicalIdentity#validate}); an {@code !!import} is a reference, read in any
      * spelling ({@link CanonicalIdentity#canonicalize}). Nothing is fetched or resolved.
      */
     private static void checkIdentityVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        TsonDocumentHeader header = TsonDocumentPeek.of(new ByteArrayInputStream(subjectBytes(subject, sidecar)))
+        TsonDocumentHeader header = TsonDocumentPeek.of(new ByteArrayInputStream(subjectBytes(subject)))
                 .header();
         boolean ownName = header.id().isPresent();
         String argument = ownName ? header.id().get()
-                : header.schema().orElseThrow(() -> new AssertionError("an identity subject carries !!id or !!schema"));
+                : header.imports().stream().findFirst()
+                        .orElseThrow(() -> new AssertionError("an identity subject carries !!id or !!import"));
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 if (ownName) {
@@ -177,7 +173,7 @@ class ConformanceSuiteTest {
             checkEncodingVector(subject, sidecar);
             return;
         }
-        byte[] raw = subjectBytes(subject, sidecar);
+        byte[] raw = subjectBytes(subject);
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 List<Token> actual = new Lexer(ByteSource.of(new ByteArrayInputStream(raw))).tokenize();
@@ -185,7 +181,7 @@ class ConformanceSuiteTest {
                 ArrayValue expectedTokens = (ArrayValue) fieldCore(outcomePayload(sidecar), "tokens");
                 assertEquals(expectedTokens.elements().size(), actual.size(), "token count");
                 for (int i = 0; i < actual.size(); i++) {
-                    RecordValue expTok = (RecordValue) expectedTokens.elements().get(i).value().coreValue();
+                    RecordValue expTok = (RecordValue) expectedTokens.elements().get(i).coreValue();
                     String expKind = fieldText(expTok, "kind");
                     String expText = fieldText(expTok, "text");
                     assertEquals(expKind, kindName(actual.get(i).type()), "token[" + i + "].kind");
@@ -241,7 +237,7 @@ class ConformanceSuiteTest {
     // ── TsonDataParser-layer vectors ─────────────────────────────────────────────
 
     private static void checkParserVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        byte[] raw = subjectBytes(subject, sidecar);
+        byte[] raw = subjectBytes(subject);
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 Document actual = new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument();
@@ -258,15 +254,15 @@ class ConformanceSuiteTest {
 
     private static void assertDocumentMatches(RecordValue expected, Document actual) {
         assertEquals(fieldTextOrAbsent(expected, "id"), actual.id().orElse(null), "document.id");
-        assertEquals(fieldTextOrAbsent(expected, "schema"), actual.schema().orElse(null), "document.schema");
+        assertEquals(fieldTextArray(expected, "imports"), actual.imports(), "document.imports");
         RecordValue expectedRoot = (RecordValue) fieldValue(expected, "root").coreValue();
         assertDataValueMatches(expectedRoot, actual.root());
     }
 
     private static void assertDataValueMatches(RecordValue expected, DataValue actual) {
         List<DataValue> expectedAnnotations = new ArrayList<>();
-        for (ScopedValue sv : ((ArrayValue) fieldCore(expected, "annotations")).elements()) {
-            expectedAnnotations.add(sv.value());
+        for (DataValue sv : ((ArrayValue) fieldCore(expected, "annotations")).elements()) {
+            expectedAnnotations.add(sv);
         }
         assertEquals(expectedAnnotations.size(), actual.annotations().size(), "annotation count");
         for (int i = 0; i < expectedAnnotations.size(); i++) {
@@ -288,12 +284,44 @@ class ConformanceSuiteTest {
         assertCoreValueMatches((RecordValue) fieldValue(expected, "core").coreValue(), actual.coreValue());
     }
 
+    /** A reference with arguments: its name, and each argument a nested reference or a token, in order. */
+    private static void assertReferenceMatches(RecordValue expected, io.ltr8.tson.schema.meta.TypeRef actual) {
+        assertEquals(fieldText(expected, "name"), actual.name(), "reference name");
+        ArrayValue expArguments = (ArrayValue) fieldCore(expected, "arguments");
+        assertEquals(expArguments.elements().size(), actual.arguments().size(), "reference argument count");
+        for (int i = 0; i < actual.arguments().size(); i++) {
+            RecordValue.Field argument = soleField((RecordValue) expArguments.elements().get(i).coreValue(),
+                    "reference argument");
+            RecordValue payload = (RecordValue) argument.value().coreValue();
+            switch (actual.arguments().get(i)) {
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref ref when !ref.ref().arguments().isEmpty() -> {
+                    assertEquals("reference", argument.name(), "argument[" + i + "] kind");
+                    assertReferenceMatches(payload, ref.ref());
+                }
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref ref -> {
+                    assertEquals("token", argument.name(), "argument[" + i + "] kind");
+                    assertEquals("unquoted", fieldText(payload, "form"), "argument[" + i + "] form");
+                    assertEquals(fieldText(payload, "text"), ref.ref().name(), "argument[" + i + "] text");
+                }
+                case io.ltr8.tson.schema.meta.TypeArgument.Value value -> {
+                    assertEquals("token", argument.name(), "argument[" + i + "] kind");
+                    assertEquals(fieldText(payload, "form"), switch (value.value().form()) {
+                        case UNQUOTED -> "unquoted";
+                        case SINGLE_LINE_QUOTED -> "single-line";
+                        case MULTI_LINE_QUOTED -> "multi-line";
+                    }, "argument[" + i + "] form");
+                    assertEquals(fieldText(payload, "text"), value.value().text(), "argument[" + i + "] text");
+                }
+            }
+        }
+    }
+
     private static void assertCoreValueMatches(RecordValue expected, CoreValue actual) {
         RecordValue.Field member = soleField(expected, "core-value");
         String kind = member.name();
         RecordValue payload = kind.equals("absent") || kind.equals("empty-brace")
                 ? null
-                : (RecordValue) member.value().value().coreValue();
+                : (RecordValue) member.value().coreValue();
         switch (kind) {
             case "token" -> {
                 TokenValue tv = assertInstanceOf(TokenValue.class, actual, "core-value kind 'token'");
@@ -306,6 +334,9 @@ class ConformanceSuiteTest {
                 assertEquals(expForm, actForm, "token form");
                 assertEquals(fieldText(payload, "text"), tv.text(), "token text");
             }
+            case "reference" -> assertReferenceMatches(payload, assertInstanceOf(io.ltr8.tson.schema.meta.TypeRef.class,
+                    assertInstanceOf(ReferenceValue.class, actual, "core-value kind 'reference'").reference(),
+                    "core-value kind 'reference'"));
             case "absent" -> assertInstanceOf(VoidValue.class, actual, "core-value kind 'absent'");
             case "empty-brace" -> assertInstanceOf(EmptyBrace.class, actual, "core-value kind 'empty-brace'");
             case "record" -> {
@@ -313,10 +344,10 @@ class ConformanceSuiteTest {
                 ArrayValue expFields = (ArrayValue) fieldCore(payload, "fields");
                 assertEquals(expFields.elements().size(), rv.fields().size(), "record field count");
                 for (int i = 0; i < rv.fields().size(); i++) {
-                    RecordValue expField = (RecordValue) expFields.elements().get(i).value().coreValue();
+                    RecordValue expField = (RecordValue) expFields.elements().get(i).coreValue();
                     assertEquals(fieldText(expField, "name"), rv.fields().get(i).name(),
                             "record field[" + i + "].name");
-                    assertScopedValueMatches((RecordValue) fieldValue(expField, "value").coreValue(),
+                    assertDataValueMatches((RecordValue) fieldValue(expField, "value").coreValue(),
                             rv.fields().get(i).value());
                 }
             }
@@ -325,10 +356,10 @@ class ConformanceSuiteTest {
                 ArrayValue expEntries = (ArrayValue) fieldCore(payload, "entries");
                 assertEquals(expEntries.elements().size(), mv.entries().size(), "map entry count");
                 for (int i = 0; i < mv.entries().size(); i++) {
-                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).value().coreValue();
+                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).coreValue();
                     assertDataValueMatches((RecordValue) fieldValue(expEntry, "key").coreValue(),
                             mv.entries().get(i).key());
-                    assertScopedValueMatches((RecordValue) fieldValue(expEntry, "value").coreValue(),
+                    assertDataValueMatches((RecordValue) fieldValue(expEntry, "value").coreValue(),
                             mv.entries().get(i).value());
                 }
             }
@@ -337,17 +368,12 @@ class ConformanceSuiteTest {
                 ArrayValue expElements = (ArrayValue) fieldCore(payload, "elements");
                 assertEquals(expElements.elements().size(), av.elements().size(), "array element count");
                 for (int i = 0; i < av.elements().size(); i++) {
-                    RecordValue expScoped = (RecordValue) expElements.elements().get(i).value().coreValue();
-                    assertScopedValueMatches(expScoped, av.elements().get(i));
+                    RecordValue expElement = (RecordValue) expElements.elements().get(i).coreValue();
+                    assertDataValueMatches(expElement, av.elements().get(i));
                 }
             }
             default -> fail("unknown expected core-value kind: " + kind);
         }
-    }
-
-    private static void assertScopedValueMatches(RecordValue expected, ScopedValue actual) {
-        assertEquals(fieldTextOrAbsent(expected, "schema-ref"), actual.schemaRef().orElse(null), "schema-ref");
-        assertDataValueMatches((RecordValue) fieldValue(expected, "value").coreValue(), actual.value());
     }
 
     // ── Reader-layer vectors ─────────────────────────────────────────────
@@ -365,7 +391,7 @@ class ConformanceSuiteTest {
      * here for the wrong reason.
      */
     private static void checkReaderVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        byte[] raw = subjectBytes(subject, sidecar);
+        byte[] raw = subjectBytes(subject);
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 TsonValue actual = new TsonTreeReader().read(new ByteArrayInputStream(raw));
@@ -460,9 +486,22 @@ class ConformanceSuiteTest {
 
     private static void assertReaderValueMatches(RecordValue expected, TsonValue actual) {
         RecordValue.Field member = soleField(expected, "reader-value");
-        CoreValue payload = member.value().value().coreValue();
+        CoreValue payload = member.value().coreValue();
         switch (member.name()) {
             case "absent" -> assertInstanceOf(TsonVoid.class, actual, "reader-value 'absent'");
+            case "reference" -> {
+                TsonApplicationReference reference = assertInstanceOf(TsonApplicationReference.class, actual,
+                        "reader-value 'reference'");
+                ArrayValue expSegments = (ArrayValue) fieldCore((RecordValue) payload, "segments");
+                assertEquals(expSegments.elements().stream().map(e -> ((TokenValue) e.coreValue()).text()).toList(),
+                        reference.segments(), "reference segments");
+                ArrayValue expArguments = (ArrayValue) fieldCore((RecordValue) payload, "arguments");
+                assertEquals(expArguments.elements().size(), reference.arguments().size(), "reference argument count");
+                for (int i = 0; i < reference.arguments().size(); i++) {
+                    assertReaderValueMatches((RecordValue) expArguments.elements().get(i).coreValue(),
+                            reference.arguments().get(i));
+                }
+            }
             case "atom" -> assertAtomMatches((RecordValue) payload,
                     assertInstanceOf(TsonAtom.class, actual, "reader-value 'atom'"));
             case "record" -> {
@@ -471,7 +510,7 @@ class ConformanceSuiteTest {
                 assertEquals(expFields.elements().size(), record.fields().size(), "record field count");
                 List<Map.Entry<String, TsonValue>> actualFields = new ArrayList<>(record.fields().entrySet());
                 for (int i = 0; i < actualFields.size(); i++) {
-                    RecordValue expField = (RecordValue) expFields.elements().get(i).value().coreValue();
+                    RecordValue expField = (RecordValue) expFields.elements().get(i).coreValue();
                     assertEquals(fieldText(expField, "name"), actualFields.get(i).getKey(),
                             "record field[" + i + "].name");
                     assertReaderValueMatches((RecordValue) fieldCore(expField, "value"),
@@ -483,7 +522,7 @@ class ConformanceSuiteTest {
                 ArrayValue expEntries = (ArrayValue) fieldCore((RecordValue) payload, "entries");
                 assertEquals(expEntries.elements().size(), map.entries().size(), "map entry count");
                 for (int i = 0; i < map.entries().size(); i++) {
-                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).value().coreValue();
+                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).coreValue();
                     assertReaderValueMatches((RecordValue) fieldCore(expEntry, "key"), map.entries().get(i).key());
                     assertReaderValueMatches((RecordValue) fieldCore(expEntry, "value"), map.entries().get(i).value());
                 }
@@ -494,7 +533,7 @@ class ConformanceSuiteTest {
                 assertEquals(expElements.elements().size(), array.elements().size(), "array element count");
                 for (int i = 0; i < array.elements().size(); i++) {
                     assertReaderValueMatches(
-                            (RecordValue) expElements.elements().get(i).value().coreValue(),
+                            (RecordValue) expElements.elements().get(i).coreValue(),
                             array.elements().get(i));
                 }
             }
@@ -509,7 +548,7 @@ class ConformanceSuiteTest {
      */
     private static void assertAtomMatches(RecordValue expected, TsonAtom actual) {
         RecordValue.Field member = soleField(expected, "reader atom");
-        String text = ((TokenValue) member.value().value().coreValue()).text();
+        String text = ((TokenValue) member.value().coreValue()).text();
         switch (member.name()) {
             case "boolean" -> assertEquals(Boolean.parseBoolean(text), actual.value(), "boolean atom");
             case "string" -> assertEquals(text, String.valueOf(actual.value()), "string atom");
@@ -524,7 +563,7 @@ class ConformanceSuiteTest {
     private static void checkResolverVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         // §4 never rejects a token, so this layer has one outcome and the sidecar carries `valid`
         // as a plain field -- a group of one is not a group (§5.11's two-member minimum).
-        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject, sidecar))).parseDocument();
+        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject))).parseDocument();
         TokenValue token = assertInstanceOf(TokenValue.class, doc.root().coreValue(),
                 "resolver vector .tn must be a single bare token");
         BaseValue actual = BaseTypeResolver.resolve(token);
@@ -534,7 +573,7 @@ class ConformanceSuiteTest {
 
     private static void assertBaseValueMatches(RecordValue expected, BaseValue actual) {
         RecordValue.Field member = soleField(expected, "base-value");
-        CoreValue payload = member.value().value().coreValue();
+        CoreValue payload = member.value().coreValue();
         switch (member.name()) {
             case "boolean" -> {
                 BaseValue.BooleanValue bv = assertInstanceOf(BaseValue.BooleanValue.class, actual, "base-value kind 'boolean'");
@@ -554,7 +593,7 @@ class ConformanceSuiteTest {
 
     private static void assertNumberFormMatches(RecordValue group, NumberForm actual) {
         RecordValue.Field member = soleField(group, "number-form");
-        RecordValue expected = (RecordValue) member.value().value().coreValue();
+        RecordValue expected = (RecordValue) member.value().coreValue();
         String shape = member.name();
         switch (shape) {
             case "integer" -> {
@@ -638,7 +677,7 @@ class ConformanceSuiteTest {
      * validation error. The suite's README flags the first half as not yet settled by the spec.
      */
     private static void checkVocabularyVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject, sidecar))).parseDocument();
+        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject))).parseDocument();
         DataValue root = doc.root();
         String typeRef = root.typeRef().orElseThrow(
                 () -> new AssertionError("vocabulary vector .tn must carry a type-ref"));
@@ -658,7 +697,7 @@ class ConformanceSuiteTest {
 
     private static void checkValidVocabularyVector(String typeRef, AtomType<?> atomType, String token, RecordValue valid) {
         RecordValue.Field family = soleField((RecordValue) fieldCore(valid, "value"), "vocabulary value");
-        CoreValue payload = family.value().value().coreValue();
+        CoreValue payload = family.value().coreValue();
         switch (typeRef) {
             case "rational" -> {
                 Rational actual = (Rational) atomType.boundTo(Rational.class).orElseThrow().read(token);
@@ -765,50 +804,6 @@ class ConformanceSuiteTest {
     private static Rational parseRational(String text) {
         String[] parts = text.split("/", 2);
         return new Rational(new BigInteger(parts[0]), new BigInteger(parts[1]));
-    }
-
-    // ── Dynamic meta/import splicing (RUNNER.md's "Schema-governed vectors") ──
-
-    /**
-     * Proves {@link Sidecar#splicedSource} both splices the right text, in the right place, and produces a
-     * document that genuinely resolves against the real bundled meta.tn/core.tn chain -- not just
-     * something that looks plausible. Self-contained: doesn't depend on the sibling test-suite repo
-     * being checked out.
-     */
-    @Test
-    void theSpliceInsertsRealDirectivesThatActuallyResolve(@TempDir Path tempDir) throws IOException {
-        Path subject = tempDir.resolve("synthetic.tn");
-        Files.writeString(subject,
-                "!!id:\"https://tson.io/test-suite/schema/valid/synthetic.tn\"\n{ my_int => integer }");
-        RecordValue sidecar = (RecordValue) new TsonDataParser("{ meta: \"meta.tn\" import: [\"core.tn\"] }")
-                .parseDocument().root().coreValue();
-
-        String resolved = Sidecar.splicedSource(subject, sidecar);
-
-        assertEquals(
-                "!!id:\"https://tson.io/test-suite/schema/valid/synthetic.tn\"\n"
-                        + "!!meta:\"" + TsonBundledSchemas.META_ID + "\"\n"
-                        + "!!import:\"" + TsonBundledSchemas.CORE_ID + "\"\n"
-                        + "{ my_int => integer }",
-                resolved, "!!meta/!!import spliced right after !!id, in header order");
-
-        SchemaDocument schemaDocument = new TsonSchemaParser(resolved).parseSchemaDocument();
-        // Resolution (unlike compilation) always needs an object-binding-mode governing-meta reader,
-        // regardless of what mode the caller eventually wants -- see Tson's own class Javadoc.
-        // Same bootstrap sequence ProcessorConfig#build uses: meta-kernel has to be resolved and
-        // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
-        // register itself -- see TsonBundledSchemas's own class Javadoc for why.
-        TsonCompiledMetaRegistry compiledRegistry =
-                new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
-        TsonCompiledSchemaLoader loader = compiledRegistry;
-        SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        compiledRegistry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
-
-        TsonSchema resolvedSchema = new TsonSchemaResolver(loader).resolveSchema(schemaDocument);
-        assertTrue(resolvedSchema.entries().containsKey("my_int"),
-                "my_int should resolve as a bare reference to core.tn's own integer, reachable via the real spliced !!import");
     }
 
     /**

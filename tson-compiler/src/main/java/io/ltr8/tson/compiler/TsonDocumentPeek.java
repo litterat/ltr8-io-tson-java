@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.compiler.lexer.LexException;
@@ -11,9 +12,14 @@ import java.io.InputStream;
 import java.util.Objects;
 
 /**
- * A document's header, read, <b>with the rest of the document still to come on the same stream</b> --
- * [TSON-DATA] §7.1's "at most two directives of lookahead and no value parsing, so streams, previews, and
- * content sniffers can classify a document from its opening bytes".
+ * A document's header and its root's tag, read, <b>with the rest of the document still to come on the same
+ * stream</b> -- [TSON-DATA] §7.1's classification of a document from its opening bytes, so streams, previews and
+ * content sniffers can route it before reading it. The header names what the document imports; the root's tag says
+ * what it is, a root tagged {@code !schema} being a schema document (§2.2).
+ *
+ * <p><b>What classifying reads.</b> The header, then the root's leading annotations and its tag; never the root's
+ * value. Annotations stand before the tag ({@code *annotation [type-ref] core-value}), so a schema document carrying
+ * an {@code @doc} is classified by reading past that annotation's value -- the one value a classification parses.
  *
  * <p><b>Nothing is rewound, because nothing is re-read.</b> The header is the stream's first event
  * ({@code DocumentStart}), so this holds the live stream positioned just past it and a reader continues
@@ -24,7 +30,7 @@ import java.util.Objects;
  *
  * <pre>{@code
  * TsonDocumentPeek peek = tson.begin(request.getInputStream());
- * Tson version = peek.header().schema().filter(V2::names).isPresent() ? v2 : v1;
+ * Tson version = peek.header().imports().stream().anyMatch(V2::names) ? v2 : v1;
  * Invoice invoice = version.objectReader().read(peek, Invoice.class);
  * }</pre>
  *
@@ -57,12 +63,16 @@ public final class TsonDocumentPeek {
 
     private final DocumentStart start;
 
+    /** Whether the root is tagged {@code !schema} -- false where the header or the root's annotations failed. */
+    private final boolean schemaDocument;
+
     private TsonDocumentPeek(TsonDataStream stream, ProcessorPolicy policy, TsonDocumentHeader header,
-                             DocumentStart start, RuntimeException failure) {
+                             DocumentStart start, boolean schemaDocument, RuntimeException failure) {
         this.stream = stream;
         this.policy = policy;
         this.header = header;
         this.start = start;
+        this.schemaDocument = schemaDocument;
         this.failure = failure;
     }
 
@@ -91,12 +101,20 @@ public final class TsonDocumentPeek {
     }
 
     private static TsonDocumentPeek of(TsonDataStream stream, ProcessorPolicy policy) {
+        DocumentStart start;
         try {
-            DocumentStart start = (DocumentStart) stream.next();
-            return new TsonDocumentPeek(stream, policy,
-                    new TsonDocumentHeader(start.id(), start.schema(), start.meta()), start, null);
+            start = (DocumentStart) stream.next();
         } catch (ParseException | LexException e) {
-            return new TsonDocumentPeek(stream, policy, TsonDocumentHeader.NONE, null, e);
+            return new TsonDocumentPeek(stream, policy, TsonDocumentHeader.NONE, null, false, e);
+        }
+        TsonDocumentHeader header = new TsonDocumentHeader(start.id(), start.imports());
+        try {
+            return new TsonDocumentPeek(stream, policy, header, start, DocumentStart.isSchemaTag(stream.rootTag()),
+                    null);
+        } catch (ParseException | LexException | LimitExceededException e) {
+            // The header read and the root's annotations did not: the header stands, and the read that continues
+            // reports the failure where it lies.
+            return new TsonDocumentPeek(stream, policy, header, null, false, e);
         }
     }
 
@@ -105,9 +123,9 @@ public final class TsonDocumentPeek {
         return Objects.requireNonNull(header);
     }
 
-    /** Whether this is a <em>schema</em> document -- [TSON-SCHEMA] §12.1's {@code !!meta} decides. */
+    /** Whether this is a <em>schema</em> document: its root is tagged {@code !schema} ([TSON-DATA] §2.2). */
     public boolean isSchemaDocument() {
-        return header.isSchemaDocument();
+        return schemaDocument;
     }
 
     // ── For the readers that continue from here ──────────────────────────

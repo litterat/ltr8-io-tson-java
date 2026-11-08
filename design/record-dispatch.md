@@ -18,15 +18,20 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
 - `UNKNOWN_TYPE_REF` means the written name denotes nothing; a name that resolves and is not admissible, or a required
   selector that is absent, is `TYPE_MISMATCH`.
 - The pin table is keyed by `ValueIdentity`, and the selector scan is a `lookingAhead` that rewinds.
-- A record template IS-A a base is no member of it, even where it pins the selector: it has no values, and its
-  applications are the members. Both member dispatchers skip it, so a pin only the template states selects nothing
-  and the refusal offers only pins a document could write (`CrossEncodingParityTest`).
+- A member is a `RecordBody`, so a record template IS-A a base is no member of it, even where it pins the selector:
+  it has no values, and its applications are the members. Both member dispatchers take only `RecordBody` subtypes,
+  which passes a template by type rather than by a check, so a pin only the template states selects nothing and the
+  refusal offers only pins a document could write (`CrossEncodingParityTest`).
+- A discriminator may be a dependent field's sibling (`slot => abstract { kind: meta.type_ref =?  v?: kind! }`,
+  [TSON-SCHEMA] §5.2): the selector scan finds it before any field is read, wherever the document writes it, and the
+  member it selects pins it, so the member's record reader reads the dependent field against the pin. Nothing here
+  knows of dependent fields; the order rule's exemption for a discriminator is this scan.
 - In a data document a bare token fills a record's one positional field (§5.6) whatever its type. In a schema
   document (`TsonReadContext.readsSchemaDocument()`) it does so only where that field is atom-typed; an unquoted
   token is otherwise a value by name, read only by a `TypeRef` component at a record-typed slot.
   `ReferenceNameReader.nameIn` is the one statement of which tokens are names; their segment grammar is the linker's.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`. §7.2's subsumption guard is
 `design/class2-compilation.md`.
@@ -39,13 +44,13 @@ play, so no family-base position reaches it.
 
 - **OPEN and FINAL** are the mode's own reader, unchanged. They read identically; the difference is which
   names a tag may carry, and a FINAL record's subtype set is empty by construction rather than by a check.
-- **ABSTRACT** is `RecordTagDispatchReader`: the `!name` annotation is the only selector and is required, and
-  the failure lands before the record's shape is consulted. A tag selecting a namespace type (resolved output's
-  `myapi => !api { … }` read at `top`) reads the map that type reads as and delivers it as an instance of the
-  constructor, a `Namespace` (`RecordTagDispatchReader.namespaces`, `NamespaceInstanceReader.instance`); a position
-  typed by the namespace type itself reads the map, delivered as a `Namespace` only where its host component is one
-  (`BindTargets`, `design/meta-layer-namespaces.md`).
-- **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up.
+- **ABSTRACT** is `RecordTagDispatchReader`: the `!name` annotation is the only selector and is required, and the failure
+  lands before the record's shape is consulted. It selects among a record's subtypes and knows nothing of namespace types:
+  resolved output's `myapi => !api { … }` is read at the schema map's `declared` position, whose reader delivers a
+  `Namespace` (`DeclaredReader`, `design/declared-positions.md`, `design/namespace-types-and-value-entries.md`).
+- **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up. Their
+  keys are matched in the base's name form (`TsonLinkedSchema.nameForm`), a record template base's included: its
+  members take its name type, and `FieldNames.readBy` records the template's as it records a record's.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
 it, so the member's own reader takes the whole data-value and does with it whatever that mode does everywhere
@@ -64,14 +69,15 @@ than §7.2 in any case: a sibling's tag is admissible under §7.2 and still wron
 said which member this is.
 
 **Both compare a written tag against a name and every alias whose chain ends at it**
-(`Subsumption.admitting`), §7.2 comparing "after following both reference chains to their terminal entries":
+(`Subsumption.admitting`), §7.2 comparing "after following both alias chains to their terminal entries":
 the base's own set, which decides the `tagNamesTheBase` refusal, and each
 member's, which decides selection. Skipping it is not a lost nicety but a family nothing can name — a family
 whose base is a **template** has a minted entry for the base and for every member, and §8.2 makes a minted
 name non-normative, so an alias is the only spelling either end has. The dispatchers apply it on the same
 terms as the concrete record readers, or a subtype-template family would read in one encoding and be
 refused in the other — the same schema, the same document, two answers. `CrossEncodingParityTest` carries both
-ends of it.
+ends of it. A resolved form's root reads as a value of `meta.schema` by the same rule and no other: its tag, `!schema`,
+names the kernel root's `schema`, an alias of `meta.schema`.
 
 **`NamedDispatchReader` is not reused**, close as the shape is. Its verdicts are a choice's, and
 [TSON-JSON] §9.4 binds a family's to the ones the JSON stack gives — which is what `base.diagnostics`'
@@ -107,30 +113,31 @@ order — the selector may arrive after the fields it selects.
 
 **In a schema document, §5.6's positional form keeps a bare token only where it would fill an atom-typed field**
 (§5.6). The rule belongs to the read, not to the readers: a value inside a schema document — a
-constructor's binding record, a namespace entry's values — reaches the governing meta's compiled readers as a replay from
+constructor's binding record, a value entry's payload — reaches its declaring schema's compiled readers as a replay from
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
-bare value as that field — `type_ref`'s `name` is a `type_name`, which is how `request: search_request` at a
-`type_ref` slot stays a type reference, and `record_field`'s `type` is `type_kind`, an atom whose value is a type's
-name (`KindSlotReader`, which also admits the application a sugar lift writes there before the closer mints its
+bare value as that field — `meta.record_field`'s `type` is `meta.type_ref`, an atom whose value is a type's name
+(`KindSlotReader`, which also admits the application a sugar lift writes there before the closer mints its
 entry) — and where the field is a product or a sum, an unquoted token
-(`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field (`record_field`'s
+(`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field (`meta.record_field`'s
 own positional field being an atom, `fields: { p => x }` fills its `type`, as the sugar `p: x` does). Whether the token is
 a well-formed qualified name — each `.`-separated segment a [TSON-DATA] §7.7 identifier — is the linker's to judge,
 where the name is resolved (`ValuesByName.segments`).
-**Every data document reads as it did before the rule**, tree mode and bind mode alike: `p: x` at a `record_field`
+**Every data document reads as it did before the rule**, tree mode and bind mode alike: `p: x` at a `meta.record_field`
 position fills `type`. Whether the positional field is atom-typed is read off the field's own compiled reader,
 captured before a bind reader rebinds it (`RecordAbstractReader.bareTokenFillsPositionally`), looking through a
 subsumption guard and a deferred reader; nothing about it is threaded into the record readers' constructors. JSON
 has no positional form, so the rule has no JSON side.
 
-**The slot declares the spelling, never the host.** A value by name stands at a reference-typed slot (`ref<T>`) and a
-type's name at a kind-typed one; a record-typed slot holds the record's value inline, and a `TypeRef` or `Ref` host
-there is a bind mismatch (`BindTargets`). Every reference has one host shape: a `type_ref` slot binds a `TypeRef`, so
-does a kind-typed slot, and a reference-typed slot a `TypeRef` or a `Ref`, whose `ReferenceNameReader` (set in place of
-the slot's atom reader by `BindTargets`) keeps the token as written in the `TypeRef`'s `name`; a host holding such a
-slot as anything else (a `String`) receives what the atom reads, and the name is recorded all the same
-(`RecordedNameReader`). At `type_ref`, whose bare token fills `name`, the component binds by the record reader. The
-reader resolves nothing — the linker does (`design/linking-and-compilation.md`). At a reference-typed slot a quoted
-token is text, and a framed (`@a x`, `!t x`) or braced value is refused as `expected the name of a 'method' value`,
-whatever the host.
+**The slot declares the spelling, never the host.** A value by name stands at a reference-typed slot (a reference over
+a type that is no constructor, `meta.ref<method>`) and a type's name at a kind-typed one (a reference over a constructor);
+a record-typed slot holds the record's value inline, and a `TypeRef` or `Ref` host there is a bind mismatch
+(`BindTargets`). Every reference has one host shape: a kind-typed slot binds a `TypeRef`, and any other
+reference-typed slot a `TypeRef` or a `Ref`, whose `ReferenceNameReader` (set in place of the slot's atom reader
+by `BindTargets`) keeps the token as written in the `TypeRef`'s `name` in a schema document; a host holding such a slot
+as anything else (a `String`) receives what the atom reads, and the name is recorded all the same
+(`RecordedNameReader`). In a schema document the reader resolves nothing — the linker does
+(`design/linking-and-compilation.md`); in a data document it hands the name to the reference's atom bound to the
+component, which judges it in the governing schema and delivers the value reached. At a reference-typed slot a
+quoted token is text, and a framed (`@a x`, `!t x`) or braced value is refused as `expected the name of a 'method'
+value`, whatever the host.

@@ -22,14 +22,14 @@ class ValueIdentityTest {
     private static final String ID = "https://example.test/identity.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/identity.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               digests => set<bytes>
               tags    => set<text>
               by_hash => { bytes => text }
 
-              hex_digest => !bytes_type { encoding: HEX  length: 2 }
+              hex_digest => !binary.bytes_type { encoding: HEX  length: 2 }
               hexes   => set<hex_digest>
 
               stamped => { k?: bytes = "SGk=" }
@@ -52,7 +52,7 @@ class ValueIdentityTest {
     }
 
     private static List<Diagnostic> read(String body) {
-        return tson().validate("!!schema:\"" + ID + "\"\n" + body);
+        return tson().validate("!!import:\"" + ID + "\"\n" + body);
     }
 
     // ── §7.5, a set ──────────────────────────────────────────────────────

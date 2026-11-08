@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,43 +20,43 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ([TSON-SCHEMA] §4.1), and composition propagates the supertype chain, so an entry composing with a constructor is
  * one too, by construction: nothing can derive from a constructor and fail to be one.
  *
- * <p>Where a constructor may be declared is §2.2.2's: only in a schema the meta-kernel governs. An ordinary schema
- * meets §2.2.3 first, since a base kind is the meta-kernel's and an ordinary schema may not import a kernel-governed
- * one, so it has no base kind to compose with.
+ * <p>Any schema may declare one ([TSON-SCHEMA] §4.2): the base kinds are the kernel's, and every closure
+ * reaching meta.tn holds them. A schema importing the one that declares a constructor applies it, and so does the
+ * document declaring it, in wait order ([TSON-SCHEMA] §3.4.1): the instance waits on the constructor being ready.
  */
 class ConstructorLevelDisciplineTest {
 
     private static final String ID = "https://example.test/m.tn";
 
-    private static List<Diagnostic> problems(String meta, String imported, String declarations) {
+    private static List<Diagnostic> problems(String firstImport, String secondImport, String declarations) {
         String source = """
                 !!id:"https://example.test/m.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                 %s }
-                """.formatted(meta, imported, declarations);
+                """.formatted(firstImport, secondImport, declarations);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
                 .validateSchema(source);
     }
 
-    private static final String KERNEL = "https://tson.io/2026/38/m/meta-kernel.tn";
-    private static final String META = "https://tson.io/2026/38/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/38/m/core.tn";
+    private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
+    private static final String META = "https://tson.io/2026/39/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
 
-    /** In a meta-schema, deriving from a constructor is ordinary — and the result is one. */
+    /** In any schema, deriving from a constructor is ordinary — and the result is one. */
     @Test
-    void aMetaSchemaMayDeriveFromAConstructor() {
+    void aSchemaMayDeriveFromAConstructor() {
         assertEquals(List.of(), problems(KERNEL, KERNEL, """
-                  c        => product & { id: identifier }
-                  composed => c & { extra: identifier }
+                  c        => meta.product & { id: meta.identifier }
+                  composed => c & { extra: meta.identifier }
                 """));
     }
 
     /** Refining a kernel constructor is the same case. */
     @Test
-    void aMetaSchemaMayRefineAConstructor() {
-        assertEquals(List.of(), problems(KERNEL, KERNEL, "  refined => array ^ { ordered?: = false }"));
+    void aSchemaMayRefineAConstructor() {
+        assertEquals(List.of(), problems(KERNEL, KERNEL, "  refined => meta.array ^ { ordered?: = false }"));
     }
 
     /** The derived entry IS-A {@code top}, so it is constructor level and applicable. */
@@ -63,32 +64,85 @@ class ConstructorLevelDisciplineTest {
     void theDerivedEntryIsItselfConstructorLevel() {
         String source = """
                 !!id:"https://example.test/m.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta-kernel.tn"
-                {
-                  c        => product & { id: identifier }
-                  composed => c & { extra: identifier }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
+                  c        => meta.product & { id: meta.identifier }
+                  composed => c & { extra: meta.identifier }
                 }
                 """;
         var entries = Tson.standard().resolve(source).schema().entries();
 
-        assertTrue(TypeChain.supertypesOf(entries.get("c")).contains("top"), "the base-kind composition");
-        assertTrue(TypeChain.supertypesOf(entries.get("composed")).contains("top"), "and everything deriving from it");
+        assertTrue(TypeChain.supertypesOf(entries.get("c")).contains("meta.top"), "the base-kind composition");
+        assertTrue(TypeChain.supertypesOf(entries.get("composed")).contains("meta.top"),
+                "and everything deriving from it");
+    }
+
+    /** An ordinary schema composes a base kind: the kernel's {@code product} is in its namespace. */
+    @Test
+    void anOrdinarySchemaDeclaresAConstructor() {
+        assertEquals(List.of(), problems(META, CORE, "  mine => meta.product & { id: meta.identifier }"));
+    }
+
+    /** A constructor an ordinary library declares is applied by a schema importing it. */
+    @Test
+    void anImporterAppliesALibrarysConstructor() {
+        String libraryId = "https://example.test/lib.tn";
+        String library = """
+                !!id:"https://example.test/lib.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
+                  steps => !meta.namespace { key_type: meta.identifier  value_type: text }
+                }
+                """;
+        String importer = """
+                !!id:"https://example.test/app.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://example.test/lib.tn"
+                !schema {
+                  plan => !steps { first => "a"  second => "b" }
+                }
+                """;
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(libraryId, library)))));
+
+        assertEquals(List.of(), tson.validateSchema(library));
+        assertEquals(List.of(), tson.validateSchema(importer));
     }
 
     /**
-     * An ordinary schema cannot reach constructor level by composing its way there: a base kind is the
-     * meta-kernel's, and importing a kernel-governed schema into an ordinary one is refused (§2.2.3), in one
-     * diagnostic naming the import rather than every declaration that would have used it.
+     * The document declaring a constructor applies it: the instance waits on the constructor being ready, whichever is
+     * written first.
      */
     @Test
-    void anOrdinarySchemaHasNoBaseKindToComposeWith() {
-        List<Diagnostic> problems = problems(META, KERNEL, "  mine => product & { id: identifier }");
+    void theDeclaringDocumentAppliesItsOwnConstructorInEitherOrder() {
+        assertEquals(List.of(), problems(META, CORE, """
+                  my_array => meta.array ^ { ordered?: = false }
+                  tags     => !my_array { element_type: text }
+                """));
+        assertEquals(List.of(), problems(META, CORE, """
+                  tags     => !my_array { element_type: text }
+                  my_array => meta.array ^ { ordered?: = false }
+                """));
+    }
 
-        assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
-        assertTrue(problems.getFirst().message().contains("governing level"), problems::toString);
-        assertTrue(problems.getFirst().message().contains("§2.2.3"), problems::toString);
+    /**
+     * A constructor composing a base kind directly makes a new form, which a processor backs with readers and writers
+     * of its own. Declaring one is sound; this library backs no form beyond the bundled ones, so an instance of one is
+     * a capability gap, {@code NOT_IMPLEMENTED} at the instance, and never a verdict on the schema.
+     */
+    @Test
+    void anInstanceOfANewFormIsAGap() {
+        for (String kind : List.of("meta.atom", "meta.product", "meta.sum")) {
+            List<Diagnostic> problems = problems(META, CORE, """
+                      c => %s & { extra: text }
+                      x => !c { extra: "hello" }
+                    """.formatted(kind));
+
+            assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), problems.stream().map(Diagnostic::code).toList(),
+                    kind);
+            assertEquals(Optional.of("/x"), problems.getFirst().schemaPointer(), kind);
+        }
     }
 
     /** An ordinary type over an ordinary type is untouched — the overwhelmingly common case. */

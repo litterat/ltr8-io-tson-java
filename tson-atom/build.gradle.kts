@@ -8,7 +8,7 @@ dependencies {
     // encodings read the same families to the same host values. This module is that vocabulary, over the
     // three things it genuinely needs and nothing else.
     //
-    // `schema.meta`'s constraint records are what a parser holds (an IntegerParser holds an IntegerType),
+    // The schema model's constraint records are what a parser holds (an IntegerParser holds an IntegerType),
     // and `schema.atom`'s host values are what several of them produce -- so `tson-schema` is api, not
     // implementation: a caller naming AtomParsers names a `Top` at the call site.
     api(project(":tson-schema"))

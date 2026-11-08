@@ -1,34 +1,35 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.TsonSchema;
+
+import java.util.Set;
 
 /**
- * On-demand resolution of a schema from its own URI -- a document's {@code !!import} or {@code !!meta}
- * target -- so a resolver reaching one needn't have it pre-registered. Two methods, split by what the
- * caller needs of the target:
+ * On-demand resolution of a schema from its own URI -- a document's {@code !!import} target -- so a resolver reaching
+ * one needn't have it pre-registered. Two methods, split by what the caller needs of the target:
  *
  * <ul>
  *   <li>{@link #resolveLinked} -- an {@code !!import} target (or a user schema being read): its
- *       <i>resolved</i> form is all that's needed (merged into the importer's type-name namespace, or
- *       compiled per-mode by a {@code TsonCompiledSchemaRegistry}). Never compiled by the loader itself.
- *   <li>{@link #loadMeta} -- a {@code !!meta} target: a governing meta-schema, which must be
- *       <i>compiled</i> (its {@code !enum}/{@code !integer} instances are read into {@code schema.meta}
- *       objects during the governed schema's own resolution).
+ *       <i>resolved</i> form, merged into the importer's namespace, or compiled per-mode by a {@code
+ *       TsonCompiledSchemaRegistry}.
+ *   <li>{@link #loadVocabulary} -- the <i>compiled</i> vocabulary of the schema that declared a constructor or an
+ *       annotation type the importer applies: its {@code !enum}/{@code !integer} instances are read into {@code
+ *       schema.meta} objects during the importer's own resolution.
  * </ul>
  *
- * <p>Not a plain registry lookup, because meta-kernel's own document names <i>itself</i> as its {@code
- * !!meta} (Part 2 §1.5's one deliberate circularity): a "look it up, fail if missing" registry would need
- * meta-kernel already registered before it could register meta-kernel. An implementation recognizes that
- * request and answers it directly, via {@link MetaKernelBootstrapResolver#getMetaKernelSchema()}'s own
- * hand-written bootstrap, instead of trying (and failing) to resolve it the ordinary way.
+ * <p>Not a plain registry lookup, because the kernel is never resolved from a document: it is pre-loaded
+ * ([TSON-SCHEMA] §3.4), and an implementation answers a request for it directly, via {@link
+ * KernelBootstrapResolver#kernelSchema()}'s bootstrap.
  *
  * <p>Also the natural, single place to enforce policy over <i>what</i> gets resolved from <i>where</i>
  * (whitelisting/blacklisting hosts, disk-only resolution) -- see {@link SchemaSource}, the pluggable
- * hook the implementation ({@code TsonCompiledMetaRegistry}) defers to for exactly this, once a request
- * isn't already cached and isn't the meta-kernel bootstrap case.
+ * hook the implementation ({@code TsonCompiledVocabularyRegistry}) defers to for exactly this, once a request
+ * isn't already cached and isn't the kernel bootstrap case.
  */
 public interface TsonCompiledSchemaLoader {
 
@@ -44,15 +45,47 @@ public interface TsonCompiledSchemaLoader {
     TsonLinkedSchema resolveLinked(String uri);
 
     /**
-     * Resolves {@code uri} to its compiled governing meta-schema -- for a document's own {@code !!meta}
-     * target, which must be a meta-layer schema (its own {@code !!meta} is meta-kernel).
+     * Resolves {@code uri} to its compiled vocabulary -- the readers a schema importing it reads a construction
+     * head or an annotation value through, where {@code uri} declared the constructor or the annotation type. Any
+     * schema: one namespace per schema ([TSON-SCHEMA] §3.3.1) puts every schema's constructors in reach of the
+     * schemas importing it.
      *
-     * @throws io.ltr8.tson.base.SchemaValidationException if {@code uri} resolves but isn't a
-     *                               meta-layer schema, so cannot govern another -- an authoring error, like
-     *                               every other verdict on a schema's own soundness (in addition to whatever
-     *                               {@link #resolveLinked} may throw)
+     * @throws RuntimeException whatever {@link #resolveLinked} may throw
      */
-    TsonCompiledMetaSchema loadMeta(String uri);
+    TsonCompiledVocabulary loadVocabulary(String uri);
+
+    /**
+     * {@link #loadVocabulary} for a schema already registered, named by its canonical identity ({@code
+     * CanonicalIdentity.canonicalize}) -- the origin an imported entry records, which is the schema whose compiled
+     * readers read an instance of it.
+     *
+     * @throws IllegalStateException if no schema is registered under {@code identity}
+     */
+    TsonCompiledVocabulary vocabularyOf(String identity);
+
+    /**
+     * The registered schema named by {@code identity}, compiled in tree mode: what a value entry's payload is read
+     * through where no class binds its type, so the value is held as a {@code TsonValue} and the schema holding it
+     * still loads and validates ([TSON-SCHEMA] §4.1).
+     *
+     * @throws IllegalStateException if no schema is registered under {@code identity}
+     */
+    TsonCompiledSchema treeVocabularyOf(String identity);
+
+    /**
+     * The readers of a schema whose resolution is in progress, compiled from its entries ready so far ({@code
+     * ready}, its imports merged from this loader's registry), {@code pending} naming its declarations not yet
+     * ready: what a value read against an entry of the document being resolved is read through ([TSON-SCHEMA]
+     * §3.4.1's wait order). In object-binding mode under this loader's bind context where {@code tree} is false, and
+     * in tree mode, holding each value as a {@code TsonValue}, where it is true. Neither registered nor cached.
+     */
+    TsonCompiledSchema compileReady(TsonSchema ready, Set<String> pending, boolean tree);
+
+    /**
+     * The limits the schemas this loader resolves are resolved under: [TSON-SCHEMA] §11.5's, the wait depth among
+     * them, which a resolution counts as it makes its entries ready.
+     */
+    LimitsPolicy limits();
 
     /**
      * [TSON-DATA] §8.2's identifier policy the schemas this loader resolves are judged under. The resolver reads

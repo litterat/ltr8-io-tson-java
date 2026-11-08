@@ -79,25 +79,23 @@ class TsonCliTest {
         assertFalse(err.contains("usage:"), err);
     }
 
-    /** A schema that loads clean and cannot be read against: {@code precision} is carried but not enforced. */
-    private static final String SCOPE_SCHEMA = """
-            !!id:"https://example.test/cli-scope.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
-              stamped => { at: extern  n: int32 }
-              plain   => { n: int32 }
+    /** A schema that loads clean. */
+    private static final String PLAIN_SCHEMA = """
+            !!id:"https://example.test/cli-plain.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
+              plain => { n: int32 }
             }
             """;
 
     /**
-     * Well formed, and valid as far as anything can tell: {@code at} is declared {@code extern}, so the
-     * value opening a scope onto another schema is exactly what the field asked for ([TSON-SCHEMA] §7.8).
-     * What no run can do is judge it -- nothing on the command line declares that {@code !!id}.
+     * Well formed, and naming a schema no run can judge it against -- nothing on the command line declares
+     * that {@code !!id}.
      */
-    private static final String UNAVAILABLE_SCOPE_DOCUMENT = """
-            !!schema:"https://example.test/cli-scope.tn"
-            !stamped { at: !!schema:"https://example.test/cli-absent.tn" !claim { id: 1 }  n: 1 }
+    private static final String UNAVAILABLE_SCHEMA_DOCUMENT = """
+            !!import:"https://example.test/cli-absent.tn"
+            !claim { id: 1 }
             """;
 
     /**
@@ -108,10 +106,10 @@ class TsonCliTest {
      * therefore 70, not 1: something went unchecked, so "invalid" is not a verdict that run is entitled to
      * give, and the two codes are what let the CLI tell them apart in one pass.
      *
-     * <p><b>Over the codes here, and end to end in {@link #aNonVerdictCostsItsOwnFieldAVerdictAndNoOthers}.</b>
+     * <p><b>Over the codes here, and end to end in {@link #aNonVerdictCostsItsOwnDocumentAVerdictAndNoOthers}.</b>
      * The end-to-end case is an unavailable schema rather than a gap: nothing this library refuses to
      * implement is reachable from a document any more, so {@code NOT_IMPLEMENTED} has no fixture, while a
-     * scope push onto a schema this run would not supply reaches it through {@code SCHEMA_NOT_PERMITTED}.
+     * document naming a schema this run would not supply reaches it through {@code SCHEMA_NOT_PERMITTED}.
      * The unit form states all five cases of the rule in one place, gap included.
      */
     @Test
@@ -145,60 +143,49 @@ class TsonCliTest {
     }
 
     /**
-     * <b>A schema this run will not supply mid-document is not a verdict, end to end.</b> The outer schema
-     * loads clean, the document is well formed, and the field it fills is declared {@code extern} -- so the
-     * scope push is authored intent, and the only thing that failed is obtaining the schema the value names.
-     * That rides in the report as {@code SCHEMA_NOT_PERMITTED} -- with the data path and position of the value
-     * that could not be read, like any other read diagnostic -- and {@link TsonCli#exitCodeFor} lifts the run
-     * to 69 with the note on stderr, so the report on stdout stays exactly what {@code --output json|tson}
-     * promises.
+     * <b>A schema this run will not supply is not a verdict, end to end.</b> The document is well formed, and
+     * the only thing that failed is obtaining the schema it names. That rides in the report as {@code
+     * SCHEMA_NOT_PERMITTED}, and {@link TsonCli#exitCodeFor} lifts the run to 69 with the note on stderr, so the
+     * report on stdout stays exactly what {@code --output json|tson} promises.
      *
      * <p>Never exit 1, which would tell a script the document was judged and rejected. It was not judged at
-     * all: nothing about that value has been checked, and whether it conforms is unknown.
+     * all: whether it conforms is unknown.
      */
     @Test
-    void aScopeThatCannotBeLoadedIsNotAVerdict(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "scope.tn", SCOPE_SCHEMA);
-        Path data = writeFile(dir, "stamped.tn", UNAVAILABLE_SCOPE_DOCUMENT);
+    void aSchemaThatCannotBeLoadedIsNotAVerdict(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "plain.tn", PLAIN_SCHEMA);
+        Path data = writeFile(dir, "claim.tn", UNAVAILABLE_SCHEMA_DOCUMENT);
 
         String err = captureStderr(() -> {
             String out = captureStdout(() ->
                     assertEquals(69, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
             assertTrue(out.contains("SCHEMA_NOT_PERMITTED"), out);
             assertTrue(out.contains("cli-absent.tn"), () -> "it names the schema it wanted: " + out);
-            assertTrue(out.contains("/at"), () -> "located at the value it could not read: " + out);
         });
         assertTrue(err.contains("could not be checked"), err);
         assertFalse(err.contains("Please report it"), err);
     }
 
     /**
-     * <b>A non-verdict costs its own field a verdict and nothing else's.</b> This is the whole point of one
-     * travelling as a code rather than as an exception, and it is checked in both directions at once: a run
-     * holding one unreadable document and one plainly invalid document reports <em>both</em>, and a single
-     * document holding an unobtainable scope and an ordinary error reports both of those too.
+     * <b>A non-verdict costs its own document a verdict and nothing else's.</b> This is the whole point of one
+     * travelling as a code rather than as an exception, and it is checked in both orders: a run holding one
+     * unreadable document and one plainly invalid document reports <em>both</em>.
      *
      * <p>Throwing instead lost the entire envelope -- stdout was empty and the invalid document was never
      * judged, in either order -- which is exactly the failure the schema pipeline gave up throwing gaps to
-     * avoid: "one unimplemented construct, and a document with three ordinary mistakes reported none of
-     * them". The read side was the last place that survived.
+     * avoid.
      */
     @Test
-    void aNonVerdictCostsItsOwnFieldAVerdictAndNoOthers(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "scope.tn", SCOPE_SCHEMA);
-        Path gap = writeFile(dir, "stamped.tn", UNAVAILABLE_SCOPE_DOCUMENT);
-        Path invalid = writeFile(dir, "plain.tn", """
-                !!schema:"https://example.test/cli-scope.tn"
+    void aNonVerdictCostsItsOwnDocumentAVerdictAndNoOthers(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "plain.tn", PLAIN_SCHEMA);
+        Path gap = writeFile(dir, "claim.tn", UNAVAILABLE_SCHEMA_DOCUMENT);
+        Path invalid = writeFile(dir, "plain-data.tn", """
+                !!import:"https://example.test/cli-plain.tn"
                 !plain { n: "nope" }
-                """);
-        Path both = writeFile(dir, "both.tn", """
-                !!schema:"https://example.test/cli-scope.tn"
-                !stamped { at: !!schema:"https://example.test/cli-absent.tn" !claim { id: 1 }  n: "nope" }
                 """);
 
         for (List<String> run : List.of(List.of(gap.toString(), invalid.toString()),
-                                        List.of(invalid.toString(), gap.toString()),
-                                        List.of(both.toString()))) {
+                                        List.of(invalid.toString(), gap.toString()))) {
             String[] args = new String[run.size() + 2];
             args[0] = "validate";
             args[1] = schema.toString();
@@ -224,11 +211,11 @@ class TsonCliTest {
      */
     @Test
     void aSchemaErrorTheSpecRefusesExitsOneNotSeventy(@TempDir Path dir) throws IOException {
-        for (String body : List.of("{ widens => !uint8 ^ { min: -10 } }", "{ narrow => !uint8 ^ 5 }")) {
+        for (String body : List.of("!schema { widens => !uint8 ^ { min: -10 } }", "!schema { narrow => !uint8 ^ 5 }")) {
             Path schema = writeFile(dir, "authorerror.tn", """
                     !!id:"https://example.test/cli-author-error.tn"
-                    !!meta:"https://tson.io/2026/38/m/meta.tn"
-                    !!import:"https://tson.io/2026/38/m/core.tn"
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/core.tn"
                     %s
                     """.formatted(body));
 
@@ -256,16 +243,16 @@ class TsonCliTest {
     void dataNamingATemplateIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "paged.tn", """
                 !!id:"https://example.test/cli-paged.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   order => { id: text }
                   paged => <T> { items: [T] }
                   orders_page => paged<order>
                 }
                 """);
         Path data = writeFile(dir, "paged-data.tn", """
-                !!schema:"https://example.test/cli-paged.tn"
+                !!import:"https://example.test/cli-paged.tn"
                 !paged { items: [ { id: "a" } ] }
                 """);
 
@@ -465,6 +452,36 @@ class TsonCliTest {
         assertTrue(err.contains("--max-depth must be at least 1"), err);
     }
 
+    /**
+     * [TSON-SCHEMA] §11.5's wait depth is counted as a schema resolves, and {@code --max-wait-depth} sets it: a chain
+     * of three waits loads at the default and is refused under a limit of two, a rejection by this processor and not
+     * a verdict; a limit below one is a usage error.
+     */
+    @Test
+    void aSchemaPastTheWaitDepthIsRefused(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "chain.tn", """
+                !!id:"https://example.test/chain.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
+                  w0 => w1 & { a: text }
+                  w1 => w2 & { b: text }
+                  w2 => w3 & { c: text }
+                  w3 => { d: text }
+                }
+                """);
+
+        captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"compile", schema.toString()})));
+        String json = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
+                "compile", "--output", "json", "--max-wait-depth", "2", schema.toString()})));
+        assertTrue(json.contains("\"outcome\":\"REJECTED\""), json);
+        assertTrue(json.contains("\"code\":\"LIMIT_EXCEEDED\""), json);
+        assertTrue(json.contains("\"max_wait_depth\":2"), json);
+
+        String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {
+                "policy", "--max-wait-depth", "0"})));
+        assertTrue(err.contains("--max-wait-depth must be at least 1"), err);
+    }
+
     /** A flag whose combination configures nothing is a usage error, not a silent no-op. */
     @Test
     void aRelaxationThatWouldConfigureNothingIsAUsageError() throws IOException {
@@ -479,9 +496,9 @@ class TsonCliTest {
         // when schema files are also present. A plain, well-formed value is valid.
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-arg-test.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                { my_int => int32 }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");
 
@@ -495,12 +512,12 @@ class TsonCliTest {
     void validateEndToEndThroughMainDispatchExitsZeroForValidData(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-arg-test-2.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                { my_int => int32 }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", """
-                !!schema:"https://example.test/cli-arg-test-2.tn"
+                !!import:"https://example.test/cli-arg-test-2.tn"
                 !my_int 42
                 """);
 
@@ -515,11 +532,11 @@ class TsonCliTest {
     void dashReadsOneDataDocumentFromStandardInput(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-stdin.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                { my_int => int32 }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema { my_int => int32 }
                 """);
-        String data = "!!schema:\"https://example.test/cli-stdin.tn\"\n!my_int 42\n";
+        String data = "!!import:\"https://example.test/cli-stdin.tn\"\n!my_int 42\n";
 
         String out = withStdin(data, () -> captureStdout(() -> assertEquals(0,
                 TsonCli.run(new String[] {"validate", "--output", "json", schema.toString(), "-"}))));

@@ -13,9 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A namespace type declares its facets and nothing else: a value of it is the map {@code key_type}, {@code
- * value_type} and {@code ordered} describe, so a field beside them has nowhere to be written, and the linker refuses
- * it rather than leave it dead.
+ * A namespace type is an instance of the kernel's {@code namespace}, so it states that constructor's facets and
+ * nothing else: a value of it is the map {@code key_type}, {@code value_type} and {@code ordered} describe, and a
+ * field beside them is refused by the constructor's own vocabulary.
  */
 class NamespaceFacetsTest {
 
@@ -24,10 +24,9 @@ class NamespaceFacetsTest {
     private static List<Diagnostic> link(String declarations) {
         String text = """
                 !!id:"https://example.test/meta-facets.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
-                {
-                  method => { request?: kind<record> }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
+                  method => { request?: meta.ref<meta.record> }
                   %s
                 }
                 """.formatted(declarations);
@@ -38,7 +37,7 @@ class NamespaceFacetsTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         List<Diagnostic> problems = new ArrayList<>();
-        TsonCompiledMetaRegistry.withStandardLibrary(SuiteBindings.context(), source)
+        TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(), source)
                 .resolveLinked(META, problems::add);
         return problems;
     }
@@ -56,34 +55,23 @@ class NamespaceFacetsTest {
     @Test
     void theFacetsAlonePass() {
         assertEquals(List.of(), link("""
-                api     => namespace & { key_type: = identifier  value_type: = method }
-                ordered => namespace & { key_type: = identifier  value_type: = method  ordered?: = true }
+                api     => !meta.namespace { key_type: meta.identifier  value_type: method }
+                ordered => !meta.namespace { key_type: meta.identifier  value_type: method  ordered: true }
                 """));
     }
 
     @Test
     void aFieldBesideTheFacetsIsRefused() {
         refused(link("""
-                api => namespace & { key_type: = identifier  value_type: = method  extends?: [type_name] }
-                """), "'api' is a namespace type", "the field 'extends' beside them",
-                "declare a record holding 'extends' beside a field typed by the map, and hold that record under a key "
-                        + "of a namespace type");
+                api => !meta.namespace { key_type: meta.identifier  value_type: method  extends: [x] }
+                """), "'api'", "unknown field 'extends' on 'meta.namespace'");
     }
 
+    /** {@code key_type} is required: no host supplies a namespace's key family. */
     @Test
-    void everyFieldBesideTheFacetsIsNamedOnce() {
+    void theKeyFamilyIsRequired() {
         refused(link("""
-                api => namespace & { key_type: = identifier  value_type: = method  extends?: [type_name]
-                                     implements?: [type_name] }
-                """), "the fields 'extends', 'implements' beside them");
-    }
-
-    /** An abstract namespace type passes the field to every subtype, which is blamed on it alone. */
-    @Test
-    void anAbstractNamespaceTypeIsRefusedToo() {
-        refused(link("""
-                base_api => abstract namespace & { key_type: = identifier  extends?: [type_name] }
-                api      => base_api & { value_type: = method }
-                """), "'base_api' is a namespace type", "the field 'extends'");
+                hosted => !meta.namespace { value_type: method }
+                """), "'hosted'", "key_type");
     }
 }

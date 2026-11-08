@@ -20,17 +20,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class VoidVocabularyTest {
 
-    private static final String ID = "https://example.test/2026/38/void-vocabulary-1.tn";
+    private static final String ID = "https://example.test/2026/39/void-vocabulary-1.tn";
     private static final String SCHEMA = """
-            !!id:"https://example.test/2026/38/void-vocabulary-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
-              slots   => !array { element_type: int32  voidable: true }
-              entries => !map { key_type: text  value_type: int32  voidable: true }
-              pair    => !tuple { elements: [{ element_type: int32 } { element_type: text  voidable: true }] }
-              one     => { only: voidable_tuple1<int32> }
-              contact => !record { fields: { email => { type: text  optional: true }
+            !!id:"https://example.test/2026/39/void-vocabulary-1.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
+              slots   => !meta.array { element_type: int32  voidable: true }
+              entries => !meta.map { key_type: text  value_type: int32  voidable: true }
+              pair    => !meta.tuple { elements: [{ element_type: int32 } { element_type: text  voidable: true }] }
+              one     => { only: meta.voidable_tuple1<int32> }
+              contact => !meta.record { fields: { email => { type: text  optional: true }
                                              phone => { type: text  optional: true } }
                                    groups: [ { members: [[email] [phone]]  optional: true } ] }
             }
@@ -47,7 +47,7 @@ class VoidVocabularyTest {
     }
 
     private static List<Diagnostic.Code> codes(String body) {
-        return tson(SCHEMA).validate("!!schema:\"" + ID + "\"\n" + body).stream().map(Diagnostic::code).toList();
+        return tson(SCHEMA).validate("!!import:\"" + ID + "\"\n" + body).stream().map(Diagnostic::code).toList();
     }
 
     @Test
@@ -76,8 +76,8 @@ class VoidVocabularyTest {
     /** The retired {@code state} is no field of the vocabulary, so a stale construction is refused, not reread. */
     @Test
     void theRetiredStateIsRefused() {
-        String stale = SCHEMA.replace("!array { element_type: int32  voidable: true }",
-                "!array { element_type: int32  state: OPTIONAL }");
+        String stale = SCHEMA.replace("!meta.array { element_type: int32  voidable: true }",
+                "!meta.array { element_type: int32  state: OPTIONAL }");
         List<Diagnostic> refused = tson(stale).validateSchema(stale);
         assertEquals(1, refused.size(), refused.toString());
         assertTrue(refused.getFirst().message().contains("state"), refused.toString());

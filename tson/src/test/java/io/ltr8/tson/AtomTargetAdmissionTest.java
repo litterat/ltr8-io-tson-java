@@ -9,7 +9,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -43,13 +43,13 @@ class AtomTargetAdmissionTest {
     private static Tson tson(String decls, Class<?> bound) {
         String schema = """
                 !!id:"https://example.test/a-1.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(decls);
-        DataNameBinder binder = name -> "t".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "t".equals(name) ? bound : SchemaModelNameBinder.INSTANCE.resolve(name);
         SchemaSource source = uri -> schema;
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
@@ -57,7 +57,7 @@ class AtomTargetAdmissionTest {
     }
 
     private static String doc(String body) {
-        return "!!schema:\"https://example.test/a-1.tn\"\n" + body;
+        return "!!import:\"https://example.test/a-1.tn\"\n" + body;
     }
 
     // ── uri, the first family to state its targets ───────────────────────

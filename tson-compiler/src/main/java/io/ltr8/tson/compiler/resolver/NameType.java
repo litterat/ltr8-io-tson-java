@@ -1,17 +1,19 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.RecordHead;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TextFamily;
+import io.ltr8.tson.schema.unicode.TextFamily;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.HashSet;
@@ -23,28 +25,27 @@ import java.util.stream.Stream;
 
 /**
  * Where an entry's {@code name_type} resolves, and whether what it resolves to may stand there: an enum's, which its
- * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of
- * ([TSON-SCHEMA] §5.2). A value the entry's constructor wrote resolves where that constructor is declared, the
- * governing meta's namespace -- so {@code !enum [A B]} names the kernel's {@code identifier}, and a record that says
- * nothing the kernel's {@code field_name}, whatever the schema declares or imports; one an author wrote resolves in
- * the schema's own namespace first. Shared by the linker's enum and field name checks and by materialisation, which
- * checks a template's value argument of an enum type before linking has run.
+ * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of ([TSON-SCHEMA] §5.2).
+ * A value the entry's constructor wrote resolves where that constructor is declared, whose closure is in the schema's
+ * -- so {@code !enum [A B]} names the kernel's {@code meta.identifier}, and a record that says nothing the kernel's {@code
+ * meta.field_name}, names no schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own
+ * namespace first. Shared by the linker's enum and field name checks and by materialisation, which checks a template's
+ * value argument of an enum type before linking has run.
  *
  * <p><b>What may stand there is the slot's kind's to say</b> ([TSON-SCHEMA] §4.2). The kernel types both slots
- * {@code identifier_kind}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
+ * {@code meta.identifier_ref}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
  * kind off the constructor the entry is built with -- the {@code name_type} field's own type -- and asks {@link
  * KindMembers} whether the referent is a member. The resolution above is the store and the kind the judgment: the
- * referent is found first, and the kind refuses the one found. Where the slot's kind is out of reach -- no governing
- * meta loaded, or a meta layer that reaches the kernel's kinds through its own {@code !!meta} without importing them
- * -- the kernel's {@code identifier_kind} is what the slot is typed by in every meta this library loads, and its
- * {@code of} is used.
+ * referent is found first, and the kind refuses the one found. Where the slot's kind is out of reach -- a schema
+ * assembled by hand whose closure holds no kernel -- the kernel's {@code meta.identifier_ref} is what the slot is typed
+ * by in every schema this library loads, and its {@code of} is used.
  */
 public final class NameType {
 
     private static final String NAME_TYPE = "name_type";
 
-    /** The {@code of} of the kernel's {@code identifier_kind}, for a slot whose own kind is out of reach. */
-    private static final String IDENTIFIER_TYPE = "identifier_type";
+    /** The {@code of} of the kernel's {@code meta.identifier_ref}, for a slot whose own kind is out of reach. */
+    private static final String IDENTIFIER_TYPE = KernelNames.of(KernelNames.UNICODE, "identifier_type");
 
     private NameType() {
     }
@@ -55,16 +56,16 @@ public final class NameType {
 
     /**
      * {@code entry}'s name type, given the constructor its value applies (an enum's decides whether its {@code
-     * name_type} is the constructor's pin), the schema's own namespace and the governing meta's. Empty for a body
-     * that is neither an enum nor a record, and for a {@code name_type} that resolves in neither namespace.
+     * name_type} is the constructor's pin), and two lookups, the schema's own namespace and the one holding the
+     * constructor -- the same namespace, from the linker. Empty for a body that is neither an enum nor a record or
+     * record template, and for a {@code name_type} that resolves in neither namespace.
      */
     public static Optional<Resolved> of(Top entry, Optional<String> constructor, Function<String, Top> local,
                                         Function<String, Top> structure) {
-        return switch (entry) {
-            case EnumBody body -> ofEnum(constructor, body, local, structure);
-            case RecordBody body -> ofRecord(body, local, structure);
-            default -> Optional.empty();
-        };
+        if (entry instanceof EnumBody body) {
+            return ofEnum(constructor, body, local, structure);
+        }
+        return RecordHead.of(entry).flatMap(head -> ofRecord(head.nameType(), local, structure));
     }
 
     /**
@@ -81,7 +82,7 @@ public final class NameType {
 
     /**
      * Whether {@code type}, {@code entry}'s resolved name type, is a member of the kind its {@code name_type} slot
-     * is typed by -- read off {@code constructor}, the one {@code entry}'s value applies: {@code identifier_kind}
+     * is typed by -- read off {@code constructor}, the one {@code entry}'s value applies: {@code meta.identifier_ref}
      * for both of the kernel's slots. A referent that resolved to nothing is no member. The referent's own
      * constructor is its body's ({@link TsonSchema#constructorOf}), the resolved value being all a name type is
      * resolved to here.
@@ -91,7 +92,8 @@ public final class NameType {
         if (type.definition() == null) {
             return false;
         }
-        String of = slotKind(entry, constructor, local, structure).map(KindBody::of).orElse(IDENTIFIER_TYPE);
+        String of = slotKind(entry, constructor, local, structure).map(reference -> reference.of().name())
+                .orElse(IDENTIFIER_TYPE);
         return KindMembers.isMember(type.definition(), TsonSchema.constructorOf(type.definition()), of,
                 type.lookup(), structure);
     }
@@ -99,16 +101,16 @@ public final class NameType {
     /**
      * The kind {@code entry}'s {@code name_type} slot is typed by: the {@code name_type} field of the constructor
      * {@code entry}'s value applies -- through a constructor template's held body to the constructor it applies
-     * -- read in the structure namespace first, where every constructor role resolves (§3.3.1). Empty where no such
-     * constructor or kind is in reach.
+     * -- read in {@code structure} first, then {@code local}; the linker hands both the schema's one namespace.
+     * Empty where no such constructor or kind is in reach.
      */
-    private static Optional<KindBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
+    private static Optional<ReferenceBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
                                                Function<String, Top> structure) {
         Function<String, Top> constructors = fallingBackTo(structure, local);
         Optional<String> head = constructor.or(() -> Optional.of(TsonSchema.constructorOf(entry)));
         Set<String> seen = new HashSet<>();
         while (head.isPresent() && seen.add(head.get())) {
-            Top found = constructors.apply(ReferenceChain.terminal(head.get(), constructors));
+            Top found = constructors.apply(AliasChain.terminal(head.get(), constructors));
             if (found instanceof TemplateBody held) {
                 head = HeldBody.of(held).application().typeRef();
                 continue;
@@ -118,14 +120,15 @@ public final class NameType {
         return Optional.empty();
     }
 
-    private static Optional<KindBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
+    private static Optional<ReferenceBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
         if (!(constructor instanceof RecordBody record)) {
             return Optional.empty();
         }
         return Optional.ofNullable(record.fields().get(NAME_TYPE))
-                .map(field -> constructors.apply(ReferenceChain.terminal(field.type().name(), constructors)))
-                .filter(KindBody.class::isInstance)
-                .map(KindBody.class::cast);
+                .flatMap(RecordField::namedType)
+                .map(type -> constructors.apply(AliasChain.terminal(type.name(), constructors)))
+                .filter(ReferenceBody.class::isInstance)
+                .map(ReferenceBody.class::cast);
     }
 
     /**
@@ -146,12 +149,13 @@ public final class NameType {
     }
 
     /**
-     * Whether {@code type} is the kernel's {@code identifier} -- an enum's default, and through {@code field_name} a
-     * record's -- whose names a refusal calls identifiers, where it names any other type, the author's own.
+     * Whether {@code type} is the kernel's {@code meta.identifier} -- an enum's default, and through
+     * {@code meta.field_name} a record's -- whose names a refusal calls identifiers, where it names any other type, the
+     * author's own.
      */
     public static boolean isIdentifier(Resolved type, Function<String, Top> structure) {
         return type.definition() != null
-                && type.definition() == structure.apply(ReferenceChain.terminal(EnumBody.IDENTIFIER, structure));
+                && type.definition() == structure.apply(AliasChain.terminal(EnumBody.IDENTIFIER, structure));
     }
 
     /**
@@ -188,11 +192,11 @@ public final class NameType {
                                              Function<String, Top> local,
                                              Function<String, Top> structure) {
         if (pinned(constructor, body, fallingBackTo(local, structure)) && structure.apply(body.nameType()) != null) {
-            return Optional.of(new Resolved(structure.apply(ReferenceChain.terminal(body.nameType(), structure)),
+            return Optional.of(new Resolved(structure.apply(AliasChain.terminal(body.nameType(), structure)),
                     structure));
         }
         if (local.apply(body.nameType()) != null) {
-            return Optional.of(new Resolved(local.apply(ReferenceChain.terminal(body.nameType(), local)),
+            return Optional.of(new Resolved(local.apply(AliasChain.terminal(body.nameType(), local)),
                     fallingBackTo(local, structure)));
         }
         return Optional.empty();
@@ -200,17 +204,17 @@ public final class NameType {
 
     /**
      * A name type the record states was written by its author, so it resolves in the schema's own namespace first,
-     * as an enum's does; the absent default is the kernel's {@code field_name}, resolved in the structure first.
+     * as an enum's does; the absent default is the kernel's {@code meta.field_name}, resolved in the structure first.
      */
-    private static Optional<Resolved> ofRecord(RecordBody body, Function<String, Top> local,
+    private static Optional<Resolved> ofRecord(Optional<String> nameType, Function<String, Top> local,
                                                Function<String, Top> structure) {
-        String name = body.nameTypeName();
-        Function<String, Top> first = body.nameType().isEmpty() ? structure : local;
+        String name = nameType.orElse(RecordBody.FIELD_NAME);
+        Function<String, Top> first = nameType.isEmpty() ? structure : local;
         Function<String, Top> second = first == structure ? local : structure;
         for (Function<String, Top> namespace : List.of(first, second)) {
             if (namespace.apply(name) != null) {
                 Function<String, Top> other = namespace == first ? second : first;
-                return Optional.of(new Resolved(namespace.apply(ReferenceChain.terminal(name, namespace)),
+                return Optional.of(new Resolved(namespace.apply(AliasChain.terminal(name, namespace)),
                         fallingBackTo(namespace, other)));
             }
         }
@@ -226,8 +230,8 @@ public final class NameType {
         Set<String> seen = new HashSet<>();
         while (head.isPresent() && seen.add(head.get())) {
             Top applied = lookup.apply(head.get());
-            if (OpenEntry.isOpen(applied)) {
-                head = HeldBody.of(applied).application().typeRef();
+            if (applied instanceof TemplateBody held) {
+                head = HeldBody.of(held).application().typeRef();
                 continue;
             }
             return applied instanceof RecordBody record

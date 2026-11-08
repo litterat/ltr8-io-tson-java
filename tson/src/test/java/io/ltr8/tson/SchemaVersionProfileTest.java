@@ -7,7 +7,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
@@ -36,18 +36,18 @@ class SchemaVersionProfileTest {
     /** v1 carries {@code code}; v2 drops it and adds {@code currency}. */
     private static final String V1_SCHEMA = """
             !!id:"https://example.test/order-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               order => { sku: text  quantity: int32  code: int32 }
             }
             """;
 
     private static final String V2_SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               order => { sku: text  quantity: int32  currency: text }
             }
             """;
@@ -83,18 +83,18 @@ class SchemaVersionProfileTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        DataNameBinder binder = name -> "order".equals(name) ? Order.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "order".equals(name) ? Order.class : SchemaModelNameBinder.INSTANCE.resolve(name);
         DataBindContext context = DataBindContext.builder().nameBinder(binder).profile(profile)
                 .registerAtoms(AtomContext.hostTypes()).build();
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)).withDataBindContext(context));
     }
 
     private static final String V1_DOC = """
-            !!schema:"https://example.test/order-1.tn"
+            !!import:"https://example.test/order-1.tn"
             !order { sku: "A"  quantity: 1  code: 7 }""";
 
     private static final String V2_DOC = """
-            !!schema:"https://example.test/order-2.tn"
+            !!import:"https://example.test/order-2.tn"
             !order { sku: "B"  quantity: 2  currency: "NZD" }""";
 
     /** The v1 document, bound through v1's constructor: its own three fields, and v2's default filled in. */

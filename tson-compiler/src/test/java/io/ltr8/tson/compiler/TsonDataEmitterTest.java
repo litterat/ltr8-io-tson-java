@@ -110,13 +110,13 @@ class TsonDataEmitterTest {
     void directivesAreWrittenOnTheirOwnLinesInHeaderOrder() {
         String tson = new TsonDataEmitter()
                 .documentId("https://example.test/doc-1.tn")
-                .schemaRef("https://example.test/point.tn")
+                .importRef("https://example.test/point.tn")
                 .beginRecord().field("x").unquotedToken("1").endRecord()
                 .toString();
 
         assertEquals("""
                 !!id:"https://example.test/doc-1.tn"
-                !!schema:"https://example.test/point.tn"
+                !!import:"https://example.test/point.tn"
                 { x: 1 }""", tson);
     }
 
@@ -133,15 +133,15 @@ class TsonDataEmitterTest {
     @Test
     void aDirectiveArgumentThatIsNotAnIriReferenceIsRefused() {
         WriteException thrown = assertThrows(WriteException.class,
-                () -> new TsonDataEmitter().schemaRef("not a uri"));
+                () -> new TsonDataEmitter().importRef("not a uri"));
 
         assertTrue(thrown.getMessage().contains("is not a valid IRI-reference"), thrown.getMessage());
     }
 
     @Test
     void aDirectiveArgumentBeyondUsAsciiIsWrittenAsItself() {
-        assertEquals("!!schema:\"https://example.test/sch\u00E9ma.tn\"",
-                new TsonDataEmitter().schemaRef("https://example.test/sch\u00E9ma.tn").toString().strip());
+        assertEquals("!!import:\"https://example.test/sch\u00E9ma.tn\"",
+                new TsonDataEmitter().importRef("https://example.test/sch\u00E9ma.tn").toString().strip());
     }
 
     // ── At most one type-ref per value (§3.2) ───────────────────────────

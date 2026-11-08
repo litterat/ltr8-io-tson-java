@@ -4,7 +4,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 
 import org.junit.jupiter.api.Test;
@@ -16,13 +16,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A diagnostic names the type <b>the author wrote at that position</b>, not the entry at the end of the
- * reference chain it resolves to.
+ * alias chain it resolves to.
  *
- * <p>[TSON-SCHEMA] §8.3 flattens a type position past a {@code REFERENCE} entry and records the name the
+ * <p>[TSON-SCHEMA] §8.3 flattens a type position past an {@code ALIAS} entry and records the name the
  * author wrote as {@code @alias} on the type-ref, so {@code c: pct} over {@code pct => small} arrives at the
  * reader as {@code small} -- one shared reader, correctly named {@code small} for a position that names it
  * directly, and wrong for one that does not. A minted application ({@code e: b<10>}) is its expansion, an
- * entry whose content-derived key ({@code integer_type_10_100_786fbcfb}) appears nowhere in the author's file,
+ * entry whose content-derived key ({@code numeric_integer_type_10_100_786fbcfb}) appears nowhere in the author's file,
  * so its message leads with no name at all.
  *
  * <p>The name is chosen where a composite reader wires
@@ -41,16 +41,16 @@ class UseSiteNamingTest {
               small => !integer ^ { max: 100 }
               pct   => small
               outer => pct
-              b     => <N> !integer_type { min: N  max: 100 }
+              b     => <N> !numeric.integer_type { min: N  max: 100 }
             """;
 
     /** Every diagnostic a read of {@code data} against {@code declarations} reports, message only. */
     private static List<String> messages(String declarations, String data) {
         String schema = """
                 !!id:"https://example.test/naming.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s%s
                 }
                 """.formatted(PRELUDE, declarations);
@@ -60,8 +60,8 @@ class UseSiteNamingTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         TsonCompiledSchema compiled = TsonCompiledSchemaRegistry.tree(core).get(ID);
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         compiled.get("r").read(TestDocuments.document(data, problems));
@@ -85,32 +85,32 @@ class UseSiteNamingTest {
     }
 
     /**
-     * <b>An application nothing declares is its expansion, which no author named</b> (§5.10). {@code b<10>} is
-     * an atom instance with no spelling of its own, so the message is the atom family's alone, and the position
-     * the diagnostic carries says where -- never the content-derived name of the entry it landed on.
+     * <b>An application nothing declares is its expansion, named by the application as written</b> (§5.10, §8.2):
+     * {@code b<10>} is an atom instance under a content-derived name no author wrote, and the message names the
+     * application that closed to it instead.
      */
     @Test
-    void aMintedApplicationLeavesTheMessageToItsFamily() {
+    void aMintedApplicationIsNamedByItsApplication() {
         List<String> found = messages("  r => { e: b<10> }", "!r { e: 5 }");
 
-        assertEquals(List.of("'5' is less than the minimum 10"), found);
+        assertEquals(List.of("'b<10>': '5' is less than the minimum 10"), found);
     }
 
-    /** A record application nothing declares expands to a record no author named, shown as its body. */
+    /** A record application nothing declares is named by its application too, not by its body. */
     @Test
-    void aMintedRecordIsNamedByItsBody() {
+    void aMintedRecordIsNamedByItsApplication() {
         List<String> found = messages("  bx => <T> { v: T }\n  r => { e: bx<int32> }", "!r { e: { v: 1  nope: 2 } }");
 
         assertEquals(1, found.size(), found::toString);
-        assertTrue(found.getFirst().startsWith("unknown field 'nope' on '{ v: int32 }'"), found.getFirst());
+        assertTrue(found.getFirst().startsWith("unknown field 'nope' on 'bx<int32>'"), found.getFirst());
     }
 
-    /** The same for a set: {@code set<text>} expands to a set no author named, which is not the array {@code [text]}. */
+    /** The same for a set: {@code set<text>} is named as the application, not as the array {@code [text]}. */
     @Test
-    void aMintedSetIsNotNamedAsAnArray() {
+    void aMintedSetIsNamedByItsApplication() {
         List<String> found = messages("  r => { t: set<text> }", "!r { t: [a a] }");
 
-        assertEquals(List.of("elements must be unique, 'a' appears more than once"), found);
+        assertEquals(List.of("'set<text>' requires unique elements, 'a' appears more than once"), found);
     }
 
     /**

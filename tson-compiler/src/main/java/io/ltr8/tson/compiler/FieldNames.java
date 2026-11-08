@@ -6,8 +6,8 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.meta.RecordHead;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
@@ -21,7 +21,7 @@ import java.util.function.Function;
 
 /**
  * What a record's {@code name_type} obliges ([TSON-SCHEMA] §5.2): that it names an identifier family, a member of
- * {@code identifier_kind} ({@link NameType#admits}, [TSON-SCHEMA] §4.2), that every field name the record states
+ * {@code meta.identifier_ref} ({@link NameType#admits}, [TSON-SCHEMA] §4.2), that every field name the record states
  * -- in {@code fields}, {@code discriminators} and its groups -- is a value of it, and that no two of its fields are
  * one value under its equality. The peer of {@link EnumLabels}, on the same terms: a
  * checker over the linked closure that hands back violations and leaves reporting to the linker.
@@ -38,12 +38,14 @@ final class FieldNames {
 
     /**
      * The definition {@code record}'s field names are read by, where its field name type is not the kernel's
-     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. Empty
-     * for the default, which every reader applies without being told, and for a type that resolves to nothing.
+     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. A record
+     * template's too: no reader reads a value against it, and its member dispatch matches the selectors' keys in
+     * the form its members read them. Empty for the default, which every reader applies without being told, and
+     * for a type that resolves to nothing.
      */
     static Optional<Top> readBy(Top record, Map<String, Top> merged,
                                            Function<String, Top> structure) {
-        if (!(record instanceof RecordBody body) || body.nameType().isEmpty()) {
+        if (RecordHead.of(record).flatMap(RecordHead::nameType).isEmpty()) {
             return Optional.empty();
         }
         return NameType.of(record, Optional.empty(), merged::get, structure).map(NameType.Resolved::definition);
@@ -54,20 +56,21 @@ final class FieldNames {
                                             Function<String, Top> structure) {
         List<EnumLabels.Violation> violations = new ArrayList<>();
         for (String name : localNames) {
-            if (merged.get(name) instanceof RecordBody body) {
-                check(name, body, body, merged, structure).ifPresent(violations::add);
-            }
+            Top definition = merged.get(name);
+            // A template's field names are each application's, so they are judged once, here.
+            RecordHead.of(definition).flatMap(head -> check(name, definition, head, merged, structure))
+                    .ifPresent(violations::add);
         }
         return List.copyOf(violations);
     }
 
-    private static Optional<EnumLabels.Violation> check(String name, Top definition, RecordBody body,
+    private static Optional<EnumLabels.Violation> check(String name, Top definition, RecordHead body,
                                                         Map<String, Top> merged,
                                                         Function<String, Top> structure) {
         Optional<NameType.Resolved> resolved = NameType.of(definition, Optional.empty(), merged::get, structure);
         if (resolved.isEmpty() && body.nameType().isEmpty()) {
             // The default where no kernel is in scope to resolve it: the identifier grammar it stands for.
-            for (String field : body.fields().keySet()) {
+            for (String field : body.fieldNames()) {
                 Optional<String> violation = io.ltr8.tson.atom.IdentifierGrammar.validate(field);
                 if (violation.isPresent()) {
                     return Optional.of(new EnumLabels.Violation(name, "'" + name + "': field name '" + field
@@ -98,12 +101,12 @@ final class FieldNames {
         if (parser.isEmpty()) {
             return Optional.empty();
         }
-        // Under the default, field_name, a refusal speaks of identifiers as any name's would; only an author's own name
+        // Under the default, meta.field_name, a refusal speaks of identifiers as any name's would; only an author's own name
         // type is named, since its rules are the ones the author has to look up.
         boolean identifier = NameType.isIdentifier(type, structure);
         String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameTypeName() + "'";
         Map<Object, String> seen = new HashMap<>();
-        for (String field : body.fields().keySet()) {
+        for (String field : body.fieldNames()) {
             Optional<EnumLabels.Violation> problem = read(name, ofType, parser.get(), field);
             if (problem.isPresent()) {
                 return problem;

@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * An enum is an instance of the kernel's {@code enum_type}: its members, held as text, and the {@code name_type}
- * they are drawn from ([TSON-SCHEMA] §7.4). {@code enum} pins {@code name_type: identifier}, and {@code !enum_type {
+ * they are drawn from ([TSON-SCHEMA] §7.4). {@code enum} pins {@code name_type: meta.identifier}, and {@code !enum_type {
  * name_type: T  members: [...] }} names any identifier family. Each member must be a value of {@code T}, and is a
  * name that [TSON-DATA] §8.2's hygiene reaches under {@code T}'s profile.
  *
@@ -27,8 +27,9 @@ class EnumTypeTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static String schema(String name, String body) {
@@ -41,7 +42,7 @@ class EnumTypeTest {
 
     // ── The type at schema load ──────────────────────────────────────────
 
-    /** {@code enum}'s type is {@code identifier}, and a member that is not one is refused -- once. */
+    /** {@code enum}'s type is {@code meta.identifier}, and a member that is not one is refused -- once. */
     @Test
     void aVocabularyRefusesAMemberThatIsNotAName() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("vocab", """
@@ -55,13 +56,13 @@ class EnumTypeTest {
     }
 
     /**
-     * The {@code identifier} {@code enum} pins was written in the governing meta, and names the kernel's there -- a
-     * schema's own {@code identifier}, however narrow, is a different type and does not take its place.
+     * The {@code meta.identifier} {@code enum} pins is the kernel's, a member of {@code meta}: a schema may declare its
+     * own {@code identifier}, which collides with nothing (§2.2.3) and never retypes an {@code enum}'s labels.
      */
     @Test
-    void aSchemasOwnIdentifierDoesNotRetypeAnEnum() {
+    void aSchemasOwnIdentifierLeavesTheOneAnEnumPinsAlone() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("own-identifier", """
-                { identifier => !identifier_type { pattern: "[a-z]+" }
+                { identifier => !unicode.identifier_type { pattern: "[a-z]+" }
                   shout      => !enum [LOUD QUIET] }""")));
     }
 
@@ -81,15 +82,15 @@ class EnumTypeTest {
     @Test
     void anEnumOverItsOwnIdentifierTypeAdmitsItsNames() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("words", """
-                { words    => !identifier_type { continue_add: "-"  medial: " " }
-                  activity => !enum_type { name_type: words  members: [sedentary "lightly active"] } }""")));
+                { words    => !unicode.identifier_type { continue_add: "-"  medial: " " }
+                  activity => !meta.enum_type { name_type: words  members: [sedentary "lightly active"] } }""")));
     }
 
     /** {@code text} is a text family and no identifier family, so an enum over it is refused. */
     @Test
     void anEnumOverTextIsRefused() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("over-text", """
-                { cities => !enum_type { name_type: text  members: ["new york" "los angeles"] } }"""));
+                { cities => !meta.enum_type { name_type: text  members: ["new york" "los angeles"] } }"""));
 
         assertTrue(messages(diagnostics).contains("its name_type 'text' is not an identifier family"),
                 messages(diagnostics));
@@ -111,15 +112,15 @@ class EnumTypeTest {
 
         // Through a tightening that pins the type, the constructor itself refuses another value.
         List<Diagnostic> pinned = Tson.standard().validateSchema(schema("retype-pinned", """
-                { upper  => !identifier_type { pattern: "[A-Z]+" }
+                { upper  => !unicode.identifier_type { pattern: "[A-Z]+" }
                   names  => !enum [OPEN DONE]
                   strict => !names ^ { name_type: upper } }"""));
         assertTrue(messages(pinned).contains("'name_type' is fixed on 'enum'"), messages(pinned));
 
         // Through `enum_type` itself, the enum's own narrowing rule does.
         List<Diagnostic> free = Tson.standard().validateSchema(schema("retype-free", """
-                { upper  => !identifier_type { pattern: "[A-Z]+" }
-                  names  => !enum_type { name_type: identifier  members: [OPEN DONE] }
+                { upper  => !unicode.identifier_type { pattern: "[A-Z]+" }
+                  names  => !meta.enum_type { name_type: meta.identifier  members: [OPEN DONE] }
                   strict => !names ^ { name_type: upper } }"""));
         assertTrue(messages(free).contains("an enum's name_type is fixed where it is constructed"), messages(free));
     }
@@ -132,16 +133,16 @@ class EnumTypeTest {
     void anOrdinarySchemaEnumeratesItsOwnNamingVocabulary() {
         Tson tson = Tson.standard();
         String kebab = """
-                { kebab => !identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
-                  steps => !enum_type { name_type: kebab  members: [make-tea drink-tea] }
+                { kebab => !unicode.identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
+                  steps => !meta.enum_type { name_type: kebab  members: [make-tea drink-tea] }
                   rec   => { s: steps } }""";
         tson.resolve(schema("steps", kebab));
-        String head = "!!schema:\"https://example.test/steps.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/steps.tn\"\n!rec ";
         assertEquals(List.of(), tson.validate(head + "{ s: make-tea }"));
 
         List<Diagnostic> refused = Tson.standard().validateSchema(schema("steps-bad", """
-                { kebab => !identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
-                  steps => !enum_type { name_type: kebab  members: [make-tea Drink] } }"""));
+                { kebab => !unicode.identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
+                  steps => !meta.enum_type { name_type: kebab  members: [make-tea Drink] } }"""));
         assertTrue(messages(refused).contains("member 'Drink' is not a value of its name_type 'kebab'"),
                 messages(refused));
     }
@@ -153,7 +154,7 @@ class EnumTypeTest {
     @Test
     void aTypeThatIsNoIdentifierFamilyIsRefused() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("numbers", """
-                { ports => !enum_type { name_type: integer  members: ["80" "443"] } }"""));
+                { ports => !meta.enum_type { name_type: integer  members: ["80" "443"] } }"""));
 
         assertTrue(messages(diagnostics).contains("its name_type 'integer' is not an identifier family"),
                 messages(diagnostics));
@@ -162,44 +163,43 @@ class EnumTypeTest {
     @Test
     void aTypeNamingNothingIsRefused() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("nothing", """
-                { e => !enum_type { name_type: no_such_type  members: [a] } }"""));
+                { e => !meta.enum_type { name_type: no_such_type  members: [a] } }"""));
 
         assertTrue(messages(diagnostics).contains("its name_type 'no_such_type' names nothing in scope"),
                 messages(diagnostics));
     }
 
     /**
-     * A meta layer's own tightening of {@code enum_type} needs no class of its own: it adds no field, so it binds
-     * as the constructor it tightens. The pinned {@code name_type} resolves where the meta layer wrote it, so a
-     * governed schema that never declares {@code kebab} still has its members checked against it.
+     * A vocabulary schema's own tightening of {@code enum_type} needs no class of its own: it adds no field, so it
+     * binds as the constructor it tightens. The pinned {@code name_type} resolves where the vocabulary wrote it, so
+     * a schema importing it that never declares {@code kebab} still has its members checked against it.
      */
     @Test
-    void aMetaLayerTighteningBindsWithNoMappingOfItsOwn() {
-        String metaId = "https://example.test/kebab-meta.tn";
+    void aVocabularyTighteningBindsWithNoMappingOfItsOwn() {
+        String vocabularyId = "https://example.test/kebab-meta.tn";
         String userId = "https://example.test/kebab-user.tn";
-        String meta = """
+        String vocabulary = """
                 !!id:"%s"
-                !!meta:"%s"
                 !!import:"%s"
-                { kebab      => !identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
-                  kebab_enum => enum_type ^ { name_type?: = kebab } }
-                """.formatted(metaId, TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID);
+                !schema { kebab      => !unicode.identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
+                  kebab_enum => meta.enum_type ^ { name_type?: = kebab } }
+                """.formatted(vocabularyId, TsonBundledSchemas.META_ID);
         String user = """
                 !!id:"%s"
-                !!meta:"%s"
-                { steps => !kebab_enum [make-tea drink-tea]
+                !!import:"%s"
+                !schema { steps => !kebab_enum [make-tea drink-tea]
                   rec   => { s: steps } }
-                """.formatted(userId, metaId);
+                """.formatted(userId, vocabularyId);
         String bad = """
                 !!id:"https://example.test/kebab-bad.tn"
-                !!meta:"%s"
-                { steps => !kebab_enum [make-tea Drink] }
-                """.formatted(metaId);
+                !!import:"%s"
+                !schema { steps => !kebab_enum [make-tea Drink] }
+                """.formatted(vocabularyId);
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(
-                Map.of(metaId, meta, userId, user, "https://example.test/kebab-bad.tn", bad)))));
+                Map.of(vocabularyId, vocabulary, userId, user, "https://example.test/kebab-bad.tn", bad)))));
 
         assertEquals(List.of(), tson.validateSchema(user));
-        assertEquals(List.of(), tson.validate("!!schema:\"" + userId + "\"\n!rec { s: drink-tea }"));
+        assertEquals(List.of(), tson.validate("!!import:\"" + userId + "\"\n!rec { s: drink-tea }"));
         assertTrue(messages(tson.validateSchema(bad)).contains("member 'Drink' is not a value of its name_type 'kebab'"),
                 messages(tson.validateSchema(bad)));
     }
@@ -215,10 +215,10 @@ class EnumTypeTest {
     void anEnumReadsItsMembersAndNamesThemOnAMiss() {
         Tson tson = Tson.standard();
         tson.resolve(schema("read", """
-                { words    => !identifier_type { continue_add: "-"  medial: " " }
-                  activity => !enum_type { name_type: words  members: [sedentary "lightly active"] }
+                { words    => !unicode.identifier_type { continue_add: "-"  medial: " " }
+                  activity => !meta.enum_type { name_type: words  members: [sedentary "lightly active"] }
                   rec => { a: activity } }"""));
-        String head = "!!schema:\"https://example.test/read.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/read.tn\"\n!rec ";
 
         assertEquals(List.of(), tson.validate(head + "{ a: \"lightly active\" }"));
 
@@ -239,12 +239,12 @@ class EnumTypeTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/answers.tn"
-                !!meta:"%s"
-                { reply  => !text_type { members: ["true" "false"] }
+                !!import:"%s"
+                !schema { reply  => !unicode.text_type { members: ["true" "false"] }
                   bit    => !enum [true false]
                   either => ( reply | bit )
                   rec    => { e: either } }""".formatted(TsonBundledSchemas.META_ID));
-        String head = "!!schema:\"https://example.test/answers.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/answers.tn\"\n!rec ";
 
         assertEquals(List.of(), tson.validate(head + "{ e: \"true\" }"));
         assertEquals(List.of(), tson.validate(head + "{ e: true }"));
@@ -255,7 +255,7 @@ class EnumTypeTest {
     void booleanIsStillAnOrdinaryEnum() {
         Tson tson = Tson.standard();
         tson.resolve(schema("bool", "{ rec => { b: boolean } }"));
-        String head = "!!schema:\"https://example.test/bool.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/bool.tn\"\n!rec ";
 
         assertEquals(List.of(), tson.validate(head + "{ b: true }"));
         assertEquals(List.of(), tson.validate(head + "{ b: \"true\" }"),

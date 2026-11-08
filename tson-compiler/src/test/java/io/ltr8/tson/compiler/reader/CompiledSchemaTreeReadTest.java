@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
@@ -22,14 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The whole pipeline, end to end, through the one entry point a real caller would actually use --
  * everything {@link MetaKernelEndToEndTest} proved piece by piece (a real, fully-registered
- * meta-kernel schema; every composite kind; every atom family; {@code top}'s own polymorphism),
+ * the kernel schema; every composite kind; every atom family; {@code top}'s own polymorphism),
  * now exercised through a single {@code compiled.get(typeName).read(document.root())} call, the
  * same one-line shape {@code TsonObjectReader.toObject(String, Class)} already offers for Class 1.
  */
 class CompiledSchemaTreeReadTest {
 
     private static TsonCompiledSchema compiled() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.tree());
     }
@@ -43,7 +43,8 @@ class CompiledSchemaTreeReadTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) read(compiled, "{ bits: 32 signed: true }", "integer_size");
+        Map<String, Object> result = (Map<String, Object>) read(compiled, "{ bits: 32 signed: true }",
+                "numeric.integer_size");
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
         assertEquals(true, result.get("signed")); // boolean reads as a real Boolean in tree mode
@@ -53,9 +54,9 @@ class CompiledSchemaTreeReadTest {
     void topIsAbstractSoABareValueThereIsRefused() {
         TsonCompiledSchema compiled = compiled();
 
-        ReadException refused = assertThrows(ReadException.class, () -> read(compiled, "{}", "top"));
+        ReadException refused = assertThrows(ReadException.class, () -> read(compiled, "{}", "meta.top"));
 
-        assertTrue(refused.getMessage().contains("'top' is abstract"), refused.getMessage());
+        assertTrue(refused.getMessage().contains("'meta.top' is abstract"), refused.getMessage());
     }
 
     @Test
@@ -72,6 +73,6 @@ class CompiledSchemaTreeReadTest {
     void badDataStillFailsWithAClearError() {
         TsonCompiledSchema compiled = compiled();
 
-        assertThrows(ReadException.class, () -> read(compiled, "{}", "integer_size"));
+        assertThrows(ReadException.class, () -> read(compiled, "{}", "numeric.integer_size"));
     }
 }

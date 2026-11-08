@@ -37,9 +37,9 @@ class DirectApplicationDeclarationTest {
     private static String schema(String id, String declarations) {
         return """
                 !!id:"https://example.test/%s.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                 %s}
                 """.formatted(id, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, declarations);
     }
@@ -105,7 +105,7 @@ class DirectApplicationDeclarationTest {
         assertEquals(List.of(), named(linked, "box_"),
                 () -> "one entry for one application: " + linked.schema().entries().keySet());
         RecordBody holder = (RecordBody) linked.schema().entries().get("holder");
-        assertEquals("bx", holder.fields().values().stream().toList().get(0).type().name(),
+        assertEquals("bx", holder.fields().values().stream().toList().get(0).typeRef().name(),
                 "the field names the declaration, which is what the application denotes");
     }
 

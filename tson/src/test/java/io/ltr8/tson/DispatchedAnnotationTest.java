@@ -10,7 +10,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.tree.TsonValue;
 import java.util.List;
@@ -39,9 +39,9 @@ class DispatchedAnnotationTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/dispatch-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               note => text
               shape => {}
               circle => shape & { radius: text }
@@ -63,14 +63,14 @@ class DispatchedAnnotationTest {
 
     private static Tson tson() {
         Map<String, Class<?>> names = Map.of("shape", Shape.class, "circle", Circle.class, "holder", Holder.class);
-        DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaMetaNameBinder.INSTANCE.resolve(n);
+        DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaModelNameBinder.INSTANCE.resolve(n);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
                         .registerAtoms(AtomContext.hostTypes()).build()));
     }
 
     private static final String DISPATCHED = """
-            !!schema:"https://example.test/dispatch-1.tn"
+            !!import:"https://example.test/dispatch-1.tn"
             !holder { thing: @note:"why this one" !circle { radius: "3" } }""";
 
     /** The defect itself: a bound variant with a carrier, dispatched to, keeping what the document wrote. */
@@ -90,7 +90,7 @@ class DispatchedAnnotationTest {
     @Test
     void theSameClassKeepsThemWhereNothingDispatched() {
         Circle circle = tson().objectReader().read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 @note:"why this one"
                 !circle { radius: "3" }""", Circle.class);
 
@@ -110,7 +110,7 @@ class DispatchedAnnotationTest {
     @Test
     void aTaggedChoiceVariantKeepsItsAnnotations() {
         TsonValue pick = tson().treeReader().read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 !chooser { pick: @note:"chosen" !integer 42 }""").get("pick");
 
         assertEquals(Optional.of("integer"), pick.typeRef());
@@ -126,7 +126,7 @@ class DispatchedAnnotationTest {
     @Test
     void anUntaggedChoiceVariantIsStillRecoveredThroughItsAnnotations() {
         TsonValue pick = tson().treeReader().read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 !chooser { pick: @note:"chosen" 42 }""").get("pick");
 
         assertEquals(Optional.of("integer"), pick.typeRef());
@@ -143,7 +143,7 @@ class DispatchedAnnotationTest {
     void anUnknownDispatchTargetDiscardsTheWholeValueFramingIncluded() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonValue root = tson().treeReader().withDiagnostics(problems).read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 !holder { thing: @note:"why" !square { side: "3" } }""");
 
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
@@ -158,7 +158,7 @@ class DispatchedAnnotationTest {
     void anUnknownUnionMemberDiscardsTheWholeValueToo() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         tson().objectReader().withDiagnostics(problems).read("""
-                !!schema:"https://example.test/dispatch-1.tn"
+                !!import:"https://example.test/dispatch-1.tn"
                 !holder { thing: @note:"why" !square { side: "3" } }""", Holder.class);
 
         assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH),

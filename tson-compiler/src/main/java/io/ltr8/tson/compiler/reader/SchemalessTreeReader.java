@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -42,7 +43,7 @@ import java.util.Set;
  * that token must satisfy the atom, and with no target class to name (rule 2 is object-binding only) any
  * other name links to nothing and is {@code UNKNOWN_TYPE_REF}. {@link #preserving()} opts out of that last
  * rule for a caller who wants the wire back as authored -- reading the structure of a document whose
- * {@code !!schema} is deliberately being ignored, or round-tripping through {@code TsonTreeWriter}.
+ * {@code !!import} is deliberately being ignored, or round-tripping through {@code TsonTreeWriter}.
  *
  * <p><b>Every problem goes through {@code ctx.report}</b>, so the read's own {@code DiagnosticsReceiver}
  * decides its fate exactly as it does for the schema-driven readers: fail-fast throws {@code
@@ -78,7 +79,7 @@ public final class SchemalessTreeReader {
 
     /**
      * A reader that keeps a type-ref naming no built-in type on the node without reporting it, carried all
-     * the way to the tree. For reading the wire form of a document whose own {@code !!schema} defines those
+     * the way to the tree. For reading the wire form of a document whose own {@code !!import} defines those
      * names but is deliberately not in scope -- a reading of its structure, not a verdict on it.
      */
     public static SchemalessTreeReader preserving() {
@@ -116,6 +117,14 @@ public final class SchemalessTreeReader {
             case TokenEvent token -> {
                 ctx.next();
                 yield leaf(ctx, token, typeRef, atom, annotations);
+            }
+            case ReferenceEvent(io.ltr8.tson.schema.meta.TypeRef reference, _) -> {
+                ctx.next();
+                yield reference(reference, typeRef, annotations);
+            }
+            case ReferenceEvent(io.ltr8.tson.schema.meta.SiblingRef sibling, _) -> {
+                ctx.next();
+                yield new TsonSiblingReference(sibling.field(), typeRef, annotations);
             }
             default -> throw new IllegalStateException("unexpected event where a value was expected: " + e);
         };
@@ -158,7 +167,6 @@ public final class SchemalessTreeReader {
         Map<String, TsonValue> fields = new LinkedHashMap<>();
         while (!(ctx.peek() instanceof RecordEnd)) {
             FieldName fieldName = (FieldName) ctx.next();
-            ScopePush.refuseSchemaless(ctx);
             if (fields.containsKey(fieldName.name())) {
                 ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
                         "duplicate field '" + fieldName.name() + "' -- a record states each field at most once "
@@ -176,7 +184,6 @@ public final class SchemalessTreeReader {
         ctx.next(); // ArrayStart
         List<TsonValue> elements = new ArrayList<>();
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            ScopePush.refuseSchemaless(ctx);
             elements.add(readNode(ctx.index(elements.size())));
         }
         ctx.next(); // ArrayEnd
@@ -212,7 +219,6 @@ public final class SchemalessTreeReader {
                         "each key stated once", "'" + keySegment(key) + "' stated again");
             }
             ctx.next(); // MapArrow
-            ScopePush.refuseSchemaless(ctx);
             entries.add(new TsonMap.Entry(key, readNode(ctx.field(keySegment(key)))));
         }
         ctx.next(); // MapEnd
@@ -243,6 +249,28 @@ public final class SchemalessTreeReader {
             value = ValueParser.INSTANCE.read(tokenValue);
         }
         return new TsonAtom(value, typeRef, annotations);
+    }
+
+    /**
+     * A reference with arguments, kept as the structured value it is ([TSON-DATA] §4): its segments, and each
+     * argument read by the schemaless rule a token is read by, a nested application a reference of its own. Nothing
+     * resolves.
+     */
+    private static TsonApplicationReference reference(io.ltr8.tson.schema.meta.TypeRef reference, Optional<String> typeRef,
+                                           List<TsonAnnotation> annotations) {
+        List<TsonValue> arguments = new ArrayList<>(reference.arguments().size());
+        for (io.ltr8.tson.schema.meta.TypeArgument argument : reference.arguments()) {
+            arguments.add(switch (argument) {
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref nested when !nested.ref().arguments().isEmpty() ->
+                        reference(nested.ref(), Optional.empty(), List.of());
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref name ->
+                        TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(name.ref().name(), TokenForm.UNQUOTED)));
+                case io.ltr8.tson.schema.meta.TypeArgument.Value value ->
+                        TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(value.value().text(),
+                                TokenForm.valueOf(value.value().form().name()))));
+            });
+        }
+        return new TsonApplicationReference(reference.segments(), arguments, typeRef, annotations);
     }
 
     /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form. */
@@ -293,6 +321,9 @@ public final class SchemalessTreeReader {
     private static Object keyIdentity(TsonValue key) {
         return switch (key) {
             case TsonAtom atom -> ValueIdentity.of(atom.value());
+            case TsonApplicationReference reference -> List.of(KeyKind.REFERENCE, reference.segments(),
+                    reference.arguments().stream().map(SchemalessTreeReader::keyIdentity).toList());
+            case TsonSiblingReference sibling -> List.of(KeyKind.SIBLING, sibling.field());
             case TsonArray array -> array.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonTuple tuple -> tuple.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonRecord record -> {
@@ -308,12 +339,9 @@ public final class SchemalessTreeReader {
             // ever a compound key's own element.
             case TsonVoid ignored -> KeyKind.VOID;
             case TsonMissing ignored -> KeyKind.MISSING;
-            // A map key is a data-value, never a scoped-value (§2.3), so no key this reader builds is one.
-            // Identity is still the value's -- a scope says where a type name resolves, not what a key is.
-            case TsonScopedValue scoped -> keyIdentity(scoped.root());
         };
     }
 
     /** Identity stand-ins for the payload-free node kinds -- see {@link #keyIdentity}. */
-    private enum KeyKind { VOID, MISSING }
+    private enum KeyKind { VOID, MISSING, REFERENCE, SIBLING }
 }

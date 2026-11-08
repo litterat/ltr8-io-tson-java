@@ -43,7 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <h2>The reference is attacker-controlled</h2>
  *
- * <p>A data document names its own schema (<code>!!schema:"https://…"</code>), so in a server the string
+ * <p>A data document names its own schema (<code>!!import:"https://…"</code>), so in a server the string
  * reaching {@link #fetch} came out of a request body. A source that fetches whatever it is handed is a
  * server-side request forgery primitive: it will read a cloud metadata endpoint, port-scan a private network,
  * or follow a redirect from a permitted host to one that isn't. Hence:
@@ -113,7 +113,7 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
     /**
      * Fetches {@code reference}'s schema document, or throws.
      *
-     * @param reference the reference as written in a {@code !!schema}/{@code !!import}/{@code !!meta}
+     * @param reference the reference as written in a {@code !!import}
      *                  directive, scheme and {@code ?sha256=} pin included
      * @throws SchemaFetchException if policy refuses it, or the host cannot supply it
      */

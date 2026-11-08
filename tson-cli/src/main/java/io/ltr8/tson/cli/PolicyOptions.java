@@ -64,6 +64,7 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy
         RestrictionLevel identifierLevel = null;
         RestrictionLevel tokenLevel = null;
         int maxDepth = LimitsPolicy.DEFAULT_MAX_DEPTH;
+        int maxWaitDepth = LimitsPolicy.DEFAULT_MAX_WAIT_DEPTH;
         boolean perSegment = false;
         boolean lookAlikes = false;
         List<UnicodeScript[]> identifierScripts = new ArrayList<>();
@@ -79,7 +80,9 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy
                 case "--identifier-scripts" ->
                         identifierScripts.add(scripts(value(args, ++i, "--identifier-scripts")));
                 case "--token-scripts" -> tokenScripts.add(scripts(value(args, ++i, "--token-scripts")));
-                case "--max-depth" -> maxDepth = depth(value(args, ++i, "--max-depth"));
+                case "--max-depth" -> maxDepth = depth(value(args, ++i, "--max-depth"), "--max-depth");
+                case "--max-wait-depth" ->
+                        maxWaitDepth = depth(value(args, ++i, "--max-wait-depth"), "--max-wait-depth");
                 default -> rest.add(args.get(i));
             }
         }
@@ -91,26 +94,27 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy
                 .withSkeletonDistinctness(!lookAlikes);
         return new PolicyOptions(perSegment ? identifiers.perSegment() : identifiers,
                 assemble("token", tokenLevel, DEFAULTS.tokenPolicy().level(), false, tokenScripts),
-                LimitsPolicy.defaults().withMaxDepth(maxDepth));
+                LimitsPolicy.defaults().withMaxDepth(maxDepth).withMaxWaitDepth(maxWaitDepth));
     }
 
     /**
-     * A [TSON-DATA] §9.1 nesting-depth bound, as a positive integer.
+     * A depth bound -- [TSON-DATA] §9.1's nesting depth or [TSON-SCHEMA] §11.5's wait depth -- as a positive
+     * integer, {@code flag} naming which.
      *
      * <p>Refused where it is not one, rather than clamped: a caller who wrote {@code --max-depth 0} meant
      * something, and reading a document under a bound they did not ask for is the one outcome that leaves
      * them unable to explain the result. The library refuses the same value for the same reason.
      */
-    private static int depth(String value) {
+    private static int depth(String value, String flag) {
         int depth;
         try {
             depth = Integer.parseInt(value.strip());
         } catch (NumberFormatException e) {
-            throw new UsageException("--max-depth needs a whole number, not '" + value + "'");
+            throw new UsageException(flag + " needs a whole number, not '" + value + "'");
         }
         if (depth < 1) {
-            throw new UsageException("--max-depth must be at least 1, not " + depth
-                    + " -- a document has to be allowed at least one container to be read at all");
+            throw new UsageException(flag + " must be at least 1, not " + depth
+                    + " -- a limit of 0 admits no document at all");
         }
         return depth;
     }

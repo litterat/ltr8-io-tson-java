@@ -2,7 +2,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -13,34 +13,33 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A {@code type_ref} keeps the wire annotations written on the reference itself.
+ * A reference keeps the wire annotations written on the reference itself.
  *
- * <p>§6 lets an annotation precede any value, and a {@code type_ref} at a field's type position is one:
+ * <p>§6 lets an annotation precede any value, and a reference at a field's type position is one:
  * {@code type: @doc:"..." token} annotates the <em>reference</em>, not the field around it, so {@link
- * TypeRef} is where it has to live. Before it had a carrier, a read discarded one and a write could not
- * produce one.
+ * TypeRef} is where it has to live, and a read keeps it and a write produces it.
  */
 class TypeRefAnnotationTest {
 
     private static Top read(String document) {
-        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaModelNameBinder.defaultContext()))
                 .objectReader().withSchema(TsonBundledSchemas.META_ID)
-                .readAs(document, "top", Top.class);
+                .readAs(document, "meta.top", Top.class);
     }
 
     private static TypeRef fieldType(Top definition) {
-        return assertInstanceOf(RecordBody.class, definition).fields().values().iterator().next().type();
+        return assertInstanceOf(RecordBody.class, definition).fields().values().iterator().next().typeRef();
     }
 
     /** An annotation written on the reference itself, read off a document. */
     @Test
     void anAnnotationOnATypeRefIsKept() {
         TypeRef type = fieldType(read("""
-                !record { fields: {
-                  n => !record_field { type: @doc:"the token itself" token }
+                !meta.record { fields: {
+                  n => !meta.record_field { type: @doc:"the token itself" text }
                 } }"""));
 
-        assertEquals("token", type.name());
+        assertEquals("text", type.name());
         assertEquals("the token itself", type.annotations().get("doc").orElseThrow().value().orElseThrow());
     }
 
@@ -48,8 +47,8 @@ class TypeRefAnnotationTest {
     @Test
     void anUnannotatedTypeRefCarriesNothing() {
         assertTrue(fieldType(read("""
-                !record { fields: {
-                  n => !record_field { type: token }
+                !meta.record { fields: {
+                  n => !meta.record_field { type: text }
                 } }""")).annotations().values().isEmpty());
     }
 
@@ -57,11 +56,11 @@ class TypeRefAnnotationTest {
     @Test
     void anAnnotatedTypeRefWritesBackAsOne() {
         TypeRef type = fieldType(read("""
-                !record { fields: {
-                  n => !record_field { type: @doc:"the token itself" token }
+                !meta.record { fields: {
+                  n => !meta.record_field { type: @doc:"the token itself" text }
                 } }"""));
 
-        String written = new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(type);
+        String written = new TsonObjectWriter(SchemaModelNameBinder.defaultContext()).toTson(type);
 
         assertTrue(written.contains("@doc"), written);
         assertTrue(written.contains("the token itself"), written);

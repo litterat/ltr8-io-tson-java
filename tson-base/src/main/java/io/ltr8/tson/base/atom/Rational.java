@@ -4,13 +4,13 @@ import java.math.BigInteger;
 import java.util.Objects;
 
 /**
- * meta-kernel's {@code rational} host value -- an exact fraction, {@code numerator}/{@code
+ * the kernel's {@code rational} host value -- an exact fraction, {@code numerator}/{@code
  * denominator}, {@code denominator} always strictly positive (§7.6's grammar never permits a
- * negative or zero denominator; any sign belongs to the numerator). Lives in {@code schema.meta},
- * not {@code tson-compiler}, because {@code RationalType}'s own {@code min}/{@code max}/{@code
+ * negative or zero denominator; any sign belongs to the numerator). Lives below the schema model,
+ * not in {@code tson-compiler}, because {@code numeric.RationalType}'s own {@code min}/{@code max}/{@code
  * multipleOf} constraint fields are typed as this.
  *
- * <p><b>Not normalized, but compared by value.</b> meta.tn's own doc for {@code rational_type} is
+ * <p><b>Not normalized, but compared by value.</b> numeric.tn's own doc for {@code numeric.rational_type} is
  * explicit: "the token is preserved as written and 2/4 round-trips as 2/4... equality and
  * constraints operate on the value (2/4 equals 1/2)." That's why this can't use the record default
  * {@code equals}/{@code hashCode} -- those are field-based ({@code 2/4} and {@code 1/2} would

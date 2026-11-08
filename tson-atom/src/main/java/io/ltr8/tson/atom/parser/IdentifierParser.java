@@ -4,16 +4,16 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.unicode.IdentifierProfile;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 
 import java.util.Optional;
 
 /**
- * Parses and validates against meta-kernel's {@code identifier_type} constructor -- a UAX #31 identifier profile
- * with {@code text_type}'s facets inside it. The kernel's {@code identifier} instance is the type of every
- * naming position in the series: type names, field names and parameter names through the
- * {@code type_name}/{@code field_name}/{@code param_name} roles, and {@code enum}'s members, its {@code type}.
- * Other instances name an outside system's positions under that system's own profile.
+ * Parses and validates against the kernel's {@code identifier_type} constructor -- a UAX #31 identifier profile with
+ * {@code text_type}'s facets inside it. The kernel's {@code meta.identifier} instance is the type of every naming position
+ * in the series: type names, field names and parameter names through the
+ * {@code meta.type_name}/{@code meta.field_name}/{@code meta.param_name} roles, and {@code enum}'s members, its
+ * {@code type}. Other instances name an outside system's positions under that system's own profile.
  *
  * <p><b>The text is put into the {@code normalization} form, then the profile judges it, then the text
  * facets.</b> The value is the normalised text ([TSON-SCHEMA] §5.5), so the profile asks whether the
@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 public final class IdentifierParser implements AtomTypeParser<String> {
 
-    /** {@code identifier => !identifier_type { continue_add: "-" }} -- [TSON-DATA] §7.7's identifier. */
+    /** {@code identifier => !unicode.identifier_type { continue_add: "-" }} -- [TSON-DATA] §7.7's identifier. */
     public static final IdentifierParser IDENTIFIER = new IdentifierParser(IdentifierType.IDENTIFIER);
 
     /** The one grammar {@code expected} fragment this reports, per {@code AtomTypeException}'s vocabulary. */

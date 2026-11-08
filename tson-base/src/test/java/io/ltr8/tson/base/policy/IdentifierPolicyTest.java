@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class IdentifierPolicyTest {
 
-    /** [TSON-DATA] §7.7's profile, as the meta-kernel's {@code identifier} declares it. */
+    /** [TSON-DATA] §7.7's profile, as the kernel's {@code meta.identifier} declares it. */
     private static final IdentifierProfile NAME =
             IdentifierProfile.of(Base.XID, Base.XID, "", "-", "", "", Normalization.NFC);
 

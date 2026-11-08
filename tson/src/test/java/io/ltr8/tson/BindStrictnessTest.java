@@ -8,7 +8,7 @@ import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +16,7 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import java.util.Arrays;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,9 +43,9 @@ class BindStrictnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               order => { sku: text  quantity: int32  currency: text }
             }
             """;
@@ -52,7 +53,7 @@ class BindStrictnessTest {
     private static final String OPTIONAL_SCHEMA = SCHEMA.replace("currency: text", "currency: text?");
 
     private static final String DOC = """
-            !!schema:"https://example.test/order-2.tn"
+            !!import:"https://example.test/order-2.tn"
             !order { sku: "A"  quantity: 1  currency: "AUD" }""";
 
     /** The v1 class: no component for the field v2 added. */
@@ -69,7 +70,7 @@ class BindStrictnessTest {
 
     private static Tson tson(String schema, Class<?> bound) {
         SchemaSource source = uri -> schema;
-        DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaModelNameBinder.INSTANCE.resolve(name);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
                         .registerAtoms(AtomContext.hostTypes()).build()));
@@ -128,7 +129,7 @@ class BindStrictnessTest {
      *
      * <p>Without the split, an unbound component reaches the writer indistinguishable from a bound one and
      * is emitted -- which for {@code schema.meta.Top} meant this library could not produce
-     * resolved output that validates against its own meta-kernel ([TSON-SCHEMA] §1.3, §7.2's closed record).
+     * resolved output that validates against its own kernel ([TSON-SCHEMA] §1.3, §7.2's closed record).
      */
     @Test
     void anUnboundComponentIsNotAFieldAndIsNotWritten() throws Exception {
@@ -189,9 +190,9 @@ class BindStrictnessTest {
 
     private static final String MONEY_SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               money => text
               order => { sku: text  quantity: int32  currency: money }
             }
@@ -219,7 +220,7 @@ class BindStrictnessTest {
     private static Tson moneyTson(boolean registered) {
         SchemaSource source = uri -> MONEY_SCHEMA;
         DataNameBinder binder = name -> "order".equals(name) ? OrderPriced.class
-                : SchemaMetaNameBinder.INSTANCE.resolve(name);
+                : SchemaModelNameBinder.INSTANCE.resolve(name);
         DataBindContext.Builder builder = DataBindContext.builder().nameBinder(binder)
                 .registerAtoms(AtomContext.hostTypes());
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
@@ -248,7 +249,7 @@ class BindStrictnessTest {
         Tson tson = moneyTson(true);
         assertNotNull(tson.bindRegistry().get(ID));
         OrderPriced order = tson.objectReader().read("""
-                !!schema:"https://example.test/order-2.tn"
+                !!import:"https://example.test/order-2.tn"
                 !order { sku: "A"  quantity: 1  currency: "12.34" }""", OrderPriced.class);
         assertEquals(new Money("12.34"), order.currency());
     }

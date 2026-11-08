@@ -14,7 +14,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
@@ -56,7 +56,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
     private final DataClassMap descriptor;
 
     /**
-     * The namespace constructor a value read here is an instance of, where the map is a namespace type's: what a
+     * The namespace type a value read here is a value of, where the map is a namespace type's: what a
      * position whose host holds a {@link Namespace} wraps the map in ({@link BindTargets}). {@code null} for a
      * map that is no namespace.
      */
@@ -151,7 +151,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
             Type valueType = resolveType(body.valueType().name());
             // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
             // an instance of the constructor holds (NamespaceInstanceReader).
-            String terminal = ReferenceChain.terminal(name, context.schema().entries()::get);
+            String terminal = AliasChain.terminal(name, context.schema().entries()::get);
             String namespace = context.linked().namespace(terminal).isPresent() ? terminal : null;
             Class<?> mapClass = namespace != null ? AnnotatedMap.class
                     : body.ordered() ? LinkedHashMap.class : Map.class;

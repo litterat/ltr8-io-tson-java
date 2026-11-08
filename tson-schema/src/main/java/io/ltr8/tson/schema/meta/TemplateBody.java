@@ -8,20 +8,20 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * The meta-kernel's {@code template} body -- the body of an entry that declares type parameters, which
+ * The kernel's {@code template} body -- the body of an entry that declares type parameters, which
  * [TSON-SCHEMA] §5.10 calls open. {@link #template} is the constructor application as written, held and
  * <em>unread</em> until materialisation substitutes the parameters away; {@link #parameters} are what it
  * binds, in order, each with the type an argument for it is read as ({@link TemplateParam}).
  *
  * <p><b>It holds in both directions</b>: an entry whose value is one of these declares type parameters, and
  * every entry that declares them has one. §5.10's partial application is no exception --
- * {@code <B> pair<uuid, B>} holds the {@code !reference { target: pair<uuid, B> }} §8.1 says it denotes.
+ * {@code <B> pair<uuid, B>} holds the {@code !meta.alias { target: pair<uuid, B> }} §8.1 says it denotes.
  *
  * <p><b>Why the body is text, and not a value of the constructor's own vocabulary.</b> A parameter stands
  * wherever a token stands: {@code element_type: T} in a type slot, {@code min_items: N} in a value slot,
  * {@code variants: [T error]} inside a collection. So a body carrying one is not typed by any constructor's
  * record shape until it closes, and writing it as though it were leaves the two halves disagreeing -- a
- * value parameter refuses to read at all ({@code N} is not a {@code non_negative_integer}), and a type
+ * value parameter refuses to read at all ({@code N} is not a {@code numeric.count}), and a type
  * parameter reads as a reference to a type nobody declared. Text is what "held" means, and it is what §8.1's
  * ingest rule already asks for: an open entry's body is re-resolved as source.
  *
@@ -38,11 +38,11 @@ import java.util.Objects;
  * could not be done at all without inverting the dependency this package deliberately keeps.
  *
  * <p><b>Composes {@code top} alone</b>: it is not a type, its open form denotes nothing, and naming it at a type
- * position is an error. A record template is not one of these -- it is a {@link RecordBody} with
- * {@link RecordBody#parameters}, a family base ({@link OpenEntry}) -- so every held body applies some other
+ * position is an error. A record template is not one of these -- it is a {@link RecordTemplateBody}, a family base
+ * ({@link OpenEntry}) -- so every held body applies some other
  * constructor, and an application of it is its expansion, with whatever chain the expansion's own body gives.
  */
-@Typename(name = "template")
+@Typename(name = "meta.template")
 public record TemplateBody(List<TemplateParam> parameters, String template) implements Top {
 
     @Record

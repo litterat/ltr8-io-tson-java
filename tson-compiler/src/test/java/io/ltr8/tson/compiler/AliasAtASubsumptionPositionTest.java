@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §7.2 compares a written type annotation against a position's type "after reference flattening
+ * [TSON-SCHEMA] §7.2 compares a written type annotation against a position's type "after alias flattening
  * of <b>both</b>". So an alias and its target are one type at either end of that comparison: {@code !b_of} at
  * a {@code base} position names the position's own type, and {@code !s_of} names a subtype, whichever of the
  * two names the schema happens to have flattened.
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * flattening on the subtype side, a subtype family over instantiations is unwritable: the family exists in
  * the index and nothing can name a member of it.
  *
- * <p><b>The alias is admitted, not rewritten to its target.</b> A reference entry compiles to its target's
+ * <p><b>The alias is admitted, not rewritten to its target.</b> An alias entry compiles to its target's
  * reader named for the entry doing the referring, so dispatching on the written name runs the same reader and
  * reports under the name the author typed.
  */
@@ -47,9 +47,9 @@ class AliasAtASubsumptionPositionTest {
     private static Read read(String declarations, String rootType, String document) {
         String schema = """
                 !!id:"https://example.test/alias-subsumption.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -59,8 +59,8 @@ class AliasAtASubsumptionPositionTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         TsonCompiledSchemaRegistry registry = TsonCompiledSchemaRegistry.tree(core);
         registry.get(ID);
         List<Diagnostic> problems = new ArrayList<>();

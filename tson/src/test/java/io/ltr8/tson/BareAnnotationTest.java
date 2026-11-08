@@ -18,9 +18,9 @@ class BareAnnotationTest {
     private static List<Diagnostic> validate(String declaration) {
         return Tson.standard().validateSchema("""
                 !!id:"https://example.test/bare-1.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   %s
                 }
                 """.formatted(declaration));
@@ -28,7 +28,7 @@ class BareAnnotationTest {
 
     @Test
     void aVoidTypedMarkerIsWrittenBare() {
-        assertEquals(List.of(), validate("@deprecated old => @numeric int32"));
+        assertEquals(List.of(), validate("@deprecated old => @atom.numeric int32"));
         assertEquals(List.of(), validate("@deprecated:_ old => int32"));
     }
 

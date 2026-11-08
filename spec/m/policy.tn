@@ -1,99 +1,116 @@
-!!id:"https://tson.io/2026/38/m/policy.tn?sha256=2346ad7dd5867ecbab830aedc1e8e0d594dcc31fff7defb39684b1d081783c84"
-!!meta:"https://tson.io/2026/38/m/meta.tn?sha256=62dde2f344853848cd0ce4f722a0305d979e5883c0dcd14308959ad6a01bff47"
-!!import:"https://tson.io/2026/38/m/core.tn?sha256=95f66505cf74dd2d64d0b6cffd07538fa45b8c7096c556c87423b56b03423497"
+!!id:"https://tson.io/2026/39/m/policy.tn?sha256=e9cb5b9305ddec62f0e18e7ee7ed3d2a087d97a243a48b411daa11f5071a496f"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5"
 @doc:"""
-  TSON processor policy — what a processor admits and spends (2026 Revision 38
+  TSON processor policy — what a processor admits and spends (2026 Revision 39
   draft).
 
   A processor's policy is a property of the deployment, never of a schema
   ([TSON-DATA] §8.2): a schema that declared its own strictness would choose
   its own check. This document declares the policy's vocabulary, so a
   processor states the policy it judged under in one shape, and a deployment
-  that writes its policy down writes a data document of type `policy`. Such a
-  document is named at the call site and never resolved by identity, and no
-  document may name, import or otherwise select the policy it is judged under.
+  that writes its policy down writes a data document of type
+  `policy.processor`. Such a document is named at the call site and never
+  resolved by identity, and no document may name, import or otherwise select
+  the policy it is judged under.
 
-  `identifier_policy` and `token_policy` are §8.2's two policies, and `limits`
-  is §9.1's and [TSON-SCHEMA] §11.5's. A script is named by its Unicode Script property value alias
-  (UAX #24), `Latin`, `Cyrillic`, `Han`.
+  `policy.identifier_policy` and `policy.script_policy` are §8.2's two
+  policies, and `policy.limits` is §9.1's and [TSON-SCHEMA] §11.5's. A script
+  is named by its Unicode Script property value alias (UAX #24), `Latin`,
+  `Cyrillic`, `Han`.
+
+  It imports meta.tn alone, every field typed by the kernel's vocabulary or by
+  an entry of its own. Its entries are members of the schema map `policy`
+  nested in its root, each named by its path from the root, and a schema
+  whose import closure holds this document reserves that map name.
   """
-{
-  @doc:"UTS #39 §5.2's restriction levels, strictest first."
-  restriction_level => !enum [
-    ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
-  ]
+!schema {
+  policy => !schema {
+    @doc:"UTS #39 §5.2's restriction levels, strictest first."
+    restriction_level => !enum [
+      ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
+    ]
 
-  @doc:"""
-    [TSON-DATA] §8.2's token policy: the restriction level over each whole
-    token, and any script combinations admitted over the level (UTS #39 §5.2's
-    own device for Latn+Jpan and its siblings), each entry in `permitting` one
-    such combination.
-    """
-  script_policy => { level: restriction_level  permitting: [[text]] }
+    @doc:"""
+      [TSON-DATA] §8.2's token policy: the restriction level over each whole
+      token, and any script combinations admitted over the level (UTS #39
+      §5.2's own device for Latn+Jpan and its siblings), each entry in
+      `permitting` one such combination.
+      """
+    script_policy => { level: policy.restriction_level  permitting: [[text]] }
 
-  @doc:"""
-    [TSON-DATA] §8.2's identifier policy: the restriction level, whether it
-    applies to each segment of a name rather than to the whole of it, whether
-    no two names in one scope may share a UTS #39 skeleton, and any script
-    combinations admitted over the level, as `script_policy` states them.
-    """
-  identifier_policy => {
-    level: restriction_level
-    per_segment: boolean
-    skeleton_distinctness: boolean
-    permitting: [[text]]
-  }
+    @doc:"""
+      [TSON-DATA] §8.2's identifier policy: the restriction level, whether it
+      applies to each segment of a name rather than to the whole of it,
+      whether no two names in one scope may share a UTS #39 skeleton, and any
+      script combinations admitted over the level, as `policy.script_policy`
+      states them.
+      """
+    identifier_policy => {
+      level: policy.restriction_level
+      per_segment: boolean
+      skeleton_distinctness: boolean
+      permitting: [[text]]
+    }
 
-  @doc:"""
-    [TSON-DATA] §9.1's resource limits and [TSON-SCHEMA] §11.5's: what a
-    processor will spend reading one document, and resolving one schema, as
-    against what it admits as a name. Every limit defaults to the spec's own
-    value, set at the tight end so that a document fitting it fits every
-    processor above, and a deployment writes only what it raises. A limit
-    refusal names the limit and the threshold, and is not a verdict on the
-    document.
+    @doc:"""
+      One resource limit: a count, a depth, or a size in code points, octets
+      or bytes, a positive `int64`, 1 to 2^63-1. A processor that holds a
+      limit in a narrower type than this range caps a larger value at the
+      widest it holds.
+      """
+    limit => !int64 ^ { min: 1 }
 
-    The §9.1 limits bound a document, a schema document among them. Sizes in
-    code points, octets or bytes are `int64`; counts and depths are `int32`.
-    The §11.5 limits bound the work resolution adds over a schema: the
-    schemas one header reaches through `!!meta` and `!!import`, the
-    declarations in one schema map (synthetic and instantiation entries
-    included), the hops from a use site to a terminal entry, the length of
-    one type's supertype chain, and the nested open synthetics closed for
-    one application. A data document's own scope pushes are counted under
-    `max_foreign_schemas`, on the document side.
-    """
-  limits => {
-    max_depth?:                 int32 ~ 64
-    max_token_length?:          int64 ~ 1048576
-    max_text_length?:           int64 ~ 1048576
-    max_numeric_literal_length?: int32 ~ 4096
-    max_binary_size?:           int64 ~ 16777216
-    max_document_size?:         int64 ~ 16777216
-    max_elements?:              int32 ~ 1048576
-    max_entries?:               int32 ~ 1048576
-    max_fields?:                int32 ~ 65536
-    max_annotations?:           int32 ~ 64
-    max_values?:                int32 ~ 16777216
-    max_foreign_schemas?:       int32 ~ 16
-    max_import_closure?:        int32 ~ 64
-    max_schema_entries?:        int32 ~ 65536
-    max_reference_chain?:       int32 ~ 64
-    max_supertype_chain?:       int32 ~ 64
-    max_materialisation_depth?: int32 ~ 64
-  }
+    @doc:"""
+      [TSON-DATA] §9.1's resource limits and [TSON-SCHEMA] §11.5's: what a
+      processor will spend reading one document, and resolving one schema, as
+      against what it admits as a name. Every limit defaults to the spec's own
+      value, set at the tight end so that a document fitting it fits every
+      processor above, and a deployment writes only what it raises. A limit
+      refusal names the limit and the threshold, and is not a verdict on the
+      document.
 
-  @doc:"""
-    The policy a processor judges a document under: §8.2's identifier and
-    token policies and §9.1's limits. `unicode_data_version` is the UCD release
-    whose tables the §8.2 rules read, which a report states beside the policy
-    (§8.2) and a deployment's own policy document leaves out, the tables being
-    the processor's rather than the deployment's choice.
-    """
-  policy => {
-    identifier_policy: identifier_policy
-    token_policy: script_policy
-    unicode_data_version?: text
-    limits: limits
+      The §9.1 limits bound a document, a schema document among them. Every
+      limit is a `policy.limit`.
+      The §11.5 limits bound the work resolution adds over a schema: the
+      schemas one header reaches through `!!import`, the
+      declarations in one schema map (synthetic and instantiation entries
+      included), the hops from a use site to a terminal entry, the length of
+      one type's supertype chain, the nested open synthetics closed for one
+      application, and the longest chain of waits one schema's resolution
+      runs, an entry waiting on the next being ready.
+      """
+    limits => {
+      max_depth?:                  policy.limit ~ 64
+      max_token_length?:           policy.limit ~ 1048576
+      max_text_length?:            policy.limit ~ 1048576
+      max_numeric_literal_length?: policy.limit ~ 4096
+      max_binary_size?:            policy.limit ~ 16777216
+      max_document_size?:          policy.limit ~ 16777216
+      max_elements?:               policy.limit ~ 1048576
+      max_entries?:                policy.limit ~ 1048576
+      max_fields?:                 policy.limit ~ 65536
+      max_annotations?:            policy.limit ~ 64
+      max_values?:                 policy.limit ~ 16777216
+      max_import_closure?:         policy.limit ~ 64
+      max_schema_entries?:         policy.limit ~ 65536
+      max_alias_chain?:            policy.limit ~ 64
+      max_supertype_chain?:        policy.limit ~ 64
+      max_materialisation_depth?:  policy.limit ~ 64
+      max_wait_depth?:             policy.limit ~ 64
+    }
+
+    @doc:"""
+      The policy a processor judges a document under: §8.2's identifier and
+      token policies and §9.1's limits. `unicode_data_version` is the UCD
+      release whose tables the §8.2 rules read, which a report states beside
+      the policy (§8.2) and a deployment's own policy document leaves out, the
+      tables being the processor's rather than the deployment's choice.
+      """
+    processor => {
+      identifier_policy: policy.identifier_policy
+      token_policy: policy.script_policy
+      unicode_data_version?: text
+      limits: policy.limits
+    }
   }
 }

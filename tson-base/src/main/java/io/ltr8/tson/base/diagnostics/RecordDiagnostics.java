@@ -30,6 +30,44 @@ import io.ltr8.tson.base.SourcePosition;
  */
 public record RecordDiagnostics(String typeName, String declaredFields) {
 
+    /**
+     * [TSON-DATA] §2.5, [TSON-SCHEMA] §5.2: the dependent field {@code field} is written before {@code sibling}, the
+     * free sibling whose value types it -- the one place a record's field order is significant, so a reader never
+     * holds a value it cannot yet type.
+     */
+    public Refusal writtenBeforeItsSibling(String field, String sibling) {
+        return new Refusal(Diagnostic.Code.VALIDATION_ERROR,
+                ("field '%s' on '%s' is written before '%s', the sibling whose value names its type -- a sibling "
+                        + "that is neither pinned nor a discriminator is written before the field that depends on it "
+                        + "(§2.5, §5.2)").formatted(field, typeName, sibling),
+                "'" + sibling + "' written before '" + field + "'", "'" + field + "' written first");
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.2, §5.11: {@code field} is written and its sibling {@code sibling}, a field group's member, is
+     * absent, another option being chosen or none, so the value has no type to be read against.
+     */
+    public Refusal writtenWithoutItsSibling(String field, String sibling) {
+        return new Refusal(Diagnostic.Code.VALIDATION_ERROR,
+                ("field '%s' on '%s' is written without '%s', the sibling whose value names its type -- '%s' is a "
+                        + "field group's member, supplied by no default or pin, so '%s' has no type to be read "
+                        + "against (§5.2, §5.11)").formatted(field, typeName, sibling, sibling, field),
+                "'" + sibling + "' written beside '" + field + "'", "'" + field + "' written without it");
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.2: {@code sibling} types the dependent field {@code field}, which is present, and holds
+     * {@code held}, no type a value can be read against -- reported at the sibling, the value to change, as
+     * {@code written}.
+     */
+    public Refusal siblingNamesNoType(String sibling, String field, String held, String written) {
+        return new Refusal(Diagnostic.Code.VALIDATION_ERROR,
+                ("field '%s' on '%s' types the dependent field '%s', and holds %s -- where the dependent field is "
+                        + "present, its sibling names a type a value can be read against (§5.2)")
+                        .formatted(sibling, typeName, field, held),
+                "the name of a type a value can be read against", written);
+    }
+
     /** The value is not a record at all -- {@code found} is the encoding's description of what was there. */
     public Refusal notARecord(String found) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,

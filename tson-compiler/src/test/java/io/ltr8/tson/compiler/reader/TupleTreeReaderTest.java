@@ -6,8 +6,8 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.IntegerType;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.numeric.IntegerType;
+import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.Top;
@@ -33,7 +33,7 @@ class TupleTreeReaderTest {
         entries.put("text", TextType.UNCONSTRAINED);
         entries.put("pair", body);
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }

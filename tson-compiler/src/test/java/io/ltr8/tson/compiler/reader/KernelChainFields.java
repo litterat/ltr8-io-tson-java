@@ -1,13 +1,13 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -28,9 +28,9 @@ final class KernelChainFields {
 
     /** The kernel's own {@code chain} field, its type's closure added to {@code entries}. */
     static Map.Entry<String, RecordField> chainField(Map<String, Top> entries) {
-        TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        RecordField declared = ((RecordBody) kernel.entries().get("type")).fields().get("chain");
-        copy(declared.type(), kernel, entries);
+        TsonSchema kernel = KernelBootstrapResolver.kernelSchema();
+        RecordField declared = ((RecordBody) kernel.entries().get("meta.type")).fields().get("chain");
+        copy(declared.typeRef(), kernel, entries);
         return Map.entry("chain", declared);
     }
 
@@ -42,7 +42,7 @@ final class KernelChainFields {
         }
         entries.put(name, value);
         switch (value) {
-            case RecordBody record -> record.fields().values().forEach(f -> copy(f.type(), kernel, entries));
+            case RecordBody record -> record.fields().values().forEach(f -> copy(f.typeRef(), kernel, entries));
             case ArrayBody array -> copy(array.elementType(), kernel, entries);
             case MapBody map -> {
                 copy(map.keyType(), kernel, entries);
@@ -51,7 +51,7 @@ final class KernelChainFields {
             case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)
                     .forEach(e -> copy(e, kernel, entries));
             case ChoiceBody choice -> choice.variants().forEach(v -> copy(v, kernel, entries));
-            case Reference reference -> copy(reference.target(), kernel, entries);
+            case Alias alias -> copy(alias.target(), kernel, entries);
             default -> {
             }
         }

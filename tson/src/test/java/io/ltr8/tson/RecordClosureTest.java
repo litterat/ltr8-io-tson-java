@@ -23,8 +23,9 @@ class RecordClosureTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static String schema(String name, String body) {
@@ -37,8 +38,8 @@ class RecordClosureTest {
      * and park it in the author-annotation channel, where it changes nothing -- leaving a schema that reads
      * as though it had asked for a flatten no encoding performs, which is the outcome this pins against.
      *
-     * <p>Asserted against meta.tn rather than the meta-kernel, whose bootstrap resolves no annotation at all:
-     * a kernel-governed schema would ignore the name instead of refusing it.
+     * <p>Asserted through an ordinary schema rather than the kernel's bootstrap, which resolves no annotation at
+     * all and so would ignore the name instead of refusing it.
      */
     @Test
     void theFlattenDirectiveNamesNoType() {

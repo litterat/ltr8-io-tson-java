@@ -7,11 +7,10 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.*;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.compiler.resolver.AliasChain;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
 
-import java.math.BigInteger;
 import java.util.Optional;
 import java.util.HashSet;
 import java.util.Set;
@@ -106,12 +105,12 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * Whether {@code body}'s key type is an identifier family: its reference chain ends at an entry whose body
-     * the {@code identifier_type} constructor made, the kernel's {@code identifier}, a schema's own, or a
+     * Whether {@code body}'s key type is an identifier family: its alias chain ends at an entry whose body
+     * the {@code identifier_type} constructor made, the kernel's {@code meta.identifier}, a schema's own, or a
      * refinement of either.
      */
     static boolean keysAreNames(MapBody body, ValueReaderContext context) {
-        return ReferenceChain.terminalDefinition(body.keyType().name(), context.schema().entries()::get)
+        return AliasChain.terminalDefinition(body.keyType().name(), context.schema().entries()::get)
                 .map(key -> key instanceof IdentifierType)
                 .orElse(false);
     }
@@ -173,7 +172,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
                 ctx.next(); // the absent key itself
                 ctx.report(rules.voidKey(VOID));
                 ctx.next(); // MapArrow
-                EventSkip.scopedValue(ctx); // no meaningful key to associate the value with -- discard it
+                EventSkip.dataValue(ctx); // no meaningful key to associate the value with -- discard it
                 count++;
                 continue;
             }
@@ -195,10 +194,6 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
                 }
             }
             ctx.next(); // MapArrow
-            SchemaRef push = ScopePush.notAdmitted(ctx, valueParser);
-            if (push != null) {
-                ScopePush.refuse(ctx.field(keySegment), body.valueType().name(), push);
-            }
             sink.accept(key, decodedValue(keySegment, ctx));
             count++;
         }
@@ -245,25 +240,22 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * <p>Tested rather than {@code ifPresent}-ed: this runs on every map a document
      * carries, and a lambda capturing {@code size}, {@code ctx} and this reader allocates whether or not
      * the bound is set -- which for the overwhelming majority of positions, whose type states neither
-     * bound, is pure cost. The {@code BigInteger} both comparisons need is built once for the same reason,
-     * and only where a bound exists at all.
+     * bound, is pure cost. A bound above what a Java collection can hold compares as any other: a {@code
+     * max_items} past {@link Integer#MAX_VALUE} is never reached, and a {@code min_items} past it is met by no
+     * value read.
      */
     private void validateSize(int size, TsonReadContext ctx) {
-        Optional<BigInteger> minItems = body.minItems();
-        Optional<BigInteger> maxItems = body.maxItems();
-        if (minItems.isEmpty() && maxItems.isEmpty()) {
-            return;
-        }
-        BigInteger actual = BigInteger.valueOf(size);
+        Optional<Long> minItems = body.minItems();
+        Optional<Long> maxItems = body.maxItems();
         if (minItems.isPresent()) {
-            BigInteger min = minItems.get();
-            if (actual.compareTo(min) < 0) {
+            long min = minItems.get();
+            if (size < min) {
                 ctx.report(rules.tooFewEntries(min, size));
             }
         }
         if (maxItems.isPresent()) {
-            BigInteger max = maxItems.get();
-            if (actual.compareTo(max) > 0) {
+            long max = maxItems.get();
+            if (size > max) {
                 ctx.report(rules.tooManyEntries(max, size));
             }
         }

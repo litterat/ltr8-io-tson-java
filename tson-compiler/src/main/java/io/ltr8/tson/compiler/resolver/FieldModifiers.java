@@ -9,14 +9,14 @@ import java.util.Optional;
 
 /**
  * [TSON-SCHEMA] §5.2's field spellings: one slot per question a field answers, and this table turns the three
- * marks into the facts a {@code record_field} stores. The name's {@code ?} makes the field {@code optional}
+ * marks into the facts a {@code meta.record_field} stores. The name's {@code ?} makes the field {@code optional}
  * (the key may be omitted); the type's {@code ?} makes it {@code voidable} (a written {@code _} is admitted);
  * the modifier gives the {@code role} and its value. No mark answers two questions, so the facts follow the
  * marks one to one, and what this table adds is the spellings it refuses. It consults nothing but the marks
  * the author wrote, which is why it can be answered before a field's type is known.
  *
  * <p><b>Two phases ask it.</b> {@link SchemaDesugarer} asks when it rewrites a record template's body into
- * the {@code !record { fields: [ ... ] }} §5.2 says it denotes, and writes the answer as wire fields;
+ * the {@code !meta.record_template { fields: { ... } }} §5.2 says it denotes, and writes the answer as wire fields;
  * {@code DefinitionResolver} asks when it resolves a closed record body, and writes the answer into a
  * {@code RecordField}. One table, so the spellings and the errors around them cannot drift apart between a
  * template and the closed record beside it.

@@ -4,10 +4,11 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.consumer.SbOp;
 import io.ltr8.tson.compiler.consumer.SbResource;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -22,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A kind-typed slot that only a tagged subtype declares is judged wherever the value sits: held directly under a
- * namespace key, or one record field further down. {@code sb_op} declares {@code request: type_kind}; its base {@code
+ * namespace key, or one record field further down. {@code sb_op} declares {@code request: meta.type_ref}; its base {@code
  * sb_endpoint} declares nothing, and {@code sb_resource.endpoints} holds the family by its base. The slot's declared
  * type comes with the name from the reader that read it, so nothing walks the declared types back to the slot.
  */
@@ -35,14 +36,13 @@ class SubtypeBehindFieldTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/sb-meta.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   sb_endpoint  => abstract {}
-                  sb_op        => sb_endpoint & { request?: type_kind }
-                  sb_ops       => namespace & { key_type: = identifier  value_type: = sb_endpoint }
-                  sb_resource  => { endpoints: {identifier => sb_endpoint} }
-                  sb_resources => namespace & { key_type: = identifier  value_type: = sb_resource }
+                  sb_op        => sb_endpoint & { request?: meta.type_ref }
+                  sb_ops       => !meta.namespace { key_type: meta.identifier  value_type: sb_endpoint }
+                  sb_resource  => { endpoints: {meta.identifier => sb_endpoint} }
+                  sb_resources => !meta.namespace { key_type: meta.identifier  value_type: sb_resource }
                 }
                 """);
     }
@@ -59,17 +59,17 @@ class SubtypeBehindFieldTest {
     private static final DataNameBinder HOSTS = new DataNameBinder.DefaultDataNameBinder(
             Set.of("io.ltr8.tson.compiler.consumer"), Map.of());
 
-    private static TsonCompiledMetaRegistry registry() {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.contextExtendedWith(HOSTS), SOURCE);
+    private static TsonCompiledVocabularyRegistry registry() {
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.contextExtendedWith(HOSTS), SOURCE);
     }
 
     private static List<Diagnostic> problems(String label, String entry) {
         String id = "https://example.test/sb-" + label + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://example.test/sb-meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://example.test/sb-meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   order => { sku: text }
                   %s
                 }
@@ -107,8 +107,8 @@ class SubtypeBehindFieldTest {
     @Test
     void aSoundNameBehindARecordFieldResolves() {
         assertEquals(List.of(), problems("field-sound", behindAField("order")));
-        Namespace<?> resources = assertInstanceOf(Namespace.class, registry()
-                .resolveLinked("https://example.test/sb-field-sound.tn").schema().entries().get("r"));
+        Namespace<?> resources = assertInstanceOf(Namespace.class, ((ValueEntry) registry()
+                .resolveLinked("https://example.test/sb-field-sound.tn").schema().entries().get("r")).value());
         SbResource resource = assertInstanceOf(SbResource.class, resources.get("o"));
         assertEquals("order", assertInstanceOf(SbOp.class, resource.endpoints().get("get")).request().name());
     }

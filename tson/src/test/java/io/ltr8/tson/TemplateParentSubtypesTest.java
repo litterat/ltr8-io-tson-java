@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * template's members are the entries whose chain names it: no second index, and nothing to keep in step with
  * the entries themselves.
  *
- * <p><b>Only where the template has a parent.</b> A container, a constructor application and a reference
+ * <p><b>Only where the template has a parent.</b> A container, a constructor application and an alias
  * template are no types, so their applications index under nothing -- crediting them would put members under
  * something no position can name, which is the defect {@code SubtypeTemplateFamilyTest} removed from the
  * other direction when it stopped a template appearing in its own base's index.
@@ -28,8 +28,9 @@ class TemplateParentSubtypesTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static TsonLinkedSchema linked(String id, String declarations) {
@@ -42,7 +43,7 @@ class TemplateParentSubtypesTest {
      * already named the same application.
      */
     private static String target(TsonLinkedSchema schema, String alias) {
-        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
+        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
 
@@ -105,7 +106,7 @@ class TemplateParentSubtypesTest {
     }
 
     @Test
-    void aReferenceTemplatesApplicationsIndexUnderNothing() {
+    void anAliasTemplatesApplicationsIndexUnderNothing() {
         TsonLinkedSchema schema = linked("s5", """
                   pair      => <A, B> { first: A  second: B }
                   uuid_pair => <B> pair<uuid, B>

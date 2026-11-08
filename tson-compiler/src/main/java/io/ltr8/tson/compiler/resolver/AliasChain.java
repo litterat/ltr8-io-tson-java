@@ -1,0 +1,127 @@
+package io.ltr8.tson.compiler.resolver;
+
+import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.VoidType;
+
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+
+/**
+ * Following a chain of {@code ALIAS} entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
+ * stated once.
+ *
+ * <p><b>Why this is a shared class rather than a loop each caller writes.</b> Resolved output states the
+ * chain as the author wrote it: a use site naming an alias names the alias, and a processor collapses the
+ * chain when it needs the type. That makes the walk the only mechanism, and several passes do it -- the linker's
+ * choice-variant distinctness and its §5.2 field-value check, subtype naming, discrimination-class
+ * classification, and a kind's membership walk, whose alias hops come first. Written once each, the one decision
+ * inside it (below) would be several decisions that could drift apart silently.
+ *
+ * <p><b>The walk stops at three things</b>, and the second is the one worth knowing:
+ * <ul>
+ *   <li>an entry whose body is not an {@link Alias} -- the type at the end;
+ *   <li>an <b>argument-bearing</b> target, which is an application rather than a hop to another entry:
+ *       there is no entry at the end of one until materialisation mints it;
+ *   <li>a name the namespace does not declare, and a cycle. {@link #terminal} answers both with the name it
+ *       stopped at, since an undeclared name is a type parameter to its caller and a cycle's answer depends
+ *       on where the walk began -- so no false equality follows. {@link #terminalDefinition} answers both
+ *       with an empty {@code Optional}, having been asked for an entry and having none to give.
+ * </ul>
+ *
+ * <p><b>Not every walk over references is this one.</b> {@code ParameterTypes} follows a chain to reach a
+ * slot's declared body and deliberately does <em>not</em> stop at an argument-bearing target -- it is after
+ * the constructor's own vocabulary, where the template is the answer. It keeps its own loop, and the
+ * difference is the reason to say so here rather than let a future reader assume the four were five.
+ */
+public final class AliasChain {
+
+    private AliasChain() {
+    }
+
+    /**
+     * The name at the end of {@code name}'s alias chain -- {@code name} itself when it starts one, and
+     * the name the walk stopped at when it cannot reach a type (see this class's own note).
+     */
+    public static String terminal(String name, Map<String, ? extends Top> entries) {
+        return terminal(name, entries::get);
+    }
+
+    /**
+     * Whether {@code annotations} holds one whose name reaches {@code target} through its alias hops: an alias of
+     * the kernel's {@code meta.disjoint} names it as {@code @meta.disjoint} does, {@code meta.disjoint} itself being an
+     * alias of {@code void}, so the walk asks whether {@code target} is on the chain, not at its end.
+     */
+    public static boolean annotates(io.ltr8.annotation.Annotations annotations, String target,
+                                    Map<String, ? extends Top> entries) {
+        return annotations.values().stream().anyMatch(a -> passesThrough(a.name(), target, entries));
+    }
+
+    /** Whether {@code name}'s alias chain, {@code name} itself included, holds {@code target}. */
+    public static boolean passesThrough(String name, String target, Map<String, ? extends Top> entries) {
+        Set<String> walked = new LinkedHashSet<>();
+        String current = name;
+        while (walked.add(current)) {
+            if (current.equals(target)) {
+                return true;
+            }
+            if (entries.get(current) instanceof Alias alias && alias.target().arguments().isEmpty()) {
+                current = alias.target().name();
+                continue;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * The same walk over a namespace still being built, which has a lookup rather than a finished map --
+     * {@code TemplateMaterialiser} normalises an application's arguments through this while resolution runs.
+     */
+    public static String terminal(String name, Function<String, ? extends Top> entries) {
+        return walk(name, entries).name();
+    }
+
+    /** The entry at the end of {@code name}'s chain, or empty where the walk reaches no type. */
+    public static Optional<Top> terminalDefinition(String name, Map<String, ? extends Top> entries) {
+        return terminalDefinition(name, entries::get);
+    }
+
+    /** The same over a lookup -- a schema's {@code Namespace} of entries, or a namespace still being built. */
+    public static Optional<Top> terminalDefinition(String name, Function<String, ? extends Top> entries) {
+        Stop stop = walk(name, entries);
+        return stop.reached() ? Optional.<Top>ofNullable(entries.apply(stop.name())) : Optional.empty();
+    }
+
+    /**
+     * Whether {@code name}'s chain ends at a {@code void} -- the kernel's, core's sibling, or any other {@code
+     * !meta.void_type} -- told by the body's constructor rather than by the name the chain ends at.
+     */
+    public static boolean resolvesToVoid(String name, Map<String, ? extends Top> entries) {
+        return terminalDefinition(name, entries).map(d -> d instanceof VoidType).orElse(false);
+    }
+
+    /** Where the walk stopped, and whether it stopped on a type rather than on nothing or on itself. */
+    private record Stop(String name, boolean reached) {
+    }
+
+    private static Stop walk(String name, Function<String, ? extends Top> entries) {
+        Set<String> walked = new LinkedHashSet<>();
+        String current = name;
+        while (walked.add(current)) {
+            Top definition = entries.apply(current);
+            if (definition == null) {
+                return new Stop(current, false);
+            }
+            if (definition instanceof Alias alias && alias.target().arguments().isEmpty()) {
+                current = alias.target().name();
+                continue;
+            }
+            return new Stop(current, true);
+        }
+        return new Stop(current, false); // a cycle has no terminal
+    }
+}

@@ -38,22 +38,22 @@ class HttpSchemaSourceThroughTsonTest {
     private static final String HOST = "schemas.example.com";
 
     private static final String SCHEMA = """
-            !!id:"https://schemas.example.com/2026/38/app/order-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            { order => { sku: text  quantity: int32 } }""";
+            !!id:"https://schemas.example.com/2026/39/app/order-1.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema { order => { sku: text  quantity: int32 } }""";
 
     private static final String BASE = """
-            !!id:"https://schemas.example.com/2026/38/app/base-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            { sku_code => !text ^ { min_length: 1 } }""";
+            !!id:"https://schemas.example.com/2026/39/app/base-1.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema { sku_code => !text ^ { min_length: 1 } }""";
 
     private static final String DERIVED = """
-            !!id:"https://schemas.example.com/2026/38/app/derived-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://schemas.example.com/2026/38/app/base-1.tn"
-            { boxed => { sku: sku_code } }""";
+            !!id:"https://schemas.example.com/2026/39/app/derived-1.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://schemas.example.com/2026/39/app/base-1.tn"
+            !schema { boxed => { sku: sku_code } }""";
 
     private HttpServer server;
     private String base;
@@ -61,9 +61,9 @@ class HttpSchemaSourceThroughTsonTest {
     void startServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         base = "http://127.0.0.1:" + server.getAddress().getPort();
-        serve("/2026/38/app/order-1.tn", SCHEMA);
-        serve("/2026/38/app/base-1.tn", BASE);
-        serve("/2026/38/app/derived-1.tn", DERIVED);
+        serve("/2026/39/app/order-1.tn", SCHEMA);
+        serve("/2026/39/app/base-1.tn", BASE);
+        serve("/2026/39/app/derived-1.tn", DERIVED);
         server.start();
     }
 
@@ -92,18 +92,18 @@ class HttpSchemaSourceThroughTsonTest {
      */
     @Test
     void aDocumentNamingAnHttpSchemaResolvesAndValidates() {
-        String schemaUri = "https://" + HOST + "/2026/38/app/order-1.tn";
+        String schemaUri = "https://" + HOST + "/2026/39/app/order-1.tn";
         try (HttpSchemaSource source = source()) {
             Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
             tson.resolve(source.fetch(schemaUri));
 
             TsonValue order = tson.treeReader().read("""
-                    !!schema:"%s"
+                    !!import:"%s"
                     !order { sku: "ABC-1"  quantity: 3 }""".formatted(schemaUri));
             assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
 
             assertEquals(2, tson.validate("""
-                    !!schema:"%s"
+                    !!import:"%s"
                     !order { }""".formatted(schemaUri)).size(), "both required fields are missing");
         }
     }

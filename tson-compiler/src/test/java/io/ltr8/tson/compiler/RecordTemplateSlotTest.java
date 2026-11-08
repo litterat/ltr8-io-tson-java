@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 
 import java.util.List;
 import java.util.Map;
@@ -26,9 +26,9 @@ class RecordTemplateSlotTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/record-template-slots.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -38,8 +38,8 @@ class RecordTemplateSlotTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -86,20 +86,20 @@ class RecordTemplateSlotTest {
     @Test
     void aParameterAnywhereElseInARecordBodyIsRefusedAtTheDeclaration() {
         Map<String, String> refused = Map.of(
-                "  keyed => <K> { K: text }", "parameter 'K' stands at a key of record.fields",
-                "  grouped => <A> { ( A: text | b: text ) }", "parameter 'A' stands at a key of record.fields",
-                "  maybe => <B> !record { fields: { v => { type: text  optional: B } } }",
-                "parameter 'B' stands at record_field.optional",
-                "  nulls => <V> !record { fields: { v => { type: text  voidable: V } } }",
-                "parameter 'V' stands at record_field.voidable",
-                "  roled => <R> !record { fields: { v => { type: text  role: R  value: \"x\" } } }",
-                "parameter 'R' stands at record_field.role",
-                "  realised => <E> !record { fields: { v => { type: text } }  extension: E }",
-                "parameter 'E' stands at record.extension",
-                "  named => <I> !record { fields: { v => { type: text } }  name_type: I }",
-                "parameter 'I' stands at record.name_type",
-                "  fam => <D> !record { fields: { kind => { type: text } }  extension: ABSTRACT  discriminators: [D] }",
-                "parameter 'D' stands at record.discriminators");
+                "  keyed => <K> { K: text }", "parameter 'K' stands at a key of meta.record.fields",
+                "  grouped => <A> { ( A: text | b: text ) }", "parameter 'A' stands at a key of meta.record.fields",
+                "  maybe => <B> !meta.record { fields: { v => { type: text  optional: B } } }",
+                "parameter 'B' stands at meta.record_field.optional",
+                "  nulls => <V> !meta.record { fields: { v => { type: text  voidable: V } } }",
+                "parameter 'V' stands at meta.record_field.voidable",
+                "  roled => <R> !meta.record { fields: { v => { type: text  role: R  value: \"x\" } } }",
+                "parameter 'R' stands at meta.record_field.role",
+                "  realised => <E> !meta.record { fields: { v => { type: text } }  extension: E }",
+                "parameter 'E' stands at meta.record.extension",
+                "  named => <I> !meta.record { fields: { v => { type: text } }  name_type: I }",
+                "parameter 'I' stands at meta.record.name_type",
+                "  fam => <D> !meta.record { fields: { kind => { type: text } }  extension: ABSTRACT  discriminators: [D] }",
+                "parameter 'D' stands at meta.record.discriminators");
         refused.forEach((declaration, expected) -> {
             String message = rejected(declaration);
 
@@ -112,10 +112,10 @@ class RecordTemplateSlotTest {
     @Test
     void aTemplateOverAnotherConstructorKeepsItsScalarSlots() {
         assertDoesNotThrow(() -> compile("""
-                  pair => <V> !tuple { elements: [{ element_type: text  voidable: V } { element_type: int32 }] }
+                  pair => <V> !meta.tuple { elements: [{ element_type: text  voidable: V } { element_type: int32 }] }
                   p => pair<true>
-                  bounded => <N> !array { element_type: text  min_items: N }
-                  b => bounded<2>
+                  capped => <N> !meta.array { element_type: text  min_items: N }
+                  b => capped<2>
                 """));
     }
 
@@ -139,14 +139,18 @@ class RecordTemplateSlotTest {
                 + "never an operand of '^'"), refined);
     }
 
-    /** §5.10's shadowing rule: a parameter hides a schema entry of the same name, at an operand as anywhere. */
+    /**
+     * §5.10's shadowing rule: a parameter spelled like a schema entry is refused at its declaration, so a template
+     * whose operand would be that parameter is refused for the shadowing before the operand is read.
+     */
     @Test
-    void aParameterShadowsAnEntryOfTheSameNameAtAnOperand() {
+    void aParameterShadowingAnEntryIsRefusedBeforeItsOperand() {
         String message = rejected("""
                   T => { age: int32 }
                   mixin => <T> T & { name: text }
                 """);
 
-        assertTrue(message.contains("supertype 'T' is a parameter of this declaration"), message);
+        assertTrue(message.contains("'mixin': parameter 'T' shadows the entry 'T' this schema's namespace holds"),
+                message);
     }
 }

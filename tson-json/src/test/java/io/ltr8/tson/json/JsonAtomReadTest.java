@@ -34,24 +34,24 @@ class JsonAtomReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/atoms-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               count      => int32
-              exact      => number
+              exact_number      => number
               ratio      => float64
               label      => text
               key        => uuid
               day        => date
               blob       => bytes
               colour     => !enum [ RED GREEN BLUE ]
-              words      => !identifier_type { continue_add: "-"  medial: " " }
-              activity   => !enum_type { name_type: words  members: [sedentary "lightly active"] }
+              words      => !unicode.identifier_type { continue_add: "-"  medial: " " }
+              activity   => !meta.enum_type { name_type: words  members: [sedentary "lightly active"] }
               country    => !text ^ { length: 2  members: ["AU" "NZ"] }
               flag       => boolean
               nothing    => void
               small      => !integer ^ { min: 0  max: 10 }
-              alias      => count
+              renamed    => count
               point      => { x: int32  y: int32 }
               lookup     => { text => int32 }
             }
@@ -68,13 +68,13 @@ class JsonAtomReadTest {
             JsonSchemaCompiler.compile(TSON.resolve(SCHEMA), ValueReaderFactoryRegistry.atoms());
 
     /**
-     * The kernel's own compiled readers. {@code value} and {@code identifier} are declared by meta-kernel.tn
+     * The kernel's own compiled readers. {@code value} and {@code meta.identifier} are declared by meta.tn
      * and by nothing else -- core.tn re-declares only {@code void} -- so the two {@code unit} instances this
      * encoding reads by rules of its own (§5.7) are reachable only here.
      */
     private static final JsonCompiledSchema KERNEL = JsonSchemaCompiler.compile(
-            TSON.schemaRegistry().get(TsonBundledSchemas.META_KERNEL_ID)
-                    .orElseThrow(() -> new IllegalStateException("meta-kernel.tn is not registered")),
+            TSON.schemaRegistry().get(TsonBundledSchemas.META_ID)
+                    .orElseThrow(() -> new IllegalStateException("meta.tn is not registered")),
             ValueReaderFactoryRegistry.atoms());
 
     /** One value read at {@code typeName}, with every problem collected rather than thrown. */
@@ -134,13 +134,13 @@ class JsonAtomReadTest {
     /** §5.3: a {@code number} keeps its digits and its scale -- {@code 199.90} is not {@code 199.9}. */
     @Test
     void anExactNumberKeepsItsDigitsAndScale() {
-        assertEquals(new BigDecimal("199.90"), read("exact", "199.90").accepted());
+        assertEquals(new BigDecimal("199.90"), read("exact_number", "199.90").accepted());
     }
 
     /** §3.1: precision is arbitrary and preserved, and an implementation that cannot hold the digits errors. */
     @Test
     void anExactNumberKeepsMoreDigitsThanABinary64Would() {
-        assertEquals(new BigDecimal("9007199254740993"), read("exact", "9007199254740993").accepted());
+        assertEquals(new BigDecimal("9007199254740993"), read("exact_number", "9007199254740993").accepted());
     }
 
     // ── §5.4 the approximate tier ────────────────────────────────────────
@@ -256,7 +256,7 @@ class JsonAtomReadTest {
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("flag", "1").refusal().code());
     }
 
-    // ── §5.7 void and value ──────────────────────────────────────────────
+    // ── §5.7 void ──────────────────────────────────────────────
 
     /** §5.7: at a {@code void} position the void sentinel is the only conforming value, and null spells it. */
     @Test
@@ -265,32 +265,12 @@ class JsonAtomReadTest {
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("nothing", "0").refusal().code());
     }
 
-    /**
-     * §5.7: {@code value} classifies by JSON's own grammar and invokes none of [TSON-DATA] §4's base type
-     * resolution -- a number without fraction or exponent is an integer, with either a float, and a string's
-     * content is uninspected, so {@code "null"} is the four-character string.
-     */
-    @Test
-    void theValueEscapeHatchClassifiesByJsonsOwnGrammar() {
-        assertEquals(Boolean.TRUE, read(KERNEL, "value", "true").accepted());
-        assertEquals(new BigInteger("7"), read(KERNEL, "value", "7").accepted());
-        assertEquals(new BigDecimal("7.5"), read(KERNEL, "value", "7.5").accepted());
-        assertEquals("null", read(KERNEL, "value", "\"null\"").accepted());
-    }
-
-    /** §5.7: {@code value} admits scalars, so an object or array there is a validation error. */
-    @Test
-    void theValueEscapeHatchRefusesAContainer() {
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "value", "{\"a\": 1}").refusal().code());
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(KERNEL, "value", "[1]").refusal().code());
-    }
-
-    /** {@code identifier} is the third {@code unit} instance, and the one the shared vocabulary does answer for. */
+    /** {@code meta.identifier} is the third {@code unit} instance, and the one the shared vocabulary does answer for. */
     @Test
     void identifierFacesTheSharedNameProfile() {
-        assertEquals("order_id", read(KERNEL, "identifier", "\"order_id\"").accepted());
+        assertEquals("order_id", read(KERNEL, "meta.identifier", "\"order_id\"").accepted());
         assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
-                read(KERNEL, "identifier", "\"42nd\"").refusal().code());
+                read(KERNEL, "meta.identifier", "\"42nd\"").refusal().code());
     }
 
     /**
@@ -320,10 +300,10 @@ class JsonAtomReadTest {
         assertEquals("", refusal.path().orElseThrow(), "the data pointer: this value is the document root");
     }
 
-    /** [TSON-SCHEMA] §8.3: a reference collapses where the schema is compiled for reading. */
+    /** [TSON-SCHEMA] §8.3: an alias collapses where the schema is compiled for reading. */
     @Test
     void anAliasReadsAsItsTarget() {
-        assertEquals(42, read("alias", "42").accepted());
+        assertEquals(42, read("renamed", "42").accepted());
     }
 
     /**

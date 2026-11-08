@@ -45,7 +45,7 @@ class QualifiedNameSegmentsTest {
 
     @Test
     void aReferenceWithArgumentsIsNoName() {
-        TypeRef applied = new TypeRef("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))));
+        TypeRef applied = TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))));
         assertThrows(SchemaValidationException.class, () -> ValuesByName.segments("'x' at /m", applied));
     }
 }

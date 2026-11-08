@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
@@ -22,9 +22,9 @@ class TreeReadTest {
     private static final String SCHEMA_ID = "https://example.test/tree-read.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/tree-read.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               point => { x: int32  y: int32 }
               shape => { name: text  origin: point  tags: [text] }
             }
@@ -37,14 +37,14 @@ class TreeReadTest {
             }
             """;
 
-    private static TsonCompiledMetaRegistry core() {
+    private static TsonCompiledVocabularyRegistry core() {
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, SCHEMA_ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
     }
 
     @Test

@@ -27,7 +27,7 @@ A component declaring an interface is built as a default class for it — `List`
 it has one and its no-argument constructor otherwise (`TreeSet`, `LinkedList`, `TreeMap`).
 
 A bare `Map` is built as a `HashMap`, which does not keep entry order. An ordered map
-(`!map { … ordered: true }`) under a schema needs a component that does — `SequencedMap` (built as a
+(`!meta.map { … ordered: true }`) under a schema needs a component that does — `SequencedMap` (built as a
 `LinkedHashMap`), `AnnotatedMap`, or a concrete class that is a `SequencedMap` but not a `SortedMap`, which sorts
 by key instead — or the bind-mode compile refuses it with a `BindMismatchException`, at whatever depth the map
 sits. A map that is not ordered binds to either.
@@ -61,7 +61,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `float32` / `float64`                           | `Float` / `Double`                              |
 | `rational`                                      | `io.ltr8.tson.base.atom.Rational`               |
 | `complex`                                       | `io.ltr8.tson.base.atom.Complex`                |
-| `text`, `identifier`, `mac`, `email`, `regex`, an enum member | `String`                         |
+| `text`, `meta.identifier`, `mac`, `email`, `regex`, an enum member | `String`                         |
 | `uuid`                                          | `UUID`                                          |
 | `date` / `time` / `datetime`                    | `LocalDate` / `OffsetTime` / `OffsetDateTime`   |
 | `duration` / `period`                           | `java.time.Duration` / `java.time.Period`       |
@@ -71,7 +71,7 @@ host type a tree read holds (`as(Class)`) and a bound component declares.
 | `hostname`                                      | `io.ltr8.net.HostName`, or `String` (lowercase U-labels) |
 | `host`                                          | `io.ltr8.net.Host`, or `String` (the member's canonical text) |
 | `media_type`                                    | `io.ltr8.net.MediaType`, or `String` (lowercase, parameters sorted) |
-| `bytes` (and any `!bytes_type { encoding: … }` instance) | `byte[]`                               |
+| `bytes` (and any `!binary.bytes_type { encoding: … }` instance) | `byte[]`                               |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
 | `_` (the only no-value spelling)                | a `TsonVoid` node / `null`                    |
 
@@ -88,14 +88,13 @@ by RFC 2396 and cannot hold every reference these atoms admit (an IRI's non-ASCI
 it cannot hold is refused at a `URI` component; declare `Iri` to take every one. A component typed `Iri` or `URI`
 with no schema reads as `iri_reference`, the widest of the four.
 
-**`bytes` is one type with a spelling.** core.tn's `bytes` is base64 (RFC 4648 §4); another alphabet is
-another type, declared as its own instance — `hexdigest => !bytes_type { encoding: HEX }`, with `BASE64`,
+**`bytes` is one type with a spelling.** The kernel's `bytes` is base64 (RFC 4648 §4); another alphabet is
+another type, declared as its own instance — `hexdigest => !binary.bytes_type { encoding: HEX }`, with `BASE64`,
 `BASE64URL`, `BASE32` and `HEX` to choose from — and every one binds to `byte[]`.
 
-**The scoped types choose their type from the data** (§7.8): `declared` (a type this schema declares or
-imports), `extern` (a type in a foreign schema the value names), `dynamic` (either), and the applications
-`extern_of<S>` / `extern_type<S, T>` that narrow to one schema or one type. A tree read wraps a foreign value
-in `TsonScopedValue(schema, root)`; a bind hands back the bound object itself.
+**`declared` chooses its type from the data** (§7.8): the value names, by its `!type` (`$type` in JSON), a
+type this schema declares or imports, and is read in full as that type; an untagged value there is refused. A
+tree read hands back the value as that type reads it, and a bind the bound object of that type's class.
 
 **The host types are registered on the context, and that is the step nothing reminds you of.**
 `AtomContext.hostTypes()` (`io.ltr8.tson.base.bind`) is the list, `AtomContext.defaultContext()` a context
@@ -120,11 +119,17 @@ than replace them. **A name outside the map is an error naming the map**, not a 
 whatever was consulted last: `orElse` composes the caller's binder over the kernel's, and the caller's is
 the one that authors the failure, because a name neither knows is a missing line of *their* configuration.
 
-`withDataBindContext` binds the **data** a schema describes. `withMetaNameBinder` is a separate namespace
-and binds the **schema vocabulary** a governing *meta* describes — a consumer's own meta-schema declaring an
-`operation` record and a namespace type of it, applied as `api => !operations { search => { … } }`, needs its
-`operation` class there. It composes over the library's binder rather than replacing it, so the kernel's
-names still resolve first.
+`withDataBindContext` is **the one bind context**, for the data a schema describes and for a schema's own **value
+entries** alike: a schema declaring an `operation` record and a namespace type of it (`operations => !meta.namespace {
+key_type: meta.identifier  value_type: operation }`), and a schema importing it that holds a value, `api => !operations {
+search => { … } }`, binds `operation` to the class this context names, exactly as a data document's `!operation { … }`
+would. `Tson.of` composes the library's own binder with yours: every entry of meta.tn (`text`, `enum`,
+`meta.record`, `unicode.text_type`, …) and each library's members under its map (`numeric.decimal_type`,
+`temporal.date_type`, `net.uuid_type`) always bind to the schema model and
+yours cannot shadow them, and every other name is yours, a member your schema contributes to an open map included;
+`tson.dataBindContext()` returns that composed context. A value entry whose type your context binds no class for is held as a
+`TsonValue`: the schema still resolves, validates and reads in tree mode, and `bindRegistry()` refuses it with
+`BIND_MISMATCH` at the entry (`MissingBindingException` where no receiver is given).
 
 A **profile** is fixed when the context is built (`DataBindContext.Builder.profile`), never afterwards, so
 one `Tson` is one profile — a server speaking two schema versions builds one instance per version.
@@ -137,8 +142,10 @@ a consumer usually wants is already there — mangle the schema's `snake_case` n
 new DataNameBinder.DefaultDataNameBinder(Set.of("com.example.api"), Map.of())
 ```
 
-The second argument is aliases, applied *before* the mangling, for the names that do not follow the
-convention. This is what `metaNameBinder(…)` usually receives.
+A qualified name's earlier segments are a sub-package each: `geo.route`, a member of the schema map nested as
+`geo => !schema { … }`, binds `com.example.api.geo.Route`. The second argument is aliases, applied *before* the
+mangling, for the names that do not follow the convention. This is what `DataBindContext.Builder.nameBinder(…)` usually
+receives.
 
 **Components bind by exact name — there is no `snake_case` ↔ `camelCase` conversion.** A `request_stream`
 field needs a `request_stream` component, or `@Field("request_stream")` on whatever the component is really
@@ -234,7 +241,7 @@ against that schema's fields, and a disagreement is a `BindMismatchException`.
 `DataBridge` (the two-way conversion behind an `@Atom` or a registered host type) and `ToData` are
 interfaces in the same package, not annotations.
 
-**A `schema.meta` bind target with more than one public constructor needs `@Record` on the canonical
+**A schema-model bind target with more than one public constructor needs `@Record` on the canonical
 one**, or `DefaultRecordBinder` throws.
 
 ### Receiving wire annotations

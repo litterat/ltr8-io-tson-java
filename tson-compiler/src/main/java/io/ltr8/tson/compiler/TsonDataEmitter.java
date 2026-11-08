@@ -218,22 +218,19 @@ public final class TsonDataEmitter {
     }
 
     /**
-     * {@code !!schema:"<uri>"} and its line terminator -- the schema governing the value that follows, which
-     * is what makes a data document self-describing: a reader resolves this, validates against it, and needs
-     * nothing out of band.
+     * {@code !!import:"<uri>"} and its line terminator -- a schema the value that follows is read under, which is
+     * what makes a data document self-describing: a reader resolves it, validates against it, and needs nothing out
+     * of band. A document may carry several, after its {@code !!id}.
      *
-     * <p>Legal in a document header and at a scoped-value position (§3.3); this emits it wherever the
-     * caller is, exactly like every other method here.
+     * <p>Legal in a document header alone (§2.2, §3.3); a directive at a value position is a parse error.
      */
-    public TsonDataEmitter schemaRef(String uri) {
-        return directive("schema", uri);
+    public TsonDataEmitter importRef(String uri) {
+        return directive("import", uri);
     }
 
     /**
-     * One directive, terminated by a newline. Private because the name set is closed and positional (§3.3):
-     * of the four, only {@code id} and {@code schema} may appear in a <em>data</em> document, and those are
-     * the two methods above. {@code meta}/{@code import} belong to a schema document, which this emitter
-     * does not write.
+     * One directive, terminated by a newline. Private because the name set is closed and positional (§2.2):
+     * {@code id} then {@code import}, the two methods above.
      *
      * <p>{@code uri} is checked against the same atom the reader parses it with, so a caller cannot emit a
      * document that will not read back -- a directive argument is an IRI-reference (§3.3), and the failure belongs
@@ -302,6 +299,62 @@ public final class TsonDataEmitter {
         startCoreValue();
         emit(text);
         return this;
+    }
+
+    /**
+     * Writes {@code reference} unquoted ([TSON-DATA] §7.4): its qualified name, and where it
+     * carries arguments an adjacent {@code <}, each argument separated by one space, and {@code >} -- the canonical
+     * text, {@code map<text list<int32>>}. A value argument keeps its token form, a quoted one escaped as {@link
+     * #quotedString} escapes. The caller is responsible for the head and every reference argument being qualified
+     * names, which is what a {@code TypeRef} read from either grammar holds.
+     */
+    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.TypeRef reference) {
+        startCoreValue();
+        emitReference(reference);
+        return this;
+    }
+
+    /**
+     * Writes {@code sibling} unquoted: its field's name and the sibling mark, {@code kind!}. Whatever follows is
+     * whitespace, as [TSON-DATA] §7.5 requires after the mark: this writer separates every element, a map's arrow and
+     * a scope's closing delimiter by a space, and ends an annotation's value with one.
+     */
+    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.SiblingRef sibling) {
+        startCoreValue();
+        emit(sibling.text());
+        return this;
+    }
+
+    /** Writes {@code reference} as its variant is written -- {@link #reference(io.ltr8.tson.schema.meta.TypeRef)}. */
+    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.Reference reference) {
+        return switch (reference) {
+            case io.ltr8.tson.schema.meta.TypeRef named -> reference(named);
+            case io.ltr8.tson.schema.meta.SiblingRef sibling -> reference(sibling);
+        };
+    }
+
+    private void emitReference(io.ltr8.tson.schema.meta.TypeRef reference) {
+        emit(reference.name());
+        if (reference.arguments().isEmpty()) {
+            return;
+        }
+        emit('<');
+        for (int i = 0; i < reference.arguments().size(); i++) {
+            if (i > 0) {
+                emit(' ');
+            }
+            switch (reference.arguments().get(i)) {
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref nested -> emitReference(nested.ref());
+                case io.ltr8.tson.schema.meta.TypeArgument.Value value -> {
+                    if (value.value().form() == io.ltr8.tson.schema.meta.Token.Form.UNQUOTED) {
+                        emit(value.value().text());
+                    } else {
+                        emitQuoted(value.value().text());
+                    }
+                }
+            }
+        }
+        emit('>');
     }
 
     /**

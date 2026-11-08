@@ -4,7 +4,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The bootstrap route states references the way ordinary resolution does.
  *
- * <p>{@link MetaKernelBootstrapResolver} resolves meta-kernel by a shorter route -- two passes and no
- * materialisation, because {@code !!meta} naming itself leaves ordinary resolution nothing to bootstrap
- * from. Shorter, not different: this output governs every schema whose {@code !!meta} is meta-kernel, so a
- * use site the two routes disagreed about would be two answers to one question. Several tests drive this
+ * <p>{@link KernelBootstrapResolver} resolves the kernel by a shorter route -- two passes and no
+ * materialisation, because the kernel declares every constructor it applies, which leaves ordinary resolution
+ * nothing to bootstrap from. Shorter, not different: every schema importing the kernel reads through this output, so
+ * a use site the two routes disagreed about would be two answers to one question. Several tests drive this
  * route deliberately to exercise every step, which is exactly why it must not quietly diverge.
  *
  * <p>What that now means is that a use site names the entry the author wrote and nothing is attached to
@@ -34,34 +34,32 @@ class BootstrapReferencesTest {
                 .filter(f -> f.getKey().equals(name)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
-    /** meta-kernel's own references, stated as written -- the fixture's own spelling. */
+    /** The kernel's own references, stated as written -- the fixture's own spelling. */
     @Test
     void aUseSiteNamesWhatWasWrittenOnTheBootstrapRouteToo() {
-        TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema kernel = KernelBootstrapResolver.kernelSchema();
 
-        RecordField name = field(kernel.entries().get("template_param"), "name");
-        assertEquals("param_name", name.type().name());
+        RecordField name = field(kernel.entries().get("meta.template_param"), "name");
+        assertEquals("meta.param_name", name.typeRef().name());
         assertTrue(name.type().annotations().isEmpty(), "nothing records where it points");
-
-        assertEquals("type_name", field(kernel.entries().get("type_ref"), "name").type().name());
     }
 
-    /** And a position naming something that is not a reference is unaffected here as well. */
+    /** And a position naming something that is not an alias is unaffected here as well. */
     @Test
-    void aNonReferenceIsUnaffectedOnTheBootstrapRoute() {
-        Top recordField = MetaKernelBootstrapResolver.getMetaKernelSchema()
-                .entries().get("record_field");
+    void aNonAliasIsUnaffectedOnTheBootstrapRoute() {
+        Top recordField = KernelBootstrapResolver.kernelSchema()
+                .entries().get("meta.record_field");
 
-        assertEquals("type_kind", field(recordField, "type").type().name());
+        assertEquals("meta.field_type_ref", field(recordField, "type").typeRef().name());
         assertTrue(field(recordField, "type").type().annotations().isEmpty());
     }
 
     /** The chain stays walkable through the entries, which is what a reader collapses it by. */
     @Test
-    void aReferenceEntryKeepsItsHopOnTheBootstrapRoute() {
-        Top typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("type_name");
+    void anAliasEntryKeepsItsHopOnTheBootstrapRoute() {
+        Top typeName = KernelBootstrapResolver.kernelSchema().entries().get("meta.type_name");
 
-        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("identifier"),
-                assertInstanceOf(Reference.class, typeName).target());
+        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("meta.identifier"),
+                assertInstanceOf(Alias.class, typeName).target());
     }
 }

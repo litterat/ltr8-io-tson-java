@@ -34,14 +34,14 @@ class JsonIdentifierValueHygieneTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/json-names-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
-              identifier => !identifier_type { continue_add: "-" }
-              handlers => { identifier => text }
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
+              slug => !unicode.identifier_type { continue_add: "-" }
+              handlers => { slug => text }
               labels => { text => text }
-              route => { name: identifier }
-              team => { roles: set<identifier> }
+              route => { name: slug }
+              team => { roles: set<slug> }
               counts => set<int32>
             }
             """;

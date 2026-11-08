@@ -31,7 +31,7 @@ import java.nio.charset.StandardCharsets;
  * percent-encoded reserved character ({@code %2F}) is part of the identity, written in uppercase hex.
  *
  * <p><b>Two entry points, because a document's own name has one spelling.</b> {@link #canonicalize} reads a
- * <em>reference</em> -- {@code !!schema}, {@code !!import}, a source's key, a request path -- in any spelling of
+ * <em>reference</em> -- {@code !!import}, a source's key, a request path -- in any spelling of
  * its identity. {@link #validate} judges a document's own {@code !!id}, which must already be written in canonical
  * form: the canonical host, the path with no character beyond US-ASCII percent-encoded, reserved encodings in
  * uppercase hex. Every published document then has one spelling of its name. {@link #toUri} is the other
@@ -39,8 +39,8 @@ import java.nio.charset.StandardCharsets;
  *
  * <p><b>An identity without a host has an absolute path.</b> A path-only or {@code file:}-style reference has the
  * path alone as its identity, resolved only against a library entry. A relative path would then be a string a host
- * and path also spell -- {@code tson.io/2026/38/m/core.tn} written without its scheme is
- * {@code https://tson.io/2026/38/m/core.tn}'s identity -- so the path must begin with {@code /}, and the two kinds
+ * and path also spell -- {@code tson.io/2026/39/m/core.tn} written without its scheme is
+ * {@code https://tson.io/2026/39/m/core.tn}'s identity -- so the path must begin with {@code /}, and the two kinds
  * of identity are disjoint by their first character. {@code /local/orders.tn}, {@code file:/local/orders.tn} and
  * {@code file:///local/orders.tn} are one identity.
  *

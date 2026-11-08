@@ -7,6 +7,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -15,13 +16,13 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A namespace type -- a constructor IS-A the kernel's {@code namespace}, pinning its {@code key_type} and {@code
- * value_type} by composition -- is read as the map it describes, never as a record of those facets. It IS-A {@code
- * top}, so a meta layer declares it, and a schema the layer governs holds a value of it as an entry; an ordinary
- * schema cannot import the layer to type a field by it (§2.2.3).
+ * A namespace type -- an instance of the kernel's {@code namespace}, stating its {@code key_type} and {@code
+ * value_type} -- is read as the map it describes. Any schema declares one; a schema importing it holds a value of it
+ * as an entry, and types a field by it as by any imported type.
  */
 class NamespaceTypeTest {
 
@@ -29,19 +30,18 @@ class NamespaceTypeTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-headers.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
-            {
-              header_name => !identifier_type { continue_add: "-" }
-              headers     => namespace & { key_type: = header_name  value_type: = text }
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !schema {
+              header_name => !unicode.identifier_type { continue_add: "-" }
+              headers     => !meta.namespace { key_type: header_name  value_type: text }
               %s
             }
             """;
 
     private static final String USER_TEXT = """
             !!id:"https://example.test/request.tn"
-            !!meta:"https://example.test/meta-headers.tn"
-            {
+            !!import:"https://example.test/meta-headers.tn"
+            !schema {
               defaults => !headers %s
             }
             """;
@@ -80,85 +80,141 @@ class NamespaceTypeTest {
         assertEquals(List.of(), read("{ key_type => \"x\" }"));
     }
 
-    /** A schema importing the layer to type a field by its namespace type is refused at the import (§2.2.3). */
+    /** A schema importing the layer types a field by its namespace type, as by any imported type. */
     @Test
-    void anOrdinarySchemaMayNotImportTheLayerToTypeAFieldByIt() {
+    void aSchemaImportingTheLayerTypesAFieldByIt() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/request.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/meta-headers.tn"
-                {
+                !schema {
                   request => { headers: headers }
                 }
                 """);
 
-        assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("governing level"), problems::toString);
+        assertEquals(List.of(), problems);
     }
 
     @Test
     void theLinkedSchemaRecordsTheMapAndTheKind() {
         TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
 
-        assertEquals(Optional.of(new MapBody.Namespace(new MapBody(TypeRef.of("header_name"), TypeRef.of("text"),
-                false, false, Optional.empty(), Optional.empty()), true)), meta.namespace("headers"));
-        assertEquals(EntryKind.NAMESPACE, meta.kindOf("headers"));
+        assertEquals(Optional.of(NamespaceBody.of(TypeRef.of("header_name"), TypeRef.of("text"), false)),
+                meta.namespace("headers"));
+        assertEquals(EntryKind.PRODUCT, meta.kindOf("headers"));
+        assertEquals(Optional.of("meta.namespace"), meta.schema().constructorOf("headers"));
         assertEquals(Optional.empty(), meta.namespace("header_name"));
     }
 
-    /** {@code namespace} IS-A {@code top} alone: a chain reaching it and a base kind describes nothing. */
-    @Test
-    void aNamespaceTypeIsNoBaseKindBesides() {
-        List<Diagnostic> problems = tson("").validateSchema(META_TEXT.formatted("""
-                  both => namespace & sum & { key_type: = header_name  value_type: = text }
-                """));
+    private static final String SMALL = "small => !meta.namespace { key_type: header_name  value_type: text  "
+            + "min_items: 1  max_items: 2 }";
 
+    /** The problems with a governed schema holding {@code !small} applied to {@code map}. */
+    private static List<Diagnostic> readSmall(String map) {
+        return tson(SMALL).validateSchema("""
+                !!id:"https://example.test/request.tn"
+                !!import:"https://example.test/meta-headers.tn"
+                !schema {
+                  defaults => !small %s
+                }
+                """.formatted(map));
+    }
+
+    /**
+     * {@code namespace} refines {@code map}, so its size bounds are a map's: a value entry of a namespace type holds
+     * no fewer than {@code min_items} entries and no more than {@code max_items}.
+     */
+    @Test
+    void aNamespaceTypesSizeBoundsAreAMapsAndAValueMeetsThem() {
+        assertEquals(List.of(), readSmall("{ accept => \"text/plain\" }"));
+        assertEquals(List.of(), readSmall("{ accept => \"text/plain\"  user-agent => \"probe\" }"));
+        assertTrue(readSmall("{}").toString().contains("fewer than the minimum 1"));
+        List<Diagnostic> over = readSmall("{ a => \"x\"  b => \"y\"  c => \"z\" }");
+        assertEquals(1, over.size(), over::toString);
+        assertTrue(over.toString().contains("more than the maximum 2"), over::toString);
+    }
+
+    /** And a data document's value at a field typed by one meets them too. */
+    @Test
+    void aDataValueOfABoundedNamespaceTypeMeetsItsBounds() {
+        Tson tson = tson(SMALL + "\n  request => { headers: small }");
+        String data = """
+                !!import:"https://example.test/meta-headers.tn"
+                !request { headers: %s }
+                """;
+
+        assertEquals(List.of(), tson.validate(data.formatted("{ accept => \"text/plain\" }")));
+        List<Diagnostic> problems = tson.validate(data.formatted("{}"));
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("reaches 2 base kinds"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("fewer than the minimum 1"), problems::toString);
     }
 
-    /**
-     * The kernel's {@code field_map} states its key family by default, the host record supplying it: its keys are
-     * read by spelling and judged by the record's {@code name_type}, so the map it is read as takes any key.
-     */
+    /** A namespace type whose floor is above its ceiling admits no value, as a map type's does. */
     @Test
-    void aDefaultKeyFamilyIsTheHostsAndIsReadBySpelling() {
-        MapBody.Namespace fields = tson("").bindRegistry().core().resolveLinked(META).namespace("field_map")
-                .orElseThrow();
-
-        assertEquals(TypeRef.of("field_name"), fields.map().keyType());
-        assertEquals(false, fields.keysPinned());
-        assertEquals(TypeRef.of(MapBody.Namespace.HOST_KEYS), fields.read().keyType());
-    }
-
-    /**
-     * A namespace type IS-A {@code top}, so only a schema the meta-kernel governs declares one: an ordinary schema
-     * reaches the kernel's {@code namespace} only by importing a kernel-governed schema, which is refused (§2.2.3).
-     */
-    @Test
-    void aNamespaceTypeIsDeclaredUnderTheMetaKernel() {
+    void aNamespaceTypeWhoseBoundsCrossIsRefused() {
         List<Diagnostic> problems = tson("").validateSchema("""
-                !!id:"https://example.test/governed.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
-                {
-                  hs => namespace & { key_type: = identifier  value_type: = text }
+                !!id:"https://example.test/crossed.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
+                  hs => !meta.namespace { key_type: meta.identifier  value_type: text  min_items: 3  max_items: 1 }
                 }
                 """);
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("governing level"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("min_items"), problems::toString);
     }
 
-    /** A namespace type leaving a facet open describes no map, unless it is abstract. */
+    /**
+     * The kernel's {@code field_map} is an ordered map keyed by {@code text}, not a namespace type: a field name is
+     * text within its own record, judged by the record's {@code name_type}, and no qualified name selects one.
+     */
     @Test
-    void anOpenFacetIsRefusedUnlessAbstract() {
+    void aRecordsFieldMapIsAnOrderedMapKeyedByText() {
+        TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
+
+        assertEquals(Optional.empty(), meta.namespace("meta.field_map"));
+        MapBody fields = assertInstanceOf(MapBody.class, meta.schema().entries().get("meta.field_map"));
+        assertEquals(TypeRef.of("text"), fields.keyType());
+        assertEquals(TypeRef.of("meta.record_field"), fields.valueType());
+        assertTrue(fields.ordered());
+    }
+
+    /**
+     * A namespace type IS-A {@code top}, and any schema declares one: the kernel's {@code namespace} is in the
+     * closure of every schema reaching meta.tn ([TSON-SCHEMA] §4.1).
+     */
+    @Test
+    void anySchemaDeclaresANamespaceType() {
+        List<Diagnostic> problems = tson("").validateSchema("""
+                !!id:"https://example.test/governed.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
+                  hs => !meta.namespace { key_type: meta.identifier  value_type: text }
+                }
+                """);
+
+        assertEquals(List.of(), problems);
+    }
+
+    /** A namespace type states the type of its values: an instance of {@code namespace} leaving it out is none. */
+    @Test
+    void aNamespaceTypeWithoutAValueTypeIsRefused() {
         List<Diagnostic> problems = tson("").validateSchema(META_TEXT.formatted("""
-                  keyed          => namespace & { key_type: = header_name }
-                  abstract_keyed => abstract namespace & { key_type: = header_name }
+                  keyed => !meta.namespace { key_type: header_name }
                 """));
 
         assertEquals(1, problems.size(), problems::toString);
-        assertTrue(problems.getFirst().message().contains("'keyed' is a namespace type"), problems::toString);
+        assertTrue(problems.getFirst().message().contains("value_type"), problems::toString);
+    }
+
+    /** A namespace type states the family of its keys: an instance of {@code namespace} leaving it out is none. */
+    @Test
+    void aNamespaceTypeWithoutAKeyTypeIsRefused() {
+        List<Diagnostic> problems = tson("").validateSchema(META_TEXT.formatted("""
+                  keyed => !meta.namespace { value_type: text }
+                """));
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("key_type"), problems::toString);
     }
 }

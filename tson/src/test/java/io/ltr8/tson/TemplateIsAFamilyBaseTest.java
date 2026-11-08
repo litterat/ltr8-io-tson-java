@@ -4,6 +4,8 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
@@ -34,8 +36,9 @@ class TemplateIsAFamilyBaseTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static TsonLinkedSchema linked(String id, String declarations) {
@@ -52,7 +55,7 @@ class TemplateIsAFamilyBaseTest {
      * already named the same application.
      */
     private static String target(TsonLinkedSchema schema, String alias) {
-        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
+        return schema.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
 
@@ -200,7 +203,12 @@ class TemplateIsAFamilyBaseTest {
     // ── A base names the entries its members name ────────────────────────
 
     private static String fieldType(TsonLinkedSchema schema, String entry, String field) {
-        return ((RecordBody) schema.schema().entries().get(entry)).fields().get(field).type().name();
+        return switch (schema.schema().entries().get(entry)) {
+            case RecordBody record -> record.fields().get(field).typeRef().name();
+            case RecordTemplateBody template ->
+                    RecordField.typeRef(template.fields().get(field).type().orElseThrow()).name();
+            default -> throw new AssertionError(entry + " is neither a record nor a record template");
+        };
     }
 
     /**
@@ -210,8 +218,8 @@ class TemplateIsAFamilyBaseTest {
     @Test
     void aSelectorTypedByAnApplicationIsTheEntryEveryMemberNames() {
         String declarations = """
-                  bounded => <M> !integer_type { max: M }
-                  pet     => <N> { kind: bounded<9> = N  name: text }
+                  capped => <M> !numeric.integer_type { max: M }
+                  pet     => <N> { kind: capped<9> = N  name: text }
                   cat     => pet<3>
                   dog     => pet<4>
                   holder  => { p: pet }
@@ -220,7 +228,8 @@ class TemplateIsAFamilyBaseTest {
 
         String closed = fieldType(schema, "cat", "kind");
         assertEquals(closed, fieldType(schema, "pet", "kind"), "the base names the member's entry");
-        assertEquals(closed, ((RecordBody) schema.schema().entries().get("pet")).parameters().getFirst().type().name(),
+        assertEquals(closed,
+                ((RecordTemplateBody) schema.schema().entries().get("pet")).parameters().getFirst().type().name(),
                 "and N's derived type is that entry too");
         assertEquals(List.of(), read("f14", declarations, "!holder { p: { kind: 4  name: \"rex\" } }"));
     }

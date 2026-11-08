@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The meta-kernel's {@code record_field} record (Part 2 §5.2, §8.1): a field as the four facts a reader
+ * The kernel's {@code meta.record_field} record (Part 2 §5.2, §8.1): a field as the four facts a reader
  * consults. {@code optional} says the key may be omitted, {@code voidable} that a written {@code _} is
  * admitted, {@code role} what the schema's {@code value} is for, and {@code value} is that value. Each
  * reader decision reads its own: a written {@code _} reads {@code voidable}; a written value reads {@code
@@ -24,12 +24,14 @@ import java.util.Optional;
  * would be admitted where the pin refuses it, and a DEFAULT on a field that is not optional, a value only
  * omission reaches.
  *
- * <p><b>{@code value} is one slot, and carries a parameter as readily as a literal.</b> Inside a template
- * body a token there is a parameter exactly when its text resolves into the enclosing entry's {@code
- * parameters} (§8.1's shadowing rule), and a closed entry has no parameters for one to resolve into -- so
- * the same slot is unambiguous at both ends and needs no label. The role beside it is the modifier's either
- * way: {@code = P} is {@link FieldRole#FIXED} where it is written, as {@code = 201} is, and closing substitutes
- * the value without changing a fact. So a {@link FieldRole#FREE} field never carries a value.
+ * <p><b>{@code type} is a {@link Reference}</b>: a type reference, or a sibling reference ({@code kind!}) naming the
+ * field of the same record whose value chooses the type ([TSON-SCHEMA] §5.2) -- the one slot besides a template
+ * field's that may hold one. A field so typed is a <em>dependent field</em>: each instance's value is read against the
+ * type that instance's sibling names. {@link #namedType()} is the type reference where there is one.
+ *
+ * <p><b>A record field is closed</b>: its {@code type} names no parameter and its {@code value} is a literal, never a
+ * parameter. A field that may carry one is a {@code meta.record_template_field}, which only a record template holds,
+ * and an application turns each of those into one of these.
  *
  * <p><b>A field never says it is a discriminator.</b> Which fields a sealed family dispatches on is the
  * enclosing record's own statement ({@code record.discriminators}), because §5.8 flattens a base's fields
@@ -37,14 +39,12 @@ import java.util.Optional;
  * simply states none. What the linker checks of a named field -- required, not voidable, no group member, an
  * atom or enum type, no value of its own, and every subtype pinning it distinctly -- is §5.2's and §5.7's.
  *
- * <p><b>{@code position} is {@code @Unbound}</b>: §8.1's {@code record_field} declares no such field, so nothing fills it
- * and the strict binding check would call
- * it a mismatch. It is this implementation's own, kept for diagnostics -- a read reporting against a field
- * locates the pointer at the field ({@code /person/age}) and, without this, could pair it only with the
- * enclosing declaration's line, so six broken fields of one record all pointed at the record. It is
- * deliberately <em>not</em> carried in the annotation channel: that channel is schema data, resolves one
- * hop against the governing meta (§6) and round-trips into resolver output, none of which is true of a
- * source position.
+ * <p><b>{@code position} is {@code @Unbound}</b>: §8.1's {@code meta.record_field} declares no such field, so nothing
+ * fills it and the strict binding check would call it a mismatch. It is this implementation's own, kept for diagnostics
+ * -- a read reporting against a field locates the pointer at the field ({@code /person/age}) and, without this, could
+ * pair it only with the enclosing declaration's line, so six broken fields of one record all pointed at the record. It
+ * is deliberately <em>not</em> carried in the annotation channel: that channel is schema data, resolves in the schema's
+ * namespace (§6) and round-trips into resolver output, none of which is true of a source position.
  *
  * <p>Excluded from {@link #equals}/{@link #hashCode} on the same footing as {@code annotations}, and for
  * the same reason an entry's own position is kept apart from its value ({@code TsonSchema.EntryFacts}): the
@@ -52,7 +52,7 @@ import java.util.Optional;
  * against really-resolved ones, and a position in equality would stop two representations of one logical
  * field comparing equal.
  */
-public record RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
+public record RecordField(Reference type, boolean optional, boolean voidable, FieldRole role,
                            Optional<Token> value, Annotations annotations,
                            @Unbound Optional<SourcePosition> position) {
 
@@ -63,50 +63,82 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
     }
 
     /** Same as the canonical constructor with no position -- every caller that does not know its own source. */
-    public RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
+    public RecordField(Reference type, boolean optional, boolean voidable, FieldRole role,
                         Optional<Token> value, Annotations annotations) {
         this(type, optional, voidable, role, value, annotations, Optional.empty());
     }
 
     /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
-    public RecordField(TypeRef type, boolean optional, boolean voidable, FieldRole role,
+    public RecordField(Reference type, boolean optional, boolean voidable, FieldRole role,
                         Optional<Token> value) {
         this(type, optional, voidable, role, value, Annotations.empty(), Optional.empty());
     }
 
     /** {@code a: T} -- the key must be written, and {@code _} is refused. */
-    public static RecordField required(TypeRef type) {
+    public static RecordField required(Reference type) {
         return new RecordField(type, false, false, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T} -- the key may be omitted, and {@code _} is refused. */
-    public static RecordField optional(TypeRef type) {
+    public static RecordField optional(Reference type) {
         return new RecordField(type, true, false, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a: T?} -- the key must be written, and may be written {@code _}. */
-    public static RecordField voidable(TypeRef type) {
+    public static RecordField voidable(Reference type) {
         return new RecordField(type, false, true, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T?} -- the key may be omitted, and may be written {@code _}. */
-    public static RecordField optionalVoidable(TypeRef type) {
+    public static RecordField optionalVoidable(Reference type) {
         return new RecordField(type, true, true, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T ~ value} -- omission injects {@code value}, and a written value overrides it. */
-    public static RecordField defaulted(TypeRef type, Token value) {
+    public static RecordField defaulted(Reference type, Token value) {
         return new RecordField(type, true, false, FieldRole.DEFAULT, Optional.of(value));
     }
 
     /** {@code a?: T = value} -- omission injects {@code value}, and a written value must equal it. */
-    public static RecordField fixed(TypeRef type, Token value) {
+    public static RecordField fixed(Reference type, Token value) {
         return new RecordField(type, true, false, FieldRole.FIXED, Optional.of(value));
     }
 
     /** {@code a: T = value} -- a marker: the key must be written, and its value must equal {@code value}. */
-    public static RecordField marker(TypeRef type, Token value) {
+    public static RecordField marker(Reference type, Token value) {
         return new RecordField(type, false, false, FieldRole.FIXED, Optional.of(value));
+    }
+
+    /**
+     * {@link #type} as the type it names -- for a consumer that holds a field already known to name one. A dependent
+     * field's type is chosen per instance by its sibling's value, so no single type is the answer, and asking for one
+     * is a broken invariant: a consumer that may meet a dependent field asks {@link #namedType()} or switches on
+     * {@link #type}.
+     */
+    public TypeRef typeRef() {
+        return typeRef(type);
+    }
+
+    /** A record field's or a record template field's {@code type} as the type it names -- see {@link #typeRef()}. */
+    public static TypeRef typeRef(Reference type) {
+        return switch (type) {
+            case TypeRef reference -> reference;
+            case SiblingRef sibling -> throw new IllegalStateException("a dependent field ('" + sibling.text()
+                    + "') names no type of its own: its type is the one its sibling's value names, per instance");
+        };
+    }
+
+    /** {@link #type} as the type it names, or empty for a dependent field ({@link #sibling()}). */
+    public Optional<TypeRef> namedType() {
+        return type instanceof TypeRef reference ? Optional.of(reference) : Optional.empty();
+    }
+
+    /**
+     * The sibling a dependent field takes its type from -- the field {@code kind} of {@code v?: kind!} -- or empty
+     * where {@link #type} names a type ([TSON-SCHEMA] §5.2).
+     */
+    public Optional<String> sibling() {
+        return type instanceof SiblingRef sibling ? Optional.of(sibling.field()) : Optional.empty();
     }
 
     /** What a field yields when a document never writes it -- see {@link #omitted}. */
@@ -120,10 +152,15 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
      * never supplied; anything else stays absent.
      */
     public Omitted omitted(boolean groupMember) {
+        return omitted(optional, value.isPresent(), groupMember);
+    }
+
+    /** {@link #omitted(boolean)} over the facts it reads: whether the field is optional, and whether it has a value. */
+    public static Omitted omitted(boolean optional, boolean valued, boolean groupMember) {
         if (!optional) {
             return Omitted.MISSING;
         }
-        return value.isPresent() && !groupMember ? Omitted.VALUE : Omitted.NOTHING;
+        return valued && !groupMember ? Omitted.VALUE : Omitted.NOTHING;
     }
 
     /**
@@ -131,6 +168,11 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
      * {@code optional}, {@code defaulted} or {@code fixed}.
      */
     public String describe() {
+        return describe(optional, role);
+    }
+
+    /** {@link #describe()} over the facts it reads. */
+    public static String describe(boolean optional, FieldRole role) {
         if (!optional) {
             return "required";
         }
@@ -154,7 +196,7 @@ public record RecordField(TypeRef type, boolean optional, boolean voidable, Fiel
      * ones it does not mention -- {@code annotations} and {@code position} both, the second of which no test
      * comparing resolved values can catch, since it is excluded from equality.
      */
-    public RecordField withType(TypeRef type) {
+    public RecordField withType(Reference type) {
         return new RecordField(type, optional, voidable, role, value, annotations, position);
     }
 

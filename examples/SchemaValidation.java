@@ -6,26 +6,26 @@
 ///   ./gradlew :tson:modules
 ///   java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java
 ///
-/// `Tson.standard()` bootstraps the standard library (meta-kernel/meta.tn/core.tn); `resolve`
-/// registers a schema under its own `!!id`. This data isn't self-describing, so the reader is told which
-/// schema and type apply -- `withSchema(uri).readAs(source, type)`. Tree mode returns an immutable,
-/// queryable TsonValue -- no Java class involved, the TSON schema is the source of truth -- that preserves
-/// structure and types and is navigable with get/at.
+/// `Tson.standard()` bootstraps the standard library (meta.tn, numeric.tn, temporal.tn, net.tn, core.tn and policy.tn);
+//`resolve` / registers a schema under its own `!!id`. This data isn't self-describing, so the reader is told which /
+//schema and type apply -- `withSchema(uri).readAs(source, type)`. Tree mode returns an immutable, / queryable TsonValue
+//-- no Java class involved, the TSON schema is the source of truth -- that preserves / structure and types and is
+//navigable with get/at.
 import module io.ltr8.tson;
 
 void main() {
     Tson tson = Tson.standard();
 
     String schema = """
-            !!id:"https://example.com/2026/38/app/server-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!id:"https://example.com/2026/39/app/server-1.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
                 server => { hostname: text  port: int32 }
             }""";
 
     tson.resolve(schema);                       // registers it under its own !!id
-    var reader = tson.treeReader().withSchema("https://example.com/2026/38/app/server-1.tn");
+    var reader = tson.treeReader().withSchema("https://example.com/2026/39/app/server-1.tn");
 
     TsonValue server = reader.readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
     IO.println("hostname: " + server.get("hostname").asString().orElseThrow());   // web-01

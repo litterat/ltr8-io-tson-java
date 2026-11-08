@@ -8,7 +8,8 @@ import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.ResolverBindContext;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * dropped them until now, and the one where §6 gives an annotation a declared type to bind against.
  *
  * <p>Two things distinguish this from the schemaless object path ({@code TsonObjectReaderTest}). The
- * annotation's <em>name</em> resolves one hop against the governing schema, so its value is read by that
+ * annotation's <em>name</em> resolves in the schema's namespace, so its value is read by that
  * type's own compiled reader and arrives as an ordinary bound Java object rather than a structural node. And
  * the carrier occupies a constructor slot the schema knows nothing about, so the reader has to fill it
  * itself -- see {@code arityIsHandledInBothDirections} for what goes wrong if it doesn't.
@@ -42,9 +43,9 @@ class SchemaDrivenBindAnnotationTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/annotated.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               note => text
               rank => int32
               marker => void
@@ -72,17 +73,18 @@ class SchemaDrivenBindAnnotationTest {
     private static TsonCompiledSchema compile(Class<?> widgetClass) {
         DataNameBinder binder = schemaTypeName -> "widget".equals(schemaTypeName)
                 ? widgetClass
-                : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+                : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
+                ResolverBindContext.registerAbsent(
+                        DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.bind(core, context).get(ID);
     }
 
@@ -162,7 +164,7 @@ class SchemaDrivenBindAnnotationTest {
 
     /**
      * A map whose <b>keys</b> are boxed. This is the shape schema documentation actually takes: a resolved
-     * schema is a <code>{type_name =&gt; top}</code>, and §6 binds an annotation written before a
+     * schema is a <code>{meta.type_name =&gt; top}</code>, and §6 binds an annotation written before a
      * declaration's name to that name -- which is the map's key. Recovering {@code @doc} on a declaration is
      * this, applied to that map; {@code TsonSchema.entries()} is exactly this type.
      */
@@ -172,9 +174,10 @@ class SchemaDrivenBindAnnotationTest {
     private static TsonCompiledSchema compileCatalogue() {
         DataNameBinder binder = schemaTypeName -> "catalogue".equals(schemaTypeName)
                 ? Catalogue.class
-                : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+                : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
+                ResolverBindContext.registerAbsent(
+                        DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -182,7 +185,7 @@ class SchemaDrivenBindAnnotationTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         return TsonCompiledSchemaRegistry.bind(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source),
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source),
                 context).get(ID);
     }
 
@@ -219,9 +222,10 @@ class SchemaDrivenBindAnnotationTest {
     private static TsonCompiledSchema compileAs(String schemaName, Class<?> bound) {
         DataNameBinder binder = schemaTypeName -> schemaName.equals(schemaTypeName)
                 ? bound
-                : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+                : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
+                ResolverBindContext.registerAbsent(
+                        DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -229,7 +233,7 @@ class SchemaDrivenBindAnnotationTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         return TsonCompiledSchemaRegistry.bind(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source),
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source),
                 context).get(ID);
     }
 

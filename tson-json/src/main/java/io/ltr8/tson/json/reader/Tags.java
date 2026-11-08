@@ -4,32 +4,32 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 
 /**
- * A leading {@code $schema} at a position that reads a tag and is not scoped -- a scope the position never
- * admitted, refused identically wherever the leading members are read.
+ * A leading {@code $import} at a value position -- the document's binding, which stands at the top of the document
+ * alone ([TSON-JSON] §3.3, §3.4) -- refused identically wherever the leading members are read.
  *
- * <p>Shared because the answer is the position's <em>kind</em> and not its extension: a concrete record, every
- * dispatcher over a record family and a choice all refuse it on the same terms, and a copy per reader would be
- * a chance per reader to disagree.
+ * <p>Shared because the answer is the same at every position: a concrete record, every dispatcher over a record
+ * family, a choice and a declared position all refuse it on the same terms, and a copy per reader would be a
+ * chance per reader to disagree.
  */
 final class Tags {
 
-    /** How a record position describes itself in the {@code $schema} refusal. */
+    /** How a record position describes itself in the {@code $import} refusal. */
     static final String RECORD = "is a record";
 
-    /** How a choice position describes itself in the {@code $schema} refusal. */
+    /** How a choice position describes itself in the {@code $import} refusal. */
     static final String CHOICE = "is a choice, whose variants its own schema declares";
 
     private Tags() {
     }
 
     /**
-     * Whether {@code lead} opens a schema scope here, reporting the refusal and consuming the value when it does
+     * Whether {@code lead} carries an {@code $import}, reporting the refusal and consuming the value when it does
      * -- so a caller told {@code true} is done with the object and returns its own refusal result.
      *
-     * @param what how the position describes itself: {@link #RECORD} or {@link #CHOICE}
+     * @param what how the position describes itself: {@link #RECORD}, {@link #CHOICE} or the caller's own
      */
     static boolean refusesScope(JsonReadContext ctx, TagMembers.Lead lead, String displayName, String what) {
-        if (!lead.schema()) {
+        if (!lead.imports()) {
             return false;
         }
         refuseScope(ctx, displayName, what);
@@ -38,15 +38,14 @@ final class Tags {
     }
 
     /**
-     * Reports a {@code $schema} in the object at {@code ctx}, consuming nothing. §8.5 admits one exactly where
-     * the position's own type is a {@code scoped} instance holding EXTERN. Neither a record nor a choice is one,
-     * and [TSON-SCHEMA] §7.8 makes it a resolver error anywhere such -- {@code SCOPE_NOT_ADMITTED}, a scope change
-     * the model never opted into.
+     * Reports an {@code $import} in the object at {@code ctx}, consuming nothing: a resolver error at every value
+     * position (§3.3), {@code SCOPE_NOT_ADMITTED} -- the document's binding written where no binding stands, as an
+     * {@code !!import} at a value position is a parse error in text.
      */
     static void refuseScope(JsonReadContext ctx, String displayName, String what) {
-        ctx.field(TagMembers.SCHEMA).report(Diagnostic.Code.SCOPE_NOT_ADMITTED,
-                "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
-                        + "-- '" + displayName + "' " + what, "no $schema at this position",
-                TagMembers.SCHEMA);
+        ctx.field(TagMembers.IMPORT).report(Diagnostic.Code.SCOPE_NOT_ADMITTED,
+                "'$import' binds the document to the schemas it names, which it does at the top of the document "
+                        + "alone (§3.3) -- '" + displayName + "' " + what, "no $import at this position",
+                TagMembers.IMPORT);
     }
 }

@@ -23,8 +23,9 @@ class TextMemberSetTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static String schema(String name, String body) {
@@ -98,7 +99,7 @@ class TextMemberSetTest {
     void aMemberSetAlreadySetMayNotBeShrunk() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("shrink", """
                 { country_code => !text ^ { members: ["SE" "NO" "DK"] }
-                  core => !country_code ^ { members: ["SE"] } }"""));
+                  sweden => !country_code ^ { members: ["SE"] } }"""));
 
         assertTrue(messages(diagnostics).contains("may be restated but not changed"), messages(diagnostics));
     }
@@ -120,7 +121,7 @@ class TextMemberSetTest {
         tson.resolve(schema("read", """
                 { code => !text ^ { length: 2  members: ["AU" "NZ"] }
                   rec => { c: code } }"""));
-        String head = "!!schema:\"https://example.test/read.tn\"\n!rec ";
+        String head = "!!import:\"https://example.test/read.tn\"\n!rec ";
 
         assertEquals(List.of(), tson.validate(head + "{ c: AU }"));
 

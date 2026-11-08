@@ -3,11 +3,12 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.TestDocuments;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.ResolverBindContext;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -34,11 +35,11 @@ class MapBindReaderTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/catalogue.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               catalogue => { entries: {text => text?} }
-              ranked    => !map { key_type: text  value_type: int32  ordered: true }
+              ranked    => !meta.map { key_type: text  value_type: int32  ordered: true }
               league    => { table: ranked }
             }
             """;
@@ -55,9 +56,10 @@ class MapBindReaderTest {
     private static Object read(Class<?> type, String entry, String document) {
         DataNameBinder binder = schemaTypeName -> entry.equals(schemaTypeName)
                 ? type
-                : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+                : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
+                ResolverBindContext.registerAbsent(
+                        DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -65,7 +67,7 @@ class MapBindReaderTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         TsonCompiledSchema compiled = TsonCompiledSchemaRegistry.bind(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source),
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source),
                 context).get(ID);
         return compiled.get(entry).read(TestDocuments.document(document));
     }

@@ -4,6 +4,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.suite.SuiteBindings;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * An entry built with a namespace type in resolved output ([TSON-SCHEMA] §8.1): written as written, the constructor's
- * tag on the map, and read back under the meta layer that declares the constructor to the same {@link Namespace} --
+ * tag on the map, and read back under the schema that declares the constructor to the same {@link Namespace} --
  * the read a Class 2 schema-layer vector's expected side takes ({@link ResolvedForm#readResolved}).
  */
 class NamespaceEntryResolvedFormTest {
@@ -25,21 +26,20 @@ class NamespaceEntryResolvedFormTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-api.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
-            {
-              status_name => identifier
-              method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
-                               replies?: {status_name => kind<record>} }
-              api         => namespace & { key_type: = identifier  value_type: = method }
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !schema {
+              status_name => meta.identifier
+              method      => { request?: meta.ref<meta.record>  response?: meta.type_ref  errors?: [meta.ref<meta.record>]
+                               replies?: {status_name => meta.ref<meta.record>} }
+              api         => !meta.namespace { key_type: meta.identifier  value_type: method }
             }
             """;
 
     private static final String SCHEMA = """
             !!id:"https://example.test/api.tn"
-            !!meta:"https://example.test/meta-api.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://example.test/meta-api.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               order      => { sku: text }
               order_list => [order]
               myapi      => !api {
@@ -51,7 +51,6 @@ class NamespaceEntryResolvedFormTest {
     private static Tson tson() {
         return Tson.of(ProcessorConfig.defaults()
                 .withDataBindContext(SuiteBindings.context())
-                .withMetaNameBinder(SuiteBindings.names())
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_TEXT)))));
     }
 
@@ -64,9 +63,9 @@ class NamespaceEntryResolvedFormTest {
         assertEquals("!api { get_orders => { response: order_list } place_order => { request: order response: order } }",
                 written.replaceAll("\\s+", " "));
 
-        Map<String, Top> read = ResolvedForm.readResolved(tson, "!schema { myapi => " + written + " }", META);
+        Map<String, Object> read = ResolvedForm.readResolved(tson, "!schema { myapi => " + written + " }", List.of(META));
         Namespace<?> back = assertInstanceOf(Namespace.class, read.get("myapi"));
-        assertEquals(myapi, back);
+        assertEquals(((ValueEntry) myapi).value(), back);
         assertEquals(List.of("get_orders", "place_order"), List.copyOf(back.entries().keySet()));
         assertEquals(ResolvedForm.rendered(myapi), ResolvedForm.rendered(back));
     }

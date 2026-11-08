@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.annotation.Typename;
 
 import org.junit.jupiter.api.Test;
@@ -66,10 +66,10 @@ class CollectionElementBridgeTest {
     void theBoundValueWritesBackOut() {
         Palette palette = read();
 
-        assertDoesNotThrow(() -> new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(palette));
+        assertDoesNotThrow(() -> new TsonObjectWriter(SchemaModelNameBinder.defaultContext()).toTson(palette));
     }
 
     private static Palette read() {
-        return new TsonObjectReader(SchemaMetaNameBinder.defaultContext()).read(DOCUMENT, Palette.class);
+        return new TsonObjectReader(SchemaModelNameBinder.defaultContext()).read(DOCUMENT, Palette.class);
     }
 }

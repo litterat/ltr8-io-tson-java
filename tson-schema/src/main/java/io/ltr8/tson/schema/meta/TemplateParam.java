@@ -7,14 +7,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * One parameter of an open entry ({@code template_param}, [TSON-SCHEMA] §5.10, §8.1): its name, the type an
+ * One parameter of an open entry ({@code meta.template_param}, [TSON-SCHEMA] §5.10, §8.1): its name, the type an
  * argument for it is read as, and -- for a type parameter -- the bound an argument's type must IS-A.
  *
  * <p><b>{@link #type} is derived from the positions the parameter stands in</b>: a type slot gives
- * {@code type_kind}, a scalar slot of the applied constructor gives that slot's declared type, a routed default or
+ * {@code meta.type_ref}, a scalar slot of the applied constructor gives that slot's declared type, a routed default or
  * fixed value gives the field's own declared type, and a parameter riding another template's argument list takes
  * that template's recorded type for the position. So the parameter's kind is not a separate field: it is a type
- * parameter exactly when {@link #type} is {@code type_kind}.
+ * parameter exactly when {@link #type} is {@code meta.type_ref}.
  *
  * <p><b>A declaration may narrow what it derives</b>, {@code <T: text, N: int8>}, read by the kind the positions
  * give: on a value parameter it narrows {@link #type}; on a type parameter it is {@link #bound}. The two kinds
@@ -24,18 +24,18 @@ import java.util.Optional;
  * <p>A {@code type} may name an earlier parameter of the same template -- {@code <T, N> { w?: T ~ N }} records
  * {@code N}'s type as {@code T} -- since the value's type is whatever that parameter's argument names.
  */
-@Typename(name = "template_param")
+@Typename(name = "meta.template_param")
 public record TemplateParam(String name, TypeRef type, Optional<TypeRef> bound) {
 
-    /** The kind of the types, {@code kind<type>}: what a type parameter's argument is read as, a type name. */
-    public static final TypeRef TYPE_KIND = TypeRef.of("type_kind");
+    /** The kind of the types, {@code meta.ref<type>}: what a type parameter's argument is read as, a type name. */
+    public static final TypeRef TYPE_REF = TypeRef.of("meta.type_ref");
 
     @Record
     public TemplateParam {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(bound, "bound");
-        if (bound.isPresent() && !TYPE_KIND.equals(type)) {
+        if (bound.isPresent() && !TYPE_REF.equals(type)) {
             throw new IllegalArgumentException("parameter '" + name + "' is a value parameter (its type is "
                     + type + "), and only a type parameter has a bound");
         }
@@ -48,11 +48,11 @@ public record TemplateParam(String name, TypeRef type, Optional<TypeRef> bound) 
 
     /** A parameter whose type is not yet derived, or derives to nothing narrower: an unbounded type parameter. */
     public static TemplateParam typeParameter(String name) {
-        return new TemplateParam(name, TYPE_KIND);
+        return new TemplateParam(name, TYPE_REF);
     }
 
     /** Whether an argument for this parameter is a type reference rather than a value (§5.10's two kinds). */
     public boolean isTypeParameter() {
-        return TYPE_KIND.equals(type);
+        return TYPE_REF.equals(type);
     }
 }

@@ -8,32 +8,45 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.compiler.reader.DependentFieldReader;
 import io.ltr8.tson.compiler.resolver.KindMembers;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
-import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.compiler.resolver.AliasChain;
+import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.TsonSchemaLoader;
+import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.tree.TsonMap;
+import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
- * The names a value entry holds -- a {@link Namespace}, a value of a namespace type -- resolved and judged by their slots
- * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code ref<T>}, held as a {@link Ref} the
+ * The names a value entry holds ({@link ValueEntry}) resolved and judged by their slots
+ * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code meta.ref<T>}, held as a {@link Ref} the
  * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
- * judged a member ({@link #judgeMember}).
+ * judged a member ({@link #judgeMember}). The same walk judges every other value's name ({@link #reach}): a field's
+ * default or pin at a reference, and a name a data document writes at one, which the linker leaves the reference a
+ * lookup for ({@code ReferenceBody.Values}).
  *
  * <p><b>Fed by the read, not by the host.</b> The references judged are the ones the resolver's read produced by
  * name, each with its slot ({@link TsonSchema#valuesByName()}). The host class declares nothing for them, so none
@@ -44,32 +57,39 @@ import java.util.function.Consumer;
  * {@code orders.1x}, {@code .orders} and {@code orders.} are refused as no qualified name before anything is looked
  * up. A reference carrying arguments is no value by name.
  *
- * <p><b>Two layers meet here.</b> The slot's type is the meta-schema's to declare, and arrives with the name: the
- * reader that read the name was built from the slot's declared type and recorded it beside the name ({@link
- * TsonSchema.SlotType}), a kind's {@code of} or a reference's {@code T} in the governing meta's namespace, whatever the
- * host class holds there. The name is the governed schema's to resolve: its first segment through this schema's own
- * entries and imports, alias hops followed ([TSON-SCHEMA] §8.3), never through the meta's namespace (§3.3.2); each
- * further segment selects in the value reached -- a key of a namespace value, a field of a record, never a position in
- * a list -- and a type entry admits none. An open entry is no referent at all: a template denotes no value until it is
- * applied. The referent's declared type is then judged against the slot's by §7.2's IS-A, comparing canonical
- * identities: an entry's declared type is the constructor that built its body, a field's is its type, and a map value's
- * is the map's value type. Found first, judged after, never a choice among candidates.
+ * <p><b>One namespace holds both sides.</b> The slot's type arrives with the name: the reader that read the name was built
+ * from the slot's declared type and recorded it beside the name ({@link TsonSchema.SlotType}), the slot's reference's {@code
+ * of}, whatever the host class holds there. What {@code of} names decides what the name is, judged here over this namespace
+ * whatever the read guessed: a constructor's values are types, so the name is a type's and a member or refused ({@link
+ * KindMembers}); any other type's values are values. Both it and the name resolve in this schema's one namespace, its own
+ * entries and its import closure: the first segment, alias hops followed ([TSON-SCHEMA] §8.3), and each further segment
+ * selects a key of a value of a named product -- a namespace value's key, or a record value's field, the record being a
+ * namespace whose keys its type fixes; never a position in a list or a key of a map that is no namespace -- and a type entry
+ * admits none. An open entry is no referent at all: a template denotes no value until it is applied. The referent's declared
+ * type is then judged against the slot's by §7.2's IS-A, comparing canonical identities: an entry's declared type is the
+ * constructor that built its body, a field's is its type, and a map value's is the map's value type. Found first, judged
+ * after, never a choice among candidates.
  *
- * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor of the
- * declaring schema's meta layer, and otherwise the kernel constructor its body mirrors ({@code @Typename}): a record
- * declaration or a composition is built by {@code record}, and {@code uuid => !uuid_type {}} by {@code uuid_type}.
- * Each type is looked up in the namespace of the meta layer that governs the schema declaring it, so an imported
- * referent is judged by its own meta's vocabulary and still compared by identity.
+ * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor, and
+ * otherwise the kernel constructor its body mirrors ({@code @Typename}): a record declaration or a composition is
+ * built by {@code record}, and {@code uuid => !net.uuid_type {}} by {@code uuid_type}. An imported referent's constructor
+ * is in the closure that declared it, which this schema's closure contains, so every type is looked up in the one
+ * namespace and compared by identity, declaring schema and name.
  *
- * <p><b>The value is walked beside its type.</b> A namespace entry holds the map its constructor describes, so a
- * segment selects a key of it and the value reached is of the constructor's {@code value_type}; a value of a namespace
- * type reached that way is the map the read built for it, entered the same way. A segment selecting a field of a
- * record value reads that field of the host object the read bound ({@link #fieldOf}), through the descriptor of the
- * bind context it was bound under, by the field's wire name, so the walk agrees with the binding on what the field is
- * called and where it lives; it never reflects over the host's class itself. A field the record declares and the
- * value does not hold is refused as not present, after the referent's type is judged, so a name wrong by type is told
- * so whatever the value holds. The resolver reads every namespace value in bind mode, so a value in hand is a bound
- * host object, never a tree.
+ * <p><b>The value is walked beside its type.</b> A value entry holds a value of its type: of a namespace type, the map
+ * it describes, so a segment selects a key of it and the value reached is of the namespace type's {@code value_type};
+ * of a record type, a record, so a segment selects a field. A segment selecting a field of a bound record value reads
+ * that field of the host object the read bound ({@link #fieldOf}), through the descriptor of the bind context it was
+ * bound under, by the field's wire name, so the walk agrees with the binding on what the field is called and where it
+ * lives; it never reflects over the host's class itself. A value no class binds is held as a tree, and a segment
+ * selects in the tree by key or field name. A field the record declares and the value does not hold is refused as
+ * not present, after the referent's type is judged, so a name wrong by type is told so whatever the value holds.
+ *
+ * <p><b>A dependent field's type is the one its sibling names in the same value</b> ([TSON-SCHEMA] §5.2, {@link
+ * #dependentType}): the sibling's pin, else what the record value holds there, else its default, judged by the read
+ * path's rules ({@link DependentFieldReader#typeNamed}) and the walk going on with that type. A sibling the value does
+ * not hold, or one naming no type a value can be read against, is refused. Past a field the value does not hold, only
+ * a pin or default can type the field, and without one the name is refused as reaching no value.
  *
  * <p>Every refusal is a {@link SchemaValidationException} naming the step that failed.
  */
@@ -77,10 +97,7 @@ final class ValuesByName {
 
     private final Map<String, Top> merged;
     private final Map<String, TsonSchema.EntryFacts> facts;
-    private final Map<String, String> origins;
-    private final String ownIdentity;
-    private final TsonLinkedSchema governingMeta;
-    private final TsonSchemaLoader loader;
+    private final Space space;
     private final DataBindContext values;
 
     /**
@@ -88,30 +105,32 @@ final class ValuesByName {
      *               record value through; {@code null} where the link was given none
      */
     ValuesByName(TsonSchema schema, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                 Map<String, String> origins, TsonLinkedSchema governingMeta, TsonSchemaLoader loader,
-                 DataBindContext values) {
+                 Map<String, String> origins, DataBindContext values) {
         this.merged = merged;
         this.facts = facts;
-        this.origins = origins;
-        this.ownIdentity = CanonicalIdentity.canonicalize(schema.id());
-        this.governingMeta = governingMeta;
-        this.loader = loader;
+        String ownIdentity = CanonicalIdentity.canonicalize(schema.id());
+        this.space = new Space(merged, name -> origins.getOrDefault(name, ownIdentity));
         this.values = values;
     }
 
-    /** A type named in one meta layer's namespace: where its name is looked up, and the name. */
-    private record Typed(TsonLinkedSchema space, String name) {
+    /** The schema's one namespace: its entries, and where each was declared. */
+    private record Space(Map<String, Top> entries, Function<String, String> originOf) {
 
-        private Namespace<Top> entries() {
-            return space.schema().entries();
+        /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link EntryKind#isConstructor}). */
+        boolean isConstructor(String name, Top value) {
+            return EntryKind.isConstructor(name, value, entry -> TsonBundledSchemas.isKernel(originOf.apply(entry)));
         }
+    }
+
+    /** A type named in the schema's namespace. */
+    private record Typed(Space space, String name) {
 
         String terminal() {
-            return ReferenceChain.terminal(name, entries()::get);
+            return AliasChain.terminal(name, space.entries()::get);
         }
 
         Top definition() {
-            return entries().get(terminal());
+            return space.entries().get(terminal());
         }
 
         Typed of(String typeName) {
@@ -124,24 +143,11 @@ final class ValuesByName {
          */
         String identity() {
             String terminal = terminal();
-            return space.originOf(terminal) + "#" + terminal;
+            return space.originOf().apply(terminal) + "#" + terminal;
         }
 
-        /**
-         * What a value of this type is read as: the map a namespace type's value is ({@link
-         * TsonLinkedSchema#namespace}), and the definition otherwise.
-         */
         Top body() {
-            return space.namespace(terminal()).<Top>map(MapBody.Namespace::map).orElseGet(this::definition);
-        }
-
-        /**
-         * Whether this type is a namespace type, IS-A the kernel's {@code namespace}: a map whose keys name its
-         * entries, which is the one map a qualified name enters ({@code method_map => namespace & { ... }}); a
-         * {@code {K => V}} sugar map is built with {@code map} and is not.
-         */
-        boolean isNamespace() {
-            return space.namespace(terminal()).isPresent();
+            return definition();
         }
 
         /** §7.2: this type is {@code wanted}, or lists it among its supertypes. */
@@ -165,7 +171,8 @@ final class ValuesByName {
         for (TsonSchema.ValueByName value : held) {
             String where = "'" + entryName + "' at " + pointer(value.slot());
             try {
-                judge(where, value.reference(), value.type(), value.cell());
+                Object reached = judge(where, value.reference(), value.type());
+                value.cell().ifPresent(cell -> cell.deliver(reached));
             } catch (SchemaValidationException e) {
                 refused.accept(e);
             } catch (UnsupportedOperationException e) {
@@ -196,22 +203,49 @@ final class ValuesByName {
         return segments;
     }
 
-    private void judge(String where, TypeRef reference, TsonSchema.SlotType slot, Optional<Ref<?>> cell) {
-        if (slot.role() == TsonSchema.SlotType.Role.APPLICATION) {
-            judgeApplication(where, reference);
-            return;
-        }
-        List<String> segments = segments(where, reference);
+    /**
+     * The value {@code reference} reaches at a slot typed by a reference over {@code of}, a type that is no
+     * constructor: a field's {@code ~}/{@code =} value, or a name a data document writes, judged as a value body's
+     * names are. Refused, as {@link #check} refuses, with a message opening with {@code where}.
+     */
+    Object reach(String where, TypeRef reference, String of) {
+        return judge(where, reference, TsonSchema.SlotType.valueName(of, of));
+    }
+
+    /**
+     * Judges one name by its slot, and returns what a {@code Ref} host receives: the value it reaches, or for a name
+     * at a slot that names types nothing.
+     */
+    private Object judge(String where, TypeRef reference, TsonSchema.SlotType slot) {
+        List<String> written = segments(where, reference);
         String name = reference.name();
-        String head = segments.getFirst();
+        String head = written.getFirst();
+        // What the slot's `of` names decides which names it holds, judged here over the final namespace whatever
+        // the read guessed: a constructor's values are types, and any other type's values are values.
+        boolean namesTypes = KindMembers.namesTypes(slot.of(), merged::get);
         if (!merged.containsKey(head)) {
             throw new SchemaValidationException(where + " names '" + name + "', and '" + head + "' is no "
-                    + (slot.role() == TsonSchema.SlotType.Role.KIND && segments.size() == 1
+                    + (namesTypes && written.size() == 1
                             ? "type declared in this schema or its imports"
                             : "entry of this schema or its imports -- the first segment names the entry a value is "
                                     + "reached through, and a member is reached through its entry"));
         }
-        String terminal = ReferenceChain.terminal(head, merged);
+        // A schema map nested as an entry is entered by its members' names: each is an entry under its path, so the
+        // walk goes on from the member a segment names, and a further segment selects in that member's value.
+        int entered = 1;
+        while (entered < written.size() && SchemaPaths.isNestedMap(merged.get(head))) {
+            String member = head + '.' + written.get(entered);
+            if (!merged.containsKey(member)) {
+                throw new SchemaValidationException(where + " names '" + name + "', and the schema map '" + head
+                        + "' declares no '" + written.get(entered) + "'");
+            }
+            head = member;
+            entered++;
+        }
+        List<String> segments = new ArrayList<>(written.size() - entered + 1);
+        segments.add(head);
+        segments.addAll(written.subList(entered, written.size()));
+        String terminal = AliasChain.terminal(head, merged);
         Top referent = merged.get(terminal);
         if (referent == null) {
             throw new SchemaValidationException(where + " names '" + name + "', and the alias '" + head
@@ -222,28 +256,26 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is an open "
                     + "entry: a template denotes no value until it is applied (§5.10), so nothing is there to name");
         }
-        if (slot.role() == TsonSchema.SlotType.Role.KIND) {
+        if (namesTypes) {
             judgeMember(where, name, segments, slot, referent, entry);
-            return;
+            return null;
         }
-        Typed wanted = new Typed(governingMeta, slot.of());
-        TsonLinkedSchema declarersMeta = metaOf(terminal);
+        Typed wanted = new Typed(space, slot.of());
         Typed at = constructorOf(TsonSchemaLinker.constructorOf(terminal, referent, facts).orElseThrow(), referent,
-                declarersMeta);
+                space);
         if (segments.size() == 1) {
             if (!at.isA(wanted)) {
                 throw new SchemaValidationException(where + " wants " + a(wanted.name()) + ", and " + entry
                         + " is an entry whose body is built by '" + at.name() + "', which is no '" + wanted.name()
                         + "'");
             }
-            cell.ifPresent(c -> c.deliver(referent));
-            return;
+            return referent instanceof ValueEntry value ? value.value() : referent;
         }
-        if (!(referent instanceof Namespace<?> namespace)) {
+        if (!(referent instanceof ValueEntry valueEntry)) {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
                     + "type: a type entry admits no further segment, so '" + segments.get(1) + "' selects in no value");
         }
-        Object value = namespace;
+        Object value = valueEntry.value();
         String absent = null;
         String reached = head;
         for (String segment : segments.subList(1, segments.size())) {
@@ -256,32 +288,39 @@ final class ValuesByName {
                                 + "' is " + a(at.name()) + ", which has no field '" + segment + "' -- it declares "
                                 + String.join(", ", record.fields().keySet()));
                     }
+                    Object holder = value;
                     if (value != null) {
-                        value = fieldOf(value, segment, where + " names '" + name + "', and '" + reached + '.'
-                                + segment + "'");
+                        value = value instanceof TsonValue tree ? present(tree.get(segment))
+                                : fieldOf(value, segment, where + " names '" + name + "', and '" + reached + '.'
+                                        + segment + "'");
                         if (value == null) {
                             absent = "'" + reached + "' is " + a(at.name()) + " whose field '" + segment + "' is "
                                     + "not present in the value";
                         }
                     }
-                    at = at.of(field.type().name());
-                }
-                case MapBody map -> {
-                    if (!at.isNamespace()) {
-                        throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
-                                + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "
-                                + "name -- a segment selects a key of a namespace value or a field of a record value");
+                    if (field.sibling().isPresent()) {
+                        String naming = where + " names '" + name + "', and '" + reached + "." + segment + "' is a "
+                                + "dependent field, typed by its sibling '" + field.sibling().get() + "'";
+                        String unreached = absent == null ? null : where + " names '" + name + "', and " + absent
+                                + ", so the name reaches no value";
+                        at = at.of(dependentType(naming, record, field.sibling().get(), holder, unreached));
+                    } else {
+                        at = at.of(field.typeRef().name());
                     }
+                }
+                case MapBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
+                        + reached + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "
+                        + "name -- a segment selects a key of a namespace value or a field of a record value");
+                case NamespaceBody namespace -> {
                     if (value != null) {
-                        Map<?, ?> entries = asMap(value, reached);
-                        Optional<Object> found = keyed(entries, segment);
+                        Optional<Object> found = keyed(value, segment, reached);
                         if (found.isEmpty()) {
                             throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
-                                    + "' has no key '" + segment + "' -- it holds " + keysOf(entries));
+                                    + "' has no key '" + segment + "' -- it holds " + keysOf(value, reached));
                         }
                         value = found.get();
                     }
-                    at = at.of(map.valueType().name());
+                    at = at.of(namespace.valueType().name());
                 }
                 case ArrayBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
                         + reached + "' is a list, whose elements have no names -- a segment selects a field of a "
@@ -300,100 +339,111 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " names '" + name + "', and " + absent + ", so the name "
                     + "reaches no value");
         }
-        Object delivered = value;
-        cell.ifPresent(c -> c.deliver(delivered));
+        return value;
     }
 
     /**
-     * A kind-typed slot holds a type's name, one segment, and the name is a member of the kind or refused
-     * ({@link KindMembers}): the referent's construction chain reaches the kind's {@code of}, and the referent is no
-     * constructor. A namespace entry is refused as a value, however many segments name it. A type reached through
-     * a namespace of types is not yet a spelling this library reads.
+     * A slot whose {@code of} is a constructor holds a type's name, its path from the root, and the name is a member
+     * or refused ({@link KindMembers}): the referent's value is of the slot's {@code of}. A value entry is refused as a
+     * value, however many segments name it, and a type admits no further segment.
      */
     private void judgeMember(String where, String name, List<String> segments, TsonSchema.SlotType slot,
                              Top referent, String entry) {
-        String wants = where + " wants the name of a type built with '" + slot.of() + "' (a member of '"
+        String wants = where + " wants the name of a type whose value is of '" + slot.of() + "' (a member of '"
                 + slot.name() + "'), and ";
-        if (segments.size() > 1 && referent instanceof Namespace<?> namespace) {
+        if (segments.size() > 1 && referent instanceof ValueEntry value) {
             throw new SchemaValidationException(wants + "'" + name + "' reaches into " + entry + ", which is "
-                    + aValueNoType(namespace) + " -- and what a further segment selects in a value is a value too");
+                    + aValueNoType(value) + " -- and what a further segment selects in a value is a value too");
         }
         if (segments.size() > 1) {
-            throw new UnsupportedOperationException(where + " names '" + name + "' at a position typed by the kind '"
-                    + slot.name() + "', which holds a type's name -- this library does not yet read a type through "
-                    + "a namespace of types, so the name is one segment");
+            throw new SchemaValidationException(wants + "'" + name + "' goes on past " + entry + ", a type, which "
+                    + "admits no further segment");
         }
         if (KindMembers.isMember(name, slot.of(), merged::get,
                 named -> TsonSchemaLinker.constructorOf(named, merged.get(named), facts),
-                governingMeta.schema().entries()::get)) {
+                merged::get)) {
             return;
         }
-        if (referent instanceof Namespace<?> namespace) {
-            throw new SchemaValidationException(wants + entry + " is " + aValueNoType(namespace));
+        if (referent instanceof ValueEntry value) {
+            throw new SchemaValidationException(wants + entry + " is " + aValueNoType(value));
         }
-        String terminal = ReferenceChain.terminal(name, merged);
+        String terminal = AliasChain.terminal(name, merged);
         throw new SchemaValidationException(wants + entry + " is an entry whose body is built by '"
                 + TsonSchemaLinker.constructorOf(terminal, referent, facts).orElse("nothing") + "', which is no '"
                 + slot.of() + "'");
     }
 
     /**
-     * A {@code type_ref}-typed slot of a value body holds the application form: a name that resolves, with as many
-     * arguments as the entry it names declares parameters, each argument the same; and never a value (§4.1).
-     * Judged by resolution and arity alone, as a {@code type_ref} slot is everywhere.
+     * The type a dependent field of {@code record} has in the value {@code holder}: the one its sibling {@code sibling}
+     * names there ([TSON-SCHEMA] §5.2), by the read path's rules ({@link DependentFieldReader}). The sibling's value is
+     * its pin wherever it is written, and otherwise the value {@code holder} holds, or its default where it holds none.
+     * Refused, opening with {@code naming}, where the sibling holds nothing or names no type a value can be read
+     * against; {@code holder} is null where an earlier segment reached no value, and a sibling with no pin or default
+     * then has no type to go on with, so the name is refused as reaching no value, in {@code unreached}'s words.
      */
-    private void judgeApplication(String where, TypeRef reference) {
-        String name = reference.name();
-        String terminal = ReferenceChain.terminal(name, merged);
-        Top referent = merged.get(terminal);
-        if (referent == null) {
-            throw new SchemaValidationException(where + " names '" + name + "', which is no type declared in this "
-                    + "schema or its imports");
+    private String dependentType(String naming, RecordBody record, String sibling, Object holder, String unreached) {
+        RecordField declared = record.fields().get(sibling);
+        if (declared == null) {
+            throw new IllegalStateException(naming + ", which the record does not declare; the linker refuses one");
         }
-        if (referent instanceof Namespace<?> namespace) {
-            throw new SchemaValidationException(where + " names '" + name + "', which is " + aValueNoType(namespace));
+        Object held = null;
+        if (declared.role() == FieldRole.FIXED) {
+            held = declared.value().map(Token::text).orElse(null);
+        } else if (holder != null) {
+            held = holder instanceof TsonValue tree ? present(tree.get(sibling)) : fieldOf(holder, sibling, naming);
         }
-        int parameters = OpenEntry.isOpen(referent) ? OpenEntry.parameterNames(referent).size() : 0;
-        if (reference.arguments().size() != parameters) {
-            throw new SchemaValidationException(where + " applies '" + name + "' to " + reference.arguments().size()
-                    + " argument" + (reference.arguments().size() == 1 ? "" : "s") + ", and it declares "
-                    + parameters + " parameter" + (parameters == 1 ? "" : "s"));
+        if (held == null && declared.role() == FieldRole.DEFAULT) {
+            held = declared.value().map(Token::text).orElse(null);
         }
-        for (io.ltr8.tson.schema.meta.TypeArgument argument : reference.arguments()) {
-            if (argument instanceof io.ltr8.tson.schema.meta.TypeArgument.Ref nested) {
-                judgeApplication(where, nested.ref());
-            }
+        if (held == null && holder == null) {
+            throw new SchemaValidationException(unreached);
         }
-    }
-
-    /** What a namespace entry is, where a type is wanted: a value, which nothing can be typed by (§4.1). */
-    private static String aValueNoType(Namespace<?> namespace) {
-        return "a value of the namespace type '" + namespace.type() + "', a map of names -- a value and not a type, so "
-                + "nothing can be typed by it";
-    }
-
-    /** The meta layer governing the schema that declared {@code entry}: this schema's, or an import's own. */
-    private TsonLinkedSchema metaOf(String entry) {
-        String origin = origins.getOrDefault(entry, ownIdentity);
-        if (origin.equals(ownIdentity) || loader == null) {
-            return governingMeta;
+        Reference named = DependentFieldReader.referenceIn(held);
+        if (named == null) {
+            throw new SchemaValidationException(naming + ", which the value does not hold, so the name has no type "
+                    + "to go on through");
         }
-        return loader.load(origin)
-                .flatMap(declarer -> loader.load(CanonicalIdentity.canonicalize(declarer.schema().meta())))
-                .orElse(governingMeta);
+        return switch (typeNamed(named, declared, merged)) {
+            case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
+            case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
+                    + ", which holds " + none.held() + " -- so the name has no type to go on through");
+        };
     }
 
     /**
-     * The constructor that built {@code definition}'s body: its tag where that names a constructor in {@code meta}'s
-     * namespace, and otherwise the kernel constructor the body's class mirrors.
+     * What a sibling declared {@code sibling} and holding {@code named} types its dependent field by in the namespace
+     * {@code merged}: the read path's rule ({@link DependentFieldReader#typeNamed}), the sibling's reference resolving
+     * an application, and a value entry naming no type either.
      */
-    private static Typed constructorOf(String tag, Top definition, TsonLinkedSchema meta) {
-        Typed source = new Typed(meta, tag);
+    static DependentFieldReader.TypeNamed typeNamed(Reference named, RecordField sibling, Map<String, Top> merged) {
+        DependentFieldReader.TypeNamed typed = DependentFieldReader.typeNamed(named,
+                DependentFieldReader.siblingType(sibling, merged::get), merged::get);
+        if (typed instanceof DependentFieldReader.TypeNamed.Entry entry
+                && AliasChain.terminalDefinition(entry.name(), merged).orElse(null) instanceof ValueEntry value) {
+            return new DependentFieldReader.TypeNamed.None("'" + named.text() + "', " + aValueNoType(value));
+        }
+        return typed;
+    }
+
+    /** What a value entry is, where a type is wanted: a value, which nothing can be typed by (§4.1). */
+    static String aValueNoType(ValueEntry value) {
+        return "a value of the type '" + value.type() + "' -- a value and not a type, so nothing can be typed by it";
+    }
+
+    /**
+     * The type {@code definition} is a value of: a value entry's type, and otherwise the constructor that built the
+     * body, its tag where that names a constructor and the kernel constructor the body's class mirrors where not.
+     */
+    private static Typed constructorOf(String tag, Top definition, Space space) {
+        if (definition instanceof ValueEntry value) {
+            return new Typed(space, value.type());
+        }
+        Typed source = new Typed(space, tag);
         Top constructor = source.definition();
-        if (constructor != null && meta.isConstructor(tag, constructor)) {
+        if (constructor != null && space.isConstructor(tag, constructor)) {
             return source;
         }
-        return new Typed(meta, TsonCompiledMetaSchema.typenameOf(definition));
+        return new Typed(space, TsonCompiledVocabulary.typenameOf(definition));
     }
 
     /**
@@ -409,7 +459,7 @@ final class ValuesByName {
         if (values == null) {
             throw new IllegalStateException(naming + " is a field of a record value, and this schema was linked with no "
                     + "bind context to read it through -- link it with the context its values were bound under "
-                    + "(TsonCompiledMetaRegistry.link)");
+                    + "(TsonCompiledVocabularyRegistry.link)");
         }
         DataClass bound;
         try {
@@ -447,6 +497,28 @@ final class ValuesByName {
                 + value.getClass().getName() + " rather than a map");
     }
 
+    /** A tree's value at a key or field, {@code null} where the tree holds none. */
+    private static Object present(TsonValue value) {
+        return value.isMissing() ? null : value;
+    }
+
+    /** The value under the key spelled {@code segment} of a namespace value, bound or held as a tree. */
+    private static Optional<Object> keyed(Object value, String segment, String reached) {
+        if (value instanceof TsonValue tree) {
+            return Optional.ofNullable(present(tree.get(segment)));
+        }
+        return keyed(asMap(value, reached), segment);
+    }
+
+    /** The keys a namespace value holds, as a message lists them. */
+    private static String keysOf(Object value, String reached) {
+        if (value instanceof TsonMap tree) {
+            return tree.entries().isEmpty() ? "none" : String.join(", ", tree.entries().stream()
+                    .map(entry -> entry.key().asString().orElse(String.valueOf(entry.key()))).toList());
+        }
+        return keysOf(asMap(value, reached));
+    }
+
     /** The value under the key spelled {@code segment}: a {@code String} key directly, any other by its text. */
     private static Optional<Object> keyed(Map<?, ?> map, String segment) {
         if (map.containsKey(segment)) {
@@ -470,7 +542,7 @@ final class ValuesByName {
     }
 
     /** A slot as an RFC 6901 pointer into the body, as a diagnostic path is written. */
-    private static String pointer(List<String> steps) {
+    static String pointer(List<String> steps) {
         StringBuilder pointer = new StringBuilder();
         for (String step : steps) {
             pointer.append('/').append(step.replace("~", "~0").replace("/", "~1"));

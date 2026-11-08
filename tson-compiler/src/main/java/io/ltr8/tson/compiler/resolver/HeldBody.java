@@ -7,13 +7,16 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -24,17 +27,17 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * An open entry's held tree -- the constructor application it holds, as a working value of the phases that need
- * one: a {@link TemplateBody}'s text parsed, or an open {@link RecordBody}'s tree written ({@link
- * WireForm#heldRecord}).
+ * A held template's tree -- the constructor application a {@link TemplateBody} holds as text, parsed, as a working
+ * value of the phases that need one. A {@link RecordTemplateBody} has no held tree: it is the {@code
+ * record_template} value it is, and the two questions both shapes are asked are answered for it off the model
+ * ({@link #namesOf}, {@link #applicationsOf}).
  *
  * <p><b>The tree is a working value, not part of the entry.</b> {@link TemplateBody} carries the application as
- * text because a parameter may stand in any slot of a constructor other than {@code record}; a record template is
- * the record value it is. Either way this builds the tree on demand for the four questions an open body is asked
- * before it closes: which names it mentions (§5.10's unreferenced-parameter
- * rule), which applications it writes (§5.10.1's regularity rule and §5.10's arity rule), what substitution
- * rewrites at materialisation, and which constructor heads it applies. Nothing outside this package sees a
- * {@link DataValue}.
+ * text because a parameter may stand in any slot of a constructor other than {@code record}. This builds the tree on
+ * demand for the four questions a held body is asked before it closes: which names it mentions (§5.10's
+ * unreferenced-parameter rule), which applications it writes (§5.10.1's regularity rule and §5.10's arity rule),
+ * what substitution rewrites at materialisation, and which constructor heads it applies. Nothing outside this
+ * package sees a {@link DataValue}.
  *
  * <p><b>Building rather than holding is what keeps the value model a value model.</b> The AST is
  * {@code tson-compiler}'s own grammar type and {@code tson-schema} depends on nothing here, so an entry
@@ -73,7 +76,7 @@ public final class HeldBody {
      */
     public static TemplateBody held(List<String> parameters, DataValue application) {
         if (WireForm.RECORD.equals(application.typeRef().orElse(null))) {
-            throw new IllegalStateException("a record template is a record with parameters, never held text "
+            throw new IllegalStateException("a record template is a record_template, never held text "
                     + "(§5.10): " + parameters);
         }
         // Every parameter starts as a type parameter: its type is derived from the body once the whole schema has
@@ -83,26 +86,15 @@ public final class HeldBody {
     }
 
     /**
-     * The held application of {@code open}, an open entry's value ({@link OpenEntry#isOpen}) -- the one door
-     * every phase asking a question of an open body goes through, so which kernel shape carries one is answered
-     * here and nowhere else.
+     * The held application of {@code body} -- a held template's text parsed.
      *
      * <p>The text is a {@code core-value} rather than a whole document, so it parses through the data
      * grammar and is complete when the value ends. A failure here is an internal fault and not an author
      * error: every held body in circulation was written by {@link WireForm} from a tree this resolver built,
      * so text that will not parse means the writer and the parser disagree.
      */
-    public static HeldBody of(Top open) {
-        Objects.requireNonNull(open, "open");
-        if (OpenEntry.isFamilyBase(open)) {
-            // An open record is a value of the vocabulary as it stands, so its tree is written rather than parsed.
-            RecordBody record = (RecordBody) open;
-            return new HeldBody(record.parameterNames(), WireForm.heldRecord(record, HeldBody::annotationValue));
-        }
-        if (!(open instanceof TemplateBody body)) {
-            throw new IllegalStateException("only an open entry has a held body, and this one is closed: "
-                    + open.getClass().getSimpleName());
-        }
+    public static HeldBody of(TemplateBody body) {
+        Objects.requireNonNull(body, "body");
         try {
             return new HeldBody(body.parameterNames(),
                     new TsonDataParser(body.template()).parseDocument().root());
@@ -113,12 +105,44 @@ public final class HeldBody {
         }
     }
 
-    /** A held tree in hand, for a check that runs on a payload before it is bound. */
-    static HeldBody ofTree(List<String> parameters, DataValue application) {
-        return new HeldBody(List.copyOf(parameters), application);
+    /**
+     * Every name an open entry's body mentions ({@link #names}) -- a held template's tokens, or a record template's
+     * labels and the names its references write (field types and parents, arguments at any depth). What §5.10's
+     * unreferenced-parameter rule asks of every open entry, whichever shape holds it.
+     */
+    public static Set<String> namesOf(Top open) {
+        if (!(open instanceof RecordTemplateBody template)) {
+            return of(heldOf(open)).names();
+        }
+        Set<String> names = new LinkedHashSet<>();
+        template.fields().values().forEach(field -> {
+            field.typeParam().ifPresent(names::add);
+            field.valueParam().ifPresent(names::add);
+        });
+        template.references().forEach(reference -> collect(reference, names));
+        return names;
     }
 
-    /** A field annotation's bound value back in wire form, for {@link WireForm#heldRecord}. */
+    /**
+     * Every application an open entry's body writes ({@link #applications}) -- in a held template's text, or among a
+     * record template's references.
+     */
+    public static List<TypeRef> applicationsOf(Top open) {
+        if (!(open instanceof RecordTemplateBody template)) {
+            return of(heldOf(open)).applications();
+        }
+        return template.references().stream().filter(reference -> !reference.arguments().isEmpty()).toList();
+    }
+
+    private static TemplateBody heldOf(Top open) {
+        if (open instanceof TemplateBody held) {
+            return held;
+        }
+        throw new IllegalStateException("only an open entry has a body to ask, and this one is closed: "
+                + (open == null ? "null" : open.getClass().getSimpleName()));
+    }
+
+    /** A field annotation's bound value back in wire form, for {@link WireForm#recordWire}. */
     static DataValue annotationValue(Object value) {
         return new TsonDataParser(WRITER.toTson(value)).parseDocument().root();
     }
@@ -137,9 +161,9 @@ public final class HeldBody {
      * Every unquoted name this body mentions, at any depth -- the one question §5.10 asks at link time: a
      * declared parameter the body never references is an author error.
      *
-     * <p>What it returns is exactly the set of tokens substitution would rewrite -- unquoted ones, a quoted
-     * token in a value slot being a literal and never a name -- or the check and the rewrite disagree about
-     * what a parameter reference is.
+     * <p>What it returns is exactly the set of names substitution would rewrite -- unquoted tokens, and the names
+     * an application writes, a quoted token being a literal and never a name -- or the check and the
+     * rewrite disagree about what a parameter reference is.
      */
     public Set<String> names() {
         Set<String> names = new LinkedHashSet<>();
@@ -167,22 +191,22 @@ public final class HeldBody {
     }
 
     /**
-     * Every {@code type_ref} record form the held tree holds. It does <b>not</b> descend into one it finds:
-     * an application's own arguments come back inside the {@link TypeRef} it yields, and the caller that
-     * cares about nesting walks those -- descending here as well would report each nested application twice.
+     * Every application the held tree holds ({@link WireForm#applicationIn}). An application's own arguments come
+     * back inside the {@link TypeRef} it yields, and the caller that cares about nesting walks those -- descending
+     * here as well would report each nested application twice.
      */
     private static void collectApplications(CoreValue value, List<TypeRef> into) {
         switch (value) {
-            case RecordValue record when WireForm.isApplication(record) ->
-                    into.add(WireForm.typeRefOf(record));
+            case ReferenceValue(TypeRef applied) ->
+                    into.add(applied);
             case RecordValue record -> record.fields()
-                    .forEach(field -> collectApplications(field.value().value().coreValue(), into));
+                    .forEach(field -> collectApplications(field.value().coreValue(), into));
             case ArrayValue array -> array.elements()
-                    .forEach(element -> collectApplications(element.value().coreValue(), into));
+                    .forEach(element -> collectApplications(element.coreValue(), into));
             // `record.fields` is a map, and an application stands in a field's value as readily as in an array.
             case MapValue map -> map.entries().forEach(entry -> {
                 collectApplications(entry.key().coreValue(), into);
-                collectApplications(entry.value().value().coreValue(), into);
+                collectApplications(entry.value().coreValue(), into);
             });
             default -> { } // a token names a type but applies nothing
         }
@@ -191,17 +215,32 @@ public final class HeldBody {
     private static void collect(CoreValue value, Set<String> into) {
         switch (value) {
             case TokenValue token when token.form() == TokenForm.UNQUOTED -> into.add(token.text());
+            case ReferenceValue(TypeRef applied) ->
+                    collect(applied, into);
             case ArrayValue array -> array.elements()
-                    .forEach(element -> collect(element.value().coreValue(), into));
+                    .forEach(element -> collect(element.coreValue(), into));
             case RecordValue record -> record.fields()
-                    .forEach(field -> collect(field.value().value().coreValue(), into));
+                    .forEach(field -> collect(field.value().coreValue(), into));
             // A map's keys carry names as readily as its values do -- `{ S => [T] }` puts one parameter in
             // each -- and a key is a full data-value (§2.6), so it is walked rather than read as a token.
             case MapValue map -> map.entries().forEach(entry -> {
                 collect(entry.key().coreValue(), into);
-                collect(entry.value().value().coreValue(), into);
+                collect(entry.value().coreValue(), into);
             });
             default -> { } // a quoted token is a literal, and nothing else carries a name
+        }
+    }
+
+    /** An application's head and every name its arguments write, at any depth, an unquoted value token included. */
+    private static void collect(TypeRef application, Set<String> into) {
+        into.add(application.name());
+        for (TypeArgument argument : application.arguments()) {
+            switch (argument) {
+                case TypeArgument.Ref ref -> collect(ref.ref(), into);
+                case TypeArgument.Value value when value.value().form() == Token.Form.UNQUOTED ->
+                        into.add(value.value().text());
+                case TypeArgument.Value ignored -> { }
+            }
         }
     }
 }

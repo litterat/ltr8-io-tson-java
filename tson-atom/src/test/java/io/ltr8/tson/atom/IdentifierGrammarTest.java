@@ -34,7 +34,7 @@ class IdentifierGrammarTest {
                 .orElseGet(() -> fail("should reject: " + text));
     }
 
-    /** The kernel's {@code identifier} declares §7.7's sets, and the grammar is built from it, not restated. */
+    /** The kernel's {@code meta.identifier} declares §7.7's sets, and the grammar is built from it, not restated. */
     @Test
     void theProfileIsTheKernelIdentifiers() {
         assertEquals(IdentifierProfile.of(Base.XID, Base.XID, "", "-", "", "", Normalization.NFC),

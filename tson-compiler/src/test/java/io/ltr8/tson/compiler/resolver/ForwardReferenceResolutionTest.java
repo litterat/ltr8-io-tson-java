@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Top;
@@ -17,17 +17,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Forward-reference resolution (§3.4.1): a declaration may compose/refine one declared later in the same
  * schema (resolution now follows dependencies, not source order). Recursion through <i>field</i> references
  * — which carry a bare name, verified later by the linker — resolves fine; a circular <i>composition</i>
- * chain, which genuinely needs the target resolved to resolve the dependant, is rejected.
+ * chain, each operand waiting on the other being ready ([TSON-SCHEMA] §3.4.1's wait order), is rejected, naming
+ * the cycle in wait order.
  */
 class ForwardReferenceResolutionTest {
 
     private static TsonSchema resolve(String body) {
         String document = """
                 !!id:"https://example.test/fwd.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                 """ + body + "\n}\n";
-        SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
+        SchemaResolver resolver =
+                new SchemaResolver(new TsonCompiledVocabularyRegistry(SchemaModelNameBinder.defaultContext()));
         return resolver.resolveSchema(new TsonSchemaParser(document).parseSchemaDocument());
     }
 
@@ -67,7 +69,7 @@ class ForwardReferenceResolutionTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolve("  a => b & { }\n  b => a & { }"));
 
-        assertTrue(thrown.getMessage().contains("circular"), thrown::getMessage);
+        assertTrue(thrown.getMessage().startsWith("'a' waits on 'b' waits on 'a'"), thrown::getMessage);
     }
 
     @Test
@@ -77,6 +79,6 @@ class ForwardReferenceResolutionTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolve("  a => b & { p: text }\n  b => a & { q: text }"));
 
-        assertTrue(thrown.getMessage().contains("circular"), thrown::getMessage);
+        assertTrue(thrown.getMessage().startsWith("'a' waits on 'b' waits on 'a'"), thrown::getMessage);
     }
 }

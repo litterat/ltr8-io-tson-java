@@ -13,7 +13,7 @@ import io.ltr8.tson.atom.parser.EnumParser;
 import io.ltr8.tson.atom.parser.IdentifierParser;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
-import io.ltr8.tson.atom.parser.KindParser;
+import io.ltr8.tson.atom.parser.TypeNameRefParser;
 import io.ltr8.tson.atom.parser.RefParser;
 import io.ltr8.tson.atom.parser.HostParser;
 import io.ltr8.tson.atom.parser.HostnameParser;
@@ -30,43 +30,41 @@ import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.schema.meta.BytesType;
-import io.ltr8.tson.schema.meta.Cidr4Type;
-import io.ltr8.tson.schema.meta.Cidr6Type;
-import io.ltr8.tson.schema.meta.ComplexType;
-import io.ltr8.tson.schema.meta.DateTimeType;
-import io.ltr8.tson.schema.meta.DateType;
-import io.ltr8.tson.schema.meta.DecimalType;
-import io.ltr8.tson.schema.meta.DurationType;
-import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.binary.BytesType;
+import io.ltr8.tson.schema.net.Cidr4Type;
+import io.ltr8.tson.schema.net.Cidr6Type;
+import io.ltr8.tson.schema.numeric.ComplexType;
+import io.ltr8.tson.schema.temporal.DateTimeType;
+import io.ltr8.tson.schema.temporal.DateType;
+import io.ltr8.tson.schema.numeric.DecimalType;
+import io.ltr8.tson.schema.temporal.DurationType;
+import io.ltr8.tson.schema.net.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.IntegerType;
-import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.RefBody;
-import io.ltr8.tson.schema.meta.HostType;
-import io.ltr8.tson.schema.meta.HostnameType;
-import io.ltr8.tson.schema.meta.MediaTypeType;
-import io.ltr8.tson.schema.meta.Ipv4Type;
-import io.ltr8.tson.schema.meta.Ipv6Type;
-import io.ltr8.tson.schema.meta.MacType;
-import io.ltr8.tson.schema.meta.PeriodType;
-import io.ltr8.tson.schema.meta.RationalType;
-import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.TextType;
-import io.ltr8.tson.schema.meta.TimeType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.numeric.IntegerType;
+import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.net.HostType;
+import io.ltr8.tson.schema.net.HostnameType;
+import io.ltr8.tson.schema.net.MediaTypeType;
+import io.ltr8.tson.schema.net.Ipv4Type;
+import io.ltr8.tson.schema.net.Ipv6Type;
+import io.ltr8.tson.schema.net.MacType;
+import io.ltr8.tson.schema.temporal.PeriodType;
+import io.ltr8.tson.schema.numeric.RationalType;
+import io.ltr8.tson.schema.unicode.RegexType;
+import io.ltr8.tson.schema.unicode.TextType;
+import io.ltr8.tson.schema.temporal.TimeType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.IriType;
-import io.ltr8.tson.schema.meta.UriType;
-import io.ltr8.tson.schema.meta.UuidType;
-import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.net.IriType;
+import io.ltr8.tson.schema.net.UriType;
+import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.VoidType;
 import java.util.Optional;
 
 /**
  * A resolved atom body to the {@link AtomType} that parses tokens against it -- the answer to "does this
- * token satisfy this type?" for a caller that holds a {@code schema.meta} body and nothing else.
+ * token satisfy this type?" for a caller that holds a schema-model body and nothing else.
  *
  * <p><b>Distinct from {@link BuiltinTypeVocabulary}, which answers a different question.</b> That maps a
  * built-in <em>name</em> ({@code int32}) to a parser with the constraints §5 fixes for it; this maps a
@@ -96,11 +94,7 @@ public final class AtomParsers {
      * parser does not model (see {@code ComplexParser}), so the body selects the parser without configuring it.
      * Every other family is constructed from the body it was given.
      *
-     * <p><b>{@code value} and {@code void} yield nothing.</b> {@code void} is the type with no value, so no token
-     * is one, and {@code value} is read by base type resolution, which is the <em>encoding's</em> ([TSON-DATA]
-     * §4 for the text encoding, [TSON-JSON] §5.7 for JSON) rather than this vocabulary's -- reading it depends on
-     * how the token was written, which an {@link AtomType} deliberately cannot see. A caller holding an encoding
-     * supplies its own.
+     * <p><b>{@code void} yields nothing.</b> It is the type with no value, so no token is one.
      */
     public static Optional<AtomType<?>> forType(Top body) {
         return forType(body, Normalization.NONE);
@@ -112,44 +106,48 @@ public final class AtomParsers {
      * meta may hold, which only linking sees, so the caller supplies what linking recorded
      * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
      *
-     * <p>A reference body is this library's gap here, an {@link UnsupportedOperationException}: these callers judge a
-     * value a schema writes ({@code ~}/{@code =}, a template argument) by its token, and a reference's value is judged
-     * by what its name reaches, which only a value body's recorded names are.
+     * <p>A reference that names values is this library's gap here, an {@link UnsupportedOperationException}: these
+     * callers judge a value a schema writes (a template argument, a discriminator's pin) by its token before the
+     * schema links, and such a reference's value is judged by what its name reaches, which only the schema's own link
+     * can follow -- the linker judges a field's {@code ~}/{@code =} there itself.
      */
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
-        if (body instanceof RefBody reference) {
-            throw new UnsupportedOperationException("a value a schema writes at a reference-typed position ('ref<"
-                    + reference.of() + ">') is not yet judged: a reference's value is judged by what its name reaches");
+        if (body instanceof ReferenceBody reference && !reference.namesTypes()) {
+            throw new UnsupportedOperationException("a value a schema writes at a reference-typed position ('meta.ref<"
+                    + reference.of().text()
+                    + ">') is not yet judged: a reference's value is judged by what its name reaches");
         }
-        return forType(body, enumForm, false);
+        return forRead(body, enumForm);
     }
 
     /**
-     * {@link #forType(Top, Normalization)} for a position read under a schema that {@code governsSchemas} -- a meta
-     * layer, whose documents are schemas or describe one. A name such a document writes at a kind-typed position
-     * resolves in the described schema's namespace and not in the closure the kind's members were computed over, so
-     * the kind reads the type-name grammar alone ({@link KindParser#namesOnly}) and that schema's link, or ingest,
-     * judges membership ([TSON-SCHEMA] §4.2, §8.1). Every other body is read as {@link #forType(Top, Normalization)}
-     * reads it.
-     *
-     * <p>A reference ({@code ref_type}) is read only here, with {@code governsSchemas} true: a reference names an
-     * entry holding a value, which only a kernel-governed schema has, so the linker refuses one declared anywhere
-     * else and a reference body reaching here under any other schema is a broken invariant.
+     * How a value read at a position typed by {@code body} reads in a schema document's value -- a constructor's or
+     * a value entry's payload -- where that differs from a data document's ({@link #forRead}): a reference that names
+     * types reads the type-name grammar alone ({@link TypeNameRefParser#namesOnly}), and one that names values its qualified
+     * name alone ({@link RefParser#namesOnly}). A name there resolves in the schema being resolved, which the closure the
+     * reference was linked over does not hold, so the read records it and the schema's link judges it ([TSON-SCHEMA]
+     * §4.2, §5.12).
+     * Empty for every other body, which reads alike in both.
      */
-    public static Optional<AtomType<?>> forType(Top body, Normalization enumForm, boolean governsSchemas) {
-        if (governsSchemas && body instanceof KindBody kind) {
-            return Optional.of(KindParser.namesOnly(kind));
-        }
-        if (body instanceof RefBody reference) {
-            if (!governsSchemas) {
-                throw new IllegalStateException("a reference ('ref<" + reference.of() + ">') reached a schema the "
-                        + "meta-kernel does not govern: the linker refuses a reference declared outside a "
-                        + "kernel-governed schema");
-            }
-            return Optional.of(new RefParser(reference));
+    public static Optional<AtomType<?>> inSchemaDocument(Top body) {
+        return switch (body) {
+            case ReferenceBody reference -> Optional.of(reference.namesTypes() ? TypeNameRefParser.namesOnly(reference)
+                    : RefParser.namesOnly(reference));
+            default -> Optional.empty();
+        };
+    }
+
+    /**
+     * {@link #forType(Top, Normalization)} for a position a data document is read at. A reference that names types
+     * judges membership in the closure its members were computed over, which is the reading document's ([TSON-SCHEMA]
+     * §4.2). One that names values reads its qualified name and judges what it reaches in that closure ({@link
+     * RefParser}), as the linker judges a value body's names (§5.12).
+     */
+    public static Optional<AtomType<?>> forRead(Top body, Normalization enumForm) {
+        if (body instanceof ReferenceBody reference) {
+            return Optional.of(reference.namesTypes() ? new TypeNameRefParser(reference) : new RefParser(reference));
         }
         return Optional.ofNullable(switch (body) {
-            case ValueType ignored -> null;
             case VoidType ignored -> null;
             case IdentifierType t -> new IdentifierParser(t);
             case IntegerType t -> new IntegerParser(t);
@@ -173,7 +171,6 @@ public final class AtomParsers {
             case Cidr4Type t -> new Cidr4Parser(t);
             case Cidr6Type t -> new Cidr6Parser(t);
             case EnumBody t -> new EnumParser(t, enumForm);
-            case KindBody t -> new KindParser(t);
             case ComplexType ignored -> ComplexParser.UNCONSTRAINED;
             case Ipv4Type t -> Ipv4Parser.of(t);
             case HostnameType t -> new HostnameParser(t);

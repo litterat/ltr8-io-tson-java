@@ -3,11 +3,12 @@ package io.ltr8.tson.schema.meta;
 import java.util.Objects;
 
 /**
- * A value held by name, as a host receives it at a slot typed {@code ref<T>} (the kernel's {@code ref_type}): the
- * qualified name as written, {@code myapi.get_orders}, and the value it names once the schema has linked. The read
- * creates it with the name alone; the linker resolves the name, judges the referent a value of {@code T}, and
- * delivers it here exactly once. Before that {@link #get} throws, so a host that reads references out of an
- * unlinked body is told rather than handed {@code null}.
+ * A value held by name, as a host receives it at a slot typed {@code meta.ref<T>} with {@code T} no constructor (the
+ * kernel's {@code reference}): the qualified name as written, {@code myapi.get_orders}, and the value it names. In a
+ * schema document the read creates it with the name alone, and the linker resolves the name, judges the referent a
+ * value of {@code T}, and delivers it here exactly once; in a data document the read judges the name in the governing
+ * schema and delivers at once. Before delivery {@link #get} throws, so a host that reads references out of an unlinked
+ * body is told rather than handed {@code null}.
  *
  * <p>Equality is by name: two references to one address are one reference, delivered or not. A {@code TypeRef}
  * component at the same slot receives the name and nothing else, for a host that wants no delivery.
@@ -34,7 +35,7 @@ public final class Ref<T> {
         return name;
     }
 
-    /** Whether the linker has delivered the value this names. */
+    /** Whether the value this names has been delivered. */
     public boolean isResolved() {
         return delivered;
     }
@@ -42,7 +43,7 @@ public final class Ref<T> {
     /**
      * The value this names.
      *
-     * @throws IllegalStateException before the schema has linked
+     * @throws IllegalStateException before the value is delivered
      */
     public T get() {
         if (!delivered) {
@@ -53,8 +54,8 @@ public final class Ref<T> {
     }
 
     /**
-     * The linker's delivery, once. A second delivery is an internal invariant broken: one read produces one
-     * reference and one link judges it.
+     * The delivery, once: the linker's for a name a schema document wrote, the read's for one in a data document. A
+     * second delivery is an internal invariant broken: one read produces one reference and one judgement delivers it.
      */
     @SuppressWarnings("unchecked")
     public void deliver(Object referent) {

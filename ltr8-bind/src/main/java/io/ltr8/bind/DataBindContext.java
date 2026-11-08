@@ -110,6 +110,11 @@ public class DataBindContext {
 			return this;
 		}
 
+		/** Whether {@code targetClass} is registered as an atom by this builder, with or without a bridge. */
+		public boolean registersAtom(Class<?> targetClass) {
+			return atoms.stream().anyMatch(atom -> atom.targetClass().equals(targetClass));
+		}
+
 		public Builder allowAny() {
 			allowAny = true;
 			return this;
@@ -165,7 +170,15 @@ public class DataBindContext {
 		return new Builder();
 	}
 
+	// What this context was built from, so a caller can derive a context that adds to it (toBuilder).
+	private final boolean allowAny;
+	private final boolean allowSerializable;
+	private final List<Builder.Registration> atoms;
+
 	private DataBindContext(Builder builder) {
+		this.allowAny = builder.allowAny;
+		this.allowSerializable = builder.allowSerializable;
+		this.atoms = List.copyOf(builder.atoms);
 
 		this.dataClassResolver = new DefaultClassBinder();
 		this.profile = builder.profile;
@@ -209,6 +222,25 @@ public class DataBindContext {
 			throw new IllegalArgumentException(e);
 		}
 
+	}
+
+	/**
+	 * A builder holding everything this context was built from -- its name binder, profile, permissions and atom
+	 * registrations -- so a caller can build a context that adds to this one rather than restating it.
+	 */
+	public Builder toBuilder() {
+		Builder builder = new Builder();
+		builder.allowAny = allowAny;
+		builder.allowSerializable = allowSerializable;
+		builder.profile = profile;
+		builder.nameBinder = nameBinder;
+		builder.atoms.addAll(atoms);
+		return builder;
+	}
+
+	/** The binder this context resolves a bare type name to a class with ({@link #getDescriptor(String)}). */
+	public DataNameBinder nameBinder() {
+		return nameBinder;
 	}
 
 	/** This context's binding profile, empty when it has none -- see {@link Builder#profile}. */

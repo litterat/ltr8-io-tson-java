@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -24,8 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>The edge cannot be minted where the author writes it.</b> At {@code ok}'s declaration {@code
  * result<T>} denotes no entry -- a template is not a type (§5.10) -- so there is nothing to name in a chain.
- * What the held body keeps is the application itself as a written parent, {@code supertypes} being a
- * {@code [type_ref]} channel, and materialisation substitutes and closes it with the rest of the held body.
+ * What the held body keeps is the application itself as a written parent, {@code parents} being a
+ * {@code [meta.type_ref]} slot whose reference may carry arguments, and materialisation substitutes and closes it
+ * with the rest of the held body.
  *
  * <p><b>Why a reference and not the head name.</b> §5.8 describes {@code supertypes} as recording head names
  * only, with substitutability then a two-part check against the bodies. A head name cannot work here: no
@@ -40,9 +41,9 @@ class SubtypeTemplateFamilyTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/subtype-template.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -52,8 +53,8 @@ class SubtypeTemplateFamilyTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -63,7 +64,7 @@ class SubtypeTemplateFamilyTest {
      * already named the same application.
      */
     private static String target(TsonCompiledSchema compiled, String alias) {
-        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
 
@@ -93,6 +94,28 @@ class SubtypeTemplateFamilyTest {
     }
 
     /**
+     * <b>An applied parent reaches the entry its arguments name, never its head</b> ([TSON-SCHEMA] §5.8's
+     * "Parameterized references", §8.1's derived indexes: "{@code ok<text>} indexes {@code result<text>}, never a
+     * head name"). So the template {@code ok} is IS-A nothing of {@code result}'s, and {@code ok<text>} reaches
+     * {@code result} only through a declaration naming {@code result<text>}: with none, it is a member of {@code
+     * ok}'s family alone.
+     */
+    @Test
+    void anAppliedParentReachesTheEntryItsArgumentsNameAndNeverTheHead() {
+        TsonCompiledSchema compiled = compile("""
+                  result    => <T> { payload: T }
+                  ok        => <T> result<T> & { note: text }
+                  ok_of     => ok<text>
+                """);
+
+        assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get("ok")),
+                "the template is IS-A no head name");
+        assertEquals(List.of("ok"), TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
+                "no declaration names result<text>, so its application reaches no member of result's family");
+        assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get("result")));
+    }
+
+    /**
      * <b>A family-base template is IS-A its parents, and so are its instantiations</b> ([TSON-SCHEMA] §4.1). A
      * record template carries a chain: it holds {@code base} as written and as reached, which puts the
      * template in {@code base.subtypes} as any record composing {@code base} is, and every instantiation closing
@@ -112,7 +135,7 @@ class SubtypeTemplateFamilyTest {
         assertTrue(TypeChain.subtypesOf(baseEntry).contains("box"),
                 () -> "the template is IS-A its parent too: " + TypeChain.subtypesOf(baseEntry));
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(compiled.schema().entries().get("box")),
-                "the open record keeps its parent as written, which closing completes");
+                "the record template keeps its parent as written, which closing completes");
     }
 
     /**

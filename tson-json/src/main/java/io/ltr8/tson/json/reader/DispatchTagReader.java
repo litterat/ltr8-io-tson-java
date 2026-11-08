@@ -32,10 +32,10 @@ import java.util.Set;
  * <p><b>Every name it admits was resolved to a reader when the schema compiled.</b> A base's {@code
  * subtypes} is its whole family, not only its children, so a tag naming a type any number of levels down
  * reaches that type's reader in one step, and every alias meaning one of them ([TSON-SCHEMA] §7.2's "after
- * reference flattening of both") reaches the same reader.
+ * alias flattening of both") reaches the same reader.
  *
  * <p><b>It decides from the leading members and reads no further</b> ({@link TagMembers#lead}): §3.3
- * puts {@code $type} first, after a {@code $schema} where one is present, so the selector is known before any
+ * puts {@code $type} first, so the selector is known before any
  * of the object's own members, and the reader it selects reads the object once, from the start.
  */
 final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {

@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -90,9 +90,9 @@ class OpenOperandCompositionTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/open-operand.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -102,8 +102,8 @@ class OpenOperandCompositionTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -121,7 +121,7 @@ class OpenOperandCompositionTest {
         // A `name => head<args>` declaration *is* the instantiation entry (§8.2), so
         // the entry every use site reaches is the declaration itself -- or, where an earlier declaration
         // already named the same application, the one it aliases.
-        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Reference ref
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
 
@@ -139,7 +139,7 @@ class OpenOperandCompositionTest {
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("id", "tag", "value"), closed.fields().keySet().stream().toList(),
                 "customer's field, then box's flattened field set, in composition order");
-        assertEquals("text", closed.fields().values().stream().toList().get(2).type().name(),
+        assertEquals("text", closed.fields().values().stream().toList().get(2).typeRef().name(),
                 () -> "the parameter absorbed from box<T> closes with vip: "
                         + closed.fields().values().stream().toList().get(2));
     }
@@ -228,16 +228,15 @@ class OpenOperandCompositionTest {
         RecordBody closed = (RecordBody) compiled.schema().entries()
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("tag", "note", "value"), closed.fields().keySet().stream().toList());
-        assertEquals("text", closed.fields().values().stream().toList().get(2).type().name(),
+        assertEquals("text", closed.fields().values().stream().toList().get(2).typeRef().name(),
                 "the parameter survived the refinement");
     }
 
     /**
      * One template applied to another, at an absorbing position and still open. Substitution writes a bound
-     * reference through {@code SchemaDesugarer.refValue}, which spells one carrying arguments in {@code
-     * type_ref}'s record form rather than as a bare token, so {@code inner<T>} survives whole and the
-     * absorbing declaration's own materialisation closes it. Writing the head name alone dropped the argument
-     * list with no diagnostic, which is why this was refused as a gap rather than closed wrongly.
+     * reference through {@code WireForm.refValue}, which spells one carrying arguments as the data grammar's
+     * reference rather than as its head name, so {@code inner<T>} survives whole and the absorbing declaration's own
+     * materialisation closes it. Writing the head name alone would drop the argument list with no diagnostic.
      */
     @Test
     void anArgumentThatIsItselfAnApplicationSurvivesSubstitutionWhole() {
@@ -253,18 +252,18 @@ class OpenOperandCompositionTest {
                 .get(aliasTarget(compiled, "use"));
         String v = closed.fields().entrySet().stream().filter(f -> f.getKey().equals("v"))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .type().name();
+                .typeRef().name();
 
         RecordBody held = (RecordBody) compiled.schema().entries().get(v);
         assertEquals(List.of("u"), held.fields().keySet().stream().toList(),
                 () -> "'v' should name the inner<text> instantiation, not bare 'inner': " + v);
-        assertEquals("text", held.fields().values().stream().toList().get(0).type().name(),
+        assertEquals("text", held.fields().values().stream().toList().get(0).typeRef().name(),
                 "the argument list survived, so U closed to text");
     }
 
     /**
-     * The one position a bound reference cannot be written into: a {@code type_ref}'s own head, which is a
-     * {@code type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
+     * The one position a bound reference cannot be written into: a reference's own head, which is a
+     * {@code meta.type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
      * at the template's declaration, before substitution has anything to say about it.
      */
     @Test

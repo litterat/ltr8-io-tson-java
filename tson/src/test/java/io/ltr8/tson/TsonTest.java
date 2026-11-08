@@ -2,15 +2,15 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledVocabulary;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import java.math.BigInteger;
+import java.util.Map;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The same real scenario {@code TinySchemaImportsCoreTn1Test} proves by hand-assembling
- * {@code TsonSchemaRegistry}/{@code TsonCompiledMetaRegistry} directly -- a small, user-defined schema
+ * {@code TsonSchemaRegistry}/{@code TsonCompiledVocabularyRegistry} directly -- a small, user-defined schema
  * importing core.tn -- but through this class's own public front door instead, confirming the builder
  * genuinely replaces that wiring.
  */
@@ -28,34 +28,28 @@ class TsonTest {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tson-test.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               my_int => int32
               my_percentage => !integer ^ { min: 1  max: 100 }
             }
             """;
 
     /**
-     * The `!!import`-vs-`!!meta` confusion, end to end: core.tn is a type library, not a meta-schema, so it
-     * can govern nothing. This is an authoring error in the schema, which is why it arrives as a {@link
-     * SchemaValidationException} a caller can catch around {@code resolve} rather than as an unchecked
-     * library-fault type — and why {@code tson validate} can tell it apart from a bug in this tool.
+     * An imported type library contributes its namespace ([TSON-SCHEMA] §2.2.3): core.tn's {@code uuid}
+     * resolves.
      */
     @Test
-    void rejectsASchemaThatNamesATypeLibraryAsItsMeta() {
-        Tson tson = Tson.standard();
-
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> tson.resolve("""
-                        !!id:"https://example.test/oops.tn"
-                        !!meta:"https://tson.io/2026/38/m/core.tn"
-                        {
-                          my_thing => uuid
-                        }
-                        """));
-        assertTrue(thrown.getMessage().contains("core.tn"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("!!import"), thrown.getMessage());
+    void anImportedTypeLibrarysNamesResolve() {
+        TsonLinkedSchema linked = Tson.standard().resolve("""
+                !!id:"https://example.test/oops.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
+                  my_thing => uuid
+                }
+                """);
+        assertTrue(linked.schema().entries().containsKey("uuid"));
     }
 
     @Test
@@ -63,10 +57,13 @@ class TsonTest {
         Tson tson = Tson.standard();
 
         TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
-        // Merged view: the two local declarations, plus core.tn's own 44 imported entries --
-        // TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved TsonSchema
-        // resolve()'s own resolution step produces internally, which stays local-only.
-        assertEquals(46, linked.schema().entries().size());
+        // Merged view: the two local declarations, plus core.tn's whole closure, the kernel's
+        // entries among it -- TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved
+        // TsonSchema resolve()'s own resolution step produces internally, which stays local-only.
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(linked.schema().id());
+        assertEquals(2, linked.schema().entries().keySet().stream().filter(n -> linked.originOf(n).equals(own))
+                .count());
+        assertTrue(linked.schema().entries().containsKey("meta.record_field"));
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 
@@ -122,17 +119,67 @@ class TsonTest {
     void theStandardLibraryItselfIsReachableThroughTheLoader() {
         Tson tson = Tson.standard();
 
-        TsonCompiledMetaSchema meta = tson.loader().loadMeta(TsonBundledSchemas.META_ID);
+        TsonCompiledVocabulary meta = tson.loader().loadVocabulary(TsonBundledSchemas.META_ID);
 
-        assertTrue(meta.schema().entries().containsKey("text_type"));
+        assertTrue(meta.schema().entries().containsKey("unicode.text_type"));
     }
 
+    /**
+     * The configured context is the one schemas and data bind through, with the kernel's vocabulary composed under
+     * its binder and asked first: the consumer's names bind, and a consumer naming a kernel type rebinds nothing.
+     */
     @Test
-    void objectReaderAndWriterAreBoundToTheConfiguredDataBindContext() {
-        DataBindContext context = DataBindContext.builder().build();
+    void theConfiguredContextBindsAndTheKernelsNamesAreFixed() throws Exception {
+        DataBindContext context = DataBindContext.builder()
+                .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(Map.of("point", Point.class, "meta.record", Point.class)))
+                .build();
         Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(context));
 
-        assertSame(context, tson.dataBindContext());
+        assertEquals(Point.class, tson.dataBindContext().nameBinder().resolve("point"));
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class,
+                tson.dataBindContext().nameBinder().resolve("meta.record"),
+                "the kernel's name binds to the schema model whatever the consumer's binder says");
+        assertTrue(tson.loader().loadVocabulary(TsonBundledSchemas.META_ID).schema().entries()
+                        .containsKey("unicode.text_type"),
+                "and the standard library resolves through the same context");
+    }
+
+    /**
+     * Only a name the kernel declares is fixed. {@code token} and {@code entry_kind} mangle to classes of
+     * the schema model ({@code Token}, {@code EntryKind}) and are entries of no bundled schema, so a consumer's schema
+     * declaring them binds them through the consumer's binder like any other name it declares.
+     */
+    @Test
+    void aNameNoLibrarySchemaDeclaresBindsThroughTheConsumer() throws Exception {
+        String schema = """
+                !!id:"https://example.test/tokens.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
+                  token => { text: text }
+                  entry_kind => { label: text }
+                }
+                """;
+        DataBindContext context = DataBindContext.builder()
+                .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(Map.of(
+                        "token", Token.class, "entry_kind", EntryKind.class, "meta.record", Point.class)))
+                .build();
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(io.ltr8.tson.base.source.SchemaAccess.of(uri -> schema))
+                .withDataBindContext(context));
+        io.ltr8.bind.DataNameBinder binder = tson.dataBindContext().nameBinder();
+
+        assertEquals(Token.class, binder.resolve("token"));
+        assertEquals(EntryKind.class, binder.resolve("entry_kind"));
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("meta.record"),
+                "a name the kernel declares still binds to the schema model");
+
+        assertEquals(new Token("a"), tson.objectReader().read("""
+                !!import:"https://example.test/tokens.tn"
+                !token { text: "a" }""", Token.class));
+        assertEquals(new EntryKind("b"), tson.objectReader().read("""
+                !!import:"https://example.test/tokens.tn"
+                !entry_kind { label: "b" }""", EntryKind.class));
     }
 
     @Test
@@ -151,5 +198,13 @@ class TsonTest {
      * constructors, as {@code tson-cli}'s {@code CliDiagnostic} also notes.
      */
     public record Point(int x, int y) {
+    }
+
+    /** A consumer's {@code token}, named as a class of the schema model is. */
+    public record Token(String text) {
+    }
+
+    /** A consumer's {@code entry_kind}, named as a class of the schema model is. */
+    public record EntryKind(String label) {
     }
 }

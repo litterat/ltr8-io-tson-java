@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-SCHEMA] §7.2: "at a position whose declared type is {@code T}, a value annotated {@code !S} is valid
- * if and only if, after reference flattening of both (§8.3), {@code S} is {@code T} or {@code T} appears in
+ * if and only if, after alias flattening of both (§8.3), {@code S} is {@code T} or {@code T} appears in
  * {@code S}'s transitive {@code supertypes}".
  *
  * <p>The rule was enforced only where {@code T} was a record with a non-empty {@code subtypes()} -- the one
@@ -27,9 +27,9 @@ class SubsumptionAtTypedPositionsTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/sub.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -40,7 +40,7 @@ class SubsumptionAtTypedPositionsTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         return TsonCompiledSchemaRegistry.tree(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source))
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source))
                 .get(ID);
     }
 
@@ -62,10 +62,10 @@ class SubsumptionAtTypedPositionsTest {
     /** An atom position: the case that reported this, and the one no dispatcher ever guarded. */
     @Test
     void anUnrelatedTypeIsRefusedAtAnAtomPosition() {
-        // `text` does carry a subtype here (core's `non_empty_text`), so this takes the wording that names
-        // them -- the point is that an atom position now refuses at all, which it never did.
-        assertTrue(refused("{ t: !uuid \"x\" " + REST + " }")
-                .contains("'uuid' is not admissible at a 'text' position"));
+        // `text` is core's alias of `text`, the type the position's reader reports -- the point is that an atom
+        // position refuses at all.
+        String message = refused("{ t: !uuid \"x\" " + REST + " }");
+        assertTrue(message.contains("'uuid' is not admissible at a 'text' position"), message);
         assertTrue(refused("{ t: !nosuch \"x\" " + REST + " }").contains("'nosuch'"));
     }
 
@@ -108,7 +108,7 @@ class SubsumptionAtTypedPositionsTest {
     }
 
     /**
-     * §7.2 compares "after reference flattening of <b>both</b>", and §8.3 makes an alias and its target one
+     * §7.2 compares "after alias flattening of <b>both</b>", and §8.3 makes an alias and its target one
      * type -- so an alias names the position's own type. The reader running at such a position belongs to
      * the target, so this is the case a name-only comparison gets wrong.
      */

@@ -11,6 +11,8 @@ applies, the continuation policy, and what a read leaves behind.
   it, is the point.
 - A stated FIXED value is checked, not obeyed, with the **pre-rebind** parser (`FixedCheck`); what an omitted field
   yields is `RecordField.omitted`, derived once per field and shared by both encodings' readers.
+- A record reader's constructor reads through no field's reader: defaults and pins are decoded by
+  `settleHeldValues`, which runs once every reader of the compilation exists (`CompiledReaders.settle`), at load.
 - Collecting mode always keeps reading, so every problem surfaces; the value is all-or-nothing in both modes
   (`ConstructionGuard` per value, `CountingReceiver` at each facade) — a read that reported anything returns `null`.
 - Reporting instead of throwing obliges a reader to skip (`EventSkip`), or the enclosing frame's next pull sees the
@@ -20,8 +22,10 @@ applies, the continuation policy, and what a read leaves behind.
 - A map's count is validated in `MapAbstractReader.expectMapShape`, not in `readInto` — an empty brace never enters the
   entry loop.
 - Records are closed under their type and a repeated field or map key is an error, on the schemaless path too.
+- A dependent field is read through its record (`DependentFieldReader.readAgainst`), never on its own: the record
+  knows the sibling's value in this instance. A record with none keeps no per-read state for it.
 
-Related: `design/reader-naming-and-schema-location.md`, `design/scope-push.md`, `design/record-dispatch.md`,
+Related: `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`, `design/record-dispatch.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`, `design/facades-and-tree.md`.
 
@@ -41,8 +45,10 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   implementation. The last is the resolver's replay of a value inside a schema document and the one read whose
   `readsSchemaDocument()` is true: the readers consult it for the one rule that is a schema document's alone (a bare
   name at a record position is a value by name, `design/record-dispatch.md`), and it alone **keeps** every name read at
-  a kind-, reference- or `type_ref`-typed slot, handing it to `heldByName` with the slot's path and declared type
-  (`TsonSchema.SlotType`) for `SchemaResolver` to keep per entry for the linker. Every other read drops it.
+  a reference-typed slot, a kind's included, handing it to `heldByName` with the slot's path and declared type
+  (`TsonSchema.SlotType`) for `SchemaResolver` to keep per entry for the linker. Every other read drops it. It also
+  tells `heldByName` each declaration a reader reads against (`HeldByName.reached`, from `inRecord` and
+  `underDeclaration`): the waits a resolution counts toward §11.5's wait depth (`design/processor-policy.md`).
 - **No error policy.** `report` builds the `Diagnostic` from the path and positions the context tracks and hands it to
   the receiver: `DiagnosticsReceiver.throwing()` raises `ReadException` at the first problem, `collecting()`
   accumulates into a `DiagnosticsCollector`, and a caller's own `report(Diagnostic)` can stream them anywhere.
@@ -74,8 +80,61 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
 - **A FIXED field's value comes from the schema, and a document that states it is checked, not obeyed** (§5.2).
   `RecordAbstractReader.verifyFixed` decodes the written token and compares it to the schema's value: a contradiction
   is `FIELD_FIXED`, and the field still resolves to the *schema's* value, so a document cannot say one thing and decode
-  to another in silence. The comparison uses the **pre-rebind** parser (`FixedCheck`), because bind mode narrows
-  `precomputedValue` in place and comparing across that narrowing would flag every conforming document.
+  to another in silence. The comparison uses the **pre-rebind** parser (`FixedCheck`), because bind mode decodes
+  `precomputedValue` through the rebound one and comparing across that narrowing would flag every conforming document.
+- **A default or pin is held as written while the reader is built, and decoded once every reader exists** ([TSON-SCHEMA]
+  §5.2; a held value orders nothing). A field's type may be an entry still on the build stack, whose reader is a
+  `DeferredTypeReader` until the walk finishes, so decoding at construction would make the record wait on it — or fail
+  outright, as a `DeferredTypeReader` read mid-walk does. Each concrete record reader hands `settleHeldValues` to
+  `CompiledReaders.afterEveryReader` as its constructor's last step (after bind mode's rebinding), and
+  `TsonSchemaCompiler` runs the queue after the walk and before the compiled schema exists; outside a compile
+  (a reader built against a plain resolver) it runs at once. `settleHeldValues` fills `FixedCheck` through the parser
+  the field was built with and `precomputedValue` through the one it reads with. It judges nothing: the linker's
+  `checkFieldValue` is the one place a pin is judged, so a refusal through the built parser is an
+  `IllegalStateException` (linker and reader disagree) and one through a rebound parser a `BindMismatchException`
+  (the component cannot hold the schema's value), both failing the compile.
+- **A dependent field is read against the type its sibling's value names** ([TSON-SCHEMA] §5.2;
+  `DependentFieldReader`, built by `FieldReaders.declared` for a field typed `kind!`). It is `DeclaredReader`'s
+  dispatch with the tag taken from the sibling: the named entry's reader, in the mode the schema compiled in, reads
+  the value, an application resolving through the sibling's reference (`ReferenceBody.entryOf`). The type is known
+  when the reader reaches the field in one of three ways, and only the third orders the document:
+  - **a pinned sibling**: the pin types the field wherever the sibling is written, or whether it is;
+  - **a discriminator**: member dispatch selects a member before any field is read, and each member pins it;
+  - **a free sibling**: the value this instance wrote before the field, or its default where it is not yet written.
+    A dependent field reached before a free sibling with no default is skipped unjudged, for no stream can say yet
+    whether the sibling comes: arriving after it is `VALIDATION_ERROR` at the field, naming both
+    (`RecordDiagnostics.writtenBeforeItsSibling`), reported when the sibling arrives and pinned where the field stood
+    (`RecordAbstractReader.Dependents`), as is a defaulted sibling written after a field read against its default. No
+    lookahead and no held value is added.
+
+  A sibling that never arrives is no order broken. A required one is the missing-field error, `FIELD_REQUIRED`, and
+  nothing more. A field group's member, absent because another option is chosen or none, is `VALIDATION_ERROR` at the
+  dependent field once the record closes (`RecordDiagnostics.writtenWithoutItsSibling`,
+  `RecordAbstractReader.refuseAbsentSiblings`), in tree and bind mode and in a schema document, which holds the value
+  as written and refuses it all the same: the check runs over every field typed `kind!`, whatever reads it, so a bound
+  `Token` component's slot answers to it (`record_template_field.value` beside `type_param`). `RecordReader` is the same
+  rule in JSON.
+
+  A sibling naming no type a value can be read against — a sibling reference, a template, an application the
+  closure does not hold — is refused at the sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and
+  the value is skipped unjudged; a sibling whose own read reported leaves the value skipped and nothing more. What a
+  sibling's value names is one rule, `DependentFieldReader.typeNamed`, which a value's name walked through a dependent
+  field asks too (`ValuesByName`). **In a schema document the value is held as written**, whatever its form, as the
+  schemaless tree (`SchemalessTreeReader.preserving()`, waiting on nothing, so `record_field` waits on no
+  entry for it), in either order of the fields, and so wherever names resolve in the document being read
+  (`readsSchemaNames`, a resolved form read as data among them): the type its sibling names is one of that document's
+  namespace, which the governing layer's readers do not hold. The record reader captures the value's events before reading it
+  (`TsonReadContext.asWritten`, a lookahead) for every field typed `kind!`, whatever reads it, a `Token` component's
+  reader included, and once the record is read hands each to the read's sink with what its sibling holds
+  (`RecordAbstractReader.Held`, `TsonReadContext.heldAsWritten`); the linker judges a value entry's
+  (`design/linking-and-compilation.md`). A default or pin is judged as a field value, and the kernel's
+  `record_field.value` is that case. In
+  bind mode the component is an `Object`, which receives what the named type reads to, or the tree held as written
+  — the context registering `Object` as an atom so the binder takes it whole, as a context built from nothing
+  for the schema model does (`ResolverBindContext.registerDefaults`), and a consumer's does where they register it —
+  and any narrower class is a `BindMismatchException` at compile (`BindTargets`); a `Token` component, the kernel's
+  `RecordField.value`, holds the token as written (`RecordBindReader.tokenAware`). The JSON reader applies the same
+  rules (`design/json-schema-directed-reading.md`).
 - **A field is four facts, and each decision reads its own** (`RecordField`: `optional`, `voidable`, `role`, `value`).
   A written `_` reads `voidable`; a written value reads `role` (FIXED means compare) and `value`; a field never written
   reads `RecordField.omitted`, derived from `optional` and `value` — `MISSING` (`FIELD_REQUIRED`) where not optional,
@@ -101,9 +160,9 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   is `UNRECOGNIZED_FIELD`, reported and then skipped unjudged (`TsonReadContext.skipUnjudged`), so a collecting pass
   finds every stray name. The diagnostic carries the type's field names in schema order, message *and* `expected` — the
   information that turns a retry into a one-shot fix. **Not configurable under a schema**, §7.2 making closure a MUST.
-  The same line polices schema authoring: a constructor body is bound by replaying it through the governing meta's
-  compiled reader, so `!integer ^ { minimum: 1 }` (JSON Schema's spelling of `min`) is rejected instead of compiling
-  clean and constraining nothing (§7.2, "a constructor is a record-shaped type").
+  The same line polices schema authoring: a constructor body is bound by replaying it through the compiled reader
+  of the schema declaring the constructor, so `!integer ^ { minimum: 1 }` (JSON Schema's spelling of `min`) is rejected
+  instead of compiling clean and constraining nothing (§7.2, "a constructor is a record-shaped type").
 - **Records are closed on the schemaless bind path too**, where the target class is the schema: a field it does not
   declare is `UNRECOGNIZED_FIELD` rather than dropped, since a later version's extra field can change what the fields a
   class does read mean. `ignoringUnknownFields()` is the opt-out, on that path only, on both encodings' object readers.
@@ -205,8 +264,21 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   the enclosing frame's next pull sees it — at the document boundary `requireDocumentEnd`, whose
   `IllegalStateException` then fires on ordinary caller input with the diagnostics lost inside it. Where the skip goes
   is the caller's question: `DataClassObjectReader.read` has taken nothing and skips a whole data value, while
-  `bindUnion` has consumed the framing to find the member and skips the core-value alone.
-- **`ListEventSource`** replays a pre-built event list: a schema default (`readSchemaDefault` wraps the literal `Token`
+  `bindUnion` has consumed the framing to find the member and skips the core-value alone. A `ReferenceEvent` is a
+  leaf to it, as a token is: the stream delivered the reference whole.
+- **A reference-typed position reads a token or a `ReferenceEvent`** (`AtomTypeReader`, `KindSlotReader`), rolling
+  either into one `TypeRef`, and refuses a quoted token holding `<` as `TYPE_MISMATCH`: a quoted token is never a
+  reference ([TSON-DATA] §7.4). A `ReferenceEvent` holding a sibling reference (`kind!`) is admitted only where the
+  reference's `allow_sibling` admits one, a record field's type (`meta.field_type_ref`), and in bind mode only by a
+  slot reader whose component is a `Reference` besides; elsewhere the slot reader (`TYPE_MISMATCH`) and the atom's own
+  parser (`ATOM_CONSTRAINT_VIOLATION`) refuse it by the position rule ([TSON-SCHEMA] §5.2,
+  `design/schema-resolution.md`). Any other typed position
+  meeting a `ReferenceEvent` reports it as it reports any non-token, naming `the reference box<text>` or `the sibling
+  reference kind!`; `DataValueEvents` replays a `ReferenceValue` as one event. In a data document the name is judged
+  where it is read, whichever `of` names: a kind's members over the closure (`TypeNameRefParser`), a value's qualified
+  name by what it reaches in the governing schema (`RefParser`, `design/references.md`); in a schema document both
+  read the grammar alone and record the name for the link.
+- **`ListEventSource`** replays a pre-built event list: a schema default (`settleHeldValues` wraps the literal `Token`
   as one synthetic event, under `IdentifierPolicy.none()` since the real stream already judged it), an annotation probe,
   and, via `DataValueEvents`, the resolver's replay of a resolved `DataValue` through a compiled reader.
 

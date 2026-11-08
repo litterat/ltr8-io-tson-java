@@ -3,9 +3,8 @@ package io.ltr8.tson.schema;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.EntryKind;
-import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.unicode.Normalization;
 
@@ -19,7 +18,7 @@ import java.util.Optional;
  * self-contained (no dangling references) and safe to {@link TsonSchemaRegistry#register}.
  *
  * <p><b>Wraps a {@link TsonSchema} rather than duplicating its fields</b> -- a {@code TsonLinkedSchema} *is* a {@code
- * TsonSchema} (the post-link {@code id}/{@code meta}/{@code imports}/{@code entries}/{@code bootstrap}), plus the
+ * TsonSchema} (the post-link {@code id}/{@code imports}/{@code entries}/{@code bootstrap}), plus the
  * extra type-level fact "this one has been linked." Not a subtype ({@link TsonSchema} is a record, and records are
  * implicitly final) and not interchangeable with one -- a plain {@code TsonSchema} means "resolved, but not
  * necessarily linked"; a {@code TsonLinkedSchema} means "linked." Keeping them nominally distinct means {@link
@@ -34,7 +33,7 @@ import java.util.Optional;
  * Merging an {@code !!import} flattens another schema's entries into this one's {@link TsonSchema#entries()},
  * which is what makes every reference resolvable in one namespace -- and also what erases which document each
  * entry was written in. A diagnostic against an imported entry needs that back: {@code /int32} at line 110 is
- * core.tn's, not the four-line schema a document named, and pairing the pointer with the importing schema's
+ * numeric.tn's, not the four-line schema a document named, and pairing the pointer with the importing schema's
  * identity would send a consumer to the wrong file. So the map is name -&gt; the canonical identity ([TSON-DATA]
  * §2.2.1) of the schema that declared it, populated as the merge happens and carried transitively (an entry
  * reached through two levels of import keeps its original author, not the intermediary).
@@ -45,39 +44,26 @@ import java.util.Optional;
  * phase that still knows it.
  *
  * <p><b>{@code enumForms} is the second</b>: each enum whose name type's {@code normalization} is not {@code NONE}
- * ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's {@code identifier} is
+ * ([TSON-SCHEMA] §5.5), with that form, which its readers match members in -- the kernel's {@code meta.identifier} is
  * NFC, a schema's own case-folding identifier {@code NFKC_CASEFOLD}. An enum not listed matches its members as
  * written. No reader can derive it: a {@code name_type} the enum's constructor pinned names an entry of the
- * governing meta-schema, which is not in {@link TsonSchema#entries()} and which linking is the last phase to see.
+ * closure, which the resolved {@link TsonSchema#entries()} do not hold and which linking is the last phase to see.
  * Like {@code entryOrigins} it is carried through {@code !!import}, each enum judged in the schema that declared it.
  *
  * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record whose {@code
- * name_type} is not the kernel's {@code field_name} ([TSON-SCHEMA] §5.2), with the value that type
+ * name_type} is not the kernel's {@code meta.field_name} ([TSON-SCHEMA] §5.2), with the value that type
  * resolves to, by which its readers judge the field names a document writes. A record not listed has
  * identifiers for field names.
- *
- * <p><b>{@code namespaces} is the fourth</b>: each namespace type -- a record IS-A the kernel's {@code namespace}
- * ({@link MapBody#isNamespace}) -- with the map a value of it is written and read as ({@link MapBody#ofNamespace}).
- * A namespace type names the kernel's {@code namespace} as a composition operand, which resolves in the governing
- * meta-schema, so whether the name is the kernel's is again a question only linking can answer where this schema
- * does not hold it ({@link #namespace}).
+
  */
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
-                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes,
-                               Map<String, MapBody.Namespace> namespaces) {
+                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
         enumForms = Map.copyOf(enumForms);
         nameTypes = Map.copyOf(nameTypes);
-        namespaces = Map.copyOf(namespaces);
-    }
-
-    /** A schema declaring no namespace type. */
-    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
-                            Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
-        this(schema, entryOrigins, enumForms, nameTypes, Map.of());
     }
 
     /** A schema whose records all have the kernel's identifiers for field names. */
@@ -110,24 +96,19 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /**
-     * The map a value of namespace type {@code entryName} is read as: the one {@link #namespaces} records, or, where
-     * this schema holds the kernel's {@code namespace} itself, the one an entry IS-A it pins -- a schema assembled
-     * by hand from the kernel's entries reads them as linking would. Empty for any other entry.
+     * The namespace type {@code entryName} is -- an instance of the kernel's {@code namespace}, whose values are read
+     * as the map it describes -- or empty for any other entry.
      */
-    public Optional<MapBody.Namespace> namespace(String entryName) {
-        MapBody.Namespace recorded = namespaces.get(entryName);
-        if (recorded != null) {
-            return Optional.of(recorded);
-        }
-        return schema.entries().get(entryName) instanceof RecordBody record
-                && MapBody.isNamespace(record, this::isKernel) ? MapBody.ofNamespace(record) : Optional.empty();
+    public Optional<NamespaceBody> namespace(String entryName) {
+        return schema.entries().get(entryName) instanceof NamespaceBody namespace ? Optional.of(namespace)
+                : Optional.empty();
     }
 
     /**
      * The form record {@code entryName}'s field names are matched in: its name type's {@code normalization}
      * ([TSON-SCHEMA] §5.5), so a document's name and a declared one that are one value of the type are one field --
      * the equality the linker judged the declared names distinct under. {@code NFC} for one {@link #nameTypes}
-     * omits, the kernel's {@code field_name} being NFC; no form compares lower than NFC.
+     * omits, the kernel's {@code meta.field_name} being NFC; no form compares lower than NFC.
      */
     public Normalization nameForm(String entryName) {
         return nameType(entryName)
@@ -135,23 +116,6 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
                 .map(body -> ((IdentifierType) body).normalization())
                 .filter(form -> form != Normalization.NONE)
                 .orElse(Normalization.NFC);
-    }
-
-    /**
-     * Whether this schema is a meta layer -- its own {@code !!meta} names the meta-kernel ([TSON-SCHEMA] §2.2.2) --
-     * so that a document it governs is a schema or describes one (resolver output, [TSON-SCHEMA] §3.3.4). A name
-     * such a document writes at a kind-typed position resolves in the described schema's namespace or its
-     * constructor's, where the position's prose says ([TSON-SCHEMA] §7.4 for {@code name_type}), and not in this
-     * schema's: its readers check the name's grammar and leave membership to the schema's link, or to ingest
-     * ([TSON-SCHEMA] §4.2, §8.1). A {@code !!meta} that is no identity at all, as a schema assembled by hand may
-     * carry, names no meta-kernel.
-     */
-    public boolean governsSchemas() {
-        try {
-            return CanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
-        } catch (SchemaValidationException notAnIdentity) {
-            return false;
-        }
     }
 
     /**
@@ -164,12 +128,13 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /**
-     * Whether {@code entryName} denotes the meta-kernel's own entry of that name: declared by meta-kernel.tn, or
-     * merged in from it. What a kind and a constructor are judged by ([TSON-SCHEMA] §4.1), so a schema's own
-     * {@code namespace} or {@code top} is an ordinary declaration whatever it is spelled.
+     * Whether {@code entryName} denotes the kernel's own entry of that name: declared by the kernel, meta.tn,
+     * or merged in from it. What a kind and a constructor are judged by
+     * ([TSON-SCHEMA] §4.1), so a schema's own {@code namespace} or {@code top} is an ordinary declaration, the
+     * kernel's being {@code meta.namespace} and {@code meta.top}.
      */
     public boolean isKernel(String entryName) {
-        return schema.entries().containsKey(entryName) && TsonBundledSchemas.isMetaKernel(originOf(entryName));
+        return schema.entries().containsKey(entryName) && TsonBundledSchemas.isKernel(originOf(entryName));
     }
 
     /** {@code entryName}'s kind ({@link EntryKind#of}), judged by origin; {@code null} for a name it lacks. */

@@ -7,7 +7,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.tree.TsonValue;
 import java.util.List;
@@ -34,13 +34,12 @@ class RootAnnotationTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/api-2.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               api => { name: text }
               since => text
               owner => { team: text  contact: text }
-              deprecated => void
             }
             """;
 
@@ -56,7 +55,7 @@ class RootAnnotationTest {
     @Test
     void anAnnotationBeforeTheRootTypeRefDoesNotHideIt() {
         String document = """
-                !!schema:"https://example.test/api-2.tn"
+                !!import:"https://example.test/api-2.tn"
                 @doc:"why this document exists"
                 !api { name: "orders" }""";
 
@@ -76,7 +75,7 @@ class RootAnnotationTest {
     @Test
     void aWholeRunOfAnnotationsIsLookedPast() {
         String document = """
-                !!schema:"https://example.test/api-2.tn"
+                !!import:"https://example.test/api-2.tn"
                 @doc:\"""
                   a multi-line explanation
                   of this document
@@ -103,11 +102,11 @@ class RootAnnotationTest {
     @Test
     void theAnnotationsReachTheBoundObjectToo() {
         String document = """
-                !!schema:"https://example.test/api-2.tn"
+                !!import:"https://example.test/api-2.tn"
                 @doc:"why this document exists"
                 !api { name: "orders" }""";
 
-        DataNameBinder binder = name -> "api".equals(name) ? Api.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "api".equals(name) ? Api.class : SchemaModelNameBinder.INSTANCE.resolve(name);
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
                         .registerAtoms(AtomContext.hostTypes()).build()));
@@ -130,7 +129,7 @@ class RootAnnotationTest {
     @Test
     void aRootThatReallyHasNoTypeRefStillReportsOne() {
         List<Diagnostic> problems = tson().validate("""
-                !!schema:"https://example.test/api-2.tn"
+                !!import:"https://example.test/api-2.tn"
                 @doc:"annotated, but never typed"
                 { name: "orders" }""");
 
@@ -146,7 +145,7 @@ class RootAnnotationTest {
     @Test
     void theRewoundStreamStillValidatesWhatFollows() {
         List<Diagnostic> problems = tson().validate("""
-                !!schema:"https://example.test/api-2.tn"
+                !!import:"https://example.test/api-2.tn"
                 @doc:"this document is wrong, and says so below"
                 !api { name: "orders"  nope: 1 }""");
 
@@ -163,7 +162,7 @@ class RootAnnotationTest {
     @Test
     void trailingContentAfterAnAnnotatedRootIsStillRejected() {
         List<Diagnostic> problems = tson().validate("""
-                !!schema:"https://example.test/api-2.tn"
+                !!import:"https://example.test/api-2.tn"
                 @doc:"why"
                 !api { name: "orders" } junk""");
 
@@ -179,7 +178,7 @@ class RootAnnotationTest {
     @Test
     void anAnnotationAfterTheTypeRefIsStillASyntaxError() {
         List<Diagnostic> problems = tson().validate("""
-                !!schema:"https://example.test/api-2.tn"
+                !!import:"https://example.test/api-2.tn"
                 !api @doc:"why" { name: "orders" }""");
 
         assertEquals(1, problems.size(), problems.toString());

@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -39,7 +39,7 @@ class ChoiceReaderTest {
                 RecordField.required(TypeRef.of("integer"))))));
         entries.put("contact_method", new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone"))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());

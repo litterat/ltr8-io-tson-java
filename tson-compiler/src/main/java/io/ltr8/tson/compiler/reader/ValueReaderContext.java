@@ -1,15 +1,14 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 
@@ -28,27 +27,23 @@ import java.util.Set;
  *
  * <p>A context object rather than a widening parameter list: a factory that later needs a further handle
  * gains a field here instead of every factory's signature churning.
- *
- * <p>{@link #foreign} is the one handle that is not about the schema being compiled: [TSON-SCHEMA] §7.8's
- * scope push resolves a schema the <em>document</em> names, so {@link ScopedReader} is given where to go and
- * ask rather than an answer. Every other factory ignores it.
  */
-public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers, ForeignSchemas foreign,
+public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers,
                                  Map<String, Set<String>> namesMeaning, Map<String, List<String>> referrers) {
 
     /**
      * The index derived rather than supplied -- for a caller with no compilation around it. A compile passes
-     * its own, built once: {@link Subsumption#namesMeaning} walks every entry's reference chain, so deriving
+     * its own, built once: {@link Subsumption#namesMeaning} walks every entry's alias chain, so deriving
      * it per factory would be the schema's size squared for an answer that does not change.
      */
-    public ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers, ForeignSchemas foreign) {
-        this(linked, readers, foreign, Subsumption.namesMeaning(linked.schema().entries()));
+    public ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers) {
+        this(linked, readers, Subsumption.namesMeaning(linked.schema().entries()));
     }
 
     /** {@link #referrers} derived, for a caller that has its own {@code namesMeaning} but not this index. */
-    public ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers, ForeignSchemas foreign,
+    public ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers,
             Map<String, Set<String>> namesMeaning) {
-        this(linked, readers, foreign, namesMeaning, referrers(linked.schema().entries()));
+        this(linked, readers, namesMeaning, referrers(linked.schema().entries()));
     }
 
 
@@ -102,17 +97,21 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
         return subtypesOf(name, definition).stream()
                 .filter(subtype -> {
                     io.ltr8.tson.schema.meta.Top entry = schema().entries().get(subtype);
-                    if (entry == null || io.ltr8.tson.schema.meta.OpenEntry.isOpen(entry)) {
-                        return false;
-                    }
-                    return !(entry instanceof io.ltr8.tson.schema.meta.RecordBody record)
-                            || record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
+                    // A record template is ABSTRACT by construction, and a held template is no type.
+                    return switch (entry) {
+                        case io.ltr8.tson.schema.meta.RecordBody record ->
+                                record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
+                        case io.ltr8.tson.schema.meta.RecordTemplateBody ignored -> false;
+                        case io.ltr8.tson.schema.meta.TemplateBody ignored -> false;
+                        case null -> false;
+                        default -> true;
+                    };
                 })
                 .toList();
     }
 
     /**
-     * Which entries name each target through a {@code REFERENCE} body, in declaration order.
+     * Which entries name each target through an {@code ALIAS} body, in declaration order.
      *
      * <p>The inverse of the alias hop, and the index {@link #bindingNamesFor} answers from. Built once per
      * compilation for the reason {@code namesMeaning} is: it is a property of the schema, not of the entry
@@ -121,8 +120,8 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     public static Map<String, List<String>> referrers(Namespace<? extends Top> entries) {
         Map<String, List<String>> byTarget = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (definition instanceof Reference reference) {
-                byTarget.computeIfAbsent(reference.target().name(), target -> new ArrayList<>()).add(name);
+            if (definition instanceof Alias alias) {
+                byTarget.computeIfAbsent(alias.target().name(), target -> new ArrayList<>()).add(name);
             }
         });
         Map<String, List<String>> fixed = new LinkedHashMap<>();
@@ -150,7 +149,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * an alias naming it must never redirect its binding.
      *
      * <p><b>A tightened constructor binds as the one it tightens.</b> {@code set_type => array ^ { ... }} and
-     * {@code enum => enum_type ^ { name_type?: = identifier }} restate fields and add none (§5.7), so their
+     * {@code enum => enum_type ^ { name_type?: = meta.identifier }} restate fields and add none (§5.7), so their
      * instances have the shape of the source's, and a class for the source is a class for them. Without the
      * fallback every such constructor -- a meta layer's {@code kebab_enum => enum_type ^ { name_type?: = kebab }}
      * included -- would need a class of its own for a shape it does not change. It is tried last, so a class
@@ -177,7 +176,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     /**
      * The constructor entry {@code name} tightens, or {@code null}: a constructor (IS-A the kernel's {@code top})
      * declared by §5.7's refinement, whose one written parent -- recorded where the declaration resolved, since
-     * its chain cannot tell {@code ^} from a composition adding nothing -- is, at the end of its reference
+     * its chain cannot tell {@code ^} from a composition adding nothing -- is, at the end of its alias
      * chain, a constructor too. A refinement restates fields and adds none, so its instances have its source's
      * shape.
      */
@@ -189,7 +188,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
         if (refined == null) {
             return null;
         }
-        String source = ReferenceChain.terminal(refined, schema().entries()::get);
+        String source = AliasChain.terminal(refined, schema().entries()::get);
         boolean constructor = schema().entries().get(source) instanceof RecordBody body
                 && linked.isConstructor(source, body);
         return constructor ? source : null;

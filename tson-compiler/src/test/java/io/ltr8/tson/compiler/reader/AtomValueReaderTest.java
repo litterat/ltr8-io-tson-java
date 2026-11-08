@@ -3,26 +3,25 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.atom.Rational;
-import io.ltr8.tson.schema.meta.BytesType;
-import io.ltr8.tson.schema.meta.DateTimeType;
-import io.ltr8.tson.schema.meta.DateType;
-import io.ltr8.tson.schema.meta.DecimalType;
-import io.ltr8.tson.schema.meta.DurationType;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.RationalType;
+import io.ltr8.tson.schema.binary.BytesType;
+import io.ltr8.tson.schema.temporal.DateTimeType;
+import io.ltr8.tson.schema.temporal.DateType;
+import io.ltr8.tson.schema.numeric.DecimalType;
+import io.ltr8.tson.schema.temporal.DurationType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.numeric.RationalType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TextType;
-import io.ltr8.tson.schema.meta.TimeType;
+import io.ltr8.tson.schema.unicode.TextType;
+import io.ltr8.tson.schema.temporal.TimeType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.ValueType;
-import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
@@ -32,7 +31,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Real data text, for each atom-family body in {@code schema.meta} -- one small {@code holder}
+ * Real data text, for each atom-family body of the schema model -- one small {@code holder}
  * record per family, reusing the exact literal each family's own {@code atom} test already proved
  * valid, read through the real compiled reader (not by
  * constructing a {@code TokenValue} directly). Dispatch to the right {@link AtomTypeReader}
@@ -51,7 +50,7 @@ class AtomValueReaderTest {
         entries.put("holder", RecordBody.of(RecordBody.fieldMap(Map.entry("value",
                 RecordField.required(TypeRef.of("field"))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
 
@@ -124,15 +123,10 @@ class AtomValueReaderTest {
         assertEquals("order_id", readValue(IdentifierType.IDENTIFIER, "{ value: order_id }"));
     }
 
-    @Test
-    void value() {
-        assertEquals("anything", readValue(new ValueType(), "{ value: anything }"));
-    }
-
     /**
      * {@code iri_type}/{@code regex_type} are the one known exception discussed in {@link
      * AtomTypeReader}'s own Javadoc -- their RFC citation is a *schema-composed* default that
-     * generic binding can't fill in during schema *resolution*, so {@code MetaKernelBootstrapResolver} hand-
+     * generic binding can't fill in during schema *resolution*, so {@code KernelBootstrapResolver} hand-
      * picks their binding instead. That gap is upstream of this layer entirely: by the time the
      * real {@code iri}/{@code regex} entries reach here, their constraints are already correctly
      * filled in, so reading real *data* against them works exactly like every other family --
@@ -140,7 +134,7 @@ class AtomValueReaderTest {
      */
     @Test
     void iriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema metaKernel = KernelBootstrapResolver.kernelSchema();
         Map<String, Object> result = readAgainstRealEntry("iri", metaKernel.entries().get("iri"),
                 "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
@@ -150,7 +144,7 @@ class AtomValueReaderTest {
 
     @Test
     void regexUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema metaKernel = KernelBootstrapResolver.kernelSchema();
         Map<String, Object> result = readAgainstRealEntry("regex", metaKernel.entries().get("regex"),
                 "{ value: \"[a-z]+\" }");
 
@@ -163,7 +157,7 @@ class AtomValueReaderTest {
         entries.put("holder", RecordBody.of(RecordBody.fieldMap(Map.entry("value",
                 RecordField.required(TypeRef.of(typeName))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
 

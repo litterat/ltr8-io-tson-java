@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Loads and resolves every {@code schemas/*.tn} file in the shared {@code ltr8-io-tson-test-suite}
- * checkout against the real bundled meta.tn/core.tn chain -- those are the real TSON schemas that
+ * checkout against the real bundled bundled chain -- those are the real TSON schemas that
  * repo's own README uses to formally describe its sidecar format (replacing ad hoc BNF), so this is
  * exactly the kind of drift this whole exercise exists to catch: if a spec revision bump or a
  * resolver change ever breaks one of them, this fails loudly instead of the schema silently going
@@ -51,7 +51,10 @@ class SidecarSchemasTest {
         // collisions those vectors are about exist only in the importer, so a fixture that did not load
         // would be testing the wrong failure.
         try (Stream<Path> files = Files.walk(schemasRoot)) {
+            // A data fixture is there to be imported and refused (an import target must be a schema), so only the
+            // schema documents are resolved here.
             return files.filter(p -> p.getFileName().toString().endsWith(".tn"))
+                    .filter(SidecarSchemasTest::isSchemaDocument)
                     .map(p -> schemasRoot.relativize(p).toString())
                     .sorted()
                     .toList();
@@ -60,22 +63,21 @@ class SidecarSchemasTest {
         }
     }
 
+    private static boolean isSchemaDocument(Path file) {
+        return TsonDocumentPeek.of(read(file)).isSchemaDocument();
+    }
+
     private static void checkSchemaResolves(Path schemasRoot, String fileName) {
         String source = read(schemasRoot.resolve(fileName));
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
 
-        // Same bootstrap sequence ProcessorConfig#build uses -- meta-kernel has to be resolved and
-        // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
-        // register itself. A fresh registry per schema file, deliberately, so one file's own
-        // failure doesn't leave a shared registry in a half-registered state for the next. Bound as the
-        // class2 runner binds, since a fixture's namespace values read only into classes.
-        TsonCompiledMetaRegistry compiledRegistry =
-                new TsonCompiledMetaRegistry(SuiteBindings.context(), id -> fetch(schemasRoot, id));
-        TsonCompiledSchemaLoader loader = compiledRegistry;
-        SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        compiledRegistry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        // The bundled schemas loaded first, as every front door loads them: a schema importing core.tn alone reaches
+        // meta.tn through core's pinned import, which only a registry already holding it serves. A fresh registry per
+        // schema file, deliberately, so one file's own failure doesn't leave a shared registry in a half-registered
+        // state for the next. Bound as the class2 runner binds, since a fixture's namespace values read only into
+        // classes.
+        TsonCompiledSchemaLoader loader = TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(),
+                id -> fetch(schemasRoot, id));
 
         TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.entries().isEmpty(), fileName + " resolved with no entries");
@@ -83,7 +85,7 @@ class SidecarSchemasTest {
 
     /**
      * Serves the suite's own schemas beside the bundled ones. The layer schemas {@code !!import}
-     * {@code sidecar-common.tn}, so a fetcher that only knows meta.tn/core.tn cannot resolve any of
+     * {@code sidecar-common.tn}, so a fetcher that only knows the bundled schemas cannot resolve any of
      * them -- and the shared declarations they used to duplicate are exactly what that import
      * exists to stop.
      *

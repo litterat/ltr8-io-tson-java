@@ -2,9 +2,8 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.TimeType;
+import io.ltr8.tson.schema.temporal.TimeType;
 import org.junit.jupiter.api.Test;
-import java.math.BigInteger;
 import java.time.OffsetTime;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,14 +81,14 @@ class TimeParserTest {
 
     /**
      * <b>{@code precision} constrains the value, not the spelling</b> (§5.5): {@code precision: N} admits an
-     * instant that is a whole number of 10⁻ᴺ seconds. meta.tn's own {@code @doc} gives the example this
+     * instant that is a whole number of 10⁻ᴺ seconds. temporal.tn's own {@code @doc} gives the example this
      * turns on -- "{@code 12:00:00.500} is admitted under {@code precision: 1}". The atom is exact either way: an
      * instant genuinely off the grid is refused rather than rounded onto it.
      */
     @Test
     void precisionConstrainsTheValueNotTheSpelling() {
         TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
-                Optional.of(BigInteger.valueOf(3))));
+                Optional.of(3L)));
         assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));
         assertEquals(OffsetTime.parse("10:15:30.123Z"), type.read(token("10:15:30.123Z")));
         // Six written digits and a millisecond value: the grid is what is tested, not the digit count.
@@ -97,11 +96,11 @@ class TimeParserTest {
         assertThrows(AtomValidationException.class, () -> type.read(token("10:15:30.1234Z")));
     }
 
-    /** meta.tn's own worked example, which counting written digits refuses and the value rule admits. */
+    /** numeric.tn's own worked example, which counting written digits refuses and the value rule admits. */
     @Test
     void aTrailingZeroSpellingOfAnAdmittedValueIsAdmitted() {
         TimeParser tenths = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
-                Optional.of(BigInteger.ONE)));
+                Optional.of(1L)));
         assertEquals(OffsetTime.parse("12:00:00.5Z"), tenths.read(token("12:00:00.500Z")));
         assertThrows(AtomValidationException.class, () -> tenths.read(token("12:00:00.51Z")));
     }
@@ -123,7 +122,7 @@ class TimeParserTest {
     @Test
     void precisionZeroAdmitsNoFraction() {
         TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
-                Optional.of(BigInteger.ZERO)));
+                Optional.of(0L)));
         assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));
         assertThrows(AtomValidationException.class, () -> type.read(token("10:15:30.1Z")));
     }

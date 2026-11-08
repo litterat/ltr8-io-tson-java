@@ -9,10 +9,7 @@ import io.ltr8.unicode.Nfc;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.atom.TokenAtomType;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.RecordEnd;
@@ -35,7 +32,8 @@ import java.util.SequencedMap;
 import java.util.Set;
 
 /**
- * A SEALED record position ([TSON-SCHEMA] §5.2): the base declares one or more discriminator fields, each
+ * A member-dispatched record position ([TSON-SCHEMA] §5.2): an ABSTRACT base declares one or more discriminator
+ * fields, each
  * member of the family pins them, and a value here is placed by reading those fields rather than by carrying
  * a tag. The text encoding reads a sealed position exactly as [TSON-JSON] §6.1.5 has JSON read one -- the tag
  * is not required and MUST agree where written -- so the discriminator is a field the reference encoding
@@ -66,7 +64,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
 
     /**
      * Every written name that means the base -- its own, and any alias whose chain ends at it (§7.2's "after
-     * reference flattening of both"). §8.1 admits a redundant tag at any typed position; a sealed base is
+     * alias flattening of both"). §8.1 admits a redundant tag at any typed position; a sealed base is
      * where that stops, and the refusal has to reach every spelling of it.
      */
     private final Set<String> selfNames;
@@ -96,7 +94,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.readerFor = readerFor;
         this.selectors = selectorFields.entrySet().stream()
                 .map(field -> selectorOf(field.getKey(), field.getValue(), entries, context.linked())).toList();
-        // The family's members compose the base, so they share its name type; a template base states none.
+        // The family's members compose the base, so they share its name type, a template base's included.
         this.nameForm = selfNames.stream().map(context.linked()::nameForm)
                 .filter(form -> form != io.ltr8.unicode.Normalization.NFC).findFirst()
                 .orElse(io.ltr8.unicode.Normalization.NFC);
@@ -105,9 +103,8 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            // A record template IS-A the base is no member: its applications are, each pinned once closed.
-            if (!(entries.get(subtype) instanceof RecordBody record)
-                    || io.ltr8.tson.schema.meta.OpenEntry.isOpen(record)) {
+            // Only a record is a member: a record template IS-A the base is none, its applications are.
+            if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }
             List<Object> key = pinsOf(record);
@@ -126,10 +123,10 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
 
     private static Selector selectorOf(String name, RecordField field, Namespace<Top> entries,
                                        TsonLinkedSchema linked) {
-        String terminal = ReferenceChain.terminal(field.type().name(), entries::get);
+        String terminal = AliasChain.terminal(field.typeRef().name(), entries::get);
         Top target = entries.get(terminal);
-        AtomType<?> parser = AtomParsers.forType(target, linked.enumForm(terminal)).orElseThrow(
-                () -> new IllegalStateException("a discriminator typed '" + field.type().name()
+        AtomType<?> parser = AtomParsers.forRead(target, linked.enumForm(terminal)).orElseThrow(
+                () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(name), parser);
     }
@@ -145,7 +142,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
                 return null; // the linker already refused this; the family is read without it
             }
             Token pin = field.get().value().get();
-            Object value = decode(selector, pin.text(), TokenForm.valueOf(pin.form().name()));
+            Object value = decode(selector, pin.text());
             if (value == null) {
                 return null;
             }
@@ -177,7 +174,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
                 EventSkip.dataValue(ctx);
                 return null;
             }
-            Object decoded = decode(selector, value.text(), value.form());
+            Object decoded = decode(selector, value.text());
             if (decoded == null) {
                 ctx.field(selector.name())
                         .report(extension.unmatchedDiscriminator(selector.name(), value.text(), pinned));
@@ -223,17 +220,14 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             if (selector != null && ctx.peek() instanceof TokenEvent token) {
                 found.putIfAbsent(selector, token);
             }
-            EventSkip.scopedValue(ctx);
+            EventSkip.dataValue(ctx);
         }
         return found;
     }
 
-    private Object decode(Selector selector, String text, TokenForm form) {
+    private Object decode(Selector selector, String text) {
         try {
-            Object value = selector.parser() instanceof TokenAtomType<?> formSensitive
-                    ? formSensitive.read(new TokenValue(text, form))
-                    : selector.parser().read(text);
-            return ValueIdentity.of(value);
+            return ValueIdentity.of(selector.parser().read(text));
         } catch (AtomTypeException notThisType) {
             return null;
         }
@@ -247,7 +241,12 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
 
     /** A pin, or a tuple of pins, rendered for a diagnostic. */
     private static String render(List<Object> key) {
-        return key.size() == 1 ? String.valueOf(key.get(0))
-                : "(" + key.stream().map(String::valueOf).reduce((a, b) -> a + ", " + b).orElse("") + ")";
+        return key.size() == 1 ? pin(key.get(0))
+                : "(" + key.stream().map(RecordMemberDispatchReader::pin).reduce((a, b) -> a + ", " + b).orElse("") + ")";
+    }
+
+    /** One pin as written: a reference by its text, any other value by its own spelling. */
+    private static String pin(Object pin) {
+        return pin instanceof io.ltr8.tson.schema.meta.Reference reference ? reference.text() : String.valueOf(pin);
     }
 }

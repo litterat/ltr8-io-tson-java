@@ -17,30 +17,30 @@ import io.ltr8.tson.base.SchemaValidationException;
  *
  * <p>Without that, exporting a template is exporting a trap: any consumer applying it with an argument the
  * exporting schema also used fails to link, with a name-collision diagnostic naming a synthetic entry the
- * author never wrote. meta.tn applies {@code set<value>} for {@code decimal_member_set}, so the reachable
- * case is a schema importing meta.tn and writing {@code set<value>} of its own.
+ * author never wrote. meta.tn lifts {@code [meta.type_ref]} for a chain's parents, so the reachable case is a schema
+ * importing meta.tn and writing {@code [meta.type_ref]} of its own.
  *
  * <p>The negative half is the same rule from the other side and is what keeps the unification honest: name
  * equality is not the test, entry equality is. Two <em>different</em> types under one name still collide.
  */
 class SharedInstantiationTest {
 
-    private static final String META = "https://tson.io/2026/38/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/38/m/core.tn";
-    private static final String KERNEL = "https://tson.io/2026/38/m/meta-kernel.tn";
+    private static final String META = "https://tson.io/2026/39/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
+    private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
 
     /**
-     * meta.tn closes {@code set<value>} itself; this schema imports meta.tn and closes it again. Both mint
-     * the same derived name for the same body, so linking unifies them rather than reporting a collision.
+     * meta.tn lifts {@code [meta.type_ref]} itself; this schema imports meta.tn and lifts it again. Both mint the same
+     * derived name for the same body, so linking unifies them rather than reporting a collision.
      */
     @Test
     void anInstantiationAnImportAlreadyClosedUnifiesWithTheLocalOne() {
         assertDoesNotThrow(() -> Tson.standard().resolve("""
                 !!id:"https://example.test/shared-instantiation.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
-                  mine => set<value>
+                !!import:"%s"
+                !schema {
+                  mine => [meta.type_ref]
                 }
                 """.formatted(KERNEL, META)));
     }
@@ -50,9 +50,9 @@ class SharedInstantiationTest {
     void aConsumerClosingATemplateItsImportExportsLinks() {
         assertDoesNotThrow(() -> Tson.standard().resolve("""
                 !!id:"https://example.test/shared-instantiation-core.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                   tags => set<text>
                   box  => { a: tags }
                 }
@@ -65,9 +65,9 @@ class SharedInstantiationTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/shadowing.tn"
-                        !!meta:"%s"
                         !!import:"%s"
-                        {
+                        !!import:"%s"
+                        !schema {
                           int32 => { a: text }
                         }
                         """.formatted(META, CORE)));

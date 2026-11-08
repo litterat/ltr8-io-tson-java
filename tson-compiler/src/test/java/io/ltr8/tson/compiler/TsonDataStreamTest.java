@@ -35,7 +35,7 @@ class TsonDataStreamTest {
 
     private static String describe(TsonEvent e) {
         return switch (e) {
-            case DocumentStart d -> "DocumentStart(" + d.id().orElse("") + "|" + d.schema().orElse("") + ")";
+            case DocumentStart d -> "DocumentStart(" + d.id().orElse("") + "|" + String.join(" ", d.imports()) + ")";
             case DocumentEnd d -> "DocumentEnd";
             case RecordStart r -> "RecordStart";
             case FieldName f -> "FieldName(" + f.name() + ")";
@@ -48,8 +48,8 @@ class TsonDataStreamTest {
             case AnnotationStart a -> "AnnotationStart(" + a.name() + ")";
             case AnnotationEnd a -> "AnnotationEnd";
             case TypeRef t -> "TypeRef(" + t.name() + ")";
-            case SchemaRef s -> "SchemaRef(" + s.uri() + ")";
             case TokenEvent t -> "Token(" + t.text() + "," + t.form() + ")";
+            case ReferenceEvent r -> "Reference(" + r.reference().text() + ")";
             case VoidEvent a -> "Absent";
             case EmptyBraceEvent e2 -> "EmptyBrace";
         };
@@ -66,6 +66,74 @@ class TsonDataStreamTest {
     void quotedTokenRoot() {
         assertEquals(List.of("DocumentStart(|)", "Token(has spaces,SINGLE_LINE_QUOTED)", "DocumentEnd"),
                 shape("\"has spaces\""));
+    }
+
+    // ── A reference ([TSON-DATA] §7.4) ──────────────────────────────────
+
+    /** A qualified name with an adjacent argument list is one value, nested to any depth; whitespace inside is free. */
+    @Test
+    void aReferenceIsOneValue() {
+        assertEquals(List.of("DocumentStart(|)", "Reference(map<text list<int32>>)", "DocumentEnd"),
+                shape("map< text,  list<int32> >"));
+        assertEquals(List.of("DocumentStart(|)", "Reference(geo.address<T 201 \"a b\">)", "DocumentEnd"),
+                shape("geo.address<T 201 \"a b\">"));
+        assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(t)", "Reference(box<text>)",
+                "FieldName(n)", "Token(1,UNQUOTED)", "RecordEnd", "DocumentEnd"), shape("{ t: box<text>  n: 1 }"));
+    }
+
+    /** A reference stands where a core value does, a map key included. */
+    @Test
+    void aReferenceMayBeAMapKey() {
+        assertEquals(List.of("DocumentStart(|)", "MapStart", "Reference(box<text>)", "MapArrow", "Token(1,UNQUOTED)",
+                "MapEnd", "DocumentEnd"), shape("{ box<text> => 1 }"));
+    }
+
+    /** {@code <} opens an argument list only adjacent to an unquoted qualified name. */
+    @Test
+    void aDetachedOrQuotedHeadIsRefused() {
+        for (String source : List.of("box <text>", "\"box\"<text>", "box<>", "box<text", "1x<text>", "box<[a]>",
+                "box<_>")) {
+            TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
+            assertThrows(ParseException.class, () -> {
+                while (!(stream.next() instanceof DocumentEnd)) {
+                    // drain
+                }
+            }, source);
+        }
+    }
+
+    // ── A sibling reference ([TSON-DATA] §7.4, §7.5) ────────────────────
+
+    /** {@code kind!} is one value, a reference event holding the sibling, wherever a core value stands. */
+    @Test
+    void aSiblingReferenceIsOneValue() {
+        assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(type)", "Reference(kind!)",
+                "FieldName(optional)", "Token(true,UNQUOTED)", "RecordEnd", "DocumentEnd"),
+                shape("{ type: kind!  optional: true }"));
+        assertEquals(List.of("DocumentStart(|)", "ArrayStart", "Reference(kind!)", "ArrayEnd", "DocumentEnd"),
+                shape("[ kind!\n]"));
+        assertEquals(List.of("DocumentStart(|)", "MapStart", "Reference(kind!)", "MapArrow", "Token(1,UNQUOTED)",
+                "MapEnd", "DocumentEnd"), shape("{ kind! => 1 }"));
+        assertEquals(List.of("DocumentStart(|)", "Reference(kind!)", "DocumentEnd"), shape("kind!"));
+        assertTrue(events("{ type: kind!  }").get(3) instanceof ReferenceEvent(
+                io.ltr8.tson.schema.meta.SiblingRef sibling, var ignored) && sibling.field().equals("kind"));
+    }
+
+    /**
+     * The {@code !} is followed by whitespace, which keeps it apart from a prefix {@code !}; the token before it is one
+     * unquoted identifier; a sibling reference is no template argument; and a tag names a type, never a sibling.
+     */
+    @Test
+    void aMalformedOrMisplacedSiblingReferenceIsRefused() {
+        for (String source : List.of("{ type: kind!}", "[kind!]", "{ v: a!b }", "{ v: kind!, w: 1 }", "{ v: kind!? }",
+                "{ v: a.b! }", "{ v: \"kind\"! }", "{ v: 1x! }", "box<kind! >", "{ v: !int32! 5 }")) {
+            TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
+            assertThrows(ParseException.class, () -> {
+                while (!(stream.next() instanceof DocumentEnd)) {
+                    // drain
+                }
+            }, source);
+        }
     }
 
     @Test
@@ -86,68 +154,80 @@ class TsonDataStreamTest {
         List<TsonEvent> es = events("!!id:\"https://example.com/x.tn\"\n_");
         DocumentStart start = (DocumentStart) es.get(0);
         assertEquals("https://example.com/x.tn", start.id().orElseThrow());
-        assertTrue(start.schema().isEmpty());
+        assertTrue(start.imports().isEmpty());
     }
 
     @Test
-    void idAndSchemaDirectives() {
+    void idAndImportDirectives() {
         List<TsonEvent> es = events("""
                 !!id:"https://example.com/orders/1042.tn"
-                !!schema:"https://example.com/order.tn"
+                !!import:"https://example.com/order.tn"
+                !!import:"https://example.com/money.tn"
                 Alice
                 """);
         DocumentStart start = (DocumentStart) es.get(0);
         assertEquals("https://example.com/orders/1042.tn", start.id().orElseThrow());
-        assertEquals("https://example.com/order.tn", start.schema().orElseThrow());
+        assertEquals(List.of("https://example.com/order.tn", "https://example.com/money.tn"), start.imports());
         assertEquals("Token(Alice,UNQUOTED)", describe(es.get(1)));
     }
 
     @Test
-    void schemaDirectiveWithoutId() {
-        List<TsonEvent> es = events("!!schema:\"https://example.com/order.tn\" Alice");
+    void importDirectiveWithoutId() {
+        List<TsonEvent> es = events("!!import:\"https://example.com/order.tn\" Alice");
         DocumentStart start = (DocumentStart) es.get(0);
         assertTrue(start.id().isEmpty());
-        assertEquals("https://example.com/order.tn", start.schema().orElseThrow());
+        assertEquals(List.of("https://example.com/order.tn"), start.imports());
+    }
+
+    /** The retired directives are refused by the header grammar itself, each naming what replaced it. */
+    @Test
+    void aRetiredDirectiveIsRefused() {
+        for (String retired : List.of("meta", "schema")) {
+            TsonDataStream stream = new TsonDataStream(ByteSource.of("!!" + retired + ":\"https://example.com/m.tn\" { }"));
+            ParseException e = assertThrows(ParseException.class, stream::next);
+            assertTrue(e.getMessage().contains("'!!" + retired + "' directive is retired"), e.getMessage());
+        }
+    }
+
+    @Test
+    void anUnknownDirectiveIsRefused() {
+        TsonDataStream stream = new TsonDataStream(ByteSource.of("!!include:\"https://example.com/m.tn\" { }"));
+        ParseException e = assertThrows(ParseException.class, stream::next);
+        assertTrue(e.getMessage().contains("unknown directive '!!include'"), e.getMessage());
+    }
+
+    @Test
+    void anIdAfterAnImportIsRefused() {
+        TsonDataStream stream = new TsonDataStream(ByteSource.of(
+                "!!import:\"https://example.com/m.tn\"\n!!id:\"https://example.com/x.tn\"\n{ }"));
+        ParseException e = assertThrows(ParseException.class, stream::next);
+        assertTrue(e.getMessage().contains("'!!id' must be the header's first directive"), e.getMessage());
     }
 
     /**
-     * The stream reports {@code !!meta}; it does not refuse it. Whether a schema document may be
-     * <em>read</em> is a conformance-class question one tier up -- {@code TsonDataParser} is Class 1 and
-     * refuses one ({@code TsonDataParserTest} pins that), {@code TsonSchemaParser} requires it, and both sit
-     * on this stream. Refusing here would settle it for both, and would leave §7.1's classification with no
-     * answer to read off the events.
+     * The stream reports a root tagged {@code !schema}; it does not refuse it. Whether a schema document may be
+     * <em>read</em> is a conformance-class question one tier up -- {@code TsonDataParser} is Class 1 and refuses
+     * one ({@code TsonDataParserTest} pins that), {@code TsonSchemaParser} requires it, and both sit on this
+     * stream.
      */
     @Test
-    void metaDirectiveOpensTheStreamAndIsReported() {
-        TsonDataStream stream = new TsonDataStream(ByteSource.of("!!meta:\"https://example.com/m.tn\" { }"));
+    void theRootTagIsFoundPastTheRootsAnnotationsAndNothingIsConsumed() {
+        TsonDataStream stream = new TsonDataStream(ByteSource.of("@doc:{ a: [1 2] } @deprecated !schema { }"));
 
-        DocumentStart start = (DocumentStart) stream.next();
-
-        assertEquals("https://example.com/m.tn", start.meta().orElseThrow());
-        assertTrue(start.isSchemaDocument());
-        assertEquals(Optional.empty(), start.schema());
+        assertEquals(Optional.of("schema"), stream.rootTag());
+        List<String> events = new ArrayList<>();
+        while (stream.hasNext()) {
+            events.add(describe(stream.next()));
+        }
+        assertEquals("DocumentStart(|)", events.getFirst());
+        assertEquals("AnnotationStart(doc)", events.get(1), "the annotations looked past are still delivered");
+        assertTrue(events.contains("TypeRef(schema)"), events.toString());
     }
 
     @Test
-    void idThenMetaIsReportedWithBoth() {
-        TsonDataStream stream = new TsonDataStream(ByteSource.of("!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }"));
-
-        DocumentStart start = (DocumentStart) stream.next();
-
-        assertEquals("https://example.com/x.tn", start.id().orElseThrow());
-        assertEquals("https://example.com/m.tn", start.meta().orElseThrow());
-        assertTrue(start.isSchemaDocument());
-    }
-
-    /** A data document says so too: the discriminant is the directive's absence, not a separate flag. */
-    @Test
-    void aDataDocumentIsNotASchemaDocument() {
-        TsonDataStream stream = new TsonDataStream(ByteSource.of("!!schema:\"https://example.com/order.tn\" { }"));
-
-        DocumentStart start = (DocumentStart) stream.next();
-
-        assertEquals(Optional.empty(), start.meta());
-        assertFalse(start.isSchemaDocument());
+    void aRootWithNoTagHasNone() {
+        assertEquals(Optional.empty(), new TsonDataStream(ByteSource.of("@doc:\"x\" { a: 1 }")).rootTag());
+        assertEquals(Optional.of("order"), new TsonDataStream(ByteSource.of("!order { a: 1 }")).rootTag());
     }
 
     @Test
@@ -392,11 +472,8 @@ class TsonDataStreamTest {
     }
 
     @Test
-    void arrayElementCanHaveOwnSchemaDirective() {
-        assertEquals(List.of("DocumentStart(|)", "ArrayStart",
-                "SchemaRef(https://example.com/s.tn)", "Token(1,UNQUOTED)", "Token(2,UNQUOTED)",
-                "ArrayEnd", "DocumentEnd"),
-                shape("[ !!schema:\"https://example.com/s.tn\" 1 2 ]"));
+    void importDirectiveOnArrayElementIsParseError() {
+        assertThrows(ParseException.class, () -> shape("[ !!import:\"https://example.com/s.tn\" 1 2 ]"));
     }
 
     // ── Unterminated structures must fail fast, not hang (bounded lookahead, no infinite loop) ──
@@ -512,17 +589,17 @@ class TsonDataStreamTest {
     /**
      * <b>Reading the header frames nothing.</b> The root value is framed by the first demand for an event
      * past {@code DocumentStart}, so a caller that stops there -- a peek, or a schema parser taking
-     * {@code !!id}/{@code !!meta} -- leaves an empty frame stack behind. That is the invariant that lets
+     * its header -- leaves an empty frame stack behind. That is the invariant that lets
      * {@code TsonSchemaParser} read a schema map over the same stream: {@code drain} frames what its caller
      * asked for and would otherwise inherit whatever the header had pushed.
      */
     @Test
     void readingOnlyTheHeaderLeavesTheFrameStackClean() {
         TsonDataStream stream = new TsonDataStream(ByteSource.of(
-                "!!id:\"https://example.com/x\"\n!!meta:\"https://example.com/m.tn\"\n{ a => text }"));
+                "!!id:\"https://example.com/x\"\n!!import:\"https://example.com/m.tn\"\n{ a => text }"));
 
         DocumentStart start = (DocumentStart) stream.next();
-        assertTrue(start.isSchemaDocument());
+        assertEquals(List.of("https://example.com/m.tn"), start.imports());
 
         // A schema map is not a data value, and reading one is the schema parser's job -- but the stream
         // must be in a state where that is still possible, which means having framed nothing of its own.
@@ -542,19 +619,21 @@ class TsonDataStreamTest {
     }
 
     /**
-     * A directive §2.2 does not admit in a header is <b>left for the parser</b> and refused at the value
-     * position it then occupies -- named, because "found '!!'" says nothing about which rule broke. The
-     * stream no longer decides it, so a schema document missing its {@code !!meta} keeps the schema
-     * parser's own wording instead of being told about {@code !!schema}.
+     * A directive past the header is refused at the value position it occupies -- named, because "found '!!'"
+     * says nothing about which rule broke.
      */
     @Test
     void aStrayDirectiveIsNamedAtTheValuePosition() {
         TsonDataStream stream = new TsonDataStream(ByteSource.of(
-                "!!import:\"https://example.com/core.tn\"\n{ a: 1 }"));
+                "!!import:\"https://example.com/core.tn\"\n{ a: !!import:\"https://example.com/x.tn\" 1 }"));
 
-        assertEquals(Optional.empty(), ((DocumentStart) stream.next()).schema(), "the header reports nothing");
+        assertEquals(List.of("https://example.com/core.tn"), ((DocumentStart) stream.next()).imports());
 
-        ParseException e = assertThrows(ParseException.class, stream::next);
+        ParseException e = assertThrows(ParseException.class, () -> {
+            while (stream.hasNext()) {
+                stream.next();
+            }
+        });
         assertTrue(e.getMessage().contains("'!!import' is not permitted here"), e.getMessage());
     }
 }

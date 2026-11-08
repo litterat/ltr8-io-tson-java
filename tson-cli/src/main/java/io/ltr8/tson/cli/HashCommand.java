@@ -12,7 +12,7 @@ import java.nio.file.Path;
  * onto the {@code !!id} as a {@code ?sha256=<hex>} query, in place. Requires an {@code !!id} on the
  * first line; the id line is excluded from the hash, so stamping it is self-consistent and re-running
  * replaces the previous pin. The first step toward hash-pinned schema references -- once a schema
- * carries its own hash, other documents can pin their {@code !!import}/{@code !!schema} references to it.
+ * carries its own hash, other documents can pin their {@code !!import} references to it.
  */
 final class HashCommand {
 

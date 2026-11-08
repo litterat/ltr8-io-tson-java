@@ -47,19 +47,15 @@ instead (confirmed to behave like "no scope" and match the generic method's resu
 non-mapped address tried) to guarantee `!ipv6` always returns `Inet6Address`, regardless of the
 address's value.
 
-**`!cidr4`/`!cidr6` validate a network but hand back the authored text.** Java has no CIDR type, so the
-host value is the token's own text rather than an invented address/prefix pair — validated, never
-rewritten, so a round trip is exact (which for IPv6 also avoids expanding `2001:db8::/32` into its
-uncompressed eight-group spelling on the way out). The address half reuses `Ipv4Parser`/`Ipv6Parser`
-whole, so both inherit the strictness above; the prefix half must be a canonical decimal, rejecting `/08`
-for the same reason a `dec-octet` rejects `010`. §5.5's own split between the two failure categories is
-followed exactly: a token that isn't CIDR-shaped is a parse error, while a prefix outside the family
-range and an address with nonzero host bits are validation errors. `min_prefix`/`max_prefix` are applied;
-`within`/`excluding` are not, on the same deferral as `ipv4_type`'s (deciding subnet-of and non-overlap
-against a list of networks is a materially bigger piece of work than a scalar bound). Whether a *declared*
-bound itself falls inside the family range — "invalid at the schema level", per meta.tn — is a
-constraint-family coherence rule tracked in `BACKLOG.md`, not enforced by the parser; an out-of-range
-bound is inert, since the family range is enforced regardless.
+**`!cidr4`/`!cidr6` read to a network value.** The host value is `CidrInet4Network`/`CidrInet6Network` (`ltr8-net`),
+the prefix octets and the prefix length, or the authored text for a text-typed target; a round trip is exact in value,
+not in spelling. The address half reuses `Ipv4Parser`/`Ipv6Parser`'s grammar whole, so both inherit the strictness
+above; the prefix half must be a canonical decimal, rejecting `/08` for the same reason a `dec-octet` rejects `010`.
+§5.5's own split between the two failure categories is followed exactly: a token that isn't CIDR-shaped is a parse
+error, while a prefix outside the family range and an address with nonzero host bits are validation errors.
+`min_prefix`/`max_prefix`, `within` and `excluding` are applied. The network lists are typed `[cidr4]`/`[cidr6]`, so a
+malformed entry is refused at schema load by that reader, and a pair that admits no value, or a declared prefix bound
+outside the family range, is refused at schema load as incoherent.
 
 **A leap second is refused.** RFC 3339's grammar admits `time-second` `60`, but `!time` is the time of day on
 `[00:00:00, 24:00:00)` and `!datetime` an instant on the UTC timeline, and second 60 is neither: `23:59:60Z` is a
@@ -76,8 +72,8 @@ holding the handful of `ucschar` characters it reads as spaces (U+00A0, U+2000�
 
 **The vocabulary is the published one.** §5.6 lists the full `int8`..`int256`/`uint8`..`uint256` ladder plus
 the four bound-only refinements, and §5.5 carries `!email` beside its "Network Types" siblings, so what is
-seeded here matches both the tables and core.tn — the two read paths agree by construction rather than by
-this implementation choosing core.tn over a shorter table.
+seeded here matches both the tables and numeric.tn and net.tn — the two read paths agree by construction rather
+than by this implementation choosing the libraries over a shorter table.
 
 **`!email` implements a subset of RFC 5322, not the whole grammar.** `email_type`'s `spec` is
 fixed to RFC 5322, but `EmailParser` accepts only the `dot-atom "@" dot-atom` core; quoted local

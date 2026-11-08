@@ -7,15 +7,15 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -54,7 +54,7 @@ class RecordClosureTest {
     private static TsonCompiledSchema personSchema() {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("text", atom(TextType.UNCONSTRAINED));
-        entries.put("text_member_set", ArrayBody.of(TypeRef.of("text")));
+        entries.put("unicode.text_member_set", ArrayBody.of(TypeRef.of("text")));
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
         entries.put("integer", atom(IntegerType.UNCONSTRAINED));
@@ -64,7 +64,7 @@ class RecordClosureTest {
                 Map.entry("name", RecordField.required(TypeRef.of("text"))),
                 Map.entry("address", RecordField.required(TypeRef.of("addr"))))));
         TsonSchema schema = new TsonSchema("https://example.test/closure.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         return TsonSchemaCompiler.compile(new TsonLinkedSchema(schema), ValueReaderFactoryRegistry.tree());
     }
 
@@ -144,26 +144,26 @@ class RecordClosureTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", atom(IntegerType.UNCONSTRAINED));
         entries.put("text", atom(TextType.UNCONSTRAINED));
-        entries.put("text_member_set", ArrayBody.of(TypeRef.of("text")));
+        entries.put("unicode.text_member_set", ArrayBody.of(TypeRef.of("text")));
         entries.put("normalization", new EnumBody(
                 List.of("NONE", "NFC", "NFKC", "NFKC_CASEFOLD")));
-        entries.put("text_type", RecordBody.of(RecordBody.fieldMap(
+        entries.put("unicode.text_type", RecordBody.of(RecordBody.fieldMap(
                 KernelChainFields.chainField(entries),
                 Map.entry("min_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("max_length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("length", RecordField.optionalVoidable(TypeRef.of("integer"))),
                 Map.entry("pattern", RecordField.optionalVoidable(TypeRef.of("text"))),
-                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("text_member_set"))),
+                Map.entry("members", RecordField.optionalVoidable(TypeRef.of("unicode.text_member_set"))),
                 Map.entry("normalization", RecordField.defaulted(TypeRef.of("normalization"),
                         new Token("NONE", Token.Form.UNQUOTED))))));
         TsonSchema schema = new TsonSchema("https://example.test/bind-closure.tn",
-                "https://example.test/meta.tn", List.of(), entries);
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+                List.of(), entries);
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(new TsonLinkedSchema(schema),
                 ValueReaderFactoryRegistry.bind(context));
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
-        Object bound = compiled.get("text_type")
+        Object bound = compiled.get("unicode.text_type")
                 .read(TestDocuments.document("{ min_length: 1  minLength: 2 }", problems));
 
         Diagnostic diagnostic = problems.diagnostics().getFirst();
@@ -174,7 +174,7 @@ class RecordClosureTest {
         assertNull(bound);
 
         // The same schema, the same reader, nothing unknown: the binding itself still works.
-        assertEquals(Optional.of(1), assertInstanceOf(TextType.class,
-                compiled.get("text_type").read(TestDocuments.document("{ min_length: 1 }"))).minLength());
+        assertEquals(Optional.of(1L), assertInstanceOf(TextType.class,
+                compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 1 }"))).minLength());
     }
 }

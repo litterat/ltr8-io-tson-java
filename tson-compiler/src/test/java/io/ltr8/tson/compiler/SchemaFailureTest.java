@@ -59,7 +59,7 @@ class SchemaFailureTest {
     @Test
     void aGapKeepsTheCodeThatSaysItCouldNotBeChecked() {
         assertEquals(Diagnostic.Code.NOT_IMPLEMENTED,
-                SchemaFailure.of(new UnsupportedOperationException("no compiled reader for 'extern'")).code());
+                SchemaFailure.of(new UnsupportedOperationException("no compiled reader for 'widget'")).code());
     }
 
     /**

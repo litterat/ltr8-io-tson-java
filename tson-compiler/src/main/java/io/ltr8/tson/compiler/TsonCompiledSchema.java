@@ -19,17 +19,15 @@ import java.util.Optional;
  * TsonSchemaLinker}/{@code TsonLinkedSchema}, {@code TsonSchemaResolver}/its own resolved {@code
  * TsonSchema}).
  *
- * <p>The compile output for *any* resolved schema. A meta-layer schema (one whose {@code !!meta} is
- * meta-kernel) compiles to the {@link TsonCompiledMetaSchema} subtype, which adds the scoped
- * constructor vocabulary needed to *govern* another schema's compilation; every other schema compiles
- * to a bare {@code TsonCompiledSchema}, which can be read but never used as a governing meta. So the
- * type itself records whether a compiled schema is allowed to govern.
+ * <p>The compile output for *any* resolved schema. A schema compiled as vocabulary -- the readers another
+ * schema's resolution reads its construction heads and annotation values through -- is the {@link
+ * TsonCompiledVocabulary} subtype, which adds the reader for an instance of each constructor; a schema compiled
+ * to read data in one mode is a bare {@code TsonCompiledSchema}.
  *
- * <p>{@link #get} reads *any* entry, unscoped -- unlike {@link TsonCompiledMetaSchema#reader}, which
- * is deliberately scoped to only the entries a governing meta-schema itself declares as constructors
- * (§3.3.1's structure-namespace rule).
+ * <p>{@link #get} reads *any* entry -- unlike {@link TsonCompiledVocabulary#reader}, which reads an instance of a
+ * constructor, an entry IS-A {@code top}.
  */
-public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
+public sealed class TsonCompiledSchema permits TsonCompiledVocabulary {
 
     /** How many declared names {@link #unknownTypeMessage} spells out before summarizing the rest. */
     private static final int NAMES_IN_MESSAGE = 8;
@@ -50,14 +48,14 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
         return linkedSchema.kindOf(name);
     }
 
-    /** Whether {@code name} denotes the meta-kernel's own entry of that name ({@link TsonLinkedSchema#isKernel}). */
+    /** Whether {@code name} denotes the kernel's own entry of that name ({@link TsonLinkedSchema#isKernel}). */
     public boolean isKernel(String name) {
         return linkedSchema.isKernel(name);
     }
 
     /**
      * The {@link TsonLinkedSchema} this was compiled from -- package-private, so the {@link
-     * TsonCompiledMetaSchema} subtype can pass it to {@code super} when built from an existing base schema.
+     * TsonCompiledVocabulary} subtype can pass it to {@code super} when built from an existing base schema.
      */
     TsonLinkedSchema linkedSchema() {
         return linkedSchema;
@@ -184,8 +182,7 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
     /**
      * The reader for {@code typeName}, or empty if this schema has none -- the non-throwing
      * counterpart to {@link #get}, for a caller that treats an absent entry as a normal outcome
-     * (e.g. building a governing meta's scoped constructor vocabulary, where a placeholder schema
-     * legitimately has no readers yet).
+     * (e.g. building a compiled schema's constructor table, where an entry may legitimately have no reader).
      */
     public Optional<TsonTypeReader<?>> find(String typeName) {
         return Optional.ofNullable(entries.get(typeName));

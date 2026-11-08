@@ -9,17 +9,17 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import java.util.List;
 
 /**
- * The reader an <b>open</b> entry compiles to -- one that declares type parameters, so it is a template
- * rather than a type ([TSON-SCHEMA] §5.10) -- unless its held body carries {@code extension}, which makes it
- * a family base with a dispatch of its own ({@link AbstractTemplateReader}). Reports the author's mistake
+ * The reader a <b>held</b> template compiles to -- an open entry over any constructor but {@code record}, so it is a
+ * template rather than a type ([TSON-SCHEMA] §5.10). A record template is a family base with a dispatch of its own
+ * ({@link AbstractTemplateReader}). Reports the author's mistake
  * and skips the value, exactly like any other reader that finds the data isn't what the schema admits.
  *
  * <p><b>Reaching this is always a data error, never a schema one.</b> A schema referring to a template
  * without applying it is rejected far earlier, when the schema is linked ({@code TsonSchemaLinker}'s own
  * arity rule), so no field, element or supertype can route here. What is left is a <em>data</em> type-ref
- * naming the template directly -- {@code !paged { ... }} against {@code paged => <T> { ... }} -- at the
- * document root or anywhere a type-ref selects a reader. It is among the likeliest author mistakes: a
- * template is the natural thing to name for "a page of orders".
+ * naming the template directly -- {@code !rows [ ... ]} against {@code rows => <T> [T]} -- at the document root
+ * or anywhere a type-ref selects a reader. It is among the likeliest author mistakes: a template is the natural
+ * thing to name for "a list of orders".
  *
  * <p><b>Why the whole entry, rather than a check at the root.</b> A parameterised body has no reader to
  * build -- its parameters name no entry -- so compiling it like any other entry would end in an {@link

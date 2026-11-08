@@ -124,10 +124,10 @@ source for it, or because reaching it would break documents already on the wire.
   (§5.4) and no JSON document carries one, JSON having no spelling for them. A converted `type: number`
   should narrow `allow_nan`/`allow_infinity` to false, which keeps the float's number class ([TSON-SCHEMA] §5.4),
   so a choice listing it can be disjoint and take §8.2's untagged route.
-- **Scoped positions.** `dynamic`/`extern` require an annotation object naming the type (§5.7, §8.5), which
+- **Declared positions.** `declared` requires an annotation object naming the type (§5.7, §8.5), which
   existing JSON does not carry. `additionalProperties: true` converts to the recursive `json` choice of §5.7,
-  which is tag-free, never to `dynamic`.
-- **In-band root binding.** Existing JSON has no `$schema`/`$type`, so the root binds by §3.4's out-of-band
+  which is tag-free, never to `declared`.
+- **In-band root binding.** Existing JSON has no `$import`/`$type`, so the root binds by §3.4's out-of-band
   route — "the expected production route" in the spec's own words — through `Json.withSchemas` and
   `tson validate --schema --type`.
 
@@ -135,7 +135,7 @@ And three shapes that look like they belong on that list and do not: **tuples** 
 are ordinary JSON arrays; **defaults** convert and inject on decode (§6.1.3), so a document omitting a
 defaulted member reads; and **a member name that is not an identifier** — JSON-LD's `@type`, JSON Schema's `$ref` —
 is a field name under the record's name type ([TSON-SCHEMA] §5.2): the converter declares the profile its names
-need, `json_name => !identifier_type { start_add: "@$" }`, once on a fieldless abstract base its records compose,
+need, `json_name => !unicode.identifier_type { start_add: "@$" }`, once on a fieldless abstract base its records compose,
 and the names are judged under it with full hygiene. None is friction for the producer.
 
 ### Where the on-ramp actually breaks
@@ -285,7 +285,7 @@ Three exported, layered the way the module reads a document, and the split is th
 | `io.ltr8.tson.json` | `Json` (the front door); `JsonTreeReader`, `JsonObjectReader`; `JsonTreeWriter`, `JsonObjectWriter`, `JsonDataEmitter`; `JsonReadContext`, `JsonPosition`, `JsonSchemaLocation`, `JsonDiagnostics`; the schema-directed surface — `JsonTypeReader`, `JsonCompiledSchema`, `JsonCompiledSchemaRegistry`, `JsonSchemaCompiler` |
 | `io.ltr8.tson.json.tree` | `JsonValue` and its six node types, `JsonText`, plus `JsonValueException` |
 | `io.ltr8.tson.json.stream` | `JsonEvent`, `JsonEventSource`, `JsonStream` |
-| `io.ltr8.tson.json.reader` | internal — the two schemaless engines (`SchemalessTreeReader`, `DataClassObjectReader`); the schema-directed readers, the mode-free container loops, each over a plan and handing its slots to the mode's builder (`RecordReader`/`RecordPlan`, `ArrayReader`/`ArrayPlan`, `TupleReader`/`TuplePlan`, `MapObjectReader`/`MapPairsReader` over a `MapPlan` with `MapEntries`; `Tree*Builder`/`Bind*Builder` for each), `TreeAtomReader`, `BindTargets` binding a position to a component, `BridgedReader`, and `Slots`' markers; the dispatchers every mode shares (`DispatchFactories` over `DispatchTagReader`/`DispatchMemberReader`, `DispatchChoiceReader`, with `Route` and `ExactReader`) with `AtomReader`, `AtomForm`, `VoidReader`, `ValuePositionReader`, `DeferredTypeReader`, `OpenTemplateReader`, `ErrorReader`; the factory registries (`ValueReaderFactory`, `ValueReaderFactoryRegistry`, `ValueReaderFactoryResolver`, `ValueReaderContext`, `TypeReaderResolver`, `CompiledReaders`); and what they share — `TagMembers`, `Tags`, `NameHygiene`, `ReferenceChain`, `DiscriminationClass`, `ValueIdentity`, `FieldValue`, `Nodes`, `EventSkip` |
+| `io.ltr8.tson.json.reader` | internal — the two schemaless engines (`SchemalessTreeReader`, `DataClassObjectReader`); the schema-directed readers, the mode-free container loops, each over a plan and handing its slots to the mode's builder (`RecordReader`/`RecordPlan`, `ArrayReader`/`ArrayPlan`, `TupleReader`/`TuplePlan`, `MapObjectReader`/`MapPairsReader` over a `MapPlan` with `MapEntries`; `Tree*Builder`/`Bind*Builder` for each), `TreeAtomReader`, `BindTargets` binding a position to a component, `BridgedReader`, and `Slots`' markers; the dispatchers every mode shares (`DispatchFactories` over `DispatchTagReader`/`DispatchMemberReader`, `DispatchChoiceReader`, with `Route` and `ExactReader`) with `AtomReader`, `AtomForm`, `VoidReader`, `DeferredTypeReader`, `OpenTemplateReader`, `ErrorReader`; the factory registries (`ValueReaderFactory`, `ValueReaderFactoryRegistry`, `ValueReaderFactoryResolver`, `ValueReaderContext`, `TypeReaderResolver`, `CompiledReaders`); and what they share — `TagMembers`, `Tags`, `NameHygiene`, `AliasChain`, `DiscriminationClass`, `ValueIdentity`, `FieldValue`, `Nodes`, `EventSkip` |
 | `io.ltr8.tson.json.writer` | internal — the two write engines, `TreeValueWriter` and `DataClassObjectWriter` |
 | `io.ltr8.tson.json.atom` | internal — `JsonAtoms`: one JSON leaf into one host value at a bound class's atom position |
 | `io.ltr8.tson.json.lexer` | internal — `JsonLexer`, `JsonToken`, `JsonTokenType`; a consumer names a value, an event or a reader, never a token or a parser |

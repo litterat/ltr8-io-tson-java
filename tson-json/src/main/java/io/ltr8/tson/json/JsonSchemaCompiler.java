@@ -7,11 +7,9 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.LinkedHashMap;
@@ -27,7 +25,7 @@ import java.util.Set;
  * <p><b>The compile is where the position is decided.</b> [TSON-JSON] §4.1 requires that where two readings
  * could apply to one JSON form, a stated rule select one <em>before</em> the value's content is touched.
  * Deciding per value would be a per-document cost and a per-document opportunity to differ; deciding once per
- * entry makes the wire decision a reference hop, which is what §8.3 asks for in so many words.
+ * entry makes the wire decision an alias hop, which is what §8.3 asks for in so many words.
  *
  * <p><b>What it consumes is a value model.</b> {@link TsonLinkedSchema} is a {@code tson-schema} record, and
  * the resolution, linking and registration that produce it are encoding-neutral and stay in {@code
@@ -35,36 +33,23 @@ import java.util.Set;
  *
  * <p><b>A failure building one entry becomes a {@link ErrorReader}</b> rather than failing the compile:
  * the schema compiles, and reading a value against that one type reports {@code NOT_IMPLEMENTED} and skips
- * it. That is what keeps a constructor this encoding cannot read -- one a meta-schema other than the bundled
- * ones declares ([TSON-SCHEMA] §2.2.2) -- from costing a document every other verdict it was owed.
- *
- * <p><b>A foreign schema is not compiled here.</b> §8.5's scope push names a schema from inside the document, so
- * a compile is handed {@link ForeignSchemas}, where to ask for one when a value arrives. A compile with no
- * registry behind it passes {@link ForeignSchemas#none()}.
+ * it. That is what keeps a constructor this encoding cannot read -- one a schema other than the bundled ones
+ * declares, as any schema may -- from costing a document every other verdict it was owed.
  */
 public final class JsonSchemaCompiler {
 
     private JsonSchemaCompiler() {
     }
 
-    /** Compiles every entry in tree mode, with no foreign schema reachable; unreadable constructors become gaps. */
+    /** Compiles every entry in tree mode; unreadable constructors become gaps. */
     public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
         return compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
-    /** {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver, ForeignSchemas)} with no foreign schema. */
+    /** Compiles every entry, dispatching each resolved body to {@code factories} by its constructor name. */
     public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema,
                                              ValueReaderFactoryResolver factories) {
-        return compile(linkedSchema, factories, ForeignSchemas.none());
-    }
-
-    /**
-     * Compiles every entry, dispatching each resolved body to {@code factories} by its constructor name, with a
-     * scoped position's foreign schemas looked up through {@code foreign}.
-     */
-    public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
-                                             ForeignSchemas foreign) {
-        Compilation compilation = new Compilation(linkedSchema, factories, foreign);
+        Compilation compilation = new Compilation(linkedSchema, factories);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -79,18 +64,16 @@ public final class JsonSchemaCompiler {
         private final TsonLinkedSchema linked;
         private final TsonSchema schema;
         private final ValueReaderFactoryResolver factories;
-        private final ForeignSchemas foreign;
         private final Map<String, JsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
         /** How a factory reaches another entry's reader -- rebound once, when this ends. */
         private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
-        Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories, ForeignSchemas foreign) {
+        Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
             this.linked = linked;
             this.schema = linked.schema();
             this.factories = factories;
-            this.foreign = foreign;
         }
 
         JsonTypeReader<?> resolve(String name) {
@@ -130,35 +113,33 @@ public final class JsonSchemaCompiler {
         }
 
         private JsonTypeReader<?> build(String name, Top definition) {
-            ValueReaderContext context = new ValueReaderContext(linked, readers, foreign);
+            ValueReaderContext context = new ValueReaderContext(linked, readers);
             Top body = definition;
-            if (body instanceof Reference reference) {
-                // [TSON-SCHEMA] §8.3: a processor MAY collapse a reference chain when it compiles for
+            if (body instanceof Alias alias) {
+                // [TSON-SCHEMA] §8.3: a processor MAY collapse an alias chain when it compiles for
                 // reading, and this is that moment -- the reader is its target's, reached once here rather
                 // than walked on every value.
-                return resolve(reference.target().name());
+                return resolve(alias.target().name());
             }
-            // A namespace type resolves to a record of the facets it states, and a value of it is the map they
-            // describe, never a record of those facets. Its keys are read under a pinned key family, and by their
-            // spelling alone where the family is a default the host supplies (MapBody.Namespace#read): a record's
-            // field names, which linking judges by the record's name_type.
-            Top read = linked.namespace(name).<Top>map(MapBody.Namespace::read).orElse(body);
+            // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key
+            // family.
+            Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
             ValueReaderFactory factory = factories.resolve(constructorOf(read));
             return factory.create(name, read, context);
         }
     }
 
     /**
-     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, and the one a
-     * namespace value names itself. An open entry reads as a template ([TSON-SCHEMA] §5.10) whichever kernel shape
-     * holds it, so it takes the template's reader. A namespace value names a meta layer's own
-     * constructor, which has no factory: nothing is typed by such an entry, and its reader is the refusal.
+     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, so a record
+     * template takes {@code record_template}'s reader and every other open entry {@code template}'s ([TSON-SCHEMA]
+     * §5.10). A value entry names the ordinary type it is a value of, which has no factory: nothing is typed by
+     * such an entry, and its reader is the refusal.
      */
     private static String constructorOf(Top body) {
-        if (body instanceof Namespace<?> value) {
+        if (body instanceof ValueEntry value) {
             return value.type();
         }
-        Class<?> leaf = OpenEntry.isOpen(body) ? TemplateBody.class : body.getClass();
+        Class<?> leaf = body.getClass();
         Typename typename = leaf.getAnnotation(Typename.class);
         if (typename == null) {
             throw new IllegalStateException(leaf + " has no @Typename -- every Top leaf must carry one");

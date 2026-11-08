@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -54,8 +54,7 @@ class VariantTreeReaderTest {
                 RecordField.required(TypeRef.of("integer"))))));
         entries.put("triangle",
                 ((Type) (RecordBody.of(RecordBody.fieldMap()))).withSupertypes(List.of("shape")));
-        return new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn",
-                List.of(), entries);
+        return new TsonSchema("https://example.test/s.tn", List.of(), entries);
     }
 
     private static TsonCompiledSchema compiled() {

@@ -5,43 +5,43 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.BytesType;
-import io.ltr8.tson.schema.meta.Cidr4Type;
-import io.ltr8.tson.schema.meta.Cidr6Type;
-import io.ltr8.tson.schema.meta.DateTimeType;
-import io.ltr8.tson.schema.meta.DateType;
-import io.ltr8.tson.schema.meta.DecimalType;
-import io.ltr8.tson.schema.meta.DurationType;
-import io.ltr8.tson.schema.meta.PeriodType;
-import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.binary.BytesType;
+import io.ltr8.tson.schema.net.Cidr4Type;
+import io.ltr8.tson.schema.net.Cidr6Type;
+import io.ltr8.tson.schema.temporal.DateTimeType;
+import io.ltr8.tson.schema.temporal.DateType;
+import io.ltr8.tson.schema.numeric.DecimalType;
+import io.ltr8.tson.schema.temporal.DurationType;
+import io.ltr8.tson.schema.temporal.PeriodType;
+import io.ltr8.tson.schema.net.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.IntegerType;
-import io.ltr8.tson.schema.meta.KindBody;
-import io.ltr8.tson.schema.meta.RefBody;
-import io.ltr8.tson.schema.meta.HostType;
-import io.ltr8.tson.schema.meta.HostnameType;
-import io.ltr8.tson.schema.meta.MediaTypeType;
-import io.ltr8.tson.schema.meta.Ipv4Type;
-import io.ltr8.tson.schema.meta.Ipv6Type;
-import io.ltr8.tson.schema.meta.MacType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.numeric.IntegerType;
+import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.net.HostType;
+import io.ltr8.tson.schema.net.HostnameType;
+import io.ltr8.tson.schema.net.MediaTypeType;
+import io.ltr8.tson.schema.net.Ipv4Type;
+import io.ltr8.tson.schema.net.Ipv6Type;
+import io.ltr8.tson.schema.net.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.TextType;
-import io.ltr8.tson.schema.meta.TimeType;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.unicode.RegexType;
+import io.ltr8.tson.schema.unicode.TextType;
+import io.ltr8.tson.schema.temporal.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.IriType;
-import io.ltr8.tson.schema.meta.UriType;
-import io.ltr8.tson.schema.meta.UuidType;
-import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.net.IriType;
+import io.ltr8.tson.schema.net.UriType;
+import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.VoidType;
 
 import java.math.BigDecimal;
@@ -65,7 +65,7 @@ import java.util.function.Function;
  * §5.4), so a choice's untagged values are one set whichever encoding reads them. Two kinds straddle classes
  * and get none: an approximate atom whose {@code allow_nan} or {@code allow_infinity} is true (a NaN is a
  * number token in TSON text and a string in JSON; narrowing both to false restores {@link #NUMBER}), and a map
- * whose key type, at the end of its reference chain, is not a type a single scalar token denotes -- an atom
+ * whose key type, at the end of its alias chain, is not a type a single scalar token denotes -- an atom
  * other than {@code value} and {@code void}, enums included -- since such a key has no single-token spelling
  * and JSON writes the map in pairs form, as an array.
  */
@@ -83,7 +83,7 @@ public enum DiscriminationClass {
      * form §4's single pass cannot recover ({@code rational}/{@code complex}, whose typed forms straddle
      * classes; {@code value} and {@code void}; a mixed-class enum; an {@code unknown}), one of [TSON-SCHEMA]
      * §5.4's two straddling kinds (an approximate atom admitting NaN or an infinity, a map whose key type is not
-     * a single-token scalar), a nested choice or extern, or a name the namespace does not resolve. A reference
+     * a single-token scalar), a nested choice or extern, or a name the namespace does not resolve. An alias
      * chain is followed to its terminal entry first (§8.3 makes an alias and its target one type); a cycle,
      * having no terminal, has no class. An empty result makes
      * the enclosing choice non-disjoint and blocks untagged recovery -- the conservative side, the tag
@@ -92,7 +92,7 @@ public enum DiscriminationClass {
     public static Optional<DiscriminationClass> of(String name, Function<String, ? extends Top> namespace) {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
-        return ReferenceChain.terminalDefinition(name, namespace).flatMap(def -> classify(def, namespace));
+        return AliasChain.terminalDefinition(name, namespace).flatMap(def -> classify(def, namespace));
     }
 
     private static Optional<DiscriminationClass> classify(Top def, Function<String, ? extends Top> namespace) {
@@ -102,8 +102,7 @@ public enum DiscriminationClass {
             case FloatType f -> f.allowNan() || f.allowInfinity() ? Optional.empty() : Optional.of(NUMBER);
             case TextType ignored -> Optional.of(STRING);
             case IdentifierType ignored -> Optional.of(STRING);
-            case RefBody ignored -> Optional.of(STRING); // a qualified name, written as a token
-            case KindBody ignored -> Optional.of(STRING); // a type name, written as an identifier is
+            case ReferenceBody ignored -> Optional.of(STRING); // a name, written as a token
             case UriType ignored -> Optional.of(STRING);
             case IriType ignored -> Optional.of(STRING);
             case RegexType ignored -> Optional.of(STRING);
@@ -125,25 +124,26 @@ public enum DiscriminationClass {
             case MacType ignored -> Optional.of(STRING);
             case EnumBody members -> ofEnum(members);
             case RecordBody ignored -> Optional.of(BRACE);
+            case RecordTemplateBody ignored -> Optional.of(BRACE); // every member is a record
             case MapBody m -> hasScalarKey(m, namespace) ? Optional.of(BRACE) : Optional.empty();
+            case NamespaceBody ignored -> Optional.of(BRACE); // its keys are names
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
-            case Reference ignored -> Optional.empty();
+            case Alias ignored -> Optional.empty();
             case TemplateBody ignored -> Optional.empty();
-            case Namespace<?> ignored -> Optional.empty();
+            case ValueEntry ignored -> Optional.empty();
         };
     }
 
     /**
-     * [TSON-SCHEMA] §5.4's key test: whether the map's key type, at the end of its reference chain, is a type a
-     * single scalar token denotes by its content -- an atom-family instance or an enum, {@code value} and
-     * {@code void} excepted.
+     * [TSON-SCHEMA] §5.4's key test: whether the map's key type, at the end of its alias chain, is a type a
+     * single scalar token denotes by its content -- an atom-family instance or an enum, {@code void} excepted.
      */
     private static boolean hasScalarKey(MapBody map, Function<String, ? extends Top> namespace) {
-        return ReferenceChain.terminalDefinition(map.keyType().name(), namespace)
-                .filter(key -> key instanceof Atom && !(key instanceof ValueType) && !(key instanceof VoidType))
+        return AliasChain.terminalDefinition(map.keyType().name(), namespace)
+                .filter(key -> key instanceof Atom && !(key instanceof VoidType))
                 .isPresent();
     }
 

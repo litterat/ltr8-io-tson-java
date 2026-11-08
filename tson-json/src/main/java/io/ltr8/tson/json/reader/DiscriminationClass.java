@@ -4,12 +4,13 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.numeric.DecimalType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -24,7 +25,7 @@ import java.util.Optional;
  * the void sentinel (§7), spent before any class question arises -- and the remaining five map one-to-one.
  *
  * <p><b>A type with no class needs no verdict.</b> {@code rational} and {@code complex} (both strings, but
- * §5.4 gives them no class), {@code value} and {@code void}, a nested choice and the {@code scoped} instances all
+ * §5.4 gives them no class), {@code value} and {@code void}, a nested choice and the {@code declared_type} instances all
  * answer empty -- and a choice containing one is not disjoint ([TSON-SCHEMA] §5.4), so §8.2's untagged route never
  * consults them. So do §5.4's two straddling kinds: an approximate atom whose {@code allow_nan} or
  * {@code allow_infinity} is true, whose special values are JSON strings (§5.4), and a map whose key type takes the
@@ -40,9 +41,9 @@ enum DiscriminationClass {
 
     BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
 
-    /** The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none. */
+    /** The class {@code name} resolves to, following its alias chain, or empty for a type §5.4 gives none. */
     static Optional<DiscriminationClass> of(TsonLinkedSchema linked, String name) {
-        return ReferenceChain.terminal(linked.schema(), name)
+        return AliasChain.terminal(linked.schema(), name)
                 .flatMap(resolved -> classify(linked.schema(), resolved.definition()));
     }
 
@@ -54,35 +55,35 @@ enum DiscriminationClass {
                     ? Optional.empty() : Optional.of(NUMBER);
             case EnumBody members -> ofEnum(members);
             case RecordBody ignored -> Optional.of(BRACE);
+            case RecordTemplateBody ignored -> Optional.of(BRACE); // every member is a record
             case MapBody map -> MapPlan.isObjectForm(schema, map) ? Optional.of(BRACE) : Optional.empty();
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
             // Every remaining atom family is string-content (§5.6). `rational`, `complex`, `value`,
-            // `void`, a nested choice and `scoped` fall through to empty: §5.4 gives them no class, so
+            // `void`, a nested choice and `declared` fall through to empty: §5.4 gives them no class, so
             // they can only be reached with a tag.
-            case io.ltr8.tson.schema.meta.TextType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.IdentifierType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.RefBody ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.KindBody ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.UriType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.IriType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.RegexType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.UuidType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.DateType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.TimeType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.DateTimeType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.DurationType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.PeriodType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.BytesType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.EmailType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.Ipv4Type ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.HostnameType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.HostType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.MediaTypeType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.Ipv6Type ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.Cidr4Type ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.Cidr6Type ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.MacType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.unicode.TextType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.unicode.IdentifierType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.meta.ReferenceBody ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.UriType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.IriType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.unicode.RegexType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.UuidType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.temporal.DateType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.temporal.TimeType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.temporal.DateTimeType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.temporal.DurationType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.temporal.PeriodType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.binary.BytesType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.EmailType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.Ipv4Type ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.HostnameType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.HostType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.MediaTypeType ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.Ipv6Type ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.Cidr4Type ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.Cidr6Type ignored -> Optional.of(STRING);
+            case io.ltr8.tson.schema.net.MacType ignored -> Optional.of(STRING);
             default -> Optional.empty();
         };
     }

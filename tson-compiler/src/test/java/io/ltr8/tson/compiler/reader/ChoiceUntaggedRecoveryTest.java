@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.EventSkip;
@@ -9,10 +8,10 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.EntryKind;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.EntryKind;
@@ -58,8 +57,7 @@ class ChoiceUntaggedRecoveryTest {
         Top choiceDef = new ChoiceBody(refs, disjoint);
         entries.put("contact", choiceDef);
         ValueReaderContext context = new ValueReaderContext(
-                new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), entries)), readers,
-                ForeignSchemas.none());
+                new TsonLinkedSchema(new TsonSchema("id", List.of(), entries)), readers);
         return ChoiceReader.FACTORY.create("contact", choiceDef, context);
     }
 

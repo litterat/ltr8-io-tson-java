@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.KindBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -101,7 +101,6 @@ class Class2ConformanceSuiteTest {
         // corpus publishes those under its own identity prefix rather than inventing a file convention.
         return Tson.of(ProcessorConfig.defaults()
                 .withDataBindContext(SuiteBindings.context())
-                .withMetaNameBinder(SuiteBindings.names())
                 .withSchemaAccess(SchemaAccess.of(Class2ConformanceSuiteTest::fetchSuiteSchema)));
     }
 
@@ -109,6 +108,8 @@ class Class2ConformanceSuiteTest {
     private static String fetchSuiteSchema(String uri) {
         String prefix = "https://tson.io/test-suite/schemas/";
         String identity = uri.startsWith("//") ? "https:" + uri : uri;
+        int query = identity.indexOf('?');
+        identity = query < 0 ? identity : identity.substring(0, query); // a ?sha256= pin is no part of the file
         if (identity.startsWith(prefix)) {
             Path file = SuiteCheckout.schemasRoot().orElseThrow().resolve(identity.substring(prefix.length()));
             try {
@@ -126,41 +127,44 @@ class Class2ConformanceSuiteTest {
     /**
      * A schema document, and what §8 says it resolves to.
      *
-     * <p>The expected side is read with this implementation's own meta.tn-governed reader, so a vector that
+     * <p>The expected side is read with this implementation's own reader of meta.tn's model, so a vector that
      * writes something meta.tn does not admit fails here rather than being compared as-is -- which is what
      * makes the corpus's expected side validated data rather than a transcript.
      */
     private static void checkSchemaVector(String bucket, java.nio.file.Path subject, RecordValue sidecar)
             throws IOException {
         Tson tson = newTson();
-        String source = Sidecar.splicedSource(subject, sidecar);
+        String source = Sidecar.subjectSource(subject);
         List<Diagnostic> problems = tson.validateSchema(source);
 
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
                 assertEquals(List.of(), problems, "a valid schema vector must load cleanly");
                 Map<String, Top> ours = ResolvedForm.ownEntries(tson, identityOf(source));
-                // Under the subject's own meta, which an instance of its namespace type needs (RUNNER.md).
-                Map<String, Top> expected = ResolvedForm.readResolved(tson,
+                // Under the subject's own imports, which an instance of its namespace type needs (RUNNER.md) -- its
+                // first, which is the one declaring the constructors its entries are written with. Reading under all
+                // of them binds every record of their closure, and SuiteBindings binds by name, one class per name
+                // across the whole corpus: a second fixture's `order` would meet a class written for another's.
+                List<String> imports = TsonDocumentPeek.of(source).header().imports();
+                Map<String, Object> expected = ResolvedForm.readResolved(tson,
                         fieldText(outcomePayload(sidecar), "resolved"),
-                        hasField(sidecar, "meta") ? Sidecar.resolveShortName(fieldText(sidecar, "meta"))
-                                : TsonBundledSchemas.META_ID);
+                        imports.isEmpty() ? imports : imports.subList(0, 1));
                 assertEquals(new TreeSet<>(expected.keySet()), new TreeSet<>(ours.keySet()),
                         "the resolved schema does not declare the entries the vector states");
                 expected.forEach((name, definition) -> assertEquals(
                         ResolvedForm.rendered(definition), ResolvedForm.rendered(ours.get(name)),
                         name + " does not resolve to what the vector states"));
-                // §8.2 puts the derived @synthetic marker on the key of every entry the resolver
+                // §8.2 puts the derived @meta.synthetic marker on the key of every entry the resolver
                 // materialised from a sugar form and on no other, so the marked set is a claim in its own
                 // right -- and one a bound comparison cannot make, a key-position annotation being dropped
                 // when a resolved-form document is read back.
                 assertEquals(ResolvedForm.markedSynthetics(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourSynthetics(tson, identityOf(source)),
-                        "the entries marked @synthetic are not the ones the vector marks");
+                        "the entries marked @meta.synthetic are not the ones the vector marks");
                 // §8.2's second key annotation: each instantiation states, on its key, the application it is.
                 assertEquals(ResolvedForm.markedApplications(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourApplications(tson, identityOf(source)),
-                        "the entries' @application are not the ones the vector states");
+                        "the entries' @meta.application are not the ones the vector states");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
             case "refused" -> assertRefused(sidecar, problems, "schema");
@@ -238,7 +242,7 @@ class Class2ConformanceSuiteTest {
     private static void checkLinkVector(String bucket, java.nio.file.Path subject, RecordValue sidecar)
             throws IOException {
         Tson tson = newTson();
-        String source = Sidecar.splicedSource(subject, sidecar);
+        String source = Sidecar.subjectSource(subject);
         List<Diagnostic> problems = tson.validateSchema(source);
 
         switch (outcomeOf(sidecar)) {
@@ -294,10 +298,11 @@ class Class2ConformanceSuiteTest {
         if (hasField(expected, "members")) {
             for (RecordValue claim : Sidecar.fieldRecordArray(expected, "members")) {
                 String name = fieldText(claim, "name");
-                // A kind's derived index, compared as a set and normalised as the subtypes index is: an
-                // instantiation a kind lists carries a minted name (RUNNER.md rule 6).
-                if (!(definitionOf(entries, name) instanceof KindBody kind)) {
-                    throw new AssertionError(name + " is not a kind, so it has no members index");
+                // The names a reference over a constructor admits, derived at link and compared as a set,
+                // normalised as the subtypes index is: an instantiation listed carries a minted name (RUNNER.md
+                // rule 6).
+                if (!(definitionOf(entries, name) instanceof ReferenceBody kind) || !kind.namesTypes()) {
+                    throw new AssertionError(name + " is no reference over a constructor, so it admits no members");
                 }
                 assertEquals(new TreeSet<>(fieldTextArray(claim, "members").stream()
                                 .map(ResolvedForm::withoutHash).toList()),
@@ -331,7 +336,7 @@ class Class2ConformanceSuiteTest {
      */
     private static void checkValidateVector(String bucket, java.nio.file.Path subject, RecordValue sidecar)
             throws IOException {
-        byte[] raw = Sidecar.subjectBytes(subject, sidecar);
+        byte[] raw = Sidecar.subjectBytes(subject);
         List<Diagnostic> reported = new ArrayList<>();
         newTson().treeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
 
@@ -367,7 +372,7 @@ class Class2ConformanceSuiteTest {
      * defaults, refuted assertions, failed ingest checks -- is a resolver error, however value-like the
      * violated rule, because it is detected while resolving the schema. Validation errors are reserved for
      * data checked against a successfully loaded schema." A schema-authoring mistake that this library
-     * happens to catch through the meta-schema's own compiled reader arrives carrying a record-shaped code,
+     * happens to catch through the kernel's own compiled reader arrives carrying a record-shaped code,
      * and it is still a resolver error: the code says which rule, the phase says which category.
      *
      * <p>What is still checked per diagnostic is that each one is a <em>verdict</em>. A gap, a binding

@@ -77,7 +77,7 @@ class LimitsPolicyTest {
     /** A schema document is untrusted input too, and reaches the bound through the same shared stream. */
     @Test
     void aSchemaDocumentIsBoundedTheSameWay() {
-        String schema = "!!meta:\"https://tson.io/2026/38/m/meta.tn\"\n{ deep => " + nested(PAST_THE_STACK) + " }";
+        String schema = "!!import:\"https://tson.io/2026/39/m/meta.tn\"\n!schema { deep => " + nested(PAST_THE_STACK) + " }";
 
         assertThrows(LimitExceededException.class,
                 () -> new TsonSchemaParser(schema).parseSchemaDocument());
@@ -149,7 +149,7 @@ class LimitsPolicyTest {
         assertThrows(IllegalArgumentException.class, () -> LimitsPolicy.defaults().withMaxDepth(0));
     }
 
-    /** Every other limit is refused below one on the same terms, though only depth is counted yet. */
+    /** Every other limit is refused below one on the same terms, whether or not it is counted yet. */
     @Test
     void everyLimitBelowOneIsRefusedAtTheConfiguration() {
         LimitsPolicy limits = LimitsPolicy.defaults();
@@ -157,9 +157,9 @@ class LimitsPolicyTest {
                 l -> l.withMaxTokenLength(0), l -> l.withMaxTextLength(0), l -> l.withMaxNumericLiteralLength(0),
                 l -> l.withMaxBinarySize(0), l -> l.withMaxDocumentSize(0), l -> l.withMaxElements(0),
                 l -> l.withMaxEntries(0), l -> l.withMaxFields(0), l -> l.withMaxAnnotations(0),
-                l -> l.withMaxValues(0), l -> l.withMaxForeignSchemas(0), l -> l.withMaxImportClosure(0),
-                l -> l.withMaxSchemaEntries(0), l -> l.withMaxReferenceChain(0), l -> l.withMaxSupertypeChain(0),
-                l -> l.withMaxMaterialisationDepth(0));
+                l -> l.withMaxValues(0), l -> l.withMaxImportClosure(0),
+                l -> l.withMaxSchemaEntries(0), l -> l.withMaxAliasChain(0), l -> l.withMaxSupertypeChain(0),
+                l -> l.withMaxMaterialisationDepth(0), l -> l.withMaxWaitDepth(0));
         for (var wither : zeroed) {
             assertThrows(IllegalArgumentException.class, () -> wither.apply(limits));
         }

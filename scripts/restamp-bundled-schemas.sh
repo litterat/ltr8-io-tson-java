@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
-# Re-stamp the five bundled schemas' content-hash pins, bottom-up, plus every copy of them this
-# repo carries. Run it after any edit to spec/m/{meta-kernel,meta,core,net,policy}.tn: a digest is over the
-# document's own bytes, so an edit to meta.tn invalidates meta.tn's own !!id pin, core.tn's !!meta
-# pin, core.tn's own !!id pin (its bytes now differ), TsonBundledSchemas' held constants, and the
-# getting-started example's pins in README.md and InitCommand.java.
+# Re-stamp the six bundled schemas' content-hash pins, bottom-up, plus every copy of them this
+# repo carries. Run it after any edit to spec/m/{meta,numeric,temporal,net,core,policy}.tn: a digest is over the
+# document's own bytes, so an edit to meta.tn invalidates meta.tn's own !!id pin, the !!import pins of numeric.tn,
+# temporal.tn and net.tn and their own !!id pins (their bytes now differ), core.tn's and policy.tn's pins above
+# those, TsonBundledSchemas' held constants, and the getting-started example's pins in README.md and
+# InitCommand.java.
 #
 #   scripts/restamp-bundled-schemas.sh            re-stamp in place
 #   scripts/restamp-bundled-schemas.sh --check    report what is stale, write nothing (exit 1 if any)
@@ -110,45 +111,34 @@ example_digest() {
     printf '%s\n' "$readme" | tail -n +2 | shasum -a 256 | cut -d' ' -f1
 }
 
-# --- bottom-up: each layer's digest is stamped into the layer above before that layer is hashed ---
+# --- bottom-up: each layer's digest is stamped into the layers above before they are hashed ---
 
-KERNEL_ID=$(identity spec/m/meta-kernel.tn)
-META_ID=$(identity spec/m/meta.tn)
-CORE_ID=$(identity spec/m/core.tn)
-NET_ID=$(identity spec/m/net.tn)
-POLICY_ID=$(identity spec/m/policy.tn)
-
-KERNEL=$(digest spec/m/meta-kernel.tn)
-restamp spec/m/meta-kernel.tn "$KERNEL_ID" "$KERNEL"
-
-restamp spec/m/meta.tn "$KERNEL_ID" "$KERNEL"
-META=$(digest spec/m/meta.tn)
-restamp spec/m/meta.tn "$META_ID" "$META"
-
-restamp spec/m/core.tn "$META_ID" "$META"
-CORE=$(digest spec/m/core.tn)
-restamp spec/m/core.tn "$CORE_ID" "$CORE"
-
-restamp spec/m/net.tn "$META_ID" "$META"
-NET=$(digest spec/m/net.tn)
-restamp spec/m/net.tn "$NET_ID" "$NET"
-
-restamp spec/m/policy.tn "$META_ID" "$META"
-restamp spec/m/policy.tn "$CORE_ID" "$CORE"
-POLICY=$(digest spec/m/policy.tn)
-restamp spec/m/policy.tn "$POLICY_ID" "$POLICY"
+# Dependency order: the kernel, the three libraries importing it alone, core importing the libraries,
+# and policy. Every document's pins to an earlier one are re-stamped, whichever it imports, so the
+# order is the only thing this list states about the imports.
+DOCUMENTS=(meta numeric temporal net core policy)
+IDS=()
+DIGESTS=()
+for i in "${!DOCUMENTS[@]}"; do
+    file=spec/m/${DOCUMENTS[$i]}.tn
+    IDS[$i]=$(identity "$file")
+    for (( lower = 0; lower < i; lower++ )); do
+        restamp "$file" "${IDS[$lower]}" "${DIGESTS[$lower]}"
+    done
+    DIGESTS[$i]=$(digest "$file")
+    restamp "$file" "${IDS[$i]}" "${DIGESTS[$i]}"
+done
 
 BUNDLED=tson-schema/src/main/java/io/ltr8/tson/schema/TsonBundledSchemas.java
-restamp_constant "$BUNDLED" META_KERNEL_SHA256 "$KERNEL"
-restamp_constant "$BUNDLED" META_SHA256 "$META"
-restamp_constant "$BUNDLED" CORE_SHA256 "$CORE"
-restamp_constant "$BUNDLED" NET_SHA256 "$NET"
-restamp_constant "$BUNDLED" POLICY_SHA256 "$POLICY"
+for i in "${!DOCUMENTS[@]}"; do
+    restamp_constant "$BUNDLED" "$(echo "${DOCUMENTS[$i]}" | tr '[:lower:]' '[:upper:]')_SHA256" "${DIGESTS[$i]}"
+done
+CORE_ID=${IDS[4]}
+CORE=${DIGESTS[4]}
 
-# The example pins meta.tn and core.tn, so its own digest is over bytes this pass has just changed:
-# stamp those two first, then hash it, then stamp its own !!id.
+# The example pins core.tn, so its own digest is over bytes this pass has just changed: stamp that
+# first, then hash it, then stamp its own !!id.
 for carrier in "${CARRIERS[@]}"; do
-    restamp "$carrier" "$META_ID" "$META"
     restamp "$carrier" "$CORE_ID" "$CORE"
 done
 EXAMPLE_ID=$(awk '/^!!id:"https:\/\/[^"]*person\.tn/ { sub(/^!!id:"/, ""); sub(/[?"].*$/, ""); print; exit }' README.md)

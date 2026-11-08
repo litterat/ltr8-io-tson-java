@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
@@ -34,9 +34,9 @@ class NumericArgumentIdentityTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/numeric-identity.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -46,13 +46,18 @@ class NumericArgumentIdentityTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledSchemaRegistry.tree(TsonCompiledMetaRegistry
-                .withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source)).get(ID);
+        return TsonCompiledSchemaRegistry.tree(TsonCompiledVocabularyRegistry
+                .withStandardLibrary(SchemaModelNameBinder.defaultContext(), source)).get(ID);
     }
 
-    /** Every derived entry, which is where two spellings of one number would show up as two. */
+    /**
+     * Every derived entry this schema declared, which is where two spellings of one number would show up as two --
+     * its closure's own derived entries, the kernel's and meta.tn's among them, left out.
+     */
     private static List<String> derivedEntries(TsonCompiledSchema compiled) {
-        return compiled.schema().entries().keySet().stream().filter(n -> n.matches(".*_[0-9a-f]{8}")).toList();
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(compiled.schema().id());
+        return compiled.schema().entries().keySet().stream().filter(n -> n.matches(".*_[0-9a-f]{8}"))
+                .filter(n -> compiled.linkedSchema().originOf(n).equals(own)).toList();
     }
 
     /**

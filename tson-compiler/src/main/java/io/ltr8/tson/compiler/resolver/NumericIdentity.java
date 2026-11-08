@@ -24,7 +24,7 @@ import io.ltr8.tson.atom.number.NumberGrammar;
  * would be this implementation inventing an equivalence rather than applying one.
  *
  * <p><b>Identity only.</b> The token itself is recorded as written -- §5.10 describes a type argument's
- * literal as a bare token, and {@code RawTokenParser} preserves it -- so resolved output still shows the
+ * literal as a bare token, and the reference grammar keeps it as one -- so resolved output still shows the
  * author's spelling. What changes is only what two spellings are compared as. Where two spellings do meet,
  * one entry results and it carries whichever reached the resolver first.
  *

@@ -9,11 +9,12 @@ check.
 - A parse that reported anything hands back no document at all; a declaration start is `name =>` back at schema-map
   depth, with depth the cursor's (`TsonDataStream.nesting()`).
 - The fail-fast paths do not route through `DiagnosticsReceiver.throwing()`; they rethrow the original untouched.
-- The resolver catches inside its memoized namespace getter (`SchemaResolver.OnDemand`), not around the driving loop.
+- The resolver catches inside its wait order (`WaitOrder`, through `SchemaResolver.OnDemand.failed`), not around the
+  driving loop.
 - A failed declaration leaves an empty-record placeholder that keeps the declaration's own type parameters; a
   desugar-reported declaration is replaced with an `absorbed` stand-in, never passed through.
 - A phase runs only if the one before it reported nothing, and a schema that reported anything is never registered —
-  in `Tson.validateSchema` and in `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)` alike.
+  in `Tson.validateSchema` and in `TsonCompiledVocabularyRegistry.resolveLinked(uri, receiver)` alike.
 - The exception's class picks the code: a gap is `NOT_IMPLEMENTED`, a bind mismatch (an unbindable target class
   included) `BIND_MISMATCH`, a refusal its §8.2 code; every `SchemaFailure` branch is a positive verdict and the default
   rethrows.
@@ -21,7 +22,7 @@ check.
   optional ones are not.
 - Namespace-level failures, the lexer, and a `BindMismatchException` at compile still throw.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/name-hygiene-read-path.md`, `design/diagnostic-model.md` (the codes,
 `Code.verdict()`, `Code.isRefusal()`), `design/diagnostic-rules-and-messages.md`, `design/processor-policy.md`,
 `design/cli-config-hashing.md` (exit codes).
@@ -76,10 +77,12 @@ first problem. **The fail-fast paths do not route through `DiagnosticsReceiver.t
 `ReadException`, and a schema that fails to resolve is not a read failure; the CLI's exit 1 against 70 turns on the
 distinction. They rethrow the original untouched (the linker re-states only an `UnresolvedReference`, below).
 
-- **The resolver catches inside `SchemaResolver.OnDemand`, not around the driving loop.** Resolution follows
-  dependencies, not source order, so a failure usually happens inside a *nested* resolve; catching at the loop would
-  attribute it to whichever declaration triggered it and then report the real one a second time. The memo makes it
-  exactly once, against itself — the shape `TsonSchemaCompiler.Compilation.resolve` has substituting an `ErrorReader`.
+- **The resolver catches inside its wait order, not around the driving loop.** Resolution follows waits, not source
+  order, so a failure usually happens inside a *nested* resolve; catching at the loop would attribute it to whichever
+  declaration triggered it and then report the real one a second time. `WaitOrder` hands each failure to
+  `OnDemand.failed` for the declaration that failed, exactly once, against itself; a wait-depth refusal travels to
+  the head of its chain before it is reported. It is the shape `TsonSchemaCompiler.Compilation.resolve` has
+  substituting an `ErrorReader`.
 - **A failed declaration leaves an empty-record placeholder** (`SchemaResolver.unresolved`), so its dependents still
   resolve. That is javac's error-type contract (it answers every question) rather than Swift's (every questioner must
   check first), and the choice is load-bearing: a `Sum`-bodied placeholder makes `parent => child & { ... }` fail
@@ -143,14 +146,13 @@ the declaration alone (the reference may resolve once the declaration does). The
 mode. javac draws the boundary there (every entry is attributed before `shouldStopPolicyIfError` blocks the next
 phase), and Swift never reaches SILGen after a Sema error. **A schema that reported anything is never registered.**
 
-`TsonCompiledMetaRegistry.resolveLinked(uri, receiver)` composes the same three phases behind the same gates — it is
-how a *data* read reports on the schema its `!!schema` names — so `tson validate` and `tson compile` give the same
+`TsonCompiledVocabularyRegistry.resolveLinked(uri, receiver)` composes the same three phases behind the same gates — it is
+how a *data* read reports on the schema its `!!import` names — so `tson validate` and `tson compile` give the same
 account of the same broken schema. It registers only a clean schema and otherwise returns `null`.
 
 **What still throws even with a receiver** makes the namespace itself unusable rather than one entry wrong: an
-`!!import` that will not load or stands at another governing level (`TsonSchemaLinker.checkImportLevel`), a `!!meta`
-that may not govern, a local declaration colliding with an imported name, a reference whose target owns a different
-`!!id` than it was fetched under (§2.2.1's cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Continuing would
+`!!import` that will not load, a local declaration colliding with an imported name, a reference whose target owns a different
+`!!id` than it was fetched under (§2.2.1's cross-check, `TsonCompiledVocabularyRegistry.crossCheckId`). Continuing would
 report a page of unresolved references that are all consequences of the one problem. `Tson.validateSchema` catches
 these and reports them against RFC 6901's root pointer (`""`), since they concern the document rather than a
 declaration: a `SchemaValidationException` or `ContentHashMismatchException` as `SCHEMA_ERROR`, a
@@ -168,8 +170,9 @@ deliberately not deferred and throws at compile.
 exception's class: `SchemaValidationException` → `SCHEMA_ERROR` (the author's mistake), `UnsupportedOperationException`
 → `NOT_IMPLEMENTED` (a construct beyond this library), `BindMismatchException` → `BIND_MISMATCH` (the reading
 application's wiring, `ofSchemaBindMismatch`), and `SchemaRefusalException` — a `SchemaValidationException` subtype —
-keeps its [TSON-DATA] §8.2 refusal code (`ofSchemaRefusal`). The test for author error against gap: *a schema
-error's verdict doesn't change when this library improves; a gap's does.*
+keeps its refusal code (`ofSchemaRefusal`): [TSON-DATA] §8.2's for a name, `LIMIT_EXCEEDED` for §11.5's wait depth.
+The test for author error against gap: *a schema error's verdict doesn't change when this library improves; a gap's
+does.*
 
 - **Why not the channel.** Throwing a gap out of a phase that reports per declaration takes every other declaration's
   verdict with it: one unimplemented construct and a document with three ordinary mistakes reports none of them. A
@@ -178,10 +181,11 @@ error's verdict doesn't change when this library improves; a gap's does.*
   `TsonCli.notImplemented`.
 - **A bind mismatch is neither an author error nor a gap.** `DefinitionResolver.bindAtomInstance` and
   `bindAnnotationValue` keep it clear of their catch-alls; relabelled `UnsupportedOperationException`, a missing line
-  of wiring would read as *this library cannot do that*. The reachable case is a meta layer's own record the consumer
-  bound no class for (`pings => !notifications { ping => … }` with none for `notification`), reported at the entry;
-  `BindMismatchClassificationTest` pins it beside an annotation typed by an abstract base kind (`@sum:_`), which is
-  the author's error in both §6 positions.
+  of wiring would read as *this library cannot do that*. The reachable case is a value entry of a type the consumer
+  bound no class for (`pings => !notifications { ping => … }` with none for `notification`): the resolver holds it as
+  a tree, so the schema loads and validates, and the bind registry reports it at the entry (`/pings`) where the
+  schema is obtained to bind (`design/compiled-registries.md`). `BindMismatchClassificationTest` pins it beside an
+  annotation typed by an abstract base kind (`@sum:_`), which is the author's error in both §6 positions.
 - **A read that cannot get its schema classifies the same way (`SchemaFailure`).** Both facades reach their schema
   through one call that resolves, links *and* compiles, so every failure arrives at one `catch`:
   `BindMismatchException` (with its `MissingBindingException` subclass) is `BIND_MISMATCH`,
@@ -216,10 +220,10 @@ declares.** `RecordBindReader` refuses four disagreements; `BindTargets` carries
   diagnostics).
 - **An atom field** is refused when its component binds structurally, or when its family cannot produce the class the
   component binds.
-- **The rule bites the library first**: `datetime_type` and `time_type` declare `precision`, so `DateTimeType` and
-  `TimeType` carry it and their parsers enforce it. §5.5 makes it a constraint on the value — a whole number of 10⁻ᴺ
-  seconds — not on the spelling, so `12:00:00.500` is admitted at `precision: 1`; nothing is truncated to satisfy it
-  (`FractionalSeconds`).
+- **The rule bites the library first**: `temporal.datetime_type` and `temporal.time_type` declare `precision`, so
+  `DateTimeType` and `TimeType` carry it and their parsers enforce it. §5.5 makes it a constraint on the value — a whole
+  number of 10⁻ᴺ seconds — not on the spelling, so `12:00:00.500` is admitted at `precision: 1`; nothing is truncated to
+  satisfy it (`FractionalSeconds`).
 - **The class is the target at every depth.** A collection's element, a map's key and value and a tuple's position are
   bound to what the component's class declares there, recursively (`reader.BindTargets`, the rule `tson-json`'s class
   of that name states too): an atom narrowed to the element's wire class, a nested container rebuilt for its declared
@@ -241,8 +245,8 @@ declares.** `RecordBindReader` refuses four disagreements; `BindTargets` carries
   map binds to either kind. Both encodings check it at every depth (`BindTargets`; `BindMapBuilder.forTarget` in
   `tson-json`), and a map read with no component to declare a class is built as a `LinkedHashMap` when ordered.
 - **A `Namespace` component binds a namespace type's map, and nothing else**: the map is read for the component's
-  `entries` and delivered as an instance of the constructor the position names. A map that is no namespace has no
-  constructor to name; a `Map` component at a namespace type receives the map.
+  `entries` and delivered as a value of the namespace type the position names. A map that is no namespace has no
+  namespace type to name; a `Map` component at a namespace type receives the map.
 - **A type with no class to build is deferred to its first read** — the `MissingBindingException` subclass — since a
   schema legitimately declares types a consumer never binds. It covers a name the binder resolves to no class
   (`ltr8-bind`'s `UnboundNameException`) and a class that cannot be analysed (the kernel's base kinds map to sealed

@@ -12,19 +12,18 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The compilation environment beyond one entry: the schema being compiled, how a composite reaches the readers
- * for its own children, and where a scoped position finds a schema a document names for itself. Handed to
- * every {@link ValueReaderFactory}.
+ * The compilation environment beyond one entry: the schema being compiled and how a composite reaches the readers
+ * for its own children. Handed to every {@link ValueReaderFactory}.
  */
-public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers, ForeignSchemas foreign,
+public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers,
                                  Map<String, Set<String>> namesMeaning) {
 
     /**
      * The alias index derived rather than supplied. A compile passes its own, built once: deriving it per
-     * factory walks every reference chain again for every entry.
+     * factory walks every alias chain again for every entry.
      */
-    public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers, ForeignSchemas foreign) {
-        this(linked, readers, foreign, ReferenceChain.namesMeaning(linked.schema()));
+    public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers) {
+        this(linked, readers, AliasChain.namesMeaning(linked.schema()));
     }
 
     public TsonSchema schema() {
@@ -33,7 +32,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
 
     /** Each of {@code names} with every alias that means it -- what a written {@code $type} is matched against. */
     public Set<String> admitting(Collection<String> names) {
-        return ReferenceChain.admitting(names, namesMeaning);
+        return AliasChain.admitting(names, namesMeaning);
     }
 
     /**
@@ -62,11 +61,15 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
         return subtypesOf(name, definition).stream()
                 .filter(subtype -> {
                     io.ltr8.tson.schema.meta.Top entry = schema().entries().get(subtype);
-                    if (entry == null || io.ltr8.tson.schema.meta.OpenEntry.isOpen(entry)) {
-                        return false;
-                    }
-                    return !(entry instanceof io.ltr8.tson.schema.meta.RecordBody record)
-                            || record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
+                    // A record template is ABSTRACT by construction, and a held template is no type.
+                    return switch (entry) {
+                        case io.ltr8.tson.schema.meta.RecordBody record ->
+                                record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
+                        case io.ltr8.tson.schema.meta.RecordTemplateBody ignored -> false;
+                        case io.ltr8.tson.schema.meta.TemplateBody ignored -> false;
+                        case null -> false;
+                        default -> true;
+                    };
                 })
                 .toList();
     }

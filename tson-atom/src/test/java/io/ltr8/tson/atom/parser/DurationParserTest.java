@@ -3,9 +3,8 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.temporal.DurationType;
 import org.junit.jupiter.api.Test;
-import java.math.BigInteger;
 import java.time.Duration;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -128,7 +127,7 @@ class DurationParserTest {
     @Test
     void precisionConstrainsTheSecondsCountNotTheSpelling() {
         AtomType<Duration> twoDigits = new DurationParser(new DurationType(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(BigInteger.TWO), Optional.empty()));
+                Optional.empty(), Optional.empty(), Optional.of(2L), Optional.empty()));
 
         assertEquals(Duration.ofMillis(250), read(twoDigits, "PT0.25S"));
         assertEquals(Duration.ofMillis(250), read(twoDigits, "PT0.250S"));

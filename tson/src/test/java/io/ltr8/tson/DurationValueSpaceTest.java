@@ -1,10 +1,9 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.temporal.DurationType;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigInteger;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -28,16 +27,16 @@ class DurationValueSpaceTest {
 
     private record Fixture(Tson tson, String id) {
         List<Diagnostic> read(String body) {
-            return tson.validate("!!schema:\"" + id + "\"\n" + body);
+            return tson.validate("!!import:\"" + id + "\"\n" + body);
         }
     }
 
     private static String schemaDeclaring(String declarations) {
         return """
                 !!id:"https://example.test/duration-%d.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                { %s }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema { %s }
                 """.formatted(NEXT.incrementAndGet(), declarations);
     }
 
@@ -122,7 +121,7 @@ class DurationValueSpaceTest {
                 overlong.coherenceCheck().toString());
 
         DurationType finer = new DurationType(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(BigInteger.valueOf(12)), Optional.empty());
+                Optional.empty(), Optional.of(12L), Optional.empty());
         assertTrue(finer.coherenceCheck().stream().anyMatch(v -> v.contains("precision 12")),
                 finer.coherenceCheck().toString());
     }

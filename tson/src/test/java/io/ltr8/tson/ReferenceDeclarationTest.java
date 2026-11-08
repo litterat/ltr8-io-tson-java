@@ -1,0 +1,129 @@
+package io.ltr8.tson;
+
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.source.SchemaAccess;
+import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.Top;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * A reference ({@code meta.ref<T>}, the kernel's {@code reference}) is declared in any schema: one namespace per schema
+ * ([TSON-SCHEMA] §3.3, §4.2) puts the kernel's {@code ref} in every closure reaching core.tn or meta.tn, a schema a meta
+ * layer governs among them, and the constructor applied directly is no different from the template that spells it.
+ * What a reference may name is still judged: a type, never a constructor, whose types a kind names.
+ */
+class ReferenceDeclarationTest {
+
+    private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
+    private static final String META = "https://tson.io/2026/39/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
+
+    private static String schema(String id, String firstImport, String secondImport, String declarations) {
+        return """
+                !!id:"%s"
+                !!import:"%s"
+                !!import:"%s"
+                !schema {
+                %s
+                }""".formatted(id, firstImport, secondImport, declarations);
+    }
+
+    private static final String PICKS = """
+              order => { id: text }
+              rpick => { m: meta.ref<order> }""";
+
+    /** The same, importing the kernel alone: its entries are named by their paths. */
+    private static final String KERNEL_PICKS = """
+              order => { id: text }
+              rpick => { m: meta.ref<order> }""";
+
+    @Test
+    void anOrdinarySchemaDeclaresAReference() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/picks.tn", META, CORE,
+                PICKS)));
+    }
+
+    /** A vocabulary schema declares one, and so does a schema importing it. */
+    @Test
+    void aVocabularyAndASchemaImportingItEachDeclareAReference() {
+        String vocabularyId = "https://example.test/meta-picks.tn";
+        String vocabulary = schema(vocabularyId, KERNEL, META, """
+                  picked => { m: meta.ref<picked> }""");
+        String importing = schema("https://example.test/governed-picks.tn", vocabularyId, CORE, PICKS);
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(vocabularyId, vocabulary)))));
+
+        assertEquals(List.of(), tson.validateSchema(vocabulary), "the vocabulary itself declares a reference");
+        assertEquals(List.of(), tson.validateSchema(importing));
+    }
+
+    @Test
+    void anOrdinarySchemaAppliesTheReferenceConstructor() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/picks.tn", META, CORE,
+                """
+                  order => { id: text }
+                  oref  => !meta.reference_type { of: order }
+                  rpick => { m: oref }""")));
+    }
+
+    @Test
+    void aSchemaImportingTheKernelAloneDeclaresAReference() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/meta-picks.tn", KERNEL,
+                META, KERNEL_PICKS)));
+    }
+
+    /**
+     * {@code meta.ref<record>} is one reference whose {@code of} is a constructor, so the slot holds a type's name: the
+     * one spelling names types or values by what {@code of} names.
+     */
+    @Test
+    void aReferenceToAConstructorNamesTypes() {
+        assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/ref-to-constructor.tn",
+                META, CORE, "  pick => { m: meta.ref<meta.record> }")));
+    }
+
+    /**
+     * {@code of} is typed {@code meta.type_ref}, so the body may write an application there, and it closes to the entry
+     * the application denotes as {@code meta.ref<box<text>>} closes its argument: one reference over one entry
+     * ([TSON-SCHEMA] §4.2).
+     */
+    @Test
+    void anApplicationWrittenInOfClosesAsTheTemplateSpellingDoes() {
+        String id = "https://example.test/of-application.tn";
+        String text = schema(id, META, CORE, """
+                  box     => <T> { v: T }
+                  written => !meta.reference_type { of: box<text>  allow_sibling: false }
+                  applied => meta.ref<box<text>>""");
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(id, text)))));
+
+        assertEquals(List.of(), tson.validateSchema(text));
+        Namespace<Top> entries = tson.bindRegistry().core().resolveLinked(id).schema().entries();
+        ReferenceBody written = assertInstanceOf(ReferenceBody.class, entries.get("written"));
+        assertEquals(entries.get("applied"), written, "one reference, whichever spelling");
+        assertTrue(written.of().arguments().isEmpty(), () -> "of names the closed entry: " + written.of().text());
+        assertInstanceOf(RecordBody.class, entries.get(written.of().name()));
+    }
+
+    /** An application in {@code of} is judged as one at any type position: an argument naming nothing is unresolved. */
+    @Test
+    void anApplicationInOfOverAnUnresolvedArgumentIsRefused() {
+        List<Diagnostic> problems = Tson.standard().validateSchema(schema("https://example.test/of-nope.tn", META,
+                CORE, """
+                  box => <T> { v: T }
+                  r   => !meta.reference_type { of: box<nope> }"""));
+        assertEquals(1, problems.size(), problems.toString());
+        assertTrue(problems.getFirst().message().contains("unresolved reference 'nope'"), problems.toString());
+    }
+}

@@ -4,8 +4,8 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.ParseException;
 
 /**
- * Thrown when a document's header contains {@code !!meta}, making it a TSON <em>schema</em>
- * document rather than a data document. A Class 1 (data-format-only) processor does not support
+ * Thrown when a document's root is tagged {@code !schema}, making it a TSON <em>schema</em> document rather
+ * than a data document ([TSON-DATA] §2.2). A Class 1 (data-format-only) processor does not support
  * schema documents and must report this as a categorized diagnostic, not a generic parse error
  * (§1.5: "A Class 1 processor rejects schema documents with a categorized diagnostic"; §8.1:
  * "MUST report the document as a TSON schema document that this processor does not support").
@@ -25,7 +25,7 @@ public final class TsonUnsupportedDocumentException extends RuntimeException {
     private final transient Position position;
 
     public TsonUnsupportedDocumentException(Position position) {
-        super("this is a TSON schema document (header contains !!meta); "
+        super("this is a TSON schema document (its root is tagged !schema); "
                 + "a Class 1 (data-format-only) processor does not support schema documents");
         this.position = position;
     }

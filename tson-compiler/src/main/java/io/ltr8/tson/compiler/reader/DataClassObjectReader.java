@@ -438,13 +438,12 @@ public final class DataClassObjectReader {
                                         + " -- the class declares (" + declaredNames(fields, carrier) + ")",
                                 declaredNames(fields, carrier), fieldName.name());
                     }
-                    EventSkip.scopedValue(ctx); // reported or not, the value is discarded unread
+                    EventSkip.dataValue(ctx); // reported or not, the value is discarded unread
                     continue;
                 }
                 if (seen[idx]) {
                     reportRepeat(ctx, fieldName.name(), dataClass);
                 }
-                ScopePush.refuseSchemaless(ctx);
                 construct[fields[idx].index()] = bindField(ctx, fields[idx]);
                 seen[idx] = true; // last occurrence wins (§2.5), reached by overwrite
             }
@@ -516,7 +515,6 @@ public final class DataClassObjectReader {
         List<Object> buffered = new ArrayList<>();
         int index = 0;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            ScopePush.refuseSchemaless(ctx);
             buffered.add(bind(ctx.index(index), elementClass));
             index++;
         }
@@ -583,7 +581,7 @@ public final class DataClassObjectReader {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the void sentinel '_' must not appear as a map key "
                         + "(§2.9) for " + dataClass.typeClass(), "a real map key", "_");
                 ctx.next(); // MapArrow
-                EventSkip.scopedValue(ctx);
+                EventSkip.dataValue(ctx);
                 continue;
             }
             int beforeKey = ctx.reported();
@@ -597,7 +595,6 @@ public final class DataClassObjectReader {
                         "each key stated once", "'" + key + "' stated again");
             }
             ctx.next(); // MapArrow
-            ScopePush.refuseSchemaless(ctx);
             Object value = bind(ctx, valueClass);
             // Not once the value is lost: a refused key or value travels as null (ConstructionGuard).
             if (!ConstructionGuard.abandoned(ctx, mark)) {
@@ -633,7 +630,6 @@ public final class DataClassObjectReader {
         int index = 0;
         boolean reportedExtra = false;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            ScopePush.refuseSchemaless(ctx);
             if (index >= slots.length) {
                 if (!reportedExtra) {
                     ctx.report(Diagnostic.Code.WRONG_ARITY, "tuple " + dataClass.typeClass() + " has " + slots.length

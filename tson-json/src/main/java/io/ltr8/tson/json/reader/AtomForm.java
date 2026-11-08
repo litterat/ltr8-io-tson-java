@@ -2,10 +2,10 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.numeric.DecimalType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.Top;
 
 /**
@@ -33,7 +33,7 @@ enum AtomForm {
     /** §5.3's exact tier: {@code integer} and its refinements, and {@code number}. The literal is the content. */
     NUMBER,
 
-    /** §5.5, §5.6 and {@code identifier}: every family whose content grammar lives above the lexer. */
+    /** §5.5, §5.6 and {@code meta.identifier}: every family whose content grammar lives above the lexer. */
     STRING,
 
     /**

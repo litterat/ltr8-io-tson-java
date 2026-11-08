@@ -1,32 +1,39 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.SiblingRef;
 
 import java.util.function.UnaryOperator;
 
 /**
- * The {@code schema.meta} reference walk: every {@link TypeRef} an entry holds, rewritten or merely visited.
+ * The {@code schema.meta} reference walk: every {@link TypeRef} an entry holds that a rewrite may move.
  *
- * <p><b>One walk, three callers, and none of them is about templates.</b> {@code TemplateMaterialiser} closes
- * an application through it,
- * {@code SyntheticMerge} renames onto a merged entry (§8.2), and {@code TemplateRegularity} uses it as a
- * visitor by returning each reference unchanged. Which body shape carries which references is a fact about
- * the value model, not about any of those three, so it is stated once here.
+ * <p><b>One walk, two callers.</b> {@code TemplateMaterialiser} closes an application through it, and {@code
+ * SyntheticMerge} renames onto a merged entry (§8.2). Which body shape carries which references is a fact about the
+ * value model, not about either caller, so it is stated once here.
  *
- * <p><b>Visiting is rewriting with the identity function</b>, deliberately: a reader that walked bodies
- * separately would be a second list of shapes to keep in step, and the one that fell behind would silently
- * skip a reference rather than fail.
+ * <p><b>The switch over {@link Top} is exhaustive, with no default.</b> {@code Top} is sealed all the way down, so a
+ * body shape added to {@code schema.meta} fails to compile here until someone says which references it holds; a
+ * default arm would have skipped its references silently. The one grouped arm is {@link Atom} after {@link
+ * ReferenceBody}: an atom's facets are values, and the reference is the one atom that names an entry.
  */
 final class MetaRefs {
 
@@ -56,33 +63,37 @@ final class MetaRefs {
         return mapBodyRefs(definition, map, false);
     }
 
-    /**
-     * Every {@link TypeRef} one body holds, mapped -- <b>the only place that knows what each body shape
-     * carries</b>, so a shape added to {@code schema.meta} needs remembering here and nowhere else.
-     */
-    static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
-        return mapBodyRefs(body, map, true);
+    /** A field's type with {@code map} applied; a sibling names a field, which no rewrite of type names touches. */
+    private static Reference mapField(Reference type, UnaryOperator<TypeRef> map) {
+        return switch (type) {
+            case TypeRef reference -> map.apply(reference);
+            case SiblingRef sibling -> sibling;
+        };
     }
 
     private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapChain) {
         Top mapped = switch (body) {
-            // An open record maps the field types that name none of its parameters, which mean the same thing in
-            // every application and so are closed already: the base names the entry each member names. A type
-            // naming a parameter, at any depth, waits for substitution to supply the argument. Its chain maps
-            // below, a record template being IS-A its parents as any record is.
-            case RecordBody record when OpenEntry.isOpen(record) -> record.withFields(record.mapFields(field ->
-                    OpenEntry.parameterIn(field.type(), record.parameterNames()).isPresent()
-                            ? field : field.withType(map.apply(field.type()))));
+            // A record template maps the field types that name none of its parameters, which mean the same thing
+            // in every application and so are closed already: the base names the entry each member names. A
+            // `type_param`, or a type naming a parameter at any depth, waits for substitution to supply the
+            // argument. Its chain maps below, a record template being IS-A its parents as any record is.
+            case RecordTemplateBody template -> template.withFields(template.mapFields(field ->
+                    field.parameterInType(template.parameterNames()).isPresent()
+                            ? field : field.withType(mapField(field.type().orElseThrow(), map))));
             // `discriminators` is carried, not mapped: it holds field *names* of this record, which no
             // reference rewrite touches. Dropping it here would lose a family's selector list on every
             // synthetic rename and every materialisation rewrite -- a body that arrived sealed would come
             // back with nothing to dispatch on.
-            case RecordBody record -> record.withFields(record.mapFields(field -> field.withType(map.apply(field.type()))));
+            case RecordBody record -> record.withFields(record.mapFields(field ->
+                    field.withType(mapField(field.type(), map))));
             case ArrayBody array -> new ArrayBody(array.chain(), map.apply(array.elementType()),
                     array.voidable(), array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(mapBody.chain(),
                     map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),
                     mapBody.voidable(), mapBody.ordered(), mapBody.minItems(), mapBody.maxItems());
+            case NamespaceBody namespace -> new NamespaceBody(namespace.chain(),
+                    map.apply(namespace.keyType()), map.apply(namespace.valueType()),
+                    namespace.ordered(), namespace.minItems(), namespace.maxItems());
             case TupleBody tuple -> new TupleBody(tuple.chain(), tuple.elements().stream()
                     .map(element -> new TupleElement(map.apply(element.elementType()), element.voidable())).toList());
             case ChoiceBody choice -> new ChoiceBody(choice.chain(),
@@ -90,13 +101,23 @@ final class MetaRefs {
             // An alias's target maps like any other reference, arguments and all -- which is what lets a
             // closed alias follow its target onto the entry materialisation minted for it, and a partial
             // application keep the arguments it binds.
-            case Reference reference -> new Reference(map.apply(reference.target()));
+            case Alias alias -> new Alias(map.apply(alias.target()));
+            // `of` is a type reference like any other, arguments and all: `!meta.reference_type { of: box<text> }`
+            // closes its application here as `meta.ref<box<text>>` closes its argument before substituting it,
+            // so either way `of` names the entry the application denotes, which the merge renames like any other
+            // reference (§4.2). The index is carried, derived at link.
+            case ReferenceBody reference -> new ReferenceBody(reference.chain(), map.apply(reference.of()),
+                    reference.allowSibling(), reference.index());
+            // Every other atom's facets are values, never references; a declared type holds its chain alone.
+            case Atom atom -> atom;
+            case DeclaredType declared -> declared;
             // A held body maps nothing: its references are tokens that have not been resolved against
             // anything yet, and rewriting one would be rewriting a name whose meaning is not settled until
             // substitution supplies the arguments.
-            // A kind holds none either: `of` names a constructor of the structure namespace, which no rewrite
-            // of this schema's entries touches, and its members are derived at link, after every rewrite.
-            default -> body; // an atom body holds no type references
+            case TemplateBody held -> held;
+            // A value is data: a name it holds is judged at link against the closure (`ValuesByName`), and
+            // data writes no sugar form, so none names a synthetic a rewrite here could move.
+            case ValueEntry value -> value;
         };
         return mapChain && mapped instanceof Type type
                 ? TypeChain.withChain(mapped, mapChain(type.chain(), map)) : mapped;

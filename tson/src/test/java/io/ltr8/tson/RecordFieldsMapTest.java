@@ -22,8 +22,9 @@ class RecordFieldsMapTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema
             """;
 
     private static List<Diagnostic> validateSchema(String id, String declarations) {
@@ -38,25 +39,25 @@ class RecordFieldsMapTest {
     @Test
     void theExplicitFormStatesFieldsAsAMapKeyedByName() {
         assertEquals(List.of(), validateSchema("explicit", """
-                  point => !record { fields: { x => { type: int32 }  y => { type: int32  optional: true } } }
+                  point => !meta.record { fields: { x => { type: int32 }  y => { type: int32  optional: true } } }
                 """));
     }
 
     /**
      * One spelling twice is a repeated key of {@code fields}, which the map's own reader refuses: read as data
-     * governed by meta.tn it is {@code DUPLICATE_MAP_KEY} at the repeated key, and at a schema's declaration it is
+     * of meta.tn's model it is {@code DUPLICATE_MAP_KEY} at the repeated key, and at a schema's declaration it is
      * the same refusal restated against the declaration, as every failure of a constructor's vocabulary is.
      */
     @Test
     void aNameWrittenTwiceInTheExplicitFormIsTheMapsDuplicateKey() {
         Diagnostic read = only(Tson.standard().validate("""
-                !!schema:"https://tson.io/2026/38/m/meta.tn"
-                !record { fields: { x => { type: int32 }  x => { type: text } } }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !meta.record { fields: { x => { type: integer }  x => { type: text } } }
                 """));
         assertEquals(Diagnostic.Code.DUPLICATE_MAP_KEY, read.code(), read.toString());
 
         Diagnostic declared = only(validateSchema("twice", """
-                  point => !record { fields: { x => { type: int32 }  x => { type: text } } }
+                  point => !meta.record { fields: { x => { type: int32 }  x => { type: text } } }
                 """));
         assertTrue(declared.message().contains("duplicate key 'x' in 'fields'"), declared.message());
         assertTrue(!declared.message().contains("are one"), "never the linker's name-type verdict");
@@ -69,8 +70,8 @@ class RecordFieldsMapTest {
     @Test
     void twoSpellingsOfOneNameAreTheLinkersToRefuse() {
         Diagnostic problem = only(validateSchema("folded", """
-                  folded => !identifier_type { normalization: NFKC_CASEFOLD }
-                  row => !record { name_type: folded  fields: { name => { type: text }  NAME => { type: text } } }
+                  folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }
+                  row => !meta.record { name_type: folded  fields: { name => { type: text }  NAME => { type: text } } }
                 """));
         assertTrue(problem.code() != Diagnostic.Code.DUPLICATE_MAP_KEY, problem.toString());
         assertTrue(problem.message().contains("'name' and 'NAME' are one value of its name_type 'folded'"),

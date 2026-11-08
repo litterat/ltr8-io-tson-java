@@ -1,5 +1,10 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.net.CidrInet4Network;
+import io.ltr8.tson.schema.net.Cidr4Type;
+import io.ltr8.tson.schema.net.Ipv4Type;
+import io.ltr8.tson.schema.net.UuidType;
+import io.ltr8.tson.schema.unicode.TextType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -60,31 +65,31 @@ class FacetNarrowingGapsTest {
     /** A version names a layout, not a bound: no v7 UUID is a v4 UUID, so a change claims a false IS-A. */
     @Test
     void aUuidVersionIsSettableOnceAndThenFixed() {
-        assertEquals(List.of(), refine(new UuidType(Optional.empty()), new UuidType(Optional.of(4))));
-        assertEquals(List.of(), refine(new UuidType(Optional.of(4)), new UuidType(Optional.of(4))));
-        assertFalse(refine(new UuidType(Optional.of(4)), new UuidType(Optional.of(7))).isEmpty());
+        assertEquals(List.of(), refine(new UuidType(Optional.empty()), new UuidType(Optional.of(4L))));
+        assertEquals(List.of(), refine(new UuidType(Optional.of(4L)), new UuidType(Optional.of(4L))));
+        assertFalse(refine(new UuidType(Optional.of(4L)), new UuidType(Optional.of(7L))).isEmpty());
     }
 
-    private static Ipv4Type ipv4(List<String> within, List<String> excluding) {
+    private static Ipv4Type ipv4(List<CidrInet4Network> within, List<CidrInet4Network> excluding) {
         return new Ipv4Type("", within, excluding);
     }
 
     /** {@code within} admits only what it names, so a refinement narrows by shrinking it. */
     @Test
     void withinMayShrinkAndMayNotGrow() {
-        assertEquals(List.of(), refine(ipv4(List.of("10.0.0.0/8", "192.168.0.0/16"), List.of()),
-                ipv4(List.of("10.0.0.0/8"), List.of())));
-        assertFalse(refine(ipv4(List.of("10.0.0.0/8"), List.of()),
-                ipv4(List.of("10.0.0.0/8", "192.168.0.0/16"), List.of())).isEmpty());
+        assertEquals(List.of(), refine(ipv4(v4("10.0.0.0/8", "192.168.0.0/16"), List.of()),
+                ipv4(v4("10.0.0.0/8"), List.of())));
+        assertFalse(refine(ipv4(v4("10.0.0.0/8"), List.of()),
+                ipv4(v4("10.0.0.0/8", "192.168.0.0/16"), List.of())).isEmpty());
     }
 
     /** {@code excluding} removes values, so it narrows the other way: it may grow and may not shrink. */
     @Test
     void excludingMayGrowAndMayNotShrink() {
-        assertEquals(List.of(), refine(ipv4(List.of(), List.of("10.0.0.0/8")),
-                ipv4(List.of(), List.of("10.0.0.0/8", "127.0.0.0/8"))));
-        List<String> violations = refine(ipv4(List.of(), List.of("10.0.0.0/8", "127.0.0.0/8")),
-                ipv4(List.of(), List.of("10.0.0.0/8")));
+        assertEquals(List.of(), refine(ipv4(List.of(), v4("10.0.0.0/8")),
+                ipv4(List.of(), v4("10.0.0.0/8", "127.0.0.0/8"))));
+        List<String> violations = refine(ipv4(List.of(), v4("10.0.0.0/8", "127.0.0.0/8")),
+                ipv4(List.of(), v4("10.0.0.0/8")));
         assertEquals(1, violations.size(), violations.toString());
         assertTrue(violations.getFirst().contains("may grow but never shrink"), violations.getFirst());
     }
@@ -93,8 +98,13 @@ class FacetNarrowingGapsTest {
     @Test
     void theCidrFamiliesGetTheSameExcludingRule() {
         Cidr4Type source = new Cidr4Type("", Optional.empty(), Optional.empty(),
-                List.of(), List.of("10.0.0.0/8"));
+                List.of(), v4("10.0.0.0/8"));
         Cidr4Type dropped = new Cidr4Type("", Optional.empty(), Optional.empty(), List.of(), List.of());
         assertFalse(refine(source, dropped).isEmpty());
+    }
+
+    /** IPv4 networks from their CIDR text, as {@code cidr4}'s reader produces them. */
+    private static List<CidrInet4Network> v4(String... networks) {
+        return java.util.Arrays.stream(networks).map(CidrInet4Network::parse).toList();
     }
 }

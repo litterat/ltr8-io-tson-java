@@ -1,17 +1,44 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.binary.BytesType;
+import io.ltr8.tson.schema.net.Cidr4Type;
+import io.ltr8.tson.schema.net.Cidr6Type;
+import io.ltr8.tson.schema.net.EmailType;
+import io.ltr8.tson.schema.net.HostType;
+import io.ltr8.tson.schema.net.HostnameType;
+import io.ltr8.tson.schema.net.Ipv4Type;
+import io.ltr8.tson.schema.net.Ipv6Type;
+import io.ltr8.tson.schema.net.IriType;
+import io.ltr8.tson.schema.net.MacType;
+import io.ltr8.tson.schema.net.MediaTypeType;
+import io.ltr8.tson.schema.net.UriType;
+import io.ltr8.tson.schema.net.UuidType;
+import io.ltr8.tson.schema.numeric.ComplexType;
+import io.ltr8.tson.schema.numeric.DecimalType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.numeric.IntegerType;
+import io.ltr8.tson.schema.numeric.RationalType;
+import io.ltr8.tson.schema.temporal.DateTimeType;
+import io.ltr8.tson.schema.temporal.DateType;
+import io.ltr8.tson.schema.temporal.DurationType;
+import io.ltr8.tson.schema.temporal.PeriodType;
+import io.ltr8.tson.schema.temporal.TimeType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.tson.schema.unicode.RegexType;
+import io.ltr8.tson.schema.unicode.TextType;
 import java.util.List;
 
 /**
- * The meta-kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
- * Top} variant IS-A this. {@link ValueType} and {@link VoidType} back {@code value} and {@code void}, the
- * two atoms with no constraint vocabulary; {@link EnumBody} backs {@code boolean} and the kernel's other
- * internal enumerations, a listed set of names; {@link KindBody} backs {@code kind_type}, a computed one -- the
- * names of the types built with one constructor; the remaining variants are the atom constraint-vocabulary
- * families, one per {@code *_type} constructor. {@link Scoped} is the sibling SUM-kind case -- see {@link Sum}, not
- * here.
+ * The kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
+ * Top} variant IS-A this. {@link VoidType} backs {@code void}, the atom with no constraint vocabulary; {@link
+ * EnumBody} backs {@code boolean} and the kernel's other
+ * internal enumerations, a listed set of names; {@link ReferenceBody} backs {@code reference}, a computed one -- the
+ * names of the entries whose values are of one type; the remaining variants are the atom constraint-vocabulary
+ * families, one per {@code *_type} constructor. {@link DeclaredType} is the sibling SUM-kind case -- see {@link
+ * Sum}, not here.
  */
-public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody, KindBody, RefBody, IntegerType, TextType,
+public sealed interface Atom extends Type permits VoidType, EnumBody, ReferenceBody, IntegerType,
+        TextType,
         IdentifierType,
         UriType, IriType, RegexType,
         DecimalType, FloatType, RationalType, UuidType, BytesType, DateType, TimeType, DateTimeType, DurationType,
@@ -30,7 +57,7 @@ public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody,
      * min_length}/{@code max_length} -- so the rule lives on the family rather than in a generic
      * field-by-field comparison, which cannot tell a tightened bound from a replaced one. The
      * default admits everything, which is correct for a family carrying no orderable facet at all
-     * ({@link ValueType}, {@link VoidType}); every family that has one overrides it.
+     * ({@link VoidType}); every family that has one overrides it.
      *
      * <p>{@code refined} is the fully merged result of applying a refinement body to this atom, not
      * the body alone (see {@code DefinitionResolver}'s own atom-refinement path), so a facet the
@@ -61,10 +88,10 @@ public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody,
      * every value for reasons the author never sees stated. Part 2 §7.2 puts both the rule and its
      * home in one sentence: "family coherence between bindings (e.g. {@code min <= max}) is a
      * compilation and ingest concern (§8), not data validation" -- which is why this is a resolver
-     * question and not something an atom parser may decide. {@code meta.tn}'s own header {@code @doc}
+     * question and not something an atom parser may decide. {@code numeric.tn}'s own header {@code @doc}
      * states the same obligation from the other side: bounds are field groups so that an
      * inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
-     * lower bound not exceeding the upper) remains a schema-load check".
+     * lower bound not exceeding the upper) is a schema-load check".
      *
      * <p>A family also reports a facet outside the range the family itself fixes, where it has one:
      * {@code cidr4_type}'s {@code @doc} says prefix bounds narrow "within the family range 0-32" and
@@ -72,7 +99,7 @@ public sealed interface Atom extends Type permits ValueType, VoidType, EnumBody,
      *
      * <p>The same fragment convention as {@link #constraintsCheck} -- each element names one problem,
      * so a body with several reports them all in one pass -- and the same "only where it is decidable
-     * by ordinary value comparison" limit. A family carrying no orderable facet at all ({@link ValueType},
+     * by ordinary value comparison" limit. A family carrying no orderable facet at all ({@link VoidType},
      * and every selector-only family) keeps the default; a family whose bounds are unparsed text
      * ({@link DurationType}) records why it does the same.
      */

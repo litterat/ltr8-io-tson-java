@@ -16,10 +16,13 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.HashMap;
 import java.util.List;
@@ -53,7 +56,7 @@ final class RecordPlan {
 
     /**
      * Every written name that means this entry: its own, and any alias whose chain ends at it. §7.2 compares
-     * "after reference flattening of both", so a tag spelling an alias names this type and reads here.
+     * "after alias flattening of both", so a tag spelling an alias names this type and reads here.
      */
     private final Set<String> selfNames;
 
@@ -79,7 +82,7 @@ final class RecordPlan {
 
     /**
      * The record's name type, by name for messages, and its reader -- {@code null} for the kernel's
-     * {@code field_name}, which §7.7's grammar answers without allocating -- and the profile a member name it
+     * {@code meta.field_name}, which §7.7's grammar answers without allocating -- and the profile a member name it
      * admits is judged under ({@link #unmatched}).
      */
     private final String nameType;
@@ -88,6 +91,18 @@ final class RecordPlan {
 
     /** Each field group, compiled to slots once ({@link GroupPlan}). */
     private final GroupPlan[] groups;
+
+    /**
+     * Each dependent field's sibling slot ([TSON-SCHEMA] §5.2), -1 at every other field; a dependent field's {@link
+     * #schemaReaders} entry is its {@link DependentReader}.
+     */
+    final int[] siblingOf;
+
+    /** Whether each field is the sibling of some dependent field, so a read keeps the reference it wrote. */
+    final boolean[] typesADependent;
+
+    /** Whether any field is a dependent one. */
+    final boolean hasDependents;
 
     /** What this record's rules say when a document breaks one -- shared with the TSON reader ([TSON-JSON] §9.4). */
     final RecordDiagnostics rules;
@@ -106,6 +121,10 @@ final class RecordPlan {
         this.omitted = new RecordField.Omitted[count];
         this.schemaReaders = new JsonTypeReader<?>[count];
         this.stated = new FieldValue[count];
+        this.siblingOf = new int[count];
+        this.typesADependent = new boolean[count];
+        List<String> order = List.copyOf(body.fields().keySet());
+        boolean dependents = false;
         Map<String, Integer> byName = new HashMap<>();
         // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule, and
         // then put into the record's name type's form (§5.5), so a name the type holds equal to a field is it.
@@ -123,16 +142,44 @@ final class RecordPlan {
             names[i] = Nfc.of(declared);
             byName.put(nameForm.apply(names[i]), i);
             omitted[i] = field.omitted(body.groups().stream().anyMatch(group -> group.hasMember(declared)));
-            schemaReaders[i] = context.readers().resolve(field.type().name());
-            if (field.value().isPresent()) {
-                stated[i] = FieldValue.of(context.linked(), field.type().name(), field.value().get());
+            siblingOf[i] = -1;
+            switch (field.type()) {
+                case TypeRef type -> {
+                    schemaReaders[i] = context.readers().resolve(type.name());
+                    if (field.value().isPresent()) {
+                        stated[i] = FieldValue.of(context.linked(), type.name(), field.value().get());
+                    }
+                }
+                // A dependent field's type is chosen per instance by its sibling's value, which the record hands it.
+                case SiblingRef sibling -> {
+                    int at = order.indexOf(sibling.field());
+                    if (at < 0) {
+                        throw new IllegalStateException("'" + name + "': dependent field '" + declared + "' names no "
+                                + "field '" + sibling.field() + "'; the linker refuses one");
+                    }
+                    siblingOf[i] = at;
+                    typesADependent[at] = true;
+                    dependents = true;
+                    schemaReaders[i] = new DependentReader(declared, sibling.field(), context,
+                            siblingType(body.fields().get(sibling.field()), context));
+                }
             }
         }
+        this.hasDependents = dependents;
         this.index = Map.copyOf(byName);
         this.groups = body.groups().stream().map(group -> GroupPlan.of(group, byName, nameForm))
                 .toArray(GroupPlan[]::new);
         this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().keySet()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
+    }
+
+    /** The reference typing a dependent field's {@code sibling}, past its alias hops, or null where it is none. */
+    private static ReferenceBody siblingType(RecordField sibling, ValueReaderContext context) {
+        if (!(sibling.type() instanceof TypeRef type)) {
+            return null;
+        }
+        return AliasChain.terminal(context.schema(), type.name()).map(AliasChain.Resolved::definition)
+                .filter(ReferenceBody.class::isInstance).map(ReferenceBody.class::cast).orElse(null);
     }
 
     /** The field slot an NFC member name fills, in the name type's form, or -1 where it names no field. */
@@ -196,12 +243,12 @@ final class RecordPlan {
     }
 
     /**
-     * One of §3.2's three where none may stand (§3.3): a {@code $schema}, which no record position admits, or a
+     * One of §3.2's three where none may stand (§3.3): an {@code $import}, which no value position admits, or a
      * {@code $type} or {@code $value} out of its leading place.
      */
     void refuseTagMember(JsonReadContext ctx, String member, boolean tagged) {
         switch (member) {
-            case TagMembers.SCHEMA -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
+            case TagMembers.IMPORT -> Tags.refuseScope(ctx, displayName, Tags.RECORD);
             case TagMembers.TYPE -> TagMembers.refuseMisplaced(ctx, member);
             case TagMembers.VALUE -> ctx.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, tagged
                     ? "'$value' follows members of the record's own, and an annotation object in wrapper form "

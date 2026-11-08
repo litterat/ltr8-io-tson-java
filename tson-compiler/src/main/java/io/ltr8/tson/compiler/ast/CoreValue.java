@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.ast;
 
 /**
- * {@code core-value = record / map / array / empty-brace / absent / token} (§2.3, §7.4).
+ * {@code core-value = record / map / array / empty-brace / absent / reference / token} (§2.3, §7.4).
  *
  * <p>This is structural only: no base type resolution (§4) happens here, and none of the
  * built-in type vocabulary (§5) is interpreted — {@link TokenValue} preserves a token's exact
@@ -9,5 +9,5 @@ package io.ltr8.tson.compiler.ast;
  * (§1.2 principle 1: "Value interpretation is deferred to base type resolution").
  */
 public sealed interface CoreValue
-        permits RecordValue, MapValue, ArrayValue, EmptyBrace, VoidValue, TokenValue {
+        permits RecordValue, MapValue, ArrayValue, EmptyBrace, VoidValue, TokenValue, ReferenceValue {
 }

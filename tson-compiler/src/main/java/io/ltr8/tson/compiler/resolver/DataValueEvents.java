@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.stream.VoidEvent;
 import io.ltr8.tson.compiler.stream.AnnotationEnd;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
@@ -16,7 +15,7 @@ import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
+import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TypeRef;
@@ -28,12 +27,12 @@ import java.util.List;
  * Replays an already-built {@link DataValue} tree (e.g. an atom-refinement/{@code Instance}
  * binding's own already-normalized value, resolved entirely within {@code resolver}'s own
  * {@code DataValue}-based pipeline -- unchanged by the streaming-reader redesign, see {@link
- * DefinitionMetaReader}'s own Javadoc) as the exact {@link TsonEvent} sequence a real {@code
+ * ConstructionReader}'s own Javadoc) as the exact {@link TsonEvent} sequence a real {@code
  * TsonDataStream} would have produced for the same source text, so a compiled reader (streaming-
  * only, {@code TsonTypeReader.read(TsonReadContext)}) can read it. Every synthesized event
  * carries the same placeholder {@link Position} -- there's no real source position to report for
  * a value that was never actually re-lexed, and nothing downstream of {@link
- * DefinitionMetaReader#read} depends on one being meaningful.
+ * ConstructionReader#read} depends on one being meaningful.
  */
 final class DataValueEvents {
 
@@ -58,18 +57,14 @@ final class DataValueEvents {
         emitCoreValue(value.coreValue(), events);
     }
 
-    private static void emitScopedValue(ScopedValue scopedValue, List<TsonEvent> events) {
-        scopedValue.schemaRef().ifPresent(uri -> events.add(new SchemaRef(uri, PLACEHOLDER)));
-        emitDataValue(scopedValue.value(), events);
-    }
-
     private static void emitCoreValue(CoreValue core, List<TsonEvent> events) {
         switch (core) {
+            case ReferenceValue reference -> events.add(new ReferenceEvent(reference.reference(), PLACEHOLDER));
             case RecordValue rv -> {
                 events.add(new RecordStart(PLACEHOLDER));
                 for (RecordValue.Field field : rv.fields()) {
                     events.add(new FieldName(field.name(), PLACEHOLDER));
-                    emitScopedValue(field.value(), events);
+                    emitDataValue(field.value(), events);
                 }
                 events.add(new RecordEnd(PLACEHOLDER));
             }
@@ -78,14 +73,14 @@ final class DataValueEvents {
                 for (MapValue.MapEntry entry : mv.entries()) {
                     emitDataValue(entry.key(), events);
                     events.add(new MapArrow(PLACEHOLDER));
-                    emitScopedValue(entry.value(), events);
+                    emitDataValue(entry.value(), events);
                 }
                 events.add(new MapEnd(PLACEHOLDER));
             }
             case ArrayValue av -> {
                 events.add(new ArrayStart(PLACEHOLDER));
-                for (ScopedValue element : av.elements()) {
-                    emitScopedValue(element, events);
+                for (DataValue element : av.elements()) {
+                    emitDataValue(element, events);
                 }
                 events.add(new ArrayEnd(PLACEHOLDER));
             }

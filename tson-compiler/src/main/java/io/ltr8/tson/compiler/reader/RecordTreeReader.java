@@ -29,11 +29,21 @@ import java.util.Optional;
 final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     public RecordTreeReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
-                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes,
+                            ValueReaderContext context, SchemaLocation schemaLocation, AnnotationTypes annotationTypes,
                             FieldNameRule fieldNames) {
-        // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
-        super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation, fieldNames);
+        // By schema type alone: a tree reader has no binding target to consult (see FieldReaders). A field whose
+        // type a resolution in progress has not made ready yet decodes a held value as written, which a node wraps.
+        super(name, displayName, body, (field, declared) -> {
+            TsonTypeReader<?> reader = FieldReaders.declared(resolver, context, field, declared);
+            return switch (reader) {
+                case PendingTypeReader pending -> new AtomTreeReader(pending, pending.entry(), annotationTypes);
+                case UnclosedApplicationReader unclosed -> new AtomTreeReader(unclosed, unclosed.application().text(),
+                        annotationTypes);
+                default -> reader;
+            };
+        }, schemaLocation, fieldNames);
         this.annotationTypes = annotationTypes;
+        CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }
 
     /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
@@ -48,7 +58,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
                 throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition);
             }
             RecordTreeReader ownParser = new RecordTreeReader(name, context.displayName(name, typeDefinition),
-                    body, resolver, context.locationOf(name),
+                    body, resolver, context, context.locationOf(name),
                     AnnotationTypes.of(context), fieldNameRule(name, body, context));
             if (context.subtypesOf(name, typeDefinition).isEmpty()) {
                 return ownParser;

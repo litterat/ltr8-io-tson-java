@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.numeric.IntegerType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -45,46 +46,55 @@ class TypeChainTest {
 
     @Test
     void anEntrysKindIsItsValuesAndARecordsIsTheBaseKindItsChainReaches() {
-        RecordBody constructor = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom", "top", "type"));
+        RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
+                .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
 
         assertEquals(EntryKind.ATOM, EntryKind.of(constructor, n -> true));
         assertEquals(EntryKind.PRODUCT, EntryKind.of(RecordBody.of(RecordBody.fieldMap()), n -> true));
         assertEquals(EntryKind.ATOM, EntryKind.of(IntegerType.UNCONSTRAINED, n -> true));
-        assertEquals(EntryKind.REFERENCE, EntryKind.of(new Reference(TypeRef.of("text")), n -> true));
+        assertEquals(EntryKind.ALIAS, EntryKind.of(new Alias(TypeRef.of("text")), n -> true));
     }
 
     @Test
     void aBaseKindIsJudgedByWhereItIsDefinedNeverBySpelling() {
-        RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("namespace"));
+        RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("meta.atom"));
 
-        assertEquals(EntryKind.NAMESPACE, EntryKind.of(payload, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `namespace` is a record");
+        assertEquals(EntryKind.ATOM, EntryKind.of(payload, n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `meta.atom` is a record");
+        RecordBody bare = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom"));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(bare, n -> true), "a schema's own `atom` is no kernel name");
     }
 
     @Test
     void aConstructorIsWhatIsATheKernelsTopAndTheKernelsTopItself() {
-        RecordBody constructor = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom", "top", "type"));
-        RecordBody templated = RecordBody.of(RecordBody.fieldMap())
-                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_KIND, Optional.empty())))
-                .withSupertypes(List.of("namespace", "top"));
+        RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
+                .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
+        RecordTemplateBody templated = emptyTemplate(
+                        List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())))
+                .withSupertypes(List.of("meta.namespace", "meta.top"));
 
-        assertTrue(EntryKind.isConstructor("integer_type", constructor, n -> true));
+        assertTrue(EntryKind.isConstructor("numeric.integer_type", constructor, n -> true));
         assertTrue(EntryKind.isConstructor("op", templated, n -> true), "a template answers as its closed form");
-        assertTrue(EntryKind.isConstructor("top", RecordBody.of(RecordBody.fieldMap()), n -> true));
-        assertFalse(EntryKind.isConstructor("integer_type", constructor, n -> false), "a schema's own top");
+        assertTrue(EntryKind.isConstructor("meta.top", RecordBody.of(RecordBody.fieldMap()), n -> true));
+        assertFalse(EntryKind.isConstructor("numeric.integer_type", constructor, n -> false), "a schema's own top");
         assertFalse(EntryKind.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
     }
 
     @Test
     void aRecordTemplateCarriesAChainAsAnyTypeDoes() {
-        RecordBody pet = RecordBody.of(RecordBody.fieldMap())
-                .withParameters(List.of(new TemplateParam("T", TemplateParam.TYPE_KIND, Optional.empty())));
-        RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
+        RecordTemplateBody pet = emptyTemplate(
+                List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())));
+        RecordTemplateBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
 
         assertEquals(List.of("animal"), TypeChain.supertypesOf(placed));
         assertEquals(List.of(TypeRef.of("animal")), TypeChain.parentsOf(placed));
         assertEquals(List.of("dog"), TypeChain.subtypesOf(placed));
         assertEquals(placed.parameterNames(), pet.parameterNames());
+    }
+
+    private static RecordTemplateBody emptyTemplate(List<TemplateParam> parameters) {
+        return new RecordTemplateBody(TypeChain.EMPTY, new io.ltr8.annotation.AnnotatedMap<>(), List.of(),
+                RecordExtensionType.OPEN, List.of(), Optional.empty(), parameters);
     }
 }

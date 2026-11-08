@@ -5,7 +5,6 @@ import io.ltr8.bind.DataClassBridge;
 import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.HostAtoms;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
@@ -27,7 +26,7 @@ import java.util.Optional;
  *
  * <p><b>The target picks the parser; the JSON kind decides only whether the content is admitted.</b> That
  * is [TSON-JSON] §4.1's schema-directed reading with the class standing in for the schema: there is no
- * untyped position in this encoding and no base type resolution under it (§5.7 says so outright), so
+ * untyped position in this encoding and no base type resolution under it, so
  * nothing here inspects a value to guess what it "is". A {@code JsonEvent.NumberValue} at an {@code int}
  * component faces {@code int32}'s own contract; the same event at a {@code BigDecimal} component faces
  * {@code number}'s and keeps every digit. The dispatch is on the target for a reason beyond symmetry --
@@ -95,13 +94,12 @@ public final class JsonAtoms {
     /**
      * <b>The target picks the parser; the JSON kind decides only whether the content is admitted.</b>
      * That is §4.1 read literally -- there is no untyped position in this encoding and no base type
-     * resolution under it (§5.7 says so outright) -- and it is why the target is the outer dispatch here.
+     * resolution under it -- and it is why the target is the outer dispatch here.
      * A switch on the leaf kind cannot express §5.4, where one parser serves two kinds.
      *
      * <p>The three targets answered by kind alone come first: they are the encoding's own rather than any
      * family's, {@code text} accepting every JSON string (§5.6) and {@code boolean} being the general enum
-     * rule applied (§5.2). {@code Object} is here for the {@code value} position of §5.7, which has no
-     * bind-path representation yet -- {@code ltr8-bind} refuses an {@code Object} component outright.
+     * rule applied (§5.2). {@code Object} names no family, so the JSON kind answers for it too.
      */
     private static Object bindTo(JsonReadContext ctx, JsonEvent leaf, Class<?> target) {
         if (target == boolean.class || target == Boolean.class) {
@@ -157,8 +155,7 @@ public final class JsonAtoms {
         return switch (leaf) {
             case JsonEvent.StringValue string -> string.value();
             case JsonEvent.BooleanValue bool when target == Object.class -> bool.value();
-            // §5.7 reads a number without fraction or exponent as an integer and one with either as a
-            // float; this keeps every digit instead, which is the wider promise and the one §5.3 makes.
+            // Every digit is kept, the promise §5.3 makes.
             case JsonEvent.NumberValue value when target == Object.class -> new BigDecimal(value.literal());
             default -> mismatch(ctx, describe(leaf), target);
         };

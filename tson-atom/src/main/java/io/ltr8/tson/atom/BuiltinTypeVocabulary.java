@@ -25,21 +25,20 @@ import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.IriParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
-import io.ltr8.tson.schema.meta.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * The built-in type vocabulary's name -&gt; {@link AtomType} table (§5) -- a hardcoded
- * transliteration of the relevant {@code core.tn} and {@code net.tn} instances, since the vocabulary is a
- * fixed, closed set (§5.1) that a Class 1 processor never resolves via schema machinery. Each name denotes
- * the type its library declares under it, so a document that moves under a schema importing that library
- * keeps the meaning it had.
+ * The built-in type vocabulary's name -&gt; {@link AtomType} table (§5) -- a hardcoded transliteration of the relevant
+ * {@code meta.tn}, {@code numeric.tn}, {@code temporal.tn} and {@code net.tn} instances, since the vocabulary is a
+ * fixed, closed set (§5.1) that a Class 1 processor never resolves via schema machinery. Each name denotes the type its
+ * library declares under it, so a document that moves under a schema importing that library keeps the meaning it had.
  *
- * <p>Seeded with the {@code integer_type} family as §5.6's table lists it and {@code core.tn} defines it:
+ * <p>Seeded with the {@code integer_type} family as §5.6's table lists it and {@code numeric.tn} defines it:
  * the full {@code int8}..{@code int256}/{@code uint8}..{@code uint256} width ladder.
  *
  * <p>Also seeded with {@code decimal_type} ({@code number}), {@code float_type} ({@code float32}/
@@ -66,10 +65,10 @@ import java.util.Optional;
  * {@link MediaTypeParser}). Those eight are net.tn's.
  *
  * <p>And with {@code email_type} ({@code email}, §5.5's own row beside {@code uuid}/{@code ipv4}/{@code mac},
- * with the shape core.tn gives it) -- the RFC 5322 pin is scoped there to the {@code dot-atom "@" dot-atom}
+ * with the shape net.tn gives it) -- the RFC 5322 pin is scoped there to the {@code dot-atom "@" dot-atom}
  * core, which is exactly what {@link EmailParser} accepts.
  *
- * <p>And with {@code boolean} ([TSON-DATA] §5.5's {@code !boolean}, meta-kernel's own
+ * <p>And with {@code boolean} ([TSON-DATA] §5.5's {@code !boolean}, the kernel's own
  * {@code !enum [true false]}): the tokens {@code true} and {@code false}, case-sensitive.
  */
 public final class BuiltinTypeVocabulary {

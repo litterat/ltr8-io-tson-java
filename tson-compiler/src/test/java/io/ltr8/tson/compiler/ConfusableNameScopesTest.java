@@ -5,7 +5,7 @@ import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
@@ -58,9 +58,9 @@ class ConfusableNameScopesTest {
     private static TsonCompiledSchema compileWith(IdentifierPolicy identifiers, String declarations) {
         String schema = """
                 !!id:"https://example.test/confusable.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -70,8 +70,8 @@ class ConfusableNameScopesTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledSchemaRegistry.tree(TsonCompiledMetaRegistry.withStandardLibrary(
-                SchemaMetaNameBinder.defaultContext(), source, identifiers)).get(ID);
+        return TsonCompiledSchemaRegistry.tree(TsonCompiledVocabularyRegistry.withStandardLibrary(
+                SchemaModelNameBinder.defaultContext(), source, identifiers)).get(ID);
     }
 
     private static String refused(String declarations) {
@@ -150,14 +150,14 @@ class ConfusableNameScopesTest {
      */
     @Test
     void anEnumsMembersAreJudgedUnderItsNameTypesProfile() {
-        String words = "  words => !identifier_type { medial: \" \" }\n";
-        assertNotNull(compile(words + "  st => !enum_type { name_type: words  members: [\"lightly active\"] }"));
+        String words = "  words => !unicode.identifier_type { medial: \" \" }\n";
+        assertNotNull(compile(words + "  st => !meta.enum_type { name_type: words  members: [\"lightly active\"] }"));
 
         String restricted = "a" + new String(Character.toChars(0x0132)) + "b";
-        String message = refused(words + "  st => !enum_type { name_type: words  members: [\"" + restricted + "\"] }");
+        String message = refused(words + "  st => !meta.enum_type { name_type: words  members: [\"" + restricted + "\"] }");
         assertTrue(message.contains("Restricted"), message);
 
-        assertTrue(refused(words + "  st => !enum_type { name_type: words  members: [ACTIVE \"" + CYR_CAP_A
+        assertTrue(refused(words + "  st => !meta.enum_type { name_type: words  members: [ACTIVE \"" + CYR_CAP_A
                 + "CTIVE\"] }").contains("has members that read alike"));
     }
 

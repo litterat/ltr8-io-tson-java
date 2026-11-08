@@ -8,7 +8,7 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 
 /**
  * A stand-in {@link TsonTypeReader} for an entry no reader could be built for -- a constructor with no
- * {@link ValueReaderFactory} (one declared by a meta-layer schema this library has never seen), a factory
+ * {@link ValueReaderFactory} (one a schema declared that this library has never seen), a factory
  * that rejected the entry, or a type with no bound class. Substituting one lets the schema as a whole still
  * compile; only actually {@link #read}ing a value against this specific entry fails, and only then. A
  * caller who never reads this entry never sees the failure at all.

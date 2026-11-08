@@ -4,8 +4,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -40,9 +39,9 @@ class TypeInhabitanceTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/inhabit.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -52,8 +51,8 @@ class TypeInhabitanceTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -230,7 +229,7 @@ class TypeInhabitanceTest {
         assertTrue(!thrown.getMessage().contains("can never be satisfied"), thrown.getMessage());
     }
 
-    /** Every bundled schema is inhabited -- the check runs over meta-kernel, meta.tn and core.tn on every link. */
+    /** Every bundled schema is inhabited -- the check runs over every bundled schema on every link. */
     @Test
     void theBundledSchemasAllPass() {
         assertNotNull(compile("  ok => { v: text }"));
@@ -247,7 +246,7 @@ class TypeInhabitanceTest {
                 RecordBody.fieldMap(Map.entry("x", RecordField.required(TypeRef.of("x"))))));
 
         TsonSchemaLinker.link(new TsonSchema("https://example.test/two.tn",
-                TsonBundledSchemas.META_KERNEL_ID, List.of(), entries), null, problems);
+                List.of(), entries), null, problems);
 
         List<Diagnostic> reported = problems.diagnostics();
         assertTrue(reported.size() >= 2, () -> "expected one per entry, got " + reported);

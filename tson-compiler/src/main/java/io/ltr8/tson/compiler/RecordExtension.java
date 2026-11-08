@@ -10,18 +10,18 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
-import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
@@ -45,7 +45,7 @@ import java.util.function.Predicate;
  * <p><b>Why here and not at resolution.</b> Every rule below needs a namespace the declaration does not have.
  * FINAL constrains whoever composes onto it, which may be another schema; the family rules range over {@code
  * subtypes}, which nothing populates until linking; and a discriminator field's type has to be followed to the
- * end of its reference chain. What <em>is</em> local -- two definition marks on one declaration, a mark
+ * end of its alias chain. What <em>is</em> local -- two definition marks on one declaration, a mark
  * carrying a value, a mark on a non-record -- the resolver already refused while lowering.
  *
  * <p><b>A selector implies {@code abstract}, and states the dispatch by itself.</b> A field written
@@ -90,7 +90,7 @@ final class RecordExtension {
                                  Map<String, TypeRef> applications, Set<String> localNames,
                                  Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
-        Predicate<String> kernel = name -> TsonBundledSchemas.isMetaKernel(origins.get(name));
+        Predicate<String> kernel = name -> TsonBundledSchemas.isKernel(origins.get(name));
         for (String name : localNames) {
             Top def = merged.get(name);
             if (def != null && isUndeclaredMember(name, def, facts, applications, kernel)) {
@@ -181,7 +181,7 @@ final class RecordExtension {
     private static void checkNothingComposesOntoFinal(String name, Top def,
             Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts, List<Violation> violations) {
         for (String supertype : TypeChain.supertypesOf(def)) {
-            Top target = merged.get(ReferenceChain.terminal(supertype, merged));
+            Top target = merged.get(AliasChain.terminal(supertype, merged));
             if (target instanceof RecordBody parent
                     && parent.extension() == RecordExtensionType.FINAL) {
                 violations.add(new Violation(name, "'" + name + "' names '" + supertype + "' as a supertype, "
@@ -218,7 +218,7 @@ final class RecordExtension {
         Optional<AtomType<?>> parser = parserFor(field, merged, facts);
         if (parser.isEmpty()) {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + fieldName
-                    + "' is declared '" + field.type().name() + "', which is not an atom or an enum -- a "
+                    + "' is declared '" + field.type().text() + "', which is not an atom or an enum -- a "
                     + "subtype pins it with a bare token (§12.1), so a type no token denotes has no pin to be "
                     + "told apart by (§5.2)"));
         }
@@ -240,11 +240,11 @@ final class RecordExtension {
         Map<List<Object>, String> seen = new LinkedHashMap<>();
         for (String subtype : new LinkedHashSet<>(TypeChain.subtypesOf(def))) {
             Top sub = merged.get(subtype);
-            // An undeclared member is refused on its own, and judging its pins too would report one mistake twice.
-            // A record template IS-A the base is no member: its applications are, each pinned once closed.
-            if (!(sub instanceof RecordBody record) || OpenEntry.isOpen(sub)
+            // Only a record is a member: a record template IS-A the base is not one, its applications are. An
+            // undeclared member is refused on its own, and judging its pins too would report one mistake twice.
+            if (!(sub instanceof RecordBody record)
                     || isUndeclaredMember(subtype, sub, facts, applications,
-                    name -> TsonBundledSchemas.isMetaKernel(origins.get(name)))) {
+                    name -> TsonBundledSchemas.isKernel(origins.get(name)))) {
                 continue;
             }
             List<Object> pins = pinsOf(base, subtype, selectors, record, merged, facts, localNames, enumForms, violations);
@@ -326,15 +326,13 @@ final class RecordExtension {
                                  Map<String, Normalization> enumForms) {
         Optional<AtomType<?>> parser = parserFor(selector, merged, facts, enumForms);
         try {
-            return parser.get() instanceof io.ltr8.tson.compiler.atom.TokenAtomType<?> formSensitive
-                    ? formSensitive.read(new TokenValue(pin.text(), TokenForm.valueOf(pin.form().name())))
-                    : parser.get().read(pin.text());
+            return parser.get().read(pin.text());
         } catch (AtomTypeException notThisType) {
             return null;
         }
     }
 
-    /** The parser for a field's type at the end of its reference chain, empty where nothing reads a token. */
+    /** The parser for a field's type at the end of its alias chain, empty where nothing reads a token. */
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, Top> merged, Map<String,
             TsonSchema.EntryFacts> facts) {
         return parserFor(field, merged, facts, Map.of());
@@ -344,13 +342,17 @@ final class RecordExtension {
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, Top> merged, Map<String,
             TsonSchema.EntryFacts> facts,
                                                    Map<String, Normalization> enumForms) {
-        if (!field.type().arguments().isEmpty()) {
+        if (field.namedType().isEmpty() || !field.typeRef().arguments().isEmpty()) {
             return Optional.empty();
         }
-        String terminal = ReferenceChain.terminal(field.type().name(), merged);
+        String terminal = AliasChain.terminal(field.typeRef().name(), merged);
         Top target = merged.get(terminal);
-        if (target == null || OpenEntry.isOpen(target) || target instanceof Reference) {
+        if (target == null || OpenEntry.isOpen(target) || target instanceof Alias) {
             return Optional.empty();
+        }
+        if (target instanceof ReferenceBody reference && !reference.namesTypes()) {
+            // A value's name: the pins compare by the name, and what each reaches is checkFieldValue's to judge.
+            return AtomParsers.inSchemaDocument(reference);
         }
         return AtomParsers.forType(target, enumForms.getOrDefault(terminal, Normalization.NONE));
     }
@@ -359,11 +361,11 @@ final class RecordExtension {
      * The record body whose family rules this entry is subject to, or {@code null} where it has none.
      *
      * <p><b>A record template is a family base and is judged as one</b> (§5.10). Its own fields may still
-     * name its parameters, so the body checked here is assembled from the facts it states as a base: ABSTRACT,
-     * the {@code discriminators} it names, and each selector at the type the base declares it. Skipping it
-     * instead -- a guard on {@code parameters().isEmpty()} alone -- would accept a marked template with no
-     * family check at all: no rule that every member pins every selector, and no
-     * rule that the pins are pairwise distinct. An unchecked family is worse than a refused one.
+     * carry its parameters, so the body checked here is assembled from the facts it states as a base: ABSTRACT,
+     * the {@code discriminators} it names, and each selector at the type the base declares it, which names no
+     * parameter. Skipping it would accept a template family with no family check at all: no rule that every
+     * member pins every selector, and no rule that the pins are pairwise distinct. An unchecked family is worse
+     * than a refused one.
      *
      * <p><b>The selector derivation is the reader's own</b> ({@code FamilySelectors}), so the check and the
      * dispatch cannot disagree about which fields a family is selected by -- a check that passed a family
@@ -373,13 +375,14 @@ final class RecordExtension {
      * instantiations are judged as the closed records they are.
      */
     private static RecordBody familyBodyOf(Top def) {
-        if (!OpenEntry.isFamilyBase(def)) {
-            return def instanceof RecordBody record && !OpenEntry.isOpen(def) ? record : null;
-        }
-        // The selectors come from `FamilySelectors`, the one derivation both encodings read.
-        return new RecordBody(RecordBody.fieldMap(FamilySelectors.of(def)), List.of(),
-                FamilySelectors.extensionOf(def).orElseThrow(), FamilySelectors.namesOf(def),
-                java.util.Optional.empty());
+        return switch (def) {
+            case RecordBody record -> record;
+            // The selectors come from `FamilySelectors`, the one derivation both encodings read.
+            case RecordTemplateBody template -> new RecordBody(RecordBody.fieldMap(FamilySelectors.of(template)),
+                    List.of(), FamilySelectors.extensionOf(template).orElseThrow(), template.discriminators(),
+                    java.util.Optional.empty());
+            case null, default -> null;
+        };
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */

@@ -5,5 +5,7 @@ Read `design/tree-model.md`. Depends on nothing, and names no `tson-compiler` ty
 - Pure immutable nodes, read-side only: no builders or transforms until a concrete use case exists.
 - `get`/`at` never throw; a `TsonMissing` carries the RFC 6901 pointer of the failed step.
 - One no-value node: `TsonVoid` is `_` (or a collecting-mode failure). `null` is a `TsonAtom` holding a string.
-- `TsonScopedValue` wraps and is transparent to navigation.
+- A reference the grammar alone shows to be one, read schemaless, is a `TsonReference`, sealed over
+  `TsonApplicationReference` (`box<text>`) and `TsonSiblingReference` (`kind!`): structure only, no referent accessor,
+  since nothing resolves without a schema. A bare name is a `TsonAtom`.
 - `as(Class)` casts; `asInt`/`asLong`/`asDouble` convert. A test about host type uses `as(Class)`.

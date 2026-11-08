@@ -2,7 +2,7 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Optional;
@@ -23,21 +23,21 @@ class TextParserTest {
 
     @Test
     void exactLengthRejectsWrongLength() {
-        TextParser type = new TextParser(Optional.empty(), Optional.empty(), Optional.of(5), Optional.empty());
+        TextParser type = new TextParser(Optional.empty(), Optional.empty(), Optional.of(5L), Optional.empty());
         assertEquals("hello", type.read(token("hello")));
         assertThrows(AtomValidationException.class, () -> type.read(token("hi")));
     }
 
     @Test
     void minLengthRejectsShorterText() {
-        TextParser type = new TextParser(Optional.of(3), Optional.empty(), Optional.empty(), Optional.empty());
+        TextParser type = new TextParser(Optional.of(3L), Optional.empty(), Optional.empty(), Optional.empty());
         assertEquals("abc", type.read(token("abc")));
         assertThrows(AtomValidationException.class, () -> type.read(token("ab")));
     }
 
     @Test
     void maxLengthRejectsLongerText() {
-        TextParser type = new TextParser(Optional.empty(), Optional.of(3), Optional.empty(), Optional.empty());
+        TextParser type = new TextParser(Optional.empty(), Optional.of(3L), Optional.empty(), Optional.empty());
         assertEquals("abc", type.read(token("abc")));
         assertThrows(AtomValidationException.class, () -> type.read(token("abcd")));
     }
@@ -83,12 +83,12 @@ class TextParserTest {
     @Test
     void aLengthCountsCodePoints() {
         String grin = "\uD83D\uDE00";
-        TextParser one = new TextParser(Optional.empty(), Optional.of(1), Optional.empty(), Optional.empty());
+        TextParser one = new TextParser(Optional.empty(), Optional.of(1L), Optional.empty(), Optional.empty());
         assertEquals(grin, one.read(token(grin)));
         assertThrows(AtomValidationException.class, () -> one.read(token("a" + grin)));
-        TextParser exactlyTwo = new TextParser(Optional.empty(), Optional.empty(), Optional.of(2), Optional.empty());
+        TextParser exactlyTwo = new TextParser(Optional.empty(), Optional.empty(), Optional.of(2L), Optional.empty());
         assertEquals("a" + grin, exactlyTwo.read(token("a" + grin)));
-        TextParser atLeastTwo = new TextParser(Optional.of(2), Optional.empty(), Optional.empty(), Optional.empty());
+        TextParser atLeastTwo = new TextParser(Optional.of(2L), Optional.empty(), Optional.empty(), Optional.empty());
         assertThrows(AtomValidationException.class, () -> atLeastTwo.read(token(grin)));
     }
 }

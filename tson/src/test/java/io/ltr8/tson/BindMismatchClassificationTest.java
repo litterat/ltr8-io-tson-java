@@ -4,11 +4,13 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import java.util.List;
 import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -36,33 +38,34 @@ class BindMismatchClassificationTest {
 
     private static final String META_X = "https://example.test/meta-bindmismatch.tn";
 
-    /** A meta layer declaring a record held in a namespace type of its own -- and no Java class for it. */
+    /** A vocabulary schema declaring a record held in a namespace type of its own -- and no Java class for it. */
     private static final String META_SCHEMA = """
             !!id:"https://example.test/meta-bindmismatch.tn"
-            !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/38/m/meta.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !schema {
               notification  => { path: text }
-              notifications => namespace & { key_type: = identifier  value_type: = notification }
+              notifications => !meta.namespace { key_type: meta.identifier  value_type: notification }
             }
             """;
 
-    private static final String GOVERNED_HEADER = """
+    private static final String IMPORTING_HEADER = """
             !!id:"https://example.test/api-bindmismatch.tn"
-            !!meta:"https://example.test/meta-bindmismatch.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!import:"https://example.test/meta-bindmismatch.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema
             """;
 
     private static final String ORDINARY_HEADER = """
             !!id:"https://example.test/bindmismatch.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema
             """;
 
     private static Tson tson() {
         return Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META_X, META_SCHEMA))))
-                .withDataBindContext(SchemaMetaNameBinder.defaultContext()));
+                .withDataBindContext(SchemaModelNameBinder.defaultContext()));
     }
 
     private static Diagnostic only(String document) {
@@ -79,38 +82,42 @@ class BindMismatchClassificationTest {
      */
     @Test
     void anAnnotationTypedByAnAbstractBaseKindIsTheSameProblemInEitherPosition() {
-        Diagnostic beforeTheName = only(ORDINARY_HEADER + "{\n@sum:_ foo => text\n}\n");
-        Diagnostic afterTheArrow = only(ORDINARY_HEADER + "{\nfoo => @sum:_ text\n}\n");
+        Diagnostic beforeTheName = only(ORDINARY_HEADER + "{\n@meta.sum:_ foo => text\n}\n");
+        Diagnostic afterTheArrow = only(ORDINARY_HEADER + "{\nfoo => @meta.sum:_ text\n}\n");
 
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, beforeTheName.code(), beforeTheName::message);
         assertEquals(beforeTheName.code(), afterTheArrow.code(),
                 "the same annotation, moved across the arrow, is the same problem");
         for (Diagnostic d : List.of(beforeTheName, afterTheArrow)) {
             assertEquals("/foo", d.schemaPointer().orElseThrow(), "located at the declaration");
-            assertTrue(d.message().contains("'sum' is abstract and has no direct instances, so a value here must name "
+            assertTrue(d.message().contains("'meta.sum' is abstract and has no direct instances, so a value here must name "
                     + "its type"), d::message);
         }
     }
 
     /**
-     * The constructor case, which reaches the same condition through {@code bindAtomInstance} rather than
-     * through an annotation: a meta layer's own constructor the consumer never registered a class for.
-     *
-     * <p>It is reported <b>per declaration, with a position</b>. Escaping resolution instead left {@code
-     * Tson.validateSchema}'s own outer catch to report it against the document as a whole -- the right code,
-     * with no declaration name and no line, for a problem that has both.
+     * A value entry of a type the consumer binds no class for -- {@code pings => !notifications { ... }}, whose
+     * values are {@code notification} records -- is held as a tree: the schema loads and validates. Obtained to
+     * bind, it is refused, <b>per entry, with a position</b>: the {@code BIND_MISMATCH} names the entry and carries
+     * the line the author can open.
      */
     @Test
-    void anUnboundMetaLayerConstructorIsReportedAtTheDeclarationThatAppliedIt() {
-        Diagnostic d = only(GOVERNED_HEADER + "{\npings => !notifications { ping => { path: \"/ping\" } }\n}\n");
+    void anUnboundValueEntryValidatesAndIsRefusedWhereTheSchemaIsBound() {
+        Tson tson = tson();
+        assertEquals(List.of(), tson.validateSchema(
+                IMPORTING_HEADER + "{\npings => !notifications { ping => { path: \"/ping\" } }\n}\n"));
 
+        List<Diagnostic> problems = new java.util.ArrayList<>();
+        assertNull(tson.bindRegistry().get("https://example.test/api-bindmismatch.tn", problems::add));
+        assertEquals(1, problems.size(), problems::toString);
+        Diagnostic d = problems.getFirst();
         assertEquals(Diagnostic.Code.BIND_MISMATCH, d.code());
         assertEquals("/pings", d.schemaPointer().orElseThrow());
         assertTrue(d.schemaPosition().isPresent(), "and carries the line the author can open");
-        assertTrue(d.message().contains("no bound Java class for 'notification'"), d::message);
+        assertTrue(d.message().contains("binds no class for it"), d::message);
     }
 
-    /** The contrast: a name the governing meta does not declare is the author's error, in either position. */
+    /** The contrast: a name the schema's namespace does not hold is the author's error, in either position. */
     @Test
     void anAuthorErrorIsTheSameWhereverItIsWritten() {
         assertEquals(Diagnostic.Code.SCHEMA_ERROR,

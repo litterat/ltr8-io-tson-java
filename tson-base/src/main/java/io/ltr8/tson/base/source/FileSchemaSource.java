@@ -87,7 +87,7 @@ public final class FileSchemaSource implements SchemaSource {
     /**
      * Reads {@code reference}'s schema document, or throws.
      *
-     * @param reference the reference as written in a {@code !!schema}/{@code !!import}/{@code !!meta}
+     * @param reference the reference as written in a {@code !!import}
      *                  directive, scheme and {@code ?sha256=} pin included
      * @throws SchemaFetchException if policy refuses it, or no readable file backs it
      */

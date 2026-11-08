@@ -4,20 +4,18 @@ import java.util.Optional;
 
 /**
  * A built-in vocabulary atom's parsing contract (§5.2): "which tokens it accepts, and what host
- * value results." One implementation per meta-kernel/meta type constructor that the built-in
+ * value results." One implementation per kernel type constructor that the built-in
  * vocabulary (§5) actually surfaces as a schemaless annotation -- e.g. {@code integer_type} backs
  * {@code IntegerParser}. A single instance is a fully-parameterized *instance* of that constructor,
  * exactly mirroring the schema's own constructor/instance split: {@code int32}'s entry in the
  * built-in map is one {@code IntegerParser} constructed with {@code size = {bits: 32, signed: true}},
- * the same way {@code core.tn} writes {@code int32 => !integer ^ { size: { bits: 32 signed: true
+ * the same way {@code numeric.tn} writes {@code int32 => !integer ^ { size: { bits: 32 signed: true
  * } } }.
  *
- * <p><b>It reads text, not a token.</b> Every family but two is a function of the content alone, which is
- * what lets one vocabulary serve both encodings: [TSON-JSON] §5.1 hands a JSON string's content to the
- * atom's own parser exactly as a TSON quoted token's text would be. The two that need the lexical form --
- * the kernel's {@code value}, whose [TSON-DATA] §4.4 rule is that a quoted token is a string, and
- * {@code Token}, which records the spelling [TSON-SCHEMA] §8's resolved form carries -- are the text
- * encoding's own and live there, behind {@code TokenAtomType}.
+ * <p><b>It reads text, not a token.</b> Every family is a function of the content alone, which is what lets one
+ * vocabulary serve both encodings: [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser exactly as
+ * a TSON quoted token's text would be. {@code Token}, which records the spelling [TSON-SCHEMA] §8's resolved form
+ * carries, needs the lexical form, and so is the text encoding's own and lives there.
  *
  * <p>{@link #read(String)} returns the atom's own canonical host value (this atom's natural
  * representation -- a {@link java.math.BigInteger} narrowed to whatever primitive its own declared
@@ -61,8 +59,7 @@ public interface AtomType<T> {
 
     /**
      * {@code type}'s boxed form, so an {@code isInstance} check answers the same for {@code int} as for
-     * {@link Integer}. Shared with {@code ValueParser}, which asks the same question of a bound slot's own
-     * host type rather than of a caller-supplied target.
+     * {@link Integer}.
      */
     static Class<?> wrap(Class<?> type) {
         if (type == int.class) {

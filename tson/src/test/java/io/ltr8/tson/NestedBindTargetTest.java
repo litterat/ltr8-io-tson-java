@@ -36,15 +36,15 @@ class NestedBindTargetTest {
     private static final String ID = "https://example.test/nested-bind-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/nested-bind-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               counts   => { values: [int32] }
               tally    => { values: {text => int32} }
               keyed    => { values: {int32 => text} }
               grid     => { rows: [[int32]] }
               holes    => { rows: [[int32?]] }
-              ranked   => !map { key_type: text  value_type: int32  ordered: true }
+              ranked   => !meta.map { key_type: text  value_type: int32  ordered: true }
               tables   => { maps: [ranked] }
               pairs    => { values: [[text, int32]] }
               point    => { x: int32  y: int32 }

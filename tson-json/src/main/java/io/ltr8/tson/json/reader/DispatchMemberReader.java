@@ -33,7 +33,7 @@ import java.util.SequencedMap;
 import java.util.Set;
 
 /**
- * A SEALED record position: [TSON-JSON] §6.1.5's third reading, and the one the discriminated-family design
+ * A member-dispatched record position: [TSON-JSON] §6.1.5's third reading, and the one the discriminated-family design
  * exists for. The base declares one or more discriminator fields, each member of the family pins them, and a
  * value here is placed by reading those members rather than by carrying a tag.
  *
@@ -108,7 +108,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         Namespace<Top> entries = schema.entries();
         this.selectors = selectorFields.entrySet().stream()
                 .map(field -> selectorOf(field.getKey(), field.getValue(), context.linked())).toList();
-        // The family's members compose the base, so they share its name type; a template base states none.
+        // The family's members compose the base, so they share its name type, a template base's included.
         this.nameForm = selfNames.stream().map(context.linked()::nameForm).filter(form -> form != Normalization.NFC)
                 .findFirst().orElse(Normalization.NFC);
         this.selectorNames = selectors.stream().map(selector -> nameForm.apply(selector.name()))
@@ -118,9 +118,8 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         Map<String, Set<String>> deeper = new LinkedHashMap<>();
         Map<String, Route> table = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            // A record template IS-A the base is no member: its applications are, each pinned once closed.
-            if (!(entries.get(subtype) instanceof RecordBody record)
-                    || io.ltr8.tson.schema.meta.OpenEntry.isOpen(record)) {
+            // Only a record is a member: a record template IS-A the base is none, its applications are.
+            if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }
             List<Object> key = pinsOf(record);
@@ -142,12 +141,12 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     }
 
     private static Selector selectorOf(String name, RecordField field, TsonLinkedSchema linked) {
-        ReferenceChain.Resolved target = ReferenceChain.terminal(linked.schema(), field.type().name()).orElseThrow(
-                () -> new IllegalStateException("a discriminator typed '" + field.type().name()
+        AliasChain.Resolved target = AliasChain.terminal(linked.schema(), field.typeRef().name()).orElseThrow(
+                () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
                         + "' names nothing this schema declares"));
-        AtomType<?> parser = AtomParsers.forType(target.definition(), linked.enumForm(target.name()))
+        AtomType<?> parser = AtomParsers.forRead(target.definition(), linked.enumForm(target.name()))
                 .orElseThrow(
-                () -> new IllegalStateException("a discriminator typed '" + field.type().name()
+                () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(name), parser, AtomForm.of(target.definition()));
     }
@@ -299,7 +298,12 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
 
     /** A pin, or a tuple of pins, rendered for a diagnostic. */
     private static String render(List<Object> key) {
-        return key.size() == 1 ? String.valueOf(key.get(0))
-                : "(" + key.stream().map(String::valueOf).reduce((a, b) -> a + ", " + b).orElse("") + ")";
+        return key.size() == 1 ? pin(key.get(0))
+                : "(" + key.stream().map(DispatchMemberReader::pin).reduce((a, b) -> a + ", " + b).orElse("") + ")";
+    }
+
+    /** One pin as written: a reference by its text, any other value by its own spelling. */
+    private static String pin(Object pin) {
+        return pin instanceof io.ltr8.tson.schema.meta.Reference reference ? reference.text() : String.valueOf(pin);
     }
 }

@@ -11,12 +11,12 @@ import java.util.Objects;
 
 /**
  * Where a {@code TsonCompiledSchemaLoader} gets a schema document's own raw source text from, for a
- * URI that isn't already registered/compiled and isn't meta-kernel's own pre-loaded bootstrap case --
+ * URI that isn't already registered/compiled and isn't the kernel's own pre-loaded bootstrap case --
  * the extension point for enforcing policy over what gets fetched from where (e.g. whitelisting/
  * blacklisting hosts, or disk-only resolution). A caller wanting a specific policy implements this
  * interface (e.g. checking {@code uri} against an allowed-host list before ever opening a
  * connection, or refusing any {@code http(s)} scheme outright and only reading from a local
- * classpath/filesystem location) and hands it to a {@code TsonCompiledMetaRegistry}'s own
+ * classpath/filesystem location) and hands it to a {@code TsonCompiledVocabularyRegistry}'s own
  * {@code (TsonSchemaRegistry, DataBindContext, SchemaSource)} constructor. Two implementations
  * ship: {@code HttpSchemaSource} and {@code FileSchemaSource}, both in the {@code tson}
  * module, both denying by default.

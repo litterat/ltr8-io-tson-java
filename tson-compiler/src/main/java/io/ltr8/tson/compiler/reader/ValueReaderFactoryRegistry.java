@@ -37,14 +37,10 @@ import java.util.function.UnaryOperator;
  * ChoiceReader#FACTORY} -- see that class's own Javadoc for why it has no {@code
  * DataClassUnion}-bounded counterpart the way {@code record} does.
  *
- * <p><b>{@code scoped} is the one constructor whose two modes differ in what they keep rather than in what
- * they build</b> ({@link ScopedReader#TREE}/{@link ScopedReader#BIND}): both read a foreign value through the
- * foreign schema's own compiled reader, and only tree mode has somewhere to record the scope the document
- * pushed. Every scoped instance -- core's {@code declared}, {@code extern} and {@code dynamic}, and every
- * narrowing {@code extern_of}/{@code extern_type} materialises -- shares the one reader, what separates them
- * being two constraint values rather than a shape.
+ * <p><b>{@code declared_type} is shared between both modes</b>, registered once via {@link
+ * DeclaredReader#FACTORY}: it selects the reader of the type the value names and builds nothing of its own.
  *
- * <p><b>Every {@code ~}-marked constructor meta-kernel.tn/meta.tn declare has an entry</b> -- verified
+ * <p><b>Every {@code ~}-marked constructor the kernel and the three libraries declare has an entry</b> -- verified
  * against both files directly, not assumed -- and every one of them now builds a real reader.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
@@ -73,8 +69,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
-                AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, AtomTypeReader.VALUE, UnaryOperator.identity(),
-                ChoiceReader.FACTORY, ScopedReader.BIND));
+                AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, UnaryOperator.identity(),
+                ChoiceReader.FACTORY));
     }
 
     /**
@@ -87,57 +83,50 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry tree() {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
-                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, TREE_VALUE,
-                AtomTreeFactory::new,
-                ChoiceReader.FACTORY, ScopedReader.TREE));
+                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, AtomTreeFactory::new,
+                ChoiceReader.FACTORY));
     }
 
     /** Tree mode's {@code void_type} factory: {@link VoidTreeReader} over {@link AtomTypeReader#VOID}'s reader. */
     private static final ValueReaderFactory TREE_VOID = (name, definition, context) ->
             new VoidTreeReader(AtomTypeReader.VOID.create(name, definition, context), AnnotationTypes.of(context));
 
-    /** Tree mode's {@code value_type} factory: {@link AtomTreeReader} over {@link AtomTypeReader#VALUE}'s reader. */
-    private static final ValueReaderFactory TREE_VALUE = (name, definition, context) ->
-            new AtomTreeReader(AtomTypeReader.VALUE.create(name, definition, context), name,
-                    AnnotationTypes.of(context));
-
-    /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
+    /** The atom constructors the kernel and the three libraries declare, by path. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
-            // meta-kernel.tn
-            "integer_type", "text_type", "identifier_type", "uri_type", "regex_type", "kind_type", "ref_type",
-            // meta.tn
-            "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
-            "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
-            "iri_type", "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type",
-            "hostname_type", "host_type", "media_type_type");
+            // meta.tn, under meta
+            "numeric.integer_type", "unicode.text_type", "unicode.identifier_type", "unicode.regex_type", "net.iri_type",
+            "meta.reference_type", "binary.bytes_type",
+            // numeric.tn, under numeric
+            "numeric.float_type", "numeric.decimal_type", "numeric.rational_type", "numeric.complex_type",
+            // temporal.tn, under temporal
+            "temporal.date_type", "temporal.time_type", "temporal.datetime_type", "temporal.duration_type",
+            "temporal.period_type",
+            // net.tn, under net
+            "net.uri_type", "net.uuid_type", "net.email_type", "net.mac_type", "net.ipv4_type", "net.ipv6_type",
+            "net.cidr4_type", "net.cidr6_type", "net.hostname_type", "net.host_type", "net.media_type_type");
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
-            ValueReaderFactory voidFactory, ValueReaderFactory valueFactory, UnaryOperator<ValueReaderFactory> leaf,
-            ValueReaderFactory choice, ValueReaderFactory scoped) {
+            ValueReaderFactory voidFactory, UnaryOperator<ValueReaderFactory> leaf, ValueReaderFactory choice) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
-        // meta-kernel.tn
-        factories.put("value_type", valueFactory);
-        factories.put("void_type", voidFactory);
-        factories.put("record", RecordDispatch.over(record));
-        factories.put("array", array);
-        factories.put("set_type", array);
-        factories.put("map", map);
-        factories.put("tuple", tuple);
+        factories.put("meta.void_type", voidFactory);
+        factories.put("meta.record", RecordDispatch.over(record));
+        factories.put("meta.array", array);
+        factories.put("meta.set_type", array);
+        factories.put("meta.map", map);
+        factories.put("meta.tuple", tuple);
         factories.put("enum", leaf.apply(enumFactory));
-        factories.put("choice", choice);
-
-        // meta.tn
-        factories.put("scoped", scoped);
+        factories.put("meta.choice", choice);
+        factories.put("meta.declared_type", DeclaredReader.FACTORY);
 
         // Every atom constructor routes to one factory, so what varies is the key and not the value:
         // AtomTypeReader.ATOM asks AtomParsers which parser the resolved body wants, and that mapping is
         // stated once, there. What the key set carries is the other fact -- *which constructors are atoms*
         // -- which nothing else states: BuiltinTypeVocabulary is keyed by type name (`int32`) rather than
         // constructor name (`integer_type`), and AtomParsers switches on the body's own class. Listing them
-        // is also what makes a constructor this library has never seen reach NOT_IMPLEMENTED (§2.2.2's
-        // extension point) instead of being guessed at from whatever body it happened to resolve to.
+        // is also what makes a constructor this library has never seen, which any schema may declare, reach
+        // NOT_IMPLEMENTED instead of being guessed at from whatever body it happened to resolve to.
         for (String atomConstructor : ATOM_CONSTRUCTORS) {
             factories.put(atomConstructor, leaf.apply(AtomTypeReader.ATOM));
         }

@@ -157,23 +157,13 @@ final class TemplateRegularity {
      * Every application a template's body writes, including ones nested inside another application's
      * arguments ({@code box<chain<T>>} at a field position applies both).
      *
-     * <p>The body walk is {@code MetaRefs.mapBodyRefs}, used as a visitor by returning each ref
-     * unchanged -- one place knows the shape of a body, so a new body type cannot be handled here and
-     * forgotten there.
+     * <p>Every entry with parameters is open -- a held body or a record template -- and either answers which
+     * applications it writes ({@link HeldBody#applicationsOf}), the same kind of declared question as its names,
+     * which is what keeps this rule at the declaration, before anything is resolved against it.
      */
     private static List<Application> applicationsIn(Top template) {
         List<Application> found = new ArrayList<>();
-        // A held body is not rewritable, so it answers for itself: `applications()` is the same kind of
-        // declared question as `names()`, and returning the applications the wire tree holds is what keeps
-        // this rule at the declaration now that every open body is held.
-        if (OpenEntry.isOpen(template)) {
-            HeldBody.of(template).applications().forEach(ref -> collect(ref, found));
-            return found;
-        }
-        MetaRefs.mapBodyRefs(template, ref -> {
-            collect(ref, found);
-            return ref;
-        });
+        HeldBody.applicationsOf(template).forEach(ref -> collect(ref, found));
         return found;
     }
 

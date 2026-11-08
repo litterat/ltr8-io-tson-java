@@ -1,0 +1,298 @@
+!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=dfa66c5d3775a7845776db737f07b16630824f2434f6587aface2f88b77bf0f2"
+!!import:"https://tson.io/2026/39/m/meta.tn?sha256=c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5"
+@doc:"""
+  TSON numeric — the numeric type library (2026 Revision 39 draft).
+
+  Its root holds the numbers a data schema writes: the exact `number` and
+  `rational`, `complex`, the sized integers `int8` to `int256` (but `int64`,
+  the kernel's) and `uint8` to `uint256`, and the approximate `float32` and
+  `float64`. Their constructors
+  and facet vocabulary are machinery, members of `numeric`, a schema map
+  nested in its root, each named by its path: `numeric.decimal_type`,
+  `numeric.float_type`, `numeric.rational_type` and `numeric.complex_type`,
+  the facet enums `numeric.ieee_format` and `numeric.complex_component`, and
+  the member set `numeric.decimal_member_set`. The kernel contributes to the
+  same map: `numeric.integer_type`, the constructor of the kernel's
+  `integer`, which the sized integers refine, its facet vocabulary, and
+  `numeric.count`.
+
+  It imports the kernel, meta.tn, alone: the kernel's constructors,
+  `numeric.count` and classifying annotations are what it builds on, and it
+  needs nothing of temporal.tn or net.tn. A schema
+  importing it reserves its root names beside the kernel's, `numeric` among
+  those ([TSON-SCHEMA] §2.2.3). core.tn imports it with temporal.tn and
+  net.tn, for a schema that wants every bundled type.
+
+  Hash pins here are real digests over the bytes of this copy; see meta.tn's
+  note.
+
+  An annotation never changes a value, its type, or whether it is valid:
+  validation is over values, and a schema with every annotation erased admits
+  exactly the same values. [TSON-SCHEMA] §6 admits two further things within
+  that rule — a load-time check, and a directive over how a class of encodings
+  represents a value — and the annotations used here use the first alone.
+  A value space is described without reference to any encoding, and where a
+  doc mentions how TSON text spells a value it says so by name.
+
+  Constructors that bind to a governing specification compose with the
+  kernel's `atom.specification` mixin and pin the spec field with `=`.
+
+  A constraint field whose value is of the constrained family — a bound, a
+  step, a member — is typed by that family's instance at this document's
+  root: `number` for the exact tier and for a float's bounds, `rational` for
+  the rational tier. A field that counts something — a digit count — is typed
+  by the kernel's `numeric.count`.
+
+  The ordered families state their bounds as field groups ([TSON-SCHEMA]
+  §5.11): one inclusive-or-exclusive group per side, so an inclusive and an
+  exclusive bound on the same side is unrepresentable. Value-level coherence
+  (the lower bound not exceeding the upper) is a schema-load check.
+
+  `multiple_of`, wherever it appears (`numeric.decimal_type`,
+  `numeric.rational_type`, the kernel's `numeric.integer_type`, and
+  temporal.tn's `temporal.duration_type` and `temporal.period_type`), follows
+  one rule: the step is strictly positive — zero or a negative step is a
+  schema-load error — the test ignores the sign of the value, a refinement may
+  only tighten the step to an integer multiple of the inherited one, and the
+  step composes with every other facet present. `members`, where it appears, is likewise
+  uniform in what it admits: every member satisfies the other facets on the
+  same body or the schema fails to load. Refinement differs by tier — the
+  numeric tiers shrink the set, the kernel's `unicode.text_type` sets it once.
+
+  References:
+    ISO/IEC 11404:2007    General Purpose Datatypes
+    W3C XSD Part 2        Facet model and constraint vocabulary
+    JSON Schema 2020-12   Modern constraint vocabulary
+    IEEE 754-2019         Floating-point semantics
+  """
+!schema {
+  @doc:"The numeric constructors and their facet vocabulary, each named by its path, `numeric.decimal_type`."
+  numeric => !schema {
+    @doc:"""
+      IEEE 754-2019 interchange formats, both radices. Selects the representable
+      grid of an approximate (`float_type`) value. The binary formats are the
+      familiar base-2 floats; the decimal formats (decimal32/64/128) are base-10
+      *floating-point* — still approximate, with their own special values — and
+      are NOT the exact fixed-point decimals of `decimal_type`.
+      """
+    ieee_format => !enum [
+      BINARY16 BINARY32 BINARY64 BINARY128 BINARY256
+      DECIMAL32 DECIMAL64 DECIMAL128
+    ]
+
+    @doc:"""
+      Approximate-numeric constraint vocabulary (SQL's approximate tier; ISO/IEC
+      11404 approximate real). Instances are `float32` and `float64`. An
+      approximate value is not stored as written: the receiver rounds it onto
+      the discrete IEEE 754-2019 grid named by `format`, so precision may be
+      lost and equality comparison is unsafe (ordering is PARTIAL — NaN is
+      unordered). The `format` radix (binary or decimal) is the ISO 11404 radix
+      characteristic of the type. The value set is that grid together with
+      signed zeros, subnormals, the two infinities, and the canonical quiet NaN
+      ([TSON-DATA] §5.6); `allow_nan`, `allow_infinity`, `allow_subnormal`, and
+      `allow_negative_zero` default to true (`~ true` — the format's full set)
+      and may be narrowed to false to exclude those representation artifacts.
+      The bounds are optional domain restrictions validated against the value as
+      written, before rounding, so they are exact `number`s rather than values
+      on the grid; they judge the infinities as ordered values and admit no
+      NaN, so `allow_nan` decides NaN only where no bound is written
+      ([TSON-SCHEMA] §5.5, §5.7). Not a narrowing of the exact tier:
+      infinities and NaN are not exact numbers.
+
+      Bounds follow the header's field-group rule. There is no `multiple_of`;
+      use the exact tier (`decimal_type`) when a step is required. A text-class
+      token that does not land on the grid is rounded to nearest, ties to even
+      (IEEE 754-2019 roundTiesToEven), the default across the format; loss of
+      precision is expected, not an error. An encoding that carries the format's
+      bits delivers a grid value directly and rounds nothing.
+      """
+    float_type => meta.atom & atom.specification & {
+      spec?:                = "https://ieeexplore.ieee.org/document/8766229"
+      format:               numeric.ieee_format
+      ( min: number | exclusive_min: number )?
+      ( max: number | exclusive_max: number )?
+      allow_nan?:           boolean ~ true
+      allow_infinity?:      boolean ~ true
+      allow_subnormal?:     boolean ~ true
+      allow_negative_zero?: boolean ~ true
+    }
+
+    @doc:"The members of a decimal_type."
+    decimal_member_set => !meta.set_type { element_type: number  min_items: 1 }
+
+    @doc:"""
+      Exact-numeric constraint vocabulary (SQL's exact tier; ISO/IEC 11404
+      `scaled`, radix 10). Instance is `number` — the unrestricted exact
+      number, which is also the JSON Schema `number` mapping (arbitrary
+      magnitude and precision, finite, no special values). Nothing is rounded on
+      the way in, so equality is safe and ordering is TOTAL. Scale is not part
+      of the value — `1`, `1.0` and `1.00` are one value, and whether a
+      spelling's trailing zeros survive a round trip is an encoding's promise,
+      not the type's. `total_digits`/`fraction_digits` are the ISO `scaled`
+      precision and scale (SQL `DECIMAL(precision, scale)`): total significant
+      digits and digits after the point.
+
+      Bounds follow the header's field-group rule. `multiple_of` is exact here
+      (e.g. `multiple_of` 0.05 admits only nickel steps). `fraction_digits` and
+      `multiple_of` overlap but are not equivalent: `fraction_digits` 2 admits
+      any hundredth, `multiple_of` 0.05 only multiples of a nickel.
+
+      `members` enumerates the admitted values. Each member is a `number`, so
+      `1` and `1.0` are one member and a duplicate rather than two, and a
+      member that is not a number fails at schema load. The header's uniform
+      `members` rule applies.
+      """
+    decimal_type => meta.atom & {
+      ( min: number | exclusive_min: number )?
+      ( max: number | exclusive_max: number )?
+      multiple_of?:     number
+      total_digits?:    numeric.count
+      fraction_digits?: numeric.count
+      members?:         numeric.decimal_member_set
+    }
+
+    @doc:"""
+      Rational constraint vocabulary. Instance is `rational`. Exact (ℚ;
+      ISO/IEC 11404 `rational`), so bounds and `multiple_of` are exact. Bounds
+      follow the header's field-group rule. Constraints operate on the value,
+      not the written token: tokens are not normalized, so `"2/4"` and `"1/2"`
+      satisfy the same constraints.
+      """
+    rational_type => meta.atom & {
+      ( min: rational | exclusive_min: rational )?
+      ( max: rational | exclusive_max: rational )?
+      multiple_of?: rational
+    }
+
+    @doc:"""
+      Allowed component types for a complex value. A closed vocabulary of
+      numeric types (naming their counterparts at this document's root): exact `INTEGER` (Gaussian
+      integers ℤ+ℤi), `NUMBER` (exact arbitrary precision), `RATIONAL` (ℚ+ℚi);
+      approximate `FLOAT32`, `FLOAT64`.
+
+      The members are a partial order, not a chain, and a refinement may move
+      `component` only to a member whose value set is a subset of the source's:
+      `INTEGER ⊂ NUMBER ⊂ RATIONAL` are the exact tiers and `FLOAT32 ⊂ FLOAT64`
+      the approximate ones, and the two families are incomparable. So
+      `!complex ^ { component: INTEGER }` narrows and its IS-A holds, while
+      `!complex ^ { component: FLOAT64 }` is refused: a float64 complex is not a
+      `complex`, and is declared as its own type,
+      `!numeric.complex_type { component: FLOAT64 }`.
+      """
+    complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]
+
+    @doc:"""
+      Complex constraint vocabulary. Instance is `complex`. A complex
+      value is a pair of components (real and imaginary parts). `component`
+      selects the type of both parts from the closed `numeric.complex_component`
+      vocabulary; it defaults to `NUMBER` (a DEFAULT, §5.2), so a bare complex
+      has exact components — a defaulted selector. Complex has no useful total
+      order (`@atom.ordering:NONE`), so the order-based facets of the other
+      numeric tiers do not apply here. Exactness is inherited from `component`
+      rather than fixed: `INTEGER`/`NUMBER`/`RATIONAL` components give an exact
+      complex, `FLOAT32`/`FLOAT64` an approximate one, so `complex` carries no
+      `@atom.exact` marker of its own.
+      """
+    complex_type => meta.atom & {
+      component?: numeric.complex_component ~ NUMBER
+    }
+  }
+
+  @doc:"""
+    Exact number of arbitrary magnitude and precision, finite, with no special
+    values (SQL exact tier; ISO/IEC 11404 `scaled`, radix 10). The canonical
+    numeric type and the JSON Schema `number` mapping: a bare JSON number is a
+    TSON `number`. Exact, so equality is safe and ordering is TOTAL; scale is
+    not part of the value (`1`, `1.0` and `1.00` are one value). Lossiness
+    enters only when a consumer narrows to an approximate type
+    (`float32`/`float64`), where the value is rounded onto an IEEE grid. A value
+    needing `.inf`/`.nan` is not a `number` — those belong to the approximate
+    tier.
+    """
+  @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
+  number => !numeric.decimal_type {}
+
+  @doc:"""
+    Exact fraction a/b with a positive nonzero denominator. The value is the
+    fraction: 2/4 and 1/2 are one value, and equality, ordering and constraints
+    are over it; receivers reduce if their representation needs it. Whether a
+    spelling survives a round trip is an encoding's promise, not the type's
+    (TSON text preserves the token as written, and quotes it, since it contains
+    `/`).
+    """
+  @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
+  rational => !numeric.rational_type {}
+
+  @doc:"""
+    Complex number, a pair of components (real and imaginary parts). Components
+    default to `NUMBER` (exact). A refinement may move `component` only to a
+    member whose value set is a subset of the source's:
+    `!complex ^ { component: INTEGER }` is Gaussian integers, ℤ+ℤi sitting
+    inside the exact-decimal complexes, while floating-point complex,
+    `!numeric.complex_type { component: FLOAT64 }`, is its own type rather than a
+    refinement and is not a `complex`. Exactness follows the component type, so
+    `complex` carries no `@atom.exact` marker. Spellings are the text class's
+    concern (TSON text accepts a+bi and a+bj); component representation is
+    host-defined.
+    """
+  @atom.ordering:NONE @atom.bounded:false @atom.numeric
+  complex => !numeric.complex_type {}
+
+  @doc:"Signed 8-bit integer (-128 to 127)."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int8 => !integer ^ { size: { bits: 8  signed: true } }
+
+  @doc:"Signed 16-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int16 => !integer ^ { size: { bits: 16  signed: true } }
+
+  @doc:"Signed 32-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int32 => !integer ^ { size: { bits: 32  signed: true } }
+
+  @doc:"Signed 128-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int128 => !integer ^ { size: { bits: 128  signed: true } }
+
+  @doc:"Signed 256-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  int256 => !integer ^ { size: { bits: 256  signed: true } }
+
+  @doc:"Unsigned 8-bit integer (0 to 255)."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint8 => !integer ^ { size: { bits: 8  signed: false } }
+
+  @doc:"Unsigned 16-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint16 => !integer ^ { size: { bits: 16  signed: false } }
+
+  @doc:"Unsigned 32-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint32 => !integer ^ { size: { bits: 32  signed: false } }
+
+  @doc:"Unsigned 64-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint64 => !integer ^ { size: { bits: 64  signed: false } }
+
+  @doc:"Unsigned 128-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint128 => !integer ^ { size: { bits: 128  signed: false } }
+
+  @doc:"Unsigned 256-bit integer."
+  @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
+  uint256 => !integer ^ { size: { bits: 256  signed: false } }
+
+  @doc:"""
+    IEEE 754 binary32. Value set is the binary32 grid plus signed zeros,
+    subnormals, both infinities, and quiet NaN.
+    """
+  @atom.ordering:PARTIAL @atom.bounded:false @atom.exact:false @atom.numeric
+  float32 => !numeric.float_type { format: BINARY32 }
+
+  @doc:"""
+    IEEE 754 binary64. Value set is the binary64 grid plus signed zeros,
+    subnormals, both infinities, and quiet NaN.
+    """
+  @atom.ordering:PARTIAL @atom.bounded:false @atom.exact:false @atom.numeric
+  float64 => !numeric.float_type { format: BINARY64 }
+}

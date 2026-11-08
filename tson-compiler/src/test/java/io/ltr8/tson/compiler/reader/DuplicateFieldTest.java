@@ -4,13 +4,13 @@ import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class DuplicateFieldTest {
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
+        TsonCompiledVocabularyRegistry core = new TsonCompiledVocabularyRegistry(SchemaModelNameBinder.defaultContext());
         return TsonCompiledSchemaRegistry.tree(core).compile(linkedSchema);
     }
 
@@ -48,7 +48,7 @@ class DuplicateFieldTest {
         entries.put("holder", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("value", RecordField.required(TypeRef.of("int8"))))));
         TsonSchema schema = new TsonSchema("https://example.test/dup-field.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         // "value" appears twice: first as 999 (out of int8's own -128..127 range), then as 42 (valid).
@@ -78,7 +78,7 @@ class DuplicateFieldTest {
         entries.put("holder", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("value", RecordField.required(TypeRef.of("int8"))))));
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(new TsonSchema(
-                "https://example.test/dup-field.tn", "https://example.test/meta.tn", List.of(), entries)));
+                "https://example.test/dup-field.tn", List.of(), entries)));
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
         compiled.get("holder").read(TestDocuments.document("{ value: 1  value: 2  value: 3 }", problems));

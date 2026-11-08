@@ -181,7 +181,7 @@ final class AnnotationCapture {
     /**
      * §6's bare form, checked rather than assumed: {@code @T} is shorthand for {@code @T:_}, so {@code T} must
      * admit the void sentinel -- true of the {@code void}-targeted markers the form exists for ({@code
-     * @disjoint}, {@code @numeric}) and false of, say, a text-targeted {@code @doc}.
+     * @meta.disjoint}, {@code @atom.numeric}) and false of, say, a text-targeted {@code @doc}.
      *
      * <p>There is no value in the stream to hand the reader, so one absent event is synthesised at the
      * annotation's own position and read through a throwaway context whose receiver discards what it is

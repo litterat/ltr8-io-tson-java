@@ -26,9 +26,9 @@ class TsonValidateSchemaTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/validate-schema-test.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            """;
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema\s""";
 
     private static List<Diagnostic> check(String body) {
         return Tson.standard().validateSchema(HEADER + body);
@@ -50,9 +50,9 @@ class TsonValidateSchemaTest {
         };
         List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(refusing))).validateSchema("""
                 !!id:"https://example.test/importer.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/nowhere.tn"
-                { t => text }
+                !schema { t => text }
                 """);
 
         assertEquals(1, problems.size(), problems::toString);
@@ -208,24 +208,36 @@ class TsonValidateSchemaTest {
      *
      * <p>The literal case is refused for a sharper reason than the typo in {@link
      * #anUnresolvedArgumentStaysWithTheApplier}: {@code 3} is not an unresolved <em>name</em>, it is not a
-     * name at all, and {@code type_ref.name} is typed {@code identifier}, so it fails where the substituted
-     * body is read against the kernel's own vocabulary rather than later at reference resolution. The verdict
-     * is the same and the explanation is better — "an identifier never begins with a digit or a sign" is
-     * actionable where "unresolved reference '3'" implies an author could go and declare one.
+     * name at all, and {@code T} is the field's {@code type_param}, so it is refused where the argument is
+     * substituted for the label rather than later at reference resolution. The verdict is the same and the
+     * explanation is better — "an identifier never begins with a digit or a sign" is actionable where "unresolved
+     * reference '3'" implies an author could go and declare one.
      */
     @Test
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
         assertStaysWithTheApplier("box<3>",
-                "'box<...>' substitutes into a body that is not valid data for 'record', the constructor's "
-                        + "own constraint vocabulary -- 'type_kind': '3': U+0033 at index 0 cannot start an "
-                        + "identifier -- an identifier never begins with a digit or a sign");
+                "'box<...>' binds the type parameter 'T' to '3', which is no type -- '3': U+0033 at index 0 cannot "
+                        + "start an identifier -- an identifier never begins with a digit or a sign (§5.10)");
     }
 
     /** The same rule for a name that is a name: {@code some_typo} is the applier's typo, not the template's. */
     @Test
     void anUnresolvedArgumentStaysWithTheApplier() {
         assertStaysWithTheApplier("box<some_typo>",
-                "'{ v: some_typo }' field 'v' has an unresolved reference 'some_typo'");
+                "'box<some_typo>' field 'v' has an unresolved reference 'some_typo'");
+    }
+
+    /**
+     * A refusal of an application nothing declares names the application as written, never the entry minted for it:
+     * {@code meta.ref<nope>}'s expansion is a reference over a name nothing declares.
+     */
+    @Test
+    void anUnresolvedReferenceApplicationIsNamedAsWritten() {
+        List<Diagnostic> problems = check("{\n  r => { f: meta.ref<nope> }\n}");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("'meta.ref<nope>'"), problems.getFirst().message());
+        assertFalse(problems.getFirst().message().contains("reference_nope"), problems.getFirst().message());
     }
 
     private static void assertStaysWithTheApplier(String application, String message) {
@@ -476,9 +488,9 @@ class TsonValidateSchemaTest {
     void anUnloadableImportIsReportedAgainstTheDocument() {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/bad-import.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/nothing-here.tn"
-                { my_int => int32 }
+                !schema { my_int => int32 }
                 """);
 
         assertFalse(problems.isEmpty());
@@ -495,8 +507,8 @@ class TsonValidateSchemaTest {
     void anImportWhoseTargetOwnsAnotherIdentityIsReportedAgainstTheDocument() {
         String lib = """
                 !!id:"https://example.test/its-real-name.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                { widget => { name: text } }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema { widget => { name: text } }
                 """;
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(uri -> {
@@ -508,9 +520,9 @@ class TsonValidateSchemaTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/mismatched-import.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/meta.tn"
                 !!import:"https://example.test/fetched-as.tn"
-                { holder => { w: widget } }
+                !schema { holder => { w: widget } }
                 """);
 
         assertEquals(1, problems.size(), problems::toString);

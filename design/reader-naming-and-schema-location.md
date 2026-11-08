@@ -13,7 +13,7 @@ in git.
   there would allocate per read.
 - Both pointers are rendered from the `PathStep` chain only when a diagnostic is built; concatenating per step is
   quadratic in depth.
-- The pointer is the path taken (`/point/y`), not the leaf reached (`/int32` in core.tn).
+- The pointer is the path taken (`/point/y`), not the leaf reached (`/int32` in numeric.tn).
 - `schemaField` steps data and schema together; `field`/`index` step the data alone. It takes two names — the
   field as the document wrote it for the data path, as declared for the schema pointer — which differ under a
   case-folding name type, where only the written one is an RFC 6901 pointer into the document.
@@ -22,7 +22,7 @@ in git.
 - A position table is identity-keyed, so every phase that rebuilds a node has to carry it over; `schemaField` takes the
   position as a parameter, not an overload.
 
-Related: `design/readers-and-diagnostics.md`, `design/scope-push.md`, `design/record-dispatch.md`,
+Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `design/record-dispatch.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`.
 
@@ -37,26 +37,32 @@ Related: `design/readers-and-diagnostics.md`, `design/scope-push.md`, `design/re
   carries its own name token's position and a minted entry has none. So `tag_list => [text; 1..2]` keeps
   `tag_list` and the anonymous form inside it renders as `[order; 1..]`, a map as `{text => order}`, a tuple
   as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application it records
-  (`@application` on its key, `TsonSchema.applicationOf`: `paged<order>`). Anything with no sugar spelling falls
+  (`@meta.application` on its key, `TsonSchema.applicationOf`, stated as written: `paged<order>`, `pair<box<text>
+  int32>`). Anything with no sugar spelling falls
   back to the entry name — honest rather than invented.
 - **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). A field
   declared `c: pct` over `pct => small` reads with `small`'s reader, that being the type at the end of the
   chain, and a message from it would otherwise name a declaration the author did write but did not write
   *here*. §8.3 makes a reference a hop and forbids collapsing it in resolved output, so a position reaches its
   child by resolving the name it names and nothing more — no carrier on the type-ref, and nothing added to
-  `TsonReadContext`. The renaming happens one level up instead: the `REFERENCE` entry's own compile names its
+  `TsonReadContext`. The renaming happens one level up instead: the `ALIAS` entry's own compile names its
   target's reader for the entry doing the referring (`TsonSchemaCompiler`, through `UseSite.named`), which is
   the collapse §8.3 permits *after linking, when a processor compiles for reading*. It runs where a composite
   reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
   in its name, every other position gets the shared reader back unchanged and allocates nothing
   (`AllocationHarnessTest` is the guard).
-    - **An application nothing declares has no authored name.** It is its expansion (§5.10): the position names
-      the synthetic directly, so `e: b<10>` over `b => <N> !integer_type { min: N  max: 100 }` reads an atom
-      instance no author named. `EntryDisplayName.authored` is empty for a form with no sugar spelling, and the
-      atom reader then leads with no name at all — the family's own sentence (`'5' is less than the minimum
-      10`), located by the diagnostic's position, never the entry's content-derived key. An expansion that
-      names its own application keeps an instantiation entry (a `Reference` to the synthetic, recording the
-      application), and that one is named like any other hop.
+    - **An application nothing declares is named by the application that closed to it.** It is its expansion
+      (§5.10): the position names the synthetic directly, so `e: b<10>` over `b => <N> !numeric.integer_type { min: N
+      max: 100 }` reads an atom instance no author named, which carries no `@meta.application`. Its
+      `TsonSchema.EntryFacts.closes` does record the application, so `EntryDisplayName` shows a synthetic with
+      none by `closes().getFirst().text()`: `'b<10>': '5' is less than the minimum 10`, `unknown field 'nope'
+      on 'bx<int32>'`, `'set<text>' requires unique elements`, never the entry's content-derived key. One with
+      neither an application nor a sugar spelling leads with no name at all — the family's own sentence, located
+      by the diagnostic's position. An expansion that names its own application keeps an instantiation entry (an
+      `Alias` to the synthetic, recording the application), and that one is named like any other hop.
+    - **A kind's refusal lists its members the same way** (`ReferenceBody.shownMembers()`, the index's `shown`): a
+      minted member by its application, `meta.ref<net.uuid_type>`, never `reference_uuid_type_…`, and one with no spelling
+      left out.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.
@@ -115,7 +121,7 @@ shallow one, and more at greater depth.
 `schemaPosition`, accumulated as the read descends rather than claimed by whichever reader is innermost.
 
 **The pointer is the path taken, not the leaf reached.** A `y: int32` field violating its bound reports
-`/point/y` in the author's own schema, *not* `/int32` in core.tn. Naming the leaf sends a reader to a file
+`/point/y` in the author's own schema, *not* `/int32` in numeric.tn. Naming the leaf sends a reader to a file
 they did not write, at a line past the end of the four-line schema their data named, and never mentions the
 field they can edit — and it makes two identical mistakes tell different stories, since a field typed by a
 local declaration would have named that instead. This is JSON Schema 2020-12 §12.3's `keywordLocation`, which
@@ -136,7 +142,7 @@ RFC 6901 pointer into it. The constraint is not lost with the leaf: `message` st
   `schemaId`/`schemaPosition` on itself, because it declares the field the pointer now ends with — and seeds
   the pointer with its own name only if nothing has yet, which is what makes the outermost record the path's
   root. **Everything else** offers its declaration only as a seed, taken when nothing encloses it, so a
-  root-level `!int32` still locates itself in core.tn while the same atom inside `person` leaves person.tn's
+  root-level `!int32` still locates itself in numeric.tn while the same atom inside `person` leaves person.tn's
   anchor alone.
 
 The upshot is that `schemaId` and `schemaPosition` are always the *same* declaration's and can never disagree
@@ -166,10 +172,10 @@ the offending token.
   `RecordField.withType`/`withState` exist: a rebuild naming components positionally silently drops the ones
   it does not mention, and **no test comparing resolved values can catch it**, since position is excluded
   from equality on `annotations`' own footing.
-- **`RecordField.position` is `@Unbound`** — §8.1's `record_field`
+- **`RecordField.position` is `@Unbound`** — §8.1's `meta.record_field`
   declares no such field, so nothing fills it and strict binding would call it a mismatch. Deliberately not
   carried in the annotation channel, which is the opposite kind of thing: annotations are schema data, they
-  resolve one hop against the governing meta (§6, and an unresolvable name is the author's error), and they
+  resolve in the schema's namespace (§3.3.3, and an unresolvable name is the author's error), and they
   round-trip into resolver output checked against the `*-resolved.tn` fixtures.
 - **The reader takes it at the one descent that knows the field** — `ctx.schemaField(name, position)`, whose
   absent case leaves the enclosing record's position in place, which is the honest answer for a document

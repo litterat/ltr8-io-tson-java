@@ -10,11 +10,10 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Top;
 
-import java.math.BigInteger;
 import java.util.Optional;
 
 /**
@@ -29,19 +28,19 @@ import java.util.Optional;
  * both, so a decoder that decided per value would be reading speculatively.
  * <ul>
  *   <li><b>Object form</b> -- when {@code K} resolves to a type whose parsing contract reads token content: every
- *       atom family, every enum, and {@code identifier}. A JSON object, each member name a key token faced to
+ *       atom family, every enum, and {@code meta.identifier}. A JSON object, each member name a key token faced to
  *       {@code K}'s own contract ({@link #keyParser}).</li>
  *   <li><b>Pairs form</b> -- when {@code K} is anything else, the compound keys [TSON-DATA] §2.6 admits. A JSON
  *       array of two-element arrays, each key read at {@code K}'s reader ({@link #schemaKey}), and so without a
  *       discrimination class ([TSON-SCHEMA] §5.4, §8.3).</li>
  * </ul>
  *
- * <p><b>The three mean nothing at a map position</b> (§3.2): keys are data, not names, so {@code "$schema"} under
+ * <p><b>The three mean nothing at a map position</b> (§3.2): keys are data, not names, so {@code "$import"} under
  * {@code {text => text}} is an ordinary key. §8.3.1's escape is for a map standing as a choice variant, and
  * belongs to the choice reader.
  */
 record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean voidableValues, boolean ordered,
-               Optional<BigInteger> minItems, Optional<BigInteger> maxItems, AtomType<?> keyParser,
+               Optional<Long> minItems, Optional<Long> maxItems, AtomType<?> keyParser,
                JsonTypeReader<?> schemaKey, JsonTypeReader<?> schemaValue, MapDiagnostics rules,
                IdentifierProfile keyProfile) {
 
@@ -69,7 +68,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
 
     /** {@code K}'s identifier profile when it is an identifier family, else {@code null}. */
     private static IdentifierProfile keyProfile(TsonSchema schema, String keyTypeName) {
-        return ReferenceChain.terminal(schema, keyTypeName)
+        return AliasChain.terminal(schema, keyTypeName)
                 .map(terminal -> terminal.definition() instanceof IdentifierType identifier
                         ? identifier.profile() : null)
                 .orElse(null);
@@ -95,7 +94,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
      * than by being listed: neither has a content grammar for a key token to face.
      */
     private static Optional<AtomType<?>> scalarKeyParser(TsonLinkedSchema linked, String keyTypeName) {
-        ReferenceChain.Resolved terminal = ReferenceChain.terminal(linked.schema(), keyTypeName).orElseThrow(() ->
+        AliasChain.Resolved terminal = AliasChain.terminal(linked.schema(), keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
         return terminal.definition() instanceof Atom atom
                 ? AtomParsers.forType(atom, linked.enumForm(terminal.name()))

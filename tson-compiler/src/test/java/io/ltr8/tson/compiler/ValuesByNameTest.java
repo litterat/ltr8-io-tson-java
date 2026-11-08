@@ -6,10 +6,12 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.consumer.Pairing;
+import io.ltr8.tson.compiler.consumer.PinnedSetting;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.suite.SuiteBindings;
@@ -30,10 +32,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A value written by name at a slot typed {@code ref<T>} ([TSON-SCHEMA] §5.12), end to end: a meta layer declaring an
- * interface, a namespace of methods, and a namespace of HTTP bindings each naming the method it serves, a schema
- * under it declaring an interface, and a schema importing that one binding a method -- the read that keeps the name,
- * the linker that resolves it and judges its referent, and each refusal with the step it names.
+ * A value written by name at a slot typed {@code meta.ref<T>} ([TSON-SCHEMA] §5.12), end to end: a vocabulary schema
+ * declaring an interface, a namespace of methods, and a namespace of HTTP bindings each naming the method it serves, a
+ * schema importing it declaring an interface, and a schema importing that one binding a method -- the read that keeps the
+ * name, the linker that resolves it and judges its referent, and each refusal with the step it names.
  */
 class ValuesByNameTest {
 
@@ -44,23 +46,33 @@ class ValuesByNameTest {
     static {
         DOCUMENTS.put(META_SERVICE, """
                 !!id:"https://example.test/meta-service.tn"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
-                {
-                  method_name => identifier
-                  status_name => identifier
-                  method      => { request?: kind<record>  response?: type_kind  errors?: [kind<record>]
-                                   replies?: {status_name => kind<record>} }
-                  interface   => namespace & { key_type: = method_name  value_type: = method }
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
+                  method_name => meta.identifier
+                  status_name => meta.identifier
+                  method      => { request?: meta.ref<meta.record>  response?: meta.type_ref
+                                   errors?: [meta.ref<meta.record>]
+                                   replies?: {status_name => meta.ref<meta.record>} }
+                  interface   => !meta.namespace { key_type: method_name  value_type: method }
                   http_verb   => !enum [GET POST]
-                  binding     => { method: ref<method>  verb: http_verb  route: text }
-                  bindings    => namespace & { key_type: = identifier  value_type: = binding }
-                  filed_in_references => { request: kind<record>  method?: ref<method> }
-                  filed_nowhere       => { request: kind<record> }
-                  refs        => namespace & { key_type: = identifier  value_type: = filed_in_references }
-                  nowheres    => namespace & { key_type: = identifier  value_type: = filed_nowhere }
+                  binding     => { method: meta.ref<method>  verb: http_verb  route: text }
+                  bindings    => !meta.namespace { key_type: meta.identifier  value_type: binding }
+                  filed_in_references => { request: meta.ref<meta.record>  method?: meta.ref<method> }
+                  filed_nowhere       => { request: meta.ref<meta.record> }
+                  refs        => !meta.namespace { key_type: meta.identifier  value_type: filed_in_references }
+                  nowheres    => !meta.namespace { key_type: meta.identifier  value_type: filed_nowhere }
                   pairing     => { primary: method }
-                  pairings    => namespace & { key_type: = identifier  value_type: = pairing }
+                  pairings    => !meta.namespace { key_type: meta.identifier  value_type: pairing }
+                  setting     => { kind: meta.type_ref  value?: kind! }
+                  settings    => !meta.namespace { key_type: meta.identifier  value_type: setting }
+                  pinned_setting    => { kind?: meta.type_ref = meta.identifier  value?: kind! }
+                  pinned_settings   => !meta.namespace { key_type: meta.identifier  value_type: pinned_setting }
+                  defaulted_setting => { kind?: meta.type_ref ~ meta.identifier  value?: kind! }
+                  defaulted_settings => !meta.namespace { key_type: meta.identifier  value_type: defaulted_setting }
+                  holder      => { inner?: setting }
+                  holders     => !meta.namespace { key_type: meta.identifier  value_type: holder }
+                  label       => { text: meta.ref<meta.identifier> }
+                  labels      => !meta.namespace { key_type: meta.identifier  value_type: label }
                 }
                 """);
         DOCUMENTS.put("https://example.test/orders.tn", orders("https://example.test/orders.tn", ""));
@@ -69,9 +81,9 @@ class ValuesByNameTest {
     private static String orders(String id, String more) {
         return """
                 !!id:"%s"
-                !!meta:"https://example.test/meta-service.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://example.test/meta-service.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   order               => { sku: text  quantity: int32 }
                   place_order_request => { order: order }
                   orders => !interface {
@@ -95,8 +107,8 @@ class ValuesByNameTest {
     private static final DataNameBinder HOSTS = new DataNameBinder.DefaultDataNameBinder(
             Set.of("io.ltr8.tson.suite.data", "io.ltr8.tson.compiler.consumer"), Map.of());
 
-    private static TsonCompiledMetaRegistry registry() {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.contextExtendedWith(HOSTS), SOURCE);
+    private static TsonCompiledVocabularyRegistry registry() {
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.contextExtendedWith(HOSTS), SOURCE);
     }
 
     /** A schema under the meta above, importing orders.tn and core.tn, declaring {@code declarations}. */
@@ -104,10 +116,10 @@ class ValuesByNameTest {
         String id = "https://example.test/api-" + label + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://example.test/meta-service.tn"
+                !!import:"https://example.test/meta-service.tn"
                 !!import:"https://example.test/orders.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   %s
                 }
                 """.formatted(id, declarations));
@@ -137,7 +149,7 @@ class ValuesByNameTest {
     @Test
     void anInterfaceHoldsItsRequestByName() {
         TsonLinkedSchema linked = registry().resolveLinked("https://example.test/orders.tn");
-        Namespace<?> orders = assertInstanceOf(Namespace.class, linked.schema().entries().get("orders"));
+        Namespace<?> orders = assertInstanceOf(Namespace.class, valueOf(linked.schema().entries().get("orders")));
         assertEquals(new Method(TypeRef.of("place_order_request"), TypeRef.of("order"), null, null),
                 orders.get("place_order"));
     }
@@ -148,8 +160,8 @@ class ValuesByNameTest {
         String id = api("binds", """
                 routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }""");
         assertEquals(List.of(), problems(id));
-        Binding binding = assertInstanceOf(Binding.class, ((Namespace<?>) registry().resolveLinked(id).schema().entries()
-                .get("routes")).get("post_orders"));
+        Binding binding = assertInstanceOf(Binding.class,
+                ((Namespace<?>) valueOf(registry().resolveLinked(id).schema().entries().get("routes"))).get("post_orders"));
         assertEquals("orders.place_order", binding.method().name());
         assertEquals("POST", binding.verb());
         assertEquals("/orders", binding.route());
@@ -185,7 +197,7 @@ class ValuesByNameTest {
                 api => !interface { m => { errors: [not_found place_order_request] } }""")));
         refused(api("errors-refused", """
                 api => !interface { m => { errors: [order uuid] } }"""),
-                "/m/errors/1", "'uuid' is an entry whose body is built by 'uuid_type'", "no 'record'");
+                "/m/errors/1", "'uuid' is an entry whose body is built by 'net.uuid_type'", "no 'meta.record'");
     }
 
     // ── Refusals, each naming its step ──────────────────────────────────────────────────────────────
@@ -195,15 +207,18 @@ class ValuesByNameTest {
         refused(api("uuid", """
                 user_id => uuid
                 api => !interface { m => { request: user_id } }"""),
-                "/m/request", "'user_id' (an alias of 'uuid')", "built by 'uuid_type'", "no 'record'");
+                "/m/request", "'user_id' (an alias of 'uuid')", "built by 'net.uuid_type'", "no 'meta.record'");
     }
 
-    /** A kind-typed slot holds a type's name, one segment: a qualified name there fails the kind's own grammar. */
+    /**
+     * A kind-typed slot holds a type's name: a qualified name there parses, and reaches into a value, which is no
+     * type.
+     */
     @Test
     void aMethodIsNoRecord() {
         refused(api("method-as-record", """
                 api => !interface { m => { request: orders.place_order } }"""),
-                "'orders.place_order'", "cannot appear in an identifier");
+                "'orders.place_order'", "a value and not a type");
     }
 
     @Test
@@ -240,8 +255,8 @@ class ValuesByNameTest {
                 routes => !bindings { b => { method: p.x.primary  verb: POST  route: "/" } }""");
         assertEquals(List.of(), problems(id));
         Map<String, Top> entries = registry().resolveLinked(id).schema().entries().entries();
-        Binding b = assertInstanceOf(Binding.class, ((Namespace<?>) entries.get("routes")).get("b"));
-        Pairing x = assertInstanceOf(Pairing.class, ((Namespace<?>) entries.get("p")).get("x"));
+        Binding b = assertInstanceOf(Binding.class, ((Namespace<?>) valueOf(entries.get("routes"))).get("b"));
+        Pairing x = assertInstanceOf(Pairing.class, ((Namespace<?>) valueOf(entries.get("p"))).get("x"));
         assertTrue(b.method().isResolved(), "delivered at link");
         assertSame(x.primary(), b.method().get());
     }
@@ -257,7 +272,7 @@ class ValuesByNameTest {
     void aRecordIsNoMethod() {
         refused(api("record-as-method", """
                 routes => !bindings { b => { method: place_order_request  verb: POST  route: "/" } }"""),
-                "wants a 'method'", "built by 'record'", "no 'method'");
+                "wants a 'method'", "built by 'meta.record'", "no 'method'");
     }
 
     @Test
@@ -274,7 +289,7 @@ class ValuesByNameTest {
                 api => !interface { m => { replies: { ok => order  missing => not_found } } }""")));
         refused(api("replies-refused", """
                 api => !interface { m => { replies: { ok => uuid } } }"""),
-                "/m/replies/ok", "built by 'uuid_type'");
+                "/m/replies/ok", "built by 'net.uuid_type'");
     }
 
     @Test
@@ -299,7 +314,7 @@ class ValuesByNameTest {
         List<Diagnostic> problems = problems(api("data-as-type", """
                 api => !interface { m => { response: orders } }"""));
         assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("'orders' is a value of the namespace type 'interface'"),
+        assertTrue(problems.getFirst().message().contains("'orders' is a value of the type 'interface'"),
                 problems.getFirst().message());
     }
 
@@ -336,16 +351,15 @@ class ValuesByNameTest {
         String id = "https://example.test/meta-" + constructor.replace('_', '-') + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!meta:"https://tson.io/2026/38/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/38/m/meta.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !schema {
                   %s => { a: %s }
                 }
                 """.formatted(id, constructor, fieldType));
-        DataBindContext context = SchemaMetaNameBinder.contextExtendedWith(new DataNameBinder.DefaultDataNameBinder(
+        DataBindContext context = SchemaModelNameBinder.contextExtendedWith(new DataNameBinder.DefaultDataNameBinder(
                 Set.of("io.ltr8.tson.compiler.consumer"), Map.of()));
         BindMismatchException thrown = assertThrows(BindMismatchException.class,
-                () -> TsonCompiledMetaRegistry.withStandardLibrary(context, SOURCE).loadMeta(id));
+                () -> TsonCompiledVocabularyRegistry.withStandardLibrary(context, SOURCE).loadVocabulary(id));
         assertTrue(thrown.getMessage().contains(expected), thrown.getMessage());
     }
 
@@ -358,7 +372,7 @@ class ValuesByNameTest {
      */
     @Test
     void resolvedOutputWritesTheNameAsWrittenAndReadsItBack() {
-        TsonCompiledMetaRegistry registry = registry();
+        TsonCompiledVocabularyRegistry registry = registry();
         String id = api("written", """
                 routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }""");
         Object body = registry.resolveLinked(id).schema().entries().get("routes");
@@ -366,9 +380,9 @@ class ValuesByNameTest {
         String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body);
         assertTrue(written.replaceAll("\\s+", " ").contains("method: orders.place_order"), written);
 
-        Object read = registry.loadMeta(META_SERVICE).compiledSchema().find("top").orElseThrow()
-                .read(TestDocuments.document(written));
-        assertEquals(body, read);
+        Map<?, ?> read = (Map<?, ?>) registry.loadVocabulary(META_SERVICE).compiledSchema().find("meta.schema").orElseThrow()
+                .read(TestDocuments.document("!schema { routes => " + written + " }"));
+        assertEquals(((ValueEntry) body).value(), read.get("routes"));
     }
 
     // ── The class declares nothing; the slot judges ─────────────────────────────────────────────────
@@ -380,10 +394,10 @@ class ValuesByNameTest {
     @Test
     void aReferenceByNameFiledInReferencesIsStillJudgedBySlot() {
         refused(api("filed-text", """
-                a => !refs { x => { request: text } }"""), "'a' at /x/request", "built by 'text_type'");
+                a => !refs { x => { request: text } }"""), "'a' at /x/request", "built by 'unicode.text_type'");
         refused(api("filed-alias", """
                 user_id => uuid
-                a => !refs { x => { request: user_id } }"""), "'a' at /x/request", "built by 'uuid_type'");
+                a => !refs { x => { request: user_id } }"""), "'a' at /x/request", "built by 'net.uuid_type'");
         assertEquals(List.of(), problems(api("filed-right", """
                 a => !refs { x => { request: order  method: orders.place_order } }""")));
     }
@@ -398,7 +412,7 @@ class ValuesByNameTest {
                 routes => !bindings { b => { method: orders.place_order  verb: POST  route: "/orders" } }""");
 
         Binding b = assertInstanceOf(Binding.class,
-                ((Namespace<?>) registry().resolveLinked(id).schema().entries().get("routes")).get("b"));
+                ((Namespace<?>) valueOf(registry().resolveLinked(id).schema().entries().get("routes"))).get("b"));
 
         assertEquals("orders.place_order", b.method().name());
         assertTrue(b.method().isResolved(), "delivered at link");
@@ -409,11 +423,183 @@ class ValuesByNameTest {
     @Test
     void aReferenceByNameDeclaredNowhereIsStillJudgedBySlot() {
         refused(api("nowhere-text", """
-                a => !nowheres { x => { request: text } }"""), "'a' at /x/request", "built by 'text_type'");
+                a => !nowheres { x => { request: text } }"""), "'a' at /x/request", "built by 'unicode.text_type'");
         refused(api("nowhere-alias", """
                 user_id => uuid
-                a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'uuid_type'");
+                a => !nowheres { x => { request: user_id } }"""), "'a' at /x/request", "built by 'net.uuid_type'");
         assertEquals(List.of(), problems(api("nowhere-right", """
                 a => !nowheres { x => { request: order } }""")));
+    }
+
+    // ── Through a dependent field ───────────────────────────────────────────────────────────────────
+
+    /**
+     * A segment selecting a dependent field reaches a value of the type its sibling names in the same value: {@code
+     * d.s.value} is a {@code meta.identifier} where {@code kind} names one, and an {@code int32} where it names that.
+     */
+    @Test
+    void aNameThroughADependentFieldHasTheTypeItsSiblingNames() {
+        assertEquals(List.of(), problems(api("dependent", """
+                d => !settings { s => { kind: meta.identifier  value: hello } }
+                l => !labels { x => { text: d.s.value } }""")));
+        refused(api("dependent-typed", """
+                d => !settings { s => { kind: int32  value: 12 } }
+                l => !labels { x => { text: d.s.value } }"""),
+                "'l' at /x/text wants a 'meta.identifier'", "'d.s.value' is an 'int32'");
+    }
+
+    /** A pinned sibling types its field by the pin, which the walk takes from the schema, not from the host. */
+    @Test
+    void aPinnedSiblingTypesTheFieldThoughTheHostHoldsNoComponentForIt() {
+        String id = api("dependent-pinned", """
+                p => !pinned_settings { x => { value: hello } }
+                l => !labels { x => { text: p.x.value } }""");
+        assertEquals(List.of(), problems(id));
+        assertInstanceOf(PinnedSetting.class,
+                ((Namespace<?>) valueOf(registry().resolveLinked(id).schema().entries().get("p"))).get("x"));
+    }
+
+    @Test
+    void aDefaultedSiblingTypesTheFieldWhereTheValueOmitsIt() {
+        assertEquals(List.of(), problems(api("dependent-defaulted", """
+                p => !defaulted_settings { x => { value: hello } }
+                l => !labels { x => { text: p.x.value } }""")));
+    }
+
+    /** The read path's rule: a template is no type a value can be read against, so the walk has none to go on with. */
+    @Test
+    void aSiblingNamingNoTypeIsRefusedAtTheName() {
+        List<Diagnostic> problems = problems(api("dependent-template", """
+                box => <T> { v: T }
+                d => !settings { s => { kind: box  value: 12 } }
+                l => !labels { x => { text: d.s.value } }"""));
+        assertTrue(problems.stream().anyMatch(p -> p.code() == Diagnostic.Code.SCHEMA_ERROR
+                && p.message().contains("'l' at /x/text names 'd.s.value', and 'd.s.value' is a dependent field, "
+                        + "typed by its sibling 'kind', which holds 'box', a template")), problems.toString());
+    }
+
+    /** Past a dependent field a segment selects a field of the type its sibling names, and no other. */
+    @Test
+    void aSegmentPastADependentFieldIsAFieldOfTheTypeItsSiblingNames() {
+        refused(api("dependent-no-field", """
+                d => !settings { s => { kind: pairing } }
+                routes => !bindings { b => { method: d.s.value.nope  verb: POST  route: "/" } }"""),
+                "'d.s.value' is a 'pairing', which has no field 'nope' -- it declares primary");
+    }
+
+    /**
+     * A dependent field the value does not hold is typed by its sibling all the same, and the name is judged by type
+     * before it is refused as reaching no value; past a field the value does not hold, a free sibling has no value to
+     * be read from, and the name is refused as reaching none.
+     */
+    @Test
+    void aNameThroughAnAbsentValueIsRefusedAsReachingNone() {
+        refused(api("dependent-absent", """
+                d => !settings { s => { kind: pairing } }
+                routes => !bindings { b => { method: d.s.value.primary  verb: POST  route: "/" } }"""),
+                "'d.s' is a 'setting' whose field 'value' is not present in the value, so the name reaches no value");
+        refused(api("dependent-unreached", """
+                h => !holders { x => { } }
+                l => !labels { x => { text: h.x.inner.value } }"""),
+                "'h.x' is a 'holder' whose field 'inner' is not present in the value, so the name reaches no value");
+    }
+
+    // ── A dependent field's value held as written, judged when the schema links ────────────────────────────────────
+
+    /** A token is judged against the type its sibling names, in the schema's own namespace. */
+    @Test
+    void aHeldTokenIsJudgedAgainstTheTypeItsSiblingNames() {
+        assertEquals(List.of(), problems(api("held-token", """
+                d => !settings { s => { kind: int32  value: 12 } }""")));
+        refused(api("held-token-refused", """
+                d => !settings { s => { kind: int32  value: abc } }"""),
+                "'d' at /s/value is the dependent field 'value', typed by its sibling 'kind'",
+                "read against 'int32'");
+    }
+
+    /** A record, a type of the schema being read, is read by that type's reader: the imported vocabulary holds none. */
+    @Test
+    void aHeldRecordIsReadAgainstALocalType() {
+        assertEquals(List.of(), problems(api("held-record", """
+                server => { port: int32  host?: text }
+                d => !settings { s => { kind: server  value: { port: 8080  host: example } } }""")));
+        refused(api("held-record-type", """
+                server => { port: int32 }
+                d => !settings { s => { kind: server  value: { port: abc } } }"""),
+                "'d' at /s/value is the dependent field 'value'", "read against 'server'", "at /port");
+        refused(api("held-record-field", """
+                server => { port: int32 }
+                d => !settings { s => { kind: server  value: { port: 1  nope: 2 } } }"""),
+                "read against 'server'", "nope");
+    }
+
+    /** A list is held and judged as a record is. */
+    @Test
+    void aHeldListIsReadAgainstTheTypeItsSiblingNames() {
+        assertEquals(List.of(), problems(api("held-list", """
+                ports => [int32]
+                d => !settings { s => { kind: ports  value: [1 2 3] } }""")));
+        refused(api("held-list-refused", """
+                ports => [int32]
+                d => !settings { s => { kind: ports  value: [1 two 3] } }"""),
+                "read against 'ports'", "at /1");
+    }
+
+    /** A pinned sibling's pin, and a defaulted one's default, type the value the instance does not type. */
+    @Test
+    void aPinnedOrDefaultedSiblingTypesTheHeldValue() {
+        refused(api("held-pinned", """
+                p => !pinned_settings { x => { value: "not a name" } }"""),
+                "'p' at /x/value is the dependent field 'value', typed by its sibling 'kind'",
+                "read against 'meta.identifier'");
+        refused(api("held-defaulted", """
+                p => !defaulted_settings { x => { value: "not a name" } }"""),
+                "read against 'meta.identifier'");
+        assertEquals(List.of(), problems(api("held-defaulted-written", """
+                p => !defaulted_settings { x => { kind: int32  value: 12 } }""")));
+    }
+
+    /** A sibling refused at its own slot is refused once: the value it types is not judged on top of it. */
+    @Test
+    void aHeldValueWhoseSiblingIsRefusedIsNotJudged() {
+        refused(api("held-template", """
+                box => <T> { v: T }
+                d => !settings { s => { kind: box  value: { v: 1 } } }"""),
+                "'d' at /s/kind names 'box', and 'box' is an open entry");
+    }
+
+    /** A value by name goes on through a dependent field into the record it holds. */
+    @Test
+    void aNameGoesOnIntoAHeldRecordValue() {
+        assertEquals(List.of(), problems(api("held-walk", """
+                named => { name: meta.identifier }
+                d => !settings { s => { kind: named  value: { name: hello } } }
+                l => !labels { x => { text: d.s.value.name } }""")));
+        refused(api("held-walk-absent", """
+                named => { name?: meta.identifier }
+                d => !settings { s => { kind: named  value: { } } }
+                l => !labels { x => { text: d.s.value.name } }"""),
+                "'d.s.value' is a 'named' whose field 'name' is not present in the value");
+    }
+
+    /** A name a held value holds by name is judged as any value body's, at its slot from the entry's root. */
+    @Test
+    void aNameInsideAHeldValueIsJudged() {
+        refused(api("held-inner-name-refused", """
+                d => !settings { s => { kind: label  value: { text: nobody.here } } }"""),
+                "'d' at /s/value/text");
+    }
+
+    /** A value entry's payload is judged; a field's default or pin keeps its own token-level check. */
+    @Test
+    void aDefaultKeepsItsOwnCheck() {
+        refused(api("held-default-unchanged", """
+                rec => { n?: int32 ~ abc }"""),
+                "'rec': field 'n' is declared 'int32', but its default abc is not a value of that type");
+    }
+
+    /** A value entry's value. */
+    private static Object valueOf(Object entry) {
+        return ((ValueEntry) entry).value();
     }
 }

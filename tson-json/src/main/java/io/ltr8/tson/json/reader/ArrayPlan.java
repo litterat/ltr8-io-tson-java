@@ -5,10 +5,9 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
-import io.ltr8.tson.schema.meta.IdentifierType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
 
-import java.math.BigInteger;
 import java.util.Optional;
 
 /**
@@ -27,7 +26,7 @@ import java.util.Optional;
  * ({@link #elementsAreNames}), no two may read alike ([TSON-SCHEMA] §11.4), as an identifier-keyed map's keys.
  */
 record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean voidableElements, boolean unique,
-                 Optional<BigInteger> minItems, Optional<BigInteger> maxItems, JsonTypeReader<?> schemaElement,
+                 Optional<Long> minItems, Optional<Long> maxItems, JsonTypeReader<?> schemaElement,
                  ArrayDiagnostics rules, boolean elementsAreNames) {
 
     static ArrayPlan of(String name, Top definition, ValueReaderContext context) {
@@ -36,7 +35,7 @@ record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean 
         return new ArrayPlan(displayName, context.locationOf(name),
                 body.voidable(), body.uniqueItems(), body.minItems(), body.maxItems(),
                 context.readers().resolve(body.elementType().name()), new ArrayDiagnostics(displayName),
-                body.uniqueItems() && ReferenceChain.terminal(context.schema(), body.elementType().name())
+                body.uniqueItems() && AliasChain.terminal(context.schema(), body.elementType().name())
                         .map(terminal -> terminal.definition() instanceof IdentifierType)
                         .orElse(false));
     }

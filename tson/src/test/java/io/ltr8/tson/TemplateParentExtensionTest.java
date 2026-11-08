@@ -24,15 +24,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * text, which is what {@code AbstractTemplateFamilyTest} pins; the two never collide.
  *
  * <p><b>Absent means "no type".</b> Only a record body has fields for a parent to carry, an {@code extension}
- * field to state and members something can select, so a container, a constructor application and a reference
+ * field to state and members something can select, so a container, a constructor application and an alias
  * template carry nothing -- and absence is the fact that a type position naming them stays an error.
  */
 class TemplateParentExtensionTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static Optional<RecordExtensionType> parentOf(String id, String declarations, String entry) {
@@ -94,12 +95,12 @@ class TemplateParentExtensionTest {
     @Test
     void aConstructorApplicationTemplateHasNoParent() {
         assertEquals(Optional.empty(), parentOf("p5",
-                "  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }\n", "vector"));
+                "  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }\n", "vector"));
     }
 
     /** §5.10's partial application: a reference is indirection, so it has nothing to be abstract over. */
     @Test
-    void aReferenceTemplateHasNoParent() {
+    void anAliasTemplateHasNoParent() {
         assertEquals(Optional.empty(), parentOf("p6",
                 "  pair => <A, B> { first: A  second: B }\n  uuid_pair => <B> pair<uuid, B>\n", "uuid_pair"));
     }
@@ -122,8 +123,8 @@ class TemplateParentExtensionTest {
     @Test
     void aDiscriminatorTypedByAnApplicationOfAParameterIsRefused() {
         String refusal = refusal("p8", """
-                  bounded => <M> !integer_type { max: M }
-                  pet     => <M, N> { kind: bounded<M> = N  name: text }
+                  capped => <M> !numeric.integer_type { max: M }
+                  pet     => <M, N> { kind: capped<M> = N  name: text }
                   cat     => pet<9, 3>
                 """);
 

@@ -81,7 +81,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         }
         for (TypeRef variant : body.variants()) {
             JsonTypeReader<?> reader = context.readers().resolve(variant.name());
-            ReferenceChain.terminal(context.schema(), variant.name())
+            AliasChain.terminal(context.schema(), variant.name())
                     .ifPresent(resolved -> context.admitting(TypeChain.subtypesOf(resolved.definition()))
                             .forEach(subtype -> table.putIfAbsent(subtype, routeBelow(reader, subtype))));
         }
@@ -158,7 +158,6 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * whether or not §8.2's condition holds, and a redundant tag is never wrong.
      */
     private Object tagged(JsonReadContext ctx, TagMembers.Lead tag) {
-        // §8.5 admits `$schema` at a scoped position -- the open sum -- and a choice is the closed one.
         if (Tags.refusesScope(ctx, tag, name, Tags.CHOICE)) {
             return null;
         }

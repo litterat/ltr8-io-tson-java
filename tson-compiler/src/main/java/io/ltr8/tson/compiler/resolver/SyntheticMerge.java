@@ -4,6 +4,8 @@ import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
+import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -102,18 +104,23 @@ final class SyntheticMerge {
         applications.replaceAll((name, application) -> renamed(application, renames));
     }
 
+    /** {@code ref} with every name {@code renames} merged rewritten, its arguments' included. */
+    static TypeRef renamedReference(TypeRef ref, Map<String, String> renames) {
+        return renames.isEmpty() ? ref : renamed(ref, renames);
+    }
+
     private static TypeRef renamed(TypeRef ref, Map<String, String> renames) {
         List<TypeArgument> arguments = ref.arguments().stream()
                 .map(argument -> argument instanceof TypeArgument.Ref nested
                         ? (TypeArgument) new TypeArgument.Ref(renamed(nested.ref(), renames)) : argument)
                 .toList();
-        return new TypeRef(renames.getOrDefault(ref.name(), ref.name()), arguments, ref.annotations());
+        return TypeRef.of(renames.getOrDefault(ref.name(), ref.name()), arguments, ref.annotations());
     }
 
     /** One type-ref rewritten, its own arguments included -- an application may name a merged form. */
     private static TypeRef rename(TypeRef ref, Map<String, String> renames) {
         String to = renames.get(ref.name());
-        return to == null ? ref : new TypeRef(to, ref.arguments(), ref.annotations());
+        return to == null ? ref : TypeRef.of(to, ref.arguments(), ref.annotations());
     }
 
     /**
@@ -132,18 +139,19 @@ final class SyntheticMerge {
     }
 
     /**
-     * Whether any slot of the binding record holds an application -- {@code type_ref}'s record form, the one
-     * shape {@code SchemaDesugarer} writes for an application standing in a slot. Nested records, arrays and
-     * maps recurse, so {@code [[box<text>]]} and {@code (box<text> | int32)} are found alike.
+     * Whether any slot of the binding record holds an application -- a reference with arguments, the reference value
+     * {@code SchemaDesugarer} writes for an application standing in a slot ({@link WireForm#applicationIn}). Nested
+     * records, arrays and maps recurse, so {@code [[box<text>]]} and {@code (box<text> | int32)} are found alike.
      */
     private static boolean holdsApplication(CoreValue value) {
         return switch (value) {
-            case RecordValue record -> WireForm.isApplication(record)
-                    || record.fields().stream().anyMatch(f -> holdsApplication(f.value().value().coreValue()));
+            case ReferenceValue(TypeRef ignored) -> true;
+            case RecordValue record ->
+                    record.fields().stream().anyMatch(f -> holdsApplication(f.value().coreValue()));
             case ArrayValue array ->
-                    array.elements().stream().anyMatch(e -> holdsApplication(e.value().coreValue()));
+                    array.elements().stream().anyMatch(e -> holdsApplication(e.coreValue()));
             case MapValue map -> map.entries().stream().anyMatch(e -> holdsApplication(e.key().coreValue())
-                    || holdsApplication(e.value().value().coreValue()));
+                    || holdsApplication(e.value().coreValue()));
             default -> false;
         };
     }

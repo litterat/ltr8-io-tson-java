@@ -1,8 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -43,9 +42,9 @@ class ReadPathConcurrencyTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/concurrent.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            { person => { name: text  age: int32 } }
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema { person => { name: text  age: int32 } }
             """;
 
     public record Person(String name, long age) {
@@ -88,8 +87,8 @@ class ReadPathConcurrencyTest {
                 }
                 throw new IllegalStateException("unexpected fetch: " + uri);
             };
-            TsonCompiledMetaRegistry core =
-                    TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+            TsonCompiledVocabularyRegistry core =
+                    TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
             TsonCompiledSchemaRegistry registry = TsonCompiledSchemaRegistry.tree(core);
 
             List<TsonCompiledSchema> compiled = inParallel(() -> registry.get(ID));

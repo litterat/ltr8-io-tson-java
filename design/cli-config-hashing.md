@@ -10,14 +10,15 @@ command-line application, and the default bind contexts. Current form only; hist
 - The content hash covers every byte past the `!!id` line's terminator; a leading BOM is stripped, never hashed.
 - Editing a bundled schema moves the whole pinned chain bottom-up; `scripts/restamp-bundled-schemas.sh` does it and
   `--check` reports staleness and writes nothing.
-- Files are classified as schema or data by header (`!!meta`) and matched by embedded `!!id`, never filename; `-` is
-  stdin, at most once, always data. `.json` is the one extension read.
+- Files are classified as schema or data by the root's tag (`!schema`) and matched by embedded `!!id`, never
+  filename; `-` is stdin, at most once, always data. `.json` is the one extension read.
 - `validate` emits one `ValidationRun` envelope per invocation; run-level `errors` are exit 2, a document's own are
   in its `FileReport`.
 - `TsonCli.exitCodeFor` reads diagnostic codes and nothing else, ranking `70 > 78 > 69 > 1 > 75`; 1 is a rejection,
   2 a usage error or a schema file that does not load, and the rest the run declining to give a verdict.
 - A policy flag never means nothing: `--token-scripts` alone raises the token level to `SINGLE_SCRIPT`, a relaxation
-  against a stated level that scans nothing is a usage error, and `--max-depth` below 1 is refused rather than clamped.
+  against a stated level that scans nothing is a usage error, and `--max-depth` or `--max-wait-depth` below 1 is
+  refused rather than clamped.
 - The two default bind contexts share one atom list (`AtomContext.hostTypes()`); the resolver's adds a name binder and
   the schema model's own three atom registrations, and nothing else.
 
@@ -27,13 +28,15 @@ Related: `design/diagnostic-model.md` (the `Diagnostic` model and the codes the 
 
 ## Bundled schema documents (`tson-schema/TsonBundledSchemas.java`)
 
-The published identities of the five bundled schemas (`META_KERNEL_ID`/`META_ID`/`CORE_ID`/`NET_ID`/`POLICY_ID`),
-their raw text (`fetch(uri)`, off `tson-schema`'s classpath) and one held digest each (`*_SHA256`), checked against
-the packaged resource on every load. The `.tn` resources are copied from `spec/m/` by `processResources`, so there
-is one copy on disk. `fetch` is a static method rather than a `SchemaSource` instance; a caller needing a source
-passes `TsonBundledSchemas::fetch`.
+The published identities of the six bundled schemas (`META_ID`, the kernel; `NUMERIC_ID`, `TEMPORAL_ID` and `NET_ID`, the
+data-format libraries, `LIBRARY_IDS`; `CORE_ID`; `POLICY_ID`; all six in dependency order as `IDS`), their raw text
+(`fetch(uri)`, off `tson-schema`'s classpath) and one held digest each (`*_SHA256`), checked against the packaged resource on
+every load. The `.tn` resources are copied from `spec/m/` by `processResources`, so there is one copy on disk. `fetch` is a
+static method rather than a `SchemaSource` instance; a caller needing a source passes `TsonBundledSchemas::fetch`.
+`isKernel(identity)` is true for meta.tn alone, the one kernel document, whose entries are judged the kernel's own by origin
+and which is pre-loaded by special resolution (`design/resolver-vocabulary-and-bootstrap.md`).
 
-The digests are over the `spec/m/` bytes, which are the live artifacts. At Revision 38 they equal the pins the
+The digests are over the `spec/m/` bytes, which are the live artifacts. On `main` they equal the pins the
 published artifacts and Part 2 §13.2 carry; on a proposal branch they are this repo's own until the revision lands.
 
 ## Content hashing (`TsonContentHash`) and the commands on it
@@ -47,37 +50,34 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
 
 - **The pin is not identity.** A pinned `!!id` resolves against a plain or differently-pinned reference because
   everything keys by canonical identity (scheme and query stripped).
-- **Verification is wired through the loader**: the top `!!schema` and each transitive `!!import`/`!!meta` carrying a
-  pin is checked before use, and a schema registered from text is hashed by the call that registers it.
-  `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — meta pins
-  meta-kernel (its `!!meta` and `!!import`), core, net and policy pin meta, and policy pins core — so bootstrap
-  verifies all of it. The one reference that can never carry a pin is meta-kernel's self-`!!meta`, whose hash input
-  would have to contain the pin: its `!!id` is pinned, its `!!meta` stays plain, and canonical comparison makes them
-  one identity.
+- **Verification is wired through the loader**: a data document's `!!import`s and each transitive `!!import` carrying
+  a pin are checked before use, and a schema registered from text is hashed by the call that registers it.
+  `design/compiled-registries.md` has the per-identity rule. The bundled chain is pinned end to end — numeric,
+  temporal, net and policy each import the kernel, and core imports the three libraries, each by a pinned reference —
+  so bootstrap verifies all of it. The kernel, meta.tn, imports nothing; its own `!!id` carries its pin.
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place, replacing any prior query. It is
   idempotent: the hashed bytes never change, so the pin stays valid.
-- **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read,
-  never to load. The `!!id`, header pins and `@doc`/`@title`/`@examples`/`@comment` go; a header reference to
-  meta-kernel, meta or core shortens to `"38/core"`; each directive and declaration gets one line. `--keep-docs`
-  (`stripKeepingDocs`) keeps the three written for the schema's readers and drops `@comment`, written for its
-  maintainers. It never re-pins and never rewrites the file: the output claims no identity, because its bytes are
-  not the published document's. **Whitespace collapses to one space and is never removed**, so tokens that touched
-  still touch and adjacency (§7.2) reads the same. The output is re-lexed against the intended tokens and
-  re-parsed, either failure being a fault here. Every other annotation stays, since several are checked.
-- **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole chain, which no single-file
-  command can do: an edit to meta.tn moves meta's `!!id`, every `!!meta` pinning it, each of those documents' own
-  `!!id`, the `TsonBundledSchemas` constants, and the getting-started example's pins in `README.md` and
-  `InitCommand.java` — the example pins meta and core, so its own digest moves with theirs. It hashes with
-  `tail -n +2 | shasum -a 256` rather than calling `tson hash`, so it runs when the tree does not compile. Only a
-  reference already carrying `?sha256=` is re-stamped: pinning is optional, and an unpinned mention is not a stale
-  pin. When to run it and what it does not cover are in `design/process.md`.
+- **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read, never to
+  load. The `!!id`, header pins and `@doc` go; a header reference to meta, numeric, temporal, net or core shortens to its
+  revision and name, `"39/numeric"`; each directive and declaration gets one line. `--keep-docs` (`stripKeepingDocs`) keeps
+  `@doc`, for a model that should read the documentation. It never re-pins and never rewrites the file: the output claims no
+  identity, because its bytes are not the published document's. **Whitespace collapses to one space and is never removed**,
+  so tokens that touched still touch and adjacency (§7.2) reads the same. The output is re-lexed against the intended tokens
+  and re-parsed, either failure being a fault here. Every other annotation stays, since several are checked.
+- **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole chain, which no single-file command can do:
+  an edit to meta.tn moves its `!!id`, each library's and policy.tn's `!!import` pinning it, their own `!!id`s, and so
+  every pin up the chain to core.tn, the `TsonBundledSchemas` constants, and the getting-started example's pins in
+  `README.md` and `InitCommand.java` — the example pins core, so its own digest moves with core's. It hashes with
+  `tail -n +2 | shasum -a 256` rather than calling `tson hash`, so it runs when the tree does not compile. Only a reference
+  already carrying `?sha256=` is re-stamped: pinning is optional, and an unpinned mention is not a stale pin. When to run it
+  and what it does not cover are in `design/process.md`.
 
 ## `tson validate`
 
 `tson validate [--output text|json|tson] <file|->...` takes a **flat list of files** and classifies each as schema
-or data (`TsonDocumentPeek.of(…).isSchemaDocument()`: a header carrying `!!meta`). The schema files become the run's
-`SchemaSource`; each data document goes to `Tson.validate`, its `!!schema` selecting the schema and its root type-ref
-the type, no `!!schema` meaning schemaless. A TSON data document is self-describing, so it takes no `--type`;
+or data (`TsonDocumentPeek.of(…).isSchemaDocument()`: a root tagged `!schema`). The schema files become the run's
+`SchemaSource`; each data document goes to `Tson.validate`, its `!!import`s selecting the schemas and its root
+type-ref the type, no `!!import` meaning schemaless. A TSON data document is self-describing, so it takes no `--type`;
 `--schema`/`--type` exist for JSON inputs alone ("JSON inputs" below). One `Tson` judges the whole run, so a schema's
 declared names and a document's names answer to one policy.
 
@@ -87,7 +87,7 @@ diagnostics — `REJECTED` would claim a check never made — while every other 
 exits 2 unless the others reach 70 or 78: the schema file is the runner's to fix before anything else means much.
 
 **The run's source is the files on the command line**, its whole configuration, and nothing is fetched beyond them.
-A `!!schema` none of them declares is `SCHEMA_NOT_PERMITTED` — a refusal, outcome `REJECTED`, exit 69 — and the source
+An `!!import` none of them declares is `SCHEMA_NOT_PERMITTED` — a refusal, outcome `REJECTED`, exit 69 — and the source
 never answers `SCHEMA_NOT_FOUND`, which is a source that looks beyond its configuration and finds nothing. The
 message lists what the supplied files *declare*: matching is by embedded `!!id`, never filename (§2.2.1), so the
 common failure is the right file with the wrong identity in it. `declaredIds` keeps the ids verbatim and in argument
@@ -111,7 +111,8 @@ library fault as a bad command line, so only this CLI's argument parsing throws 
 
 Also: `tson compile <schema>` (resolves through compile, tree mode, and renders a bare `ValidationReport`), `tson
 hash`, `tson strip`, `tson policy` (below), and `tson init-example [<dir>]` (writes a working
-`person.tn`/`person-data.tn`, refusing to overwrite). The installed command is `tson`
+`person.tn`, a schema importing core.tn with root `!schema`, and `person-data.tn`, `!!import`ing it, refusing to
+overwrite). The installed command is `tson`
 (`application.applicationName`), launched on the classpath.
 
 ## Reports
@@ -128,10 +129,10 @@ document is read — an unreadable file during classification, a schema with no 
 files, a bad `--schema`/`--type` binding — and is exit 2 with the run `UNDETERMINED`. A document that read reports in
 its own `FileReport`. A consumer tells "your invocation was wrong" from "your document was" without reading messages.
 
-**`outcome` answers "will this be accepted"** ([TSON-DATA] §8.1): `ACCEPTED`; `REJECTED` for an invalidity or a
-refusal under this processor's §8.2 policy or §9.1 limits, one rejection settling it whatever else went unjudged;
-`UNDETERMINED` where nothing rejected the document but something could not be judged. Which kind a rejection was is
-each diagnostic's code (`Code.verdict()`, `Code.isRefusal()`). It is an enum rather than a `valid` boolean so that
+**`outcome` answers "will this be accepted"** ([TSON-DATA] §8.1): `ACCEPTED`; `REJECTED` for an invalidity or a refusal
+under this processor's §8.2 policy or its §9.1 or §11.5 limits, one rejection settling it whatever else went unjudged;
+`UNDETERMINED` where nothing rejected the document but something could not be judged. Which kind a rejection was is each
+diagnostic's code (`Code.verdict()`, `Code.isRefusal()`). It is an enum rather than a `valid` boolean so that
 `if (!valid)` cannot read "undetermined" as "rejected".
 
 **`CliDiagnostic` renders an absent field as absent.** `Diagnostic` spells "nothing to say" as `""` for
@@ -145,8 +146,10 @@ document either way.
 `null`. `--output tson` binds through `CliDiagnostic`'s `@Field` names to what `diagnostics.tn` declares, and
 `--output json` writes the same keys by hand. Nothing in §8.1 fixes a CLI's wire shape, so the schema settles it.
 `diagnostics.tn` holds two hand-written enum copies, `diagnostic_code` and `outcome`, which `DiagnosticsSchemaTest`
-checks against `Diagnostic.Code` and `Outcome` in both directions; it imports the spec's `policy.tn` for `policy`,
-whose `restriction_level` `PolicySchemaTest` checks against `RestrictionLevel`.
+checks against `Diagnostic.Code` and `Outcome` in both directions; it imports the spec's `core.tn`, and its
+`policy.tn` for `policy.processor`, whose `policy.restriction_level` `PolicySchemaTest` checks against
+`RestrictionLevel`. `DiagnosticsSchema`'s binder names policy.tn's entries by their paths (`policy.limits` to
+`CliPolicy.CliLimits`).
 
 ## Exit codes
 
@@ -171,8 +174,8 @@ declaration and a mistake in another reports both. `exitCodeFor`'s Javadoc carri
 why a bind mismatch is 78 rather than 70; the note printed with 78 omits the diagnostic's own remedy
 (`ProcessorConfig.withDataBindContext`, a `DataNameBinder`), which has no command-line surface.
 
-**69 and 75 are both `SchemaFetchException`, reached two ways.** A data document's `!!schema` that no source will
-serve arrives through `SchemaFailure` as a read diagnostic; a schema document's own `!!import`/`!!meta` that will not
+**69 and 75 are both `SchemaFetchException`, reached two ways.** A data document's `!!import` that no source will
+serve arrives through `SchemaFailure` as a read diagnostic; a schema document's own `!!import` that will not
 load arrives through `Tson.validateSchema`'s catch as `TsonDiagnostics.ofSchemaUnavailable`, located at the root
 pointer. So `validate` missing a schema file and `compile` on a schema importing something unfetchable land alike.
 The code is one per `Reason`: `SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_TOO_LARGE` are 69 because no rerun
@@ -190,9 +193,11 @@ name the way to write the thing today, and a trace and a bug-report banner would
 (`CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT`), so the wire carries no second discriminator.
 
 **What §8.2 requires a refusal to name rides on the envelope**, as `policy` on both `validation_run` and
-`validation_report`: `CliPolicy`, the shape of `policy.tn`'s `policy` — `identifier_policy` (level, `per_segment`,
+`validation_report`: `CliPolicy`, the shape of `policy.tn`'s `policy.processor` — `identifier_policy` (level, `per_segment`,
 `skeleton_distinctness`, `permitting` combinations with each script by its UAX #24 alias), `token_policy` (level,
-`permitting`), `unicode_data_version`, and `limits` (§9.1, a `max_depth`). It is on the envelope rather than each
+`permitting`), `unicode_data_version`, and `limits` (all seventeen of §9.1's and §11.5's, `max_depth` and
+`max_wait_depth` among them, each a `long`, as `policy.limit` is an `int64`: a report states the limits its producer ran
+under, which this processor's own `LimitsPolicy` need not hold). It is on the envelope rather than each
 diagnostic because it is a fact about the processor: constant for the run, and needed by a sender *before* it writes
 a document, which a channel that opens only on failure cannot give. `limits` sits inside `policy` because the
 envelope's one question is "what judged this run", and a limit refusal answers it as much as a name refusal. The
@@ -214,20 +219,20 @@ positionals. §8.2 asks that a relaxation not be *silent*; the rule targets ambi
 a CI file is the opposite. A CLI with no way to configure this would tell the runner which policy refused their
 document and leave them unable to change it.
 
-**The flags:** `--max-depth` takes §9.1's nesting bound; `--identifier-policy`/`--token-policy` a UTS #39 §5.2 level,
-in the spelling a person types (`highly-restrictive`) or the one `tson policy` prints (`HIGHLY_RESTRICTIVE`);
-`--identifier-per-segment` the unit; `--identifier-allow-look-alikes` drops skeleton distinctness; and
-`--identifier-scripts`/`--token-scripts` a `Latin+Cyrillic` combination, repeatable. Allow-look-alikes is no
-relaxation of the level, so it is valid under every level. There is no `--token-per-segment`: a token policy is a
-`ScriptPolicy`, which has no unit.
+**The flags:** `--max-depth` takes §9.1's nesting bound and `--max-wait-depth` [TSON-SCHEMA] §11.5's wait depth;
+`--identifier-policy`/`--token-policy` a UTS #39 §5.2 level, in the spelling a person types (`highly-restrictive`) or
+the one `tson policy` prints (`HIGHLY_RESTRICTIVE`); `--identifier-per-segment` the unit;
+`--identifier-allow-look-alikes` drops skeleton distinctness; and `--identifier-scripts`/`--token-scripts` a
+`Latin+Cyrillic` combination, repeatable. Allow-look-alikes is no relaxation of the level, so it is valid under every
+level. There is no `--token-per-segment`: a token policy is a `ScriptPolicy`, which has no unit.
 
 **Three rules keep a flag from meaning nothing.** `--token-scripts` alone raises the token level from its
 `UNRESTRICTED` default to `SINGLE_SCRIPT`, because `permitting(…)` is consulted only by a level that scans, and Single
 Script is the level at which a list of combinations is the whole configuration. A relaxation (scripts, per-segment)
 against a *stated* level that scans nothing is a usage error: `--token-policy unrestricted --token-scripts
 Latin+Cyrillic` configures nothing, and accepting it would leave the caller believing a restriction is in force.
-And `--max-depth` below 1 is refused rather than clamped: reading under a bound the caller did not ask for is the
-one outcome that leaves them unable to explain the result.
+And `--max-depth` or `--max-wait-depth` below 1 is refused rather than clamped: reading under a bound the caller did
+not ask for is the one outcome that leaves them unable to explain the result.
 
 ## JSON inputs (`--schema`, `--type`)
 
@@ -253,11 +258,14 @@ and its failures list the `!!id`s those files declare.
 list**, distinct because a `DataNameBinder` is fixed when a `DataBindContext` is built:
 
 - `AtomContext.defaultContext()` — the built-in atoms' host types, **no name binder**. The consumer and schemaless
-  default: what `Tson.dataBindContext()` returns unless `ProcessorConfig.withDataBindContext` states one, and the base
-  a consumer layers a binder onto. `registerAtoms(AtomContext.hostTypes())` adds the same list to any builder, so it
-  lives in one place.
-- `SchemaMetaNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three
-  registrations for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose
-  `SourcePositionStringBridge` names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a
-  `DataNameBinder` scoped to `io.ltr8.tson.schema.meta`. The library's internal context for binding meta instances to
-  `schema.meta` classes, not a consumer default.
+  default: what `ProcessorConfig.dataBindContext()` holds unless `withDataBindContext` states one, and the base a
+  consumer layers a binder onto. `Tson.of` composes the schema model's binder and registrations onto whichever it is
+  (`SchemaModelNameBinder.over`), and `Tson.dataBindContext()` returns that composition.
+  `registerAtoms(AtomContext.hostTypes())` adds the same list to any builder, so it lives in one place.
+- `SchemaModelNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three registrations
+  for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose `SourcePositionStringBridge`
+  names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a `DataNameBinder` over
+  `io.ltr8.tson.schema` that answers only for every entry of meta.tn (its root names and its members of its six maps)
+  and each library's members under its map (`numeric`, `temporal`, `net`), each bound by its path, a sub-package per
+  segment before the last (`numeric.integer_type` to `numeric.IntegerType`). The context of the
+  kernel's bootstrap and of a registry built directly with no consumer classes, not a consumer default.

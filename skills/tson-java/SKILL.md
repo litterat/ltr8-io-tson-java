@@ -42,22 +42,22 @@ TypeScript port is [ltr8-io-tson-typescript](https://github.com/litterat/ltr8-io
 the shared conformance vectors both are tested against are
 [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite).
 
-**Versioning is `0.<spec revision>.<patch>`.** `0.38.x` implements **2026 Revision 38**: its bundled schemas
-carry Revision 38 identities (`https://tson.io/2026/38/m/…`). A new revision moves the minor, and the spec is a working draft
+**Versioning is `0.<spec revision>.<patch>`.** `0.39.x` implements **2026 Revision 39**: its bundled schemas
+carry Revision 39 identities (`https://tson.io/2026/39/m/…`). A new revision moves the minor, and the spec is a working draft
 with no compatibility guarantee between revisions — so a schema `!!id` pinned at
-`https://tson.io/2026/38/m/core.tn` is revision-specific and must match the library's own revision.
+`https://tson.io/2026/39/m/core.tn` is revision-specific and must match the library's own revision.
 
 > **Not on Maven Central**, deliberately — publishing needs signed artifacts and a fuller POM, which is a
 > separate decision. To use it from another project on the same machine: clone, `./gradlew
-> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.38.0-SNAPSHOT` (the front
+> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.39.0-SNAPSHOT` (the front
 > door pulls the rest in). The jars carry real `module-info.class`es, so class path or module path both
 > work.
 
 ## Workflow
 
 1. **Decide whether you need a schema at all.** Reading one document with no schema is one
-   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the five
-   bundled schemas (meta-kernel, meta, core, net, policy) and is what you need only once a *schema* is in play.
+   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps the six
+   bundled schemas (meta, numeric, temporal, net, core, policy) and is what you need only once a *schema* is in play.
 2. **Pick the reader from the matrix below** — the two questions are *what drives the interpretation*
    (the wire alone, your Java class, or a TSON schema) and *what you want out* (a `TsonValue` tree, or
    a bound Java object).
@@ -85,17 +85,18 @@ with no compatibility guarantee between revisions — so a schema `!!id` pinned 
 | a data document                    | a grammar-faithful AST                        | `new TsonDataParser(text).parseDocument()` |
 | a data document                    | to pull events lazily                         | `TsonDataStream`                          |
 
-**The two facade readers are the whole document-reading surface.** They own the `!!schema` decision,
+**The two facade readers are the whole document-reading surface.** They own the `!!import` decision,
 the target-class check, and the framing that rejects trailing content. Everything under them
 (`TsonCompiledSchemaRegistry`, `TsonTypeReader`) reads *one value at a cursor* and polices nothing
 around it.
 
 **Constructed directly** (`new TsonTreeReader()`, `new TsonObjectReader()`, and the two writers) a
-reader is schemaless, Jackson-style: it ignores any `!!schema` and binds to the wire, or your Java
+reader is schemaless, Jackson-style: it ignores any `!!import` and binds to the wire, or your Java
 class, alone — no standard-library bootstrap, no `Tson`. **Obtained from a `Tson`** it is schema-aware:
-a document that declares its own `!!schema` is resolved and validated as it is read, and one that
-declares none falls back to a schemaless read. `readWithoutSchema(…)` opts a schema-aware reader back
-out.
+a document that names its schemas with `!!import` is resolved and validated as it is read (several imports
+read as one namespace), and one that imports none falls back to a schemaless read. `readWithoutSchema(…)`
+opts a schema-aware reader back out. A *schema* document — root tagged `!schema` — is reported as unsupported
+by every read but `readAs`; `tson.validateSchema(text)` is its door.
 
 ## The front door
 
@@ -107,13 +108,12 @@ import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetchi
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
 
-Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn, core.tn, net.tn and policy.tn
+Tson tson = Tson.standard();   // bootstraps meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn, policy.tn
 
 String schema = """
-        !!id:"https://example.com/2026/38/app/order-1.tn"
-        !!meta:"https://tson.io/2026/38/m/meta.tn"
-        !!import:"https://tson.io/2026/38/m/core.tn"
-        {
+        !!id:"https://example.com/2026/39/app/order-1.tn"
+        !!import:"https://tson.io/2026/39/m/core.tn"
+        !schema {
           order => {
             order_id: int32
             customer: text
@@ -125,7 +125,7 @@ String schema = """
 tson.resolve(schema);                 // registers it under its own !!id
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/38/app/order-1.tn")
+        .withSchema("https://example.com/2026/39/app/order-1.tn")
         .readAs("""
                 { order_id: 1042  customer: "Ada Lovelace"  placed: !date 2026-07-01  total: 149.95 }""",
                 "order");
@@ -134,9 +134,9 @@ value.get("customer").asString();     // Optional[Ada Lovelace]
 value.get("order_id").asInt();        // OptionalInt[1042]
 ```
 
-`withSchema(uri)` supplies what a `!!schema` directive would have said and `readAs(source, type)` what
-a root type-ref would have. A **self-describing** document needs neither — `tson.treeReader().read(doc)`
-resolves the schema the document names and picks the type from its own root `!order`.
+`withSchema(uri)` (or `withImports(List.of(…))` for several) supplies what `!!import` directives would have
+said and `readAs(source, type)` what a root type-ref would have. A **self-describing** document needs neither —
+`tson.treeReader().read(doc)` resolves the schema the document names and picks the type from its own root `!order`.
 
 **`Tson` methods that matter:**
 
@@ -156,13 +156,15 @@ resolves the schema the document names and picks the type from its own root `!or
 throws `SchemaValidationException` ("a schema is already registered under …"). Pick one.
 
 `ProcessorConfig` (a value in `tson-base`, handed to `Tson.of`) carries: `withSchemaAccess(…)`,
-`withDataBindContext(…)`, `withMetaNameBinder(…)`, and `withProcessorPolicy(…)` (or its
+`withDataBindContext(…)` — one context for data and for a schema's value entries alike — and
+`withProcessorPolicy(…)` (or its
 `withIdentifierPolicy(…)` / `withTokenPolicy(…)` / `withLimits(…)` components). Every setter returns a
 new value, so a configuration may be derived from without the holder losing what they stated.
 
-**Resource limits (§9.1)** are `LimitsPolicy`, today one bound: `maxDepth`, how deeply a document may nest,
-**64 by default**. Raise it with `withLimits(LimitsPolicy.defaults().withMaxDepth(256))` on the config or on
-either reader. A document past it is refused with `LIMIT_EXCEEDED` — **not a verdict**: the bytes may be valid
+**Resource limits (§9.1, §11.5)** are `LimitsPolicy`, today two bounds counted: `maxDepth`, how deeply a document
+may nest, **64 by default**, and `maxWaitDepth`, how long a chain of waits one schema's resolution may run (also
+64). Raise depth with `withLimits(LimitsPolicy.defaults().withMaxDepth(256))` on the config or on either reader.
+A document past it is refused with `LIMIT_EXCEEDED` — **not a verdict**: the bytes may be valid
 and read in full by a processor configured for more.
 
 Where schemas come from is one value, `SchemaAccess` — the source plus the `FetchPolicy` governing it.
@@ -171,11 +173,10 @@ Where schemas come from is one value, `SchemaAccess` — the source plus the `Fe
 
 ## Reading into a tree
 
-`TsonValue` is a sealed interface over eight pure immutable node types — `TsonRecord`, `TsonMap`,
-`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonVoid`, `TsonMissing`, `TsonScopedValue` (no `Node` suffix,
-deliberately). **Every accessor is total — nothing throws.** `TsonScopedValue(schema, root)` is a value
-read under a foreign schema at an `extern`/`dynamic` position (§7.8): it names that schema and is transparent
-to navigation, so `get`/`at` look straight through it.
+`TsonValue` is a sealed interface over eight pure immutable node kinds — `TsonRecord`, `TsonMap`,
+`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonReference`, `TsonVoid`, `TsonMissing` (no `Node` suffix,
+deliberately); `TsonReference` is itself sealed over `TsonApplicationReference` and `TsonSiblingReference`. **Every
+accessor is total — nothing throws.**
 
 | Call                                                     | Answers                                                         |
 | -------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -193,6 +194,26 @@ returns that same node, so the first failure stays the informative one.
 **`TsonMissing` (nothing there) is not `TsonVoid` (the document wrote `_`).** There is one no-value
 node because there is one no-value spelling: `TsonVoid` carries `_` and a collecting-mode read failure.
 The token `null` is not absence — §4 resolves it to the string `null`, so it arrives as a `TsonAtom`.
+
+**A reference with arguments is data, written unquoted** (`t: set<text>`, `@meta.application:response<order 201>`;
+[TSON-DATA] §7.4). A schemaless read keeps one as a `TsonApplicationReference` — `segments()`, `arguments()` (each
+read by the ordinary rule: `201` a number, `text` a string, a nested application another `TsonApplicationReference`),
+`text()` for the canonical spelling — and resolves nothing, so it has no referent. A sibling reference, `kind!` (a record
+field's type taken from the field `kind` of the same record), is kept as a `TsonSiblingReference` (`field()`, `text()`). Both
+are a `TsonReference`, the references the grammar alone shows to be one; a bare name is a `TsonAtom`. Under a schema, a value
+at a kind-typed position (`meta.ref<T>`, `meta.type_ref`) arrives in tree mode as an atom holding a `schema.meta.TypeRef`
+(`as(TypeRef.class)`), never a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names
+in the schema it was read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text,
+a type mismatch. A record field's type (`meta.field_type_ref`, the reference whose `allow_sibling` is left true) may hold
+a sibling reference, read as a `schema.meta.SiblingRef`; every other reference refuses one. A position typed by a reference
+over a type that is no constructor (`meta.ref<order>`) holds a value's qualified name (`o1`, `book.first`), judged by what it
+reaches in the schema, and its `TypeRef`'s `referent()` is that value.
+
+**A dependent field, `v?: kind!`, is read against the type its sibling names in each instance** (Part 2 §5.2): `{ kind:
+point  v: { x: 1  y: 2 } }`. Write a free sibling before its dependent field (a pinned or discriminator sibling may come
+anywhere); a sibling naming a template is refused at the sibling. In tree mode the value is whatever the named type reads
+to; in bind mode declare the component `Object` and register `Object` as an atom in the `DataBindContext`
+(`registerAtom(Object.class)`), and it receives what the named type binds to.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever
 cast (`isInstance`), so a test asserting *which host type a reader produced* must use `as(Class)`.
@@ -262,14 +283,14 @@ unchanged.
 
 ## Routing on the header alone
 
-Whether a file is data or schema is a property of its header, not its extension, and §7.1 fixes the
-cost at two directives of lookahead:
+Whether a file is data or schema is a property of its root's tag, not its extension: a root tagged
+`!schema` is a schema document. A peek reads the header (`!!id`, then any `!!import`s) and the root's tag,
+looking past the root's leading annotations, and never parses the root's value:
 
 ```java
 TsonDocumentPeek peek = tson.begin(text);                    // or an InputStream
-TsonDocumentHeader header = peek.header();
-if (header.isSchemaDocument()) { … }                         // it carries !!meta
-String uri = header.schema().orElse(DEFAULT_SCHEMA);
+if (peek.isSchemaDocument()) { … }                           // its root is tagged !schema
+List<String> imports = peek.header().imports();              // what it names, in header order
 ```
 
 It is **total**: a header it cannot read yields nothing rather than throwing, and it never answers with
@@ -294,7 +315,7 @@ project shipped exactly that bug.
 
 ## Fetching schemas
 
-Out of the box a `Tson` serves only the five bundled schemas (meta-kernel, meta, core, net, policy):
+Out of the box a `Tson` serves only the six bundled schemas (meta, numeric, temporal, net, core, policy):
 `SchemaAccess.registeredOnly()` is the default, so anything else must be registered first or reachable through a
 configured source. Two fetching sources ship, plus a non-fetching third:
 
@@ -362,7 +383,7 @@ remembering which convention each component uses.
 parse `message`. The type's name leads `message` instead.
 
 The **schema end is the path taken through *your* schema**: an `age: int32` field that violates its
-bound reports `/person/age`, not `/int32` in core.tn, because a pointer into a library file you did not
+bound reports `/person/age`, not `/int32` in numeric.tn, because a pointer into a library file you did not
 write is not where you go to fix it.
 
 `Diagnostic.Code` is a **closed enum** — switch on it exhaustively. Eleven of its members are not verdicts
@@ -404,7 +425,7 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
 ```
 
 `identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names, and every
-value whose type is an `identifier_type` family — with all three §8.2 mechanisms on and Highly Restrictive over
+value whose type is a `unicode.identifier_type` family — with all three §8.2 mechanisms on and Highly Restrictive over
 the whole name (§8.2's SHOULD). Reach for `perSegment()`, or `permitting(scripts…)` on the level, before
 loosening the level: both keep the rule everywhere else. A segment ends at `_`, and at whatever a name's profile
 adds that is not a letter or digit (`-` for core names, a `$` or a medial `.` for a family that adds one).
@@ -433,13 +454,13 @@ tson compile person.tn                  # does the schema itself resolve and com
 tson policy                             # the §8.2 Unicode policy and §9.1 limits this run would apply
 tson hash person.tn                     # stamp ?sha256=… onto its own !!id, in place
 tson strip person.tn                    # print a token-lean reading form for a prompt (not loadable)
-tson strip --keep-docs person.tn        # the same, keeping @doc, @title and @examples
+tson strip --keep-docs person.tn        # the same, keeping @doc
 tson validate --schema order.tn --type order data.json        # JSON data, bound out of band
 ```
 
-**A flat file list**. Each `.tn` is auto-classified as schema or data by content and never by filename, and a
-data document's own `!!schema` plus its root type-ref select what it is checked against. A `.json` file is
-JSON data — the one place the tool reads an extension — and, naming neither its schema nor its type, takes
+**A flat file list**. Each `.tn` is auto-classified as schema or data by its root's tag (`!schema`) and never
+by filename, and a data document's own `!!import`s plus its root type-ref select what it is checked against. A
+`.json` file is JSON data — the one place the tool reads an extension — and, naming neither its schema nor its type, takes
 `--schema <file|uri> --type <name>` together; they bind every JSON input in the run. A schema file given to
 `--schema` joins the run and binds by the `!!id` it declares, wherever it sits. Nothing is fetched over the
 network. Exit codes: `0` accepted · `1` rejected, as invalid or refused (§8.2 name hygiene, a §9.1 limit) ·
@@ -450,7 +471,8 @@ answers the question a sender asks, "will this be accepted": `ACCEPTED`, `REJECT
 this processor's policy or limits) or `UNDETERMINED` (nothing rejected it, but something could not be judged).
 
 `tson --help` lists the commands; `tson <command> --help` carries that command's own options, including
-the policy flags (§8.2's name hygiene and §9.1's `--max-depth`) for the three that judge a document.
+the policy flags (§8.2's name hygiene, §9.1's `--max-depth` and §11.5's `--max-wait-depth`) for the three that
+judge a document.
 
 **`references/cli.md` has the rest** — every flag, the policy options and the rules that keep one from
 meaning nothing, the `--output json`/`tson` shapes field by field, and the CLI's own pitfalls.
@@ -459,21 +481,21 @@ meaning nothing, the `--output json`/`tson` shapes field by field, and the CLI's
 
 A record's field names are identifiers by default. A schema translated from JSON-LD, JSON Schema or OpenAPI
 has members such as `@id`, `@type` or `$ref`, and a record can declare them as written by naming a **name
-type**: an `identifier_type` whose profile admits the extra characters. State it once, on a fieldless abstract
+type**: a `unicode.identifier_type` whose profile admits the extra characters. State it once, on a fieldless abstract
 base, and compose that base; a composition takes its supertypes' one name type (Part 2 §5.2):
 
 ```
-json_name   => !identifier_type { start_add: "@$" }
-json_record => !record { name_type: json_name  extension: ABSTRACT  fields: {} }
+json_name   => !unicode.identifier_type { start_add: "@$" }
+json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
 node        => json_record & { "@id": text  "$ref"?: text  label: text }
 ```
 
 - **In TSON text a relaxed name is quoted** (`!node { "@id": "urn:x"  label: "y" }`); the writer quotes it for you.
 - **In JSON it is an ordinary member** (`{"@id": "urn:x", "label": "y"}`), and `$ref`/`$id` are field names: only
-  `$schema`, `$type` and `$value` mean anything to the encoding, so a record should not declare those three.
+  `$import`, `$type` and `$value` mean anything to the encoding, so a record should not declare those three.
 - **Bind it through the component that states it**: `public record Node(@Field("@id") String id,
   @Field("$ref") String ref, String label) {}`.
-- **Other name types**: words with a space (`!identifier_type { continue_add: "-"  medial: " " }`), names compared
+- **Other name types**: words with a space (`!unicode.identifier_type { continue_add: "-"  medial: " " }`), names compared
   without case (`normalization: NFKC_CASEFOLD`, so `NAME` is the field `name`), HTTP-style header names (`start:
   ASCII  continue: ASCII  medial: "-"  normalization: ASCII_CASEFOLD`). A name type's normalization must imply NFC.
 - **Records that inherit share one name type**, the default included: a plain record composed into a `json_record`
@@ -506,10 +528,10 @@ List<Diagnostic> problems = json.validate(body, uri, "order");
 arguments (`withSchema` + `readAs`, or `validate(source, uri, type)`). `JsonValue` is a sealed tree
 (`JsonObject`, `JsonArray`, `JsonString`, `JsonNumber`, `JsonBoolean`, `JsonNull`) whose model follows JEP
 540. A schema-directed tree read returns a `JsonValue`, never a `TsonValue`; a schema-directed object read
-validates in full and builds the classes the binding resolves, all-or-nothing like TSON's. A value at a scoped
-position (`declared`, `extern`, `dynamic`) names its own type in the object: `{"$type": "note", "body": "hi"}`, or
-led by `"$schema": "<uri>"` for a foreign schema's type, which the reader loads through the same `withSchemas`
-loader; a bare value there is refused, and the tree comes back without the tag. Built from the same
+validates in full and builds the classes the binding resolves, all-or-nothing like TSON's. A value at a
+`declared` position names its own type, one of the schema's or its imports', in the object: `{"$type": "note",
+"body": "hi"}`; a bare value there is refused, and the tree comes back without the tag. `$schema` binds the
+document on the root alone, and anywhere else is refused (`SCOPE_NOT_ADMITTED`). Built from the same
 `ProcessorConfig`, `Json.of(config)` and `Tson.of(config)` judge under the same policy and bind the same
 classes.
 
@@ -529,7 +551,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | You wrote                                                       | Problem                                                             | Do this instead                                             |
 | --------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `tson.validateSchema(s)` then `tson.resolve(s)`                 | both register; the second throws "already registered"               | pick one — `validateSchema` registers when the schema is sound |
-| `new TsonTreeReader().read(doc)` on a self-describing document  | a directly-built reader ignores `!!schema` by design, so the root `!order` is an `UNKNOWN_TYPE_REF` | `tson.treeReader()`, from a built `Tson`  |
+| `new TsonTreeReader().read(doc)` on a self-describing document  | a directly-built reader ignores `!!import` by design, so the root `!order` is an `UNKNOWN_TYPE_REF` | `tson.treeReader()`, from a built `Tson`  |
 | `new TsonObjectReader().read(…, Server.class)` with a non-`public` record | binding is reflective across a module boundary            | make the target class `public`                              |
 | a `Tson` built per request                                       | it re-bootstraps and recompiles every schema                        | build one at startup and keep it                            |
 | registering schemas from several threads                        | only *reads* through one `Tson` are safe                            | resolve every schema at startup, then read                  |
@@ -587,8 +609,8 @@ outstanding work, `SPEC-FEEDBACK.md` the spec issues still open against the curr
 
 ## Specification
 
-- Part 1 — Text Data Format: https://tson.io/raw/2026/38/tson-part1-data.md
-- Part 2 — Type System and Schema: https://tson.io/raw/2026/38/tson-part2-schema.md
+- Part 1 — Text Data Format: https://tson.io/raw/2026/39/tson-part1-data.md
+- Part 2 — Type System and Schema: https://tson.io/raw/2026/39/tson-part2-schema.md
 - Part 3 — JSON Encoding: drafted in the repository, `spec/tson-part3-json.md`
 
 Both are working revisions and change without compatibility guarantees. Re-fetch and check the revision

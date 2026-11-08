@@ -4,10 +4,12 @@ import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
@@ -41,7 +43,7 @@ import java.util.List;
  *
  * <p>That determinism is load-bearing, not cosmetic. An entry name is part of the resolved form, and an
  * importing schema reaches an <em>imported</em> entry by deriving the same name for the same form --
- * meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already produced.
+ * a schema writing the kernel's own {@code [text; 1..]} landing on the entry the kernel already produced.
  *
  * <p><b>The canonical renderings are separate from the names</b> so each is stated once: a rendering decides
  * whether two forms are the same form, which {@link MintedNames} asks with it, and a second copy free to
@@ -62,7 +64,7 @@ final class DerivedName {
         // outside ASCII, and a name that mixes it with the ASCII parts below is refused by §8.2's own walk.
         StringBuilder readable = new StringBuilder(InternalName.part(head));
         for (RecordValue.Field field : fields) {
-            appendReadable(readable, field.value().value().coreValue());
+            appendReadable(readable, field.value().coreValue());
         }
         return readable.append('_')
                 .append(String.format("%08x", canonicalBinding(head, fields).hashCode())).toString();
@@ -71,18 +73,32 @@ final class DerivedName {
     /** The readable half of a derived name: every scalar the binding record holds, in order, under {@code _}. */
     private static void appendReadable(StringBuilder out, CoreValue value) {
         switch (value) {
+            case ReferenceValue(TypeRef applied) ->
+                    appendReadable(out, applied);
+            case ReferenceValue(SiblingRef sibling) -> out.append('_').append(InternalName.part(sibling.field()));
             case TokenValue token -> out.append('_')
                     .append(InternalName.part(
                             NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
             case RecordValue record -> record.fields()
-                    .forEach(field -> appendReadable(out, field.value().value().coreValue()));
+                    .forEach(field -> appendReadable(out, field.value().coreValue()));
             case ArrayValue array -> array.elements()
-                    .forEach(element -> appendReadable(out, element.value().coreValue()));
+                    .forEach(element -> appendReadable(out, element.coreValue()));
             case MapValue map -> map.entries().forEach(entry -> {
                 appendReadable(out, entry.key().coreValue());
-                appendReadable(out, entry.value().value().coreValue());
+                appendReadable(out, entry.value().coreValue());
             });
             default -> out.append("_v");
+        }
+    }
+
+    /** An application in a slot, readable as its head and arguments. */
+    private static void appendReadable(StringBuilder out, TypeRef application) {
+        out.append('_').append(InternalName.part(application.name()));
+        for (TypeArgument argument : application.arguments()) {
+            switch (argument) {
+                case TypeArgument.Ref ref -> appendReadable(out, ref.ref());
+                case TypeArgument.Value value -> out.append('_').append(InternalName.part(canonicalText(value.value())));
+            }
         }
     }
 
@@ -98,13 +114,20 @@ final class DerivedName {
         out.append('(');
         for (RecordValue.Field field : fields) {
             appendText(out.append('f'), field.name());
-            appendValue(out, field.value().value().coreValue());
+            appendValue(out, field.value().coreValue());
         }
         out.append(')');
     }
 
     private static void appendValue(StringBuilder out, CoreValue value) {
         switch (value) {
+            // An application in a slot is its parsed form, so two spellings of one are one binding (§8.2).
+            case ReferenceValue(TypeRef application) -> {
+                out.append('p');
+                appendRef(out, application);
+            }
+            // A sibling reference is a third spelling of a slot, kept apart from a name and an application.
+            case ReferenceValue(SiblingRef sibling) -> appendText(out.append('s'), sibling.field());
             case TokenValue token -> {
                 // The form by name, not ordinal: inserting a TokenForm constant would renumber every ordinal
                 // invisibly, which is the same hazard as hashing a record's toString.
@@ -114,17 +137,17 @@ final class DerivedName {
             case RecordValue record -> appendFields(out.append('r'), record.fields());
             case ArrayValue array -> {
                 out.append("a(");
-                array.elements().forEach(element -> appendValue(out, element.value().coreValue()));
+                array.elements().forEach(element -> appendValue(out, element.coreValue()));
                 out.append(')');
             }
-            // Both halves of every entry, in written order. Without this a map slot rendered as the
-            // unknown-value mark and every binding differing only inside one was the same name --
-            // `extern_of<"a.tn">` and `extern_of<"b.tn">` are two types and were one entry.
+            // Both halves of every entry, in written order. Without this a map slot renders as the
+            // unknown-value mark and every binding differing only inside one is the same name, two types
+            // sharing one entry.
             case MapValue map -> {
                 out.append("m(");
                 map.entries().forEach(entry -> {
                     appendValue(out.append('k'), entry.key().coreValue());
-                    appendValue(out.append('v'), entry.value().value().coreValue());
+                    appendValue(out.append('v'), entry.value().coreValue());
                 });
                 out.append(')');
             }
@@ -154,15 +177,7 @@ final class DerivedName {
         appendText(canonical.append('A'), head);
         canonical.append('(');
         for (TypeArgument argument : arguments) {
-            switch (argument) {
-                case TypeArgument.Ref ref -> appendRef(canonical.append('r'), ref.ref());
-                case TypeArgument.Value value -> {
-                    // The form by name, not ordinal: inserting a constant would renumber every ordinal.
-                    appendText(canonical.append('v'), value.value().form().name());
-                    appendNumberAware(canonical, value.value().text(),
-                            value.value().form() == Token.Form.UNQUOTED);
-                }
-            }
+            appendArgument(canonical, argument);
         }
         return canonical.append(')').toString();
     }
@@ -171,16 +186,28 @@ final class DerivedName {
         appendText(out.append('n'), ref.name());
         out.append('(');
         for (TypeArgument argument : ref.arguments()) {
-            switch (argument) {
-                case TypeArgument.Ref nested -> appendRef(out.append('r'), nested.ref());
-                case TypeArgument.Value value -> {
-                    appendText(out.append('v'), value.value().form().name());
-                    appendNumberAware(out, value.value().text(),
-                            value.value().form() == Token.Form.UNQUOTED);
-                }
-            }
+            appendArgument(out, argument);
         }
         out.append(')');
+    }
+
+    /**
+     * One argument, as the reference grammar parses it: an unquoted token that is no number renders as the
+     * reference it parses as, whether a resolver filed it as a value at its parameter or not, so {@code names<red>}
+     * is one application however it was read ([TSON-SCHEMA] §8.2).
+     */
+    private static void appendArgument(StringBuilder out, TypeArgument argument) {
+        switch (argument) {
+            case TypeArgument.Ref ref -> appendRef(out.append('r'), ref.ref());
+            case TypeArgument.Value value when value.value().form() == Token.Form.UNQUOTED
+                    && NumericIdentity.of(value.value().text(), true) == null ->
+                    appendRef(out.append('r'), TypeRef.of(value.value().text()));
+            case TypeArgument.Value value -> {
+                // The form by name, not ordinal: inserting a constant would renumber every ordinal.
+                appendText(out.append('v'), value.value().form().name());
+                appendNumberAware(out, value.value().text(), value.value().form() == Token.Form.UNQUOTED);
+            }
+        }
     }
 
     /** A value argument's readable segment, with §4.3's numeric equivalence applied ({@link NumericIdentity}). */

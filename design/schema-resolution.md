@@ -6,9 +6,28 @@ facts and refinement, groups, subtraction, and the exception boundary.
 
 **Invariants**
 
-- An annotation on a declaration resolves one hop against the governing meta and nowhere else (§3.3.3); a name that
-  misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its type. Only
-  the meta-kernel bootstrap, resolving `meta-kernel.tn` itself, skips the check.
+- Every name a declaration writes resolves in the schema's one namespace, its own entries and the closure of its
+  `!!import`s (§3.3). An annotation on a declaration resolves there (§3.3.3); a
+  name that misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its
+  type. Only the kernel's bootstrap, resolving meta.tn itself, skips the check.
+- **Every name resolves from the root** (§3.3). A name written inside a nested `!schema` map resolves
+  as one written at the root does: a sibling is `geo.address`, never a bare `address`. There is no lexical scope.
+- **A nested map's members are entries under their paths; the nested map's value is derived, never maintained by
+  hand.** `TsonSchema.entries` holds `geo.address` as it holds `order`, and `geo`'s `ValueEntry` of `meta.schema` is
+  rebuilt from the path entries by `SchemaPaths.synced` in `TsonSchema`'s compact constructor. A phase that edits a
+  member edits its path entry: where a path entry and the nested map's own copy disagree, the path entry is the one
+  held, whichever comes first (the kernel's `meta` precedes its members, and a linked schema rebuilt from a partly
+  ready namespace carries a stale copy).
+- **A nested map is open** (§2.2.3). A document's own `!schema` map is resolved locally, its members
+  under their paths; where an import declares a map of the same path, the two are one map, the union of their
+  members, and only a member path declared twice collides (§2.2.3). `SchemaResolver.mergeImports` and the local
+  collision loop pass over a nested map met twice; `design/linking-and-compilation.md` has the merge.
+- Every declaration is made ready in wait order (`WaitOrder`, §3.4.1), never source order: a read against an entry
+  of the same document — `!C { … }` with `C` local, a value of a local type, an annotation whose type is local —
+  makes that entry ready first, in either order. Entries waiting on each other are a `SchemaValidationException`
+  naming the cycle; a chain past §11.5's wait depth is a `SchemaRefusalException(LIMIT_EXCEEDED)`.
+- A judgement that walks a name to what it names (§5.8's one name type, `requireOneNameType`) is deferred and run by
+  `DefinitionResolver.judgeDeferred` once every entry is ready, so it never makes an entry wait.
 - `abstract`/`final` are grammar, not annotations; `=?` is field syntax; and the definition mark is applied once, in
   `DefinitionResolver.resolve` (`withExtension`), never inside whichever `resolve*` built the body.
 - A restated field's annotations concatenate over the inherited ones, restatement first — never replacement by name.
@@ -20,60 +39,106 @@ facts and refinement, groups, subtraction, and the exception boundary.
   omission yields, so that order is asked of `RecordField.omitted`.
 - An entry is its value (§8.1). Every type body, a record template's included, carries its own chain, `type`'s one
   field `chain`, a `TypeChain`: `parents` as written, `supertypes`, `subtypes`. The application an entry
-  instantiates is the derived `@application` on its key (`TsonSchema.applicationOf`). What no value holds — where
+  instantiates is the derived `@meta.application` on its key (`TsonSchema.applicationOf`). What no value holds — where
   the entry was declared, the annotations on its value, its constructor, the entry a `^` names — is
   `TsonSchema.EntryFacts`, never a field of any constructor.
-- `supertypes` is bare names, sorted, complete to a fixed point through applied parents
-  (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type that is no
-  template keeps none (`closeChains`). A declaration never writes `chain`, and a constructor never declares a field
-  of that name (`refuseWrittenChain`, `refuseDeclaredChain`).
+- `supertypes` is names without arguments, each a path from the root, sorted, complete to a fixed point through applied
+  parents (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type that is no
+  template keeps none (`closeChains`). A declaration never writes `chain`, and a constructor never declares a field of that
+  name (`refuseWrittenChain`, `refuseDeclaredChain`).
 - `subtypes` is linking's throughout: no resolved entry, minted or declared, carries any.
 - A kind and a constructor are judged by where `top` and the base kinds are defined, never by their spelling: the
   resolver's `kernel` predicates, `EntryKind.of(value, kernel)` and `TsonLinkedSchema.isKernel`.
 - An application of a family base minted at a use site is a member of nothing; only a declared one gains the edge to
   its base (`SchemaResolver.familyBaseEdges`).
 - Subtraction runs last and empties the chain (every supertype goes); nothing is kept in its place.
-- A field's name is its key in `record.fields` (`RecordBody.fields`, the kernel's `field_map`) and never one of its
+- **A dependent field's rules are the link's, over the flattened record** (`DependentFields`, [TSON-SCHEMA] §5.2): the
+  sibling declared before it, typed by a reference to types, there to read whenever it is, its pin or default no template;
+  the dependent field never voidable, carrying no value, restated only as itself. Each is a `SchemaValidationException`.
+- A field's name is its key in `meta.record.fields` (`RecordBody.fields`, the kernel's `meta.field_map`) and never one of its
   facts; declaration order is part of the value, and `RecordBody.equals` compares it.
 - The exception's class picks the diagnostic code (`SchemaResolver.Problems.report`): `SchemaValidationException` →
-  `SCHEMA_ERROR` (a `SchemaRefusalException` keeps its §8.2 rule's code), `UnsupportedOperationException` →
-  `NOT_IMPLEMENTED`, `BindMismatchException` → `BIND_MISMATCH`.
+  `SCHEMA_ERROR` (a `SchemaRefusalException` keeps its rule's code, §8.2's or `LIMIT_EXCEEDED`),
+  `UnsupportedOperationException` → `NOT_IMPLEMENTED`, `BindMismatchException` → `BIND_MISMATCH`.
 
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
 `design/template-materialisation.md` and `design/held-template-bodies.md` (§5.10 closing, applied-parent edges),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, reference hops, `@synthetic`, the
-meta-kernel bootstrap), `design/meta-layer-namespaces.md` (namespace-type payloads),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.synthetic`, the
+kernel's bootstrap), `design/namespace-types-and-value-entries.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
 
 ## The two resolvers
 
 `SchemaResolver` resolves a whole `SchemaDocument` (`TsonSchemaResolver` is its public wrapper): header directives,
-the structure namespace from the governing `!!meta`, and the `!!import` merge into the type-name namespace *before*
-any local declaration resolves. That merge mirrors `TsonSchemaLinker.mergeImports` — transitive, collisions decided
-by entry identity, each import edge judged by `TsonSchemaLinker.checkImportLevel` (§2.2.3) — because it is the same
-concept met one phase earlier, and the two are kept in step deliberately. Local declarations resolve on demand
-(`OnDemand`), so a supertype or source may be declared later; a cycle through those edges is the author's error.
+and the merge of every `!!import`'s namespace (`TsonSchema.namespaceSources`) *before* any
+local declaration resolves, recording each imported entry's origin. That merge mirrors `TsonSchemaLinker.mergeImports`
+— transitive, collisions decided by entry identity (§2.2.3) — because it is the same concept met one phase earlier,
+and the two are kept in step deliberately. The origins key its vocabulary: each `!C` body and annotation value is
+read through the compiled form of the schema that declared `C` or the type
+(`design/resolver-vocabulary-and-bootstrap.md`); one of this document's own is read through readers compiled from
+its entries ready so far. Local declarations are made ready in wait order (below), `OnDemand` being the `Readiness`
+that resolves one declaration and reports its failure.
 
 `DefinitionResolver` (package-private) resolves one `SchemaMap.Declaration` and never sees a document. Everything it
-consults is fixed at construction: the type-name namespace and the structure namespace (`DefinitionGetter`s — the
-second consulted only for a construction head and an annotation name, §3.3.1), the meta's compiled reader
-(`DefinitionMetaReader`) and annotation reader (`AnnotationValueReader`), the `ApplicationCloser` onto the
+consults is fixed at construction: two `DefinitionGetter`s, `namespaceDefinitions` the whole namespace and
+`vocabularyDefinitions` where a construction head and an annotation name resolve — the same wait order, except in the
+kernel's ordinary resolution, which resolves heads through its pre-loaded stand-in (§3.4) — the vocabulary's
+compiled reader (`ConstructionReader`) and annotation reader (`AnnotationValueReader`), the `ApplicationCloser` onto the
 schema's one `TemplateMaterialiser`, and the `EntryFacts` map it shares with `SchemaResolver` and the materialiser,
 so an atom refinement finds the constructor of a source another schema declared. Its class Javadoc lists the
 shapes it dispatches and the exact exception boundary.
+
+## The wait order (`WaitOrder`, §3.4.1)
+
+One algorithm for every schema; the kernel's bootstrap and `SchemaResolver` both drive it, and what differs is only
+what is ready before it starts — the kernel's hand-built pre-loaded set, or the import closure
+(`design/resolver-vocabulary-and-bootstrap.md`). `WaitOrder` is the `DefinitionGetter` every lookup of a resolution
+goes through, so an entry is made ready the first time anything asks for it, and `readyAll` drives the rest.
+
+- **What waits.** A declaration waits on its head (`C` in `!C { … }`), its refinement source and `&` operands, the
+  types of its annotations, and every type a read of its value reaches. A name at a type position (a field's, a
+  variant's, an element's) is carried as a name for the linker and orders nothing, as a held value (a default or pin)
+  does, which a read reaching a pending declaration binds as written.
+- **Reads restart.** A value read against an entry of the same document goes through `WaitOrder.read`: readers
+  compiled from the entries ready so far, every declaration not yet ready a `PendingTypeReader`. A read reaching one
+  throws `NotReady`, that entry is made ready as a wait of the one being made ready, and the read starts over.
+- **An application written inline at a field type is not yet closed there.** A use site names the entry an
+  application closes to once materialisation runs, after every declaration is ready, so a record ready so far may still
+  have a field typed `meta.ref<order>` or `box<text>`. Its compiled reader is an `UnclosedApplicationReader`, never
+  the head's (a template, which refuses every value): a held value binds as written, as at a pending declaration, and
+  is judged against the closed entry at link; a value entry's read reaching the field is `NOT_IMPLEMENTED`, since the
+  application does not yet wait in the order as a named one does (`BACKLOG.md`). A tree-mode record wraps either
+  held-value reader in an atom node (`RecordTreeReader`). A gap the payload read reports stays a gap: the value entry
+  is refused as `NOT_IMPLEMENTED`, never as a payload that is no value of its type (`resolveValueEntry`).
+- **Cycles are the author's error.** An entry reached again while it is being made ready is a
+  `SchemaValidationException` naming the cycle in wait order: `'a' waits on 'b' waits on 'a': entries waiting on each
+  other are never ready -- …`, or `'step' waits on 'step'`. A composition or refinement cycle is this same rule,
+  reached through an application too (`design/template-materialisation.md`). An alias loop is §8.3's reference-chain
+  refusal, not a wait (`WaitOrderTest.anAliasLoopIsRefusedAsAnAliasChainNotAWaitCycle`).
+- **Wait depth is counted here**, order-independently, and a chain past `LimitsPolicy.maxWaitDepth` refuses its head
+  with `LIMIT_EXCEEDED` (`design/processor-policy.md`).
+- **Rule 6: a judgement that walks a name waits for everything.** §5.8's one name type over a composition's
+  supertypes (`requireOneNameType`) walks a name type to its terminal (`meta.field_name` → `meta.identifier`); run during
+  resolution it would make the composition wait on what it only names. `DefinitionResolver` defers it, and
+  `judgeDeferred` runs it once every entry is ready, a failure reported against its declaration
+  (`DefinitionResolverTest.aCompositionsNameTypesAreJudgedOnceEveryEntryIsReady`).
+
+`ResolutionOrderTest` resolves each bundled schema, and a schema whose entries read each other, with its declarations
+reversed and shuffled, and gets identical output; `KernelBootstrapResolverTest.theBootstrapIsTheSameInAnyOrder`
+does the same for the bootstrap.
 
 ## Annotations on a declaration
 
 Both annotation sets go through `annotationsFor`: those after `=>` land on the entry's facts (on its value), those
 before the name on the entry's key (§6 — a resolver does not hoist key to value). `SchemaResolver` catches the
-key set's failures itself, since that loop runs outside the memoized getter that catches the value set's.
+key set's failures itself, since that loop runs outside the wait order that catches the value set's.
 
 The name is checked whether or not a value was written — §6 makes `@T` shorthand for `@T:_` — so silence is never
 the outcome: an annotation keeping its name and losing its value would let the schema load clean with the
-metadata gone (`SchemaAnnotationScopeTest`). The near miss gets its own wording: a type the schema itself declares
-or imports is usable by its *data documents*, not inside the schema document, so the message names the remedy
-(move it into a meta-schema). A resolved value is read by that type's own compiled reader, a bare mark as a
+metadata gone (`SchemaAnnotationScopeTest`). A type the schema itself declares is made ready before the value is
+read against it, and a type annotated with itself (`note => @note:"x" text`) is a wait cycle of one. A resolved
+value is read by that type's own compiled reader, a bare mark as a
 synthetic `_` (`BareAnnotationTest`). The bootstrap passes no `AnnotationValueReader`, because it is producing the
 entries such a reader would read through; there the name is kept and the value dropped.
 
@@ -107,24 +172,31 @@ derives none: `array ^ { element_type: = T }` pins a constructor's facet and say
 
 **On a template**, `abstract` is admitted and `final` refused: every application is a subtype of the template by
 construction, so the claim is false before anything else is written (§5.2, §5.10). On a record template the mark
-sets the open record's own `extension`, which is each application's — the base itself is ABSTRACT by construction
-— and `WireForm.heldRecord` writes it into the held tree that closing reads back. The `=?`-forces-ABSTRACT rule is
+sets the template's own `extension`, which is each application's — the base itself is ABSTRACT by construction
+— and closing carries it to each member (`TemplateMaterialiser.closedExtension`). The `=?`-forces-ABSTRACT rule is
 a closed record's alone. An open body applying anything but `record` has no `extension` and is refused, named by
 the constructor it applies.
 
 ## Record templates as family bases
 
-A record template is a `RecordBody` with `parameters`, ABSTRACT by construction (`OpenEntry.isFamilyBase`), and
-takes part in IS-A (§5.10). That is safe by *elimination*: no value is read against the template; a value at a
-position typed by it is a value of some member, selected by tag or discriminators, each member closed with its
-arguments fixed (`AbstractTemplateReader`, `design/class2-compilation.md`). A container, reference or
+A record template is a `RecordTemplateBody` (`meta.record_template`), ABSTRACT by construction
+(`FamilySelectors.extensionOf`), and takes part in IS-A (§5.10). Its fields are `RecordTemplateField`s, labelling
+a parameter that stands for the whole type (`type_param`) or the whole value (`value_param`), each field classified
+once by its source spelling where it is built (`SchemaDesugarer`'s `RecordTemplateDef`, `DefinitionResolver.Built` over
+`BuiltField`); a parameter spelled like a schema type or like a name an absorbed field's arguments write is refused
+(`design/held-template-bodies.md`), and `checked` refuses a selector
+typed by a parameter and a literal value on a parameter-typed field. That is safe by *elimination*: no
+value is read against the template; a value at a position typed by it is a value of some member, selected by tag or
+discriminators, each member closed with its arguments fixed (`AbstractTemplateReader`,
+`design/class2-compilation.md`). A container, reference or
 constructor-application template is a `TemplateBody` with no such dispatch, and stays no type until applied.
 
 **Member dispatch does not travel to a member** (`TemplateMaterialiser.closedExtension`): closing pins the
 selectors and the member names none, so it is an ordinary concrete record. ABSTRACT without selectors does travel,
 which is how `abstract` reaches every instantiation (`AbstractTemplateFamilyTest`). `FamilySelectors.of` derives
-the selector fields from the base's own fields for either kind of base; a record template that IS-A a
-base is no member of it, so `RecordExtension`'s pin checks and both encodings' member dispatchers skip an open subtype.
+the selector fields from the base's own fields for either kind of base, a template's selector closed to a
+`RecordField` (its type names no parameter). A record template that IS-A a base is no member of it: a member is a
+`RecordBody`, so `RecordExtension`'s pin checks and both encodings' member dispatchers pass a template by type.
 
 **Two edges populate a family's `subtypes`, from two mechanisms.**
 
@@ -145,17 +217,43 @@ base is no member of it, so `RecordExtension`'s pin checks and both encodings' m
 A resolved entry's `subtypes` is empty, minted or declared: linking computes it one phase later, which keeps two
 schemas closing one application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`).
 
-## Namespace-type payloads
+## Value entries
 
-`myapi => !api { … }`, with `api` IS-A the kernel's `namespace`, resolves to a `Namespace` value of kind `NAMESPACE`,
-`api` recorded as the constructor (`design/meta-layer-namespaces.md` has the read: `NamespaceInstanceReader`,
-`SchemaResolver.payloadNames`, `isValueBody`). The resolver's part: a payload that is no such map is refused
-against the entry as no value of the namespace type, with the read's path (`bindAtomInstance`), and
-`!namespace { … }` itself is refused as abstract (`refuseAbstractHead`).
+`name => !T { … }` with `T` no constructor (not IS-A `top`, `EntryKind.isConstructor`) is a value entry: `resolveInstance`
+hands it to `resolveValueEntry`, which reads the payload against `T` as a data value is read and returns a `ValueEntry(T,
+value)` of kind `VALUE`, `T` recorded as the entry's constructor fact for the tag
+(`design/namespace-types-and-value-entries.md` has the read, the binding and the tree fallback). The resolver's part: a head
+that is itself a value is refused (a value has no instances), a braced payload at an atom type is refused with the `^` it is
+missing, and a payload that is no value of `T` is refused against the entry with the read's path. A namespace type is the
+other side of the line: `api => !meta.namespace { … }` applies the constructor `meta.namespace` and builds a type, a
+`NamespaceBody`.
+
+## Nested schema maps
+
+`geo => !schema { address => { … } }` declares: every value of `meta.schema` does, as the root does. The tag is
+`!schema`, the kernel root's alias the root's tag names, or `!meta.schema`, its target, as resolved output writes a
+nested map (`TsonSchemaParser` takes either, matched as a spelling, so no declaration captures it). The kernel's
+machinery is one such map, `meta`; the data-format libraries' constructors are three more, numeric.tn's `numeric`,
+temporal.tn's `temporal` and net.tn's `net`.
+`TsonSchemaParser`
+puts each member into the document's one declaration map under its path (`geo.address`, `geo.inner.deep`), and the
+entry `geo` itself is a `SchemaMapDef` holding its members' own names. So every phase reads a member as a root entry:
+the desugar phase lifts its sugar, the wait order readies it, and a reference to `geo.address` anywhere is a lookup
+of that key. `DefinitionResolver` resolves the `SchemaMapDef` to `ValueEntry("meta.schema", Namespace("meta.schema", {}))`,
+waiting on nothing, and `SchemaPaths.synced` fills it from the path entries wherever a `TsonSchema` is built,
+innermost map first, the members' key annotations kept. A schema built from a resolved form read back holds the
+nested map alone, and `synced` keys its members under their paths (`SchemaPaths.withPaths` does the same for a
+resolved form read as a plain map).
+
+A member's identity is its declaring document plus its path: two maps may each declare `address`, and a diagnostic, a
+kind's member list, a chain and an `@meta.application` name it `geo.address`. A map of one path that several documents of a
+closure declare is one map whose members are the union of theirs; the annotations on each `geo => !schema { … }`
+entry are its own document's, and the merged map carries none of an import's. A value of any other namespace type,
+`!api { … }`, stays a value entry (above).
 
 ## Fields
 
-**A resolved field is four facts, not a state** (`RecordField`, the kernel's `record_field`), held under its name in
+**A resolved field is four facts, not a state** (`RecordField`, the kernel's `meta.record_field`), held under its name in
 `record.fields`. §5.2's `name?: type? ~ value` has one mark per fact: the name's `?` is `optional`, the type's `?` is
 `voidable`, and `~`/`=` give the `role` (DEFAULT or FIXED) and its `value`. `FieldModifiers.of` maps the marks one to
 one and adds only refusals — a default on an unmarked name, a pin on a voidable type, `= _` and `~ _` (spell
@@ -172,20 +270,76 @@ it its voidability; its name's `?` is always its own. That is why `resolveField`
 **Refinement is three orders** (`refines`), each least to most determined: what omission yields, absent →
 missing-field error → injected (`RecordField.omitted`, asked of a plain field); voidable → not; role FREE → DEFAULT
 → FIXED. A restatement refines its source when no order moves backwards, which reproduces §5.7's transition matrix
-cell for cell without the matrix existing in code. No rule compares a restated type with its source's here, so
-`nickname?: void?` restating `nickname?: text?` narrows the field to `_` and keeps it in the contract.
+cell for cell without the matrix existing in code.
+
+**A restated type narrows, and the link judges it** (`TsonSchemaLinker.checkRestatedFieldTypes`, §5.7, §5.8). The
+restated type is the inherited one or IS-A it by §7.2's chain, alias hops followed on both sides, or `void` at a
+voidable position: `nickname?: void?` restating `nickname?: text?` narrows the field to `_`. The resolver binds a
+restatement before the names it holds need be ready, so the IS-A is asked at link, as a reference's `of` is; the
+kernel's `meta.namespace` narrowing `meta.map`'s `key_type: meta.type_ref` to `meta.identifier_ref` passes by
+`meta.identifier_ref`'s refinement of `meta.type_ref`. The relation is nominal and nothing more (§5.7): `[int8]`
+restating `[int32]` and a variant restating its choice are refused, no IS-A edge joining either pair.
+Each record is judged against the nearest closed records on its chain, so an applied operand is judged through the
+entry its application denotes. One denoting none, whose edge is only to the open family base, is not judged, nor is
+a subtraction's tightening entry, its chain being empty (`BACKLOG.md`).
 
 **A restated field's annotations are the restatement's, in source order, then the inherited field's** (`merged`,
 §5.8), one path for refinement and composition. Concatenation, because [TSON-DATA] §3.1 makes an annotation name
 repeatable — "the inherited `@doc`" names nothing when two were written. Restatement first, because
 `Annotations.get`/`value` take the first occurrence, so the nearer declaration wins at every lookup. No annotation
-the meta layer declares changes how a value reads, so the ordering is pinned over resolved output
+the kernel declares changes how a value reads, so the ordering is pinned over resolved output
 (`RestatedFieldAnnotationsTest`).
+
+## Dependent fields (§5.2)
+
+A field typed by a sibling reference, `v?: kind!`, is a **dependent field**: each instance's value is read against the
+type that instance's `kind` names. Resolution keeps the sibling reference as written wherever a field's type flows —
+sugar (`SchemaDesugarer` passes one through at a field's type and refuses it elsewhere), `BuiltField`, composition and
+refinement flattening, a record template's substitution and an application's closing — so a pinned sibling's
+refinement still spells the field `type: kind!`, and resolved output writes it as the source does.
+
+The rules are checked when the record links, against its flattened fields (`DependentFields.check`, called from
+`TsonSchemaLinker.validateBody` before any field's type reference is validated), so a record template's member is
+judged once its application closes it:
+
+- **Declared before it.** The fields are a telescope, each depending only on those before it in `fields`' order, so
+  no cycle can form and none is looked for; flattening puts inherited fields first. A sibling naming no field of the
+  record is refused, a sibling reference never naming an entry.
+- **Typed by a reference to types**: past its alias hops a `ReferenceBody` whose `of` is a constructor or `top`
+  (`KindMembers.namesTypes`). One that allows a sibling, as `record_field.type` does, is admitted; a sibling
+  reference as its value is refused where the dependent field is read.
+- **There to read whenever the dependent field is**: required, defaulted, pinned, or a field group's member with the
+  dependent field optional; never voidable, and never optional with no default. A group's members are declared
+  `optional`, so a dependent field that is a member counts as optional, as `value` does on
+  `meta.record_template_field` beside `( type | type_param )`, and a refinement making one required is judged on the
+  flattened record. A member is absent when another option is chosen, so a dependent field written without it is
+  refused where it is read (`design/readers-and-diagnostics.md`); nothing refuses a sibling and its dependent field
+  in two options of one group, where the field can be written in no document.
+- **Its pin or default names a type a value can be read against**: a template, a record template among them, and a
+  sibling reference are refused. Membership of the sibling's reference is `checkKindValue`'s, as for any field value.
+- **The dependent field** is never voidable and carries no default or pin: its type is not fixed at its declaration.
+  It may be restated only as itself, its marks moving along §5.7's orders as any field's do; restating it with a named
+  type, or a typed field as a dependent one, is refused (`DependentFields.restates`, asked by
+  `checkRestatedFieldTypes`). A sibling may be a discriminator: the family rules ask of it what they ask of any
+  required atom-typed field, and a dependent field named as a discriminator is no atom-typed field and is refused.
+
+Everything else that walks field types skips a dependent field: it is satisfiable for inhabitance whatever its sibling names
+(`TypeInhabitance`), carries no value to check (`checkFieldValue`), contributes no name to a name type or a parameter's type
+(`NameType`, `ParameterTypes`). A value's qualified name going on through one takes the type its sibling names in the value
+walked (`ValuesByName.dependentType`, `design/namespace-types-and-value-entries.md`). A value entry's dependent value is held
+as written at the read and judged against that type when the schema links (`HeldValues`,
+`design/linking-and-compilation.md`).
+
+**A template field's `value` is one too**, typed `type!` with `type` its sibling, a member of `( type | type_param )`.
+A literal is held as written and judged when the template closes, against the closed field's type (`checkFieldValue`),
+its §8.2 hygiene being judged on the template (`TsonSchemaLinker.checkFieldValues`). A literal beside `type_param` is
+refused by `openRecord` before the payload is bound, so the author reads §5.10's reason and not the reader's; a literal
+on an application over a parameter is refused after it (`refuseLiteralOnOpenType`), the sibling `type` being there.
 
 ## Field groups
 
-A group is options of members (`GroupDef`, the kernel's `field_group`; §5.11): an option is chosen when any member is
-present, a chosen option holds every member `optional_members` does not name, and `field_group.optional` decides
+A group is options of members (`GroupDef`, the kernel's `meta.field_group`; §5.11): an option is chosen when any member is
+present, a chosen option holds every member `optional_members` does not name, and `meta.field_group.optional` decides
 whether no option may be chosen. `GroupDef.fieldGroup` is the one lowering, for a fresh body and a held one: `+`
 becomes the non-optional group of one option whose members are all optional within it, so a one-option non-optional group is
 always a `+` group. Members flatten as optional fields whatever the group says. The parser refuses the shapes that
@@ -222,17 +376,25 @@ library improves; a gap's does.* Misfiling an author error as `NOT_IMPLEMENTED` 
 fix and lifts the CLI to exit 70. All three kinds are collected per declaration, each leaving a placeholder
 (`SchemaResolver.unresolved`) that keeps the failed declaration's type parameters.
 
-- **No schema construct reaches `NOT_IMPLEMENTED`.** The `UnsupportedOperationException` sites left are the
-  catch-alls around the compiled meta reader (an exception none of the classified ones), a failed re-serialisation
-  of an atom refinement's source, a closed application with no `ApplicationCloser` (a resolver built standalone),
-  and the bootstrap's closed switch over `meta-kernel.tn`'s own declarations.
+- **One schema construct reaches `NOT_IMPLEMENTED`: an instance of a user constructor of types**
+  (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `meta.type` builds types, and a type's body is
+  one of the schema model's, built only by the bundled constructors (meta.tn's, numeric.tn's, temporal.tn's and net.tn's).
+  Composing `meta.atom`, `meta.product` or `meta.sum` directly (`c => meta.product & { … }`) makes a new form, which a
+  processor backs with readers and writers of its own; this library backs none beyond the bundled ones, so the refusal is a
+  capability verdict, and stays one. Composing an existing constructor (`c => meta.record & { extra: text }`) makes no new
+  form, and is refused the same way today only because no body in the schema model holds the added facet (`BACKLOG.md`). An
+  instance of a constructor composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a tree
+  where no class binds the head — as a value entry's payload is (`design/namespace-types-and-value-entries.md`). The other
+  `UnsupportedOperationException` sites are the catch-alls around the compiled reader (an exception none of the classified
+  ones), a failed re-serialisation of an atom refinement's source, a closed application with no `ApplicationCloser` (a
+  resolver built standalone), and the bootstrap's closed switch over the kernel's own declarations.
 - **A body the constructor's vocabulary rejects** arrives as a `ReadException` and is restated as a schema error
   (`bodyIsNotValidData`, `payloadFailure`). The read `Diagnostic` is dropped: it was produced against a
   `DataValueEvents` replay whose positions are placeholders and whose path points into a synthetic body. The real
   position comes from `SchemaResolver`'s catch.
 - **`IllegalStateException`** is for an invariant only a malformed resolved value or a skipped phase could break —
   an applicable head with a non-record body, a constructor not record-shaped (§7.2), and a container sugar form
-  reaching resolution unlifted (`DefinitionResolver.unlifted`). `TypeDef`, `StructuralDef` and the AST `TypeRef`
+  reaching resolution unlifted (`DefinitionResolver.unlifted`). `TypeDef`, `StructuralDef` and the AST `TypeExpr`
   are sealed and `resolveTypeDef`/`resolveTypeRef` switch over them exhaustively, so the sugar case is the only
   arm left, and only a caller resolving raw AST without `SchemaDesugarer` reaches it
   (`DefinitionResolverTest.anUnliftedSugarFormIsABrokenInvariantNotAGap`).
@@ -243,18 +405,47 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
   §10.1 lets an id-less schema be registered under an application-supplied identity, a route no front door here
   offers, so a conforming processor may load the same document cleanly and no vector states the refusal.
 
-**No gap reaches a read either:** every constructor `meta-kernel.tn` and `meta.tn` declare builds a real reader, and
-`CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReader`. The machinery stays because §2.2.2's
-extension point can still reach it — a meta-layer constructor this library has no factory for — and it rides in
-the report, located at the value it could not read (`TsonCli.exitCodeFor` lifts the run to 70).
+**No gap reaches a read either:** every constructor meta.tn, numeric.tn, temporal.tn and net.tn declare builds a real reader,
+and `CoreSchemaImportTest` asserts no `core.tn` entry compiles to an `ErrorReader`. The machinery stays because the extension
+point can still reach it — a schema's own constructor this library has no factory for — and it rides in the report, located
+at the value it could not read (`TsonCli.exitCodeFor` lifts the run to 70).
 
-## The `schema.meta` value model
+## The schema value model
 
-One Java type per kernel record or enum; `Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as
-Java subtyping, and an entry's kind is `EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record
-carries `TypeChain chain` as its first component, mirroring the constructor's flattened shape (`type`'s field first);
-`Reference`, `TemplateBody` and `Namespace` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), the
-kernel's labelled choice, because a record of two `Optional`s would not say that exactly one is present.
+One Java type per kernel record or enum, in the package of the namespace that declares its entry (`schema.meta`,
+`schema.unicode`, `schema.numeric`, `schema.net`, `schema.binary`, `schema.temporal`), so the binder reaches it by
+path (`design/front-door-and-config.md`); a class no entry declares stays in `schema.meta`.
+`Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as Java subtyping, and an entry's kind is
+`EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record carries `TypeChain chain` as its first
+component, mirroring the constructor's flattened shape (`type`'s field first);
+`Alias`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), one
+argument of a reference, because a record of two `Optional`s would not say that exactly one is present; it compares
+by its canonical text, the head's parameter and not the grammar deciding which it binds. `Reference` is the parsed
+form of a reference value, sealed over `TypeRef` and `SiblingRef` (`kind!`, a record field's type chosen per instance
+by a sibling field's value, [TSON-SCHEMA] §5.2); `TypeRef` is sealed in turn over `NameRef`
+(no arguments) and `ApplicationRef` (at least one), the variant chosen by `TypeRef.of`, which never builds a sibling. Only
+`RecordField.type` and `RecordTemplateField.type` are typed `Reference`; every other slot holding a reference is
+typed `TypeRef`, so the position rule is the Java type and only the field-type consumers switch on the variant. **The
+position rule is enforced where a sibling is read**, so none reaches a `TypeRef` slot: in sugar by `SchemaDesugarer`
+(`design/schema-grammar-and-desugaring.md`); in an explicit instance or a resolved form by the slot reader `BindTargets`
+picks by the component's class, a `TypeNameSlotReader` refusing one at its token where the component is a `TypeRef`
+(`TYPE_MISMATCH`, naming the slot, `!meta.array { element_type: kind! }`) and admitting it where it is a `Reference`
+at a reference whose `allow_sibling` admits one (`record_field.type`, `record_template_field.type`, positional or
+not); inside an argument list by the data stream;
+and wherever no component narrows the read (a tree-mode read, a field typed `meta.type_ref` in data) by the reference
+atom's parser, which reads every variant through `ReferenceGrammar.parseReference` and admits a sibling only where the
+reference's `allow_sibling` does (`meta.field_type_ref`), refusing it elsewhere as a constraint the value breaks
+(`ATOM_CONSTRAINT_VIOLATION`). A model walk such as `MetaRefs` could not see a misplaced sibling, the Java type having
+no room for one. At a field's type a sibling makes the field a **dependent field**: a consumer that needs a field's type
+reference asks `RecordField.namedType()` (empty for a dependent field) or switches on the variant, and
+`RecordField.typeRef()` on a dependent field is a broken invariant (`IllegalStateException`); a rewrite of type names
+(`MetaRefs`, substitution, closing an application) keeps a sibling as written, name collection and §5.10's spelling
+checks skip it, and the writers write its text unquoted. `Reference`, `TypeRef` and each variant are registered as atom
+host types, since a value written by its own class is described by the variant (`TypeRefTextBridge` and its nested
+bridges, in `ResolverBindContext`; `ForReference` and `ForSibling` read a sibling through
+`ReferenceGrammar.parseReference`). A context without those registrations describes `TypeRef` as a union of two records,
+so the schema model's classes bind only through a context that carries them (`ResolverBindContext.registerAbsent`, which
+`SchemaModelNameBinder.over` applies).
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the
 model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtures are listed in
 `DefinitionResolverTest`'s Javadoc.

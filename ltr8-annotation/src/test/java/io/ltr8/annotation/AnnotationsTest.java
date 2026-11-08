@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The query surface, sized to what annotations are actually used for. Across the spec's own bundled
- * schemas the whole vocabulary is markers ({@code @numeric}, {@code @disjoint}, {@code @annotation}) and
- * single scalars ({@code @doc} text, {@code @bounded} boolean, {@code @ordering} enum) -- so
+ * schemas the whole vocabulary is markers ({@code @atom.numeric}, {@code @meta.disjoint}, {@code @meta.annotation}) and
+ * single scalars ({@code @doc} text, {@code @atom.bounded} boolean, {@code @atom.ordering} enum) -- so
  * {@link Annotations#has} and {@link Annotations#value} carry nearly all the traffic, and repeats, though
  * §3.1 permits them, barely appear.
  */

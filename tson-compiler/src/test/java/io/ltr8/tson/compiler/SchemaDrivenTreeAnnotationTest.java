@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonValue;
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * type-ref?} framing where the node is <em>not</em> built, so rather than widen four shared shape-check
  * signatures with a field only tree mode reads, each tree reader captures first and leaves the base's own
  * framing call a no-op. <b>Checking</b> follows [TSON-SCHEMA] §6: an annotation names a type, resolved one
- * hop against the governing schema (§3.3.3), and its value is read by that type's own compiled reader -- so a
+ * hop in the schema's one namespace (§3.3.3), and its value is read by that type's own compiled reader -- so a
  * wrong-typed value is a diagnostic simply because the right reader rejected it, with no separate validation
  * pass.
  *
@@ -46,11 +46,11 @@ class SchemaDrivenTreeAnnotationTest {
     private static final String SCHEMA_ID = "https://example.test/tree-annotations.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/tree-annotations.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
-              label => @annotation text
-              checked => @annotation void
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
+              label => @meta.annotation text
+              checked => @meta.annotation void
               point => { x: int32  y: int32 }
               shape => { name: text  origin: point  tags: [text] }
               circle => shape & { radius: int32 }
@@ -72,8 +72,8 @@ class SchemaDrivenTreeAnnotationTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return (TsonValue) TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID).get("shape")
                 .read(TestDocuments.document(data));
     }
@@ -105,7 +105,7 @@ class SchemaDrivenTreeAnnotationTest {
     @Test
     void anAnnotationValueIsReadByTheTypeItNames() {
         // @doc resolves through core's doc -> documentation -> text, @label through this schema's own
-        // `label => @annotation text`. Both come back as read values, not raw tokens.
+        // `label => @meta.annotation text`. Both come back as read values, not raw tokens.
         TsonValue shape = read(VALID);
 
         assertEquals(Optional.of("a shape"), shape.annotations().get(0).value().orElseThrow().asString());
@@ -127,7 +127,7 @@ class SchemaDrivenTreeAnnotationTest {
 
     @Test
     void anAnnotationNamingNoTypeIsReported() {
-        // §6: an annotation names a type. A name the governing schema doesn't declare is an unresolved
+        // §6: an annotation names a type. A name the schema's namespace doesn't hold is an unresolved
         // reference, not silently-accepted metadata.
         ReadException thrown = assertThrows(ReadException.class,
                 () -> read("!shape { name: @nosuchthing:\"x\" \"square\"  origin: { x: 1  y: 2 }  tags: [] }"));

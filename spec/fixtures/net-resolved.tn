@@ -1,0 +1,143 @@
+!!id:"https://tson.io/2026/39/m/net-resolved.tn"
+!!import:"https://tson.io/2026/39/m/meta.tn"
+@doc:"""
+  Resolver-output fixture for net.tn (2026 Revision 39 draft).
+  Parse the source schema, run the resolver, canonicalise, compare.
+  Conventions as in meta-resolved.tn, and the header note in
+  numeric-resolved.tn applies here: net.tn imports meta.tn alone, its
+  constructors are members of the schema map nested as its entry `net`,
+  which holds this document's members only and none of the kernel's, and
+  every entry's tag names a kernel constructor or one of `net`'s.
+  """
+!schema {
+  net => !meta.schema {
+    email_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
+      chain         => !meta.record_field { type: meta.type_chain  optional: true }
+      min_length    => !meta.record_field { type: numeric.count  optional: true }
+      max_length    => !meta.record_field { type: numeric.count  optional: true }
+      length        => !meta.record_field { type: numeric.count  optional: true }
+      pattern       => !meta.record_field { type: regex  optional: true }
+      members       => !meta.record_field { type: unicode.text_member_set  optional: true }
+      normalization => !meta.record_field { type: unicode.normalization  optional: true  role: FIXED  value: NONE }
+      spec          => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
+    } }
+
+    ipv4_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain     => !meta.record_field { type: meta.type_chain  optional: true }
+      spec      => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
+      within    => !meta.record_field { type: array_cidr4_xxhash  optional: true }
+      excluding => !meta.record_field { type: array_cidr4_xxhash  optional: true }
+    } }
+
+    ipv6_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain     => !meta.record_field { type: meta.type_chain  optional: true }
+      spec      => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
+      within    => !meta.record_field { type: array_cidr6_xxhash  optional: true }
+      excluding => !meta.record_field { type: array_cidr6_xxhash  optional: true }
+    } }
+
+    cidr4_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain      => !meta.record_field { type: meta.type_chain  optional: true }
+      spec       => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
+      min_prefix => !meta.record_field { type: numeric.count  optional: true }
+      max_prefix => !meta.record_field { type: numeric.count  optional: true }
+      within     => !meta.record_field { type: array_cidr4_xxhash  optional: true }
+      excluding  => !meta.record_field { type: array_cidr4_xxhash  optional: true }
+    } }
+
+    cidr6_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain      => !meta.record_field { type: meta.type_chain  optional: true }
+      spec       => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
+      min_prefix => !meta.record_field { type: numeric.count  optional: true }
+      max_prefix => !meta.record_field { type: numeric.count  optional: true }
+      within     => !meta.record_field { type: array_cidr6_xxhash  optional: true }
+      excluding  => !meta.record_field { type: array_cidr6_xxhash  optional: true }
+    } }
+
+    mac_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain => !meta.record_field { type: meta.type_chain  optional: true }
+      spec  => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9542" }
+    } }
+
+    hostname_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain     => !meta.record_field { type: meta.type_chain  optional: true }
+      spec      => !meta.record_field { type: iri      optional: true  role: FIXED    value: "https://www.rfc-editor.org/rfc/rfc5890" }
+      allow_idn => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+    } }
+
+    host_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain => !meta.record_field { type: meta.type_chain  optional: true }
+      spec  => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3987" }
+    } }
+
+    media_type_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain            => !meta.record_field { type: meta.type_chain  optional: true }
+      spec             => !meta.record_field { type: iri      optional: true  role: FIXED    value: "https://www.rfc-editor.org/rfc/rfc6838" }
+      allow_parameters => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
+      types            => !meta.record_field { type: array_text_xxhash  optional: true }
+      suffixes         => !meta.record_field { type: array_text_xxhash  optional: true }
+    } }
+
+    uri_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {
+      chain          => !meta.record_field { type: meta.type_chain  optional: true }
+      min_length     => !meta.record_field { type: numeric.count  optional: true }
+      max_length     => !meta.record_field { type: numeric.count  optional: true }
+      length         => !meta.record_field { type: numeric.count  optional: true }
+      pattern        => !meta.record_field { type: regex       optional: true }
+      members        => !meta.record_field { type: unicode.text_member_set  optional: true }
+      normalization  => !meta.record_field { type: unicode.normalization  optional: true  role: FIXED  value: NONE }
+      spec           => !meta.record_field { type: iri         optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
+      schemes        => !meta.record_field { type: net.scheme_set  optional: true }
+      allow_relative => !meta.record_field { type: boolean     optional: true  role: DEFAULT  value: true }
+      allow_fragment => !meta.record_field { type: boolean     optional: true  role: DEFAULT  value: true }
+    } }
+
+    uuid_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
+      chain   => !meta.record_field { type: meta.type_chain  optional: true }
+      spec    => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
+      version => !meta.record_field { type: numeric.count  optional: true }
+    } }
+  }
+
+  @atom.ordering:NONE @atom.bounded:false
+  email => !net.email_type {}
+
+  @atom.ordering:TOTAL @atom.bounded:true
+  ipv4 => !net.ipv4_type {}
+
+  @atom.ordering:TOTAL @atom.bounded:true
+  ipv6 => !net.ipv6_type {}
+
+  @atom.ordering:PARTIAL @atom.bounded:false
+  cidr4 => !net.cidr4_type {}
+
+  @atom.ordering:PARTIAL @atom.bounded:false
+  cidr6 => !net.cidr6_type {}
+
+  @atom.ordering:NONE @atom.bounded:false
+  mac => !net.mac_type {}
+
+  @atom.ordering:NONE @atom.bounded:false
+  hostname => !net.hostname_type {}
+
+  @atom.ordering:NONE @atom.bounded:false
+  host => !net.host_type {}
+
+  @atom.ordering:NONE @atom.bounded:false
+  media_type => !net.media_type_type {}
+
+  @atom.ordering:NONE @atom.bounded:false
+  uri_reference => !net.uri_type { chain: { subtypes: [uri] } }
+
+  @atom.ordering:NONE @atom.bounded:false
+  uri => !net.uri_type { chain: { supertypes: [uri_reference] }  allow_relative: false }
+
+  @atom.ordering:NONE @atom.bounded:false
+  uuid => !net.uuid_type {}
+
+  @meta.synthetic array_cidr4_xxhash => !meta.array { element_type: cidr4 }
+
+  @meta.synthetic array_cidr6_xxhash => !meta.array { element_type: cidr6 }
+
+  @meta.synthetic array_text_xxhash => !meta.array { element_type: text }
+}

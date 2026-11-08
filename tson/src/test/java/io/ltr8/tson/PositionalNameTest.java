@@ -12,23 +12,23 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * §5.6's positional form in a data document, which values by name ([TSON-SCHEMA] §5.12) do not reach: a data
- * document has no namespace to resolve a name in, so a bare token at a record position fills the one positional
- * field whatever that field's type. A kind-typed field reaches a data document through core.tn's own {@code kind};
- * a field typed by a kernel record ({@code type_ref}, {@code record_field}) does not, since an ordinary schema
- * imports only ordinary ones (§2.2.3). The one schema-document case here is the contrast: there a bare token fills
- * the positional field only where that field is atom-typed, which {@code record_field}'s {@code type_kind} is.
+ * §5.6's positional form in a data document, which values by name ([TSON-SCHEMA] §5.12) do not reach: a data document
+ * has no namespace to resolve a name in, so a bare token at a record position fills the one positional field whatever
+ * that field's type. A kind-typed field reaches a data document through core.tn's own {@code kind}; a field typed by a
+ * kernel record ({@code meta.record_field}, {@code meta.template_param}) does not, since an ordinary schema imports
+ * only ordinary ones (§2.2.3). The one schema-document case here is the contrast: there a bare token fills the
+ * positional field only where that field is atom-typed, which {@code meta.record_field}'s {@code meta.type_ref} is.
  */
 class PositionalNameTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/positional-name.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               named  => { v: text }
-              slot   => { type: kind<record> }
-              holder => { c?: named  p?: slot  q?: kind<record> }
+              slot   => { type: meta.ref<meta.record> }
+              holder => { c?: named  p?: slot  q?: meta.ref<meta.record> }
             }""";
 
     private static List<Diagnostic> read(String data) {
@@ -49,7 +49,7 @@ class PositionalNameTest {
     }
 
     /**
-     * {@code slot}'s one field is {@code type}, a {@code kind<record>}: in a data document a name fills it, and is
+     * {@code slot}'s one field is {@code type}, a {@code meta.ref<record>}: in a data document a name fills it, and is
      * judged a member of the kind in the governing schema's namespace.
      */
     @Test
@@ -58,7 +58,10 @@ class PositionalNameTest {
         assertFalse(read("!holder { p: some_type }").isEmpty(), "a name that is no member is refused");
     }
 
-    /** A kind-typed slot holds a type's name, one segment: a dotted token is refused by the grammar, never read by name. */
+    /**
+     * A kind-typed slot holds a type's name, its path from the root: a dotted token naming no member is refused, never
+     * read as the positional field's record by name.
+     */
     @Test
     void aDottedTokenIsReadAsThePositionalField() {
         List<Diagnostic> reported = read("!holder { q: orders.methods.place_order }");
@@ -68,7 +71,7 @@ class PositionalNameTest {
     }
 
     /**
-     * In a schema document the same fill: {@code record_field}'s positional field is {@code type}, an atom, so
+     * In a schema document the same fill: {@code meta.record_field}'s positional field is {@code type}, an atom, so
      * {@code p => text} is {@code p => { type: text }}, which is what the sugar {@code p: text} desugars to.
      */
     @Test
@@ -76,10 +79,10 @@ class PositionalNameTest {
         for (String fields : List.of("{ p => text }", "{ p => { type: text } }")) {
             assertEquals(List.of(), Tson.standard().validateSchema("""
                     !!id:"https://example.test/positional-name-schema.tn"
-                    !!meta:"https://tson.io/2026/38/m/meta.tn"
-                    !!import:"https://tson.io/2026/38/m/core.tn"
-                    {
-                      r => !record { fields: %s }
+                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !schema {
+                      r => !meta.record { fields: %s }
                     }""".formatted(fields)), fields);
         }
     }

@@ -10,7 +10,7 @@ import java.util.Optional;
  * A store of linked schemas keyed by canonical identity ({@code [TSON-DATA] §2.2.1}), mirroring
  * Part 2 §10.1's "schema library" concept. {@link #register} only accepts a {@link
  * TsonLinkedSchema} -- proof, at the type level, that {@code TsonSchemaLinker.link} already ran (import
- * merging, argument-bearing {@code type_ref} synthesis, reference validation) -- and does nothing
+ * merging, subtype and kind indexes, reference validation) -- and does nothing
  * but store it; once admitted, a schema is never overwritten or removed -- together with {@link
  * TsonSchema#entries()} already being an unmodifiable map, this registration-time rejection of
  * re-registering the same identity *is* the "locked, no mutations allowed" guarantee.
@@ -18,7 +18,7 @@ import java.util.Optional;
  * <p><b>Linking and storing are two operations, not one</b>, following the pipeline's own compiler
  * vocabulary (parse -&gt; resolve -&gt; link -&gt; register -&gt; compile -&gt; read): a caller calls
  * {@code TsonSchemaLinker.link} explicitly (passing this registry itself as the {@link TsonSchemaLoader}
- * it needs for {@code !!import}/{@code !!meta} lookups -- see {@code implements TsonSchemaLoader} below)
+ * it needs for {@code !!import} lookups -- see {@code implements TsonSchemaLoader} below)
  * and only then calls {@link #register}. Two consequences: {@code register} cannot silently do the wrong
  * thing with an unlinked schema (there's no overload that accepts one), and "has this been linked" is
  * answered by the compiler, not by a flag every caller has to remember to check.
@@ -31,18 +31,16 @@ import java.util.Optional;
  * the schema's own {@code !!id}) and {@link #get} (from whatever raw URI a caller has, e.g. off a
  * document's {@code !!import} list) canonicalize internally.
  *
- * <p><b>{@link #register} refuses any self-referential schema (its own {@code !!meta} names its
- * own {@code !!id}) whose {@link TsonSchema#bootstrap()} is {@code true}</b> -- meta-kernel's own
- * defining trait (Part 2 §1.5's "one deliberate circularity"), and the only schema ever allowed to
- * have that shape. {@code bootstrap()} is a real, stored flag that only {@code
- * MetaKernelBootstrapResolver.getMetaKernelSchema()} ever sets, so this guard keeps proving, continuously,
- * that meta-kernel's own identity can only ever be registered by something that genuinely came
+ * <p><b>{@link #register} refuses any schema whose {@link TsonSchema#bootstrap()} is {@code true}</b> -- the
+ * kernel's pre-loaded form ([TSON-SCHEMA] §3.4). {@code bootstrap()} is a real, stored flag that only {@code
+ * KernelBootstrapResolver.kernelSchema()} ever sets, so this guard keeps proving, continuously,
+ * that the kernel's own identity can only ever be registered by something that genuinely came
  * from the real bootstrap reader -- not just something shaped like it. {@code
  * TsonSchemaLinker.linkBootstrap} is the one sanctioned way to turn the raw bootstrap form into a
  * {@link TsonLinkedSchema} without this rejection -- it lives there because it's a linking operation,
  * not a storage one, and this registry never stores its own result anyway
  * (a caller that also needs it *persisted* under its own identity still can't register that result
- * directly -- it's still {@code bootstrap() == true}); the one way meta-kernel's own identity can
+ * directly -- it's still {@code bootstrap() == true}); the one way the kernel's own identity can
  * actually be registered is resolving its document a second time, ordinarily (never setting {@code
  * bootstrap}), against a coordinator seeded from the one-off linked bootstrap result.
  */
@@ -66,7 +64,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     }
 
     /**
-     * @param loader consulted for a {@code !!import}/{@code !!meta} target not already registered;
+     * @param loader consulted for an {@code !!import} target not already registered;
      *               {@code null} falls back to the registered-only default (this registry itself).
      */
     public TsonSchemaRegistry(TsonSchemaLoader loader) {
@@ -107,24 +105,14 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     /** The validation both registration paths share; returns the canonical identity to key on. */
     private static String checkRegistrable(TsonLinkedSchema schema) {
         TsonSchema unwrapped = schema.schema();
-        if (selfReferential(unwrapped) && unwrapped.bootstrap()) {
-            throw new SchemaValidationException("'" + unwrapped.id() + "' is self-referential (its own "
-                    + "!!meta names its own !!id) and bootstrap() == true -- meta-kernel's own identity "
+        if (unwrapped.bootstrap()) {
+            throw new SchemaValidationException("'" + unwrapped.id() + "' is the kernel's pre-loaded form "
+                    + "(bootstrap() == true) -- the kernel's own identity "
                     + "must be registered via a schema resolved ordinarily (TsonSchemaResolver.resolveSchema,"
                     + " which never sets bootstrap), never the bootstrap-produced form directly, "
                     + "materialized or not");
         }
         return CanonicalIdentity.canonicalize(unwrapped.id());
-    }
-
-    /**
-     * Part 2 §1.5's "one deliberate circularity": a schema whose own {@code !!meta} names its own
-     * {@code !!id}. Compared by canonical identity, not raw string -- meta-kernel's own {@code !!id}
-     * may carry a {@code ?sha256=} pin while its self-{@code !!meta} cannot (pinning the self-reference
-     * would be circular, §2.2.1), so the two differ as strings but name the same identity.
-     */
-    private static boolean selfReferential(TsonSchema schema) {
-        return CanonicalIdentity.sameIdentity(schema.id(), schema.meta());
     }
 
     @Override

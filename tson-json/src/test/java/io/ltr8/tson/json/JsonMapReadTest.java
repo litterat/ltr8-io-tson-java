@@ -23,14 +23,14 @@ class JsonMapReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/maps-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               counts    => { text => int32 }
               by_date   => { date => number }
               by_number => { number => text }
               optional  => { text => int32? }
-              sized     => !map { key_type: text  value_type: int32  min_items: 1  max_items: 2 }
+              sized     => !meta.map { key_type: text  value_type: int32  min_items: 1  max_items: 2 }
               point     => { x: int32  y: int32 }
               by_point  => { point => text }
               pair      => [text, int32]
@@ -88,8 +88,8 @@ class JsonMapReadTest {
     @Test
     void aDollarInitialMemberIsAnOrdinaryKey() {
         assertEquals("""
-                {"$schema":1}""", read("counts", """
-                {"$schema": 1}""").accepted().toString());
+                {"$import":1}""", read("counts", """
+                {"$import": 1}""").accepted().toString());
     }
 
     /**

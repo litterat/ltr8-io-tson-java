@@ -10,9 +10,11 @@ history lives in git.
 - What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`); `IdentifierGrammar.hygiene`
   returns a verdict rather than throwing.
 - A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
-- A namespace type's instance and an annotation value are judged at the payload read
-  (`SchemaResolver.payloadNames`), not in the walk, which cannot see into them; every other constructor payload is
-  read under no policy.
+- Each schema map is a scope of its own, the root and each nested `!schema` map, grouped by `SchemaPaths.parent`; the
+  per-name rules judge a member's own name, its path's last segment, never the dotted path.
+- A value entry's payload and an annotation value are judged at the payload read (`SchemaResolver`, under the
+  loader's identifier policy), not in the walk, which cannot see into them; every constructor payload is read under
+  no policy.
 - A minted name is ASCII and an identifier by construction, and is never exempted from the walk.
 - Non-ASCII or non-admitted content in a minted name is hashed rather than dropped; a part is capped at 64 characters,
   hash included.
@@ -29,46 +31,47 @@ Related: `design/linking-and-compilation.md`, `design/schema-resolution.md`, `de
 alike, a character outside the identifier profile, and a script combination the restriction level does not
 admit. The scopes are §11.4's — the
 merged namespace, which is where §2.2.3's own disjointness rule is exact equality and a confusable pair passes
-it by construction; each entry's record field names, its groups' member labels arriving flattened among them;
-and its enum members, where the enum declares itself a vocabulary — plus **a template's parameters, which
-§11.4 declines to list** (`<T, Т>` otherwise
-declares two parameters that render identically, and a body referencing `T` binds one of them with nothing in
-the source to say which). §11.4 and §5.10 both say why they are left out — one author writes the list whole on
-one line — and this stays stricter deliberately: mechanisms 2 and 3 reach every identifier position anyway
-(§8.2), so only the look-alike rule is a divergence, and a walk with an exemption is the shape that grows the
-holes one walk exists to close. A **choice's variants are deliberately not checked**: a variant
-is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
-there could never fire.
+it by construction, split into one scope per schema map (the root's entries, and each nested `!schema` map's members
+by their own names, a refusal naming the map); each entry's record field names, its groups' member labels arriving flattened
+among them; and its enum members, where the enum declares itself a vocabulary — plus **a template's parameters, which §11.4
+declines to list** (`<T, Т>` otherwise declares two parameters that render identically, and a body referencing `T` binds one
+of them with nothing in the source to say which). §11.4 and §5.10 both say why they are left out — one author writes the list
+whole on one line — and this stays stricter deliberately: mechanisms 2 and 3 reach every identifier position anyway (§8.2),
+so only the look-alike rule is a divergence, and a walk with an exemption is the shape that grows the holes one walk exists
+to close. A **choice's variants are deliberately not checked**: a variant is a reference to a declared name, so a confusable
+pair is already two confusable namespace entries and a check there could never fire.
 
 **A field's default or fixed value is a name when its type is an identifier family** (`checkFieldValues`), and
 meets the two per-name rules in the same pass, under that family's own profile. It is not a scope — one value
 stands alone — but it is the schema's own copy of a value a read judges: a default reaches every document that
 omits the field, so a value the reader would refuse if written must not be one it injects
-(`design/name-hygiene-read-path.md`).
+(`design/name-hygiene-read-path.md`). A record template's literal values are judged the same way, once, at the
+template, applied or not: they are every application's, and judged only on a minted member they would be reported
+against a content-derived name. A `value_param` is no literal of the template's.
 
-**A namespace value and an annotation value are judged where they are read, not in the walk.** A namespace type's
-instance (`!api { … }`) is a map keyed by names whose values bind to the consumer's own classes
-(`design/meta-layer-namespaces.md`), and an annotation value binds to whatever its type binds, so by link time the
-field types that make a value a name are behind them — a meta layer's `replies: {status_name => …}` arrives as a
-`Map<String, …>`. `SchemaResolver` reads those two payloads under the registry's policy instead, and the readers
-apply §8.2 exactly as they do in a data document: the namespace's keys are one scope, so are the keys of each
-identifier-keyed map in it, and an identifier-typed value meets the per-name rules. Every other
-constructor builds the schema layer's own vocabulary and is read under `IdentifierPolicy.none()`: its names are
-the walk's scopes, and its identifier-typed values outside them are references — a choice's variants, a
-supertype — whose verdict belongs to the declaration they name, possibly in another schema. Judging a reference
-too would report one name twice, against the wrong declaration, and stop the schema reaching the linker.
+**A value entry and an annotation value are judged where they are read, not in the walk.** A value entry's payload (`!api { …
+}`, a map keyed by names) binds to the consumer's own classes or is held as a tree
+(`design/namespace-types-and-value-entries.md`), and an annotation value binds to whatever its type binds, so by link time
+the field types that make a value a name are behind them — a schema's `replies: {status_name => …}` arrives as a `Map<String,
+…>`. `SchemaResolver` reads those two payloads under the registry's policy instead, and the readers apply §8.2 exactly as
+they do in a data document: a namespace value's keys are one scope, so are the keys of each identifier-keyed map in it, and
+an identifier-typed value meets the per-name rules. A constructor's payload builds the schema layer's own vocabulary and is
+read under `IdentifierPolicy.none()`: its names are the walk's scopes, and its identifier-typed values outside them are
+references — a choice's variants, a supertype — whose verdict belongs to the declaration they name, possibly in another
+schema. Judging a reference too would report one name twice, against the wrong declaration, and stop the schema reaching the
+linker.
 
 **The restriction level is refused per name, in the same pass** (`IdentifierPolicy.judge`, UTS #39 §5.2). The two
 are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
 it can never fire on a lone name; the level is a *property* of one name, so it is what reaches a name nothing
 else in the schema resembles. Configured by `ProcessorConfig.withIdentifierPolicy` and carried on
-`TsonCompiledMetaRegistry`, which is the one object every resolve and every read passes through. The same policy
+`TsonCompiledVocabularyRegistry`, which is the one object every resolve and every read passes through. The same policy
 switches the confusable check (`appliesSkeletonDistinctness()`), which each scope asks before comparing.
 **Two axes, not a ladder** — a level and a unit — because per-segment Highly Restrictive and Moderately
 Restrictive are incomparable. The default is Highly Restrictive over a whole name, which refuses
 `id_пользователя`; the relaxation to reach for is the *unit*, since `perSegment()` admits that and still
 refuses `аdmin`. The bootstrap links under the default rather than under a caller's policy: a configuration
-should not be able to break meta-kernel.
+should not be able to break the kernel.
 
 ## Minted names (`InternalName`, `MintedNames`)
 
@@ -78,9 +81,9 @@ other** (`InternalName`). Both naming sites splice author-written content into t
 arguments — so a derived name is a place where a document's own text reaches the schema namespace. Two
 requirements meet there, and the second is why meeting the first is not enough:
 
-- **[TSON-SCHEMA] §8.2's freshness MUST**, that an internal name is a valid `identifier`. Splicing raw text
+- **[TSON-SCHEMA] §8.2's freshness MUST**, that an internal name is a valid `meta.identifier`. Splicing raw text
   breaks it outright: a `text` field holding a path puts `/` in a name, and §7.7 admits only `XID_Continue` and
-  `-`. An HTTP operation is the case that finds it — a meta layer's vocabulary is motivated by one, and
+  `-`. An HTTP operation is the case that finds it — a schema's value entries are motivated by one, and
   every realistic path carries a slash.
 - **§8.2's hygiene must still be able to judge the result.** Admitting every `XID_Continue` character keeps
   the name legal and still lets author text shape it: a Cyrillic `о` in a value would sit in a namespace
@@ -89,9 +92,13 @@ requirements meet there, and the second is why meeting the first is not enough:
   recommended default for containing a Russian word. Exempting minted names from the walk answers that and
   opens a worse hole: the namespace then takes on whatever a document happens to contain, unchecked.
 
-So the rule is ASCII, in three cases. What is ASCII and admitted by §7.7 is spliced verbatim — the ordinary
-case, a type name or a verb or a bound. What is ASCII but not admitted keeps its admitted characters and
-gains a hash, so `"/x"` reads `x_h00000f2f` and `1.0` reads `1_0_h0000bdb3`. Anything else is the hash alone.
+So the rule is ASCII, in four cases, after a kernel path is read as its member (a `meta.array` head reads
+`array`, so the kernel's `[meta.type_ref]` mints `array_type_ref_…`). What is ASCII and admitted
+by §7.7 is spliced verbatim — the ordinary case, a type name or a verb or a bound. A qualified name of ASCII
+identifiers, `geo.inner.tag`, writes each dot `_` (`array_geo_inner_tag_…`), a minted name being one identifier; its
+path is no part of identity, so it needs no hash of its own. What is ASCII but not admitted keeps its admitted
+characters and gains a hash, so `"/x"` reads `x_h00000f2f` and `1.0` reads `1_0_h0000bdb3`. Anything else is the hash
+alone.
 **Hashed rather than dropped**, because replacing it would collapse two different values onto one readable
 half, where a hash keeps them visibly distinct and keeps the name inspectable — a reader holding the schema
 can hash the same text and match it. Nothing identity depends on is at stake either way: that is the
@@ -121,6 +128,16 @@ its own. **Per phase**: desugaring and materialisation hold one each and run eit
 name minted in one phase colliding with a different form in the other is not caught; the two share their
 naming functions, so such a pair would have to have collided within a phase as well to exist.
 
+**Across documents, one form is one entry.** Two documents that mint one form without importing each other declare
+one synthetic, and a closure holding both keeps the first (`resolver.ImportedSynthetics`,
+`design/linking-and-compilation.md`). No canonical rendering crosses a schema boundary, so that merge compares the
+resolved bodies instead, and two bodies under one minted name are the same `IllegalStateException`. A local lift whose
+name an import already declares references the import's entry, and is held to it: `SchemaDesugarer` keeps the declaration
+it would have injected (`reused`), `SchemaResolver` resolves that form on its own once every entry is ready, and
+`ImportedSynthetics.requireForm` compares it with the import's entry, chain and a choice's linker-derived `disjoint` left
+out, an open entry by its parameter names and held text. A declared entry of the name is §2.2.3's collision, a
+`SchemaValidationException`; a synthetic of another form is the `IllegalStateException`.
+
 ## Why one walk, and what a refusal carries
 
 **One walk rather than one check per naming position, and that is the load-bearing part.** Running the
@@ -130,13 +147,13 @@ positions only some of those reach: an enum member and a group's member labels g
 and for script mixing, and never for a restricted character, invisibly.
 
 **An enum's members and a record's field names are judged under their name type's profile.** Both `name_type`s are
-identifier families (`enum`'s is the kernel's `identifier`; `!enum_type { name_type: words … }` or a record's
+identifier families (`enum`'s is the kernel's `meta.identifier`; `!meta.enum_type { name_type: words … }` or a record's
 `name_type: json_name` names the author's own), so the names are names and all three mechanisms reach them, with the
 profile's added characters — a `start_add`, a `continue_add`, a `medial` — counted as its own rather than as
 restricted characters (`NameType.profile`, passed to `checkScope`). That exemption has a floor
 (`IdentifierProfile.incoherence`): an addition may not be a Default_Ignorable_Code_Point, a control, or a space other
 than U+0020, or a profile could carry an invisible character past every rule. A closed set of text that is no name is
-no enum: it is `text_type`'s `members` facet, a value set no name rule reaches. A scope list can be reviewed; three
+no enum: it is `unicode.text_type`'s `members` facet, a value set no name rule reaches. A scope list can be reviewed; three
 call sites cannot. What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`), which is
 validity, is stable across Unicode versions, and really is a parse error; `IdentifierGrammar.hygiene` returns the
 restricted-character rule's verdict rather than throwing, because a refusal is not one.

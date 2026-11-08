@@ -29,7 +29,7 @@ refusal interacts with the verdicts around it. Current form only; history lives 
   is read as nothing when refused, and the keys of a map keyed by one, and the elements of a set of one, are a
   look-alike scope checked as each arrives.
 
-Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
+Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`. The schema-side walk is
 `design/name-hygiene-and-minted-names.md`.
@@ -78,7 +78,7 @@ the pair reads coherently where the suppressed one contradicted it.
 around — and it produces no comparable misinstruction.
 
 A Class 1 document carries two names — a type-ref name and an annotation name, the positions §7.4 marks
-`identifier` — and §8.2's restricted-character and restricted-script rules apply to both, **on by default**. They
+`meta.identifier` — and §8.2's restricted-character and restricted-script rules apply to both, **on by default**. They
 run in
 `DefaultTsonReadContext` as the name's event is first pulled, that being the first point on the read path
 holding the read's diagnostics receiver for names: what `TsonDataStream` raises of its own is a thrown
@@ -163,8 +163,8 @@ that the caller must change it or relax the policy. What these codes carry that 
 that another processor at another Unicode version may accept the same document.
 
 **A value whose type is an identifier family is a name too**, because the type says so (§8.2, [TSON-SCHEMA]
-§11.4): a field value or a map key typed by any entry whose body `identifier_type` made — the kernel's
-`identifier`, a schema's own, a refinement of either. `AtomTypeReader` holds the family's profile, built once when
+§11.4): a field value or a map key typed by any entry whose body `unicode.identifier_type` made — the kernel's
+`meta.identifier`, a schema's own, a refinement of either. `AtomTypeReader` holds the family's profile, built once when
 the reader compiles, and after the family parses a value it asks `TsonReadContext.refusesName` of that value — the
 text in the family's `normalization` form, never the spelling, so a folded name is judged as the name it is — the
 same two rules

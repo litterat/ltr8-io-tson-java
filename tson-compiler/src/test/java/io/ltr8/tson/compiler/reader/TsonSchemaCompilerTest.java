@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
@@ -50,7 +51,7 @@ class TsonSchemaCompilerTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("A", bodyA);
         entries.put("B", bodyB);
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         TsonCompiledSchema compiled = compile(linkedSchema);
@@ -66,7 +67,7 @@ class TsonSchemaCompilerTest {
                 RecordBody.of(RecordBody.fieldMap(Map.entry("child", RecordField.required(TypeRef.of("Node")))));
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("Node", selfReferencing);
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         TsonCompiledSchema compiled = compile(linkedSchema);
@@ -76,15 +77,15 @@ class TsonSchemaCompilerTest {
 
     @Test
     void anEntryWithNoRegisteredFactoryDoesNotBlockCompilingTheRestOfTheSchemaButFailsOnlyWhenActuallyRead() {
-        // "orphan" is an instance of a meta layer's own namespace type -- [TSON-SCHEMA] §2.2.2's extension
-        // point, and the only kind of entry left that this library can build no reader for, every kernel and
-        // meta constructor having one. TsonSchemaCompiler.compile() still builds the whole schema eagerly,
-        // including "orphan" itself (get("orphan") succeeds); "used" (which never references "orphan") reads
-        // normally either way.
+        // "orphan" is an instance of a schema's own namespace type -- the only kind of entry left that this library can
+        // build no reader for, every kernel and bundled-library constructor having one. TsonSchemaCompiler.compile() still
+        // builds the whole schema eagerly, including "orphan" itself (get("orphan") succeeds); "used" (which never
+        // references "orphan") reads normally either way.
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("used", RecordBody.of(RecordBody.fieldMap()));
-        entries.put("orphan", new Namespace<>("endpoints", AnnotatedMap.of(Map.of("search", "/search"))));
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        entries.put("orphan", new ValueEntry("endpoints",
+                new Namespace<>("endpoints", AnnotatedMap.of(Map.of("search", "/search")))));
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         TsonCompiledSchema compiled = compile(linkedSchema);
@@ -94,19 +95,18 @@ class TsonSchemaCompilerTest {
                 .read(TestDocuments.document("{}")));
         assertTrue(used.isEmpty());
 
-        // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.
-        // Fail-fast, so the report raises: the gap is in `diagnostic().code()`, never in the exception type,
-        // which is the same rule the schema pipeline follows (`Diagnostic.Code.NOT_IMPLEMENTED`).
+        // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails, and as the
+        // document's mistake: a value entry is no type, so a data tag naming it names nothing to read against.
         TsonTypeReader<?> orphan = compiled.get("orphan");
         ReadException thrown =
                 assertThrows(ReadException.class, () -> orphan.read(TestDocuments.document("{}")));
-        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, thrown.diagnostic().code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, thrown.diagnostic().code());
         assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());
     }
 
     @Test
     void getOnAnUnknownNameThrowsBeforeAnyCompilationHappens() {
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), Map.of());
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), Map.of());
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         TsonCompiledSchema compiled = compile(linkedSchema);
 
@@ -119,7 +119,7 @@ class TsonSchemaCompilerTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("first", RecordBody.of(RecordBody.fieldMap()));
         entries.put("second", RecordBody.of(RecordBody.fieldMap()));
-        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", List.of(), entries);
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> compiled.get("frist"));

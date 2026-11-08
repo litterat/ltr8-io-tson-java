@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.unicode.Normalization;
-import io.ltr8.tson.schema.meta.IriType;
+import io.ltr8.tson.schema.net.IriType;
 import org.junit.jupiter.api.Test;
 import io.ltr8.net.Iri;
 import java.net.URI;
@@ -80,7 +80,7 @@ class IriParserTest {
     @Test
     void anIrisLengthCountsCodePoints() {
         String iri = "https://a.example/\uD83D\uDE00";
-        IriParser upTo19 = new IriParser(new IriType(IriType.SPEC, Optional.empty(), Optional.of(19),
+        IriParser upTo19 = new IriParser(new IriType(IriType.SPEC, Optional.empty(), Optional.of(19L),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true,
                 Normalization.NONE));
         assertEquals(19, iri.codePointCount(0, iri.length()));

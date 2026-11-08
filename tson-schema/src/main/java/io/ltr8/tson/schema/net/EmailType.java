@@ -1,0 +1,81 @@
+package io.ltr8.tson.schema.net;
+
+import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Typename;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.unicode.RegexType;
+import io.ltr8.tson.schema.unicode.TextFamily;
+import io.ltr8.tson.schema.unicode.TextType;
+import io.ltr8.unicode.Normalization;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * net.tn's {@code net.email_type} constructor (RFC 5322), composing {@code text_type}'s {@code
+ * min_length}/{@code max_length}/{@code length}/{@code pattern}. Pure constraint values, no
+ * parsing/validation behavior -- {@code tson-compiler}'s {@code EmailParser} holds one of these and does
+ * the actual reading/writing.
+ *
+ * <p>{@code spec} is flat and a bare {@link String}, never a {@link java.net.URI} -- see {@link
+ * Cidr4Type}'s own Javadoc for both halves of why. {@link RegexType} is this record's exact twin:
+ * {@code regex_type} is declared by the identical composition and differs only in the document {@code
+ * spec} is fixed to.
+ */
+@Typename(name = "net.email_type")
+public record EmailType(TypeChain chain,
+        String spec, @Field("min_length") Optional<Long> minLength,
+                         @Field("max_length") Optional<Long> maxLength,
+                         Optional<Long> length, Optional<String> pattern,
+                         Optional<List<String>> members, Normalization normalization) implements Atom, TextFamily {
+    /** The chain normalised: absent and empty are one list. */
+    @Record
+    public EmailType {
+        chain = TypeChain.orEmpty(chain);
+    }
+
+    /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
+    public EmailType(String spec, Optional<Long> minLength, Optional<Long> maxLength, Optional<Long> length,
+            Optional<String> pattern, Optional<List<String>> members, Normalization normalization) {
+        this(TypeChain.EMPTY, spec, minLength, maxLength, length, pattern, members, normalization);
+    }
+
+    @Override
+    public EmailType withChain(TypeChain chain) {
+        return new EmailType(chain, spec, minLength, maxLength, length, pattern, members, normalization);
+    }
+
+    /** {@code email => !net.email_type {}} -- the unconstrained email address, net.tn's own {@code !email}. */
+    public static final EmailType UNCONSTRAINED = new EmailType(
+            "https://www.rfc-editor.org/rfc/rfc5322", Optional.empty(), Optional.empty(),
+            Optional.empty(), Optional.empty(), Optional.empty(), Normalization.NONE);
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The same length facets {@link TextType} carries, checked the same way -- {@link #length}
+     * pins both ends and folds into the range the other two are compared against. {@link #pattern}
+     * is undecidable here (see {@link TextType#constraintsCheck}) and {@code spec} is fixed by the
+     * schema.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof EmailType other)) {
+            return List.of("refines an email with " + refined.getClass().getSimpleName());
+        }
+        return textConstraints().constraintsCheck(other.textConstraints());
+    }
+
+    /** The {@code text_type} facets this composes, as the {@link TextType} that owns their comparison rules. */
+    public TextType textConstraints() {
+        return new TextType(minLength, maxLength, length, pattern, members, normalization);
+    }
+
+    /** {@inheritDoc} <p>The length facets this composes, judged by {@link TextType#coherenceCheck} that owns them. */
+    @Override
+    public List<String> coherenceCheck() {
+        return textConstraints().coherenceCheck();
+    }
+}

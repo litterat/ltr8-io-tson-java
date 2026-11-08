@@ -5,7 +5,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.meta.VoidType;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -23,12 +23,12 @@ class TsonSchemaRegistryTest {
 
     private static TsonSchema schemaWithARecordField() {
         Map<String, Top> entries = new LinkedHashMap<>();
-        entries.put("token", new ValueType());
+        entries.put("token", new VoidType());
         entries.put("set_token", RecordBody.of(RecordBody.fieldMap()));
         entries.put("container", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("members", RecordField.required(TypeRef.of("set_token"))))));
         return new TsonSchema("https://example.test/registry-test.tn",
-                "https://example.test/meta.tn", List.of(), entries);
+                List.of(), entries);
     }
 
     /**
@@ -100,7 +100,7 @@ class TsonSchemaRegistryTest {
     @Test
     void constructingASchemaWithNoIdIsRejected() {
         assertThrows(NullPointerException.class,
-                () -> new TsonSchema(null, "https://example.test/meta.tn", List.of(), Map.of()));
+                () -> new TsonSchema(null, List.of(), Map.of()));
     }
 
     @Test
@@ -118,8 +118,7 @@ class TsonSchemaRegistryTest {
         registry.register(linkedSchema());
 
         TsonSchema sameIdentityDifferentScheme = new TsonSchema(
-                "http://example.test/registry-test.tn", "https://example.test/meta.tn",
-                List.of(), Map.of());
+                "http://example.test/registry-test.tn", List.of(), Map.of());
         TsonLinkedSchema linked = new TsonLinkedSchema(sameIdentityDifferentScheme);
 
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));

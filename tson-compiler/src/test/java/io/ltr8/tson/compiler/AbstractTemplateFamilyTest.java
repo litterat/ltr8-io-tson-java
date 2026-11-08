@@ -4,7 +4,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Every member's entry name is minted, which is what makes the alias half load-bearing.</b> §8.2 makes
  * a materialised name non-normative, so {@code ok_of => ok<text>} is the only name a document has for that
- * member -- and §7.2's "after reference flattening of both" is what lets a tag spell it.
+ * member -- and §7.2's "after alias flattening of both" is what lets a tag spell it.
  */
 class AbstractTemplateFamilyTest {
 
@@ -62,9 +62,9 @@ class AbstractTemplateFamilyTest {
     private static TsonCompiledSchemaRegistry compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/abstract-template.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -74,8 +74,8 @@ class AbstractTemplateFamilyTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         TsonCompiledSchemaRegistry registry = TsonCompiledSchemaRegistry.tree(core);
         registry.get(ID);
         return registry;
@@ -88,7 +88,7 @@ class AbstractTemplateFamilyTest {
      */
     private static String target(TsonCompiledSchemaRegistry registry, String alias) {
         return registry.get(ID).schema().entries().get(alias)
-                instanceof io.ltr8.tson.schema.meta.Reference ref ? ref.target().name() : alias;
+                instanceof io.ltr8.tson.schema.meta.Alias ref ? ref.target().name() : alias;
     }
 
     private static RecordBody bodyOf(TsonCompiledSchemaRegistry registry, String alias) {

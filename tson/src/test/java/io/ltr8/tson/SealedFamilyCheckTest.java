@@ -26,8 +26,9 @@ class SealedFamilyCheckTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!meta:"%s"
             !!import:"%s"
+            !!import:"%s"
+            !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
     private static String schema(String name, String body) {
@@ -52,9 +53,8 @@ class SealedFamilyCheckTest {
      * @discriminator} are already on, and the reason there is no name left to reserve once the mark is a word
      * the grammar reads.
      *
-     * <p>Asserted here rather than against the meta-kernel, whose bootstrap resolves no annotation at all: a
-     * schema governed by the kernel would ignore the name instead, and the kernel governs only the three
-     * bundled schemas.
+     * <p>Asserted through an ordinary schema rather than the kernel's bootstrap, which resolves no annotation at
+     * all and so would ignore the name instead of refusing it.
      */
     @Test
     void theAnnotationSpellingNamesNoType() {
@@ -368,9 +368,9 @@ class SealedFamilyCheckTest {
 
     private static final String BASE = """
             !!id:"https://example.test/base.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               pet => abstract { pet_type: text =?  name: text }
               dog => pet & { pet_type?: = "dog"  breed: text }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
@@ -378,9 +378,9 @@ class SealedFamilyCheckTest {
     private static String importer(String name, String body) {
         return """
                 !!id:"https://example.test/%s.tn"
-                !!meta:"%s"
+                !!import:"%s"
                 !!import:"https://example.test/base.tn"
-                %s""".formatted(name, TsonBundledSchemas.META_ID, body);
+                !schema %s""".formatted(name, TsonBundledSchemas.META_ID, body);
     }
 
     /**
@@ -426,10 +426,10 @@ class SealedFamilyCheckTest {
 
         List<Diagnostic> diagnostics = tson.validateSchema("""
                 !!id:"https://example.test/both.tn"
-                !!meta:"%s"
+                !!import:"%s"
                 !!import:"https://example.test/cats.tn"
                 !!import:"https://example.test/kittens.tn"
-                { home => { p: pet } }""".formatted(TsonBundledSchemas.META_ID));
+                !schema { home => { p: pet } }""".formatted(TsonBundledSchemas.META_ID));
 
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         String message = diagnostics.getFirst().message();
@@ -448,10 +448,10 @@ class SealedFamilyCheckTest {
 
         assertEquals(List.of(), tson.validateSchema("""
                 !!id:"https://example.test/both.tn"
-                !!meta:"%s"
+                !!import:"%s"
                 !!import:"https://example.test/cats.tn"
                 !!import:"https://example.test/birds.tn"
-                { home => { p: pet } }""".formatted(TsonBundledSchemas.META_ID)));
+                !schema { home => { p: pet } }""".formatted(TsonBundledSchemas.META_ID)));
     }
 
     /** An importer that adds a well-formed member is not refused, and neither is the family it joins. */

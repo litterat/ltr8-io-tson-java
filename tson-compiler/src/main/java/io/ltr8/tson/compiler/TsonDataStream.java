@@ -9,6 +9,7 @@ import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
@@ -32,7 +33,7 @@ import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
+import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -144,7 +145,7 @@ public final class TsonDataStream implements TsonEventSource {
     /**
      * Whether the document's root value still has to be framed. Set once the header is read and cleared by
      * the first {@link #fill()} that needs an event past it, so a caller who wants only the header -- a
-     * peek, a schema parser taking {@code !!id}/{@code !!meta} -- never pushes a frame at all and leaves an
+     * peek, a schema parser taking its header -- never pushes a frame at all and leaves an
      * empty stack behind for {@link #drain(Frame)} to work over.
      */
     private boolean rootPending;
@@ -236,7 +237,7 @@ public final class TsonDataStream implements TsonEventSource {
      * rule by the time the name rule looks at it. That is a property of where the check sits, and the
      * setter is named {@code tokenPolicy} to state it rather than hide it.
      *
-     * <p>Document directives are deliberately not checked. A {@code !!schema}/{@code !!id} token is a URI
+     * <p>Document directives are deliberately not checked. A {@code !!import}/{@code !!id} token is a URI
      * naming an external resource rather than document content, §2.2.1 governs what an identity may be,
      * and an IRI's scripts are the resource owner's business, not this document's.
      */
@@ -278,8 +279,7 @@ public final class TsonDataStream implements TsonEventSource {
      * <p><b>The root is framed here rather than with the header</b>, which is what makes reading the header
      * free of consequence: a caller that stops after {@code DocumentStart} has pushed nothing, and one that
      * goes on to read a value gets the frames the moment it asks. It also means this stream never has to
-     * know what kind of document it holds -- a schema document simply never asks for a value, where it used
-     * to be recognised by its {@code !!meta} and framed differently on that basis.
+     * know what kind of document it holds -- a schema parser simply never asks for a value.
      *
      * <p>{@link #drain(Frame)} does not come through here and never consults {@link #rootPending}: it
      * frames what its caller asked for and runs that to completion, which is how {@code TsonSchemaParser}
@@ -339,43 +339,157 @@ public final class TsonDataStream implements TsonEventSource {
     /**
      * Nothing here can start a value.
      *
-     * <p><b>A directive is named rather than described</b>, because at a value position it is almost always
-     * a header directive in the wrong place -- §2.2 admits {@code !!id} and one governing directive and
-     * nothing else, and {@code !!import} is a schema document's. "found '!!'" is true and useless; naming
-     * the directive says which rule was broken. The rule is the <em>position's</em>, not the document
-     * kind's, so this holds whoever is reading -- which is why it can live here while the header's own
-     * verdicts have moved up to the parsers.
+     * <p><b>A directive is named rather than described</b>, because at a value position it is always a
+     * header directive in the wrong place -- a directive stands only in the header (§2.2, §3.3), so an {@code
+     * !!import} prefixing a field value, a map entry value or an array element is refused here like any other.
+     * "found '!!'" is true and useless; naming the directive says which rule was broken. The rule is the
+     * <em>position's</em>, not the document kind's, so this holds whoever is reading.
      */
+    // ── A reference ([TSON-DATA] §7.4) ────────────────────────────────────────────────────────────
+
+    /**
+     * Whether the token just consumed, {@code head}, opens a reference's argument list: the next token is a {@code <}
+     * adjacent to it. A {@code <} with whitespace before it opens nothing and is refused, as is one after a quoted
+     * token, which is never a reference (§7.5).
+     */
+    private boolean opensArguments(Token head) {
+        Token next = peekToken();
+        if (next.type() != TokenType.LESS_THAN) {
+            return false;
+        }
+        if (!head.adjacentTo(next)) {
+            throw parseError("'<' opens a reference's argument list only adjacent to the name it applies (§7.5): "
+                    + "write '" + head.text() + "<...>' with no whitespace before '<'");
+        }
+        if (head.type() != TokenType.UNQUOTED) {
+            throw parseError("a quoted token is never a reference, so '<' cannot apply it: write the qualified "
+                    + "name unquoted");
+        }
+        return true;
+    }
+
+    /**
+     * The reference {@code head} heads, its argument list next at the cursor: {@code "<" ws type-args ws ">"}, each
+     * argument a qualified name (a reference, itself possibly applied) or any other token (a value), separated as an
+     * array's elements are. Assembled whole, so the stream delivers one value.
+     */
+    private io.ltr8.tson.schema.meta.TypeRef referenceArguments(Token head) {
+        requireQualifiedName(head);
+        advance(); // '<'
+        List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new ArrayList<>();
+        if (check(TokenType.GREATER_THAN)) {
+            throw parseError("an argument list holds at least one argument, and '" + head.text() + "<>' holds none");
+        }
+        arguments.add(referenceArgument());
+        while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
+            arguments.add(referenceArgument());
+        }
+        expect(TokenType.GREATER_THAN, "a reference's closing '>'");
+        return io.ltr8.tson.schema.meta.TypeRef.of(head.text(), arguments);
+    }
+
+    private io.ltr8.tson.schema.meta.TypeArgument referenceArgument() {
+        Token t = peekToken();
+        switch (t.type()) {
+            case UNQUOTED -> {
+                advance();
+                if (marksSibling(t)) {
+                    throw new ParseException(siblingReference(t).refusedAt("a template argument"), t.start());
+                }
+                boolean applied = opensArguments(t);
+                if (ReferenceGrammar.isQualifiedName(t.text())) {
+                    return new io.ltr8.tson.schema.meta.TypeArgument.Ref(applied ? referenceArguments(t)
+                            : io.ltr8.tson.schema.meta.TypeRef.of(t.text()));
+                }
+                if (applied) {
+                    requireQualifiedName(t);
+                }
+                return new io.ltr8.tson.schema.meta.TypeArgument.Value(
+                        new io.ltr8.tson.schema.meta.Token(t.text(), io.ltr8.tson.schema.meta.Token.Form.UNQUOTED));
+            }
+            case SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
+                advance();
+                opensArguments(t);
+                return new io.ltr8.tson.schema.meta.TypeArgument.Value(new io.ltr8.tson.schema.meta.Token(t.text(),
+                        t.type() == TokenType.SINGLE_LINE_STRING ? io.ltr8.tson.schema.meta.Token.Form.SINGLE_LINE_QUOTED
+                                : io.ltr8.tson.schema.meta.Token.Form.MULTI_LINE_QUOTED));
+            }
+            default -> throw mismatch("a reference's argument: a qualified name, an application or a token "
+                    + "(no structure stands in an argument list in data)");
+        }
+    }
+
+    /**
+     * Whether the token just consumed, {@code head}, is marked as a sibling reference ([TSON-DATA] §7.4): the next
+     * token is a {@code !} adjacent to it. A prefix {@code !} is adjacent to the token after it and so is never
+     * adjacent to the one before ({@link #siblingReference} holds the other half). A quoted token is never a
+     * reference, so a {@code !} after one is refused.
+     */
+    private boolean marksSibling(Token head) {
+        Token next = peekToken();
+        // A multi-line token's end is past its closing line's terminator, where the next line starts, so a prefix
+        // `!` opening that line would read as adjacent to it.
+        if (next.type() != TokenType.BANG || !head.adjacentTo(next) || head.type() == TokenType.MULTI_LINE_STRING) {
+            return false;
+        }
+        if (head.type() != TokenType.UNQUOTED) {
+            throw parseError("a quoted token is never a reference, so '!' cannot mark it as a sibling reference: "
+                    + "a sibling is a field named by one unquoted identifier");
+        }
+        return true;
+    }
+
+    /**
+     * The sibling reference {@code head} and the {@code !} next at the cursor spell: {@code sibling-ref =
+     * unquoted-token "!"}, the token one identifier (a single segment), and the {@code !} followed by whitespace
+     * (§7.5) or the end of the document. The whitespace is what keeps a postfix {@code !} apart from a prefix one,
+     * so {@code a!b}, <code>kind!}</code>, {@code kind!]} and {@code kind!?} are refused here. Assembled whole, so the
+     * stream delivers one value.
+     */
+    private io.ltr8.tson.schema.meta.SiblingRef siblingReference(Token head) {
+        if (!ReferenceGrammar.isSiblingField(head.text())) {
+            throw new ParseException("'" + head.text() + "!' is no sibling reference -- the '!' marks one field "
+                    + "of the same record, named by one identifier, a single segment (§7.4)", head.start());
+        }
+        Token bang = advance();
+        Token next = peekToken();
+        if (next.type() != TokenType.EOF && bang.adjacentTo(next)) {
+            throw parseError("a sibling reference's '!' must be followed by whitespace (§7.5): write '"
+                    + head.text() + "! ' before " + describe(next));
+        }
+        return new io.ltr8.tson.schema.meta.SiblingRef(head.text(), null);
+    }
+
+    private void requireQualifiedName(Token head) {
+        if (!ReferenceGrammar.isQualifiedName(head.text())) {
+            throw new ParseException("'" + head.text() + "' is no qualified name, so it takes no argument list -- "
+                    + "each segment between the dots is an identifier (§7.7)", head.start());
+        }
+    }
+
     private ParseException notAValue(Token t) {
         if (t.type() == TokenType.DIRECTIVE) {
-            return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here "
-                    + "(expected '!!schema', '!!meta' or the start of the document's value)");
+            return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here: a directive "
+                    + "stands only in the document header (§2.2, §3.3)");
         }
         return parseError("expected a value (record, map, array, empty braces, "
                 + "the void sentinel '_', or a token), found " + describe(t));
     }
 
     /**
-     * §2.2's header, once, as the stream's first event -- {@code !!id} then at most one of {@code !!schema}
-     * / {@code !!meta}.
+     * §2.2's header, once, as the stream's first event -- an optional {@code !!id}, then any number of {@code
+     * !!import}s. The header grammar is one for every document, so it is judged here in full: a retired directive
+     * ({@code !!meta}, {@code !!schema}), an unknown one and an {@code !!id} out of place are refused, each naming
+     * the rule it broke.
      *
-     * <p><b>This reads the header for everyone and judges nobody.</b> Whether a document may be read at all
-     * is a conformance-class question and this tier is below it: {@code TsonDataParser} is a Class 1
-     * processor and refuses a {@code !!meta} document, {@code TsonSchemaParser} requires one, and both sit
-     * on this stream. Deciding here would settle it for both, and would also make classifying a document
-     * (§7.1) impossible through the events -- which is what a second header scan used to exist for.
+     * <p><b>The header does not say what a document is.</b> The root's tag does ({@link #rootTag()}): a root tagged
+     * {@code !schema} is a schema document, any other a data document. Whether a document may be read at all is a
+     * conformance-class question this tier is below -- {@code TsonDataParser} is a Class 1 processor and refuses a
+     * schema document, {@code TsonSchemaParser} requires one, and both sit on this stream.
      *
-     * <p><b>A directive that is neither {@code !!schema} nor {@code !!meta} is left unconsumed</b> rather
-     * than refused, for the same reason one step further on. {@code !!import} is a schema document's and
-     * {@code TsonSchemaParser} reads it; a data document carrying one is an error, but the wording that
-     * names the rule it broke belongs to the parser that knows which kind of document was expected --
-     * refusing here produced "expected '!!schema', '!!meta' or the start of the document's value" for a
-     * schema document whose real problem was a missing {@code !!meta}.
-     *
-     * <p><b>No frame is pushed here</b>, so the header costs a caller who wants only the header nothing
-     * more. A document's root value is framed by {@link #fill()} on the first demand for an event past the
-     * header -- which is also what lets a schema parser take {@code !!id}/{@code !!meta} from this event and
-     * then read {@code !!import} at token level over an empty frame stack.
+     * <p><b>No frame is pushed here</b>, so the header costs a caller who wants only the header nothing more. A
+     * document's root value is framed by {@link #fill()} on the first demand for an event past the header -- which
+     * is also what lets a schema parser read its schema map at token level over an empty frame stack.
      */
     private void ensureStarted() {
         if (started) {
@@ -385,27 +499,78 @@ public final class TsonDataStream implements TsonEventSource {
 
         Position docStart = peekToken().start();
         Optional<String> id = Optional.empty();
-        if (check(TokenType.DIRECTIVE) && "id".equals(peekDirectiveName())) {
-            id = Optional.of(parseNamedDirective("id"));
-        }
-
-        Optional<String> schema = Optional.empty();
-        Optional<String> meta = Optional.empty();
-        if (check(TokenType.DIRECTIVE)) {
+        List<String> imports = new ArrayList<>();
+        while (check(TokenType.DIRECTIVE)) {
             String name = peekDirectiveName();
             switch (name) {
-                case "schema" -> schema = Optional.of(parseNamedDirective("schema"));
-                case "meta" -> meta = Optional.of(parseNamedDirective("meta"));
-                default -> {
-                    // Left where it stands, deliberately -- see this method's Javadoc. `!!import` is a
-                    // schema document's and the schema parser consumes it; anything else is an error whose
-                    // wording belongs to whoever knows which kind of document this was meant to be.
+                case "id" -> {
+                    if (id.isPresent() || !imports.isEmpty()) {
+                        throw parseError("'!!id' must be the header's first directive, and appear once "
+                                + "([TSON-DATA] §2.2)");
+                    }
+                    id = Optional.of(parseNamedDirective("id"));
                 }
+                case "import" -> imports.add(parseNamedDirective("import"));
+                case "meta", "schema" -> throw parseError("the '!!" + name + "' directive is retired: a "
+                        + "document names the schemas it uses with '!!import', and a schema document says what it "
+                        + "is by tagging its root '!schema' ([TSON-DATA] §2.2)");
+                default -> throw parseError("unknown directive '!!" + name + "': a header holds an optional "
+                        + "'!!id' then any number of '!!import's ([TSON-DATA] §2.2)");
             }
         }
 
-        ready.add(new DocumentStart(id, schema, meta, docStart));
+        ready.add(new DocumentStart(id, imports, docStart));
         rootPending = true;
+    }
+
+    /**
+     * The root value's tag, looked for past the root's leading annotations, consuming nothing -- what classifies a
+     * document ([TSON-DATA] §2.2: a root tagged {@code !schema} is a schema document). Empty when the root carries
+     * no type-ref.
+     *
+     * <p><b>The events read stay in this stream</b>, unconsumed and not yet through §8.2's token check: the root is
+     * framed exactly as the first read past the header would frame it, and stepped only until the event after the
+     * root's annotations is ready, so a reader continuing from here receives every event as if nothing had looked.
+     * The core value is never entered -- the step that produces the root's type-ref, or finds none, pushes its
+     * value's frame and stops there -- so a schema map, whose sugar no data frame reads, is classified without being
+     * parsed. What this reads beyond the header is the root's annotations, whose values are parsed to find their end.
+     *
+     * <p>Valid only before any event past {@code DocumentStart} has been taken: the stream's first read past the
+     * header is what this anticipates.
+     */
+    Optional<String> rootTag() {
+        ensureStarted();
+        if (rootPending && frames.isEmpty()) {
+            rootPending = false;
+            pushFrame(new RootFrame());
+            pushFrame(new DataValueFrame());
+        }
+        int scanned = 0;
+        int depth = 0;
+        while (true) {
+            int index = 0;
+            for (TsonEvent event : ready) {
+                if (index++ < scanned) {
+                    continue;
+                }
+                scanned++;
+                switch (event) {
+                    case DocumentStart ignored -> { }
+                    case AnnotationStart ignored -> depth++;
+                    case AnnotationEnd ignored -> depth--;
+                    default -> {
+                        if (depth == 0) {
+                            return event instanceof TypeRef tag ? Optional.of(tag.name()) : Optional.empty();
+                        }
+                    }
+                }
+            }
+            if (frames.isEmpty() || depth == 0 && frames.peek() instanceof CoreValueFrame) {
+                // The root's core value is next with no tag before it: it is untagged, and is not entered.
+                return Optional.empty();
+            }
+            frames.pop().step();
+        }
     }
 
     // ── Cursor primitives over Lexer.nextToken() (bounded 2-token lookahead) ────────────
@@ -592,7 +757,7 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * A name position's token, matched in full against meta-kernel's {@code identifier} profile (§7.1's name
+     * A name position's token, matched in full against the kernel's {@code meta.identifier} profile (§7.1's name
      * profile). The two-layer shape is §7.6's, stated there for numbers: the lexer produces a token, and a
      * production that is no part of the token-stream grammar then matches its decoded text. Token-Start admits
      * {@code Nd}, {@code -}, {@code +} and {@code .} so a <em>number</em> can be an unquoted token, and those
@@ -606,6 +771,34 @@ public final class TsonDataStream implements TsonEventSource {
         Optional<String> violation = IdentifierGrammar.validate(name.text());
         if (violation.isPresent()) {
             throw new ParseException("invalid " + role + " -- " + violation.get(), name.start());
+        }
+    }
+
+    /**
+     * A tag's name: {@code type-ref = "!" qualified-name} (§7.4), segments joined by {@code .}, each matched as
+     * {@link #requireIdentifier} matches a name. {@code !order} is one segment and {@code !geo.address} two; which
+     * entry a qualified tag names is the reading schema's walk, and a schemaless read keeps it as written.
+     */
+    private void requireTagName(Token name) {
+        requireQualifiedName(name, "type name");
+    }
+
+    /**
+     * A {@code qualified-name} (§7.4) at a name position, a tag's or an annotation's: one identifier, or several
+     * joined by {@code .}, each matched as {@link #requireIdentifier} matches a name.
+     */
+    private void requireQualifiedName(Token name, String role) {
+        String text = name.text();
+        if (text.indexOf('.') < 0) {
+            requireIdentifier(name, role);
+            return;
+        }
+        for (String segment : text.split("\\.", -1)) {
+            Optional<String> violation = segment.isEmpty() ? Optional.of("a segment between the dots is empty")
+                    : IdentifierGrammar.validate(segment);
+            if (violation.isPresent()) {
+                throw new ParseException("invalid " + role + " '" + text + "' -- " + violation.get(), name.start());
+            }
         }
     }
 
@@ -711,7 +904,7 @@ public final class TsonDataStream implements TsonEventSource {
         if (!bang.adjacentTo(name)) {
             throw parseError("'!' must be immediately adjacent to the type name (no whitespace)");
         }
-        requireIdentifier(name, "type name");
+        requireTagName(name);
         advance();
 
         Token next = peekToken();
@@ -722,6 +915,10 @@ public final class TsonDataStream implements TsonEventSource {
             throw parseError("'!" + name.text() + "<...>' applies type arguments, which are schema syntax and "
                     + "not available in a data value (§3.2): a data type-ref is a bare name. Name the "
                     + "application in the schema ('my_type => " + name.text() + "<...>') and write '!my_type' here");
+        }
+        if (next.type() == TokenType.BANG && name.adjacentTo(next)) {
+            throw parseError("'!" + name.text() + "!' marks a type's name as a sibling reference, and a tag names a "
+                    + "type (§7.4): a tag is '!' and a qualified name, never a reference to a field");
         }
         if (next.type() == TokenType.QUESTION && name.adjacentTo(next)) {
             throw parseError("'!" + name.text() + "?' uses the optional suffix, which is schema syntax and not "
@@ -799,7 +996,8 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * One standalone annotation (§3.1): {@code "@" identifier [ ":" data-value ]}. Split out
+     * One standalone annotation (§3.1): {@code "@" qualified-name [ ":" data-value ]}, the name resolving from the
+     * root as every name does ({@code @doc}, {@code @doc}). Split out
      * of {@link DataValueFrame} so {@link #nextAnnotationEvents()} can drive exactly this
      * production on its own -- [TSON-SCHEMA]'s own annotation positions (§12.1) reuse it the same
      * way {@link TsonSchemaParser} reuses {@code TsonDataParser.parseAnnotation()} today.
@@ -815,7 +1013,7 @@ public final class TsonDataStream implements TsonEventSource {
             if (!at.adjacentTo(name)) {
                 throw parseError("'@' must be immediately adjacent to the annotation name (no whitespace)");
             }
-            requireIdentifier(name, "annotation name");
+            requireQualifiedName(name, "annotation name");
             advance();
 
             if (check(TokenType.COLON) && name.adjacentTo(peekToken())) {
@@ -859,7 +1057,13 @@ public final class TsonDataStream implements TsonEventSource {
                 }
                 case UNQUOTED, SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
                     advance();
-                    ready.add(new TokenEvent(t.text(), formOf(t.type()), t.start()));
+                    if (opensArguments(t)) {
+                        ready.add(new ReferenceEvent(referenceArguments(t), t.start()));
+                    } else if (marksSibling(t)) {
+                        ready.add(new ReferenceEvent(siblingReference(t), t.start()));
+                    } else {
+                        ready.add(new TokenEvent(t.text(), formOf(t.type()), t.start()));
+                    }
                 }
                 default -> throw notAValue(t);
             }
@@ -894,7 +1098,15 @@ public final class TsonDataStream implements TsonEventSource {
                     ready.add(new RecordStart(lbrace.start()));
                     ready.add(new FieldName(Nfc.of(t1.text()), t1.start()));
                     pushFrame(new RecordFrame());
-                    pushFrame(new ScopedValueFrame());
+                    pushFrame(new DataValueFrame());
+                    return;
+                }
+                if ((t2.type() == TokenType.LESS_THAN || t2.type() == TokenType.BANG && t1.type() == TokenType.UNQUOTED)
+                        && t1.adjacentTo(t2)) {
+                    // A reference as the first key: the entry's own frame reads it, and the arrow after it.
+                    ready.add(new MapStart(lbrace.start()));
+                    pushFrame(new MapFrame(MapFrame.Mode.AWAITING_ARROW));
+                    pushFrame(new DataValueFrame());
                     return;
                 }
                 if (t2.type() == TokenType.MAP_ARROW) {
@@ -904,7 +1116,7 @@ public final class TsonDataStream implements TsonEventSource {
                     ready.add(new TokenEvent(t1.text(), formOf(t1.type()), t1.start()));
                     ready.add(new MapArrow(t2.start()));
                     pushFrame(new MapFrame(MapFrame.Mode.AFTER_ENTRY));
-                    pushFrame(new ScopedValueFrame());
+                    pushFrame(new DataValueFrame());
                     return;
                 }
                 throw parseError("a value inside curly braces must be followed by ':' (record) or "
@@ -923,23 +1135,6 @@ public final class TsonDataStream implements TsonEventSource {
         }
     }
 
-    /** {@code [ schema-directive ws ] data-value} (§2.3): record field values, map entry values, array elements. */
-    private final class ScopedValueFrame extends Frame {
-        @Override
-        void step() {
-            if (check(TokenType.DIRECTIVE)) {
-                String name = peekDirectiveName();
-                if (!"schema".equals(name)) {
-                    throw parseError("directive '!!" + name + "' is not permitted here (only '!!schema' is)");
-                }
-                Position pos = peekToken().start();
-                String uri = parseNamedDirective("schema");
-                ready.add(new SchemaRef(uri, pos));
-            }
-            pushFrame(new DataValueFrame());
-        }
-    }
-
     /** Repeatable step for every record field after the first (whose name/colon brace-disambiguation already consumed). */
     private final class RecordFrame extends Frame {
         @Override
@@ -955,7 +1150,7 @@ public final class TsonDataStream implements TsonEventSource {
             expect(TokenType.COLON, "a record field's ':'");
             ready.add(new FieldName(Nfc.of(name.text()), name.start()));
             pushFrame(new RecordFrame());
-            pushFrame(new ScopedValueFrame());
+            pushFrame(new DataValueFrame());
         }
     }
 
@@ -985,7 +1180,7 @@ public final class TsonDataStream implements TsonEventSource {
                     Token arrow = expect(TokenType.MAP_ARROW, "a map entry's '=>'");
                     ready.add(new MapArrow(arrow.start()));
                     pushFrame(new MapFrame(Mode.AFTER_ENTRY));
-                    pushFrame(new ScopedValueFrame());
+                    pushFrame(new DataValueFrame());
                 }
             }
         }
@@ -1010,7 +1205,7 @@ public final class TsonDataStream implements TsonEventSource {
                 return;
             }
             pushFrame(new ArrayFrame(false));
-            pushFrame(new ScopedValueFrame());
+            pushFrame(new DataValueFrame());
         }
     }
 }

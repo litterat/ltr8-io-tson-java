@@ -9,8 +9,8 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.IntegerSize;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -42,7 +42,7 @@ class RecordTreeReaderTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry);
         entries.put("point", RecordBody.of(RecordBody.fieldMap(valueField)));
-        return new TsonLinkedSchema(new TsonSchema("test-schema", "test-meta", List.of(), entries));
+        return new TsonLinkedSchema(new TsonSchema("test-schema", List.of(), entries));
     }
 
     private static Top atomEntry(IntegerType body) {

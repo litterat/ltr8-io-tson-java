@@ -10,15 +10,15 @@ import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.HostType;
-import io.ltr8.tson.schema.meta.HostnameType;
+import io.ltr8.tson.schema.net.HostType;
+import io.ltr8.tson.schema.net.HostnameType;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
  * {@code net.tn}, the network type library: the address and network families, {@code hostname} and {@code host},
- * in a library a schema imports when it wants them, so a schema importing core alone may declare those names
- * itself. Characters beyond ASCII are escapes.
+ * in a library a schema imports when it wants them, so a schema importing the other libraries alone may declare
+ * those names itself. Characters beyond ASCII are escapes.
  */
 class NetSchemaTest {
 
@@ -29,10 +29,10 @@ class NetSchemaTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            !!import:"https://tson.io/2026/38/m/net.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/39/m/net.tn"
+            !schema {
               listener => { host: host  port: uint16 }
               site => { name: hostname }
               ascii_name => !hostname ^ { allow_idn: false }
@@ -47,7 +47,7 @@ class NetSchemaTest {
     }
 
     private static List<Diagnostic> validate(String body) {
-        return tson().validate("!!schema:\"" + ID + "\"\n" + body);
+        return tson().validate("!!import:\"" + ID + "\"\n" + body);
     }
 
     /** One string-class type, so none of the three spellings of a host needs a tag. */
@@ -63,7 +63,7 @@ class NetSchemaTest {
     void aHostReadsToItsMemberWrittenCanonically() {
         Tson tson = tson();
         assertEquals("::1", tson.treeReader()
-                .read("!!schema:\"" + ID + "\"\n!listener { host: \"[0:0:0:0:0:0:0:1]\"  port: 443 }")
+                .read("!!import:\"" + ID + "\"\n!listener { host: \"[0:0:0:0:0:0:0:1]\"  port: 443 }")
                 .get("host").as(Host.class).orElseThrow().text());
     }
 
@@ -85,9 +85,9 @@ class NetSchemaTest {
     @Test
     void aHostNameIsOneValueInEitherLabelForm() {
         Tson tson = tson();
-        HostName unicode = tson.treeReader().read("!!schema:\"" + ID + "\"\n!site { name: \"" + BUCHER + "\" }")
+        HostName unicode = tson.treeReader().read("!!import:\"" + ID + "\"\n!site { name: \"" + BUCHER + "\" }")
                 .get("name").as(HostName.class).orElseThrow();
-        HostName ascii = tson.treeReader().read("!!schema:\"" + ID + "\"\n!site { name: XN--BCHER-KVA.example }")
+        HostName ascii = tson.treeReader().read("!!import:\"" + ID + "\"\n!site { name: XN--BCHER-KVA.example }")
                 .get("name").as(HostName.class).orElseThrow();
         assertEquals(unicode, ascii);
         assertEquals(BUCHER, ascii.unicode());
@@ -115,10 +115,10 @@ class NetSchemaTest {
     void allowIdnIsWithdrawnButNeverGrantedBack() {
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/regrant.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                !!import:"https://tson.io/2026/38/m/net.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/39/m/net.tn"
+                !schema {
                   ascii => !hostname ^ { allow_idn: false }
                   again => !ascii ^ { allow_idn: true }
                 }
@@ -127,30 +127,30 @@ class NetSchemaTest {
 
     /** Core claims none of the network names, so a schema importing it alone may declare them. */
     @Test
-    void aSchemaImportingCoreAloneMayDeclareTheNetworkNames() {
+    void aSchemaImportingTheOtherLibrariesMayDeclareTheNetworkNames() {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/own-mac.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/numeric.tn"
+                !!import:"https://tson.io/2026/39/m/temporal.tn"
+                !schema {
                   mac => { vendor: text  model: text }
                   hostname => text
                   host => text
                 }
                 """);
         assertEquals(List.of(), tson.validate("""
-                !!schema:"https://example.test/own-mac.tn"
+                !!import:"https://example.test/own-mac.tn"
                 !mac { vendor: acme  model: m1 }"""));
     }
 
     @Test
-    void aSchemaImportingCoreAloneDoesNotSeeTheNetworkTypes() {
+    void aSchemaImportingTheOtherLibrariesDoesNotSeeTheNetworkTypes() {
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/no-net.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                { server => { address: ipv4 } }
+                !!import:"https://tson.io/2026/39/m/numeric.tn"
+                !!import:"https://tson.io/2026/39/m/temporal.tn"
+                !schema { server => { address: ipv4 } }
                 """));
     }
 

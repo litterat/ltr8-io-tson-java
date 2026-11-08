@@ -2,22 +2,21 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.numeric.DecimalType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.numeric.FloatType;
+import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.RationalType;
+import io.ltr8.tson.schema.numeric.RationalType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.IdentifierType;
-import io.ltr8.tson.schema.meta.ValueType;
+import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.VoidType;
-import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.Type;
 import org.junit.jupiter.api.Test;
 
@@ -242,28 +241,19 @@ class ChoiceDisjointnessTest {
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
         TypeRef point = product("point", RecordBody.of(RecordBody.fieldMap()));
         TypeRef colour = atom("colour", new EnumBody(List.of("red", "green")));
-        TypeRef value = atom("value", new ValueType());
         TypeRef nothing = atom("void", new VoidType());
-        namespace.put("text_alias", new io.ltr8.tson.schema.meta.Reference(TypeRef.of("text")));
+        namespace.put("text_alias", new io.ltr8.tson.schema.meta.Alias(TypeRef.of("text")));
         assertFalse(disjoint(mapKeyedBy("by_point", point), i));
         assertTrue(disjoint(mapKeyedBy("by_text", TypeRef.of("text")), i));
         assertTrue(disjoint(mapKeyedBy("by_alias", TypeRef.of("text_alias")), i));
         assertTrue(disjoint(mapKeyedBy("by_colour", colour), i));
-        assertFalse(disjoint(mapKeyedBy("by_value", value), i));
         assertFalse(disjoint(mapKeyedBy("by_void", nothing), i));
-    }
-
-    @Test
-    void aValueVariantMakesTheChoiceNotDisjoint() {
-        TypeRef value = atom("value", new ValueType());
-        TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
-        assertFalse(disjoint(value, i));
     }
 
     /** An identifier is a text family, so it is string-class and apart from a number. */
     @Test
     void anIdentifierVariantIsStringClass() {
-        TypeRef id = atom("identifier", IdentifierType.IDENTIFIER);
+        TypeRef id = atom("meta.identifier", IdentifierType.IDENTIFIER);
         TypeRef i = atom("integer", IntegerType.UNCONSTRAINED);
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertTrue(disjoint(id, i));
@@ -295,20 +285,20 @@ class ChoiceDisjointnessTest {
 
     // ---------------------------------------------------------------- references
 
-    /** §8.3 makes an alias and its target one type, so a variant classifies through its reference chain. */
+    /** §8.3 makes an alias and its target one type, so a variant classifies through its alias chain. */
     @Test
     void anAliasVariantClassifiesAsItsTarget() {
         atom("integer", IntegerType.UNCONSTRAINED);
-        namespace.put("my_int", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("integer")));
+        namespace.put("my_int", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("integer")));
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertTrue(disjoint(TypeRef.of("my_int"), t));
         assertFalse(disjoint(TypeRef.of("my_int"), TypeRef.of("integer")));
     }
 
     @Test
-    void aReferenceCycleHasNoClassSoItsChoiceIsNotDisjoint() {
-        namespace.put("a", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("b")));
-        namespace.put("b", new io.ltr8.tson.schema.meta.Reference(io.ltr8.tson.schema.meta.TypeRef.of("a")));
+    void anAliasCycleHasNoClassSoItsChoiceIsNotDisjoint() {
+        namespace.put("a", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("b")));
+        namespace.put("b", new io.ltr8.tson.schema.meta.Alias(io.ltr8.tson.schema.meta.TypeRef.of("a")));
         TypeRef t = atom("text", TextType.UNCONSTRAINED);
         assertFalse(disjoint(TypeRef.of("a"), t));
     }

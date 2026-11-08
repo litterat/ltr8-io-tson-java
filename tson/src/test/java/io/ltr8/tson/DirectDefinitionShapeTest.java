@@ -34,16 +34,18 @@ class DirectDefinitionShapeTest {
     private static TsonLinkedSchema resolve(String id, String declarations) {
         return Tson.standard().resolve("""
                 !!id:"https://example.test/%s.tn"
-                !!meta:"%s"
                 !!import:"%s"
-                {
+                !!import:"%s"
+                !schema {
                 %s}
                 """.formatted(id, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, declarations));
     }
 
-    /** Entry names this schema itself produced -- core.tn's own are the same under every one of these. */
+    /** The entries with {@code prefix} this schema minted itself -- its closure's own left out. */
     private static List<String> minted(TsonLinkedSchema linked, String prefix) {
-        return linked.schema().entries().keySet().stream().filter(name -> name.startsWith(prefix)).toList();
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(linked.schema().id());
+        return linked.schema().entries().keySet().stream().filter(name -> name.startsWith(prefix))
+                .filter(name -> linked.originOf(name).equals(own)).toList();
     }
 
     // ── A sugar form at declaration position is the entry ────────────────
@@ -55,7 +57,7 @@ class DirectDefinitionShapeTest {
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(textList, n -> true),
                 "the declaration is the array entry, not a hop to one");
-        assertEquals(java.util.Optional.of("array"), schema.constructorOf("text_list"));
+        assertEquals(java.util.Optional.of("meta.array"), schema.constructorOf("text_list"));
     }
 
     /**
@@ -65,11 +67,11 @@ class DirectDefinitionShapeTest {
     @Test
     void aUseSiteWritingTheSameSugarFormMintsASeparateEntry() {
         TsonLinkedSchema linked = resolve("dd2", """
-                  text_list => [text]
-                  holder    => { f: [text] }
+                  uuid_list => [uuid]
+                  holder    => { f: [uuid] }
                 """);
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("text_list"), n -> true));
+        assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("uuid_list"), n -> true));
         assertEquals(1, minted(linked, "array_").size(),
                 () -> "the use site mints its own: " + minted(linked, "array_"));
     }

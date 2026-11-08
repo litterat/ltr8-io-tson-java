@@ -37,9 +37,9 @@ class JsonChoiceReadTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/choice-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               scalar_or_list => ( text | int32 | boolean | [text] )
               any_json       => ( text | number | boolean | [any_json?] | {text => any_json?} )
 
@@ -49,7 +49,7 @@ class JsonChoiceReadTest {
               unit_circle => circle & { fixed: boolean }
 
               loose  => ( float64 | text )
-              strict => !float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
+              strict => !numeric.float_type { format: BINARY64  allow_nan: false  allow_infinity: false }
               tight  => ( strict | text )
 
               holder => { pick: scalar_or_list }
@@ -219,11 +219,11 @@ class JsonChoiceReadTest {
         assertTrue(refusal.expected().contains("circle"), refusal.expected());
     }
 
-    /** §8.5 admits `$schema` at a scoped position; a choice is the closed sum, so it is refused here. */
+    /** §3.3: `$import` stands at the top of the document alone, so a choice position refuses it like every other. */
     @Test
-    void aSchemaMemberIsRefusedAtAChoicePosition() {
+    void anImportMemberIsRefusedAtAChoicePosition() {
         assertEquals(Diagnostic.Code.SCOPE_NOT_ADMITTED, read("shape", """
-                {"$schema": "https://example.test/other.tn", "$type": "circle", "radius": 1.0}""")
+                {"$import": ["https://example.test/other.tn"], "$type": "circle", "radius": 1.0}""")
                 .refusal().code());
     }
 

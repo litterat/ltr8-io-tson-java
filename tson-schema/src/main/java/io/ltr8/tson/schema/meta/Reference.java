@@ -1,25 +1,28 @@
 package io.ltr8.tson.schema.meta;
 
-import io.ltr8.annotation.Typename;
+import io.ltr8.annotation.Annotations;
 
 /**
- * The meta-kernel's {@code reference} constructor's own vocabulary, resolved (Part 2 §4.1, §8.1):
- * a {@code kind: REFERENCE} entry's body, {@code !reference { target: E }} -- the kernel's aliasing
- * shape, used by {@code type_name}/{@code field_name}/{@code param_name} (aliasing {@code identifier}), the
- * annotation markers {@code annotation}/{@code doc}/{@code synthetic}, and the instantiation entry of a
- * non-record template application whose expansion names itself (§5.10, §8.2). It composes {@code top} directly
- * and so carries no IS-A chain: a hop is not a type of its own.
+ * What the kernel's {@code reference} atom reads to, as written: a name, an application or a sibling reference. A
+ * {@link TypeRef} (a {@link NameRef} or an {@link ApplicationRef}) names a type; a {@link SiblingRef}, {@code kind!},
+ * names a field of the enclosing record whose value chooses the type.
  *
- * <p><b>{@code target} is a {@link TypeRef}, so an alias to an application states its own arguments.</b>
- * [TSON-SCHEMA] §5.10's partial application, {@code uuid_pair => <B> pair<uuid, B>}, is an alias whose target
- * carries an argument list, which a name-typed slot would have nowhere to put.
+ * <p><b>A sibling reference stands only at a record field's type</b> ([TSON-SCHEMA] §5.2, proposed): {@link
+ * RecordField#type} and {@link RecordTemplateField#type} are typed {@code Reference}, and every other slot holding a
+ * reference -- an alias target, an element, key or value type, a choice variant, a tuple element, a parent, a
+ * template argument -- is typed {@link TypeRef}, so the position rule is the Java type.
  *
- * <p><b>A closed alias never carries arguments.</b> Materialisation rewrites {@code text_box => box<text>} to
- * name the entry it minted, so an argument-bearing target appears only where an application is still open --
- * inside a template. §8.3 flattens a use site past a REFERENCE entry but never this slot: the chain has to
- * stay walkable, and the walk stops at an argument-bearing target, which is an application rather than a
- * further hop.
+ * <p><b>Identity</b> is the variant and its components, {@code annotations} excluded: {@code kind}, {@code kind<T>}
+ * and {@code kind!} are three references.
  */
-@Typename(name = "reference")
-public record Reference(TypeRef target) implements Top {
+public sealed interface Reference permits TypeRef, SiblingRef {
+
+    /** The annotations written on the reference itself; no part of its identity. */
+    Annotations annotations();
+
+    /** The canonical text, what resolved output writes unquoted: {@code kind}, {@code kind<T>} or {@code kind!}. */
+    String text();
+
+    /** A copy of this reference with {@code annotations} replaced -- every other component unchanged. */
+    Reference withAnnotations(Annotations annotations);
 }

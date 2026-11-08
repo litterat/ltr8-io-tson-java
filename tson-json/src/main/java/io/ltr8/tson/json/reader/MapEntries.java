@@ -5,7 +5,6 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 
-import java.math.BigInteger;
 
 /** The rules both map forms share: an entry's value, the size facets, and a value of the wrong shape. */
 final class MapEntries {
@@ -35,10 +34,9 @@ final class MapEntries {
 
     /** §6.4: size facets count entries -- an entry with a void value is an entry. */
     static void checkSize(MapPlan plan, JsonReadContext ctx, int count) {
-        BigInteger size = BigInteger.valueOf(count);
-        plan.minItems().filter(min -> size.compareTo(min) < 0)
+        plan.minItems().filter(min -> count < min)
                 .ifPresent(min -> ctx.report(plan.rules().tooFewEntries(min, count)));
-        plan.maxItems().filter(max -> size.compareTo(max) > 0)
+        plan.maxItems().filter(max -> count > max)
                 .ifPresent(max -> ctx.report(plan.rules().tooManyEntries(max, count)));
     }
 

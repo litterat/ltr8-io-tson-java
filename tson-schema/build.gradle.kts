@@ -5,7 +5,7 @@ plugins {
 dependencies {
     api(project(":tson-base"))
     // api, not implementation -- this module now has a module-info.java (requires io.ltr8.annotation,
-    // deliberately not `requires transitive`, since no public schema.meta method signature exposes an
+    // deliberately not `requires transitive`, since no public schema-model method signature exposes an
     // annotation type directly). JPMS module-path resolution still needs io.ltr8.annotation physically
     // present for any downstream compilation that transitively requires io.ltr8.tson.schema (tson-compiler,
     // tson) -- Gradle's own implementation/api split controls compile-classpath *type* visibility, which
@@ -15,7 +15,7 @@ dependencies {
     // `text_type.members` must answer to a `pattern` on the same body, which is a regex match. The engine
     // is an internal library like any other and the check belongs beside the length checks that share its
     // method, so the constraint model carries the dependency rather than splitting one coherence rule
-    // across two modules. `implementation`: no public schema.meta signature names a ltr8-regex type.
+    // across two modules. `implementation`: no public schema-model signature names a ltr8-regex type.
     implementation(project(":ltr8-regex"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
@@ -23,13 +23,11 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-// TsonBundledSchemas needs meta-kernel/meta/core's own source files on the classpath at runtime
-// (none of the three can be resolved from nothing -- see that class's own Javadoc). Packaged straight
-// from the repo's own spec/ snapshot rather than a duplicated copy under src/main/resources, so there
-// is exactly one file per document to keep in sync with the spec. Moved here from tson-compiler
-// (2026-07-29) alongside TsonBundledSchemas itself -- see that class's own Javadoc.
+// TsonBundledSchemas needs the bundled schemas' own source files on the classpath at runtime (none can be resolved
+// from nothing -- see that class's own Javadoc). Packaged straight from the repo's own spec/m rather than a duplicated
+// copy under src/main/resources, so there is exactly one file per document to keep in sync with the spec.
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
     from(rootProject.layout.projectDirectory.dir("spec/m")) {
-        include("meta-kernel.tn", "meta.tn", "core.tn", "net.tn", "policy.tn")
+        include("meta.tn", "numeric.tn", "temporal.tn", "net.tn", "core.tn", "policy.tn")
     }
 }

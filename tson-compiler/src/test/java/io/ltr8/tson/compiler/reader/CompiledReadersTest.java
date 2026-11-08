@@ -36,7 +36,7 @@ class CompiledReadersTest {
     }
 
     private static TsonCompiledSchema compiledWith(String name, TsonTypeReader<?> reader) {
-        TsonSchema schema = new TsonSchema("id", "meta", List.of(), Map.of());
+        TsonSchema schema = new TsonSchema("id", List.of(), Map.of());
         return new TsonCompiledSchema(new TsonLinkedSchema(schema), Map.of(name, reader));
     }
 

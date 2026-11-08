@@ -3,9 +3,8 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.reader.Dom;
-import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.net.CidrNetwork;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -22,45 +21,45 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The same proof {@link MetaSchemaImportTest} gives for meta.tn, one rung further up the schema
- * ladder: registers meta-kernel explicitly (its own well-known bootstrap case, per {@link
- * TsonCompiledMetaRegistry}'s own Javadoc), then loads meta.tn and {@code core.tn} through
- * the fully generic fetch-parse-resolve-register-compile path -- exactly the sequence {@link
- * TsonBundledSchemas}'s own class Javadoc documents as the intended way to load this library's
- * three bundled schema documents.
+ * The same proof {@link NetSchemaImportTest} gives for net.tn, for core.tn: registers the kernel explicitly (its own
+ * well-known bootstrap case, per {@link TsonCompiledVocabularyRegistry}'s own Javadoc), then loads meta.tn and {@code
+ * core.tn} through the fully generic fetch-parse-resolve-register-compile path -- exactly the sequence {@link
+ * TsonBundledSchemas}'s own class Javadoc documents as the intended way to load this library's three bundled schema
+ * documents.
  *
  * <p>Every real {@code core.tn} declaration resolves in a single source-order pass, the same way
  * meta.tn's own 31 do -- core.tn's own declaration order already places each dependency before its
- * use, so no {@code MetaKernelBootstrapResolver}-style two-pass ordering is needed here either.
+ * use, so no {@code KernelBootstrapResolver}-style two-pass ordering is needed here either.
  */
 class CoreSchemaImportTest {
 
     /**
-     * The registered {@link TsonSchemaRegistry} plus the exact {@link TsonCompiledMetaRegistry}
+     * The registered {@link TsonSchemaRegistry} plus the exact {@link TsonCompiledVocabularyRegistry}
      * that loaded everything into it -- a second call reusing this same loader hits {@code
-     * TsonCompiledMetaRegistry}'s own cache (see {@link TsonCompiledMetaRegistry#load}'s own case
+     * TsonCompiledVocabularyRegistry}'s own cache (see {@link TsonCompiledVocabularyRegistry#loadVocabulary}'s own case
      * 1) rather than attempting to register {@code core.tn} a second time, which {@link
      * TsonSchemaRegistry#register} would correctly reject as a duplicate identity.
      */
-    private record Loaded(TsonSchemaRegistry schemaRegistry, TsonCompiledMetaRegistry registry) {
+    private record Loaded(TsonSchemaRegistry schemaRegistry, TsonCompiledVocabularyRegistry registry) {
     }
 
     private static Loaded loadMetaKernelMetaAndCore() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
+        TsonCompiledVocabularyRegistry registry = new TsonCompiledVocabularyRegistry(schemaRegistry,
+                SchemaModelNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
-        // meta.tn's own !!import needs meta-kernel present in the *shared* registry first --
-        // meta-kernel's own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry
-        // itself (see TsonCompiledMetaRegistry's own Javadoc), so it's registered separately,
+        // meta.tn's own !!import needs the kernel present in the *shared* registry first --
+        // the kernel's own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry
+        // itself (see TsonCompiledVocabularyRegistry's own Javadoc), so it's registered separately,
         // resolved ordinarily against this same loader (whose own bootstrap branch supplies the
         // structure namespace).
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
+                TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(resolvedMetaKernel);
 
-        loader.loadMeta(TsonBundledSchemas.META_ID);
+        loader.loadVocabulary(TsonBundledSchemas.META_ID);
         loader.resolveLinked(TsonBundledSchemas.CORE_ID); // core.tn is a non-meta import: resolved, not compiled here
         loader.resolveLinked(TsonBundledSchemas.NET_ID); // and so is net.tn
 
@@ -75,16 +74,14 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(44, core.entries().size(), "expected every core.tn declaration to resolve");
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.CORE_ID);
+        assertEquals(6, core.entries().keySet().stream().filter(name -> registered.get().originOf(name).equals(own))
+                .count(), "expected every core.tn declaration to resolve");
+        assertTrue(core.entries().containsKey("title") && core.entries().containsKey("examples"));
 
-        // A representative spread of core.tn's own real declarations -- atom refinements
-        // (int32/positive_integer) and constructor applications (hex, float32, email, complex, unknown) --
-        // all genuinely present in the validated, registered namespace. core.tn declares
-        // no !!import of its own (only !!meta:"...meta.tn"), so unlike MetaSchemaImportTest's own
-        // assertions, meta.tn's/meta-kernel's own vocabulary (e.g. "atom", "binary") is never merged
-        // into this schema's own entries() -- it's only reachable one hop via !!meta, and only for a
-        // "source" reference (§3.3.1's structure-namespace rule), which is exactly what lets int32's
-        // own `source: integer_type` validate despite integer_type living in meta-kernel, two hops up.
+        // A representative spread of the libraries' real declarations core.tn imports -- atom refinements (int32) and
+        // constructor applications (float32, email, complex) -- all genuinely present in the validated, registered
+        // namespace, which also holds the kernel's entries under `meta`: an import contributes its closure (§2.2.3).
         assertTrue(core.entries().containsKey("int32"));
         assertTrue(core.entries().containsKey("uint8"));
         assertTrue(core.entries().containsKey("bytes"));
@@ -92,28 +89,37 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("float64"));
         assertTrue(core.entries().containsKey("email"));
         assertTrue(core.entries().containsKey("complex"));
-        assertTrue(core.entries().containsKey("declared"));
-        assertTrue(core.entries().containsKey("extern"));
-        assertTrue(core.entries().containsKey("dynamic"));
-        assertTrue(core.entries().containsKey("extern_of"));
-        assertTrue(core.entries().containsKey("extern_type"));
+        assertTrue(core.entries().containsKey("meta.declared"));
+        assertTrue(core.entries().containsKey("meta.record_field"));
+        assertTrue(core.entries().containsKey("text"));
     }
 
-    /** The network families are net.tn's, beside its host name, and core claims none of their names. */
+    /**
+     * The network families are net.tn's: their instances at its root, their constructors under its {@code net}, and
+     * core.tn, importing it, holds each by net.tn's identity.
+     */
     @Test
     void theNetworkFamiliesAreNetTnsAndNotCores() {
         TsonSchemaRegistry schemaRegistry = loadMetaKernelMetaAndCore().schemaRegistry();
         TsonSchema net = schemaRegistry.get(TsonBundledSchemas.NET_ID).orElseThrow().schema();
         TsonSchema core = schemaRegistry.get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
-        Set<String> network = Set.of("ipv4", "ipv6", "cidr4", "cidr6", "mac", "hostname", "host", "media_type");
-        assertEquals(network, net.entries().keySet());
-        assertTrue(network.stream().noneMatch(core.entries()::containsKey), "core declares a network name");
+        Set<String> network = Set.of("email", "ipv4", "ipv6", "cidr4", "cidr6", "mac", "hostname", "host", "media_type",
+                "uri_reference", "uri", "uuid");
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(TsonBundledSchemas.NET_ID);
+        TsonLinkedSchema linkedNet = schemaRegistry.get(TsonBundledSchemas.NET_ID).orElseThrow();
+        assertEquals(network, net.entries().keySet().stream().filter(name -> linkedNet.originOf(name).equals(own))
+                .filter(name -> !name.equals("net") && !name.startsWith("net.") && !name.startsWith("array_"))
+                .collect(java.util.stream.Collectors.toSet()));
+        assertTrue(net.entries().containsKey("net.ipv4_type"));
+        TsonLinkedSchema linkedCore = schemaRegistry.get(TsonBundledSchemas.CORE_ID).orElseThrow();
+        assertTrue(network.stream().allMatch(name -> linkedCore.originOf(name).equals(own)),
+                "core.tn holds net.tn's names as net.tn's");
     }
 
     /**
-     * {@link TsonCompiledMetaRegistry#register} (reached via {@code loader.load}, inside {@link
-     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own 44 entries as a side
+     * {@link TsonCompiledVocabularyRegistry#register} (reached via {@code loader.load}, inside {@link
+     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own entries as a side
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone
@@ -121,18 +127,15 @@ class CoreSchemaImportTest {
      * the whole standard library, so "every one of these reads" is the strongest single statement about the
      * compiled reader stack this repo can make, and a regression here is silent everywhere else.
      *
-     * <p>It was not always empty. {@code declared}, {@code extern} and {@code dynamic} sat here for as long
-     * as {@code scoped} had no reader, which is why this is written as a set rather than a boolean -- a new
-     * gap names itself.
+     * <p>Written as a set rather than a boolean so a new gap names itself.
      */
     @Test
     void noCoreEntryCompilesToAnErrorReader() {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
-        // core.tn is not a meta-layer schema (its !!meta is meta.tn, not meta-kernel), so it's resolved
-        // but never compiled in the core -- its readers are compiled per mode in a read registry, exactly
-        // as they are when a user schema imports it. DOM mode is enough to check which entries error.
+        // core.tn's readers are compiled per mode in a read registry, exactly as they are when a user schema
+        // imports it. DOM mode is enough to check which entries error.
         TsonCompiledSchema compiledCore =
                 TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
 

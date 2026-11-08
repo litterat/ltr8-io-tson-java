@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code template_param.type} end to end: each parameter of an open entry records the type an argument for it is
+ * {@code meta.template_param.type} end to end: each parameter of an open entry records the type an argument for it is
  * read as, derived from the positions it stands in ([TSON-SCHEMA] §5.10), and the kind follows from it.
  */
 class TemplateParamTypeTest {
@@ -25,11 +25,11 @@ class TemplateParamTypeTest {
     private static final String ID = "https://example.test/params-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/params-1.tn"
-            !!meta:"https://tson.io/2026/38/m/meta.tn"
-            !!import:"https://tson.io/2026/38/m/core.tn"
-            {
+            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/39/m/core.tn"
+            !schema {
               percent  => !integer ^ { min: 0  max: 100 }
-              vector   => <T, N> !array { element_type: T  min_items: N  max_items: N }
+              vector   => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
               counted  => <C> { c?: percent ~ C }
               outer    => <X> counted<X>
               typed_by => <T, N> { w?: T ~ N }
@@ -53,13 +53,14 @@ class TemplateParamTypeTest {
         return new TemplateParam(name, TypeRef.of(type));
     }
 
-    /** A type slot gives {@code type_kind}; a scalar slot of the applied constructor gives that slot's type. */
+    /** A type slot gives {@code meta.type_ref}; a scalar slot of the applied constructor gives that slot's type. */
     @Test
     void aSlotGivesItsDeclaredType() {
-        assertEquals(List.of(param("T", "type_kind"), param("N", "non_negative_integer")), parameters().get("vector"));
+        assertEquals(List.of(param("T", "meta.type_ref"), param("N", "numeric.count")),
+                parameters().get("vector"));
     }
 
-    /** A routed default is read as the field's own declared type, not as {@code record_field.value}'s. */
+    /** A routed default is read as the field's own declared type, not as {@code meta.record_field.value}'s. */
     @Test
     void aRoutedDefaultGivesTheFieldsType() {
         assertEquals(List.of(param("C", "percent")), parameters().get("counted"));
@@ -74,7 +75,7 @@ class TemplateParamTypeTest {
     /** A field typed by a parameter makes the routed parameter's type that parameter. */
     @Test
     void aTypeMayNameAnEarlierParameter() {
-        assertEquals(List.of(param("T", "type_kind"), param("N", "T")), parameters().get("typed_by"));
+        assertEquals(List.of(param("T", "meta.type_ref"), param("N", "T")), parameters().get("typed_by"));
     }
 
     /**
@@ -88,8 +89,8 @@ class TemplateParamTypeTest {
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, SCHEMA)))));
         assertEquals(List.of(), tson.validateSchema(SCHEMA));
-        assertEquals(List.of(), tson.validate("!!schema:\"" + ID + "\"\n!holder { n: c }"));
-        List<Diagnostic> refused = tson.validate("!!schema:\"" + ID + "\"\n!holder { n: z }");
+        assertEquals(List.of(), tson.validate("!!import:\"" + ID + "\"\n!holder { n: c }"));
+        List<Diagnostic> refused = tson.validate("!!import:\"" + ID + "\"\n!holder { n: z }");
         assertEquals(1, refused.size(), refused.toString());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, refused.getFirst().code());
     }
@@ -99,9 +100,9 @@ class TemplateParamTypeTest {
     void usesThatDisagreeAreRefused() {
         List<Diagnostic> refused = Tson.standard().validateSchema("""
                 !!id:"https://example.test/clash-1.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   clash => <N> { a?: text ~ N  b?: int32 ~ N }
                 }
                 """);
@@ -113,9 +114,7 @@ class TemplateParamTypeTest {
     @Test
     void coresTemplatesRecordTheirTypes() {
         Map<String, List<TemplateParam>> core = parameters();
-        assertEquals(List.of(param("S", "schema_identity")), core.get("extern_of"));
-        assertEquals(List.of(param("S", "schema_identity"), param("T", "type_name")), core.get("extern_type"));
-        assertEquals(List.of(param("T", "type_kind")), core.get("set"));
+        assertEquals(List.of(param("T", "meta.type_ref")), core.get("set"));
     }
 
     // ── A template over a meta constructor is the meta's ─────────────────────────────
@@ -123,45 +122,46 @@ class TemplateParamTypeTest {
     private static List<Diagnostic> load(String declarations) {
         return Tson.standard().validateSchema("""
                 !!id:"https://example.test/params-structure.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 """ + declarations + "}");
     }
 
     /**
-     * {@code N} stands in {@code array.min_items}, so its type is the meta's {@code non_negative_integer}, judged in
-     * the structure namespace (§5.10): a schema's own entry under that name is another type and never stands in for
-     * it, so {@code vec<0>} is a valid application however narrowly the schema defines its own.
+     * {@code N} stands in {@code array.min_items}, so its type is the kernel's {@code numeric.count}, the
+     * slot's own (§5.10): {@code vec<0>} is a valid application, and a text argument is refused. A schema may declare its
+     * own entry under the kernel member's name, the kernel's being {@code numeric.count} (§2.2.3).
      */
     @Test
-    void aConstructorTemplatesValueIsJudgedInTheStructureNamespace() {
+    void aConstructorTemplatesValueIsTheSlotsType() {
         assertEquals(List.of(), load("""
-                  non_negative_integer => !integer ^ { min: 1 }
-                  vec => <N> !array { element_type: text  min_items: N }
+                  vec => <N> !meta.array { element_type: text  min_items: N }
                   v0  => vec<0>
                 """));
         List<Diagnostic> wide = load("""
-                  non_negative_integer => !text ^ {}
-                  vec    => <N> !array { element_type: text  min_items: N }
+                  vec    => <N> !meta.array { element_type: text  min_items: N }
                   holder => { a: vec<"abc"> }
                 """);
         assertEquals(1, wide.size(), wide::toString);
         assertTrue(wide.getFirst().message().contains("binds 'N' to 'abc'"), wide::toString);
+        assertEquals(List.of(), load("""
+                  count => !integer ^ { min: 1 }
+                """));
     }
 
-    /** A written type on such a template narrows within the meta's vocabulary, and a schema type is not there. */
+    /** A written type on such a template narrows the slot's type, and a type that is no narrowing of it is refused. */
     @Test
-    void aConstructorTemplatesWrittenTypeNamesTheMetasVocabulary() {
+    void aConstructorTemplatesWrittenTypeNarrowsTheSlotsType() {
         assertEquals(List.of(), load("""
-                  vec => <N: non_negative_integer> !array { element_type: text  max_items: N }
+                  vec => <N: numeric.count> !meta.array { element_type: text  max_items: N }
                   v3  => vec<3>
                 """));
         List<Diagnostic> core = load("""
-                  vec => <N: int8> !array { element_type: text  max_items: N }
+                  vec => <N: int8> !meta.array { element_type: text  max_items: N }
                 """);
         assertEquals(1, core.size(), core::toString);
-        assertTrue(core.getFirst().message().contains("not in the structure namespace"), core::toString);
+        assertTrue(core.getFirst().message().contains("does not IS-A"), core::toString);
     }
 
     /** A record template's fields are the schema's, and so is a written type on its parameters. */

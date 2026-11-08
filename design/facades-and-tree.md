@@ -40,19 +40,23 @@ Related: `design/writers-and-document-header.md` (writers, `TsonDocumentHeader`,
 consumer read front doors, named for what a consumer holds, matching Jackson's `ObjectReader`/`readTree`.
 Each is **dual-mode, fixed at construction**: built standalone (`new TsonObjectReader(ctx)` / `new
 TsonTreeReader()`) it's **schemaless** (Class 1 — the target class, or the wire, is the whole contract;
-any `!!schema` the document declares is ignored, Jackson-style); obtained from a `Tson` facade
+any `!!import` the document declares is ignored, Jackson-style); obtained from a `Tson` facade
 (`objectReader()`/`treeReader()`, carrying a configured `SchemaSource`) it's **schema-aware** — a
-self-describing document is validated against its declared `!!schema` as it's read (the schema resolves
-through the source, the root type-ref selects the type), else read schemalessly. `readWithoutSchema(...)`
-forces the schemaless path on a schema-aware reader.
+self-describing document is validated against its `!!import`s as it's read (the schemas resolve through the
+source under one namespace, the root type-ref selects the type), else read schemalessly. `readWithoutSchema(...)`
+forces the schemaless path on a schema-aware reader. Every whole-document read but `readAs` refuses a *schema*
+document (root tagged `!schema`): `requireDataDocument` throws `TsonUnsupportedDocumentException`, which reaches the
+receiver as §1.5's categorized diagnostic, the Class 1 verdict;
+`readAs` does not, since a caller naming the root's type has said how to read it — how a resolved form is read back.
 
 **These two are the whole document-reading surface**, and both derive Jackson-`ObjectReader`-style rather
 than taking parameters, so source form, error policy and schema selection stay orthogonal instead of
 multiplying overloads: `withDiagnostics(receiver)` swaps fail-fast for any other receiver,
 `withHostTypes()` and `preservingUnknownTypeRefs()` relax the schemaless type-ref rules below,
 `withTokenPolicy(policy)` applies UTS #39 §5.2 to every token the read pulls (see below), and
-`withSchema(uri).readAs(source, typeName)` covers data that *isn't* self-describing — the caller supplies
-what a `!!schema` plus a root type-ref would have said, and validation is identical either way. Each returns
+`withSchema(uri).readAs(source, typeName)` (or `withImports(uris)` for several) covers data that *isn't*
+self-describing — the caller supplies what `!!import`s plus a root type-ref would have said, and validation is
+identical either way. Each returns
 a new reader **sharing** the original's compiled-schema registry, never rebuilding it. A
 `TsonTypeReader` from a compiled schema is the layer underneath: a strict single-method interface that
 reads one value at a cursor and polices nothing around it.
@@ -102,7 +106,7 @@ The check sees the four events carrying text — a value, a field name, a type-r
 at that layer nothing yet knows which is which. **So a name is a token**, and a token policy stricter than the
 identifier policy subsumes it: the name has already cleared the stricter rule by the time the name rule looks
 at it. The setter is named for the surface rather than for the values it mostly affects so that this is
-visible where it is configured. Document directives are not checked: a `!!schema`/`!!id` token is a URI naming
+visible where it is configured. Document directives are not checked: an `!!import`/`!!id` token is a URI naming
 an external resource, §2.2.1 governs what an identity may be, and an IRI's scripts are the resource owner's
 business. The diagnostic (`RESTRICTED_SCRIPT`) carries a position and no `path`, which is not an omission —
 there is no path yet at the point the check runs. The token policy is a `ScriptPolicy`, which has no unit: `_`
@@ -113,12 +117,12 @@ admit UTS #39's own `Toys-Я-Us`.
 
 - **The class-driven binding / tree-building mechanics live in the internal `reader` package**
   (`DataClassObjectReader`/`SchemalessTreeReader`, unexported); the public readers are thin facades that
-  peek the `DocumentStart` for a `!!schema` and dispatch to either the compiled schema registry or the
+  peek the `DocumentStart` for its `!!import`s and dispatch to either the compiled schema registry or the
   schemaless engine. The whole-document entry points (`read`/`readWithoutSchema`/`readAs`) own document
   framing — consuming the leading `DocumentStart`, and the `requireDocumentEnd` pull that makes the lazy
   stream check for trailing content; the low-level `read(TsonReadContext, …)` is frame-free (a value at the
   cursor, for a caller managing their own context) and always schemaless.
-- **A failure reaching the schema is a diagnostic, not an exception.** An unresolvable `!!schema`, a missing
+- **A failure reaching the schema is a diagnostic, not an exception.** An unresolvable `!!import`, a missing
   root type-ref, a root type the target class can't hold: each reports through the receiver and skips the
   root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is a `ReadException` at
   the first one; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
@@ -141,7 +145,7 @@ admit UTS #39's own `Toys-Я-Us`.
       Events are replayed from a buffer rather than re-lexed, so a lookahead holds only what it looked past.
     - An annotation *after* the type-ref stays a syntax error, correctly — the grammar admits one order.
 - **A schema that *resolves* badly reports like one, even mid-read.** `tree.get(uri, receiver)` /
-  `bind.get(uri, receiver)` (over `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)`) resolve and link
+  `bind.get(uri, receiver)` (over `TsonCompiledVocabularyRegistry.resolveLinked(uri, receiver)`) resolve and link
   the named schema collecting, so validating a data document against a broken schema reports **every**
   declaration at fault — the same account `tson compile` gives, since the schema is equally broken either
   way. Those diagnostics go to the **facade's own receiver, not through `ctx.report`**, which would rebuild
@@ -166,8 +170,16 @@ admit UTS #39's own `Toys-Я-Us`.
   naming the control. It is the same move as `withSchema`: the caller supplies the schema the document does
   not bind, here as classes. `preservingUnknownTypeRefs()` on either facade opts out of rule 3 only —
   built-in names stay checked — and is what round-tripping through `TsonTreeWriter`, or reading the wire of a
-  document whose `!!schema` is deliberately out of scope, wants. The two controls compose, as
+  document whose `!!import` is deliberately out of scope, wants. The two controls compose, as
   `ignoringUnknownFields()` does with both.
+- **A reference is a `TypeRef` in both modes.** Under a schema a reference-typed position (a kind or a `meta.ref<…>`)
+  reads to a `schema.meta.TypeRef`, so a tree read hands back a `TsonAtom` holding one (`node.as(TypeRef.class)`)
+  and a bind delivers the same object, a `String` host receiving its canonical text. Read in data under a kind, it
+  carries its closure, so `referent()` is the value of the entry it names (`design/references.md`); read in data
+  under a reference naming values (`meta.ref<order>`), its `referent()` is the value its name reaches, and a `Ref`
+  host is delivered that value at the read. A schemaless read
+  has no closure: it keeps an application or a sibling reference as a `TsonReference` (`design/tree-model.md`) and a
+  bare name as a token.
 - **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,
   else the simple class name case-insensitively — the same match `bindUnion` gives union members) is what
   lets `!point { x: 3  y: 4 }` bind to a Java `Point` with nothing annotated. An atom position takes
@@ -183,14 +195,14 @@ admit UTS #39's own `Toys-Я-Us`.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
   reported *before* the value is read, not a cast failure after. A root typed by a namespace type reads as its map;
-  asked for `Namespace.class`, the map is delivered as an instance of the constructor the root names
+  asked for `Namespace.class`, the map is delivered as a value of the namespace type the root names
   (`NamespaceInstanceReader`).
 - **Both tree read paths capture wire annotations** onto each node's `annotations()`, at every position §3.1
   permits one (root, record field value, array element, both sides of a map entry, and recursively an
   annotation's own value). `AnnotationCapture` (in `reader`) is the shared helper: an annotation's value
   events are buffered and replayed through a schemaless tree read via `ListEventSource`, so the recursion
-  needs no special case, and an annotation's value is *always* read schemalessly — its type resolves one hop
-  against the governing namespace (§3.3.3), not against the compiled readers in scope. `EventSkip.typeRef`
+  needs no special case, and an annotation's value is *always* read schemalessly — its type resolves in the
+  namespace of the document's schema (§3.3.3), not against the compiled readers in scope. `EventSkip.typeRef`
   is split out of `annotationsAndTypeRef` so capture and discard share the framing's second half.
 - **The schema-driven readers capture by hoisting, not by widening signatures.** A compiled tree reader
   shares its `*AbstractReader` base with the bind subclass, and the base consumes the framing where the node
@@ -216,8 +228,8 @@ admit UTS #39's own `Toys-Я-Us`.
       recovery reads the value's discrimination class off `EventSkip.aheadOfValue` for the same reason — the
       cursor sits at the framing, not at the core-value.
 - **A schema-driven read also type-checks annotations** (§6: an annotation *names a type*). `AnnotationTypes`
-  resolves the name against the governing schema (§3.3.3's one hop — for a data document that's the
-  `!!schema` target, i.e. the very schema the readers were compiled from) and the value is read by *that
+  resolves the name in the governing schema's namespace (§3.3.3 — for a data document that's the one over its
+  `!!import`s, i.e. the very schema the readers were compiled from) and the value is read by *that
   type's* compiled reader, so a wrong-typed value fails for the ordinary reason any wrong-typed value fails.
   Read-time resolution is safe because `compile` is eager; the lookup is gated on `schema().entries()`
   because the resolver throws for an unknown name. An unresolvable name reports `UNKNOWN_TYPE_REF` and the

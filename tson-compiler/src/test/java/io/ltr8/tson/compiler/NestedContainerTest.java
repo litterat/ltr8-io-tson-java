@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TupleBody;
@@ -12,7 +12,6 @@ import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonValue;
 
-import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A nested bracket form ({@code [[T; 2], U]}, {@code [[T]; 3]}) in an ordinary user schema -- one governed by
- * {@code meta.tn} and importing {@code core.tn} -- driven through the real bundled chain, from the sugar an
+ * A nested bracket form ({@code [[T; 2], U]}, {@code [[T]; 3]}) in an ordinary user schema -- one importing
+ * {@code meta.tn} and {@code core.tn} -- driven through the real bundled chain, from the sugar an
  * author writes to a reader enforcing the inner container's own constraints. The end-to-end peer of {@code
  * SchemaDesugarerTest}'s nested-form cases, which pin the rewrite itself.
  *
@@ -54,9 +53,9 @@ class NestedContainerTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/nested-container.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -66,8 +65,8 @@ class NestedContainerTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -94,8 +93,8 @@ class NestedContainerTest {
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
                 entry(compiled, outer.elements().get(0).elementType().name()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
-        assertEquals(Optional.of(BigInteger.TWO), inner.minItems());
-        assertEquals(Optional.of(BigInteger.TWO), inner.maxItems());
+        assertEquals(Optional.of(2L), inner.minItems());
+        assertEquals(Optional.of(2L), inner.maxItems());
 
         assertNotNull((TsonValue) compiled.get("grid").read(TestDocuments.document("[ [1 2] \"a\" ]")));
     }
@@ -119,7 +118,7 @@ class NestedContainerTest {
         TsonCompiledSchema compiled = compile("  rows => [[integer]; 3]");
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
-        assertEquals(Optional.of(new BigInteger("3")), outer.minItems());
+        assertEquals(Optional.of(3L), outer.minItems());
         ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().name()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
         assertEquals(Optional.empty(), inner.maxItems(), "the inner array is unconstrained");
@@ -164,7 +163,7 @@ class NestedContainerTest {
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, entry(compiled, "triple"));
         assertTrue(body.voidable());
-        assertEquals(Optional.of(new BigInteger("3")), body.minItems());
+        assertEquals(Optional.of(3L), body.minItems());
 
         assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[1 _ 3]")));
         assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[_ _ _]")));

@@ -13,7 +13,7 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `TYPE_MISMATCH`             | the value's shape does not match the type in scope                                           |
 | `WRONG_ARITY`               | a tuple or template application has the wrong element/argument count                         |
 | `UNKNOWN_TYPE_REF`          | a `!type` annotation names a type the schema in scope does not declare                       |
-| `SCOPE_NOT_ADMITTED`        | a `!!schema` (`$schema`) at a position whose type is not `scoped` (§7.8, a resolver error)   |
+| `SCOPE_NOT_ADMITTED`        | a `$schema` in JSON anywhere but the root annotation object (a resolver error)              |
 | `ATOM_FORM_INVALID`         | the token is not the atom's grammar — `'thirty'` where an integer goes                      |
 | `ATOM_CONSTRAINT_VIOLATION` | the token parsed, then broke a declared constraint — `150` under `max: 100`                  |
 | `UNRECOGNIZED_FIELD`        | the data carried a field the type does not declare (§7.2 — records are closed, always)       |
@@ -34,8 +34,9 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `SCHEMA_TIMEOUT`            | the location did not answer in time                                                          |
 | `SCHEMA_TOO_LARGE`          | the location answered with more bytes than a schema document may be                          |
 
-A push at a `scoped` position whose `scope` does not hold `EXTERN` is not `SCOPE_NOT_ADMITTED` but the cell rule's
-refusal, `VALIDATION_ERROR`: that position reads scopes, and this one is not admitted there.
+In TSON text an `!!import` anywhere but the header is a parse error, reported as `VALIDATION_ERROR` like any
+document that will not parse — as are the retired `!!meta` and `!!schema` directives, an unknown directive and an
+`!!id` after an `!!import`.
 
 ### The eleven that are not verdicts on the document
 
@@ -47,21 +48,27 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
   not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in one
-  document both get reported. No construct the bundled schemas declare reaches one; what still can is a
-  document read against an entry built with a meta layer's own namespace type (§2.2.2's extension point), which
-  is a value and has no reader.
+  document both get reported. No construct the bundled schemas declare reaches one; what still can is,
+  in a schema, an instance of a constructor of types the schema declares itself (`c => meta.product & { … }`,
+  `x => !c { … }`), and a value entry read against a record of the same document whose field is typed by an
+  application written inline (`holder => { r: meta.ref<order> }`, `h => !holder { r: o1 }`; name the application
+  instead, `order_ref => meta.ref<order>`). A constructor, a type or an annotation type
+  declared in the same document is otherwise read in wait order, whichever is written first. A data tag
+  naming a schema's value entry (`!orders { … }` over `orders => !api { … }`) is no gap: it is `TYPE_MISMATCH`,
+  a value and not a type.
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
   document than a gap is. It normally fails the bind-mode compile as an exception instead; it reaches a
   read as a diagnostic for a schema compiled on demand, and where the bound class refuses a value the schema
   admits — its constructor's own check, or a void value meeting a collection that refuses `null`, such as
   `ConcurrentHashMap`. With no schema the class is the contract, and the same refusal is `TYPE_MISMATCH`.
   A field or position that can hold no value (voidable, or optional with no default) bound to a primitive is
-  refused at compile.
-- **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth`
-  (64 by default). The bytes may be valid and read in full by a processor configured for more, which is why
-  the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope)
-  rather than copied into the diagnostic. It and the three refusal codes below are the non-verdicts where
-  the reader holds the fix.
+  refused at compile. A schema value entry whose type the context binds no class for is held as a tree, so it
+  validates; obtained through `bindRegistry()` it is a `BIND_MISMATCH` at the entry (`/entry`).
+- **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth` (64 by
+  default), or a schema's entries waited on a chain longer than `LimitsPolicy.maxWaitDepth` (64 by default, reported at
+  the entry heading the chain). The bytes may be valid and read in full by a processor configured for more, which is why
+  the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope) rather than
+  copied into the diagnostic. It and the three refusal codes below are the non-verdicts where the reader holds the fix.
 - **The five `SCHEMA_*` fetch codes** are everyone else: no configured `SchemaSource` would supply
   the schema the document names. Nothing is wrong with the document, and nothing may be wrong with the
   schema either — it was never obtained, so it was never read. **`SCHEMA_ERROR` vs the five** is the
@@ -131,7 +138,7 @@ a location this really emits. `schemaId`/`expected`/`actual` use `""` and offer 
 in code points, the offset counting UTF-8 bytes from 0. Rendered `line:column:byteOffset`.
 
 **The schema end is the path taken through your schema**, accumulated as the read descends, never the
-leaf it resolves to: `/person/age`, not `/int32` in core.tn. The leaf names a file the author did not
+leaf it resolves to: `/person/age`, not `/int32` in numeric.tn. The leaf names a file the author did not
 write and never mentions the field they can edit. A record re-anchors id + position on itself.
 
 ## Receivers
@@ -218,13 +225,14 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 | a collecting facade read                                | nothing, for any bad document — a library fault still throws             |
 | `Tson.validate` / `validateSchema`                      | nothing, for any bad document — a library fault still throws             |
 | `Tson.resolve` on an already-registered `!!id`          | `SchemaValidationException`                                          |
-| `Tson.resolve` naming an unavailable `!!import`/`!!meta`| `SchemaFetchException`                                               |
+| `Tson.resolve` naming an unavailable `!!import`         | `SchemaFetchException`                                               |
 | a bind-mode compile whose class disagrees               | `BindMismatchException` — at compile, not at first read              |
 | the first read of a type with no bound class            | `MissingBindingException`, thrown unwrapped from its `ErrorReader`   |
 | a `SchemaSource`                                    | `SchemaFetchException` and nothing else — another type means a fault |
 
-**`!!meta` in a document handed to the data parser** throws `TsonUnsupportedDocumentException`, not
-`ParseException`: a schema document is unsupported there, not malformed.
+**A root tagged `!schema` in a document handed to the data parser** throws `TsonUnsupportedDocumentException`,
+not `ParseException`: a schema document is unsupported there, not malformed. `parseResolvedForm()` reads one
+without the refusal, the caller saying it holds a resolved form.
 
 ## CLI exit codes
 

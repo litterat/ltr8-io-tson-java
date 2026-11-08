@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 
@@ -27,9 +27,9 @@ class TemplateRegularityTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/regularity.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   box => <T> { v: T }
                 %s
                 }
@@ -40,8 +40,8 @@ class TemplateRegularityTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -57,6 +57,15 @@ class TemplateRegularityTest {
         assertTrue(message.contains("'weird' applies 'weird' recursively"), message);
         assertTrue(message.contains("does not pass 'T' through unchanged"), message);
         assertTrue(message.contains("the application 'box<...>'"), "names what argument 1 actually is: " + message);
+    }
+
+    /** A template of any constructor is checked, its held tree read as a record template's is. */
+    @Test
+    void aGrowingArgumentInANamespaceTemplateIsRejected() {
+        String message = rejected(
+                "  weird => <T> !meta.namespace { key_type: meta.identifier  value_type: weird<box<T>> }");
+
+        assertTrue(message.contains("'weird' applies 'weird' recursively"), message);
     }
 
     @Test

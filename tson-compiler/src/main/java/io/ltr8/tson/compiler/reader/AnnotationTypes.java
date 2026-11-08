@@ -12,7 +12,7 @@ import java.util.Optional;
  * {@code T} and attaches it as metadata to the surrounding value", resolved one hop against the governing
  * target's namespace (§3.3.3) and with its value validated against {@code T}'s contract.
  *
- * <p>For a data document that governing target is the {@code !!schema} target -- which is exactly the schema
+ * <p>For a data document that namespace is its import closure -- which is exactly the schema
  * the surrounding compiled readers were built from, so the reader is reachable by name with no second
  * compilation. {@link #of} is the schema-driven case; {@link #UNVALIDATED} is the schemaless one, where there
  * is no governing schema and an annotation is kept as authored without any claim about its type.

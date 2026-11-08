@@ -1,6 +1,6 @@
 # ltr8-unicode — Unicode properties and algorithms (`io.ltr8.unicode`)
 
-Unicode Character Database properties and the algorithms over them, each to its Unicode standard: identifier
+Unicode Character Database properties and the algorithms over them, each to its Unicode standard: meta.identifier
 properties and profiles (UAX #31), normalization forms (UAX #15, NFKC_Casefold) and UTS #39's security mechanisms —
 identifier status, confusable skeletons over a set, joining-control contexts and restriction levels — and IDNA2008's
 derived property (RFC 5892) and Bidi rule (RFC 5893). Depends on

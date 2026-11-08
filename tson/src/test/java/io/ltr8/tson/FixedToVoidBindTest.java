@@ -7,7 +7,7 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
 
@@ -27,9 +27,9 @@ class FixedToVoidBindTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/retired.tn"
-            !!meta:"%s"
             !!import:"%s"
-            {
+            !!import:"%s"
+            !schema {
               person => { name: text  retired?: void? }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
@@ -39,7 +39,7 @@ class FixedToVoidBindTest {
     private static Tson bound() {
         SchemaSource source = uri -> SCHEMA;
         DataBindContext context = DataBindContext.builder()
-                .nameBinder(DataNameBinder.ofMap(Map.of("person", Person.class)).orElse(SchemaMetaNameBinder.INSTANCE))
+                .nameBinder(DataNameBinder.ofMap(Map.of("person", Person.class)).orElse(SchemaModelNameBinder.INSTANCE))
                 .registerAtoms(AtomContext.hostTypes())
                 .build();
         Tson tson = Tson.of(ProcessorConfig.defaults()
@@ -50,7 +50,7 @@ class FixedToVoidBindTest {
     }
 
     private static Person read(String body) {
-        return bound().objectReader().read("!!schema:\"" + ID + "\"\n!person " + body, Person.class);
+        return bound().objectReader().read("!!import:\"" + ID + "\"\n!person " + body, Person.class);
     }
 
     @Test

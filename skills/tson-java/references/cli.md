@@ -26,8 +26,8 @@ options, exit codes and description — including the policy options for the thr
 
 |                       |                                                                                                     |
 | --------------------- | --------------------------------------------------------------------------------------------------- |
-| Arguments             | **a flat file list** — each `.tn` auto-classified as schema (its header carries `!!meta`) or data, by content, never by filename; a `.json` file is JSON data |
-| Schema selection      | a `.tn` data document's own: its `!!schema` names the schema, its root type-ref (`!person`) the type. JSON names neither, so `--schema <file|uri> --type <name>`, given together, bind every JSON input in the run |
+| Arguments             | **a flat file list** — each `.tn` auto-classified as schema (its root is tagged `!schema`) or data, by content, never by filename; a `.json` file is JSON data |
+| Schema selection      | a `.tn` data document's own: its `!!import`s name the schemas, its root type-ref (`!person`) the type. JSON names neither, so `--schema <file|uri> --type <name>`, given together, bind every JSON input in the run |
 | `-`                   | reads one data document from stdin, at most once, always data (a file really named `-` is `./-`); JSON when `--schema`/`--type` are given |
 | `--output`            | `text` (default), `json`, `tson`                                                                    |
 | Exit codes            | `0` accepted · `1` rejected, as invalid or refused (§8.2, §9.1) · `2` usage · `69` a schema nothing would supply · `75` a schema that could not be reached · `78` a type with no Java class here · `70` library gap or fault |
@@ -39,16 +39,16 @@ the document, the rest name who must act otherwise — this library (`70`), an a
 the type (`78`), the reference or the schema files given (`69`), or nobody, by rerunning (`75`).
 `TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by who must act first — `70` > `78` > `69` > `1` >
 `75`, a rerun last because every other fix ends in one.
-A refusal — a §8.2 name-hygiene rule or a §9.1 limit (`LIMIT_EXCEEDED`) — is a rejection and a `1` like an
+A refusal — a §8.2 name-hygiene rule or a §9.1 or §11.5 limit (`LIMIT_EXCEEDED`) — is a rejection and a `1` like an
 invalidity, though not a finding about validity: another deployment may accept the same document, and the runner
-can act — a relaxed policy, `--max-depth`, a renamed field or a smaller document.
+can act — a relaxed policy, `--max-depth` or `--max-wait-depth`, a renamed field or a smaller document.
 `validate` collects every problem in a file in one pass.
 
 ```bash
 tson init-example .                                   # writes person.tn + person-data.tn
 tson validate person.tn person-data.tn                # OK
 tson validate --output json person.tn bad-data.tn
-tson validate person.tn - < person-data.tn            # stdin; the data still names its own !!schema and type
+tson validate person.tn - < person-data.tn            # stdin; the data still names its own !!import and type
 tson compile person.tn                                # does the schema itself resolve and compile?
 tson hash person.tn                                   # stamp ?sha256=… onto its own !!id, in place
 tson validate --schema order.tn --type order a.json b.json          # JSON inputs, bound out of band
@@ -62,13 +62,11 @@ cached copy binds wherever it sits — or the `!!id` of a schema file on the com
 
 `tson strip <schema>` prints a schema's **reading form** to standard output — the same declarations in as few
 tokens as the syntax allows, for a reader that reads the schema rather than loading it, such as a language model
-given it in a prompt. The `!!id`, every `!!meta`/`!!import` pin, and every `@doc`, `@title`, `@examples` and
-`@comment` are removed; a reference to the spec's own library is shortened to its revision and name
-(`!!import:"38/core"`); each directive and declaration gets one line. Other annotations stay, and other
-references keep their URLs. `--keep-docs` keeps `@doc`, `@title` and `@examples`; `@comment`, a note for
-maintainers, still goes.
+given it in a prompt. The `!!id`, every `!!import` pin, and every `@doc` are removed; a reference to the spec's own library
+is shortened to its revision and name (`!!import:"39/core"`); each directive and declaration gets one line. Other annotations
+stay, and other references keep their URLs. `--keep-docs` keeps `@doc`.
 
-The output is valid syntax but **not a loadable schema** — nothing resolves `"38/core"` — so the file is never
+The output is valid syntax but **not a loadable schema** — nothing resolves `"39/core"` — so the file is never
 rewritten. Exit codes: `0` printed, `1` not a well-formed schema document, `2` usage or an unreadable file.
 
 ## The Unicode policy, and configuring it
@@ -94,19 +92,19 @@ max entries:                1048576
 max fields:                 65536
 max annotations:            64
 max values:                 16777216
-max foreign schemas:        16
 max import closure:         64
 max schema entries:         65536
-max reference chain:        64
+max alias chain:            64
 max supertype chain:        64
 max materialisation depth:  64
+max wait depth:             64
 ```
 
 **Read it before you generate and the refusal never happens** — that is the useful direction, and the reason
 the command exists. A generator that learns the policy from a rejection has already spent a round trip.
 
 Three commands take the policy options — `validate`, `compile`, `policy` — which cover §8.2's name hygiene and
-§9.1's resource limits:
+the resource limits of §9.1 and §11.5:
 
 ```
 --identifier-policy <level>    level for identifiers (default: highly-restrictive)
@@ -116,6 +114,8 @@ Three commands take the policy options — `validate`, `compile`, `policy` — w
 --token-policy <level>         level for values (default: unrestricted, which scans nothing)
 --token-scripts <A+B>          the same for values (repeatable)
 --max-depth <n>                how deeply a document may nest before this refuses to read it (default: 64)
+--max-wait-depth <n>           the longest chain of waits resolving a schema may run, each entry waiting on the
+                               next being ready (default: 64)
 ```
 
 `<level>` is one of UTS #39 §5.2's six — `ascii-only`, `single-script`, `highly-restrictive`,
@@ -187,8 +187,8 @@ was judged under, stated once because it is constant for the run and cannot diff
 deployment, which the `policy` beside it explains.
 
 `--output tson` is the same record through the library's own writer — the shape `tson-cli`'s own
-`diagnostics.tn` (`https://tson.io/2026/38/io/ltr8/cli/diagnostics.tn`) declares, which that output is validated
-against, and which `--output json` matches key for key. Its `policy` field is the spec's own `policy` type,
+`diagnostics.tn` (`https://tson.io/2026/39/io/ltr8/cli/diagnostics.tn`) declares, which that output is validated
+against, and which `--output json` matches key for key. Its `policy` field is the spec's own `policy.processor` type,
 imported from the bundled `policy.tn`. A position is `line:column:byteOffset`, the first two 1-based, the offset
 counting UTF-8 bytes from 0. The top-level `errors` carries only what
 stopped the run before any document was read.
@@ -198,9 +198,9 @@ stopped the run before any document was read.
 | You wrote                                                    | Problem                                                                | Do this instead                                       |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------ |
 | a `null` expected where a field is absent                    | both formats omit an absent field rather than writing `null`           | test the key's presence, not its value                |
-| `--type`/`--schema` for a `.tn` data file                    | they bind JSON inputs only; a `.tn` document names its own             | put `!!schema` and a root type-ref in the data        |
+| `--type`/`--schema` for a `.tn` data file                    | they bind JSON inputs only; a `.tn` document names its own             | put `!!import` and a root type-ref in the data        |
 | a `LIMIT_EXCEEDED` file read as "invalid"                    | the depth bound refused it; rejected here, not invalid                 | raise `--max-depth` if the nesting is legitimate      |
-| a schema passed by filename convention                       | classification is by content (`!!meta`), and matching is by `!!id`      | check the `!!id` the schema declares                  |
+| a schema passed by filename convention                       | classification is by the root's `!schema` tag, matching by `!!id`      | check the `!!id` the schema declares                  |
 | exit `70` read as "invalid document"                         | it is a gap or a fault in this library, not a verdict                  | treat it as a bug report                              |
 | exit `69` read as "invalid document"                         | no schema was obtained, so nothing was judged                          | pass the schema file, or check the `!!id`             |
 | exit `75` retried forever, or `69` retried at all            | `75` says a rerun may help; `69` says it will not                      | retry `75`; fix the reference or allow-list for `69`  |

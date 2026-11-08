@@ -4,7 +4,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 
@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-SCHEMA] §5.2's dependency between a field's two halves: a {@code ~} default or {@code =} fixed value
- * must be a value of the field's own declared type. meta-kernel states the rule on {@code record_field.value}
+ * must be a value of the field's own declared type. The kernel states the rule on {@code meta.record_field.value}
  * and calls it "a dependency the schema language does not express directly", which is what leaves it to
  * {@code TsonSchemaLinker} to check.
  *
@@ -38,9 +38,9 @@ class FieldValueConformanceTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/field-value.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                 %s
                 }
                 """.formatted(declarations);
@@ -50,8 +50,8 @@ class FieldValueConformanceTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
@@ -74,18 +74,18 @@ class FieldValueConformanceTest {
     }
 
     /**
-     * <b>Through a reference chain, which is the walk this check has to do itself.</b> Resolved output
+     * <b>Through an alias chain, which is the walk this check has to do itself.</b> Resolved output
      * states the chain the author wrote rather than rewriting the use site past it, so a field typed by an
      * alias arrives here naming the alias. The value is still a value of whatever the chain ends at, and
      * skipping the hop would let every aliased field's default go unchecked.
      */
     @Test
-    void aDefaultIsCheckedThroughAReferenceChain() {
+    void aDefaultIsCheckedThroughAnAliasChain() {
         SchemaValidationException thrown = refused("""
                   small => !integer ^ { max: 100 }
                   hop   => small
-                  alias => hop
-                  rec   => { n?: alias ~ 500 }""");
+                  renamed => hop
+                  rec   => { n?: renamed ~ 500 }""");
 
         assertTrue(thrown.getMessage().contains("field 'n'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("100"), thrown.getMessage());
@@ -97,8 +97,8 @@ class FieldValueConformanceTest {
         compile("""
                   small => !integer ^ { max: 100 }
                   hop   => small
-                  alias => hop
-                  rec   => { n?: alias ~ 50 }""");
+                  renamed => hop
+                  rec   => { n?: renamed ~ 50 }""");
     }
 
     /** A fixed value is the same rule, and says "fixed value" rather than "default" so the author's own spelling is echoed. */
@@ -241,9 +241,9 @@ class FieldValueConformanceTest {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         String schema = """
                 !!id:"https://example.test/field-value.tn"
-                !!meta:"https://tson.io/2026/38/m/meta.tn"
-                !!import:"https://tson.io/2026/38/m/core.tn"
-                {
+                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/39/m/core.tn"
+                !schema {
                   a => { n?: int32 ~ "nope" }
                   b => { m?: int32 = "also nope" }
                 }
@@ -254,8 +254,8 @@ class FieldValueConformanceTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
 
         TsonCompiledSchema compiled = TsonCompiledSchemaRegistry.tree(core).get(ID, problems);
 

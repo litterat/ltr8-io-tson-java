@@ -18,14 +18,12 @@ import java.util.List;
 
 /**
  * Bind mode's <b>labelled choice</b>: a record whose fields form one REQUIRED group, bound to a sealed interface
- * whose members each carry one of those fields as their only component. The kernel's {@code type_argument} is the
- * shape -- {@code { ( name: type_ref | value: value ) }}.
+ * whose members each carry one of those fields as their only component, such as
+ * {@code { ( cents: int64 | text: text ) }}.
  *
  * <p><b>The present field is the discriminator.</b> There is no {@code $type} to dispatch on, so the record is
  * read by {@link RecordReader} the ordinary way -- §6.1.4's group rule admitting exactly one member -- and the
- * member built is the one whose field arrived. Why a union rather than a record of optional components: the
- * union is what lets a recursive shape bind at all, {@code type_argument} holding a {@code type_ref} whose
- * arguments hold {@code type_argument}s right back.
+ * member built is the one whose field arrived.
  *
  * <p><b>A member is matched to its field by its one component's wire name</b> ({@code @Field} where present, the
  * component name otherwise): a member of a labelled choice carries exactly the field it is the label for. Every

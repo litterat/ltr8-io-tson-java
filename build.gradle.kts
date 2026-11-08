@@ -1,6 +1,6 @@
 allprojects {
     group = "io.ltr8"
-    version = "0.38.0-SNAPSHOT"
+    version = "0.39.0-SNAPSHOT"
 
     repositories {
         mavenCentral()
@@ -14,7 +14,7 @@ val moduleDescriptions = mapOf(
     "tson" to "TSON front door: the Tson facade over the compiler's readers, writers and registries",
     "tson-compiler" to "TSON engine: lexer, both grammars, schema resolution, Class 2 compilation, readers, writers",
     "tson-base" to "The diagnostic vocabulary and source positions every encoding and phase reports through",
-    "tson-schema" to "TSON resolved-schema value model (schema.meta) plus the schema registry and identity algorithm",
+    "tson-schema" to "TSON resolved-schema value model plus the schema registry and identity algorithm",
     "tson-atom" to "The built-in atom vocabulary: which tokens each family accepts, and what host value results",
     "tson-tree" to "TSON data-document tree model: TsonValue and its pure immutable node types",
     "ltr8-bind" to "TSON binding engine between data values and Java objects",
