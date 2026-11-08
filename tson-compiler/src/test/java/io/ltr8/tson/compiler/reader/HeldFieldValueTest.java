@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A field's default or pin is held as written while the readers are built, and decoded through its type once
- * every reader of the schema exists ([TSON-SCHEMA] §5.2; SPEC-FEEDBACK.md #4 rule 3) -- so building a record's
+ * every reader of the schema exists ([TSON-SCHEMA] §5.2, §3.4.1 rule 3) -- so building a record's
  * reader never reads through the reader of a pin's type, and a pin whose type is still being built holds
  * nothing back. Every pin is still judged before the schema is handed out (rule 6).
  */

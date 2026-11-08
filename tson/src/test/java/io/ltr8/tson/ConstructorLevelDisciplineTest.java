@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ([TSON-SCHEMA] §4.1), and composition propagates the supertype chain, so an entry composing with a constructor is
  * one too, by construction: nothing can derive from a constructor and fail to be one.
  *
- * <p>Any schema may declare one (SPEC-FEEDBACK.md #7): the base kinds are the kernel's, and every closure
+ * <p>Any schema may declare one ([TSON-SCHEMA] §4.2): the base kinds are the kernel's, and every closure
  * reaching meta.tn holds them. A schema importing the one that declares a constructor applies it, and so does the
  * document declaring it, in wait order ([TSON-SCHEMA] §3.4.1): the instance waits on the constructor being ready.
  */

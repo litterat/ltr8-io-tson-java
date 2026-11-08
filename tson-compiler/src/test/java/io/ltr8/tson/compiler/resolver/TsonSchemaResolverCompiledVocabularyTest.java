@@ -394,7 +394,7 @@ class TsonSchemaResolverCompiledVocabularyTest {
     }
 
     /**
-     * One namespace per schema (SPEC-FEEDBACK.md #7): a schema importing the kernel alone, and one importing the
+     * One namespace per schema ([TSON-SCHEMA] §3.3): a schema importing the kernel alone, and one importing the
      * kernel and core.tn, each resolve in one namespace.
      */
     @Test

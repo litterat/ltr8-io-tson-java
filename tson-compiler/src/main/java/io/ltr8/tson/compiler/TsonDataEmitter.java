@@ -302,7 +302,7 @@ public final class TsonDataEmitter {
     }
 
     /**
-     * Writes {@code reference} unquoted ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12): its qualified name, and where it
+     * Writes {@code reference} unquoted ([TSON-DATA] §7.4): its qualified name, and where it
      * carries arguments an adjacent {@code <}, each argument separated by one space, and {@code >} -- the canonical
      * text, {@code map<text list<int32>>}. A value argument keeps its token form, a quoted one escaped as {@link
      * #quotedString} escapes. The caller is responsible for the head and every reference argument being qualified

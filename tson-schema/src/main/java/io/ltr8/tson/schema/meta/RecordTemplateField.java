@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The kernel's {@code meta.record_template_field} ([TSON-SCHEMA] §5.10, §8.1, SPEC-FEEDBACK.md #19): a field of a
+ * The kernel's {@code meta.record_template_field} ([TSON-SCHEMA] §5.10, §8.1): a field of a
  * record template, a {@link RecordField}'s four facts where the type and the value may each be one of the
  * template's parameters, and the label says which. {@link #typeParam} names a parameter standing for the whole
  * type and {@link #valueParam} one standing for the whole value; {@link #type} and {@link #value} are as on a record

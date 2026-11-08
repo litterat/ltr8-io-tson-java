@@ -57,7 +57,7 @@ import java.util.Set;
  * {@code !!id} alone. Every constructor the kernel applies is declared in the kernel, so no compiled vocabulary
  * exists to read its instances through until this class has produced one.
  *
- * <p><b>The order is {@code SPEC-FEEDBACK.md #4}'s.</b> Reading a value against a type waits on that type being
+ * <p><b>The order is [TSON-SCHEMA] §3.4.1's.</b> Reading a value against a type waits on that type being
  * ready, and on each type a part of the value is read against as the read reaches it; a reference and a held value
  * (a field's default or pin) order nothing. So:
  *

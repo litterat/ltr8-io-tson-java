@@ -56,7 +56,7 @@ class ResolvedFixtureTest {
     /**
      * A fixture read under its header's imports and, beside them, its source: an entry of net.tn's is an instance of
      * a constructor net.tn itself declares, and a resolved form is read under its source's imports rather than over
-     * its own entries ({@code SPEC-FEEDBACK.md #4}, "What is not running").
+     * its own entries (where [TSON-SCHEMA] §8.1 supplies nothing beside it).
      */
     private static Map<String, Object> fixtureEntries(String file, String id) throws Exception {
         String text = Files.readString(specDirectory().resolve(file));

@@ -304,7 +304,7 @@ final class WireForm {
 
     /**
      * A reference in the held spelling: a bare name an unquoted token, and an application a {@link ReferenceValue},
-     * written unquoted as data grammar ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12).
+     * written unquoted as data grammar ([TSON-DATA] §7.4).
      *
      * <p><b>One spelling is the requirement, not the tidiness.</b> An entry name derives from what is written, so a
      * second spelling of one reference would give one type two entry names. That is why {@link TemplateMaterialiser}'s

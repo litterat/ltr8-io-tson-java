@@ -29,7 +29,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Typed field names — `meta.record.name_type` names the identifier family a record's field names belong to, as
       `meta.enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
       judged under its own name type in both encodings (Part 2 §5.2)
-- [x] References ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — one atom, `!meta.reference_type { of: T }`, spelled
+- [x] References (Part 2 §4.2) — one atom, `!meta.reference_type { of: T }`, spelled
       `meta.ref<T>` (`allow_sibling: false`) whatever `T` is, admits a name exactly when the named entry's value, past
       its alias hops, is of a type IS-A `T`. Over a constructor (`meta.ref<net.uuid_type>`) its values are the names of
       the types in the schema's closure built with it: computed at link, never listed or written, and judged by
@@ -37,18 +37,18 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `meta.enum_type.name_type` and `meta.record.name_type` by its `meta.identifier_ref`, a refinement of
       `meta.type_ref`, and judges a name type by membership (Part 2 §4.2). A refinement narrows `of` to the source's or
       a type IS-A it, judged at link (Part 2 §5.7)
-- [x] An application is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12) — a reference with arguments is
+- [x] An application is a reference value (Part 2 §4.2, §8.2) — a reference with arguments is
       data grammar ([TSON-DATA] §7.4), written unquoted (`t: set<text>`, `@meta.application:response<order 201>`, an open
       alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonApplicationReference`, and at a kind-typed
       position it reads to a `TypeRef` that resolves level by level, by structural identity, to the entry the schema closed
       it to, its `referent()` that entry's value. An application the schema never closes is refused; a quoted token is never
       a reference. In JSON the same text is a string
-- [x] A sibling reference is a reference value ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #21) — `kind!` parses in data
+- [x] A sibling reference is a reference value (Part 1 §7.4, Part 2 §4.2) — `kind!` parses in data
       and in sugar, its `!` followed by whitespace, and in JSON the same text is a string; it stands only at a record
       field's type, the one slot whose type, `meta.field_type_ref`, keeps `meta.reference_type`'s `allow_sibling`, and
       is refused elsewhere, naming the slot, in sugar, in an explicit instance and in data. A schemaless read keeps one
       as a `TsonSiblingReference`
-- [x] Dependent fields (Part 2 §5.2, [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #21) — `v?: kind!` is read per instance
+- [x] Dependent fields (Part 2 §5.2) — `v?: kind!` is read per instance
       against the type its sibling's value names, in tree and bind mode (an `Object` component) and in JSON. The
       sibling's rules are checked at the declaration against the flattened record: declared first, typed by a reference
       to types, there to read whenever it is (a field group's member only beside an optional dependent field, which is
@@ -58,7 +58,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` and
       `record_template_field.value` are `type!`. A value entry's dependent value, of any form, is held as written and
       judged when the schema links against the type its sibling names in the schema's own namespace
-- [x] Every `!schema` value declares ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #14) — `geo => !schema { address => { … }
+- [x] Every `!schema` value declares (Part 2 §4.1) — `geo => !schema { address => { … }
       }` is a schema map nested as an entry, its members declarations that lift, mint, link and compile as root
       entries do, each named by its path from the root (`geo.address`). A nested map is open: several documents of a closure
       declaring `geo` contribute to one map, the union of their members, and only a member path declared twice
@@ -67,7 +67,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       an application's head (`geo.box<text>`) and a reference's `of` (`meta.ref<geo.address>`) included; a value's name
       walks through nested maps (`geo.home.at`). A data tag is a qualified name (`!geo.address { … }`, `"$type":
       "geo.address"` in JSON), and resolved output writes a nested map nested
-- [x] A bundled document's root holds only what an author writes ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #15) — the
+- [x] A bundled document's root holds only what an author writes (Part 2 §9) — the
       one kernel document, meta.tn, pre-loaded and importing nothing, is its wait cycle's closure plus the map, tuple,
       choice, template, reference and octet-sequence vocabulary and the classifying annotations; its root is `void`,
       `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum` (`!enum [A B]`),
@@ -81,7 +81,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `numeric`, `unicode`, `net`, `binary`, `temporal` and the root names of the kernel, the libraries and core, so
       `record`, `identifier`, `type_ref` and `kind` stay free; one importing only temporal.tn sees `date` and no `int32`.
       Any schema may contribute a member to a nested map, which stays its own
-- [x] A constructor is an ordinary record type ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #11) — `net.uuid_type`'s value is
+- [x] A constructor is an ordinary record type (Part 2 §4.1) — `net.uuid_type`'s value is
   a record, so `meta.type_ref` and `meta.ref<meta.record>` hold it and a field typed `net.uuid_type` holds a declaration
   body as data, in TSON tree and bind mode and in JSON
 - [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
@@ -118,9 +118,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
       directives during resolution, flattens argument-bearing type references into real named
       entries, merges every `!!import`'s namespace into one per schema
-      ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #7), validates every reference in a schema actually resolves, and
+      (Part 2 §2.2.3, §3.3), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
-- [x] Value entries ([SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #9) — an entry whose tag names an ordinary type
+- [x] Value entries (Part 2 §4.1) — an entry whose tag names an ordinary type
       (`create_order => !operation { … }`, `orders => !api { … }` over a namespace type `api => !meta.namespace { … }`)
       is a value of it, no type and in no kind, named by a reference over its type and walked by key and field;
       bound through the one bind context, or held as a tree where no class binds its type, so the schema loads and

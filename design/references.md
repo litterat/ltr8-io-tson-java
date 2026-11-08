@@ -1,12 +1,11 @@
 # References: the forms a name takes, and the two facts a reference carries
 
 Design notes for every position in a schema that holds a name: which are references, what a reference's store and
-judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape,
-one reference atom with a constructor an ordinary record type, is SPEC-FEEDBACK.md #11's; an application is a value
-of that atom, a reference carrying an argument list and written as data grammar ([TSON-DATA] §7.4), SPEC-FEEDBACK.md
-#12's. A record template's field names a whole-type or whole-value parameter under its own label (`type_param`,
-`value_param`, `meta.record_template_field`), so only an argument of an application is a parameter recognised by its
-text.
+judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape
+is one reference atom with a constructor an ordinary record type (§4.1, §4.2); an application is a value of that
+atom, a reference carrying an argument list and written as data grammar ([TSON-DATA] §7.4; §4.2). A record template's
+field names a whole-type or whole-value parameter under its own label (`type_param`, `value_param`,
+`meta.record_template_field`), so only an argument of an application is a parameter recognised by its text.
 
 **Invariants**
 
@@ -27,7 +26,7 @@ text.
   delivered as the referent (`Ref<T>`). So `meta.ref<bar>` over a record type names values of `bar`, `meta.ref<meta.record>`
   names record types, and `meta.ref<api>` names `myapi`. These notes call a reference over a constructor a *kind*, the
   concept of Part 2 §4.2: the set of types a constructor builds.
-- **Every name resolves from the root** (SPEC-FEEDBACK.md #14). A name's first segment names an entry of the root
+- **Every name resolves from the root** (§3.3, §5.12). A name's first segment names an entry of the root
   namespace, the root's entries and the import closure, and each further segment selects in what it reached: a member
   of a nested `!schema` map, a key of a namespace value, a field of a record value. Inside `geo`, a sibling is
   `geo.address`, and a bare `address` is the root's or unresolved. There is no lexical scope, so no shadowing rule.
@@ -50,7 +49,7 @@ text.
   every type. `meta.ref<meta.alias>` admits nothing, no entry past its hops being an alias, and a required field typed by it
   is refused by §5.10.1's productivity check (`TypeInhabitance`). A reference is not a bound: `meta.template_param.bound`
   still refuses a constructor (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
-- **A reference may carry an argument list** (SPEC-FEEDBACK.md #12), and that is what an application is in a slot.
+- **A reference may carry an argument list** (§4.2), and that is what an application is in a slot.
   It is data grammar ([TSON-DATA] §7.4): `reference = qualified-name "<" ws type-args ws ">"`, the `<` adjacent to the
   name (§7.5), arguments separated by whitespace or a comma, each a reference (a qualified name, with or without
   arguments) or any other token, a number or a quoted token, which is a value. **A quoted token is never a
@@ -63,7 +62,7 @@ text.
   `result<T>`. A qualified head (`geo.box<T>`) names a member of a nested schema map as a bare head names a root
   entry. The grammar classifies an argument, a reference first; the head's parameters judge whether it binds a type or a
   value (§5.10), so `TypeArgument` compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
-- **A reference may be a sibling reference** (SPEC-FEEDBACK.md #21), `kind!`: a record field's type chosen per instance
+- **A reference may be a sibling reference** (§4.2, §5.2), `kind!`: a record field's type chosen per instance
   by the value of the field `kind` of the same record. It is data grammar as well, `sibling-ref = unquoted-token "!"`,
   the `!` adjacent to one identifier and followed by whitespace ([TSON-DATA] §7.4, §7.5); JSON holds the same text in
   a string, read by the same production (`ReferenceGrammar.parseReference`). The reference atom reads one wherever a
@@ -97,7 +96,7 @@ text.
   enum-keyed map is no namespace. `key_type` is required, the family every key is read and judged under. A record's fields
   are no namespace: `meta.field_map` is an ordered map keyed by `text`, each key judged by the record's `name_type`, its
   supertypes' where it states none, and `meta.field_name` where neither does.
-- **A constructor is an ordinary record type** (SPEC-FEEDBACK.md #11). A constructor whose declaration is a record
+- **A constructor is an ordinary record type** (§4.1). A constructor whose declaration is a record
   (`net.uuid_type => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
   `meta.ref<meta.product>` hold it, and `meta.record`, `meta.top`, `meta.alias`, `meta.template`, `meta.namespace` and
   `meta.reference_type` themselves. A field typed `spec: net.uuid_type` holds a declaration body as data (`!holder { spec: {
@@ -146,7 +145,7 @@ text.
   reads, through a `RecordedNameReader` that refuses what is no name as a `TypeRef` host's reader refuses it.
 - A slot that names a value is typed by a reference over a type that is no constructor, `meta.ref<method>`. Its value
   is a qualified name. A slot typed by a record holds the record's value inline and takes no name.
-- Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `meta.ref` is in every closure,
+- Any schema declares a reference (§4.2): the kernel's `meta.ref` is in every closure,
   and `!meta.reference_type { of: order }` applied directly is no different
   (`ReferenceDeclarationTest`). A value's qualified name is judged by what it reaches, which a link judges: a
   reference over a type that is no constructor reads its grammar alone in a schema document
@@ -207,10 +206,10 @@ A name stands in a schema in one of five forms. Two are not references.
 
 **Stores**, positional: the writer's namespace, its own entries and its import closure (every type a declaration
 names, every `!C` and `!I ^` head, `meta.reference_type.of`, a tag in a schema map, an annotation, the first segment of a
-qualified name; SPEC-FEEDBACK.md #7); and the enclosing collection (`discriminators` and group members in `fields`, a
+qualified name; §3.3); and the enclosing collection (`discriminators` and group members in `fields`, a
 parameter in held text, the later segments of a qualified name, each selecting in the nested `!schema` map, namespace
 value or record value reached). Neither store is lexical: a name written inside a nested map resolves from the root
-as one written anywhere else (SPEC-FEEDBACK.md #14).
+as one written anywhere else (§3.3).
 
 **Judgement.** One predicate covers every reference row: *the referent's value is a value of `T`*. For a constructor
 `T` the referent is a type built with `T` (`KindMembers`), a constructor whose declaration is a record being built

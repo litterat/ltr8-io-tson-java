@@ -150,7 +150,7 @@ import java.util.function.Predicate;
  * declaration's name in front. What §5.7 leaves unchecked is not reported at all: a restated FIXED field
  * MUST NOT change its pinned value, and {@link #resolveTighteningField} does not compare the two.
  *
- * <p>Declarations resolve in one namespace per schema (§3.3.1, SPEC-FEEDBACK.md #7): the schema's own entries and its
+ * <p>Declarations resolve in one namespace per schema (§3.3, §3.3.1): the schema's own entries and its
  * import closure. It reaches this class as two getters over that one
  * namespace, required constructor parameters fixed for as long as this resolver is used:
  * <ul>
@@ -433,7 +433,7 @@ final class DefinitionResolver {
      * schema-map <em>key</em> (§8.1), beside the derived {@code @meta.synthetic} marker.
      *
      * <p>A value is bound the same way §6 describes reading one: the annotation's name resolves in the schema's one
-     * namespace (§3.3.3, SPEC-FEEDBACK.md #7), and its value is read by that type's own compiled reader -- so {@code
+     * namespace (§3.3.3), and its value is read by that type's own compiled reader -- so {@code
      * @doc:"..."} arrives as a {@code String}. <b>A name that does not resolve there is the author's error</b>
      * ({@link #unresolvedAnnotation}), not a silently valueless annotation: an annotation whose type is unreachable
      * has no contract to validate its value against. A type this document declares itself is made ready before its
@@ -1066,7 +1066,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * A literal {@code value} needs a closed type ([TSON-SCHEMA] §5.10, SPEC-FEEDBACK.md #19): what a literal token
+     * A literal {@code value} needs a closed type ([TSON-SCHEMA] §5.10): what a literal token
      * means is decided by the type it is read as, and a field typed by a parameter, whole ({@code w?: T ~ 5}) or as
      * an argument ({@code w?: box<T> ~ 5}), has a different type in every application. Such a field takes a value parameter
      * or no value; a field of a closed type takes either.

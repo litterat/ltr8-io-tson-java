@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * type-ref?} framing where the node is <em>not</em> built, so rather than widen four shared shape-check
  * signatures with a field only tree mode reads, each tree reader captures first and leaves the base's own
  * framing call a no-op. <b>Checking</b> follows [TSON-SCHEMA] §6: an annotation names a type, resolved one
- * hop in the schema's one namespace (SPEC-FEEDBACK.md #7), and its value is read by that type's own compiled reader -- so a
+ * hop in the schema's one namespace (§3.3.3), and its value is read by that type's own compiled reader -- so a
  * wrong-typed value is a diagnostic simply because the right reader rejected it, with no separate validation
  * pass.
  *

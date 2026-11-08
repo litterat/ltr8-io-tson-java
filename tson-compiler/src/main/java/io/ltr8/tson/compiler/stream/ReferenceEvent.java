@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.schema.meta.Reference;
 
 /**
- * A {@code reference} core-value ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12, #21) that is no bare name, assembled whole
+ * A {@code reference} core-value ([TSON-DATA] §7.4) that is no bare name, assembled whole
  * by the stream and delivered as one value: a qualified name with an adjacent argument list, {@code geo.address<T>}
  * or {@code map<text list<int32>>}, or a sibling reference, {@code kind!}. A qualified name without arguments is a
  * {@link TokenEvent}, and a reader at a reference-typed position rolls either into one {@link Reference}; at any

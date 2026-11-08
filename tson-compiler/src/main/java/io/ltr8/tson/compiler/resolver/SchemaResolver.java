@@ -58,7 +58,7 @@ import java.util.function.Function;
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
  * ({@code !!id}/{@code !!import}), merging every {@code !!import}'s entries into the
- * schema's one namespace (SPEC-FEEDBACK.md #7) through this resolver's own {@link TsonCompiledSchemaLoader}, and
+ * schema's one namespace (Part 2 §3.3) through this resolver's own {@link TsonCompiledSchemaLoader}, and
  * handing each local declaration off to a {@link DefinitionResolver} for the actual, per-declaration
  * resolution work (Part 2 §4, §8's <code>{meta.type_name =&gt; top}</code> shape, an entry being its value). A
  * construction head and an annotation type are read through the compiled form of the schema that declared them
@@ -299,7 +299,7 @@ public final class SchemaResolver {
             }
         }
 
-        // Every declaration is made ready in wait order (§3.4.1, SPEC-FEEDBACK.md #4), on demand: an entry waits on
+        // Every declaration is made ready in wait order (§3.4.1), on demand: an entry waits on
         // its head, its refinement source and operands, an annotation's type and every type a read of its value
         // reaches, each made ready first, whichever is written first. A name at a type position (a field's, a
         // variant's, an element's) is carried as a name, judged by the linker, and orders nothing. The imports are
@@ -1186,8 +1186,8 @@ public final class SchemaResolver {
 
     /**
      * The compiled readers one schema's resolution reads through. For an imported entry, the compiled form of the
-     * schema that declared it ({@link TsonCompiledSchemaLoader#vocabularyOf}): one namespace per schema (§3.3.1,
-     * SPEC-FEEDBACK.md #7) puts every construction head and annotation type in the closure, and the closure is the
+     * schema that declared it ({@link TsonCompiledSchemaLoader#vocabularyOf}): one namespace per schema (§3.3,
+     * §3.3.1) puts every construction head and annotation type in the closure, and the closure is the
      * union of the imported schemas' own, so an entry's reader, compiled over its declaring schema's closure, reads
      * everything its body can name. Nothing is compiled per closure for those -- each declaring schema is compiled
      * once and cached by identity, and a schema that applies only the kernel's constructors reaches exactly the

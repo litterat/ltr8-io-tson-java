@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
- * A constructor is an ordinary record type ([TSON-SCHEMA] §4.1, §4.2; SPEC-FEEDBACK.md #11): a name slot over {@code
+ * A constructor is an ordinary record type ([TSON-SCHEMA] §4.1, §4.2): a name slot over {@code
  * T} admits a name exactly when the type of the named entry's value IS-A {@code T}, and a constructor whose
  * declaration is a record, {@code uuid_type => atom & { ... }}, holds a value of {@code record}. So it is a type a
  * field may be typed by, its instances being declarations read as data, and a name {@code meta.ref<record>} admits.

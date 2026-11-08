@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A sibling reference, {@code kind!} ([TSON-DATA] §7.4, [TSON-SCHEMA] §5.2, SPEC-FEEDBACK.md #21), end to end: the
+ * A sibling reference, {@code kind!} ([TSON-DATA] §7.4, [TSON-SCHEMA] §5.2), end to end: the
  * reference atom reads one wherever a reference stands, and the position rule refuses it everywhere but a record
  * field's type -- in sugar where it is written, in an explicit instance at the slot reader, and in data at a field
  * typed by a type reference. At a field's type it is a dependent field ({@code DependentFieldTest}).

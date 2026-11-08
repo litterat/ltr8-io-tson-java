@@ -16,9 +16,9 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds unless it is equal to the entry already there. A nested `!schema` map is the
   exception that is no collision: several documents declaring one map path contribute to one map, the union of their
-  members (`SPEC-FEEDBACK.md #14`). A synthetic is the other: its identity is its form (§8.2), so two documents minting
+  members (§2.2.3). A synthetic is the other: its identity is its form (§8.2), so two documents minting
   one are one entry, and two bodies under one minted name are an `IllegalStateException`.
-- One namespace per schema (SPEC-FEEDBACK.md #7): its own entries and the whole closure of its `!!import`s
+- One namespace per schema (§3.3): its own entries and the whole closure of its `!!import`s
   (`TsonSchema.namespaceSources`, header order, deduplicated by identity). Every name the schema writes resolves
   there; no rule ties what a schema may declare to what it imports, so any schema declares a constructor, a namespace
   type or a reference, and imports any schema document.
@@ -126,7 +126,7 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
 - **A local entry equal to the closure's is the same entry.** §8.2 names a minted instantiation by its resolved form
   alone, so an application this schema closed and one an import closed agree by construction; any other local reuse
   of a closure name is refused and the local entry dropped, keeping the import's, which is already-linked material.
-- **A nested schema map is open** (`SPEC-FEEDBACK.md #14`). `geo => !schema { … }` declared by several documents of
+- **A nested schema map is open** (§2.2.3). `geo => !schema { … }` declared by several documents of
   one closure is one map, merged exactly as the root namespace merges across imports: its members are the union, each
   merged under its path, and a member path two different documents declare is the ordinary collision above. A
   member's identity is its declaring document plus its path, so its origin is recorded per path. Both the import loop
@@ -147,7 +147,7 @@ are worth their place here, each catching what would otherwise link, compile, an
   names by `ValuesByName`, so `validateBody` asks nothing of it.
 - **A `meta.type_ref` slot is judged by membership** of `meta.type_ref` (`KindMembers.isMember`), where `type` is in reach:
   an alias stopping at an application, an open entry and a value entry are no type a value can have. A constructor
-  is one, its declaration a record (`spec: net.uuid_type` holds a declaration body as data; SPEC-FEEDBACK.md #11).
+  is one, its declaration a record (`spec: net.uuid_type` holds a declaration body as data; §4.1).
 - **A choice's variants are distinct at the end of each §8.3 alias chain** (`AliasChain.terminal`), since an
   alias and its target are one type: `(text | my_text)` with `my_text => text` is caught, the only spelling an author
   cannot see. No variant may resolve to `void` (`checkVariantsAreNotVoid`).

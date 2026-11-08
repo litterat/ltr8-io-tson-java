@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A reference ({@code meta.ref<T>}, the kernel's {@code reference}) is declared in any schema: one namespace per schema
- * (SPEC-FEEDBACK.md #7) puts the kernel's {@code ref} in every closure reaching core.tn or meta.tn, a schema a meta
+ * ([TSON-SCHEMA] §3.3, §4.2) puts the kernel's {@code ref} in every closure reaching core.tn or meta.tn, a schema a meta
  * layer governs among them, and the constructor applied directly is no different from the template that spells it.
  * What a reference may name is still judged: a type, never a constructor, whose types a kind names.
  */

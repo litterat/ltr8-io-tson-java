@@ -10,7 +10,7 @@ import java.util.Optional;
  * field's type delivers, in a tree read and a bound one alike ([TSON-SCHEMA] §4.2). It is a {@link NameRef} or an
  * {@link ApplicationRef}, and {@link #of(String, List, Annotations, Closure)} decides which. {@code name} is the qualified
  * name, its {@link #segments} joined by {@code .}; {@code arguments} is the argument list, empty for a name, so
- * {@code result<T>} is the application {@code result} with arguments {@code [Ref(T)]} (SPEC-FEEDBACK.md #12).
+ * {@code result<T>} is the application {@code result} with arguments {@code [Ref(T)]} ([TSON-SCHEMA] §4.2).
  *
  * <p><b>A reference is data grammar</b> ([TSON-DATA] §7.4): {@code geo.address<T>} is a qualified name, an adjacent
  * {@code <}, arguments and {@code >}, written unquoted wherever a value stands, and a reference without arguments is

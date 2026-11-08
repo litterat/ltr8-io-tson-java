@@ -50,7 +50,7 @@ import java.util.function.Function;
  * the type it names.
  *
  * <p><b>A constructor is read from the {@code structure} lookup first, then the entry's own namespace.</b> The linker
- * hands both the schema's one namespace (SPEC-FEEDBACK.md #7), where a constructor and a type share one store and a
+ * hands both the schema's one namespace ([TSON-SCHEMA] §3.3), where a constructor and a type share one store and a
  * name denotes one entry; the second lookup serves a caller holding a narrower first one. A hop naming {@code of}
  * itself reaches it whether or not a namespace in reach declares it: the name is the constructor's.
  *

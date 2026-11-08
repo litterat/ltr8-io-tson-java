@@ -7,10 +7,10 @@ facts and refinement, groups, subtraction, and the exception boundary.
 **Invariants**
 
 - Every name a declaration writes resolves in the schema's one namespace, its own entries and the closure of its
-  `!!import`s (SPEC-FEEDBACK.md #7). An annotation on a declaration resolves there (§3.3.3); a
+  `!!import`s (§3.3). An annotation on a declaration resolves there (§3.3.3); a
   name that misses is a resolver error, the valueless form included, and a bare mark is read as `_` against its
   type. Only the kernel's bootstrap, resolving meta.tn itself, skips the check.
-- **Every name resolves from the root** (SPEC-FEEDBACK.md #14). A name written inside a nested `!schema` map resolves
+- **Every name resolves from the root** (§3.3). A name written inside a nested `!schema` map resolves
   as one written at the root does: a sibling is `geo.address`, never a bare `address`. There is no lexical scope.
 - **A nested map's members are entries under their paths; the nested map's value is derived, never maintained by
   hand.** `TsonSchema.entries` holds `geo.address` as it holds `order`, and `geo`'s `ValueEntry` of `meta.schema` is
@@ -18,7 +18,7 @@ facts and refinement, groups, subtraction, and the exception boundary.
   member edits its path entry: where a path entry and the nested map's own copy disagree, the path entry is the one
   held, whichever comes first (the kernel's `meta` precedes its members, and a linked schema rebuilt from a partly
   ready namespace carries a stale copy).
-- **A nested map is open** (SPEC-FEEDBACK.md #14). A document's own `!schema` map is resolved locally, its members
+- **A nested map is open** (§2.2.3). A document's own `!schema` map is resolved locally, its members
   under their paths; where an import declares a map of the same path, the two are one map, the union of their
   members, and only a member path declared twice collides (§2.2.3). `SchemaResolver.mergeImports` and the local
   collision loop pass over a nested map met twice; `design/linking-and-compilation.md` has the merge.
@@ -277,8 +277,8 @@ restated type is the inherited one or IS-A it by §7.2's chain, alias hops follo
 voidable position: `nickname?: void?` restating `nickname?: text?` narrows the field to `_`. The resolver binds a
 restatement before the names it holds need be ready, so the IS-A is asked at link, as a reference's `of` is; the
 kernel's `meta.namespace` narrowing `meta.map`'s `key_type: meta.type_ref` to `meta.identifier_ref` passes by
-`meta.identifier_ref`'s refinement of `meta.type_ref`. The relation is nominal and nothing more (SPEC-FEEDBACK.md
-#18): `[int8]` restating `[int32]` and a variant restating its choice are refused, no IS-A edge joining either pair.
+`meta.identifier_ref`'s refinement of `meta.type_ref`. The relation is nominal and nothing more (§5.7): `[int8]`
+restating `[int32]` and a variant restating its choice are refused, no IS-A edge joining either pair.
 Each record is judged against the nearest closed records on its chain, so an applied operand is judged through the
 entry its application denotes. One denoting none, whose edge is only to the open family base, is not judged, nor is
 a subtraction's tightening entry, its chain being empty (`BACKLOG.md`).
@@ -422,7 +422,7 @@ component, mirroring the constructor's flattened shape (`type`'s field first);
 argument of a reference, because a record of two `Optional`s would not say that exactly one is present; it compares
 by its canonical text, the head's parameter and not the grammar deciding which it binds. `Reference` is the parsed
 form of a reference value, sealed over `TypeRef` and `SiblingRef` (`kind!`, a record field's type chosen per instance
-by a sibling field's value, [TSON-SCHEMA] §5.2, SPEC-FEEDBACK.md #21); `TypeRef` is sealed in turn over `NameRef`
+by a sibling field's value, [TSON-SCHEMA] §5.2); `TypeRef` is sealed in turn over `NameRef`
 (no arguments) and `ApplicationRef` (at least one), the variant chosen by `TypeRef.of`, which never builds a sibling. Only
 `RecordField.type` and `RecordTemplateField.type` are typed `Reference`; every other slot holding a reference is
 typed `TypeRef`, so the position rule is the Java type and only the field-type consumers switch on the variant. **The

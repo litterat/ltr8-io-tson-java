@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The bundled documents' roots hold the vocabulary an author writes and their machinery sits under a map of each
- * document's own name ({@code SPEC-FEEDBACK.md #15}): meta.tn, the kernel, holds its wait cycle's closure and the
+ * document's own name ([TSON-SCHEMA] §9): meta.tn, the kernel, holds its wait cycle's closure and the
  * concepts that go with it under the open {@code meta}; numeric.tn, temporal.tn and net.tn each import the kernel alone
  * and declare their constructors under {@code numeric}, {@code temporal} and {@code net}; core.tn imports the three and
  * declares the author annotations; and a schema importing a document reserves its map names and its roots' names.

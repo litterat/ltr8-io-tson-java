@@ -97,7 +97,7 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
     so in `response<order 201>` the `201` is a number and `order` a string, and a nested application is another
     `TsonApplicationReference`. `text()` (and `toString()`) recreates the canonical text, one space between
     arguments, a string argument that is a qualified name bare and any other quoted.
-  - **`TsonSiblingReference`**: `field`, `typeRef`, `annotations`; `text()` is `kind!` (SPEC-FEEDBACK.md #21). What
+  - **`TsonSiblingReference`**: `field`, `typeRef`, `annotations`; `text()` is `kind!` ([TSON-DATA] §7.4). What
     it names is per record instance and a schema's to give, only at a record field's type.
   - **Neither offers a referent**: what a reference names is a closure's question, and a schemaless read has none.
   Under a schema a reference-typed position delivers the schema model's `TypeRef` instead, whose `referent()` answers it

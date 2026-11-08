@@ -707,7 +707,7 @@ class TsonSchemaLinkerTest {
                 linked.originOf("shared_name"));
     }
 
-    /** An import's entries join the importer's one namespace beside its own (SPEC-FEEDBACK.md #7). */
+    /** An import's entries join the importer's one namespace beside its own ([TSON-SCHEMA] §2.2.3). */
     @Test
     void anImportLinksIntoTheImportersNamespace() {
         TsonLinkedSchema linked = linkImporting();

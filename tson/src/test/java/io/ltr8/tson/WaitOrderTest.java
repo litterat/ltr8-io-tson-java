@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §3.4.1's wait order in an ordinary schema ({@code SPEC-FEEDBACK.md #4}): reading a value against a
+ * [TSON-SCHEMA] §3.4.1's wait order in an ordinary schema: reading a value against a
  * type waits on that type being ready, so a constructor and its instance, a type and a value of it, share a document
  * in either order; entries waiting on each other are refused naming the cycle; a name at a type position orders
  * nothing; and the longest chain of waits is bounded by §11.5's wait depth.

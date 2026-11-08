@@ -1,8 +1,8 @@
 package io.ltr8.tson.schema.meta;
 
 /**
- * One positional argument of a {@link TypeRef}, as the reference grammar parses it ([TSON-SCHEMA] §12.1,
- * SPEC-FEEDBACK.md #12): {@code argument = reference / token}, a reference first.
+ * One positional argument of a {@link TypeRef}, as the reference grammar parses it ([TSON-DATA] §7.4,
+ * [TSON-SCHEMA] §12.1): {@code argument = reference / token}, a reference first.
  *
  * <p><b>Modeled as a sealed interface ({@code Ref}/{@code Value}), not a record with two {@code Optional}s.</b> An
  * argument is one of two things and never both, and the type says so.

@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.ast;
 import io.ltr8.tson.schema.meta.Reference;
 
 /**
- * A {@code reference} core-value ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12, #21) that is no bare name, as the stream
+ * A {@code reference} core-value ([TSON-DATA] §7.4) that is no bare name, as the stream
  * assembled it: a qualified name with its argument list, {@code pair<uuid B>}, or a sibling reference, {@code kind!}.
  * A qualified name without arguments is a {@link TokenValue}. Uninterpreted like a token: what the head and its
  * arguments name is a reader's or the resolver's to judge, and {@code reference} holds each argument as the grammar

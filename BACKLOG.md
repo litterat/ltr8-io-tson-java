@@ -38,6 +38,32 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
+- [ ] **A literal under a closed type in a record template is judged only when the template closes**
+  ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
+  field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as
+  §5.2 judges any default or pin. Judge a literal whose field type mentions no parameter when the template is
+  declared, and add a `schema/invalid` vector for the out-of-range default.
+- [ ] **A refinement of an application depends on declaration order** ([TSON-SCHEMA] §5.7, §8.2; Revision 39 change
+  log #1, (a)). A refinement source is a trigger position: `x => box<text> ^ { … }` is IS-A the entry `box<text>`
+  denotes, whichever declaration is written first. Today, `tb => box<text>` written before `x` gives `x` the supertypes
+  `[box, tb]`. Written after it, `x` is IS-A a minted synthetic with no edge to `box`, and `tb` resolves to a second
+  entry for the same application (`design/template-materialisation.md`, "Operands and on-demand closing"). Unify the
+  on-demand closing with a later declaration that owns the application, and add `schema/valid` vectors in both orders
+  with one expected output.
+- [ ] **A value parameter's written type still reads in a structure namespace** ([TSON-SCHEMA] §5.10; Revision 39
+  change log #2). With one namespace there is no structure namespace: a written type on a value parameter resolves in
+  the schema's namespace and must IS-A the type its uses derive. `ParameterTypes.readsInStructure` still picks the
+  kernel's types for a template applying a constructor other than `record`, and refuses
+  `rb => <N: int8> box<N>` over `box => <N> { w?: integer ~ N }` for `int8` not being in the structure namespace.
+  Remove the split, so the alias resolves and `<N: int8>` over a `numeric.count`-typed slot is refused for `int8` not
+  being a count. Rewrite `design/held-template-bodies.md`'s "The template's form decides where value types are read".
+- [ ] **A template's applied parent earns no edge to the parent's head** ([TSON-SCHEMA] §5.8, §8.1; Revision 39
+  change log #20). Under the expansion rule, `ok_of => ok<text>` over `ok => <T> result<T> & { note: text }` is IS-A
+  `result` as well as `result<text>`, as its hand-written expansion is, and joins `result`'s family, its own pins or
+  arguments supplying the outer family's discriminators. Today its supertypes are `[ok]`, plus `result<text>` only
+  where a declaration names it (`SubtypeTemplateFamilyTest`). Add the head edge to a declared member's chain, update
+  §8.1's derived indexes, and add `link/valid` and `class2/validate` vectors reading `ok_of` at a position typed
+  `result`.
 - [ ] **An alias of a template cannot be applied** ([TSON-SCHEMA] §8.3). `design/resolver-vocabulary-and-bootstrap.md`
   says an application through an alias of a template applies the template (`TemplateMaterialiser.templateHead`), but
   `r => ref_of<order>` over `ref_of => meta.ref` is refused ("'ref_of' declares no type parameters"), and so are
@@ -67,8 +93,8 @@ spec-required case:
   `box<text>`. Make the application wait in the order, as a named one does -- close it on demand
   (`TemplateMaterialiser.closeApplication`) and type the ready copy's field by the minted name -- and add a
   `link/valid` vector writing it inline.
-- [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1;
-  `SPEC-FEEDBACK.md #4`, the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
+- [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1's
+  "Reading a resolved form"; the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
   `meta.schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
   entry whose tag names a constructor or a type the same form declares (`counts => !counted { … }` beside `counted
   => !meta.record { … }`) has no reader, and a `class2/schema/valid` vector cannot state such a schema's output. Read it
@@ -175,7 +201,7 @@ spec-required case:
   importing meta.tn alone, is refused though the annotating schema imports core, which declares `title`. The read
   needs
   the annotating document's annotation scope beside the reader's own (`AnnotationTypes`), consulted where the reader's
-  misses. `SPEC-FEEDBACK.md #15`, "Open".
+  misses ([TSON-SCHEMA] §3.3.3, §9).
 
 - [ ] **The family-base seam is spread across about twelve classes.** Give a family base one view -- selectors,
   extension, discriminators, name type, members, the record-level ones read off `RecordHead` -- that every
@@ -418,12 +444,25 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **A float's bounds skip NaN and the infinities** ([TSON-SCHEMA] §5.7, `SPEC-FEEDBACK.md #23`). `FloatParser`'s
+- [ ] **`policy.script_policy` is the token policy under another name** ([TSON-DATA] §8.2). Part 1 names the two
+  policies "so that two implementations reporting them agree on what they are called", and `policy.processor` writes
+  `token_policy: policy.script_policy` beside `identifier_policy: policy.identifier_policy`. Rename the record
+  `policy.token_policy`, with `identifier_policy`'s doc reference and the Java `ScriptPolicy` following it. Then
+  restamp `policy.tn` and the schemas that pin it. The Revision 39 change log keeps the received name, with the
+  policy keeping its name in prose, so this waits for a revision to carry it.
+
+- [ ] **A float's bounds skip NaN and the infinities** ([TSON-SCHEMA] §5.5, §5.7). `FloatParser`'s
   validation returns before the bound checks for a NaN `allow_nan` admits and an infinity `allow_infinity` admits, so
   `!float64 ^ { max: 100 }` accepts `+.inf` and `.nan`. An infinity is ordered, so judge it against the bounds like any
-  value. Per #23's proposal, a body with any bound admits no NaN, `allow_nan` deciding only where no bound is written.
+  value. A body with any bound admits no NaN, `allow_nan` deciding only where no bound is written (§5.5).
   The parser is `tson-atom`'s and both encodings read through it, so one fix serves both. Add `class2/validate` vectors
   for `+.inf` above a `max`, `-.inf` below a `min` and `.nan` under a bound, and a `CrossEncodingParityTest` case.
+
+- [ ] **A float's bounds are compared after rounding** ([TSON-SCHEMA] §5.5). §5.5 validates a float's bounds
+  against the value as written, before rounding; `FloatParser` compares the rounded `double` with
+  `bound.doubleValue()`, so `!float32 ^ { max: 1.0 }` accepts a written `1.00000001`, which rounds to `1.0`. Compare
+  the written decimal with the exact `number` bound, with a `class2/validate` vector at a bound's edge and a
+  `CrossEncodingParityTest` case.
 
 - [ ] **No test pins [TSON-SCHEMA] §5.9 rule 8.** A subtracted construction whose head is a constructor
   (`my_record => record - { groups }`) resolves with an empty chain, so it is no constructor, and `!my_record {

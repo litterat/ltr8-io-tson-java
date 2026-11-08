@@ -27,8 +27,8 @@ meta.tn, itself. Current form only; history lives in git.
   the same path; `@meta.synthetic` is recomputed on ingest, `@meta.application` read as stated, and an author writing it
   is refused.
 - A bundled document's root holds only the vocabulary an author writes; its machinery is a member of a nested map
-  and named by its path (`SPEC-FEEDBACK.md #15`): the kernel's root is `void`, `boolean`, `integer`, `text`, `bytes`,
-  `iri`, `iri_reference`, `regex`, `doc`, `enum` and `set`, and everything else it declares is under one of six maps,
+  and named by its path (§9): the kernel's root is `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`,
+  `iri_reference`, `regex`, `doc`, `enum`, `set` and `schema`, and everything else it declares is under one of six maps,
   `meta` (the type system), `atom` (the datatype properties and `atom.specification`), `numeric`, `unicode`, `net` and
   `binary` (the kernel's atom constructors by family); each data-format library holds its instances at its root and its
   constructors under its map (`numeric`, `temporal`, `net`, numeric.tn and net.tn adding to the kernel's), and core.tn's
@@ -38,7 +38,7 @@ meta.tn, itself. Current form only; history lives in git.
   `array_type_ref_…`, `record_…`); a path under the kernel's other maps keeps its first segment
   (`numeric_integer_type_…`).
 - The bootstrap hand-builds exactly the pre-loaded set — the instances and the two refinements on the kernel's one
-  wait cycle (`SPEC-FEEDBACK.md #4`, rule 4) — and makes every other entry ready by `WaitOrder`, the one algorithm
+  wait cycle (§3.4, §3.4.1 rule 4) — and makes every other entry ready by `WaitOrder`, the one algorithm
   every schema's resolution runs. The order is the waits', never source order. `KernelBootstrapResolverTest`
   holds the set to the measured cycle and the output to the kernel's ordinary resolution in any declaration order;
   it attaches no `@meta.synthetic`.
@@ -63,7 +63,7 @@ once.
 
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names; the
 `plain`/`nameField` builders every producer goes through; `refValue`, which writes a reference as a bare token or,
-carrying arguments, as a `ReferenceValue`, the data grammar's reference ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12), and
+carrying arguments, as a `ReferenceValue`, the data grammar's reference ([TSON-DATA] §7.4), and
 its inverse `applicationIn`, an `instanceof ReferenceValue`; `substituted`, which walks an application's argument tree,
 rewrites a parameter named among its arguments at any depth, and writes the application again as a `ReferenceValue`;
 the closed-record writer `recordWire`, which spells `fields` as a map from each field's declared name to its
@@ -254,7 +254,7 @@ annotation is: there is no author to resolve against, and the value is fixed.
 
 ## The compiled vocabulary (`SchemaResolver.Vocabulary`)
 
-One namespace per schema (SPEC-FEEDBACK.md #7) puts every construction head and annotation type in the closure, and
+One namespace per schema (§3.3) puts every construction head and annotation type in the closure, and
 a head's instance is read by a compiled reader. `SchemaResolver` records, for each imported entry, the canonical
 identity of the schema that declared it, and its private `Vocabulary` reads `!C { … }` through
 `TsonCompiledSchemaLoader.vocabularyOf(origin of C).reader(C)` and an annotation value through that schema's entry
@@ -290,7 +290,7 @@ data-format libraries state their types with. It is the one kernel document. Its
 writes (`void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`
 and `schema`; `enum => meta.enum_type ^ { name_type?: = meta.identifier }`, so resolved output tags `!enum`, and `schema
 => meta.schema`, the alias every schema map's tag names); everything else is a
-member of `meta => !schema { … }`, named by its path (`SPEC-FEEDBACK.md #15`), `meta.identifier` among them. It imports
+member of `meta => !schema { … }`, named by its path (§9), `meta.identifier` among them. It imports
 nothing and applies only its own constructors (§3.4's one cycle, closed by pre-loading, not resolution). It is never resolved
 from a document, and its names reach any other schema only by import. Every name resolves from the root (#14), so an entry
 naming a sibling writes its path, and the synthetics its sugar lifts are minted at its root. A schema importing it alone has
@@ -302,7 +302,7 @@ each other, so they are built by hand (§3.4), and only the wait order over what
 runs.
 
 `KernelBootstrapResolver.kernelSchema()` (its only public method) produces the resolved kernel under
-`SPEC-FEEDBACK.md #4`'s order: reading a value against a type waits on the type being ready, and on each type a part
+§3.4.1's wait order: reading a value against a type waits on the type being ready, and on each type a part
 of the value is read against as the read reaches it; a reference and a held value (a default or pin) order nothing.
 Its output is what ordinary resolution of the kernel against it produces, entry for entry and constructor for
 constructor, positions included (the bootstrap resolves with the parser's positions).

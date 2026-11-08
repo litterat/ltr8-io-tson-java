@@ -110,7 +110,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * named, which a message names by its spelling or not at all. {@code closes} is every application the resolver
      * closed to this entry, as it met them, an expansion's among them, which carries no {@code @meta.application}: what
      * lets a data read resolve an application by structural identity to the entry the schema closed it to
-     * ([TSON-SCHEMA] §8.2, SPEC-FEEDBACK.md #12).
+     * ([TSON-SCHEMA] §7.4, §8.2).
      */
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
                              Optional<String> constructor, Optional<String> refines, boolean synthetic,

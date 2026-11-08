@@ -18,7 +18,7 @@ import java.util.List;
  * field's type, a {@link Reference}: {@code meta.record_field.type}, typed {@code meta.type_ref} in the kernel, or a
  * meta layer's own {@code request: meta.ref<record>}. The value is a
  * reference: a type's name, one token, or an application, the data grammar's reference with an argument list
- * ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12), which the stream delivers as one value. A name is read by the reference's own
+ * ([TSON-DATA] §7.4), which the stream delivers as one value. A name is read by the reference's own
  * atom reader (the grammar, and the members where the document is data) into a {@code TypeRef}; in a schema document
  * that reader reads the grammar alone and records the name with the reference ({@link TsonReadContext#heldByName}), so
  * the linker judges it a member. An annotation written on the reference ({@code type: @doc:"x" text}) is kept

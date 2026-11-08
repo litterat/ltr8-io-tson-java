@@ -70,7 +70,7 @@ at the root; `numeric-resolved.tn`,
 `core-resolved.tn` core.tn's author annotations. A fixture states its own document's entries only, never an import's members
 of the same map. A library's fixture holds instances of constructors its own source declares (net.tn's
 `ipv4 => !net.ipv4_type {}`), so every fixture but the kernel's is read beside its source, a resolved form being read under
-its source's imports and not over its own entries (`SPEC-FEEDBACK.md #4`).
+its source's imports and not over its own entries, where [TSON-SCHEMA] §8.1 supplies nothing beside the document.
 
 ### Writing the bundled schemas' docs
 

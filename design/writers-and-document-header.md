@@ -18,10 +18,10 @@ keeps the rest of the document. Current form only; history lives in git.
   will not read back.
 - `TsonDataEmitter.field` writes a name that is no identifier as a quoted string: a relaxed `name_type`
   ([TSON-SCHEMA] §5.2) admits `"@id"`, which written bare would not lex back.
-- A reference is written unquoted, as data grammar ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12):
+- A reference is written unquoted, as data grammar ([TSON-DATA] §7.4):
   `TsonDataEmitter.reference(TypeRef)` writes the qualified name and, where it carries arguments, an adjacent `<`,
   the arguments one space apart and `>`, the canonical text `map<text list<int32>>`, a value argument keeping its
-  token form. `TsonDataEmitter.reference(SiblingRef)` writes `kind!` (SPEC-FEEDBACK.md #21), and
+  token form. `TsonDataEmitter.reference(SiblingRef)` writes `kind!` ([TSON-DATA] §7.4), and
   `reference(Reference)` picks between the two. A sibling's `!` must be followed by whitespace ([TSON-DATA] §7.5),
   which the emitter always supplies: a space separates every element, a map's arrow and a non-empty scope's closing
   delimiter, and ends an annotation's value. `AstWriter` writes a `ReferenceValue` through it, `TreeValueWriter` a
@@ -138,7 +138,7 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
   the real read runs — pulling the stream's first event, `DocumentStart`, which carries the `!!id` and the
   `!!import`s, then `TsonDataStream.rootTag()`, which looks past the root's leading annotations to its tag — and
   never parses the root's value: annotations stand before the tag, so a root's `@doc` is the one value it reads
-  (not quite §7.1's "no value parsing"; SPEC-FEEDBACK.md #8). **There is no second
+  ([TSON-DATA] §2.2's kind dispatch reads the root's leading annotations and its tag). **There is no second
   header scan**; the header is a projection of the one the stream performs for every reader. It is reached
   through `Tson.begin(…)`, or `TsonDocumentPeek.of(…)` standalone. `TsonDocumentHeader` itself is a pure value
   with no way to obtain one — reading a header means running the lexer, which is the stream's job.

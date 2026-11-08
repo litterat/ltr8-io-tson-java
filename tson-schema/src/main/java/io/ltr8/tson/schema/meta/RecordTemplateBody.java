@@ -16,8 +16,8 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 /**
- * The kernel's {@code record_template} constructor's vocabulary, resolved ([TSON-SCHEMA] §5.10, §8.1,
- * SPEC-FEEDBACK.md #19): a record body over {@link #parameters}, whose fields are {@link RecordTemplateField}s and
+ * The kernel's {@code record_template} constructor's vocabulary, resolved ([TSON-SCHEMA] §5.10, §8.1):
+ * a record body over {@link #parameters}, whose fields are {@link RecordTemplateField}s and
  * may carry them. Each application
  * substitutes its arguments for the parameters and closes to a {@link RecordBody}, its member.
  *

@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §3.3.3 on the schema side, under one namespace per schema (SPEC-FEEDBACK.md #7): a schema document's
+ * [TSON-SCHEMA] §3.3.3 on the schema side, under one namespace per schema (§3.3): a schema document's
  * annotations resolve in its own namespace, its entries and its whole import closure. An annotation type an import declares
  * binds its value through that schema's compiled reader; one this document declares itself binds it too, the annotated entry
  * waiting on the type being ready ([TSON-SCHEMA] §3.4.1's wait order), whichever is written first; a name nowhere in the

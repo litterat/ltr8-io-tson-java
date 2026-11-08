@@ -13,7 +13,7 @@ import java.util.Set;
 
 /**
  * A schema compiled in object-binding mode as <b>vocabulary</b>: what a schema importing it reads its construction
- * heads and annotation values through. One namespace per schema ([TSON-SCHEMA] §3.3.1, SPEC-FEEDBACK.md #7) puts
+ * heads and annotation values through. One namespace per schema ([TSON-SCHEMA] §3.3, §3.3.1) puts
  * every constructor of the import closure in reach, and the resolver reads {@code !C value} through the compiled form
  * of the schema that declared {@code C} ({@code SchemaResolver}'s vocabulary), which is one of these. Any schema
  * compiles to one -- meta.tn, numeric.tn, temporal.tn, net.tn, a library declaring constructors of its own -- and

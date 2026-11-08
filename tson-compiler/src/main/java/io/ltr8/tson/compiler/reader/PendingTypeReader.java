@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 
 /**
  * The reader a compile of a resolution in progress ({@code TsonSchemaCompiler.compileReady}) gives a declaration not
- * yet ready, under [TSON-SCHEMA] §3.4.1's wait order ({@code SPEC-FEEDBACK.md #4}): reading a value against a type
+ * yet ready, under [TSON-SCHEMA] §3.4.1's wait order: reading a value against a type
  * waits on that type being ready, and a held value orders nothing.
  *
  * <ul>

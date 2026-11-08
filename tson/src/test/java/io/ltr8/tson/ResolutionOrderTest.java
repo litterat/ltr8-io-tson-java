@@ -27,7 +27,7 @@ import java.util.TreeSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * [TSON-SCHEMA] §3.4.1's fifth rule ({@code SPEC-FEEDBACK.md #4}): every order consistent with the waits gives one
+ * [TSON-SCHEMA] §3.4.1's fifth rule: every order consistent with the waits gives one
  * verdict and one resolved output, and the order entries are written in is not consulted. Each bundled schema, and
  * schemas whose entries read values against each other, resolved with its declarations reversed and shuffled
  * comes out entry for entry as written: the same values, the same key annotations, the same facts.

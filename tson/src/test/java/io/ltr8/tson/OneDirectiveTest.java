@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * One header directive, {@code !!import}, and a root that says what a document is ([TSON-DATA] §2.2,
- * SPEC-FEEDBACK.md #8): a schema is a document whose root is tagged {@code !schema}, every import target is one, and a
- * data document imports as a schema does -- several schemas, read under one namespace over their closures.
+ * [TSON-SCHEMA] §2.2.3, §3.3.4): a schema is a document whose root is tagged {@code !schema}, every import target is
+ * one, and a data document imports as a schema does -- several schemas, read under one namespace over their closures.
  */
 class OneDirectiveTest {
 

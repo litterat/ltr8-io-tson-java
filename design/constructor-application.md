@@ -8,7 +8,7 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
 - A template closes by application (`C<...>`), never by construction (`!C { ... }`); naming one at a construction site
   is an author error (`SchemaValidationException`), never an `IllegalStateException`.
 - A construction head resolves in the schema's one namespace, among the entries its closure imports
-  (SPEC-FEEDBACK.md #7), through its alias chain first (`resolveConstructorTarget`): every question is asked of
+  (§3.3.1), through its alias chain first (`resolveConstructorTarget`): every question is asked of
   the entry at the end, while the entry's facts record the name the author wrote as its constructor.
 - A head declared in the same document is made ready before its instance is read, in wait order (`WaitOrder`,
   `design/schema-resolution.md`), whichever is written first; the body is read through readers compiled from the
@@ -90,8 +90,8 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `!meta.top ^ { … }` gets the plain answer rather than advice that would fail in turn. **There is no marker.** §12.1's
   grammar has no constructor sigil and §8.1's `meta.type` no `constructor` field: what makes an entry a constructor is that
   it IS-A `meta.top`, which its supertype chain records. **There is no level discipline**: composition propagates the chain,
-  so an entry deriving from a constructor *is* one, and any schema may declare one (SPEC-FEEDBACK.md
-  #7). **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an entry with an empty chain,
+  so an entry deriving from a constructor *is* one, and any schema may declare one (§4.2).
+  **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an entry with an empty chain,
   which is why an instance is not itself a constructor. `ApplicabilityIsIsATopTest` and `ConstructorLevelDisciplineTest` pin
   both halves; §3.3.1 and §4.2 are the spec side.
 - **What an instance of a schema's own constructor holds** (`SchemaResolver.constructed`). The constructors meta.tn,

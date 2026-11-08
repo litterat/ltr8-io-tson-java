@@ -43,17 +43,16 @@ materialization, no validation (those are the resolver's/linker's jobs).
   and `SiblingRef`, and `TypeRef` over `NameRef` and `ApplicationRef` — the shape of `schema.meta`'s `Reference` and
   of `meta.tn`'s `meta.type_ref`, so one name means one thing in the AST, the resolved model and the kernel. The
   structural forms are expressions, not references: `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is
-  any of them, a reference or a structural form, and is what §12.1's `type-ref` production parses to (the production's
-  name says reference where it means expression, SPEC-FEEDBACK.md #22). A slot the grammar holds to a reference is
-  typed by it: `MapExpr.keyType` and `RefinedDef.target` are a `Reference` (`parseTypeRefHead`), a sibling there being
-  the desugar phase's to refuse.
+  any of them, a reference or a structural form, and is what §12.1's `type-expr` production parses to. A slot the
+  grammar holds to a reference is typed by it: `MapExpr.keyType` and `RefinedDef.target` are a `Reference`
+  (`parseTypeRefHead`), a sibling there being the desugar phase's to refuse.
 - **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
   takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
   the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's root `schema`, an
   alias of `meta.schema`, whatever the document imports, so it is matched as a spelling (`DocumentStart.SCHEMA_TAG`):
   which grammar the payload takes is settled before any name is looked up; an untagged root is a syntax error saying
   the document is data.
-- **A schema map nests as an entry** (`nestedSchemaMap`, SPEC-FEEDBACK.md #14). A `!` head spelled `schema`, or its
+- **A schema map nests as an entry** (`nestedSchemaMap`, §4.1, §12.1). A `!` head spelled `schema`, or its
   target's path `meta.schema`, and followed by `{` reads `"!schema" ws schema-map`: the tag names what the root's
   does and is matched as a spelling for the same reason, so the payload is the schema grammar and never a data map,
   and no declaration of the document captures it — an import-free schema may declare its own `schema`, which the tag
@@ -91,7 +90,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   data grammar's is ([TSON-DATA] §7.5): `box <text>` is a parse error naming the rule; inside the list whitespace and commas
   are free. The schema grammar keeps a parser of its own for references rather than the data stream's, because its `type-arg`
   admits sugar (`box<[text]>`, `box<(text | int32)>`), which a data argument never holds.
-- **`sibling-ref` is a `type-ref` alternative** (§12.1, SPEC-FEEDBACK.md #21; `parseTypeRefHead`,
+- **`sibling-ref` is a `type-expr` alternative** (§12.1; `parseTypeRefHead`,
   `parseSiblingRef`): one token of lookahead after the name picks it, an adjacent `!` a sibling reference, an adjacent
   `<` an application, neither a bare name. It becomes an `ast.schema.SiblingRef`, a `Reference` and so a `TypeExpr`, so
   `[ kind! ]`, `box< kind! >`, `( kind! | text )`, `{ kind! => text }` (the brace dispatch takes an adjacent `!` after
@@ -115,7 +114,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
     [T error] }` parses and resolves, which is §5.10's "collection-valued slots are parameterizable". The
     kernel declares no `template_argument` or `instance_template` for a quotation to need.
   - **An application is data too**: `!meta.array { element_type: box<text> }` is a `core-value`, the reference
-    production being [TSON-DATA] §7.4's (SPEC-FEEDBACK.md #12), and it is what the sugar `[box<text>]` expands
+    production being [TSON-DATA] §7.4's, and it is what the sugar `[box<text>]` expands
     to. What a payload cannot spell is sugar: `[text]` in a payload is a data array, never the array type, so a
     sugar argument there is named by the entry that declares it. That line falls where the
     grammars divide — a *type* position is schema grammar and takes the sugar forms, while `!C value` takes

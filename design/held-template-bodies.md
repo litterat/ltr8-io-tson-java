@@ -57,7 +57,7 @@ lives in git.
 - A parameter is a TYPE parameter exactly when its recorded type is `meta.type_ref` (§5.10); a slot typed `meta.type_ref`
   gives one, an `Atom`-typed slot gives a VALUE parameter, and anything else is refused at the declaration.
 - An application in a held tree is a `ReferenceValue`, the data grammar's reference written unquoted (`result<T>`,
-  [TSON-DATA] §7.4, SPEC-FEEDBACK.md #12): `WireForm.refValue` writes it, `WireForm.applicationIn` recognises it (an
+  [TSON-DATA] §7.4): `WireForm.refValue` writes it, `WireForm.applicationIn` recognises it (an
   `instanceof`, nothing parsed), and `HeldBody.names()` includes the names its arguments write. A `ReferenceValue`
   holding a sibling reference (`kind!`, at a record template field's type) is no application: every walk that
   rewrites one matches `ReferenceValue(TypeRef applied)`, and a sibling falls through as written. A quoted token is

@@ -127,7 +127,7 @@ import java.util.stream.Collectors;
  * literal argument whose type it leaves open ({@link #checkHeldArity}) -- never resolved against the schema. A
  * closed entry holds no parameter, so every name it holds resolves in the schema's own namespace or is unresolved.
  *
- * <p><b>One namespace per schema (Part 2 §2.2.3, SPEC-FEEDBACK.md #7).</b> The namespace a schema is checked
+ * <p><b>One namespace per schema (Part 2 §2.2.3, §3.3).</b> The namespace a schema is checked
  * against is built in two stages, in this order: (1) the whole namespace of every {@code !!import} ({@link
  * TsonSchema#namespaceSources}), in header order, looked up via {@code loader} by canonical
  * identity -- <b>transitive, not shallow</b>: {@code loader} hands back an already-registered, already-linked schema
@@ -204,7 +204,7 @@ public final class TsonSchemaLinker {
 
     /**
      * Links the part of a schema whose resolution is in progress that is ready, {@code pending} naming its
-     * declarations not yet ready: the partial link of [TSON-SCHEMA] §3.4.1's wait order ({@code SPEC-FEEDBACK.md #4}).
+     * declarations not yet ready: the partial link of [TSON-SCHEMA] §3.4.1's wait order.
      * A resolution reads a value against an entry of its own document through readers compiled from the entries
      * ready so far ({@code TsonSchemaCompiler.compileReady}), and those need a linked schema while some of the names
      * its entries hold have no entry yet. {@code ready}'s imports are merged through {@code loader}, which may be
@@ -1733,7 +1733,7 @@ public final class TsonSchemaLinker {
      * [TSON-SCHEMA] §5.7's rule for a restated field's type, which §5.8 applies to a composition's tightening
      * entries: refinement only restricts, so a field a record restates is typed by its source's type or a type IS-A
      * it, §7.2's IS-A asked as {@link #checkReferenceNarrows} asks it, past alias hops on both sides, and nothing
-     * structural beside it (SPEC-FEEDBACK.md #18): {@code [int8]} restating {@code [int32]} is no narrowing. §5.7's
+     * structural beside it (§5.7): {@code [int8]} restating {@code [int32]} is no narrowing. §5.7's
      * one other narrowing is {@code void} at a voidable position, whose value set {@code {_}} is inside every voidable
      * position's; the voidable order itself is the resolver's ({@code DefinitionResolver.refines}). The resolver binds
      * the restatement before the names it holds need be ready, so the IS-A is asked here, over the one namespace both

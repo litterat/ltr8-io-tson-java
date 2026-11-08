@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
  * {@link TypeRef} as an atom host: its data form is the reference's text, parsed by {@link ReferenceGrammar} and
- * written as {@link TypeRef#text} ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12) -- the text a reader rolls a
+ * written as {@link TypeRef#text} ([TSON-DATA] §7.4) -- the text a reader rolls a
  * reference's tree into in TSON, where it is written unquoted, and what a JSON string holds. A reference-typed slot
  * of a schema read does not come through here ({@code BindTargets} sets {@code TypeNameSlotReader} in place, which
  * records the name for the linker), and the writers write a reference themselves; this serves a reference bound

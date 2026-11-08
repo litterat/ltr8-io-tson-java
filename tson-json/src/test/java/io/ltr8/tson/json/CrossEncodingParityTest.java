@@ -577,7 +577,7 @@ class CrossEncodingParityTest {
 
     /**
      * A kind may hold an applied type, judged through the entry the closure closed it to: {@code unique =>
-     * set<text>} is a type, and no type built with {@code uuid_type} (SPEC-FEEDBACK.md #12). TSON writes the
+     * set<text>} is a type, and no type built with {@code uuid_type} ([TSON-SCHEMA] §4.2, §7.4). TSON writes the
      * reference unquoted, as data grammar; JSON, having no unquoted form, writes the same text as a string.
      */
     @Test

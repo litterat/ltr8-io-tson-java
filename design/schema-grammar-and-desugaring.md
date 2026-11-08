@@ -31,7 +31,7 @@ Related: `design/schema-grammar.md` (the parser producing the AST this rewrites)
 
 ## Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
 
-**The position rule for a sibling reference runs first, over the declaration as written** (SPEC-FEEDBACK.md #21). The
+**The position rule for a sibling reference runs first, over the declaration as written** (§5.2). The
 grammar admits `kind!` wherever a type-ref stands; a lift would carry it into an entry outside the record, which has no
 sibling to read (`[ kind! ]` would need an array chosen per value, a template family the language does not have), so
 the phase refuses it where it is written, as a `SchemaValidationException` whose message is `SiblingRef.refusedAt`'s:

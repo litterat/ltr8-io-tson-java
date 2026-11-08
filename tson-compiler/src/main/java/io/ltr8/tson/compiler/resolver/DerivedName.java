@@ -194,7 +194,7 @@ final class DerivedName {
     /**
      * One argument, as the reference grammar parses it: an unquoted token that is no number renders as the
      * reference it parses as, whether a resolver filed it as a value at its parameter or not, so {@code names<red>}
-     * is one application however it was read (SPEC-FEEDBACK.md #12).
+     * is one application however it was read ([TSON-SCHEMA] §8.2).
      */
     private static void appendArgument(StringBuilder out, TypeArgument argument) {
         switch (argument) {

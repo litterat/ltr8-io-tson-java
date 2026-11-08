@@ -6,7 +6,7 @@ is why they are the linker's. Current form only; history lives in git.
 
 **Invariants**
 
-- A kind is the kernel's `meta.reference_type` atom (`ReferenceBody`; SPEC-FEEDBACK.md #11) over a constructor, `meta.top`
+- A kind is the kernel's `meta.reference_type` atom (`ReferenceBody`; §4.2) over a constructor, `meta.top`
   or IS-A it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling,
   which is one, `meta.ref<T>`: `meta.ref<meta.record>` holds type names, and `meta.ref<api>`, over a type that is no
   constructor, names values (`ValuesByName`, `design/references.md`).
@@ -63,7 +63,7 @@ widen a role against §5.7; `name_type` with `target` and `relation` facets, whe
 one enum; the predicate as facets on the name atom; `meta.ref<T>` with `of` resolving in the writer's namespace, which
 sent `of` to two namespaces depending on who wrote it; and the kind as a sum over its members' values, which admitted
 an identifier token where a family's name was wanted. A kind is an atom whose values are names, `of` resolves in the
-schema's one namespace (SPEC-FEEDBACK.md #7), and the members are computed.
+schema's one namespace (§3.3), and the members are computed.
 
 ## The types built with a constructor (`KindMembers`, §4.2)
 

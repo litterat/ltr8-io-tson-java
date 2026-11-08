@@ -182,7 +182,7 @@ Key points:
   rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets
   `TokenValue` text as boolean/number/string (base type resolution,
   `design/base-types-and-atom-vocabulary.md`). These are intentional gaps, not omissions.
-- **A reference is data grammar** ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #12): `reference = qualified-name "<" ws
+- **A reference is data grammar** ([TSON-DATA] §7.4): `reference = qualified-name "<" ws
   type-args ws ">"`, each `type-arg` a reference or a token, a qualified name being a reference and any other token,
   a number or a quoted token, a value argument. The lexer is unchanged, `<` and `>` lexing as single-character
   special tokens, so `map<text list<int32>>` arrives as eight tokens and `>>` is two. `TsonDataStream` assembles one
@@ -201,7 +201,7 @@ Key points:
   - **Where it stands**: anywhere a core value does, a map key included, the stream looking one token past a
     `{`'s first key for an adjacent `<` or `!` to frame the map. A `!` tag is a qualified name with no arguments,
     below.
-- **A sibling reference is data grammar too** ([TSON-DATA] §7.4, SPEC-FEEDBACK.md #21): `sibling-ref =
+- **A sibling reference is data grammar too** ([TSON-DATA] §7.4): `sibling-ref =
   unquoted-token "!"`. The lexer is unchanged, so `kind!` is an unquoted token and an adjacent `!`, and adjacency
   tells it from a prefix `!`, which is adjacent to the token after it. `TsonDataStream` assembles it (`marksSibling`,
   `siblingReference`) into a `ReferenceEvent` holding a `SiblingRef`, one value like an application.
@@ -228,7 +228,7 @@ Key points:
   `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
   unchanged and still catches everything else (`!int32"5"`).
 - **A name position takes an `meta.identifier`, not merely a bare token, and the check sits in the grammar.**
-  `type-ref = "!" qualified-name` and `annotation = "@" qualified-name` (§7.4, SPEC-FEEDBACK.md #15): `TsonDataStream`
+  `type-ref = "!" qualified-name` and `annotation = "@" qualified-name` (§3.1, §3.2, §7.4): `TsonDataStream`
   matches each `.`-separated segment of a tag's or an annotation's name (`requireQualifiedName`, none empty) in full
   against `IdentifierProfile`
   once adjacency is settled, which is §7.6's own two-layer shape —

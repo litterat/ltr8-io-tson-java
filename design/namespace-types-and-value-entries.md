@@ -4,7 +4,7 @@ Design notes for **namespace types**, the instances of the kernel's `meta.namesp
 an entry whose value is an instance of an ordinary type rather than a type. Together they are how a schema puts
 vocabulary of its own in a schema map: any schema declares a record type or a namespace type,
 and any schema importing it holds values of them. Covers how such a value is read, bound or held, how the names inside
-it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.2, §5.12; SPEC-FEEDBACK.md #9).
+it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.2, §5.12).
 
 **Invariants**
 
@@ -12,7 +12,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   `name => !T { … }` with `T` a constructor builds a type; with `T` any other type of the closure -- a record type, a
   namespace type -- the entry is a value of `T` (`ValueEntry(type, value)`, `EntryKind.VALUE`), read against `T` as a
   data value is and marked by nothing but its tag. A record component, `!meta.record_field { … }`, is a value entry too.
-- **A value of `meta.schema` declares instead** (SPEC-FEEDBACK.md #14). `geo => !schema { … }` is a schema map nested
+- **A value of `meta.schema` declares instead** (§4.1). `geo => !schema { … }` is a schema map nested
   as an entry: the parser reads its payload as schema grammar, never as a value body, and its members are declarations
   of the document under their paths. It is held as a `ValueEntry` of `meta.schema` whose `Namespace` is derived from
   those path entries (`SchemaPaths.synced`, `design/schema-resolution.md`). It is open: several documents of a closure
@@ -289,7 +289,7 @@ core.tn or net.tn compiles to one.
 ## One namespace, so shared vocabulary sits beside the types
 
 A schema declaring `method` puts its shared types beside it -- a `status_code` atom, an envelope template -- and every
-schema importing it names them: an `!!import` contributes its whole namespace (SPEC-FEEDBACK.md #7). The cost is
+schema importing it names them: an `!!import` contributes its whole namespace (§2.2.3). The cost is
 reservation: every root name in the closure is taken, so a schema importing core.tn cannot declare `text`, `enum`,
 `set`, `uuid` or `title` of its own, nor `meta`, `atom`, `numeric`, `unicode`, `net`, `binary` or `temporal`
 (`ImportedVocabularyTest`). The machinery is under those seven prefixes, so `record`, `identifier`, `map`, `namespace`,

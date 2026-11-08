@@ -87,7 +87,7 @@ public final class TsonSchemaCompiler {
 
     /**
      * Compiles the part of a schema whose resolution is in progress that is ready, {@code pending} naming its
-     * declarations not yet ready: [TSON-SCHEMA] §3.4.1's wait order ({@code SPEC-FEEDBACK.md #4}). A pending name
+     * declarations not yet ready: [TSON-SCHEMA] §3.4.1's wait order. A pending name
      * compiles to a {@link PendingTypeReader}, which stops a read of a schema document's value that reaches it, so the
      * resolution can make that entry ready first, and binds a held value typed by it as written. {@code
      * linkedSchema} comes from {@code TsonSchemaLinker.linkReady}; nothing but a resolution reading its own

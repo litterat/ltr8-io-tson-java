@@ -23,7 +23,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * One schema's declarations made ready in [TSON-SCHEMA] §3.4.1's wait order ({@code SPEC-FEEDBACK.md #4}): the one
+ * One schema's declarations made ready in [TSON-SCHEMA] §3.4.1's wait order: the one
  * algorithm, whichever schema it runs over. The {@link DefinitionGetter} every lookup of a resolution goes through,
  * so an entry is made ready the first time anything asks for it, and the reader its own document's values are read
  * through. What differs between the kernel's bootstrap and every other schema is only what is ready before it starts

@@ -372,7 +372,7 @@ class ImportedVocabularyTest {
     // ── An imported vocabulary is in the importing schema's namespace ────────────────────────────
 
     /**
-     * <b>Every reference form resolves, applied or not.</b> One namespace per schema (SPEC-FEEDBACK.md #7): the
+     * <b>Every reference form resolves, applied or not.</b> One namespace per schema ([TSON-SCHEMA] §2.2.3): the
      * {@code !!import} target contributes its namespace, so a name the imported schema declares -- atom, record, or
      * template -- is a type of the schema importing it, and an application of a template there is judged by its
      * arity as any other.

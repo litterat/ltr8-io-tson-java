@@ -10,8 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * [TSON-DATA] §7.4's reference production, read from text into the {@link Reference} it spells (SPEC-FEEDBACK.md
- * #12, #21): what a JSON string at a reference-typed position holds, JSON having no unquoted form, and the text form
+ * [TSON-DATA] §7.4's reference production, read from text into the {@link Reference} it spells: what
+ * a JSON string at a reference-typed position holds, JSON having no unquoted form, and the text form
  * {@link Reference#text} writes. The TSON text reader builds the same tree from tokens ({@code TsonDataStream}).
  *
  * <pre>

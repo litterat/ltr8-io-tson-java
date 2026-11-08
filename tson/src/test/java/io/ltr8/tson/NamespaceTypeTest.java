@@ -181,7 +181,7 @@ class NamespaceTypeTest {
 
     /**
      * A namespace type IS-A {@code top}, and any schema declares one: the kernel's {@code namespace} is in the
-     * closure of every schema reaching meta.tn (SPEC-FEEDBACK.md #7).
+     * closure of every schema reaching meta.tn ([TSON-SCHEMA] §4.1).
      */
     @Test
     void anySchemaDeclaresANamespaceType() {

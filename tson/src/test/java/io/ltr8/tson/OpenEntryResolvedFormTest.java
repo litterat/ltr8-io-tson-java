@@ -87,7 +87,7 @@ class OpenEntryResolvedFormTest {
     void everyPublishedResolvedFixtureValidatesAgainstItsGoverningSchema() throws Exception {
         Tson tson = tson();
         // A library's form holds instances of constructors its source declares, and a resolved form is read under its
-        // source's imports, not over its own entries (SPEC-FEEDBACK.md #4): each is read beside its source.
+        // source's imports, not over its own entries as [TSON-SCHEMA] §8.1 reads one: each is read beside its source.
         Map<String, String[]> fixtures = new LinkedHashMap<>();
         fixtures.put("meta-resolved.tn", new String[0]);
         fixtures.put("numeric-resolved.tn", new String[] {TsonBundledSchemas.NUMERIC_ID});

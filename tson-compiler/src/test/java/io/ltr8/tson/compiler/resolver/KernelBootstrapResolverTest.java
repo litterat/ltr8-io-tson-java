@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * build.gradle.kts}): the header directives carry straight through, every declaration resolves -- the hand-built
  * pre-loaded set, the declarations resolved from their grammar, and the instances read through the readers compiled
  * from what is ready -- and its output is the kernel's ordinary resolution entry for entry. The pre-loaded set is
- * held to the kernel's measured wait cycle ({@code SPEC-FEEDBACK.md #4}, rule 4).
+ * held to the kernel's measured wait cycle ([TSON-SCHEMA] §3.4, §3.4.1 rule 4).
  */
 class KernelBootstrapResolverTest {
 
@@ -176,7 +176,7 @@ class KernelBootstrapResolverTest {
     // ── The pre-loaded set, and what the rest of the kernel comes out as ──
 
     /**
-     * Rule 4 of {@code SPEC-FEEDBACK.md #4}: the pre-loaded set is exactly the kernel's one wait cycle. The bootstrap
+     * [TSON-SCHEMA] §3.4, §3.4.1's rule 4: the pre-loaded set is exactly the kernel's one wait cycle. The bootstrap
      * builds by hand the instances and refinements on it, so they are measured here from {@code
      * meta-resolved.tn}'s own declarations ({@link WaitGraph}) rather than trusted: a kernel edit that moves
      * the cycle fails this test, not a read. An entry on the cycle written {@code !meta.record} or {@code

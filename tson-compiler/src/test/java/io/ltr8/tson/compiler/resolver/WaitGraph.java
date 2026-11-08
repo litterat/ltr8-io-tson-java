@@ -25,7 +25,7 @@ import java.util.TreeSet;
 
 /**
  * The wait graph of a resolved schema document: which entries must be ready before each entry's declaration can be
- * read, under the resolution-order rule proposed in {@code SPEC-FEEDBACK.md #4}.
+ * read, under [TSON-SCHEMA] §3.4.1's resolution-order rule.
  *
  * <p><b>The rule.</b> Reading a value against a type {@code T} waits on {@code T} being ready, and on each type a
  * <i>written</i> part of the value is read against as the read reaches it: a field's declared type, an array or set

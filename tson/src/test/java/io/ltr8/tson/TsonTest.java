@@ -37,7 +37,7 @@ class TsonTest {
             """;
 
     /**
-     * An imported type library contributes its namespace (SPEC-FEEDBACK.md #7): core.tn's {@code uuid}
+     * An imported type library contributes its namespace ([TSON-SCHEMA] §2.2.3): core.tn's {@code uuid}
      * resolves.
      */
     @Test

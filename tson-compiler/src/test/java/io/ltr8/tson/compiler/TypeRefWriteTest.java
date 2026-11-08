@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * How a reference is written: an argument-free one as its bare name, which [TSON-SCHEMA] §8.1 requires of canonical
  * output and which is the only spelling a value written by name has ([TSON-SCHEMA] §5.12); an application as its
- * canonical text, unquoted, the data grammar's reference (SPEC-FEEDBACK.md #12); a sibling reference as its field's
+ * canonical text, unquoted, the data grammar's reference ([TSON-DATA] §7.4); a sibling reference as its field's
  * name and the mark, unquoted.
  */
 class TypeRefWriteTest {

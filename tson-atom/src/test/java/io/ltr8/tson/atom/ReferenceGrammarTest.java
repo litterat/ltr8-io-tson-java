@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The reference grammar a reference-typed slot's value is read by (SPEC-FEEDBACK.md #12): segments, an optional
+ * The reference grammar a reference-typed slot's value is read by ([TSON-DATA] §7.4): segments, an optional
  * argument list of references and tokens, and one canonical text.
  */
 class ReferenceGrammarTest {

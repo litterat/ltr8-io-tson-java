@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The kernel's resolved form, meta.tn's, measured under {@code SPEC-FEEDBACK.md #4}'s resolution-order rule ({@link
+ * The kernel's resolved form, meta.tn's, measured under [TSON-SCHEMA] §3.4.1's resolution-order rule ({@link
  * WaitGraph} states it).
  *
  * <p>Rule 4 makes the pre-loaded set a measurement rather than a list: it is exactly the one cycle the kernel must
@@ -143,7 +143,7 @@ class KernelWaitGraphTest {
 
     private static void report(WaitGraph graph, List<Set<String>> components, List<Set<String>> cycles,
                                Set<String> preloaded, Map<String, Integer> depth) {
-        System.out.println("== Kernel wait graph (SPEC-FEEDBACK #4), meta-resolved.tn ==");
+        System.out.println("== Kernel wait graph ([TSON-SCHEMA] §3.4.1), meta-resolved.tn ==");
         int edges = graph.entries().stream().mapToInt(e -> graph.waits(e).size()).sum();
         System.out.println("entries: " + graph.entries().size() + ", wait edges: " + edges);
         Map<String, Long> heads = graph.entries().stream()

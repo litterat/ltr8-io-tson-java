@@ -118,8 +118,8 @@ that changed one has said nothing about the other. The three arguments above tra
 sender needs it before it writes, and a number a caller can act on beats a refusal after the fact.
 
 **The whole table is stated; nesting depth and wait depth are counted.** §9.1 states its limits as one table with a
-default each — eleven on the document side, its foreign-schemas row withdrawn with the scope push (`SPEC-FEEDBACK.md`
-#6) — and [TSON-SCHEMA] §11.5 adds six on the schema side under the same policy and the same reporting surfaces.
+default each — eleven on the document side — and [TSON-SCHEMA] §11.5 adds six on the schema side under the same policy
+and the same reporting surfaces.
 `LimitsPolicy` has a component per limit, in the table's order, each defaulting to the spec's value and refused below 1,
 and `policy.tn`'s `policy.limits` and `CliPolicy.CliLimits` carry the same seventeen, so `tson policy` and every
 envelope state each threshold. Nesting depth is counted at §9.1's default of 64, the tightest in common use, so a
