@@ -55,8 +55,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             .forRead(definition, context.linked().enumForm(name))
             .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(context.authoredName(name, definition), parser,
                     context.locationOf(name), namesProfile(definition),
-                    definition instanceof ReferenceBody kind && kind.namesTypes() ? kind.of() : null,
-                    definition instanceof ReferenceBody reference && !reference.namesTypes() ? reference.of() : null,
+                    definition instanceof ReferenceBody kind && kind.namesTypes() ? kind.of().name() : null,
+                    definition instanceof ReferenceBody reference && !reference.namesTypes() ? reference.of().name() : null,
                     AtomParsers.inSchemaDocument(definition).orElse(null),
                     definition instanceof ReferenceBody facet && facet.allowSibling()))
             .orElseThrow(() -> new IllegalStateException(

@@ -75,7 +75,7 @@ public final class KindMembers {
                                   Function<String, Optional<String>> constructorOf, Function<String, Top> structure) {
         List<String> members = new ArrayList<>();
         for (String name : merged.keySet()) {
-            if (isMember(name, reference.of(), merged::get, constructorOf, structure)) {
+            if (isMember(name, reference.of().name(), merged::get, constructorOf, structure)) {
                 members.add(name);
             }
         }
@@ -145,7 +145,7 @@ public final class KindMembers {
      * applied (§5.10), and a value entry, which is a value and no type.
      */
     public static Optional<String> ofRefusal(ReferenceBody reference, Function<String, Top> structure) {
-        String of = reference.of();
+        String of = reference.of().name();
         Optional<Found> found = reached(of, structure);
         if (found.isEmpty()) {
             return Optional.empty();

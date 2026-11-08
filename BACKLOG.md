@@ -38,10 +38,14 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **A data reference does not follow alias chains inside its arguments** ([TSON-SCHEMA] §8.2, §8.3). With
-  `user_id => uuid` and the schema closing `box<uuid>`, a data document writing `box<user_id>` at a kind-typed slot is
-  matched only through the bottom-up lookup (`ReferenceBody.entryOf`), not by the identity §8.2 gives it, which
-  follows each argument's chain to its terminal. Follow the chains before the lookup and add a validate vector.
+- [ ] **An alias of a template cannot be applied** ([TSON-SCHEMA] §8.3). `design/resolver-vocabulary-and-bootstrap.md`
+  says an application through an alias of a template applies the template (`TemplateMaterialiser.templateHead`), but
+  `r => ref_of<order>` over `ref_of => meta.ref` is refused ("'ref_of' declares no type parameters"), and so are
+  `bx<text>` over `bx => box` (a record template) and `vv<text>` over `vv => vec` (a held one); no test or vector
+  covers the case. Once it closes, a data reference written with the alias head (`bx<uuid>`) must find the entry
+  `box<uuid>` closed to: `ReferenceBody.entryOf` follows the arguments' alias chains but not the head's, and
+  `TemplateMaterialiser.close` records a use site under its written head only. Add a `schema/valid` and a
+  `validate/valid` vector.
 - [ ] **A nested or aliased application across imports is untested at the IS-A edge fold.** An imported schema's
   `@meta.application` is the application as written, nested arguments unreduced (`pair<box<text> int32>`), and
   reaches the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
@@ -134,11 +138,6 @@ spec-required case:
   §5.7's rules, are not judged either: its chain is empty. The resolver holds the inherited field
   (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a deferred judgement there, or the inherited
   fields carried to link, would close all three without reporting a case the link already judges twice.
-- [ ] **A reference's `of` written as an application in the body is refused** ([TSON-SCHEMA] §4.2). `r =>
-  !meta.reference_type { of: box<text> }` reports "'r' of has an unresolved reference 'box<text>'", where
-  `meta.ref<box<text>>`, which §4.2 says is that body, closes `of` to the expansion: `ReferenceBody.of` is a `String`,
-  bound from the text, and nothing closes it. Hold `of` as a `TypeRef`, map it in `MetaRefs`' reference arm as the
-  application it is, and add a `schema/valid` vector.
 - [ ] **An application argument where a value parameter stands is accepted when a record template closes**
   ([TSON-SCHEMA] §5.10). With `pin => <N> { v?: int32 = N }`, `<T> pin<box<T>> & { … }` is refused where the operand
   is substituted (`RecordTemplateSubstitution`), but `pin<box<text>>` is not: `TemplateMaterialiser` closes nested

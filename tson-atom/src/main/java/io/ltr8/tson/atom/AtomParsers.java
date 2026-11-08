@@ -114,7 +114,8 @@ public final class AtomParsers {
     public static Optional<AtomType<?>> forType(Top body, Normalization enumForm) {
         if (body instanceof ReferenceBody reference && !reference.namesTypes()) {
             throw new UnsupportedOperationException("a value a schema writes at a reference-typed position ('meta.ref<"
-                    + reference.of() + ">') is not yet judged: a reference's value is judged by what its name reaches");
+                    + reference.of().text()
+                    + ">') is not yet judged: a reference's value is judged by what its name reaches");
         }
         return forRead(body, enumForm);
     }

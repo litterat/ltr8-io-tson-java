@@ -115,8 +115,8 @@ class ClosedBodyReferencesTest {
 
         ReferenceBody reference = assertInstanceOf(ReferenceBody.class, entry(linked, "r"));
         String array = ((RecordBody) entry(linked, "direct")).fields().get("d").typeRef().name();
-        assertEquals(array, reference.of(), "one entry for one form, whichever position names it");
-        assertInstanceOf(ArrayBody.class, entry(linked, reference.of()));
+        assertEquals(array, reference.of().name(), "one entry for one form, whichever position names it");
+        assertInstanceOf(ArrayBody.class, entry(linked, reference.of().name()));
     }
 
     /** The same reference at a field's type, where the application closes to a minted reference entry. */
@@ -126,6 +126,6 @@ class ClosedBodyReferencesTest {
 
         String minted = ((RecordBody) entry(linked, "rec")).fields().get("f").typeRef().name();
         ReferenceBody reference = assertInstanceOf(ReferenceBody.class, entry(linked, minted));
-        assertInstanceOf(ArrayBody.class, entry(linked, reference.of()), () -> "of names a live entry: " + reference);
+        assertInstanceOf(ArrayBody.class, entry(linked, reference.of().name()), () -> "of names a live entry: " + reference);
     }
 }

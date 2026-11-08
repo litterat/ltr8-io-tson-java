@@ -31,18 +31,22 @@ text.
   namespace, the root's entries and the import closure, and each further segment selects in what it reached: a member
   of a nested `!schema` map, a key of a namespace value, a field of a record value. Inside `geo`, a sibling is
   `geo.address`, and a bare `address` is the root's or unresolved. There is no lexical scope, so no shadowing rule.
-- The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members,
-  applications, entries, shown, values)`: the entry each application the closure closed denotes, an
-  `@meta.application` or an expansion's `EntryFacts.closes`; the final namespace's entries, which a reference read here
-  names; the members as a message names them, a minted one by its application; and, for a reference naming values in
-  a whole link, `values`, a lookup (`ReferenceBody.Values`) that judges a qualified name over the final namespace by
-  `ValuesByName`'s walk, empty in a link of a resolution in progress), and `ValuesByName` re-derives it from `of` over the
-  final namespace whatever the read guessed; `TsonSchema.SlotType`'s `KIND` and `REFERENCE`
-  roles are only how the read read the name. The index is never written: a resolved form states
-  `!meta.reference_type { of: … }` alone, a written `members:` is refused as an unknown field, and equality and `toString`
-  exclude it (`ReferenceBody.memberNames()` is the processor's own).
-- `of` names any type or constructor of the writer's namespace. Refused are a name resolving to nothing (an unresolved
-  reference), an open entry and a value entry (`KindMembers.ofRefusal`, from `validateBody`). `meta.ref<meta.top>` holds
+- The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members, applications,
+  aliases, entries, shown, values)`: the entry each application the closure closed denotes, an `@meta.application` or an
+  expansion's `EntryFacts.closes`; each alias entry to the end of its chain (`AliasChain.terminal`), which an application's
+  arguments are compared past; the final namespace's entries, which a reference read here names; the members as a message
+  names them, a minted one by its application; and, for a reference naming values in a whole link, `values`, a lookup
+  (`ReferenceBody.Values`) that judges a qualified name over the final namespace by `ValuesByName`'s walk, empty in a link of
+  a resolution in progress), and `ValuesByName` re-derives it from `of` over the final namespace whatever the read guessed;
+  `TsonSchema.SlotType`'s `KIND` and `REFERENCE` roles are only how the read read the name. The index is never written: a
+  resolved form states `!meta.reference_type { of: … }` alone, a written `members:` is refused as an unknown field, and
+  equality and `toString` exclude it (`ReferenceBody.memberNames()` is the processor's own).
+- `of` names any type or constructor of the writer's namespace. It is a `TypeRef`, `meta.type_ref` being a type
+  position, so a body may write an application there: `!meta.reference_type { of: box<text> }` is
+  `meta.ref<box<text>>` (§4.2), and resolution closes it to the entry it denotes as it closes one at any type position
+  (`MetaRefs`' reference arm), so a resolved `of` is a name. Refused are a name resolving to nothing (an unresolved
+  reference, an application that did not close among them), an open entry and a value entry (`KindMembers.ofRefusal`,
+  from `validateBody`). `meta.ref<meta.top>` holds
   every type. `meta.ref<meta.alias>` admits nothing, no entry past its hops being an alias, and a required field typed by it
   is refused by §5.10.1's productivity check (`TypeInhabitance`). A reference is not a bound: `meta.template_param.bound`
   still refuses a constructor (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
@@ -126,7 +130,9 @@ text.
   spelling named: `order_box => box<order>`, then the bare name. In a data document the kind's reader (`KindParser`)
   judges an application through the entry it denotes, resolved bottom-up by structural identity
   (`ReferenceBody.entryOf`): each argument that is itself an application first, then the application over those
-  entries, against every application the closure closed, `@meta.application`s and the `EntryFacts.closes` the resolver
+  entries, each argument compared past its alias chain (§8.2: over `user_id => uuid`, `box<user_id>` is
+  `box<uuid>`), as the resolver keyed every application it closed (`TemplateMaterialiser.dereferenced`), against
+  every application the closure closed, `@meta.application`s and the `EntryFacts.closes` the resolver
   records (`TemplateMaterialiser.closedApplications`, generated heads skipped). A schema loads only when every
   application in it closes, so data never creates one: an application nothing in the closure closed is refused
   (`ATOM_CONSTRAINT_VIOLATION`, "names no type this schema closes"), as a name no member is. The name itself is
@@ -232,7 +238,7 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 | `meta.record_field.value`, `meta.record_template_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference (typed `type!`, so read against the field's own `type`) | namespace | member of the slot's kind | `checkKindValue` |
 | `meta.record.discriminators`, `meta.field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `meta.record.name_type`, `meta.enum_type.name_type` | reference | namespace | `meta.identifier_ref` | `NameType.admits` |
-| `meta.reference_type.of` | reference, `meta.type_ref` | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |
+| `meta.reference_type.of` | reference, `meta.type_ref`; an application closes to its entry | namespace | any type or constructor, never a value entry or an open entry | `validateBody`, `KindMembers.ofRefusal` |
 | a slot typed by a reference over a type that is no constructor | reference by key, a path | root namespace, then nested `!schema` members, namespace values and record fields | the referent's type IS-A `of` | `ValuesByName.judge` |
 | a schema-map value (`meta.schema.value_type: declared`) | tag | namespace | a constructor builds a type; any other type a value of it | `DefinitionResolver` |
 | `geo => !schema { … }` | tag, a spelling of the pre-loaded kernel's `schema` (an alias of `meta.schema`) or `meta.schema` | pre-loaded kernel | none: the payload is schema grammar, its members declarations keyed by path | `TsonSchemaParser`, `SchemaPaths` |

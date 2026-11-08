@@ -154,9 +154,10 @@ are worth their place here, each catching what would otherwise link, compile, an
 
 **A chain's names resolve in the same namespace.** A refinement of a kernel constructor reaches one (`meta.set_type =>
 meta.array ^ {...}` carries `[meta.array, meta.product, meta.top, meta.type]`), and the defining schema's closure is inside
-the importer's, so every name on it is there. A `reference_type` body's `of` names any type or constructor, never a value
-entry or an open entry (`KindMembers.ofRefusal`); what it names decides whether the slot holds a type's name or a value's. A
-namespace type's stated `key_type` must be a member of `meta.identifier_ref`: its keys are names.
+the importer's, so every name on it is there. A `reference_type` body's `of` names any type or constructor, an application
+there having closed to its entry during resolution, never a value entry or an open entry (`KindMembers.ofRefusal`); what it
+names decides whether the slot holds a type's name or a value's. A namespace type's stated `key_type` must be a member of
+`meta.identifier_ref`: its keys are names.
 
 **Two narrowings are judged here, both by `isA`** (§7.2's chain IS-A, alias hops followed): a reference refinement's
 `of` (`checkReferenceNarrows`), and a record's restated field types against the nearest closed records on its chain

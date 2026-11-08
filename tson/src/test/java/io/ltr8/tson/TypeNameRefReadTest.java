@@ -9,6 +9,7 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
@@ -48,6 +49,9 @@ class TypeNameRefReadTest {
               inner       => box<text>
               outer       => pair<box<text> int32>
               typed       => { t: meta.type_ref }
+              label       => text
+              caption     => label
+              refined     => !text ^ {}
             }""";
 
     private static final SchemaSource SOURCE = uri -> IDS_SCHEMA;
@@ -98,6 +102,29 @@ class TypeNameRefReadTest {
         assertEquals("box<text>", inner.text());
         assertEquals(tson().bindRegistry().core().resolveLinked(IDS).schema().entries().get("inner"),
                 inner.referent().orElseThrow());
+    }
+
+    /**
+     * An argument is compared past its alias chain, as [TSON-SCHEMA] §8.2 gives an application its identity: over
+     * {@code caption => label => text}, {@code box<caption>} is {@code box<text>}, which the schema closes as {@code
+     * inner}, and so is the argument of {@code pair<box<label> int32>}, which is {@code outer}.
+     */
+    @Test
+    void anArgumentIsComparedPastItsAliasChain() {
+        Namespace<Top> entries = tson().bindRegistry().core().resolveLinked(IDS).schema().entries();
+        assertEquals(entries.get("inner"), reference(read("!typed { t: box<caption> }").get("t")).referent()
+                .orElseThrow());
+        TypeRef nested = reference(read("!typed { t: pair<box<label> int32> }").get("t"));
+        assertEquals("pair<box<label> int32>", nested.text(), "the reference keeps the spelling the data wrote");
+        assertEquals(entries.get("outer"), nested.referent().orElseThrow());
+    }
+
+    /** A refinement is a type of its own, no alias: {@code box<refined>} is no application the schema closes. */
+    @Test
+    void anArgumentRefiningATypeIsNoAliasOfIt() {
+        List<Diagnostic> problems = problems("!typed { t: box<refined> }");
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
     }
 
     /**
@@ -163,6 +190,24 @@ class TypeNameRefReadTest {
     }
 
     public record Ledger(String named, String fallback) {
+    }
+
+    public record Typed(TypeRef t) {
+    }
+
+    /** Bind mode resolves an aliased argument as a tree read does: the bound reference names the entry. */
+    @Test
+    void bindModeComparesAnArgumentPastItsAliasChain() {
+        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE))
+                .withDataBindContext(DataBindContext.builder()
+                        .nameBinder(DataNameBinder.ofMap(Map.of("typed", Typed.class))
+                                .orElse(SchemaModelNameBinder.INSTANCE))
+                        .registerAtoms(AtomContext.hostTypes()).build()));
+
+        Typed typed = tson.objectReader().read("!!import:\"" + IDS + "\"\n!typed { t: box<caption> }", Typed.class);
+
+        assertEquals(tson.bindRegistry().core().resolveLinked(IDS).schema().entries().get("inner"),
+                typed.t().referent().orElseThrow());
     }
 
     @Test

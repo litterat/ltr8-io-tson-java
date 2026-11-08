@@ -88,7 +88,7 @@ public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) imple
         }
         // An application is named as written, never by the entry minted for it.
         throw new AtomValidationException("'" + reference.text() + "' is not a member of this kind -- expected the "
-                + "name of a type whose value IS-A '" + kind.of() + "', one of " + kind.shownMembers(),
+                + "name of a type whose value IS-A '" + kind.of().text() + "', one of " + kind.shownMembers(),
                 "one of (" + String.join(", ", kind.shownMembers()) + ")");
     }
 

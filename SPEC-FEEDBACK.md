@@ -669,7 +669,9 @@ binds.
   mints there.
 - **In a data document** a kind-typed slot may name an applied type, `t: set<text>`, resolved bottom-up, level by
   level, by structural identity against every application the closure closed, an expansion's among them (the
-  resolver keeps them beside the entries; resolved output does not carry them). A schema loads only when every
+  resolver keeps them beside the entries; resolved output does not carry them). Each argument is compared past its
+  alias chain, as §8.2 compares a schema's own: over `user_id => uuid`, `box<user_id>` names what `box<uuid>` closed
+  to, and an argument refining `uuid` names nothing the schema closed over `uuid`. A schema loads only when every
   application in it closes, so data never creates one: an application nothing in the closure closed names no type
   the schema closes and is refused, as a name no member is.
 - **A message names a minted entry by its application**, as written: `'b<10>': '5' is less than the minimum 10`, and
@@ -684,7 +686,8 @@ binds.
   `application` are typed `meta.type_ref`; `@meta.application` states the application as written, nested arguments
   unreduced.
 - §8.2: identity compares a reference's parsed form, its head, and its arguments as references or tokens, never the
-  text or the channel a processor filed an argument in; a nested argument is compared as the entry it closed to.
+  text or the channel a processor filed an argument in; a nested argument is compared as the entry it closed to, and
+  a bare-name argument past its alias chain, in data as in a schema.
 - §5.10: an argument is a reference or a token by the grammar, and typed by the head's parameter; a parameter
   standing in an argument is its name, in held text as in a record template.
 
