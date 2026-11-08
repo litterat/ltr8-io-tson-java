@@ -585,9 +585,22 @@ constructor's declaration is a record (`uuid_type => atom & { … }`) and a reco
   required field typed by it is refused by §5.10.1's productivity rule.
 - **`members` is no part of the body.** A resolved form states `of` alone, and an author writing `members` is refused
   as an unknown field. The admitted set is derived at link and kept by the processor for its own judgements.
-- **Where a name is judged** is unchanged: in a data document a type's name by membership in the reading closure, and
-  a value's qualified name is this library's gap there (`NOT_IMPLEMENTED`); in a schema document the grammar where it
-  is written and the judgement when the schema links.
+- **Where a name is judged.** In a schema document the grammar where it is written and the judgement when the schema
+  links. In a data document a type's name by membership in the reading closure, and a value's qualified name by what
+  it reaches there: §5.12's walk, run over the governing schema's namespace (the closure of the document's imports),
+  the referent's type IS-A `of`, so `which: o2` at `meta.ref<order>` reads where `o2` is a value of `order` or of a
+  subtype, and a name reaching nothing, a type, or a value of another type is a validation error. A host receives the
+  referent with the name (a `Ref` delivered at the read, a reference whose referent is the value); JSON reads the
+  same name from a string (Part 3 §5.6). This departs from §5.12's "the rule does not reach a data document … a host
+  component bound to a reference there receives a name, unresolved", which was written when a reference was kernel
+  vocabulary and no data document's schema could declare one; with any schema declaring a reference (#7), a data
+  document holds values at reference-typed slots routinely, and an unjudged name there would be the one value a
+  schema types that its data is never checked against. The store is not the problem §5.12 names: a data document
+  has a namespace, the one its `!!import`s bind, as a kind-typed slot in it already relies on.
+- **A field's default or pin at a reference naming values** is a value's qualified name, judged at link by the same
+  walk, and a refusal is the declaring entry's resolver error (§5.2: the value must be the field's declared type).
+  §5.12 states the walk for a value body's names alone; nothing states that a `~`/`=` token at a `ref<T>` field is a
+  name and not a token of an atom's grammar.
 - **A qualified name selects a key of a value of a named product**: a namespace value's key, or a record value's field,
   the record being a namespace whose keys its type fixes. That is §5.12's walk restated, and nothing it admits moves.
 - **A constructor is an ordinary record type.** Nothing in the predicate sets a constructor apart. `uuid_type`'s
@@ -611,7 +624,10 @@ constructor's declaration is a record (`uuid_type => atom & { … }`) and a reco
 - §4.1: a constructor is a type like any other at a name slot and a type position: its declaration is a record, whose
   instances are declarations. The sentence making a constructor "never itself the type of a value" goes.
 - §5.12: a further segment selects a key of a value of a named product, a namespace value's key or a record value's
-  field, the record being a namespace whose keys its type fixes; a map that is no namespace is not entered.
+  field, the record being a namespace whose keys its type fixes; a map that is no namespace is not entered. "The rule
+  does not reach a data document" goes: a name a data document writes at a `ref<T>` slot is judged by the same walk
+  over the namespace its imports bind, and delivered with its referent, and a field's default or pin at one is a name
+  judged so when the schema links.
 - §7.4 and §8.1: "a kind-typed position" reads "a position typed by a reference over a constructor"; `members` is no
   longer a derived index written in resolved output.
 

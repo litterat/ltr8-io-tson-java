@@ -175,7 +175,9 @@ admit UTS #39's own `Toys-Я-Us`.
 - **A reference is a `TypeRef` in both modes.** Under a schema a reference-typed position (a kind or a `meta.ref<…>`)
   reads to a `schema.meta.TypeRef`, so a tree read hands back a `TsonAtom` holding one (`node.as(TypeRef.class)`)
   and a bind delivers the same object, a `String` host receiving its canonical text. Read in data under a kind, it
-  carries its closure, so `referent()` is the value of the entry it names (`design/references.md`). A schemaless read
+  carries its closure, so `referent()` is the value of the entry it names (`design/references.md`); read in data
+  under a reference naming values (`meta.ref<order>`), its `referent()` is the value its name reaches, and a `Ref`
+  host is delivered that value at the read. A schemaless read
   has no closure: it keeps an application or a sibling reference as a `TsonReference` (`design/tree-model.md`) and a
   bare name as a token.
 - **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,

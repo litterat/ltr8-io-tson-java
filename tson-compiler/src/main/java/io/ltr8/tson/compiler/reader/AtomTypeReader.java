@@ -266,14 +266,6 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             EventSkip.coreValue(ctx);
             return null;
         }
-        if (refOf != null && !ctx.readsSchemaNames()) {
-            // What a reference's name reaches is judged where a schema links, and a data document never links.
-            ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, "a value at a reference-typed position ('meta.ref<" + refOf
-                    + ">') in a data document is not yet read: what its name reaches is judged when a schema links, "
-                    + "and a data document is not linked", "a position this library can read", text);
-            ctx.next();
-            return null;
-        }
         ctx.next();
         TokenValue tokenValue = new TokenValue(text, form);
         if (inSchemaDocument != null && ctx.readsSchemaNames()) {
@@ -323,7 +315,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             }
             return ctx.refusesName(value instanceof String named ? named : text, names) ? null : value;
         } catch (UnsupportedOperationException gap) {
-            // A value this library cannot judge yet, such as a type named by a qualified name (`geo.address<T>`).
+            // A value this library cannot judge yet, such as a value named through a FIXED field.
             ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge", text);
             return null;
         } catch (AtomTypeException ex) {

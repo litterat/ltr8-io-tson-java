@@ -125,7 +125,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
                                        TsonLinkedSchema linked) {
         String terminal = AliasChain.terminal(field.typeRef().name(), entries::get);
         Top target = entries.get(terminal);
-        AtomType<?> parser = AtomParsers.forType(target, linked.enumForm(terminal)).orElseThrow(
+        AtomType<?> parser = AtomParsers.forRead(target, linked.enumForm(terminal)).orElseThrow(
                 () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(name), parser);
@@ -241,7 +241,12 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
 
     /** A pin, or a tuple of pins, rendered for a diagnostic. */
     private static String render(List<Object> key) {
-        return key.size() == 1 ? String.valueOf(key.get(0))
-                : "(" + key.stream().map(String::valueOf).reduce((a, b) -> a + ", " + b).orElse("") + ")";
+        return key.size() == 1 ? pin(key.get(0))
+                : "(" + key.stream().map(RecordMemberDispatchReader::pin).reduce((a, b) -> a + ", " + b).orElse("") + ")";
+    }
+
+    /** One pin as written: a reference by its text, any other value by its own spelling. */
+    private static String pin(Object pin) {
+        return pin instanceof io.ltr8.tson.schema.meta.Reference reference ? reference.text() : String.valueOf(pin);
     }
 }

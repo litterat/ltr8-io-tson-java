@@ -31,8 +31,17 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
     public RecordTreeReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
                             ValueReaderContext context, SchemaLocation schemaLocation, AnnotationTypes annotationTypes,
                             FieldNameRule fieldNames) {
-        // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
-        super(name, displayName, body, FieldReaders.byType(resolver, context), schemaLocation, fieldNames);
+        // By schema type alone: a tree reader has no binding target to consult (see FieldReaders). A field whose
+        // type a resolution in progress has not made ready yet decodes a held value as written, which a node wraps.
+        super(name, displayName, body, (field, declared) -> {
+            TsonTypeReader<?> reader = FieldReaders.declared(resolver, context, field, declared);
+            return switch (reader) {
+                case PendingTypeReader pending -> new AtomTreeReader(pending, pending.entry(), annotationTypes);
+                case UnclosedApplicationReader unclosed -> new AtomTreeReader(unclosed, unclosed.application().text(),
+                        annotationTypes);
+                default -> reader;
+            };
+        }, schemaLocation, fieldNames);
         this.annotationTypes = annotationTypes;
         CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }

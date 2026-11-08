@@ -134,8 +134,10 @@ a type that is no constructor, `meta.ref<method>`) and a type's name at a kind-t
 a record-typed slot holds the record's value inline, and a `TypeRef` or `Ref` host there is a bind mismatch
 (`BindTargets`). Every reference has one host shape: a kind-typed slot binds a `TypeRef`, and any other
 reference-typed slot a `TypeRef` or a `Ref`, whose `ReferenceNameReader` (set in place of the slot's atom reader
-by `BindTargets`) keeps the token as written in the `TypeRef`'s `name`; a host holding such a slot as anything else (a
-`String`) receives what the atom reads, and the name is recorded all the same (`RecordedNameReader`). The reader
-resolves nothing — the linker does
-(`design/linking-and-compilation.md`). At a reference-typed slot a quoted token is text, and a framed (`@a x`, `!t x`)
-or braced value is refused as `expected the name of a 'method' value`, whatever the host.
+by `BindTargets`) keeps the token as written in the `TypeRef`'s `name` in a schema document; a host holding such a slot
+as anything else (a `String`) receives what the atom reads, and the name is recorded all the same
+(`RecordedNameReader`). In a schema document the reader resolves nothing — the linker does
+(`design/linking-and-compilation.md`); in a data document it hands the name to the reference's atom bound to the
+component, which judges it in the governing schema and delivers the value reached. At a reference-typed slot a
+quoted token is text, and a framed (`@a x`, `!t x`) or braced value is refused as `expected the name of a 'method'
+value`, whatever the host.

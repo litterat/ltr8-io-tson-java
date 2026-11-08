@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.TestDocuments;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.schema.TsonSchema;
@@ -18,12 +19,17 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A reference written by name at a reference-typed slot ([TSON-SCHEMA] §5.12): an unquoted token, read as written into
- * a {@link TypeRef}, the one host shape every reference has. The segment grammar is the linker's.
+ * A reference written by name at a reference-typed slot ([TSON-SCHEMA] §5.12): an unquoted token, kept as written in a
+ * {@link TypeRef} in a schema document, whose link judges it, and read by the reference's atom in a data document.
  */
 class ReferenceNameReaderTest {
 
     private static final TsonSchema.SlotType METHOD = TsonSchema.SlotType.valueName("method", null);
+
+    /** The atom a test of the schema-document path never reaches. */
+    private static final TsonTypeReader<?> NEVER = ctx -> {
+        throw new AssertionError("a schema document's name is not the atom's to read");
+    };
 
     private static Optional<String> in(String text, TokenForm form) {
         return ReferenceNameReader.nameIn(new TokenEvent(text, form, new Position(1, 1, 0)));
@@ -40,16 +46,28 @@ class ReferenceNameReaderTest {
         assertEquals(Optional.empty(), in("orders", TokenForm.SINGLE_LINE_QUOTED));
     }
 
+    /** In a schema document the name is kept as written, and handed on for the link to judge. */
     @Test
-    void theReaderKeepsTheNameAsWrittenInATypeRef() {
-        assertEquals(TypeRef.of("orders.methods.place_order"), new ReferenceNameReader("a 'method' value", false, METHOD)
-                .read(TestDocuments.document("orders.methods.place_order")));
+    void aSchemaDocumentsNameIsKeptAsWrittenAndHeld() {
+        List<TypeRef> held = new ArrayList<>();
+        assertEquals(TypeRef.of("orders.methods.place_order"), new ReferenceNameReader("a 'method' value", false, METHOD,
+                NEVER).read(TestDocuments.schemaDocument("orders.methods.place_order",
+                        (slot, type, reference, cell) -> held.add(reference))));
+        assertEquals(List.of(TypeRef.of("orders.methods.place_order")), held);
+    }
+
+    /** In a data document the name is the reference's atom's to read and judge. */
+    @Test
+    void aDataDocumentsNameIsReadByTheAtom() {
+        TsonTypeReader<?> atom = ctx -> "judged " + ((TokenEvent) ctx.next()).text();
+        assertEquals("judged o1", new ReferenceNameReader("a 'method' value", false, METHOD, atom)
+                .read(TestDocuments.document("o1")));
     }
 
     @Test
     void aBracedValueIsNoName() {
         List<Diagnostic> reported = new ArrayList<>();
-        assertNull(new ReferenceNameReader("a 'method' value", false, METHOD)
+        assertNull(new ReferenceNameReader("a 'method' value", false, METHOD, NEVER)
                 .read(TestDocuments.document("{ a: 1 }", reported::add)));
         assertEquals(1, reported.size(), reported.toString());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, reported.getFirst().code());

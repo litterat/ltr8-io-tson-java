@@ -32,9 +32,11 @@ text.
   of a nested `!schema` map, a key of a namespace value, a field of a record value. Inside `geo`, a sibling is
   `geo.address`, and a bare `address` is the root's or unresolved. There is no lexical scope, so no shadowing rule.
 - The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members,
-  applications, entries, shown)`: the entry each application the closure closed denotes, an `@meta.application` or an
-  expansion's `EntryFacts.closes`; the final namespace's entries, which a reference read here names; and the members
-  as a message names them, a minted one by its application), and `ValuesByName` re-derives it from `of` over the
+  applications, entries, shown, values)`: the entry each application the closure closed denotes, an
+  `@meta.application` or an expansion's `EntryFacts.closes`; the final namespace's entries, which a reference read here
+  names; the members as a message names them, a minted one by its application; and, for a reference naming values in
+  a whole link, `values`, a lookup (`ReferenceBody.Values`) that judges a qualified name over the final namespace by
+  `ValuesByName`'s walk, empty in a link of a resolution in progress), and `ValuesByName` re-derives it from `of` over the
   final namespace whatever the read guessed; `TsonSchema.SlotType`'s `KIND` and `REFERENCE`
   roles are only how the read read the name. The index is never written: a resolved form states
   `!meta.reference_type { of: … }` alone, a written `members:` is refused as an unknown field, and equality and `toString`
@@ -140,9 +142,13 @@ text.
   is a qualified name. A slot typed by a record holds the record's value inline and takes no name.
 - Any schema declares a reference (SPEC-FEEDBACK.md #7): the kernel's `meta.ref` is in every closure,
   and `!meta.reference_type { of: order }` applied directly is no different
-  (`ReferenceDeclarationTest`). A value's qualified name is judged by what it reaches, which only a link can judge: a
-  reference over a type that is no constructor reads its grammar in a schema document (`AtomParsers.inSchemaDocument`), and
-  in a data document `AtomTypeReader` reports it as a gap (`NOT_IMPLEMENTED`), a data document never being linked.
+  (`ReferenceDeclarationTest`). A value's qualified name is judged by what it reaches, which a link judges: a
+  reference over a type that is no constructor reads its grammar alone in a schema document
+  (`AtomParsers.inSchemaDocument`, `RefParser.namesOnly`), the schema's own link judging the name; in a data document
+  its atom (`RefParser`) asks the lookup the governing schema's link left on the reference (`ReferenceBody.Values`),
+  so the name is judged by the walk a value body's names take and refused as `ATOM_CONSTRAINT_VIOLATION` where it
+  reaches nothing, a type, or a value of another type. A field's default or pin at one is judged at link the same way
+  (`checkFieldValue`, through `ValuesByName.reach`), refused against the entry declaring the field.
 - A recorded name at a kind-typed slot of a value body is judged a member by `ValuesByName.judgeMember`; a qualified
   name there is refused where it reaches a value, and where it goes on past a type, which admits no further segment.
   `ValuesByName.judge` resolves a name's first segment in the root namespace, collapses each segment that selects a
@@ -155,11 +161,12 @@ text.
   host receives its canonical text). Only the judgement differs by slot, and it is the slot's, never the host's.
 - **A reference read in data finds what it names.** `TypeRef.referent()` is the value of the entry it denotes in the
   closure it was read under: `KindParser` attaches `ReferenceBody.closure()`, which resolves through `entryOf` over
-  the index's `entries`, and every nested argument carries the same closure, so each level's referent resolves. The
-  closure is a component excluded from `equals`, `hashCode` and `toString`. A reference read in a schema document,
-  built by hand, or at a slot naming values (`RefParser`) carries `Closure.NONE` and names nothing. A schemaless read
-  has no closure at all and keeps an application or a sibling reference as a `TsonReference` (`design/tree-model.md`),
-  with no referent.
+  the index's `entries`, and every nested argument carries the same closure, so each level's referent resolves. Read
+  in data at a slot naming values, its referent is the value its name reached (`RefParser`), the governing schema's
+  own value, bound or tree-held as the value entry is. The closure is a component excluded from `equals`, `hashCode`
+  and `toString`. A reference read in a schema document, or built by hand, carries `Closure.NONE` and names nothing.
+  A schemaless read has no closure at all and keeps an application or a sibling reference as a `TsonReference`
+  (`design/tree-model.md`), with no referent.
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter positions),
 `design/namespace-types-and-value-entries.md` (value entries' slots), `design/record-dispatch.md` (the positional form).

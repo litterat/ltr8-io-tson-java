@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.policy.IdentifierPolicy;
 
 /**
  * Positions a {@link TsonReadContext} at a whole document's root value, so a unit test can drive one
@@ -28,6 +29,17 @@ public final class TestDocuments {
     public static TsonReadContext document(String source, DiagnosticsReceiver receiver) {
         TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
         TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+        ctx.next(); // DocumentStart
+        return ctx;
+    }
+
+    /**
+     * As {@link #document(String)}, read as a value inside a schema document ({@link
+     * TsonReadContext#readsSchemaDocument()}), each name a reader keeps handed to {@code held}.
+     */
+    public static TsonReadContext schemaDocument(String source, TsonReadContext.HeldByName held) {
+        TsonReadContext ctx = TsonReadContext.schemaDocument(new TsonDataStream(ByteSource.of(source)),
+                IdentifierPolicy.defaults(), held, true);
         ctx.next(); // DocumentStart
         return ctx;
     }

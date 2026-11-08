@@ -198,15 +198,24 @@ record field, through the subtype a tag selected -- and the path serves only to 
 
 **One host shape for every reference.** A kind-typed slot binds a `TypeRef`, and any other reference-typed slot a
 `Ref<T>` or a `TypeRef`; `BindTargets` sets a `KindSlotReader` or `ReferenceNameReader` for them, and a `Ref` receives
-the value the name reaches when the schema links (`Ref.deliver`): the bound object, the `Namespace`, or the tree. A host
+the value the name reaches when the schema links (`Ref.deliver`): the bound object, the `Namespace`, or the tree. In a
+data document the same reader hands the name to the reference's atom bound to the component, which judges it and
+delivers at once. A host
 holding the slot as a `String` gets the atom's reader wrapped in a `RecordedNameReader`, which refuses what is no name
 as a `TypeRef` host's reader would; the name is recorded by the atom reader either way, so `method: nobody.place` is
 refused under a `String` exactly as under a `TypeRef`.
 
-**In a data document a kind is judged by membership**, over the reading document's closure, and a value's qualified
-name at a reference over any other type is `NOT_IMPLEMENTED` at read (nothing links a data document). So a data
-document importing only temporal.tn that writes `!meta.record_field { type: int32 }` is refused, `int32` being numeric.tn's
-(`design/kinds-and-name-types.md`).
+**In a data document a kind is judged by membership**, over the reading document's closure, so a data document
+importing only temporal.tn that writes `!meta.record_field { type: int32 }` is refused, `int32` being numeric.tn's
+(`design/kinds-and-name-types.md`). **A value's qualified name is judged by what it reaches in the governing schema**,
+by the same walk (`ValuesByName`): the link that indexed the reference leaves it a lookup over its final namespace
+(`ReferenceBody.Values`), and the reference's atom (`RefParser`) asks it. So `which: o2` at `meta.ref<order>` reads
+where `o2` is a value of `order` or a subtype, through a nested map, a namespace value's key or a record value's field
+included, and a name reaching nothing, a type, or a value of another type is `ATOM_CONSTRAINT_VIOLATION`. What a host
+receives is the slot's one shape: a `TypeRef` whose `referent()` is the value reached (a tree read's `TsonAtom` holds
+it), a `Ref` delivered with that value at the read, a `String` the name; JSON reads the same name from a string and
+binds the same shapes (`design/json-facades-binding-writing.md`). The value is the schema's own, bound or tree-held as
+the schema's value entry is, never a copy read again under the data document's context.
 
 ## The walk: by key and by field (`ValuesByName`)
 

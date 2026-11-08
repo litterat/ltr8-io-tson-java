@@ -44,7 +44,9 @@ import java.util.function.Function;
  * The names a value entry holds ({@link ValueEntry}) resolved and judged by their slots
  * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code meta.ref<T>}, held as a {@link Ref} the
  * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
- * judged a member ({@link #judgeMember}).
+ * judged a member ({@link #judgeMember}). The same walk judges every other value's name ({@link #reach}): a field's
+ * default or pin at a reference, and a name a data document writes at one, which the linker leaves the reference a
+ * lookup for ({@code ReferenceBody.Values}).
  *
  * <p><b>Fed by the read, not by the host.</b> The references judged are the ones the resolver's read produced by
  * name, each with its slot ({@link TsonSchema#valuesByName()}). The host class declares nothing for them, so none
@@ -169,7 +171,8 @@ final class ValuesByName {
         for (TsonSchema.ValueByName value : held) {
             String where = "'" + entryName + "' at " + pointer(value.slot());
             try {
-                judge(where, value.reference(), value.type(), value.cell());
+                Object reached = judge(where, value.reference(), value.type());
+                value.cell().ifPresent(cell -> cell.deliver(reached));
             } catch (SchemaValidationException e) {
                 refused.accept(e);
             } catch (UnsupportedOperationException e) {
@@ -200,7 +203,20 @@ final class ValuesByName {
         return segments;
     }
 
-    private void judge(String where, TypeRef reference, TsonSchema.SlotType slot, Optional<Ref<?>> cell) {
+    /**
+     * The value {@code reference} reaches at a slot typed by a reference over {@code of}, a type that is no
+     * constructor: a field's {@code ~}/{@code =} value, or a name a data document writes, judged as a value body's
+     * names are. Refused, as {@link #check} refuses, with a message opening with {@code where}.
+     */
+    Object reach(String where, TypeRef reference, String of) {
+        return judge(where, reference, TsonSchema.SlotType.valueName(of, of));
+    }
+
+    /**
+     * Judges one name by its slot, and returns what a {@code Ref} host receives: the value it reaches, or for a name
+     * at a slot that names types nothing.
+     */
+    private Object judge(String where, TypeRef reference, TsonSchema.SlotType slot) {
         List<String> written = segments(where, reference);
         String name = reference.name();
         String head = written.getFirst();
@@ -242,7 +258,7 @@ final class ValuesByName {
         }
         if (namesTypes) {
             judgeMember(where, name, segments, slot, referent, entry);
-            return;
+            return null;
         }
         Typed wanted = new Typed(space, slot.of());
         Typed at = constructorOf(TsonSchemaLinker.constructorOf(terminal, referent, facts).orElseThrow(), referent,
@@ -253,8 +269,7 @@ final class ValuesByName {
                         + " is an entry whose body is built by '" + at.name() + "', which is no '" + wanted.name()
                         + "'");
             }
-            cell.ifPresent(c -> c.deliver(referent instanceof ValueEntry value ? value.value() : referent));
-            return;
+            return referent instanceof ValueEntry value ? value.value() : referent;
         }
         if (!(referent instanceof ValueEntry valueEntry)) {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
@@ -324,8 +339,7 @@ final class ValuesByName {
             throw new SchemaValidationException(where + " names '" + name + "', and " + absent + ", so the name "
                     + "reaches no value");
         }
-        Object delivered = value;
-        cell.ifPresent(c -> c.deliver(delivered));
+        return value;
     }
 
     /**

@@ -103,6 +103,14 @@ goes through, so an entry is made ready the first time anything asks for it, and
 - **Reads restart.** A value read against an entry of the same document goes through `WaitOrder.read`: readers
   compiled from the entries ready so far, every declaration not yet ready a `PendingTypeReader`. A read reaching one
   throws `NotReady`, that entry is made ready as a wait of the one being made ready, and the read starts over.
+- **An application written inline at a field type is not yet closed there.** A use site names the entry an
+  application closes to once materialisation runs, after every declaration is ready, so a record ready so far may still
+  have a field typed `meta.ref<order>` or `box<text>`. Its compiled reader is an `UnclosedApplicationReader`, never
+  the head's (a template, which refuses every value): a held value binds as written, as at a pending declaration, and
+  is judged against the closed entry at link; a value entry's read reaching the field is `NOT_IMPLEMENTED`, since the
+  application does not yet wait in the order as a named one does (`BACKLOG.md`). A tree-mode record wraps either
+  held-value reader in an atom node (`RecordTreeReader`). A gap the payload read reports stays a gap: the value entry
+  is refused as `NOT_IMPLEMENTED`, never as a payload that is no value of its type (`resolveValueEntry`).
 - **Cycles are the author's error.** An entry reached again while it is being made ready is a
   `SchemaValidationException` naming the cycle in wait order: `'a' waits on 'b' waits on 'a': entries waiting on each
   other are never ready -- …`, or `'step' waits on 'step'`. A composition or refinement cycle is this same rule,

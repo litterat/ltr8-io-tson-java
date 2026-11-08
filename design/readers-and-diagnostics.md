@@ -274,7 +274,10 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   parser (`ATOM_CONSTRAINT_VIOLATION`) refuse it by the position rule ([TSON-SCHEMA] §5.2,
   `design/schema-resolution.md`). Any other typed position
   meeting a `ReferenceEvent` reports it as it reports any non-token, naming `the reference box<text>` or `the sibling
-  reference kind!`; `DataValueEvents` replays a `ReferenceValue` as one event.
+  reference kind!`; `DataValueEvents` replays a `ReferenceValue` as one event. In a data document the name is judged
+  where it is read, whichever `of` names: a kind's members over the closure (`TypeNameRefParser`), a value's qualified
+  name by what it reaches in the governing schema (`RefParser`, `design/references.md`); in a schema document both
+  read the grammar alone and record the name for the link.
 - **`ListEventSource`** replays a pre-built event list: a schema default (`settleHeldValues` wraps the literal `Token`
   as one synthetic event, under `IdentifierPolicy.none()` since the real stream already judged it), an annotation probe,
   and, via `DataValueEvents`, the resolver's replay of a resolved `DataValue` through a compiled reader.
