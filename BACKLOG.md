@@ -418,6 +418,13 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **A float's bounds skip NaN and the infinities** ([TSON-SCHEMA] §5.7, `SPEC-FEEDBACK.md #23`). `FloatParser`'s
+  validation returns before the bound checks for a NaN `allow_nan` admits and an infinity `allow_infinity` admits, so
+  `!float64 ^ { max: 100 }` accepts `+.inf` and `.nan`. An infinity is ordered, so judge it against the bounds like any
+  value. Per #23's proposal, a body with any bound admits no NaN, `allow_nan` deciding only where no bound is written.
+  Do the same in `tson-json`'s float reading, and add `class2/validate` vectors for `+.inf` above a `max`, `-.inf`
+  below a `min`, and `.nan` under a bound.
+
 - [ ] **No test pins [TSON-SCHEMA] §5.9 rule 8.** A subtracted construction whose head is a constructor
   (`my_record => record - { groups }`) resolves with an empty chain, so it is no constructor, and `!my_record {
   … }` is read as a value of it, a value entry, rather than building a type; nothing in the suite or the corpus

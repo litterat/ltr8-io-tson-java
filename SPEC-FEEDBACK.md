@@ -1570,3 +1570,44 @@ document's meaning changes; prose that says "type-ref" meaning any type position
 §5.1's comment calls an alias's body a reference. "Sibling" is kept for #21's typing field alone, and the five informal
 uses are reworded: "a same-named entry" (gone with §3.3.5 regardless), "peers" or "fresh constructions" for a
 construction's family, "two refinements of one source", "its three companions", and "the group's other members".
+
+## 23. [TSON-SCHEMA] §5.5, §5.7 — a float carries bounds, though §5.7 asks a bound's family to be totally ordered
+
+**Problem.** §5.7's "Value tightening is per facet kind" says an ordered bound "requires its family's value space to be
+**totally ordered**, which every family carrying one now is". `float_type` carries both bound groups, `( min: number |
+exclusive_min: number )?` and `( max: number | exclusive_max: number )?`, and `float32` and `float64` are
+`@atom.ordering:PARTIAL`: NaN is unordered. So either the claim is wrong or float's bounds are. Nor does any section say
+how a bound treats the values a float adds to the reals: NaN, which compares with nothing, and ±infinity, which
+compare with everything.
+
+**What is running.** A float's bounds are judged only on finite values. NaN, where `allow_nan` admits it, and ±infinity,
+where `allow_infinity` admits it (both default true), skip the bound checks, so `!float64 ^ { max: 100 }` admits `+.inf`
+and `.nan`. The infinity half is an implementation defect and is in `BACKLOG.md`: an infinity is ordered, and `max: 100`
+refuses `+.inf` under any reading.
+
+**Resolution, a proposal.** A bound needs an order on the values it can admit, not a total order on the family:
+- §5.7 reads "requires its family's value space to be ordered" in place of "totally ordered". Float stays bounded.
+- **A bound excludes NaN.** A bound admits a value inside its interval, and NaN is inside none. So a float body with
+  any bound admits no NaN, and `allow_nan` decides NaN only where no bound is written. The alternative, NaN passing
+  every bound as `allow_nan` alone decides, makes `min: 0` admit a value that is no number. That reads a bound as
+  "refuses what compares below", which is a weaker facet than the one an author writes.
+- **±infinity are ordered values, and bounds judge them** as any value: `max: 100` refuses `+.inf`, and `min: 0`
+  admits it where `allow_infinity` does.
+- §5.5's coherence paragraph gains nothing: a bounded body with `allow_nan: true` still admits a value, and the
+  permission is simply unreachable while a bound stands.
+
+## 24. [TSON-SCHEMA] §8.2, §10.2 — a document is identified by its bytes, an entry by its structure; no section says both
+
+**Problem.** Two identity rules sit far apart and read as contradictory until both are in view. §10.2 pins a document
+by a digest of its content, so a whitespace edit to a schema changes its digest, and every pin that names it has to
+move. §8.2's "Two identities" makes an entry a declared name or, for an application or a synthetic, a parsed structure
+compared after following alias chains, so two spellings of one form are one entry. An external reviewer of the kernel
+read "a whitespace edit moves every pin" against "two spellings of one form reduce to one entry" as a conflict.
+
+**What is running.** Both, as written: digests over a document's bytes, verified on load against
+`TsonBundledSchemas`'s pins and every pinned reference, and structural identity for applications and synthetics.
+
+**Resolution, a proposal.** One sentence, in §8.2's "Two identities" and referenced from §10.2: "Bytes identify a
+document, for distribution and pinning; names and parsed structure identify an entry, for typing. Neither stands in
+for the other: a whitespace edit changes a document's digest and none of its entries, and two spellings of one form
+in a schema are one entry."
