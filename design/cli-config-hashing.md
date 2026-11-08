@@ -36,7 +36,7 @@ static method rather than a `SchemaSource` instance; a caller needing a source p
 `isKernel(identity)` is true for meta.tn alone, the one kernel document, whose entries are judged the kernel's own by origin
 and which is pre-loaded by special resolution (`design/resolver-vocabulary-and-bootstrap.md`).
 
-The digests are over the `spec/m/` bytes, which are the live artifacts. At Revision 38 they equal the pins the
+The digests are over the `spec/m/` bytes, which are the live artifacts. On `main` they equal the pins the
 published artifacts and Part 2 §13.2 carry; on a proposal branch they are this repo's own until the revision lands.
 
 ## Content hashing (`TsonContentHash`) and the commands on it

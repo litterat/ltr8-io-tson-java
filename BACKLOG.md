@@ -244,8 +244,8 @@ encodings ([TSON-JSON] §6.1.1).
   `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. Decided: the reader admits the annotation
   members anywhere within the object's leading run of `$`-named members, a run bounded by the record's declared `$`
   fields so the lookahead stays fixed by the schema. Implement it in the JSON readers (`RecordPlan`,
-  `DispatchChoiceReader`, `DispatchDeclaredReader`) and edit §3.3 with it, as a Revision 39 proposal; Revision 38
-  keeps the strict lead.
+  `DispatchChoiceReader`, `DispatchDeclaredReader`) and edit §3.3 with it, for Revision 40; Revision 39 keeps
+  the strict lead.
 
 - [ ] **A JSON document has no in-band way to name its schemas — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
