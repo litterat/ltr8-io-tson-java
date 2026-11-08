@@ -21,7 +21,7 @@ the wait depth are counted. Current form only; history lives in git.
 - A limit is a `long` or an `int` component of `LimitsPolicy`, by what it counts; a limit past `Integer.MAX_VALUE`
   for an `int` one is held as `Integer.MAX_VALUE`, the processor capping what it cannot reach.
 - The bundled schemas resolve under the default limits whatever a deployment configures
-  (`TsonCompiledMetaRegistry`), as they link under the default identifier policy.
+  (`TsonCompiledVocabularyRegistry`), as they link under the default identifier policy.
 - `LIMIT_EXCEEDED` is not a verdict and has its own classifier (`Diagnostic.ofLimitExceeded`), caught ahead of
   `ofBaseSyntaxError`; the CLI still exits 1. A schema-side limit is a `SchemaRefusalException(LIMIT_EXCEEDED)`,
   reported through `TsonDiagnostics.ofSchemaRefusal` beside §8.2's name refusals.

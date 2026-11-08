@@ -45,7 +45,7 @@ class RecordFieldsMapTest {
 
     /**
      * One spelling twice is a repeated key of {@code fields}, which the map's own reader refuses: read as data
-     * governed by meta.tn it is {@code DUPLICATE_MAP_KEY} at the repeated key, and at a schema's declaration it is
+     * of meta.tn's model it is {@code DUPLICATE_MAP_KEY} at the repeated key, and at a schema's declaration it is
      * the same refusal restated against the declaration, as every failure of a constructor's vocabulary is.
      */
     @Test

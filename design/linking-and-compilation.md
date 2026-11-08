@@ -45,7 +45,7 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   does a type, and the constructor test (`EntryKind.isConstructor`) reads a template's chain as a closed one's,
   judging `top` by its origin.
 
-Related: `design/meta-layer-namespaces.md`, `design/references.md`, `design/class2-compilation.md`,
+Related: `design/namespace-types-and-value-entries.md`, `design/references.md`, `design/class2-compilation.md`,
 `design/compiled-registries.md`, `design/schema-resolution.md`, `design/template-materialisation.md`.
 
 ## Why two modules
@@ -239,7 +239,7 @@ key_type: header_name value_type: text }` in any schema), and resolves to a `Nam
   linker has no facet check of its own.
 - **The reader is the map's.** `TsonSchemaCompiler` and `JsonSchemaCompiler` hand `read()` to the `map` factory;
   `ParameterTypes` reads a namespace type as its map too, where a written value faces one. How a value binds and when
-  it is delivered as a `Namespace` is `design/meta-layer-namespaces.md`'s.
+  it is delivered as a `Namespace` is `design/namespace-types-and-value-entries.md`'s.
 - **Any schema's vocabulary.** Any schema declares a namespace type or types a field by it, and a schema importing the
   declaring one holds values of it as entries. Such an entry (`myapi => !api { … }`) is a `ValueEntry`: refused at
   every type position (above), a member of no kind, named by `meta.ref<api>` (`api` being no
@@ -253,7 +253,7 @@ slot's declared type (`TsonSchema.SlotType`), and `checkValuesByName` judges eac
 `validateEntry`, by what the slot's `of` names over `merged` (`KindMembers.namesTypes`), whatever the read guessed:
 over a constructor the name as a member (`judgeMember`), over any other type by the walk, the value it reaches
 delivered into the host's `Ref` cell. The walk itself, by key and by field through the binding's
-descriptor, is `design/meta-layer-namespaces.md`'s; what is the linker's is below.
+descriptor, is `design/namespace-types-and-value-entries.md`'s; what is the linker's is below.
 
 - **The grammar is judged here.** `ValuesByName.segments` splits the name at each `.` and requires each segment to be
   a [TSON-DATA] §7.7 identifier, none empty and no arguments, so `orders.1x`, `.orders` and `orders.` are refused
@@ -272,7 +272,7 @@ descriptor, is `design/meta-layer-namespaces.md`'s; what is the linker's is belo
   (`ValuesByName.Space`), and two types are one when their terminal entries share origin and name.
 - **Each refusal is its own `SCHEMA_ERROR` naming the step**, against the entry holding the name, at the slot's RFC
   6901 pointer. A qualified name at a kind-typed slot is refused where it reaches into a value or goes on past a
-  type. A field step needs the bind context its values were bound under (`TsonCompiledMetaRegistry.link` passes it);
+  type. A field step needs the bind context its values were bound under (`TsonCompiledVocabularyRegistry.link` passes it);
   an overload without one throws `IllegalStateException` if a walk reaches a field. One step is a gap
   (`NOT_IMPLEMENTED`): a FIXED field with no component.
 

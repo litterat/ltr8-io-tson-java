@@ -27,12 +27,12 @@ import java.util.List;
  * Replays an already-built {@link DataValue} tree (e.g. an atom-refinement/{@code Instance}
  * binding's own already-normalized value, resolved entirely within {@code resolver}'s own
  * {@code DataValue}-based pipeline -- unchanged by the streaming-reader redesign, see {@link
- * DefinitionMetaReader}'s own Javadoc) as the exact {@link TsonEvent} sequence a real {@code
+ * ConstructionReader}'s own Javadoc) as the exact {@link TsonEvent} sequence a real {@code
  * TsonDataStream} would have produced for the same source text, so a compiled reader (streaming-
  * only, {@code TsonTypeReader.read(TsonReadContext)}) can read it. Every synthesized event
  * carries the same placeholder {@link Position} -- there's no real source position to report for
  * a value that was never actually re-lexed, and nothing downstream of {@link
- * DefinitionMetaReader#read} depends on one being meaningful.
+ * ConstructionReader#read} depends on one being meaningful.
  */
 final class DataValueEvents {
 

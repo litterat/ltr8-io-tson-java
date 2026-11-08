@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -28,7 +28,7 @@ final class KernelChainFields {
 
     /** The kernel's own {@code chain} field, its type's closure added to {@code entries}. */
     static Map.Entry<String, RecordField> chainField(Map<String, Top> entries) {
-        TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema kernel = KernelBootstrapResolver.kernelSchema();
         RecordField declared = ((RecordBody) kernel.entries().get("meta.type")).fields().get("chain");
         copy(declared.typeRef(), kernel, entries);
         return Map.entry("chain", declared);

@@ -1,12 +1,11 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -28,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * SchemaResolver#resolveSchema} over a registered kernel, whose own constructors under {@code net} compose the
  * kernel's {@code meta.atom} and {@code atom.specification} -- names visible only through the merge.
  */
-class MetaSchemaImportTest {
+class NetSchemaImportTest {
 
     /**
      * The kernel resolved the ordinary way and registered (the registry refuses the raw bootstrap output,
@@ -36,8 +35,8 @@ class MetaSchemaImportTest {
      * so {@code TsonSchemaRegistry#register}'s import merge runs one stage later, in the test.
      */
     private static TsonSchema parseNet(TsonSchemaRegistry registry) {
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledMetaRegistry compiledRegistry = new TsonCompiledMetaRegistry(context);
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
+        TsonCompiledVocabularyRegistry compiledRegistry = new TsonCompiledVocabularyRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
         for (String id : List.of(TsonBundledSchemas.META_ID)) {

@@ -1,6 +1,6 @@
 # The compiled registries
 
-Design notes for `TsonCompiledMetaRegistry` and `TsonCompiledSchemaRegistry`: the shared meta/resolution core, the
+Design notes for `TsonCompiledVocabularyRegistry` and `TsonCompiledSchemaRegistry`: the shared resolution core, the
 per-mode read registries, the import-cycle guard, content-hash verification, and the read path's concurrency. Current
 form only; history lives in git.
 
@@ -21,27 +21,27 @@ form only; history lives in git.
 - A value entry no class binds is held as a tree by the core, read through the declaring schema's tree-mode compilation
   (`treeVocabularyOf`); the bind registry refuses one anywhere in the closure it compiles, the tree registry nothing.
 
-Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/meta-layer-namespaces.md`,
+Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/namespace-types-and-value-entries.md`,
 `design/cli-config-hashing.md`, `design/facades-and-tree.md`.
 
-## The registries (`tson-compiler/{TsonCompiledMetaRegistry,TsonCompiledSchemaRegistry}.java`)
+## The registries (`tson-compiler/{TsonCompiledVocabularyRegistry,TsonCompiledSchemaRegistry}.java`)
 
 Two registries over one shared resolution core, the compiled-side counterparts to `tson-schema`'s
 `TsonSchemaRegistry`.
 
-- **`TsonCompiledMetaRegistry`** is the shared **meta/resolution core**, and *is* the on-demand
+- **`TsonCompiledVocabularyRegistry`** is the shared **resolution core**, and *is* the on-demand
   `TsonCompiledSchemaLoader`. It owns the paired `TsonSchemaRegistry`, a bind-mode resolver, a
   `SchemaSource`, content-hash verification, and the kernel's bootstrap. Its loader interface:
   `resolveLinked(uri) → TsonLinkedSchema` (an `!!import` target, or a user schema —
-  fetched/resolved/linked/registered), and `loadMeta(uri)` / `vocabularyOf(identity) → TsonCompiledMetaSchema`,
+  fetched/resolved/linked/registered), and `loadVocabulary(uri)` / `vocabularyOf(identity) → TsonCompiledVocabulary`,
   a schema's **compiled vocabulary**: the readers a schema importing it reads a `!C { … }` body or an annotation
   value through, where it declared `C` or the annotation's type (`design/resolver-vocabulary-and-bootstrap.md`).
   `treeVocabularyOf(identity)` is the same schema compiled in tree mode, cached per identity beside it: what a value
   entry's payload is read through where the bind context binds no class for its type, so the entry holds a
-  `TsonValue` and the schema still loads and validates (`design/meta-layer-namespaces.md`). `compileReady(ready,
+  `TsonValue` and the schema still loads and validates (`design/namespace-types-and-value-entries.md`). `compileReady(ready,
   pending, tree)` compiles a resolution in progress, its document's entries ready so far, in either mode, neither
   registered nor cached: what a value read against an entry of the same document is read through (`WaitOrder`).
-  Any schema compiles to one (`TsonCompiledMetaSchema.compile`), **on first use and cached per identity**, never per closure:
+  Any schema compiles to one (`TsonCompiledVocabulary.compile`), **on first use and cached per identity**, never per closure:
   a construction head is read through the compile of the document that declared it, so a schema applying only the kernel's
   constructors reaches exactly meta.tn's compiled schema, and numeric.tn, temporal.tn, net.tn, core.tn and policy.tn are
   compiled here only if something applies a constructor or an annotation type they declare.
@@ -63,9 +63,9 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   `!enum`/`!numeric.integer_type` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue` can't stand in —
   so every read registry shares the one bind-mode core for resolution; only the final compile runs in the registry's mode
   (one factory set, no scoping: linking already established that every head the schema applies is in its namespace). The core
-  and the bind read registry share one `DataBindContext`, the configured one composed with `SchemaMetaNameBinder.INSTANCE`,
+  and the bind read registry share one `DataBindContext`, the configured one composed with `SchemaModelNameBinder.INSTANCE`,
   which owns every entry of meta.tn and each library's members under its map (`numeric`, `temporal`, `net`)
-  (`SchemaMetaNameBinder.over`, `design/front-door-and-config.md`), so a schema's value entry and a data document's value of
+  (`SchemaModelNameBinder.over`, `design/front-door-and-config.md`), so a schema's value entry and a data document's value of
   the same type bind to the same class. A user schema importing core.tn gets core.tn's entries merged into its own linked
   form (by `link`) and compiled inline in the read registry's mode.
 - **A schema obtained to bind holds no tree.** The bind registry's `get(uri)`, `get(uri, receiver)`, `get(imports,
@@ -94,7 +94,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   first resolution and checks every reference's `?sha256=` pin against it, on both fetch and cache-hit
   paths, so a conflicting pin errors rather than silently resolving to the cached instance. Verify-before-
   record, so a rejected fetch can't poison a later valid one. **Per identity means per identity and not per
-  route**, which is why registering a schema from text is one call (`TsonCompiledMetaRegistry.register(linked,
+  route**, which is why registering a schema from text is one call (`TsonCompiledVocabularyRegistry.register(linked,
   sourceText)`, what `Tson.resolve`/`Tson.validateSchema` reach) rather than a registration a caller may
   remember to pair with a hash: a hash recorded only where a schema was *fetched* leaves `verifyPin` nothing
   to compare against, and its silence there is indistinguishable from a verified pin — a wrong `?sha256=` on
@@ -110,7 +110,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   a `ContentHashMismatchException` naming that, which §2.2.1 requires ("the target of a hashed reference
   MUST carry an id line"). Eagerly hashing with `sha256` instead would make an unpinned single-line schema an
   `IllegalArgumentException` escaping the read as a fault.
-- **Concurrent first use of one identity is safe, and deliberately not serialized.** `loadMeta`/
+- **Concurrent first use of one identity is safe, and deliberately not serialized.** `loadVocabulary`/
   `resolveLinked` recurse into themselves and hold no lock across a fetch, so two threads reaching the same
   cold identity both do the work; the caches settle it, keeping the first entry and handing it to both
   (`TsonSchemaRegistry.registerIfAbsent`, `compileAndCache`). **What is duplicated on a race is work, never

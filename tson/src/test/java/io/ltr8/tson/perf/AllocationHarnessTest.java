@@ -7,7 +7,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.ScriptPolicy;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.TsonDataEmitter;
@@ -114,7 +114,7 @@ class AllocationHarnessTest {
                 .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class,
                                         "named", Names.class, "labelled", Names.class))
-                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                                .orElse(SchemaModelNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
         reader = tson.objectReader();
         // The same bind context, so what separates this from `reader` is the schema and nothing else -- the

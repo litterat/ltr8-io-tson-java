@@ -33,10 +33,10 @@ class BundledSchemaPinTest {
     void aCorrectlyPinnedReferenceToEachBundledSchemaVerifies() {
         Tson tson = Tson.standard();
         assertDoesNotThrow(() -> {
-            // the kernel and a library are vocabulary (loadMeta); core.tn is an ordinary import (resolveLinked).
-            tson.loader().loadMeta(TsonBundledSchemas.META_ID + "?sha256="
+            // the kernel and a library are vocabulary (loadVocabulary); core.tn is an ordinary import (resolveLinked).
+            tson.loader().loadVocabulary(TsonBundledSchemas.META_ID + "?sha256="
                     + TsonBundledSchemas.META_SHA256);
-            tson.loader().loadMeta(TsonBundledSchemas.NUMERIC_ID + "?sha256=" + TsonBundledSchemas.NUMERIC_SHA256);
+            tson.loader().loadVocabulary(TsonBundledSchemas.NUMERIC_ID + "?sha256=" + TsonBundledSchemas.NUMERIC_SHA256);
             tson.loader().resolveLinked(TsonBundledSchemas.CORE_ID + "?sha256=" + TsonBundledSchemas.CORE_SHA256);
         });
     }

@@ -19,29 +19,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * parameters away ([TSON-SCHEMA] §5.10); {@code !C { ... }} fills a <em>constructor's</em> own vocabulary
  * (§4.2). They are different operations, and a template named at a construction site is an author error.
  *
- * <p><b>It used to be an {@code IllegalStateException}</b> -- this project's spelling of "an internal
- * invariant broke" -- so `tson validate` printed the please-report-it banner and a stack trace and exited
- * <b>70</b> for a mistake in someone's schema. The throw is still in {@code DefinitionResolver} and its own
- * comment claimed it was unreachable from anything the parser produces; what made that false is that an
- * <em>open</em> declaration holds its body rather than resolving it to a record, and a parameterised {@code
- * ~} declaration is exactly one.
+ * <p><b>It is a schema error, never an {@code IllegalStateException}</b> -- this project's spelling of "an
+ * internal invariant broke", on which `tson validate` prints the please-report-it banner and exits <b>70</b>. The
+ * case reaches {@code DefinitionResolver} because an <em>open</em> declaration holds its body rather than resolving
+ * it to a record, and a parameterised {@code ~} declaration is exactly one.
  *
  * <p>End to end through {@link Tson} rather than at {@code DefinitionResolver}, because the construction
- * head resolves against the <em>structure</em> namespace -- which needs a real governing meta-schema, and
+ * head resolves against the schema's namespace -- which needs a real imported vocabulary, and
  * because what is being asserted is the user-visible half: the problem arrives as a collected {@link
  * Diagnostic}, not as an exception past the collector.
  */
 class TemplateClosesByApplicationTest {
 
-    private static final String META = "https://example.test/m.tn";
+    private static final String VOCABULARY = "https://example.test/m.tn";
     private static final String USER = "https://example.test/u.tn";
 
     /**
-     * Three templates over one governing meta-schema: a {@code ~} constructor whose parameter routes into a
+     * Three templates in one vocabulary schema: a {@code ~} constructor whose parameter routes into a
      * <b>value</b> slot (§4.2's legal shape), one whose parameter routes into a <b>type</b> slot, and an
      * unmarked §5.10 template. All three are templates, which is the only thing the rule turns on.
      */
-    private static String meta(String extraDeclarations) {
+    private static String vocabulary(String extraDeclarations) {
         return """
                 !!id:"https://example.test/m.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
@@ -55,17 +53,16 @@ class TemplateClosesByApplicationTest {
                 """.formatted(extraDeclarations);
     }
 
-    private static final String META_SOURCE = meta("");
+    private static final String VOCABULARY_SOURCE = vocabulary("");
 
     /**
-     * A template <em>application</em> resolves in the type-name namespace, which {@code !!meta} does not
-     * contribute (§3.3.3) -- so the closing cases are declared in the meta-schema beside the templates, where
-     * a construction site needs only the structure namespace the governing meta already is.
+     * The problems the vocabulary schema itself reports, with {@code extraDeclarations} -- the closing cases --
+     * declared beside the templates.
      */
-    private static List<Diagnostic> metaProblems(String extraDeclarations) {
-        String source = meta(extraDeclarations);
+    private static List<Diagnostic> vocabularyProblems(String extraDeclarations) {
+        String source = vocabulary(extraDeclarations);
         Tson tson = Tson.of(ProcessorConfig.defaults()
-                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, source)))));
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(VOCABULARY, source)))));
         return tson.validateSchema(source);
     }
 
@@ -76,17 +73,17 @@ class TemplateClosesByApplicationTest {
                 !schema { %s }
                 """.formatted(body);
         Tson tson = Tson.of(ProcessorConfig.defaults()
-                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE, USER, user)))));
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(VOCABULARY, VOCABULARY_SOURCE, USER, user)))));
         return tson.validateSchema(user);
     }
 
-    /** The meta-schema itself is fine: declaring a template is not the mistake, applying one wrongly is. */
+    /** The vocabulary itself is fine: declaring a template is not the mistake, applying one wrongly is. */
     @Test
     void theTemplatesThemselvesResolve() {
         Tson tson = Tson.of(ProcessorConfig.defaults()
-                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE)))));
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(VOCABULARY, VOCABULARY_SOURCE)))));
 
-        assertEquals(List.of(), tson.validateSchema(META_SOURCE));
+        assertEquals(List.of(), tson.validateSchema(VOCABULARY_SOURCE));
     }
 
     @Test
@@ -124,7 +121,7 @@ class TemplateClosesByApplicationTest {
      */
     @Test
     void aValueRoutedConstructorParameterClosesByApplication() {
-        assertEquals(List.of(), metaProblems("three => my_bounded<3>"));
+        assertEquals(List.of(), vocabularyProblems("three => my_bounded<3>"));
     }
 
     /**
@@ -134,8 +131,8 @@ class TemplateClosesByApplicationTest {
      */
     @Test
     void aTypeChannelConstructorParameterPinsWhenItCloses() {
-        assertEquals(List.of(), metaProblems("tags => my_set<text>"));
-        List<Diagnostic> problems = metaProblems("tags => my_set<no_such_type>");
+        assertEquals(List.of(), vocabularyProblems("tags => my_set<text>"));
+        List<Diagnostic> problems = vocabularyProblems("tags => my_set<no_such_type>");
 
         assertEquals(1, problems.size(), problems::toString);
     }

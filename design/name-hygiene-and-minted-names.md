@@ -49,23 +49,23 @@ omits the field, so a value the reader would refuse if written must not be one i
 template, applied or not: they are every application's, and judged only on a minted member they would be reported
 against a content-derived name. A `value_param` is no literal of the template's.
 
-**A value entry and an annotation value are judged where they are read, not in the walk.** A value entry's payload
-(`!api { … }`, a map keyed by names) binds to the consumer's own classes or is held as a tree
-(`design/meta-layer-namespaces.md`), and an annotation value binds to whatever its type binds, so by link time the
-field types that make a value a name are behind them — a schema's `replies: {status_name => …}` arrives as a
-`Map<String, …>`. `SchemaResolver` reads those two payloads under the registry's policy instead, and the readers
-apply §8.2 exactly as they do in a data document: a namespace value's keys are one scope, so are the keys of each
-identifier-keyed map in it, and an identifier-typed value meets the per-name rules. A
-constructor's payload builds the schema layer's own vocabulary and is read under `IdentifierPolicy.none()`: its names are
-the walk's scopes, and its identifier-typed values outside them are references — a choice's variants, a
-supertype — whose verdict belongs to the declaration they name, possibly in another schema. Judging a reference
-too would report one name twice, against the wrong declaration, and stop the schema reaching the linker.
+**A value entry and an annotation value are judged where they are read, not in the walk.** A value entry's payload (`!api { …
+}`, a map keyed by names) binds to the consumer's own classes or is held as a tree
+(`design/namespace-types-and-value-entries.md`), and an annotation value binds to whatever its type binds, so by link time
+the field types that make a value a name are behind them — a schema's `replies: {status_name => …}` arrives as a `Map<String,
+…>`. `SchemaResolver` reads those two payloads under the registry's policy instead, and the readers apply §8.2 exactly as
+they do in a data document: a namespace value's keys are one scope, so are the keys of each identifier-keyed map in it, and
+an identifier-typed value meets the per-name rules. A constructor's payload builds the schema layer's own vocabulary and is
+read under `IdentifierPolicy.none()`: its names are the walk's scopes, and its identifier-typed values outside them are
+references — a choice's variants, a supertype — whose verdict belongs to the declaration they name, possibly in another
+schema. Judging a reference too would report one name twice, against the wrong declaration, and stop the schema reaching the
+linker.
 
 **The restriction level is refused per name, in the same pass** (`IdentifierPolicy.judge`, UTS #39 §5.2). The two
 are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
 it can never fire on a lone name; the level is a *property* of one name, so it is what reaches a name nothing
 else in the schema resembles. Configured by `ProcessorConfig.withIdentifierPolicy` and carried on
-`TsonCompiledMetaRegistry`, which is the one object every resolve and every read passes through. The same policy
+`TsonCompiledVocabularyRegistry`, which is the one object every resolve and every read passes through. The same policy
 switches the confusable check (`appliesSkeletonDistinctness()`), which each scope asks before comparing.
 **Two axes, not a ladder** — a level and a unit — because per-segment Highly Restrictive and Moderately
 Restrictive are incomparable. The default is Highly Restrictive over a whole name, which refuses

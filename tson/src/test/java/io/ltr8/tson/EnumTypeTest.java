@@ -170,33 +170,33 @@ class EnumTypeTest {
     }
 
     /**
-     * A meta layer's own tightening of {@code enum_type} needs no class of its own: it adds no field, so it binds
-     * as the constructor it tightens. The pinned {@code name_type} resolves where the meta layer wrote it, so a
-     * governed schema that never declares {@code kebab} still has its members checked against it.
+     * A vocabulary schema's own tightening of {@code enum_type} needs no class of its own: it adds no field, so it
+     * binds as the constructor it tightens. The pinned {@code name_type} resolves where the vocabulary wrote it, so
+     * a schema importing it that never declares {@code kebab} still has its members checked against it.
      */
     @Test
-    void aMetaLayerTighteningBindsWithNoMappingOfItsOwn() {
-        String metaId = "https://example.test/kebab-meta.tn";
+    void aVocabularyTighteningBindsWithNoMappingOfItsOwn() {
+        String vocabularyId = "https://example.test/kebab-meta.tn";
         String userId = "https://example.test/kebab-user.tn";
-        String meta = """
+        String vocabulary = """
                 !!id:"%s"
                 !!import:"%s"
                 !schema { kebab      => !unicode.identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
                   kebab_enum => meta.enum_type ^ { name_type?: = kebab } }
-                """.formatted(metaId, TsonBundledSchemas.META_ID);
+                """.formatted(vocabularyId, TsonBundledSchemas.META_ID);
         String user = """
                 !!id:"%s"
                 !!import:"%s"
                 !schema { steps => !kebab_enum [make-tea drink-tea]
                   rec   => { s: steps } }
-                """.formatted(userId, metaId);
+                """.formatted(userId, vocabularyId);
         String bad = """
                 !!id:"https://example.test/kebab-bad.tn"
                 !!import:"%s"
                 !schema { steps => !kebab_enum [make-tea Drink] }
-                """.formatted(metaId);
+                """.formatted(vocabularyId);
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(
-                Map.of(metaId, meta, userId, user, "https://example.test/kebab-bad.tn", bad)))));
+                Map.of(vocabularyId, vocabulary, userId, user, "https://example.test/kebab-bad.tn", bad)))));
 
         assertEquals(List.of(), tson.validateSchema(user));
         assertEquals(List.of(), tson.validate("!!import:\"" + userId + "\"\n!rec { s: drink-tea }"));

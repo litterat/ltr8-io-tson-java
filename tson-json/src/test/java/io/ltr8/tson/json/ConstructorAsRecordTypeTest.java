@@ -4,7 +4,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.net.UuidType;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,7 @@ class ConstructorAsRecordTypeTest {
     private static final String HEAD = "!!import:\"" + ID + "\"\n";
 
     private static Tson tson() {
-        Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.contextExtendedWith(
+        Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaModelNameBinder.contextExtendedWith(
                 new DataNameBinder.DefaultDataNameBinder(Set.of("io.ltr8.tson.json"),
                         Map.of("holder", "constructor_holder", "pick", "constructor_pick")))));
         assertEquals(List.of(), tson.validateSchema(SCHEMA), "a constructor is a type a field may be typed by");

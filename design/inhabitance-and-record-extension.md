@@ -64,7 +64,7 @@ the schema, at a line the data's author does not control. The diagnostic spells 
   its family's coherence rule (`Atom.coherenceCheck`, over `AtomCoherence`), asked by the resolver of each written
   body and by the linker's `checkCoherent` of every entry (`design/atom-refinement-and-coherence.md`). A value entry
   (`ValueEntry`) is inhabited because nothing may be typed by it, which is what makes that refusal load-bearing
-  (`design/meta-layer-namespaces.md`).
+  (`design/namespace-types-and-value-entries.md`).
 
 ## What `record.extension` obliges (`RecordExtension`)
 

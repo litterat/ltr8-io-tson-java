@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -62,8 +61,8 @@ class ValueReaderFactoryRegistryTest {
      * new constructor would be added.
      *
      * <p>An entry the compiler can build no reader for is still possible and still becomes an
-     * {@code ErrorReader} -- but only through [TSON-SCHEMA] §2.2.2's extension point, a meta-layer
-     * constructor this library has never seen, which by construction is not in this table.
+     * {@code ErrorReader} -- but only through a constructor a schema declares of its own, one this library has
+     * never seen, which by construction is not in this table.
      * {@code TsonSchemaCompilerTest} is where that behaviour lives.
      */
     @Test
@@ -71,7 +70,7 @@ class ValueReaderFactoryRegistryTest {
         Top declared = new DeclaredType();
 
         for (ValueReaderFactoryRegistry registry : List.of(ValueReaderFactoryRegistry.tree(),
-                ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()))) {
+                ValueReaderFactoryRegistry.bind(SchemaModelNameBinder.defaultContext()))) {
             TsonTypeReader<?> reader = registry.resolve("meta.declared_type").create("declared", declared, CONTEXT);
             assertFalse(reader instanceof ErrorReader, () -> "declared_type errors: " + reader);
         }
@@ -83,7 +82,7 @@ class ValueReaderFactoryRegistryTest {
 
         TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("boolean", booleanEntry, CONTEXT);
-        TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
+        TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaModelNameBinder.defaultContext())
                 .resolve("enum").create("boolean", booleanEntry, CONTEXT);
 
         // Both use the object-binding enum factory, so boolean reads as a real Boolean (tree wraps it in a TsonAtom).
@@ -97,7 +96,7 @@ class ValueReaderFactoryRegistryTest {
 
         TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("status", statusEntry, CONTEXT);
-        TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
+        TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaModelNameBinder.defaultContext())
                 .resolve("enum").create("status", statusEntry, CONTEXT);
 
         assertEquals("ACTIVE", Dom.of((TsonValue) treeReader.read(TestDocuments.document("ACTIVE"))));

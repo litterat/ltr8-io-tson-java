@@ -17,17 +17,17 @@ import java.util.Set;
  * every constructor of the import closure in reach, and the resolver reads {@code !C value} through the compiled form
  * of the schema that declared {@code C} ({@code SchemaResolver}'s vocabulary), which is one of these. Any schema
  * compiles to one -- meta.tn, numeric.tn, temporal.tn, net.tn, a library declaring constructors of its own -- and
- * {@link TsonCompiledMetaRegistry#loadMeta} caches each by identity.
+ * {@link TsonCompiledVocabularyRegistry#loadVocabulary} caches each by identity.
  *
  * <p>Holds, beside the compiled entries, the reader for an <em>instance</em> of each constructor it declares or
  * imports ({@link #reader}): every entry IS-A {@code top}, keyed by its own name. The factory that builds a reader for
  * an entry whose body <em>is</em> such a construction is the library's global set, consulted by {@link #compile}.
  */
-public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
+public final class TsonCompiledVocabulary extends TsonCompiledSchema {
 
     private final Map<String, TsonTypeReader<?>> constructors;
 
-    private TsonCompiledMetaSchema(TsonCompiledSchema base) {
+    private TsonCompiledVocabulary(TsonCompiledSchema base) {
         super(base.linkedSchema(), base.entries());
         this.constructors = buildConstructors(this);
     }
@@ -38,7 +38,7 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * {@code atom} or {@code top} -- stands in as an {@link ErrorReader} naming the gap ({@link #unbuildable}), so the
      * schema compiles and only reading a value against that entry fails.
      */
-    static TsonCompiledMetaSchema compile(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver) {
+    static TsonCompiledVocabulary compile(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver) {
         return compileReady(linked, resolver, Set.of());
     }
 
@@ -46,9 +46,9 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * {@link #compile} of a schema whose resolution is in progress, {@code pending} naming its declarations not yet
      * ready ({@link TsonSchemaCompiler#compileReady}).
      */
-    static TsonCompiledMetaSchema compileReady(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
+    static TsonCompiledVocabulary compileReady(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
                                                Set<String> pending) {
-        return new TsonCompiledMetaSchema(TsonSchemaCompiler.compileReady(linked, name -> {
+        return new TsonCompiledVocabulary(TsonSchemaCompiler.compileReady(linked, name -> {
             try {
                 return resolver.resolve(name);
             } catch (RuntimeException noFactory) {

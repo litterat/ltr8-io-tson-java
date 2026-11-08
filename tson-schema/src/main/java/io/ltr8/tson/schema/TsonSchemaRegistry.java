@@ -33,7 +33,7 @@ import java.util.Optional;
  *
  * <p><b>{@link #register} refuses any schema whose {@link TsonSchema#bootstrap()} is {@code true}</b> -- the
  * kernel's pre-loaded form ([TSON-SCHEMA] §3.4). {@code bootstrap()} is a real, stored flag that only {@code
- * MetaKernelBootstrapResolver.getMetaKernelSchema()} ever sets, so this guard keeps proving, continuously,
+ * KernelBootstrapResolver.kernelSchema()} ever sets, so this guard keeps proving, continuously,
  * that the kernel's own identity can only ever be registered by something that genuinely came
  * from the real bootstrap reader -- not just something shaped like it. {@code
  * TsonSchemaLinker.linkBootstrap} is the one sanctioned way to turn the raw bootstrap form into a

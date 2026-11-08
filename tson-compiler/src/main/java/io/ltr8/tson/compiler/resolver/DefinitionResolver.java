@@ -134,7 +134,7 @@ import java.util.function.Predicate;
  * <p><b>No construct of the schema grammar is a gap.</b> Every {@code UnsupportedOperationException} this
  * class throws is one of:
  * <ul>
- *   <li><b>A {@code RuntimeException} from the compiled meta reader that is none of the classified ones</b>
+ *   <li><b>A {@code RuntimeException} from the compiled vocabulary reader that is none of the classified ones</b>
  *   -- binding a constructor's payload ({@link #bindAtomInstance}) or an annotation's value
  *   ({@link #bindAnnotationValue}). A {@code ReadException} or {@code SchemaValidationException} there is
  *   the author's and a {@code BindMismatchException} the deployment's, each rethrown as itself; what is left
@@ -159,7 +159,7 @@ import java.util.function.Predicate;
  *   by this class: the caller supplies a {@link DefinitionGetter} over a map it owns. A supertype or source
  *   must be answerable when asked for, so a caller wanting forward references resolves on demand, as
  *   {@link SchemaResolver} does.</li>
- *   <li>{@code metaDefinitions} -- where a constructor-application target ({@link #resolveConstructorTarget}) and
+ *   <li>{@code vocabularyDefinitions} -- where a constructor-application target ({@link #resolveConstructorTarget}) and
  *   an annotation's name resolve, both read through a compiled reader. For every schema but the kernel it is the
  *   whole namespace too, made ready in wait order ({@link WaitOrder}): a head or an annotation type declared in the
  *   same document is made ready before the value read against it. The kernel's ordinary resolution resolves them
@@ -200,7 +200,7 @@ import java.util.function.Predicate;
  * merges every {@code !!import}'s entries, and holds one instance of this class to
  * do the per-declaration work. This class takes a bare declaration and never sees a {@code SchemaDocument}.
  *
- * <p>Has no dependency on {@code reader} -- binding goes through {@link DefinitionMetaReader} (a required
+ * <p>Has no dependency on {@code reader} -- binding goes through {@link ConstructionReader} (a required
  * constructor parameter), a narrow read contract rather than the full {@code TsonCompiledSchema}.
  */
 final class DefinitionResolver {
@@ -231,9 +231,9 @@ final class DefinitionResolver {
      */
     private final DataClassObjectWriter writer = new DataClassObjectWriter();
 
-    private final DefinitionMetaReader definitionMetaReader;
+    private final ConstructionReader constructionReader;
     private final AnnotationValueReader annotationValueReader;
-    private final DefinitionGetter metaDefinitions;
+    private final DefinitionGetter vocabularyDefinitions;
     private final DefinitionGetter namespaceDefinitions;
 
     /**
@@ -243,8 +243,8 @@ final class DefinitionResolver {
      */
     private final Predicate<String> kernel;
 
-    /** {@link #kernel} for {@code metaDefinitions}, where every construction head resolves (§3.3.1). */
-    private final Predicate<String> metaKernel;
+    /** {@link #kernel} for {@code vocabularyDefinitions}, where every construction head resolves (§3.3.1). */
+    private final Predicate<String> vocabularyKernel;
 
     /**
      * Whether this resolver can bind annotation values at all -- false only for a caller with no compiled
@@ -290,25 +290,25 @@ final class DefinitionResolver {
      * No annotation reader: an annotation's name is kept, its value is out of reach, and no name is checked
      * against the imported entries. See {@link AnnotationValueReader}.
      */
-    DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
-                        DefinitionGetter namespaceDefinitions) {
-        this(definitionMetaReader, null, metaDefinitions, namespaceDefinitions, null,
+    DefinitionResolver(ConstructionReader constructionReader, DefinitionGetter vocabularyDefinitions,
+                       DefinitionGetter namespaceDefinitions) {
+        this(constructionReader, null, vocabularyDefinitions, namespaceDefinitions, null,
                 SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true);
     }
 
-    DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
-                        DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
-                        ApplicationCloser applicationCloser, SchemaPositions positions,
-                        Map<String, TsonSchema.EntryFacts> facts, Predicate<String> kernel,
-                        Predicate<String> metaKernel) {
+    DefinitionResolver(ConstructionReader constructionReader, AnnotationValueReader annotationValueReader,
+                       DefinitionGetter vocabularyDefinitions, DefinitionGetter namespaceDefinitions,
+                       ApplicationCloser applicationCloser, SchemaPositions positions,
+                       Map<String, TsonSchema.EntryFacts> facts, Predicate<String> kernel,
+                       Predicate<String> vocabularyKernel) {
         this.kernel = Objects.requireNonNull(kernel, "kernel");
-        this.metaKernel = Objects.requireNonNull(metaKernel, "metaKernel");
+        this.vocabularyKernel = Objects.requireNonNull(vocabularyKernel, "vocabularyKernel");
         this.positions = Objects.requireNonNull(positions, "positions");
         this.facts = Objects.requireNonNull(facts, "facts");
-        this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
+        this.constructionReader = Objects.requireNonNull(constructionReader, "constructionReader");
         this.annotationsResolve = annotationValueReader != null;
         this.annotationValueReader = annotationValueReader == null ? (type, value) -> null : annotationValueReader;
-        this.metaDefinitions = Objects.requireNonNull(metaDefinitions, "metaDefinitions");
+        this.vocabularyDefinitions = Objects.requireNonNull(vocabularyDefinitions, "vocabularyDefinitions");
         this.namespaceDefinitions = Objects.requireNonNull(namespaceDefinitions, "namespaceDefinitions");
         this.applicationCloser = applicationCloser;
     }
@@ -458,7 +458,7 @@ final class DefinitionResolver {
             // §6's bare `@T` is shorthand for `@T:_`, so both forms name a type and both are read against it: a
             // marker whose type nothing can reach is as unresolved as a valued one, and a bare mark whose type
             // is not void is refused as `_` would be.
-            if (annotationsResolve && metaDefinitions.definition(annotation.name()) == null) {
+            if (annotationsResolve && vocabularyDefinitions.definition(annotation.name()) == null) {
                 throw unresolvedAnnotation(name, annotation.name());
             }
             refuseWrittenApplication(name, annotation.name());
@@ -482,7 +482,7 @@ final class DefinitionResolver {
 
     /** An annotation's value through the type its name refers to, or {@code null} when that type is out of reach. */
     private Object bindAnnotationValue(String declaration, String annotationName, DataValue value) {
-        if (metaDefinitions.definition(annotationName) == null) {
+        if (vocabularyDefinitions.definition(annotationName) == null) {
             return null;
         }
         try {
@@ -508,7 +508,7 @@ final class DefinitionResolver {
             throw e;
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException("'" + declaration + "': failed to bind the value of "
-                    + "annotation '@" + annotationName + "' via the compiled meta-schema reader: "
+                    + "annotation '@" + annotationName + "' via the compiled vocabulary reader: "
                     + e.getMessage(), e);
         }
     }
@@ -719,9 +719,9 @@ final class DefinitionResolver {
         }
         List<String> instantiable = TypeChain.subtypesOf(head).stream()
                 .filter(subtype -> !TEMPLATE.equals(subtype) && !RECORD_TEMPLATE.equals(subtype)
-                        && isInstantiable(metaDefinitions.definition(subtype)))
+                        && isInstantiable(vocabularyDefinitions.definition(subtype)))
                 .toList();
-        String terminal = AliasChain.terminal(target, metaDefinitions::definition);
+        String terminal = AliasChain.terminal(target, vocabularyDefinitions::definition);
         throw new SchemaValidationException("'" + name + "': '!" + target + "' names an abstract entry, which has no "
                 + "direct instances (§5.2), so there is nothing for '!" + target + " { ... }' to build -- "
                 + (instantiable.isEmpty()
@@ -798,7 +798,7 @@ final class DefinitionResolver {
                     + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
                     + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
-        if (!EntryKind.isConstructor(head.name(), constructor, metaKernel)) {
+        if (!EntryKind.isConstructor(head.name(), constructor, vocabularyKernel)) {
             return resolveValueEntry(name, target, head, instance.value());
         }
         refuseAbstractHead(name, target, constructor);
@@ -841,7 +841,7 @@ final class DefinitionResolver {
         }
         Object value;
         try {
-            value = definitionMetaReader.readValue(head.name(), readAs(payload, head.name()));
+            value = constructionReader.readValue(head.name(), readAs(payload, head.name()));
         } catch (ReadException e) {
             throw payloadFailure("'" + name + "': the body", "'" + name + "': the body is no value of the type '"
                     + head.name() + "' -- " + e.diagnostic().path().filter(path -> !path.isEmpty())
@@ -906,8 +906,8 @@ final class DefinitionResolver {
      * meta layer's own annotation of that name is its own.
      */
     private void refuseWrittenApplication(String name, String annotation) {
-        if (TsonSchema.APPLICATION.equals(annotation) && metaDefinitions.definition(annotation) != null
-                && metaKernel.test(annotation)) {
+        if (TsonSchema.APPLICATION.equals(annotation) && vocabularyDefinitions.definition(annotation) != null
+                && vocabularyKernel.test(annotation)) {
             throw new SchemaValidationException("'" + name + "': '@meta.application' is written, which a declaration "
                     + "never writes -- it is the application an entry is the instantiation of, which the resolver "
                     + "states on the key of every entry that closes one (§8.2). Write the application itself: '"
@@ -962,7 +962,8 @@ final class DefinitionResolver {
     /** {@code nameType}'s terminal entry, or {@code null} where the namespace holds no such name. */
     private String nameTypeIdentity(Optional<String> nameType) {
         String written = nameType.orElse(RecordBody.FIELD_NAME);
-        DefinitionGetter in = metaDefinitions.definition(written) != null ? metaDefinitions : namespaceDefinitions;
+        DefinitionGetter in = vocabularyDefinitions.definition(written) != null ? vocabularyDefinitions
+                : namespaceDefinitions;
         return in.definition(written) == null ? null : AliasChain.terminal(written, in::definition);
     }
 
@@ -994,7 +995,7 @@ final class DefinitionResolver {
         ConstructorHead head = resolveConstructorTarget(name, target);
         requireAuthorable(name, target, head);
         Top constructor = head.definition();
-        if (!EntryKind.isConstructor(head.name(), constructor, metaKernel)) {
+        if (!EntryKind.isConstructor(head.name(), constructor, vocabularyKernel)) {
             // A template over an ordinary type closes to a value entry, read against the type when it is applied.
             if (constructor instanceof ValueEntry value) {
                 throw new SchemaValidationException("'" + name + "': '!" + target + "' names a value of the type '"
@@ -1042,7 +1043,7 @@ final class DefinitionResolver {
             checkTemplateBindings(name, WireForm.RECORD, vocabulary,
                     new RecordValue(bindings.fields().subList(0, bindings.fields().size() - 1)));
         }
-        ParameterTypes.checkSlots(template.typeParams(), payload, metaDefinitions::definition);
+        ParameterTypes.checkSlots(template.typeParams(), payload, vocabularyDefinitions::definition);
         refuseLiteralOnParameter(payload);
         if (!(bindAtomInstance(name, payload, WireForm.RECORD) instanceof RecordTemplateBody built)) {
             throw new IllegalStateException("'" + name + "': '!record_template { ... }' bound to something other "
@@ -1345,12 +1346,12 @@ final class DefinitionResolver {
      * the value's tag, not the terminal, so the chain stays walkable from resolved output.
      */
     private ConstructorHead resolveConstructorTarget(String name, String target) {
-        if (metaDefinitions.definition(target) == null) {
+        if (vocabularyDefinitions.definition(target) == null) {
             throw new SchemaValidationException("'" + name + "': '!" + target + "' names no entry of this "
                     + "schema's namespace -- its own entries and every entry its !!imports bring in (§3.3.1)");
         }
-        String terminal = AliasChain.terminal(target, metaDefinitions::definition);
-        Top atEnd = metaDefinitions.definition(terminal);
+        String terminal = AliasChain.terminal(target, vocabularyDefinitions::definition);
+        Top atEnd = vocabularyDefinitions.definition(terminal);
         if (atEnd == null) {
             // The walk stopped at a name no import declares -- a broken hop, which is the alias's own problem and
             // not this declaration's, but this is where it becomes visible.
@@ -1380,7 +1381,7 @@ final class DefinitionResolver {
      * Shared by {@link #resolveInstance} and {@link #resolveAtomRefinement} -- both need to read a
      * type-ref-carrying value against its own constructor's compiled reader. {@code value} already
      * names its own constructor via {@link DataValue#typeRef()}, so {@code
-     * definitionMetaReader.read(constructorName, value)} finds and reads the right compiled reader
+     * constructionReader.read(constructorName, value)} finds and reads the right compiled reader
      * directly -- no separate name→class table, no union-member scan.
      */
     private Top bindAtomInstance(String name, DataValue value) {
@@ -1397,7 +1398,7 @@ final class DefinitionResolver {
                         + "DefinitionResolver should never produce this"));
         Top body;
         try {
-            body = definitionMetaReader.read(constructorName, value);
+            body = constructionReader.read(constructorName, value);
         } catch (ReadException e) {
             throw bodyIsNotValidData(name, written, e);
         } catch (BindMismatchException e) {
@@ -1423,7 +1424,7 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': " + e.getMessage(), e);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException(
-                    "'" + name + "': failed to bind '" + constructorName + "' via the compiled meta-schema reader: "
+                    "'" + name + "': failed to bind '" + constructorName + "' via the compiled vocabulary reader: "
                             + e.getMessage(), e);
         }
         checkCoherent(name, constructorName, body);

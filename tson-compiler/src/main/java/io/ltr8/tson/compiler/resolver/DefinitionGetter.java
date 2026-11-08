@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.meta.Top;
  * schema's one namespace: {@code namespaceDefinitions}, the whole of it, which {@link
  * DefinitionResolver#resolveComposition}/{@link DefinitionResolver#resolveRefinement}/{@link
  * DefinitionResolver#resolveAtomRefinement} look a supertype/refinement-source/atom-refinement-source up in, and
- * {@code metaDefinitions}, where {@link DefinitionResolver#resolveConstructorTarget} looks a constructor-application
+ * {@code vocabularyDefinitions}, where {@link DefinitionResolver#resolveConstructorTarget} looks a constructor-application
  * target up and an annotation's type is found -- the whole namespace too, but for the kernel's own resolution, which
  * reads every head through its pre-loaded stand-in.
  *

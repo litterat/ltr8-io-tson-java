@@ -124,7 +124,7 @@ final class TemplateMaterialiser {
     private final Function<String, Optional<String>> localConstructors;
 
     /** The same, of an imported entry. */
-    private final Function<String, Optional<String>> metaConstructors;
+    private final Function<String, Optional<String>> importedConstructors;
 
     /** §8.2's freshness MUST over the names this class mints -- see {@link MintedNames}. */
     private final MintedNames minted = new MintedNames();
@@ -245,7 +245,7 @@ final class TemplateMaterialiser {
      * {@code min_items: "two"} an ordinary read error rather than a check this class would have to grow: the
      * bindings a template defers are exactly the ones a closed instance has always had checked for it.
      */
-    private final DefinitionMetaReader metaReader;
+    private final ConstructionReader constructionReader;
 
     /**
      * The entry names desugaring generated rather than the author writing them.
@@ -277,7 +277,7 @@ final class TemplateMaterialiser {
     private final Predicate<String> kernel;
 
     /** The imported entries, where a constructor and the type its slot declares are read from. */
-    private final Function<String, Top> metaTypes;
+    private final Function<String, Top> importedTypes;
 
     /** The local declaration resolution is inside, or {@code null} -- who an early check answers to. */
     private final Supplier<String> resolving;
@@ -297,21 +297,22 @@ final class TemplateMaterialiser {
     }
 
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, Top> publish,
-            DefinitionMetaReader metaReader, Set<String> generated,
-            Function<String, Top> metaTypes, Supplier<String> resolving,
-            Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
-            Function<String, Optional<String>> localConstructors, Function<String, Optional<String>> metaConstructors,
-            Predicate<String> kernel) {
+                         ConstructionReader constructionReader, Set<String> generated,
+                         Function<String, Top> importedTypes, Supplier<String> resolving,
+                         Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
+                         Function<String, Optional<String>> localConstructors,
+                         Function<String, Optional<String>> importedConstructors,
+                         Predicate<String> kernel) {
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.applications = Objects.requireNonNull(applications, "applications");
         this.localConstructors = Objects.requireNonNull(localConstructors, "localConstructors");
-        this.metaConstructors = Objects.requireNonNull(metaConstructors, "metaConstructors");
+        this.importedConstructors = Objects.requireNonNull(importedConstructors, "importedConstructors");
         this.publish = Objects.requireNonNull(publish, "publish");
-        this.metaReader = Objects.requireNonNull(metaReader, "metaReader");
+        this.constructionReader = Objects.requireNonNull(constructionReader, "constructionReader");
         this.generated = Objects.requireNonNull(generated, "generated");
-        this.metaTypes = Objects.requireNonNull(metaTypes, "metaTypes");
+        this.importedTypes = Objects.requireNonNull(importedTypes, "importedTypes");
         this.resolving = Objects.requireNonNull(resolving, "resolving");
     }
 
@@ -861,7 +862,7 @@ final class TemplateMaterialiser {
         List<String> parameters = template == null ? List.of() : OpenEntry.parameterNames(template);
         Map<String, ParameterTypes.Kind> kinds = parameters.isEmpty() ? null
                 : Optional.ofNullable(parameterKinds.get(head)).orElseGet(() -> kindsOnDemand
-                        .computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, metaTypes)));
+                        .computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, importedTypes)));
         List<TypeArgument> arguments = new ArrayList<>(reference.arguments().size());
         for (int i = 0; i < reference.arguments().size(); i++) {
             TypeArgument argument = reference.arguments().get(i);
@@ -904,7 +905,7 @@ final class TemplateMaterialiser {
                 OpenEntry.parameterNames(template), bindings);
         CoreValue wire = closeApplications(substituted);
         try {
-            return new Closed(wire, metaReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
+            return new Closed(wire, constructionReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
         } catch (ReadException e) {
             // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
             // fine declaration, and `vector<text, "two">` is where it stops being one.
@@ -1020,7 +1021,7 @@ final class TemplateMaterialiser {
                                           List<String> parameters, List<TypeArgument> arguments) {
         Map<String, ParameterTypes.Kind> kinds = parameterKinds.get(head);
         if (kinds == null) {
-            kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, metaTypes));
+            kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, importedTypes));
         }
         if (kinds == null || kinds.isEmpty()) {
             checkArguments(head, template, arguments);
@@ -1106,13 +1107,13 @@ final class TemplateMaterialiser {
         if (type == null) {
             return;
         }
-        Function<String, Top> resolve = structural ? metaTypes : this::lookup;
+        Function<String, Top> resolve = structural ? importedTypes : this::lookup;
         String terminal = AliasChain.terminal(type, resolve::apply);
         Top definition = resolve.apply(terminal);
         // An enum's argument is matched in its name type's form, which an import may hold.
         Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition,
-                NameType.form(definition, (structural ? metaConstructors : localConstructors).apply(terminal),
-                        namespace::definition, metaTypes));
+                NameType.form(definition, (structural ? importedConstructors : localConstructors).apply(terminal),
+                        namespace::definition, importedTypes));
         if (parser.isEmpty()) {
             return; // no scalar reading -- the substituted body's own position judges it
         }
@@ -1127,7 +1128,7 @@ final class TemplateMaterialiser {
     /** A name in the schema's own namespace first, then among its imported entries. */
     private Top lookup(String name) {
         Top local = namespace.definition(name);
-        return local != null ? local : metaTypes.apply(name);
+        return local != null ? local : importedTypes.apply(name);
     }
 
 }

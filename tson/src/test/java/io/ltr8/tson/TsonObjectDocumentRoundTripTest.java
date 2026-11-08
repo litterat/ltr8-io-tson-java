@@ -5,7 +5,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.base.bind.AtomContext;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.annotation.Typename;
@@ -53,7 +53,7 @@ class TsonObjectDocumentRoundTripTest {
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class))
-                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                                .orElse(SchemaModelNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
         tson.resolve(SCHEMA);
         return tson;

@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.ProcessorConfig;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
@@ -66,7 +66,7 @@ class BindingsConfigTest {
     /** The binding these tests configure: a map over the kernel's vocabulary, with the atoms registered. */
     private static DataBindContext binding(Map<String, Class<?>> names, String profile) {
         DataBindContext.Builder builder = DataBindContext.builder()
-                .nameBinder(DataNameBinder.ofMap(names).orElse(SchemaMetaNameBinder.INSTANCE))
+                .nameBinder(DataNameBinder.ofMap(names).orElse(SchemaModelNameBinder.INSTANCE))
                 .registerAtoms(AtomContext.hostTypes());
         if (profile != null) {
             builder.profile(profile);

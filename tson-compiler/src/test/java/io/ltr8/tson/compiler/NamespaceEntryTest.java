@@ -67,8 +67,8 @@ class NamespaceEntryTest {
         throw new IllegalStateException("unexpected fetch: " + uri);
     };
 
-    private static TsonCompiledMetaRegistry registry() {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SuiteBindings.context(), SOURCE);
+    private static TsonCompiledVocabularyRegistry registry() {
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(), SOURCE);
     }
 
     /** A schema under the meta above declaring {@code order}, {@code order_list}, {@code myapi} and {@code more}. */
@@ -307,7 +307,7 @@ class NamespaceEntryTest {
      */
     @Test
     void resolvedOutputWritesTheEntryAsWrittenAndReadsItBack() {
-        TsonCompiledMetaRegistry registry = registry();
+        TsonCompiledVocabularyRegistry registry = registry();
         Object myapi = registry.resolveLinked(schema("written", "")).schema().entries().get("myapi");
 
         String written = new TsonObjectWriter(SuiteBindings.context()).toTson(myapi);
@@ -317,7 +317,7 @@ class NamespaceEntryTest {
         assertTrue(flat.contains("place_order => { request: order response: order }"), written);
 
         // Read as a schema map, a value of the kernel's `schema`, whose names resolve in the map itself.
-        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META).compiledSchema().find("meta.schema").orElseThrow()
+        Map<?, ?> read = (Map<?, ?>) registry.loadVocabulary(META).compiledSchema().find("meta.schema").orElseThrow()
                 .read(TestDocuments.document("!schema { myapi => " + written + " }"));
         assertEquals(((ValueEntry) myapi).value(), read.get("myapi"));
     }

@@ -53,9 +53,8 @@ class SealedFamilyCheckTest {
      * @discriminator} are already on, and the reason there is no name left to reserve once the mark is a word
      * the grammar reads.
      *
-     * <p>Asserted here rather than against the kernel, whose bootstrap resolves no annotation at all: a
-     * schema governed by the kernel would ignore the name instead, and the kernel governs only the three
-     * bundled schemas.
+     * <p>Asserted through an ordinary schema rather than the kernel's bootstrap, which resolves no annotation at
+     * all and so would ignore the name instead of refusing it.
      */
     @Test
     void theAnnotationSpellingNamesNoType() {

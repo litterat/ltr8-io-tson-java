@@ -4,7 +4,7 @@ The resolved-schema model (pure records, sealed interfaces, enums — §8's mode
 are declared in (`schema.meta`, `unicode`, `numeric`, `net`, `binary`, `temporal`; the unexported `schema.atom` holds the
 families' shared facet mechanics), `TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`, and
 `TsonBundledSchemas`. Read `design/linking-and-compilation.md` for the
-registry and identity, `design/meta-layer-namespaces.md` for `NamespaceBody`, `Namespace` and `ValueEntry`,
+registry and identity, `design/namespace-types-and-value-entries.md` for `NamespaceBody`, `Namespace` and `ValueEntry`,
 `design/held-template-bodies.md` for `TemplateBody`.
 
 - Names no `tson-compiler` type — the engine depends on this module, not the reverse. Where a compiler type is needed

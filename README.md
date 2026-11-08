@@ -1,7 +1,7 @@
 # tson-java
 
 A Java implementation of [TSON](https://tson.io) (Typed Schema Object Notation) — a schema system with immutable, hash-pinned
-schemas whose definitions are themselves data. A document names its schema, the schema names its meta-schema;
+schemas whose definitions are themselves data. A document names its schema, the schema names the schemas it imports;
 one hash verifies the whole chain. The finishing touch, TSON's data format is a Unicode-first notation you'll
 actually enjoy writing — JSON-like in shape, and not a superset of it.
 
@@ -586,7 +586,7 @@ libraries you want: a schema importing temporal.tn alone sees `date` and no `int
 `meta`, `atom`, `numeric`, `unicode`, `net`, `binary`, `temporal` and every root name of those documents and of core, leaving
 `record`, `identifier`, `type_ref` and `kind` free. The
 kernel imports nothing and applies only its own constructors, a cycle closed by pre-loading a hand-written bootstrap
-(`MetaKernelBootstrapResolver`) rather than resolving it from a document. See
+(`KernelBootstrapResolver`) rather than resolving it from a document. See
 [design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
 including how meta.tn, numeric.tn, temporal.tn, net.tn, core.tn and policy.tn are loaded and registered together.
 

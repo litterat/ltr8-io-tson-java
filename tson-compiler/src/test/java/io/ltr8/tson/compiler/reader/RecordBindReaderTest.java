@@ -6,8 +6,8 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Proves object-binding mode ({@link ValueReaderFactoryRegistry#bind}) genuinely produces real,
  * bound {@code schema.meta} Java objects -- not {@code Map<String, Object>} -- reading against the
  * real, registered {@code meta.tn} schema, mirroring {@link MetaKernelEndToEndTest}'s own
- * DOM-mode bootstrap pattern. {@link SchemaMetaNameBinder} (a {@code Class.forName}-based lookup,
+ * DOM-mode bootstrap pattern. {@link SchemaModelNameBinder} (a {@code Class.forName}-based lookup,
  * not a scan of any sealed hierarchy) resolves every real {@code record}-shaped entry in the
  * schema, including nested helper records like {@code numeric.integer_size} -- so {@code integer_type}
  * itself compiles cleanly (its own {@code size: numeric.integer_size?} field is not a {@link
@@ -44,9 +44,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RecordBindReaderTest {
 
     private static TsonCompiledSchema compiled() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
         return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.bind(context));
     }
 
@@ -77,7 +77,7 @@ class RecordBindReaderTest {
                         new Token("NONE", Token.Form.UNQUOTED))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));
 
         Object result = compiled.get("unicode.text_type").read(TestDocuments.document("{ min_length: 3 max_length: 10 }"));
@@ -114,7 +114,7 @@ class RecordBindReaderTest {
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 new TsonLinkedSchema(new TsonSchema("https://example.test/s.tn",
                         List.of(), entries)),
-                ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()));
+                ValueReaderFactoryRegistry.bind(SchemaModelNameBinder.defaultContext()));
 
         // stating the fixed value is fine, and the bound field still gets the narrowed Integer
         TextType stated = assertInstanceOf(TextType.class,
@@ -133,7 +133,7 @@ class RecordBindReaderTest {
     @Test
     void integerTypeCompilesAndReadsWithSizeLeftAbsent() {
         // integer_type's own `size: numeric.integer_size?` field previously had no Class binding at all
-        // under a sealed-hierarchy scan (numeric.integer_size isn't a Top leaf) -- SchemaMetaNameBinder has
+        // under a sealed-hierarchy scan (numeric.integer_size isn't a Top leaf) -- SchemaModelNameBinder has
         // no such restriction (a plain Class.forName lookup), so integer_type compiles cleanly.
         //
         // `size` is left absent in the data here, deliberately -- not to route around anything, but
@@ -156,7 +156,7 @@ class RecordBindReaderTest {
         // (atom/product/sum/top, which resolve to real but deliberately non-record
         // sealed interfaces) -- gets a compiled reader; TsonSchemaCompiler's own eager walk builds
         // the whole schema regardless of whether any given entry is ever actually read.
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         TsonCompiledSchema compiled = compiled();
 
@@ -207,7 +207,7 @@ class RecordBindReaderTest {
                 .withSupertypes(List.of("unicode.text_type")));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));
 
         // No type-ref -- reads against text_type's own body, same as before the fix.

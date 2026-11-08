@@ -44,10 +44,10 @@ play, so no family-base position reaches it.
 
 - **OPEN and FINAL** are the mode's own reader, unchanged. They read identically; the difference is which
   names a tag may carry, and a FINAL record's subtype set is empty by construction rather than by a check.
-- **ABSTRACT** is `RecordTagDispatchReader`: the `!name` annotation is the only selector and is required, and
-  the failure lands before the record's shape is consulted. It selects among a record's subtypes and knows nothing
-  of namespace types: resolved output's `myapi => !api { … }` is read at the schema map's `declared` position, whose
-  reader delivers a `Namespace` (`DeclaredReader`, `design/declared-positions.md`, `design/meta-layer-namespaces.md`).
+- **ABSTRACT** is `RecordTagDispatchReader`: the `!name` annotation is the only selector and is required, and the failure
+  lands before the record's shape is consulted. It selects among a record's subtypes and knows nothing of namespace types:
+  resolved output's `myapi => !api { … }` is read at the schema map's `declared` position, whose reader delivers a
+  `Namespace` (`DeclaredReader`, `design/declared-positions.md`, `design/namespace-types-and-value-entries.md`).
 - **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up. Their
   keys are matched in the base's name form (`TsonLinkedSchema.nameForm`), a record template base's included: its
   members take its name type, and `FieldNames.readBy` records the template's as it records a record's.

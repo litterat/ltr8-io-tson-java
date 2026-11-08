@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -39,8 +39,8 @@ class SchemaNameAnnotationTest {
     }
 
     private static io.ltr8.tson.schema.TsonLinkedSchema linkedSchema(String id) {
-        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
-                SchemaMetaNameBinder.defaultContext(), uri -> {
+        TsonCompiledVocabularyRegistry core = TsonCompiledVocabularyRegistry.withStandardLibrary(
+                SchemaModelNameBinder.defaultContext(), uri -> {
                     throw new IllegalStateException("unexpected fetch: " + uri);
                 });
         return core.resolveLinked(id);

@@ -17,10 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-SCHEMA] §3.3.3 on the schema side, under one namespace per schema (SPEC-FEEDBACK.md #7): a schema document's
- * annotations resolve in its own namespace, its entries and its whole import closure, the {@code !!meta} target
- * among them. An annotation type an import declares binds its value through that schema's compiled reader; one this
- * document declares itself binds it too, the annotated entry waiting on the type being ready ([TSON-SCHEMA] §3.4.1's
- * wait order), whichever is written first; a name nowhere in the closure is the author's error.
+ * annotations resolve in its own namespace, its entries and its whole import closure. An annotation type an import declares
+ * binds its value through that schema's compiled reader; one this document declares itself binds it too, the annotated entry
+ * waiting on the type being ready ([TSON-SCHEMA] §3.4.1's wait order), whichever is written first; a name nowhere in the
+ * closure is the author's error.
  *
  * <p><b>Every case is loud.</b> An annotation kept by name with its value quietly discarded is the worst outcome:
  * the schema loads clean and the metadata is not there. Every case asserts a value bound or a diagnostic naming the
@@ -38,7 +38,7 @@ class SchemaAnnotationScopeTest {
             }
             """;
 
-    /** The §3.3.3 remedy: the annotation type in a meta-layer schema, named by the user schema's !!meta. */
+    /** The §3.3.3 remedy: the annotation type in a vocabulary schema the user schema imports. */
     private static final String META_HTTP_ID = "https://example.test/meta-http.tn";
     private static final String META_HTTP = """
             !!id:"https://example.test/meta-http.tn"
@@ -178,11 +178,11 @@ class SchemaAnnotationScopeTest {
     }
 
     /**
-     * {@code method} declared in a meta-layer schema and reached through {@code !!meta} binds its value, on both
-     * sides of {@code =>}, as through any import.
+     * {@code method} declared in a vocabulary schema of annotation types alone binds its value, on both sides of
+     * {@code =>}, as through any import.
      */
     @Test
-    void anAnnotationTypeInTheGoverningMetaBindsItsValue() {
+    void anAnnotationTypeInAnImportedVocabularyBindsItsValue() {
         Tson tson = tson();
         String schema = """
                 !!id:"https://example.test/meta-governed.tn"
@@ -196,9 +196,9 @@ class SchemaAnnotationScopeTest {
 
         assertEquals(List.of(), tson.validateSchema(schema));
 
-        var governed = tson.schemaRegistry().get("https://example.test/meta-governed.tn").orElseThrow().schema();
-        Namespace<Top> entries = governed.entries();
+        var importing = tson.schemaRegistry().get("https://example.test/meta-governed.tn").orElseThrow().schema();
+        Namespace<Top> entries = importing.entries();
         assertEquals(Optional.of("POST"), entries.getAnnotations("order").value("method", String.class));
-        assertEquals(Optional.of("GET"), governed.factsOf("item").annotations().value("method", String.class));
+        assertEquals(Optional.of("GET"), importing.factsOf("item").annotations().value("method", String.class));
     }
 }

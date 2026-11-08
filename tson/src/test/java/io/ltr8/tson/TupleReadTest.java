@@ -8,7 +8,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.tree.TsonValue;
@@ -166,7 +166,7 @@ class TupleReadTest {
     }
 
     private static Tson tsonBindingPair() {
-        DataNameBinder binder = name -> "pair".equals(name) ? Pair.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "pair".equals(name) ? Pair.class : SchemaModelNameBinder.INSTANCE.resolve(name);
         DataBindContext context =
                 DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
         return Tson.of(ProcessorConfig.defaults().withDataBindContext(context));

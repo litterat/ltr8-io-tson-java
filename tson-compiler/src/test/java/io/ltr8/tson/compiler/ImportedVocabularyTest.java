@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.consumer.Operation;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A meta layer's own vocabulary riding along with a schema: a record a <b>meta-schema</b> declares, held in a
- * namespace type of it, each value bound to the consumer's own Java class ({@link Operation}).
+ * An imported schema's vocabulary riding along with the schema that imports it: a record the <b>imported</b> schema
+ * declares, held in a namespace type of it, each value bound to the consumer's own Java class ({@link Operation}).
  *
  * <p>The motivating case is an HTTP API described at the schema layer, because that is the only layer that
  * can name request and response types <em>by name</em> -- a data document can only instantiate a type. An entry
@@ -40,21 +40,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>The wiring, in full, is three things</b> -- there is nothing else to register:
  * <ol>
- *   <li>a meta-layer schema chaining {@code !!meta} to the kernel and declaring a record
+ *   <li>a vocabulary schema importing the kernel and declaring a record
  *       {@code operation => { ... }} and a namespace of it, {@code operations => !namespace { ... }}
  *       ({@link #META_HTTP_SCHEMA});</li>
  *   <li>a Java class for {@code operation} ({@link Operation}), a plain record;</li>
  *   <li>a {@link DataBindContext} whose {@link DataNameBinder} can find that class
  *       ({@link #consumerContext()}).</li>
  * </ol>
- * A governed schema then writes {@code api => !operations { search => { ... } }} and each value of the resolved
+ * A schema importing it then writes {@code api => !operations { search => { ... } }} and each value of the resolved
  * entry's map <em>is</em> an {@link Operation}.
  */
-class MetaLayerVocabularyTest {
+class ImportedVocabularyTest {
 
     private static final String META_HTTP = "https://example.test/meta-http.tn";
 
-    /** (1) The meta-layer schema: an operation record, and the namespace type whose values are operations. */
+    /** (1) The vocabulary schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
@@ -78,7 +78,7 @@ class MetaLayerVocabularyTest {
             }
             """;
 
-    /** The declaration under test, written by a schema governed by the meta above. */
+    /** The declaration under test, written by a schema importing the vocabulary above. */
     private static final String SEARCH = """
             api => !operations {
                 search => { path: "/search"  method: "GET"  request: search_request  response: search_response }
@@ -91,20 +91,20 @@ class MetaLayerVocabularyTest {
     }
 
     /**
-     * (3) The bind context, composed rather than copied. {@link SchemaMetaNameBinder#INSTANCE} already
+     * (3) The bind context, composed rather than copied. {@link SchemaModelNameBinder#INSTANCE} already
      * resolves the kernel's own vocabulary; a consumer wants that <em>plus</em> their own, so {@link
-     * SchemaMetaNameBinder#contextExtendedWith} asks the library's binder first and this one only for a
+     * SchemaModelNameBinder#contextExtendedWith} asks the library's binder first and this one only for a
      * name it does not know. Nothing here duplicates the kernel's table, and nothing needs keeping in sync
-     * when that vocabulary grows. {@code ProcessorConfig.metaNameBinder} is the same seam through the front door.
+     * when that vocabulary grows. {@code ProcessorConfig.withDataBindContext} is the same seam through the front door.
      */
     private static final DataNameBinder CONSUMER_NAMES = new DataNameBinder.DefaultDataNameBinder(
             Set.of("io.ltr8.tson.compiler.consumer"), Map.of());
 
     private static DataBindContext consumerContext() {
-        return SchemaMetaNameBinder.contextExtendedWith(CONSUMER_NAMES);
+        return SchemaModelNameBinder.contextExtendedWith(CONSUMER_NAMES);
     }
 
-    private static TsonCompiledMetaRegistry core(DataBindContext context) {
+    private static TsonCompiledVocabularyRegistry core(DataBindContext context) {
         SchemaSource source = uri -> {
             for (Map.Entry<String, String> document : DOCUMENTS.entrySet()) {
                 if (CanonicalIdentity.sameIdentity(uri, document.getKey())) {
@@ -113,10 +113,10 @@ class MetaLayerVocabularyTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledMetaRegistry.withStandardLibrary(context, source);
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(context, source);
     }
 
-    /** An API document against the meta above, named for the case so each test gets its own identity. */
+    /** An API document importing the vocabulary above, named for the case so each test gets its own identity. */
     private static String api(String label, String declarations) {
         String id = "https://example.test/api-" + label + ".tn";
         DOCUMENTS.put(id, """
@@ -136,23 +136,23 @@ class MetaLayerVocabularyTest {
         return core(consumerContext()).resolveLinked(api(label, declarations));
     }
 
-    // ── The meta-layer declaration ───────────────────────────────────────────────────────────────
+    // ── The vocabulary's declarations ─────────────────────────────────────────────────────────────
 
     /**
      * {@code operations => !namespace { ... }} is a namespace type: an instance of the kernel's {@code namespace},
      * a type whose values are maps, and no constructor. The record its values are is an ordinary record type too.
      */
     @Test
-    void theMetaSchemaDeclaresANamespaceOfOperations() {
-        TsonLinkedSchema meta = core(consumerContext()).resolveLinked(META_HTTP);
-        Top operations = meta.schema().entries().get("operations");
+    void theVocabularyDeclaresANamespaceOfOperations() {
+        TsonLinkedSchema vocabulary = core(consumerContext()).resolveLinked(META_HTTP);
+        Top operations = vocabulary.schema().entries().get("operations");
 
-        assertEquals(EntryKind.PRODUCT, meta.kindOf("operations"));
+        assertEquals(EntryKind.PRODUCT, vocabulary.kindOf("operations"));
         assertEquals(List.of(), TypeChain.supertypesOf(operations), "construction transfers kind, not IS-A");
-        assertFalse(meta.isConstructor("operations", operations),
+        assertFalse(vocabulary.isConstructor("operations", operations),
                 "a namespace type is a type: `!operations { ... }` builds a value of it");
-        assertEquals(EntryKind.PRODUCT, meta.kindOf("operation"));
-        assertFalse(meta.isConstructor("operation", meta.schema().entries().get("operation")),
+        assertEquals(EntryKind.PRODUCT, vocabulary.kindOf("operation"));
+        assertFalse(vocabulary.isConstructor("operation", vocabulary.schema().entries().get("operation")),
                 "the record its values are is a type too");
     }
 
@@ -180,14 +180,14 @@ class MetaLayerVocabularyTest {
      * an operation value straight into the record.
      */
     @Test
-    void theMetaRecordBindsToTheRegisteredJavaClass() throws Exception {
-        DataNameBinder binder = SchemaMetaNameBinder.extendedWith(CONSUMER_NAMES);
+    void theVocabularyRecordBindsToTheRegisteredJavaClass() throws Exception {
+        DataNameBinder binder = SchemaModelNameBinder.extendedWith(CONSUMER_NAMES);
         assertEquals(Operation.class, binder.resolve("operation"),
                 "the name binder is the whole of the registration");
         assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("meta.record"),
                 "and the library's own vocabulary still resolves through it");
 
-        Object read = core(consumerContext()).loadMeta(META_HTTP).compiledSchema().find("operation")
+        Object read = core(consumerContext()).loadVocabulary(META_HTTP).compiledSchema().find("operation")
                 .orElseThrow()
                 .read(TestDocuments.document(
                         "{ path: \"/p\"  method: \"GET\"  request: text  response: integer }"));
@@ -369,16 +369,16 @@ class MetaLayerVocabularyTest {
         assertEquals(Optional.of("hello"), value.get("q").asString());
     }
 
-    // ── A meta layer's own vocabulary is in the governed schema's namespace ──────────────────────
+    // ── An imported vocabulary is in the importing schema's namespace ────────────────────────────
 
     /**
      * <b>Every reference form resolves, applied or not.</b> One namespace per schema (SPEC-FEEDBACK.md #7): the
-     * {@code !!meta} target contributes its namespace as an {@code !!import} does, so a name the meta layer declares
-     * -- atom, record, or template -- is a type of the schema it governs, and an application of a template there is
-     * judged by its arity as any other.
+     * {@code !!import} target contributes its namespace, so a name the imported schema declares -- atom, record, or
+     * template -- is a type of the schema importing it, and an application of a template there is judged by its
+     * arity as any other.
      */
     @Test
-    void aMetaLayerNameResolvesInAGovernedSchemaWhetherOrNotItIsApplied() {
+    void anImportedNameResolvesWhetherOrNotItIsApplied() {
         record Reference(String label, String declaration) {
         }
         List<Reference> references = List.of(
@@ -397,9 +397,9 @@ class MetaLayerVocabularyTest {
         assertTrue(arity.getMessage().contains("pair"), arity.getMessage());
     }
 
-    /** And a governed schema declaring a name its meta layer declares collides with it (§2.2.3). */
+    /** And a schema declaring a name its import declares collides with it (§2.2.3). */
     @Test
-    void aLocalDeclarationOfAMetaLayerNameCollides() {
+    void aLocalDeclarationOfAnImportedNameCollides() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("localtemplate", SEARCH + "\n  envelope => <T> { body: T }\n  x => envelope<text>"));
 

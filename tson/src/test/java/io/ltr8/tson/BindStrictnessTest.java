@@ -8,7 +8,7 @@ import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +16,7 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import java.util.Arrays;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -69,7 +70,7 @@ class BindStrictnessTest {
 
     private static Tson tson(String schema, Class<?> bound) {
         SchemaSource source = uri -> schema;
-        DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaModelNameBinder.INSTANCE.resolve(name);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
                         .registerAtoms(AtomContext.hostTypes()).build()));
@@ -219,7 +220,7 @@ class BindStrictnessTest {
     private static Tson moneyTson(boolean registered) {
         SchemaSource source = uri -> MONEY_SCHEMA;
         DataNameBinder binder = name -> "order".equals(name) ? OrderPriced.class
-                : SchemaMetaNameBinder.INSTANCE.resolve(name);
+                : SchemaModelNameBinder.INSTANCE.resolve(name);
         DataBindContext.Builder builder = DataBindContext.builder().nameBinder(binder)
                 .registerAtoms(AtomContext.hostTypes());
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))

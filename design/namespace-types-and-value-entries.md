@@ -47,7 +47,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
 - A value entry is refused at every type position, in one sentence (`ValuesByName.aValueNoType`): a reference in a
   type declaration (`validateTypeRef`), a kind-typed slot in a value body (`judgeMember`). A data tag naming one
   compiles to a `ValueEntryReader` and is `TYPE_MISMATCH`.
-- **One bind context serves schemas and data** (`Tson.dataBindContext()`, `SchemaMetaNameBinder.over`): a name meta.tn
+- **One bind context serves schemas and data** (`Tson.dataBindContext()`, `SchemaModelNameBinder.over`): a name meta.tn
   declares (a root name or a path under one of its six maps) or a library's member under its map (`numeric.*`,
   `temporal.*`, `net.*`) binds to the schema model, every other to the consumer's binder, a member a consumer contributes
   to an open map included, so a
@@ -67,7 +67,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   no namespace, `{text => method}` or a record value's `meta.field_map`, is not entered whatever its key type, though
   `meta.ref<meta.map>` holds namespace types and plain map types alike: the walk asks the body, a `NamespaceBody`.
 - A field step through a bound record value reads the host object through the descriptor of the bind context it was
-  bound under, by wire name, never by reflection (`TsonCompiledMetaRegistry.link`). An optional field the value does
+  bound under, by wire name, never by reflection (`TsonCompiledVocabularyRegistry.link`). An optional field the value does
   not hold is refused as not present, after the referent's type is judged.
 - A read delivers a `Namespace` at four places and nowhere else: a value entry's payload (`SchemaResolver`'s read), a
   `declared` position whose tag selects a namespace type (`DeclaredReader`, which is how resolved output's entries
@@ -159,8 +159,8 @@ identifier-typed value is a name (`design/name-hygiene-and-minted-names.md`).
 
 ## Binding: one context, and a tree where nothing binds
 
-`Tson.of` builds one `DataBindContext` from the configured one (`SchemaMetaNameBinder.over`): the consumer's binder, profile
-and atoms (`DataBindContext.toBuilder`, `nameBinder`), composed with `SchemaMetaNameBinder.INSTANCE`, which answers for
+`Tson.of` builds one `DataBindContext` from the configured one (`SchemaModelNameBinder.over`): the consumer's binder, profile
+and atoms (`DataBindContext.toBuilder`, `nameBinder`), composed with `SchemaModelNameBinder.INSTANCE`, which answers for
 exactly every entry of meta.tn, its root names and its members of its six maps, and the members numeric.tn, temporal.tn and
 net.tn declare under `numeric`, `temporal` and `net` (read from the bundled sources), each by its path into the package of
 its namespace (`numeric.integer_type` to `io.ltr8.tson.schema.numeric.IntegerType`) -- so a kernel name can never be
@@ -169,7 +169,7 @@ although `schema.meta` has a `Token` -- and the schema model's own registrations
 (`ResolverBindContext.registerAbsent`). The resolution core resolves schemas through it and the bind registry reads data
 through it, so `create_order => !operation { … }` and a data document's `!operation { … }` bind to the same class. A class
 implements nothing; `@Typename` is needed only where the binder's convention would not find it.
-`SchemaMetaNameBinder.extendedWith`/`contextExtendedWith` build the same composition for a caller assembling a context
+`SchemaModelNameBinder.extendedWith`/`contextExtendedWith` build the same composition for a caller assembling a context
 themselves.
 
 **No class is a tree, not an error, until something binds.** `SchemaResolver` reads the payload in bind mode; a
@@ -222,7 +222,7 @@ fields: no such field is refused, listing those declared. A bound value is read 
 it -- the bind context's `getDescriptor` of the host's class, its `fieldIndex` by wire name, that component's `get`
 -- since raw reflection would bypass binding's own naming (a component renamed with `@Field`, an `Optional`
 component, a tagged subtype's class, a host that is no Java record). The context is the one the resolution core binds
-with, passed by `TsonCompiledMetaRegistry.link` to `TsonSchemaLinker.link`. A tree-held value is read by field name.
+with, passed by `TsonCompiledVocabularyRegistry.link` to `TsonSchemaLinker.link`. A tree-held value is read by field name.
 A FIXED field may have no component, its value being the schema's, and naming a value through one is the one field
 step reported as a gap.
 
@@ -274,7 +274,7 @@ membership is ingest's
 a `ValueEntryReader`, which reports `TYPE_MISMATCH` (write `!api` for a value of that type) and skips the value;
 `JsonSchemaCompiler.constructorOf` names the value's type, which has no factory, and the entry compiles to an
 `ErrorReader`. A constructor this library has no factory for compiles to an `ErrorReader` carrying the cause
-(`TsonCompiledMetaSchema`'s `unbuildable`), kept rather than dropped; `CoreSchemaImportTest` asserts no entry of
+(`TsonCompiledVocabulary`'s `unbuildable`), kept rather than dropped; `CoreSchemaImportTest` asserts no entry of
 core.tn or net.tn compiles to one.
 
 ## One namespace, so shared vocabulary sits beside the types
@@ -283,7 +283,7 @@ A schema declaring `method` puts its shared types beside it -- a `status_code` a
 schema importing it names them: an `!!import` contributes its whole namespace (SPEC-FEEDBACK.md #7). The cost is
 reservation: every root name in the closure is taken, so a schema importing core.tn cannot declare `text`, `enum`,
 `set`, `uuid` or `title` of its own, nor `meta`, `atom`, `numeric`, `unicode`, `net`, `binary` or `temporal`
-(`MetaLayerVocabularyTest`). The machinery is under those seven prefixes, so `record`, `identifier`, `map`, `namespace`,
+(`ImportedVocabularyTest`). The machinery is under those seven prefixes, so `record`, `identifier`, `map`, `namespace`,
 `template`, `type_ref`, `field_name`, `bounded`, `value` and `kind` are free; a schema importing only the libraries it wants
 leaves the rest's root names free too (one importing temporal.tn alone may declare `title` or `int32`). The one thing a
 schema cannot do is hold a value of a type it declares itself: `!api { … }` beside `api => !meta.namespace { … }` waits on

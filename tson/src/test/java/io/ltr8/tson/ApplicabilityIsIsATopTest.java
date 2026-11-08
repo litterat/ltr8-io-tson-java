@@ -188,12 +188,12 @@ class ApplicabilityIsIsATopTest {
 
     /**
      * With nothing in scope composing it, an abstract constructor's refusal says so rather than naming an empty
-     * list: a meta layer's own {@code marker => abstract top & {}}, which nothing composes, applied in a schema it
-     * governs.
+     * list: a vocabulary schema's own {@code marker => abstract top & {}}, which nothing composes, applied in a schema
+     * importing it.
      */
     @Test
     void anAbstractConstructorWithNothingComposingItSaysSo() {
-        String meta = """
+        String vocabulary = """
                 !!id:"https://example.test/marker-meta.tn"
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
@@ -207,7 +207,7 @@ class ApplicabilityIsIsATopTest {
                 """;
         List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(
-                        "https://example.test/marker-meta.tn", meta, "https://example.test/marked.tn", user)))))
+                        "https://example.test/marker-meta.tn", vocabulary, "https://example.test/marked.tn", user)))))
                 .validateSchema(user);
         assertEquals(1, problems.size(), problems::toString);
         String message = problems.getFirst().message();

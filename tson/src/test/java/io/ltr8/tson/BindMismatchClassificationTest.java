@@ -4,9 +4,10 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import java.util.List;
 import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -37,7 +38,7 @@ class BindMismatchClassificationTest {
 
     private static final String META_X = "https://example.test/meta-bindmismatch.tn";
 
-    /** A meta layer declaring a record held in a namespace type of its own -- and no Java class for it. */
+    /** A vocabulary schema declaring a record held in a namespace type of its own -- and no Java class for it. */
     private static final String META_SCHEMA = """
             !!id:"https://example.test/meta-bindmismatch.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
@@ -47,7 +48,7 @@ class BindMismatchClassificationTest {
             }
             """;
 
-    private static final String GOVERNED_HEADER = """
+    private static final String IMPORTING_HEADER = """
             !!id:"https://example.test/api-bindmismatch.tn"
             !!import:"https://example.test/meta-bindmismatch.tn"
             !!import:"https://tson.io/2026/39/m/core.tn"
@@ -64,7 +65,7 @@ class BindMismatchClassificationTest {
     private static Tson tson() {
         return Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META_X, META_SCHEMA))))
-                .withDataBindContext(SchemaMetaNameBinder.defaultContext()));
+                .withDataBindContext(SchemaModelNameBinder.defaultContext()));
     }
 
     private static Diagnostic only(String document) {
@@ -104,7 +105,7 @@ class BindMismatchClassificationTest {
     void anUnboundValueEntryValidatesAndIsRefusedWhereTheSchemaIsBound() {
         Tson tson = tson();
         assertEquals(List.of(), tson.validateSchema(
-                GOVERNED_HEADER + "{\npings => !notifications { ping => { path: \"/ping\" } }\n}\n"));
+                IMPORTING_HEADER + "{\npings => !notifications { ping => { path: \"/ping\" } }\n}\n"));
 
         List<Diagnostic> problems = new java.util.ArrayList<>();
         assertNull(tson.bindRegistry().get("https://example.test/api-bindmismatch.tn", problems::add));
@@ -116,7 +117,7 @@ class BindMismatchClassificationTest {
         assertTrue(d.message().contains("binds no class for it"), d::message);
     }
 
-    /** The contrast: a name the governing meta does not declare is the author's error, in either position. */
+    /** The contrast: a name the schema's namespace does not hold is the author's error, in either position. */
     @Test
     void anAuthorErrorIsTheSameWhereverItIsWritten() {
         assertEquals(Diagnostic.Code.SCHEMA_ERROR,

@@ -50,7 +50,7 @@ is why they are the linker's. Current form only; history lives in git.
 
 Related: `design/linking-and-compilation.md` (the link order), `design/references.md` (which slot is typed by a kind),
 `design/name-hygiene-and-minted-names.md` (the per-name rules a name type's profile feeds),
-`design/meta-layer-namespaces.md`.
+`design/namespace-types-and-value-entries.md`.
 
 **What a kind is not.** Eight shapes were tried before the atom of names, and each fell for one reason, so none is
 worth re-proposing: a refined `schema` type carrying the checks (§5.7 gives entry-membership only and tightens no

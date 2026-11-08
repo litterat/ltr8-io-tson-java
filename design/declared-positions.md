@@ -11,7 +11,7 @@ position is refused. Current form only; history lives in git.
 - The schema map's values are `declared` (`meta.schema => !meta.namespace { key_type: meta.type_name value_type:
   meta.declared }`): a type entry's tag names its constructor, a value entry's its type. Where the tag selects a namespace
   type, the TSON reader delivers the map as the `Namespace` it is (`NamespaceInstanceReader`,
-  `design/meta-layer-namespaces.md`).
+  `design/namespace-types-and-value-entries.md`).
 - The closure is fixed at compile time: the entry belongs to one schema, and every name it holds is resolved through
   the same reader resolver every other dispatch uses.
 - A value naming no type is a **validation** error (`VALIDATION_ERROR`) in every mode; a tag naming no type of the

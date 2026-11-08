@@ -65,7 +65,7 @@ Related: `design/constructor-application.md` (what `!C { … }` may apply and ho
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
 `design/template-materialisation.md` and `design/held-template-bodies.md` (§5.10 closing, applied-parent edges),
 `design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.synthetic`, the
-kernel's bootstrap), `design/meta-layer-namespaces.md` (value entries),
+kernel's bootstrap), `design/namespace-types-and-value-entries.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
 
 ## The two resolvers
@@ -82,9 +82,9 @@ that resolves one declaration and reports its failure.
 
 `DefinitionResolver` (package-private) resolves one `SchemaMap.Declaration` and never sees a document. Everything it
 consults is fixed at construction: two `DefinitionGetter`s, `namespaceDefinitions` the whole namespace and
-`metaDefinitions` where a construction head and an annotation name resolve — the same wait order, except in the
+`vocabularyDefinitions` where a construction head and an annotation name resolve — the same wait order, except in the
 kernel's ordinary resolution, which resolves heads through its pre-loaded stand-in (§3.4) — the vocabulary's
-compiled reader (`DefinitionMetaReader`) and annotation reader (`AnnotationValueReader`), the `ApplicationCloser` onto the
+compiled reader (`ConstructionReader`) and annotation reader (`AnnotationValueReader`), the `ApplicationCloser` onto the
 schema's one `TemplateMaterialiser`, and the `EntryFacts` map it shares with `SchemaResolver` and the materialiser,
 so an atom refinement finds the constructor of a source another schema declared. Its class Javadoc lists the
 shapes it dispatches and the exact exception boundary.
@@ -117,7 +117,7 @@ goes through, so an entry is made ready the first time anything asks for it, and
   (`DefinitionResolverTest.aCompositionsNameTypesAreJudgedOnceEveryEntryIsReady`).
 
 `ResolutionOrderTest` resolves each bundled schema, and a schema whose entries read each other, with its declarations
-reversed and shuffled, and gets identical output; `MetaKernelBootstrapResolverTest.theBootstrapIsTheSameInAnyOrder`
+reversed and shuffled, and gets identical output; `KernelBootstrapResolverTest.theBootstrapIsTheSameInAnyOrder`
 does the same for the bootstrap.
 
 ## Annotations on a declaration
@@ -211,13 +211,13 @@ schemas closing one application agreeing on the entry §2.2.3 unifies them by (`
 
 ## Value entries
 
-`name => !T { … }` with `T` no constructor (not IS-A `top`, `EntryKind.isConstructor`) is a value entry:
-`resolveInstance` hands it to `resolveValueEntry`, which reads the payload against `T` as a data value is read and
-returns a `ValueEntry(T, value)` of kind `VALUE`, `T` recorded as the entry's constructor fact for the tag
-(`design/meta-layer-namespaces.md` has the read, the binding and the tree fallback). The resolver's part: a head that
-is itself a value is refused (a value has no instances), a braced payload at an atom type is refused with the `^` it
-is missing, and a payload that is no value of `T` is refused against the entry with the read's path. A namespace type
-is the other side of the line: `api => !meta.namespace { … }` applies the constructor `meta.namespace` and builds a type, a
+`name => !T { … }` with `T` no constructor (not IS-A `top`, `EntryKind.isConstructor`) is a value entry: `resolveInstance`
+hands it to `resolveValueEntry`, which reads the payload against `T` as a data value is read and returns a `ValueEntry(T,
+value)` of kind `VALUE`, `T` recorded as the entry's constructor fact for the tag
+(`design/namespace-types-and-value-entries.md` has the read, the binding and the tree fallback). The resolver's part: a head
+that is itself a value is refused (a value has no instances), a braced payload at an atom type is refused with the `^` it is
+missing, and a payload that is no value of `T` is refused against the entry with the read's path. A namespace type is the
+other side of the line: `api => !meta.namespace { … }` applies the constructor `meta.namespace` and builds a type, a
 `NamespaceBody`.
 
 ## Nested schema maps
@@ -315,11 +315,11 @@ judged once its application closes it:
   `checkRestatedFieldTypes`). A sibling may be a discriminator: the family rules ask of it what they ask of any
   required atom-typed field, and a dependent field named as a discriminator is no atom-typed field and is refused.
 
-Everything else that walks field types skips a dependent field: it is satisfiable for inhabitance whatever its
-sibling names (`TypeInhabitance`), carries no value to check (`checkFieldValue`), contributes no name to a name type
-or a parameter's type (`NameType`, `ParameterTypes`). A value's qualified name going on through one takes the type its
-sibling names in the value walked (`ValuesByName.dependentType`, `design/meta-layer-namespaces.md`). A value entry's
-dependent value is held as written at the read and judged against that type when the schema links (`HeldValues`,
+Everything else that walks field types skips a dependent field: it is satisfiable for inhabitance whatever its sibling names
+(`TypeInhabitance`), carries no value to check (`checkFieldValue`), contributes no name to a name type or a parameter's type
+(`NameType`, `ParameterTypes`). A value's qualified name going on through one takes the type its sibling names in the value
+walked (`ValuesByName.dependentType`, `design/namespace-types-and-value-entries.md`). A value entry's dependent value is held
+as written at the read and judged against that type when the schema links (`HeldValues`,
 `design/linking-and-compilation.md`).
 
 **A template field's `value` is one too**, typed `type!` with `type` its sibling, a member of `( type | type_param )`.
@@ -376,7 +376,7 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
   capability verdict, and stays one. Composing an existing constructor (`c => meta.record & { extra: text }`) makes no new
   form, and is refused the same way today only because no body in the schema model holds the added facet (`BACKLOG.md`). An
   instance of a constructor composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a tree
-  where no class binds the head — as a value entry's payload is (`design/meta-layer-namespaces.md`). The other
+  where no class binds the head — as a value entry's payload is (`design/namespace-types-and-value-entries.md`). The other
   `UnsupportedOperationException` sites are the catch-alls around the compiled reader (an exception none of the classified
   ones), a failed re-serialisation of an atom refinement's source, a closed application with no `ApplicationCloser` (a
   resolver built standalone), and the bootstrap's closed switch over the kernel's own declarations.
@@ -437,7 +437,7 @@ host types, since a value written by its own class is described by the variant (
 bridges, in `ResolverBindContext`; `ForReference` and `ForSibling` read a sibling through
 `ReferenceGrammar.parseReference`). A context without those registrations describes `TypeRef` as a union of two records,
 so the schema model's classes bind only through a context that carries them (`ResolverBindContext.registerAbsent`, which
-`SchemaMetaNameBinder.over` applies).
+`SchemaModelNameBinder.over` applies).
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the
 model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtures are listed in
 `DefinitionResolverTest`'s Javadoc.

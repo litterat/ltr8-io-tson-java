@@ -23,9 +23,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A per-mode registry of compiled <b>user</b> schemas, over a shared {@link TsonCompiledMetaRegistry}
- * (the bind-mode resolution core). The parallel to that class: {@code TsonCompiledMetaRegistry} holds the
- * compiled meta layer every schema resolves against; this holds compiled user schemas, read in one mode.
+ * A per-mode registry of compiled <b>user</b> schemas, over a shared {@link TsonCompiledVocabularyRegistry}
+ * (the bind-mode resolution core). The parallel to that class: {@code TsonCompiledVocabularyRegistry} holds the
+ * compiled vocabulary every schema resolves against; this holds compiled user schemas, read in one mode.
  * Built via {@link #tree} or {@link #bind} -- the read mode is which factory the registry was made with,
  * not a parameter threaded through compile, so two registries over one core read the same schema as a
  * queryable {@code TsonValue} tree or as real Java objects.
@@ -50,12 +50,13 @@ public final class TsonCompiledSchemaRegistry {
         TREE, BIND
     }
 
-    private final TsonCompiledMetaRegistry core;
+    private final TsonCompiledVocabularyRegistry core;
     private final ValueReaderFactoryResolver factories;
     private final Mode mode;
     private final Map<String, TsonCompiledSchema> compiled = new ConcurrentHashMap<>();
 
-    private TsonCompiledSchemaRegistry(TsonCompiledMetaRegistry core, ValueReaderFactoryResolver factories, Mode mode) {
+    private TsonCompiledSchemaRegistry(TsonCompiledVocabularyRegistry core, ValueReaderFactoryResolver factories,
+                                       Mode mode) {
         this.core = core;
         this.factories = factories;
         this.mode = mode;
@@ -72,7 +73,7 @@ public final class TsonCompiledSchemaRegistry {
      * typed leaves and null-safe navigation, and no Java class per schema type (hence no {@code
      * DataBindContext}). The recommended read mode; {@link #bind} is the object-binding alternative.
      */
-    public static TsonCompiledSchemaRegistry tree(TsonCompiledMetaRegistry core) {
+    public static TsonCompiledSchemaRegistry tree(TsonCompiledVocabularyRegistry core) {
         return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.tree(), Mode.TREE);
     }
 
@@ -83,7 +84,7 @@ public final class TsonCompiledSchemaRegistry {
      * schemas through, so the class a schema's value entry binds to binds the same type's values in data. A schema
      * obtained here is refused where its closure holds a value entry no class binds ({@code refuseUnbound}).
      */
-    public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext context) {
+    public static TsonCompiledSchemaRegistry bind(TsonCompiledVocabularyRegistry core, DataBindContext context) {
         return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.bind(context), Mode.BIND);
     }
 
@@ -219,7 +220,7 @@ public final class TsonCompiledSchemaRegistry {
     }
 
     /** The bind-mode resolution core this registry reads user schemas against. */
-    public TsonCompiledMetaRegistry core() {
+    public TsonCompiledVocabularyRegistry core() {
         return core;
     }
 }

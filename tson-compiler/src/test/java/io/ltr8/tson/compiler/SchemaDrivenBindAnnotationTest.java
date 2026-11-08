@@ -9,7 +9,7 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * dropped them until now, and the one where §6 gives an annotation a declared type to bind against.
  *
  * <p>Two things distinguish this from the schemaless object path ({@code TsonObjectReaderTest}). The
- * annotation's <em>name</em> resolves one hop against the governing schema, so its value is read by that
+ * annotation's <em>name</em> resolves in the schema's namespace, so its value is read by that
  * type's own compiled reader and arrives as an ordinary bound Java object rather than a structural node. And
  * the carrier occupies a constructor slot the schema knows nothing about, so the reader has to fill it
  * itself -- see {@code arityIsHandledInBothDirections} for what goes wrong if it doesn't.
@@ -73,7 +73,7 @@ class SchemaDrivenBindAnnotationTest {
     private static TsonCompiledSchema compile(Class<?> widgetClass) {
         DataNameBinder binder = schemaTypeName -> "widget".equals(schemaTypeName)
                 ? widgetClass
-                : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+                : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
                 ResolverBindContext.registerAbsent(
                         DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
@@ -83,8 +83,8 @@ class SchemaDrivenBindAnnotationTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.bind(core, context).get(ID);
     }
 
@@ -174,7 +174,7 @@ class SchemaDrivenBindAnnotationTest {
     private static TsonCompiledSchema compileCatalogue() {
         DataNameBinder binder = schemaTypeName -> "catalogue".equals(schemaTypeName)
                 ? Catalogue.class
-                : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+                : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
                 ResolverBindContext.registerAbsent(
                         DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
@@ -185,7 +185,7 @@ class SchemaDrivenBindAnnotationTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         return TsonCompiledSchemaRegistry.bind(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source),
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source),
                 context).get(ID);
     }
 
@@ -222,7 +222,7 @@ class SchemaDrivenBindAnnotationTest {
     private static TsonCompiledSchema compileAs(String schemaName, Class<?> bound) {
         DataNameBinder binder = schemaTypeName -> schemaName.equals(schemaTypeName)
                 ? bound
-                : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+                : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
                 ResolverBindContext.registerAbsent(
                         DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())).build();
@@ -233,7 +233,7 @@ class SchemaDrivenBindAnnotationTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         return TsonCompiledSchemaRegistry.bind(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source),
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source),
                 context).get(ID);
     }
 

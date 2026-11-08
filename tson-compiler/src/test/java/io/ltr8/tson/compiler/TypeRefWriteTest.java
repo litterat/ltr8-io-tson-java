@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Token;
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TypeRefWriteTest {
 
     private static String written(Object value) {
-        return new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(value).replaceAll("\\s+", " ")
+        return new TsonObjectWriter(SchemaModelNameBinder.defaultContext()).toTson(value).replaceAll("\\s+", " ")
                 .trim();
     }
 

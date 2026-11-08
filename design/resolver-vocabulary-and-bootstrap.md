@@ -39,7 +39,7 @@ meta.tn, itself. Current form only; history lives in git.
   (`numeric_integer_type_…`).
 - The bootstrap hand-builds exactly the pre-loaded set — the instances and the two refinements on the kernel's one
   wait cycle (`SPEC-FEEDBACK.md #4`, rule 4) — and makes every other entry ready by `WaitOrder`, the one algorithm
-  every schema's resolution runs. The order is the waits', never source order. `MetaKernelBootstrapResolverTest`
+  every schema's resolution runs. The order is the waits', never source order. `KernelBootstrapResolverTest`
   holds the set to the measured cycle and the output to the kernel's ordinary resolution in any declaration order;
   it attaches no `@meta.synthetic`.
 - A `!C { … }` body or an annotation value against an imported entry is read through the compiled form of the schema
@@ -240,7 +240,7 @@ annotation is: there is no author to resolve against, and the value is fixed.
   rebuilds its entry map several times and re-attaches key annotations at the one point every entry passes
   through (`withNameAnnotations`), imports included, so an imported synthetic keeps the marker its own schema
   gave it.
-- **The bootstrap route attaches none, deliberately.** `MetaKernelBootstrapResolver` exists to be *just*
+- **The bootstrap route attaches none, deliberately.** `KernelBootstrapResolver` exists to be *just*
   enough to load the real kernel from its own file, and nothing in the pipeline reads this marker — it is
   informational. The kernel's own seven synthetics, minted at meta.tn's root, are marked anyway, because the entries
   anything else sees come from ordinary resolution: the bootstrap output stands in only as the transient vocabulary the
@@ -269,15 +269,15 @@ is read through the compile of the document that declared it — `!meta.record` 
   declaration not yet ready a `PendingTypeReader`. A read reaching one throws `NotReady`, the order makes that entry
   ready, and the read restarts; each declaration the read reaches is a wait of the entry being made ready
   (`TsonReadContext.HeldByName.reached`), which is what wait depth counts (`design/processor-policy.md`).
-- **A payload is a value body exactly when its head is no constructor**: a value entry's payload is read against
-  the type, under the loader's identifier policy, and lifts nothing; a construction's binding record is read under
-  no policy (`SchemaResolver`'s `DefinitionMetaReader`, `design/meta-layer-namespaces.md`). The value is bound where
-  the context binds its type, and otherwise read in tree mode (the declaring schema's `treeVocabularyOf`, or a
-  tree-mode compile of the entries ready so far) and held as a tree.
+- **A payload is a value body exactly when its head is no constructor**: a value entry's payload is read against the type,
+  under the loader's identifier policy, and lifts nothing; a construction's binding record is read under no policy
+  (`SchemaResolver`'s `ConstructionReader`, `design/namespace-types-and-value-entries.md`). The value is bound where the
+  context binds its type, and otherwise read in tree mode (the declaring schema's `treeVocabularyOf`, or a tree-mode compile
+  of the entries ready so far) and held as a tree.
 - **The kernel reads through itself.** Its resolution is handed the pre-loaded stand-in, which answers for every
   name, the one cycle being closed by pre-loading (§3.4).
 
-## Kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
+## Kernel bootstrap (`tson-compiler/.../resolver/KernelBootstrapResolver.java`)
 
 The kernel, meta.tn (`TsonBundledSchemas.META_ID`), is special: its header is its `!!id` alone. It holds the kernel's
 one wait cycle, every name the cycle's declarations reference, closed to a fixed point, so it resolves and links on its
@@ -295,12 +295,12 @@ from a document, and its names reach any other schema only by import. Every name
 naming a sibling writes its path, and the synthetics its sugar lifts are minted at its root. A schema importing it alone has
 every sugar form and `meta.ref`. numeric.tn, temporal.tn and net.tn each import it alone and declare their
 constructors under a map of their own, `numeric`, `temporal` and `net`, contributing nothing to `meta`
-(`design/meta-layer-namespaces.md` has the open-namespace merge); core.tn imports the three. Ordinary resolution
+(`design/namespace-types-and-value-entries.md` has the open-namespace merge); core.tn imports the three. Ordinary resolution
 can't bootstrap the kernel: an instance waits on its constructor being ready, and the instances on the one wait cycle wait on
 each other, so they are built by hand (§3.4), and only the wait order over what that leaves is the algorithm every schema
 runs.
 
-`MetaKernelBootstrapResolver.getMetaKernelSchema()` (its only public method) produces the resolved kernel under
+`KernelBootstrapResolver.kernelSchema()` (its only public method) produces the resolved kernel under
 `SPEC-FEEDBACK.md #4`'s order: reading a value against a type waits on the type being ready, and on each type a part
 of the value is read against as the read reaches it; a reference and a held value (a default or pin) order nothing.
 Its output is what ordinary resolution of the kernel against it produces, entry for entry and constructor for
@@ -322,7 +322,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   the integer family's `min`, `max` and `size` (`numeric.count`'s `size: { bits: 64  signed: true }`) and a
   reference's `of` and `allow_sibling` (`meta.type_ref`'s `allow_sibling: false`). Once every entry is ready the
   chains are closed transitively, as `SchemaResolver` closes a schema's (`completeChains`), so `meta.identifier_ref`,
-  a refinement of `meta.type_ref`, lists `meta.field_type_ref` too. `MetaKernelBootstrapResolverTest` measures the
+  a refinement of `meta.type_ref`, lists `meta.field_type_ref` too. `KernelBootstrapResolverTest` measures the
   cycle with `WaitGraph` from `spec/fixtures/meta-resolved.tn` (the six maps read as their members under their paths)
   and asserts the hand-built names equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest`
   prints the measurement — 88 entries (68 members of the six maps, 13 at the root and 7 synthetics; the maps
@@ -339,7 +339,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   !meta.type_ref ^ { … }` on `meta.type_ref`, hand-built; the names their `key_type` and `of` hold order nothing, so
   neither is a wait of the cycle's entries and the measurements above stand.
 - **Every other instance is read through the ordinary path.** `DefinitionResolver.resolveInstance` binds through a
-  `DefinitionMetaReader` that reads through `WaitOrder.read`, against readers compiled from the entries ready now:
+  `ConstructionReader` that reads through `WaitOrder.read`, against readers compiled from the entries ready now:
   `TsonSchemaLinker.linkReady(ready, null, pending)` then `TsonSchemaCompiler.compileReady(linked, factories,
   pending)`, `pending` naming the kernel's declarations not yet ready. A pending name compiles to a
   `PendingTypeReader`. A read that reaches one throws `PendingTypeReader.NotReady`; the order makes that entry
@@ -360,7 +360,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   resolution does.
 - **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
   first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by
-  (`TsonCompiledMetaRegistry.loadMeta` links and compiles the output into the stand-in).
+  (`TsonCompiledVocabularyRegistry.loadVocabulary` links and compiles the output into the stand-in).
 - **Every name the kernel holds is the kernel's own**, so `DefinitionResolver` judges kinds and constructors with a
   predicate that admits every name (`name -> true`); ordinary resolution judges by the origin of each name in the
   merged namespace instead, `TsonBundledSchemas.isKernel` admitting meta.tn alone, so a member a user schema
@@ -371,7 +371,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   is fixed by the sugar forms and nothing is looked up in another schema. The kernel's six sugar forms are
   ordinary declarations at its root by the time the linker sees them, and every sugar target is the kernel's own.
 - **Cost.** The two partial links and compiles make a warm bootstrap about 11 ms, and it runs once per registry:
-  `loadMeta` builds the stand-in on the first lookup of meta.tn's identity and reuses it until the ordinarily
+  `loadVocabulary` builds the stand-in on the first lookup of meta.tn's identity and reuses it until the ordinarily
   resolved kernel is registered (`registerBundled`), after which the kernel's vocabulary is that registered schema's
   compile. The whole of `Tson.standard()`, all six bundled schemas resolved and registered, is about 440 ms as a
   fresh JVM's first call and 65 ms warm.

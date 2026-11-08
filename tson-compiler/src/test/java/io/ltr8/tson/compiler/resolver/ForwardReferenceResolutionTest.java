@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Top;
@@ -28,7 +28,8 @@ class ForwardReferenceResolutionTest {
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !schema {
                 """ + body + "\n}\n";
-        SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
+        SchemaResolver resolver =
+                new SchemaResolver(new TsonCompiledVocabularyRegistry(SchemaModelNameBinder.defaultContext()));
         return resolver.resolveSchema(new TsonSchemaParser(document).parseSchemaDocument());
     }
 

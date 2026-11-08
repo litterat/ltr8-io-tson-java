@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -266,23 +266,25 @@ class KernelUnderMetaTest {
      */
     @Test
     void theSchemaModelBindsTheKernelDocumentsDeclarations() throws Exception {
-        assertEquals(RecordBody.class, SchemaMetaNameBinder.INSTANCE.resolve("meta.record"));
-        assertEquals(UuidType.class, SchemaMetaNameBinder.INSTANCE.resolve("net.uuid_type"));
-        assertEquals(RecordField.class, SchemaMetaNameBinder.INSTANCE.resolve("meta.record_field"));
-        assertEquals(Ipv4Type.class, SchemaMetaNameBinder.INSTANCE.resolve("net.ipv4_type"));
+        assertEquals(RecordBody.class, SchemaModelNameBinder.INSTANCE.resolve("meta.record"));
+        assertEquals(UuidType.class, SchemaModelNameBinder.INSTANCE.resolve("net.uuid_type"));
+        assertEquals(RecordField.class, SchemaModelNameBinder.INSTANCE.resolve("meta.record_field"));
+        assertEquals(Ipv4Type.class, SchemaModelNameBinder.INSTANCE.resolve("net.ipv4_type"));
         assertEquals(io.ltr8.tson.schema.numeric.DecimalType.class,
-                SchemaMetaNameBinder.INSTANCE.resolve("numeric.decimal_type"));
+                SchemaModelNameBinder.INSTANCE.resolve("numeric.decimal_type"));
         assertEquals(io.ltr8.tson.schema.temporal.DateType.class,
-                SchemaMetaNameBinder.INSTANCE.resolve("temporal.date_type"));
-        assertEquals(io.ltr8.tson.schema.binary.BytesType.class, SchemaMetaNameBinder.INSTANCE.resolve("binary.bytes_type"));
+                SchemaModelNameBinder.INSTANCE.resolve("temporal.date_type"));
+        assertEquals(io.ltr8.tson.schema.binary.BytesType.class,
+                SchemaModelNameBinder.INSTANCE.resolve("binary.bytes_type"));
         assertEquals(io.ltr8.tson.schema.temporal.DateTimeType.class,
-                SchemaMetaNameBinder.INSTANCE.resolve("temporal.datetime_type"));
+                SchemaModelNameBinder.INSTANCE.resolve("temporal.datetime_type"));
         assertEquals(io.ltr8.tson.schema.numeric.IntegerType.class,
-                SchemaMetaNameBinder.INSTANCE.resolve("numeric.integer_type"));
-        assertEquals(io.ltr8.tson.schema.unicode.TextType.class, SchemaMetaNameBinder.INSTANCE.resolve("unicode.text_type"));
-        assertThrows(io.ltr8.bind.DataBindException.class, () -> SchemaMetaNameBinder.INSTANCE.resolve("record"));
+                SchemaModelNameBinder.INSTANCE.resolve("numeric.integer_type"));
+        assertEquals(io.ltr8.tson.schema.unicode.TextType.class,
+                SchemaModelNameBinder.INSTANCE.resolve("unicode.text_type"));
+        assertThrows(io.ltr8.bind.DataBindException.class, () -> SchemaModelNameBinder.INSTANCE.resolve("record"));
         assertThrows(io.ltr8.bind.DataBindException.class,
-                () -> SchemaMetaNameBinder.INSTANCE.resolve("meta.short_text_type"));
+                () -> SchemaModelNameBinder.INSTANCE.resolve("meta.short_text_type"));
     }
 
     /**
@@ -291,7 +293,7 @@ class KernelUnderMetaTest {
      */
     @Test
     void theRootTagIsTheSpellingOfTheKernelsSchema() {
-        Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
+        Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaModelNameBinder.defaultContext()));
         List<Diagnostic> problems = new java.util.ArrayList<>();
         tson.treeReader().withImports(List.of(TsonBundledSchemas.META_ID)).withDiagnostics(problems::add)
                 .readAs("!schema { a => !meta.record { fields: {} } }", TsonSchema.SCHEMA);

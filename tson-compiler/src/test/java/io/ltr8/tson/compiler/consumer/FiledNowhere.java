@@ -4,7 +4,7 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
- * A meta-layer record that declares none of its references. {@code ValuesByNameTest} shows the by-name one judged
+ * A vocabulary record that declares none of its references. {@code ValuesByNameTest} shows the by-name one judged
  * anyway: the resolver's read records it, so nothing the class omits goes unchecked.
  */
 @Typename(name = "filed_nowhere")

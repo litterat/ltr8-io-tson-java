@@ -19,7 +19,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledVocabulary;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.reader.NamespaceInstanceReader;
 import io.ltr8.tson.compiler.stream.ListEventSource;
@@ -51,7 +51,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.SequencedSet;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Function;
@@ -103,7 +102,7 @@ public final class SchemaResolver {
      *               registry that implements it -- and a loader rather than a plain "look it up, throw
      *               if missing" lookup, because the kernel is never resolved from a document: it is
      *               pre-loaded ([TSON-SCHEMA] §3.4), and the loader's implementation ({@code
-     *               TsonCompiledMetaRegistry}) answers for it from its bootstrap.
+     *               TsonCompiledVocabularyRegistry}) answers for it from its bootstrap.
      */
     public SchemaResolver(TsonCompiledSchemaLoader loader) {
         this(loader, loader.limits());
@@ -312,7 +311,7 @@ public final class SchemaResolver {
                 (pending, tree) -> loader.compileReady(readySoFar(document, namespace, origins, facts), pending,
                         tree));
         waitOrder.readyWith(onDemand);
-        Vocabulary vocabulary = isKernel ? new Vocabulary(loader.loadMeta(id))
+        Vocabulary vocabulary = isKernel ? new Vocabulary(loader.loadVocabulary(id))
                 : new Vocabulary(namespace, origins, waitOrder);
         // Where a construction head and an annotation type resolve: the whole namespace, made ready in wait order --
         // except in the kernel, whose own resolution reads every head through its pre-loaded stand-in (§3.4).
@@ -335,7 +334,7 @@ public final class SchemaResolver {
         // closing and a later batch closing of the same application land on one entry.
         // A held body closes to whatever its head builds: a type where the head is a constructor, and a value entry
         // where it is an ordinary type (`fetch => <T> !operations { ... }`, then `get_order => fetch<order>`).
-        DefinitionMetaReader reads = new DefinitionMetaReader() {
+        ConstructionReader reads = new ConstructionReader() {
 
             @Override
             public Top read(String written, io.ltr8.tson.compiler.ast.DataValue value) {
@@ -1202,14 +1201,14 @@ public final class SchemaResolver {
     private final class Vocabulary {
 
         /** The kernel's pre-loaded stand-in, answering for every name; {@code null} for every other schema. */
-        private final TsonCompiledMetaSchema self;
+        private final TsonCompiledVocabulary self;
         private final Map<String, Top> imported;
         private final Map<String, String> origins;
 
         /** This document's entries made ready in wait order; {@code null} for the kernel, which reads through itself. */
         private final WaitOrder local;
 
-        Vocabulary(TsonCompiledMetaSchema self) {
+        Vocabulary(TsonCompiledVocabulary self) {
             this.self = self;
             this.imported = self.schema().entries().entries();
             this.origins = Map.of();
@@ -1230,7 +1229,7 @@ public final class SchemaResolver {
         }
 
         /** The compiled schema that declared {@code name}, an imported entry. */
-        private TsonCompiledMetaSchema of(String name) {
+        private TsonCompiledVocabulary of(String name) {
             if (self != null) {
                 return self;
             }

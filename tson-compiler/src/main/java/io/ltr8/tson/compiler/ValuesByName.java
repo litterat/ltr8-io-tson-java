@@ -429,7 +429,7 @@ final class ValuesByName {
         if (constructor != null && space.isConstructor(tag, constructor)) {
             return source;
         }
-        return new Typed(space, TsonCompiledMetaSchema.typenameOf(definition));
+        return new Typed(space, TsonCompiledVocabulary.typenameOf(definition));
     }
 
     /**
@@ -445,7 +445,7 @@ final class ValuesByName {
         if (values == null) {
             throw new IllegalStateException(naming + " is a field of a record value, and this schema was linked with no "
                     + "bind context to read it through -- link it with the context its values were bound under "
-                    + "(TsonCompiledMetaRegistry.link)");
+                    + "(TsonCompiledVocabularyRegistry.link)");
         }
         DataClass bound;
         try {

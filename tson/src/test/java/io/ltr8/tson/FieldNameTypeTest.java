@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.ltr8.tson.base.Diagnostic;
 import java.util.List;
+
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -142,7 +144,7 @@ class FieldNameTypeTest {
         io.ltr8.tson.base.source.SchemaSource source = uri -> JSON_LD;
         io.ltr8.bind.DataBindContext context = io.ltr8.bind.DataBindContext.builder()
                 .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(java.util.Map.of("node", Node.class))
-                        .orElse(io.ltr8.tson.compiler.config.SchemaMetaNameBinder.INSTANCE))
+                        .orElse(SchemaModelNameBinder.INSTANCE))
                 .build();
         Tson tson = Tson.of(io.ltr8.tson.base.ProcessorConfig.defaults()
                 .withSchemaAccess(io.ltr8.tson.base.source.SchemaAccess.of(source))

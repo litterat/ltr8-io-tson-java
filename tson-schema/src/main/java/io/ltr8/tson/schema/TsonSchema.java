@@ -67,7 +67,7 @@ import java.util.Optional;
  * actually stored -- see {@link TsonSchemaRegistry#register}'s own Javadoc for why linked-ness stops
  * mattering once a schema is safely registered).
  *
- * <p><b>{@link #bootstrap()}</b> -- {@code true} <i>only</i> for a schema {@code MetaKernelBootstrapResolver}
+ * <p><b>{@link #bootstrap()}</b> -- {@code true} <i>only</i> for a schema {@code KernelBootstrapResolver}
  * itself produced (the kernel, pre-loaded by special resolution, [TSON-SCHEMA] §3.4). A real, stored flag,
  * not derived from the identity -- a *derived* check can't tell "this schema really
  * was produced by reading meta.tn through the real bootstrap reader" apart from

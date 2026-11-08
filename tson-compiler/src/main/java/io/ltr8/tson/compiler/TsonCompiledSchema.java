@@ -21,13 +21,13 @@ import java.util.Optional;
  *
  * <p>The compile output for *any* resolved schema. A schema compiled as vocabulary -- the readers another
  * schema's resolution reads its construction heads and annotation values through -- is the {@link
- * TsonCompiledMetaSchema} subtype, which adds the reader for an instance of each constructor; a schema compiled
+ * TsonCompiledVocabulary} subtype, which adds the reader for an instance of each constructor; a schema compiled
  * to read data in one mode is a bare {@code TsonCompiledSchema}.
  *
- * <p>{@link #get} reads *any* entry -- unlike {@link TsonCompiledMetaSchema#reader}, which reads an instance of a
+ * <p>{@link #get} reads *any* entry -- unlike {@link TsonCompiledVocabulary#reader}, which reads an instance of a
  * constructor, an entry IS-A {@code top}.
  */
-public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
+public sealed class TsonCompiledSchema permits TsonCompiledVocabulary {
 
     /** How many declared names {@link #unknownTypeMessage} spells out before summarizing the rest. */
     private static final int NAMES_IN_MESSAGE = 8;
@@ -55,7 +55,7 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
 
     /**
      * The {@link TsonLinkedSchema} this was compiled from -- package-private, so the {@link
-     * TsonCompiledMetaSchema} subtype can pass it to {@code super} when built from an existing base schema.
+     * TsonCompiledVocabulary} subtype can pass it to {@code super} when built from an existing base schema.
      */
     TsonLinkedSchema linkedSchema() {
         return linkedSchema;

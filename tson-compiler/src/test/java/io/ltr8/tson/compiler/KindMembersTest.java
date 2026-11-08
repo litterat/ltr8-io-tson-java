@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.resolver.KindMembers;
@@ -53,7 +53,7 @@ class KindMembersTest {
     }
 
     private static TsonLinkedSchema link(String schema, String imported) {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), uri -> {
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
@@ -241,7 +241,7 @@ class KindMembersTest {
      */
     @Test
     void typeRefHoldsTheNamespaceTypesAndTheConstructors() {
-        TsonLinkedSchema kernel = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
+        TsonLinkedSchema kernel = TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(),
                 uri -> {
                     throw new IllegalStateException("unexpected fetch: " + uri);
                 }).resolveLinked(TsonBundledSchemas.META_ID);
@@ -497,7 +497,7 @@ class KindMembersTest {
      */
     @Test
     void theKernelsIdentifierRefHoldsItsIdentifierFamilies() {
-        TsonLinkedSchema meta = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
+        TsonLinkedSchema meta = TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(),
                 uri -> { throw new IllegalStateException("unexpected fetch: " + uri); })
                 .resolveLinked("https://tson.io/2026/39/m/meta.tn");
 
@@ -528,7 +528,7 @@ class KindMembersTest {
 
     /**
      * A constructor pinning {@code name_type} pins a value of the slot's kind, judged where the pin is written: a
-     * meta layer pinning a text family fails to load, and one pinning its own identifier family loads.
+     * schema pinning a text family fails to load, and one pinning its own identifier family loads.
      */
     @Test
     void aPinnedNameTypeIsJudgedAMemberWhereThePinIsWritten() {

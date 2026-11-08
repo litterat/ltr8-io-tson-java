@@ -426,20 +426,20 @@ mistake, not an absent one.
 ### Compiled schemas
 
 ```java
-public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
+public sealed class TsonCompiledSchema permits TsonCompiledVocabulary {
     public TsonTypeReader<?>           get(String typeName);   // throws if there is no such entry
     public Optional<TsonTypeReader<?>> find(String typeName);
     public TsonSchema                  schema();
 }
 
 public final class TsonCompiledSchemaRegistry {
-    public static TsonCompiledSchemaRegistry tree(TsonCompiledMetaRegistry core);
-    public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext ctx);
+    public static TsonCompiledSchemaRegistry tree(TsonCompiledVocabularyRegistry core);
+    public static TsonCompiledSchemaRegistry bind(TsonCompiledVocabularyRegistry core, DataBindContext ctx);
     public TsonCompiledSchema get(String uri);
     public TsonCompiledSchema get(String uri, DiagnosticsReceiver receiver);
     public TsonCompiledSchema get(List<String> imports, DiagnosticsReceiver receiver); // one namespace, once per set
     public TsonCompiledSchema compile(TsonLinkedSchema linked);
-    public TsonCompiledMetaRegistry core();
+    public TsonCompiledVocabularyRegistry core();
 }
 
 public interface TsonTypeReader<T> { T read(TsonReadContext ctx); }
@@ -451,7 +451,7 @@ at compile time; an entry that cannot be built becomes an `ErrorReader` reportin
 read, with two exceptions: a `BindMismatchException` fails the compile, and a
 `MissingBindingException` is thrown unwrapped from its reader.
 
-`TsonCompiledMetaRegistry` is the shared resolution core: it resolves/links/registers every schema, compiles
+`TsonCompiledVocabularyRegistry` is the shared resolution core: it resolves/links/registers every schema, compiles
 (in object-binding mode, cached per identity) only a schema whose constructors or annotation types another
 schema's resolution reads through, and owns content-hash verification, the bootstrap and §2.2.3's
 import-cycle guard.
@@ -478,7 +478,7 @@ everything, are fail-fast by design.
   `EmptyBraceEvent`, `TypeRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`: the schema
-  pipeline's own bind context), `SchemaMetaNameBinder` (`INSTANCE`, `defaultContext()`, `contextExtendedWith(binder)`,
+  pipeline's own bind context), `SchemaModelNameBinder` (`INSTANCE`, `defaultContext()`, `contextExtendedWith(binder)`,
   `extendedWith(binder)`, `over(context)`: every entry of meta.tn (its root names and its members of `meta`, `atom`,
   `numeric`, `unicode`, `net` and `binary`) and each library's members under its map (`numeric`, `temporal`, `net`) bound to
   the schema model, each by its path (`numeric.integer_type` to `io.ltr8.tson.schema.numeric.IntegerType`), every other

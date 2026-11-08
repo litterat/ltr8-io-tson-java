@@ -38,10 +38,6 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **Rename the meta-layer vocabulary the header no longer has.** `TsonCompiledMetaRegistry`,
-  `TsonCompiledMetaSchema`, `TsonCompiledSchemaLoader.loadMeta` and `SchemaMetaNameBinder` name a "meta" no
-  directive states: each is the compiled vocabulary of an imported schema, or
-  the bind context for the schema model's classes. A rename across some 130 files, done as one IDE refactor.
 - [ ] **A data reference does not follow alias chains inside its arguments** ([TSON-SCHEMA] §8.2, §8.3). With
   `user_id => uuid` and the schema closing `box<uuid>`, a data document writing `box<user_id>` at a kind-typed slot is
   matched only through the bottom-up lookup (`ReferenceBody.entryOf`), not by the identity §8.2 gives it, which
@@ -59,7 +55,7 @@ spec-required case:
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
-  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the six bundled
+  `TsonCompiledVocabularyRegistry.withStandardLibrary` already does, which is scoped to just the six bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **A value entry read against a type declared beside it cannot read a field typed by an inline application.**

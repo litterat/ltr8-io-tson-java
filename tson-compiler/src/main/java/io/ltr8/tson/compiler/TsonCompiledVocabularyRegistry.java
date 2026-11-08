@@ -9,7 +9,7 @@ import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -31,14 +31,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * The resolution core: the registry of compiled <b>vocabulary</b>, and the on-demand {@link
  * TsonCompiledSchemaLoader} that fills it. It pairs with a {@link TsonSchemaRegistry}'s store of resolved schemas,
  * adding the compiled half a resolution reads through: a schema whose constructors or annotation types another
- * schema's closure reaches is compiled here, in object-binding mode, once per identity ({@link #loadMeta}). In
+ * schema's closure reaches is compiled here, in object-binding mode, once per identity ({@link #loadVocabulary}). In
  * practice that is the kernel, meta.tn, and numeric.tn, temporal.tn and net.tn, plus any library declaring
  * constructors of its own. Every schema is
  * <i>resolved</i> here -- registered into the paired {@link TsonSchemaRegistry} via {@link #resolveLinked} -- and
  * compiled per mode for reading data in a {@link TsonCompiledSchemaRegistry}.
  *
  * <p><b>As a loader</b> it resolves a schema on demand from its URI, so a resolver reaching an {@code !!import}
- * target needn't have it pre-registered -- {@link #loadMeta} for a schema's compiled vocabulary, {@link
+ * target needn't have it pre-registered -- {@link #loadVocabulary} for a schema's compiled vocabulary, {@link
  * #resolveLinked} for its resolved form. Both, in order: a cache hit; the kernel's own well-known identity, answered
  * by its bootstrap until the kernel is registered (the kernel is pre-loaded and never resolved from a document,
  * [TSON-SCHEMA] §3.4); otherwise fetch via the configured {@link SchemaSource}, parse, resolve via a fresh {@code
@@ -62,7 +62,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * identity).
  *
  * <p><b>Concurrent resolution of one identity is safe; it is not serialized.</b> {@link #register}/{@link
- * #get} are {@code synchronized} and the content-hash map is concurrent, but {@link #loadMeta}/{@link
+ * #get} are {@code synchronized} and the content-hash map is concurrent, but {@link #loadVocabulary}/{@link
  * #resolveLinked} deliberately are not: they recurse into themselves and holding a lock across a fetch
  * would serialize unrelated loads. So two threads reaching the same cold identity both do the work, and the
  * caches settle it -- {@link TsonSchemaRegistry#registerIfAbsent} and {@link #compileAndCache} both keep the
@@ -73,7 +73,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * still reject an identity that is already there, because registering the same schema twice on purpose is a
  * caller error however many threads are involved.
  */
-public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader {
+public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaLoader {
 
     private static final String KERNEL_IDENTITY =
             CanonicalIdentity.canonicalize(TsonBundledSchemas.META_ID);
@@ -83,14 +83,14 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     /** What {@link #resolver} binds with, and so what every namespace value the resolver reads is bound under. */
     private final DataBindContext context;
     private final SchemaSource source;
-    private final Map<String, TsonCompiledMetaSchema> compiled = new LinkedHashMap<>();
+    private final Map<String, TsonCompiledVocabulary> compiled = new LinkedHashMap<>();
     private final Map<String, TsonCompiledSchema> trees = new ConcurrentHashMap<>();
     /**
-     * Meta-kernel's bootstrap stand-in, compiled on the first lookup of its identity and reused until the
+     * The kernel's bootstrap stand-in, compiled on the first lookup of its identity and reused until the
      * ordinarily resolved kernel is registered. The bootstrap is a function of the bundled bytes and this
      * registry's resolver alone, so two threads racing here build equal values and either may win.
      */
-    private volatile TsonCompiledMetaSchema bootstrapped;
+    private volatile TsonCompiledVocabulary bootstrapped;
     // Content hash per canonical identity, recorded when an identity is first resolved. Every
     // hash-pinned reference to an identity is verified against it -- so conflicting pins for one
     // identity error (at most one can match the content) and a plain reference resolves to the
@@ -132,7 +132,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /**
      * The identities this thread is part-way through resolving, outermost first -- [TSON-DATA] §2.2.3's
-     * import-cycle guard ({@link #loadMeta} reaches every link through {@link #resolveLinked}).
+     * import-cycle guard ({@link #loadVocabulary} reaches every link through {@link #resolveLinked}).
      *
      * <p><b>Why a guard is needed at all:</b> an {@code !!import} is resolved through this
      * registry, and a schema is registered only once it is fully linked -- so while {@code a.tn} is resolving it is in
@@ -152,17 +152,17 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * A fresh, empty {@link TsonSchemaRegistry} of its own and no fetch capability -- the common case for a
      * caller that owns the whole registration+compilation pipeline and only resolves the bundled standard library.
      */
-    public TsonCompiledMetaRegistry(DataBindContext context) {
+    public TsonCompiledVocabularyRegistry(DataBindContext context) {
         this(new TsonSchemaRegistry(), context);
     }
 
     /** As above but sharing an existing {@link TsonSchemaRegistry}, still with no fetch capability. */
-    public TsonCompiledMetaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context) {
+    public TsonCompiledVocabularyRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context) {
         this(schemaRegistry, context, SchemaSource.registeredOnly());
     }
 
     /** A fresh, empty {@link TsonSchemaRegistry} of its own, with a fetch {@code source}. */
-    public TsonCompiledMetaRegistry(DataBindContext context, SchemaSource source) {
+    public TsonCompiledVocabularyRegistry(DataBindContext context, SchemaSource source) {
         this(new TsonSchemaRegistry(), context, source);
     }
 
@@ -171,12 +171,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      *     object-binding mode (a DOM resolver can't resolve the {@code !enum}/{@code !integer} instances a
      *     schema declares), so it is taken as a {@link DataBindContext} and the bind-mode {@code
      *     ValueReaderFactoryResolver} is built from it here rather than accepted directly and possibly wrong.
-     * @param source where {@link #loadMeta}/{@link #resolveLinked} fetch a not-yet-registered schema's
+     * @param source where {@link #loadVocabulary}/{@link #resolveLinked} fetch a not-yet-registered schema's
      *     source text from -- {@link SchemaSource#registeredOnly()} by default, so nothing is fetched
      *     unless a caller opts in.
      */
-    public TsonCompiledMetaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
-                                      SchemaSource source) {
+    public TsonCompiledVocabularyRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
+                                          SchemaSource source) {
         this.schemaRegistry = schemaRegistry;
         this.resolver = ValueReaderFactoryRegistry.bind(context);
         this.context = context;
@@ -185,8 +185,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /**
      * The paired {@link TsonSchemaRegistry} -- a caller resolving a declaration against one of the schemas
-     * registered here (an {@code !!import} target, ...) reads its resolved entries from there, same
-     * as always; this registry only adds the compiled half.
+     * registered here (an {@code !!import} target, ...) reads its resolved entries from there;
+     * this registry only adds the compiled half.
      */
     public TsonSchemaRegistry schemaRegistry() {
         return schemaRegistry;
@@ -194,13 +194,13 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /**
      * Compiles {@code linked} against this registry's own object-binding resolver as vocabulary ({@link
-     * TsonCompiledMetaSchema#compile}), without registering or caching it. The one-off/bootstrap path: it is how
+     * TsonCompiledVocabulary#compile}), without registering or caching it. The one-off/bootstrap path: it is how
      * the kernel itself is first compiled, pre-loaded ([TSON-SCHEMA] §3.4). {@code linked} is expected to come from
      * {@code TsonSchemaLinker#linkBootstrap} for that case. Also compiles an already-resolved entry set that never went
      * through this registry's own fetch/resolve pipeline.
      */
-    public TsonCompiledMetaSchema bootstrap(TsonLinkedSchema linked) {
-        return TsonCompiledMetaSchema.compile(linked, resolver);
+    public TsonCompiledVocabulary bootstrap(TsonLinkedSchema linked) {
+        return TsonCompiledVocabulary.compile(linked, resolver);
     }
 
     /**
@@ -209,21 +209,21 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * way to get a working registry; the plain constructors leave it empty (for a caller that populates
      * it itself, e.g. a test bootstrapping in isolation).
      */
-    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source) {
+    public static TsonCompiledVocabularyRegistry withStandardLibrary(DataBindContext context, SchemaSource source) {
         return withStandardLibrary(context, source, IdentifierPolicy.defaults());
     }
 
     /** The same, with {@link #identifierPolicy} chosen rather than defaulted. */
-    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
-                                                               IdentifierPolicy identifierPolicy) {
+    public static TsonCompiledVocabularyRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
+                                                                     IdentifierPolicy identifierPolicy) {
         return withStandardLibrary(context, source, identifierPolicy, LimitsPolicy.defaults());
     }
 
     /** The same, with {@link #limits} chosen rather than defaulted as well. */
-    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
-                                                               IdentifierPolicy identifierPolicy,
-                                                               LimitsPolicy limits) {
-        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
+    public static TsonCompiledVocabularyRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
+                                                                     IdentifierPolicy identifierPolicy,
+                                                                     LimitsPolicy limits) {
+        TsonCompiledVocabularyRegistry registry = new TsonCompiledVocabularyRegistry(context, source);
         registry.identifierPolicy = Objects.requireNonNull(identifierPolicy, "identifierPolicy");
         registry.limits = Objects.requireNonNull(limits, "limits");
         registry.loadStandardLibrary();
@@ -246,7 +246,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     public TsonCompiledSchema compileReady(TsonSchema ready, Set<String> pending, boolean tree) {
         TsonLinkedSchema linked = TsonSchemaLinker.linkReady(ready, schemaRegistry, pending);
         return tree ? TsonSchemaCompiler.compileReady(linked, ValueReaderFactoryRegistry.tree(), pending)
-                : TsonCompiledMetaSchema.compileReady(linked, resolver, pending);
+                : TsonCompiledVocabulary.compileReady(linked, resolver, pending);
     }
 
     /**
@@ -254,7 +254,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * schema importing them resolves. Each is fetched straight from {@link TsonBundledSchemas} (never the
      * configured {@code source}) and registered; its own {@code !!import} targets are cache hits
      * by the time they're needed (the kernel is resolved ordinarily against its pre-loaded stand-in and registered
-     * explicitly -- see {@link #loadMeta}).
+     * explicitly -- see {@link #loadVocabulary}).
      */
     private void loadStandardLibrary() {
         for (String id : TsonBundledSchemas.IDS) {
@@ -266,7 +266,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * Fetches one bundled schema's own source straight from {@link TsonBundledSchemas}, records its content
      * hash (so a later hash-pinned reference to it is verified), resolves it against this registry (its
      * {@code !!import} targets already loaded) and registers it. Its compiled vocabulary is built on
-     * first use ({@link #loadMeta}), so a bundled schema no resolution reads through is never compiled here.
+     * first use ({@link #loadVocabulary}), so a bundled schema no resolution reads through is never compiled here.
      */
     private void registerBundled(String id) {
         String sourceText = TsonBundledSchemas.fetch(id);
@@ -290,9 +290,9 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * holding a lock across a whole fetch would serialize unrelated loads for no real benefit.
      */
     @Override
-    public TsonCompiledMetaSchema loadMeta(String uri) {
+    public TsonCompiledVocabulary loadVocabulary(String uri) {
         String identity = CanonicalIdentity.canonicalize(uri);
-        Optional<TsonCompiledMetaSchema> cached = get(uri);
+        Optional<TsonCompiledVocabulary> cached = get(uri);
         if (cached.isPresent()) {
             // Already compiled: verify *this* reference's own pin against the identity's content hash. A
             // conflicting pin (a different digest than the one this identity was verified against) errors
@@ -307,9 +307,9 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             // ordinarily against this one; until then this stand-in, built once per registry, answers every
             // lookup, so nothing is ever left unable to resolve.
             recordAndVerify(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID), uri, identity);
-            TsonCompiledMetaSchema standIn = bootstrapped;
+            TsonCompiledVocabulary standIn = bootstrapped;
             if (standIn == null) {
-                standIn = bootstrap(TsonSchemaLinker.linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema()));
+                standIn = bootstrap(TsonSchemaLinker.linkBootstrap(KernelBootstrapResolver.kernelSchema()));
                 bootstrapped = standIn;
             }
             return standIn;
@@ -327,8 +327,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      *                               import that carried the entry was linked against
      */
     @Override
-    public TsonCompiledMetaSchema vocabularyOf(String identity) {
-        TsonCompiledMetaSchema cached;
+    public TsonCompiledVocabulary vocabularyOf(String identity) {
+        TsonCompiledVocabulary cached;
         synchronized (this) {
             cached = compiled.get(identity);
         }
@@ -340,7 +340,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             return compileAndCache(registered.get());
         }
         if (KERNEL_IDENTITY.equals(identity)) {
-            return loadMeta(TsonBundledSchemas.META_ID);
+            return loadVocabulary(TsonBundledSchemas.META_ID);
         }
         throw new IllegalStateException("'" + identity + "' is named as the schema that declared an imported entry, "
                 + "and no schema is registered under it");
@@ -352,12 +352,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * what a per-mode {@link TsonCompiledSchemaRegistry} reads a user schema through, and what an {@code
      * !!import} target is resolved through: the schema is resolved once here (bind-anchored, so its own
      * {@code !enum}/{@code !integer} instances bind correctly), and each read registry compiles the
-     * returned linked form itself, in its own mode -- so a non-meta schema is never compiled and cached in
-     * this core just to be read or imported. Idempotent via {@link #schemaRegistry} (a second call is a
+     * returned linked form itself, in its own mode -- so a schema is never compiled and cached in this core just
+     * to be read or imported. Idempotent via {@link #schemaRegistry} (a second call is a
      * cache hit); this reference's own {@code ?sha256=} pin is verified each call (§10.2).
      *
      * <p>For ordinary schemas only -- not the kernel's pre-loaded bootstrap, which {@link
-     * #loadMeta} owns (the kernel's stand-in is never registered, so it has no linked form here to hand back).
+     * #loadVocabulary} owns (the kernel's stand-in is never registered, so it has no linked form here to hand back).
      */
     @Override
     public TsonLinkedSchema resolveLinked(String uri) {
@@ -553,19 +553,19 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * reader needs linking already done) and stores it keyed by {@code schema}'s own {@code !!id}. The
      * result is returned directly, so a caller building a chain by hand doesn't have to {@link #get} it again.
      */
-    public synchronized TsonCompiledMetaSchema register(TsonSchema schema) {
+    public synchronized TsonCompiledVocabulary register(TsonSchema schema) {
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry,
                 IdentifierPolicy.defaults(), context));
         return compileAndCache(registered);
     }
 
     /**
-     * Compiles an already-linked, already-registered schema as vocabulary ({@link TsonCompiledMetaSchema#compile})
+     * Compiles an already-linked, already-registered schema as vocabulary ({@link TsonCompiledVocabulary#compile})
      * and caches it by canonical identity. The compiled-cache half of resolution, split from {@link
      * #resolveLinked}'s register-only half.
      *
-     * <p><b>First one wins, rather than last.</b> {@link #loadMeta} checks the cache before doing the work,
-     * so two threads reaching the same uncached meta together both compile it; storing both would leave two
+     * <p><b>First one wins, rather than last.</b> {@link #loadVocabulary} checks the cache before doing the work,
+     * so two threads reaching the same uncached identity together both compile it; storing both would leave two
      * equivalent instances for one identity, with whichever readers were built against the loser holding a
      * reference nothing else shares. Overwriting is not an error -- the two are equivalent -- but one
      * instance per identity is the property a cache is supposed to have. {@link #register}'s own path
@@ -584,13 +584,13 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
                 id -> TsonSchemaCompiler.compile(registered, ValueReaderFactoryRegistry.tree()));
     }
 
-    private synchronized TsonCompiledMetaSchema compileAndCache(TsonLinkedSchema registered) {
+    private synchronized TsonCompiledVocabulary compileAndCache(TsonLinkedSchema registered) {
         String identity = CanonicalIdentity.canonicalize(registered.schema().id());
-        TsonCompiledMetaSchema existing = compiled.get(identity);
+        TsonCompiledVocabulary existing = compiled.get(identity);
         if (existing != null) {
             return existing;
         }
-        TsonCompiledMetaSchema result = TsonCompiledMetaSchema.compile(registered, resolver);
+        TsonCompiledVocabulary result = TsonCompiledVocabulary.compile(registered, resolver);
         compiled.put(identity, result);
         return result;
     }
@@ -598,9 +598,9 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     /**
      * The compiled vocabulary cached under {@code id}, if any -- matched by canonical identity ({@link
      * CanonicalIdentity#canonicalize}), so any spelling (pinned or plain) of a registered schema's own {@code !!id}
-     * finds it. Present once {@link #loadMeta} or {@link #register} compiled it.
+     * finds it. Present once {@link #loadVocabulary} or {@link #register} compiled it.
      */
-    public synchronized Optional<TsonCompiledMetaSchema> get(String id) {
+    public synchronized Optional<TsonCompiledVocabulary> get(String id) {
         return Optional.ofNullable(compiled.get(CanonicalIdentity.canonicalize(id)));
     }
 

@@ -7,7 +7,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
 
@@ -72,7 +72,7 @@ class AliasedInstantiationBindingTest {
     private static Tson bound(String schema, Map<String, Class<?>> names) {
         SchemaSource source = uri -> schema;
         DataBindContext context = DataBindContext.builder()
-                .nameBinder(DataNameBinder.ofMap(names).orElse(SchemaMetaNameBinder.INSTANCE))
+                .nameBinder(DataNameBinder.ofMap(names).orElse(SchemaModelNameBinder.INSTANCE))
                 .registerAtoms(AtomContext.hostTypes())
                 .build();
         Tson tson = Tson.of(ProcessorConfig.defaults()

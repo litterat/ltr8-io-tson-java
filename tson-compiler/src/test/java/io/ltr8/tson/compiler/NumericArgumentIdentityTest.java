@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
@@ -46,8 +46,8 @@ class NumericArgumentIdentityTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledSchemaRegistry.tree(TsonCompiledMetaRegistry
-                .withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source)).get(ID);
+        return TsonCompiledSchemaRegistry.tree(TsonCompiledVocabularyRegistry
+                .withStandardLibrary(SchemaModelNameBinder.defaultContext(), source)).get(ID);
     }
 
     /**

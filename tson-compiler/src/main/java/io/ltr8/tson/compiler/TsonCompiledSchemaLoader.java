@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 
@@ -17,18 +17,18 @@ import java.util.Set;
  *   <li>{@link #resolveLinked} -- an {@code !!import} target (or a user schema being read): its
  *       <i>resolved</i> form, merged into the importer's namespace, or compiled per-mode by a {@code
  *       TsonCompiledSchemaRegistry}.
- *   <li>{@link #loadMeta} -- the <i>compiled</i> vocabulary of the schema that declared a constructor or an
+ *   <li>{@link #loadVocabulary} -- the <i>compiled</i> vocabulary of the schema that declared a constructor or an
  *       annotation type the importer applies: its {@code !enum}/{@code !integer} instances are read into {@code
  *       schema.meta} objects during the importer's own resolution.
  * </ul>
  *
  * <p>Not a plain registry lookup, because the kernel is never resolved from a document: it is pre-loaded
  * ([TSON-SCHEMA] §3.4), and an implementation answers a request for it directly, via {@link
- * MetaKernelBootstrapResolver#getMetaKernelSchema()}'s bootstrap.
+ * KernelBootstrapResolver#kernelSchema()}'s bootstrap.
  *
  * <p>Also the natural, single place to enforce policy over <i>what</i> gets resolved from <i>where</i>
  * (whitelisting/blacklisting hosts, disk-only resolution) -- see {@link SchemaSource}, the pluggable
- * hook the implementation ({@code TsonCompiledMetaRegistry}) defers to for exactly this, once a request
+ * hook the implementation ({@code TsonCompiledVocabularyRegistry}) defers to for exactly this, once a request
  * isn't already cached and isn't the kernel bootstrap case.
  */
 public interface TsonCompiledSchemaLoader {
@@ -52,16 +52,16 @@ public interface TsonCompiledSchemaLoader {
      *
      * @throws RuntimeException whatever {@link #resolveLinked} may throw
      */
-    TsonCompiledMetaSchema loadMeta(String uri);
+    TsonCompiledVocabulary loadVocabulary(String uri);
 
     /**
-     * {@link #loadMeta} for a schema already registered, named by its canonical identity ({@code
+     * {@link #loadVocabulary} for a schema already registered, named by its canonical identity ({@code
      * CanonicalIdentity.canonicalize}) -- the origin an imported entry records, which is the schema whose compiled
      * readers read an instance of it.
      *
      * @throws IllegalStateException if no schema is registered under {@code identity}
      */
-    TsonCompiledMetaSchema vocabularyOf(String identity);
+    TsonCompiledVocabulary vocabularyOf(String identity);
 
     /**
      * The registered schema named by {@code identity}, compiled in tree mode: what a value entry's payload is read

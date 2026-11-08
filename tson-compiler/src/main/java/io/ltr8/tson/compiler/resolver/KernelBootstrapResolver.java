@@ -20,7 +20,7 @@ import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.reader.PendingTypeReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.stream.ListEventSource;
@@ -65,13 +65,13 @@ import java.util.Set;
  *   <li><b>The pre-loaded set is hand-built</b> ({@link #instanceBody}, {@link #refinedBody}): the instances and the
  *       two refinements on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED} and
  *       the arrays lifted over {@link #PRE_LOADED_ELEMENTS}. Rule 4 makes the set a measurement of the kernel, and
- *       {@code MetaKernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle
+ *       {@code KernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle
  *       fails there rather than here.</li>
  *   <li><b>A declaration no read produces is resolved from its grammar</b> by {@link DefinitionResolver}, as {@link
  *       SchemaResolver} resolves a record: a composition, a refinement of a record, an alias, a template. It reads
  *       nothing, so it is ready as soon as the entries it composes are.</li>
  *   <li><b>Every other instance and atom refinement is read through the ordinary path</b>, {@link
- *       DefinitionResolver}'s, whose {@link DefinitionMetaReader} reads through readers compiled from the entries
+ *       DefinitionResolver}'s, whose {@link ConstructionReader} reads through readers compiled from the entries
  *       ready so far ({@link TsonSchemaLinker#linkReady}, {@link TsonSchemaCompiler#compileReady}). An entry not
  *       yet ready compiles to a {@link PendingTypeReader}: a read that reaches one stops ({@link
  *       PendingTypeReader.NotReady}), the entry it names is made ready on demand, the ready entries are compiled
@@ -84,17 +84,17 @@ import java.util.Set;
  * ready before it starts. The order is computed, never the order entries are written in: an entry is made ready the
  * first time anything asks for it, and an entry that waits on itself is refused, naming the cycle -- a wait cycle
  * outside the pre-loaded set, which only a kernel edit can introduce. Everything closes here:
- * every entry is ready before {@link #getMetaKernelSchema()} returns, and its output is the kernel's resolved form,
+ * every entry is ready before {@link #kernelSchema()} returns, and its output is the kernel's resolved form,
  * entry for entry what the kernel's ordinary resolution against it produces.
  *
  * <p>The output is resolved and not linked: a caller links it through {@link TsonSchemaLinker#linkBootstrap} --
  * never {@code TsonSchemaRegistry#register}, which refuses a bootstrap schema -- and compiles it. {@link
  * SchemaDesugarer} runs first, as for every schema: the desugar table is fixed by the sugar forms (§5.3), so it
- * consults no governing meta. The class is locked down to one public method taking no arguments: it bootstraps
+ * consults no imported vocabulary. The class is locked down to one public method taking no arguments: it bootstraps
  * the bundled kernel, meta.tn ({@link TsonBundledSchemas#META_ID}), fetched from the classpath so the
  * bootstrap works from a built jar, and nothing else.
  */
-public final class MetaKernelBootstrapResolver {
+public final class KernelBootstrapResolver {
 
     /**
      * The kernel's named instances and refinements on its one wait cycle, built by hand: the {@code boolean} and
@@ -114,7 +114,7 @@ public final class MetaKernelBootstrapResolver {
      */
     private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("meta.type_ref", "meta.field_group", "text");
 
-    private MetaKernelBootstrapResolver() {
+    private KernelBootstrapResolver() {
     }
 
     /**
@@ -123,14 +123,14 @@ public final class MetaKernelBootstrapResolver {
      * that matters: {@code TsonSchemaRegistry.register} gates on it, so the kernel's own identity can only be
      * registered by something that came from here.
      */
-    public static TsonSchema getMetaKernelSchema() {
+    public static TsonSchema kernelSchema() {
         TsonSchemaParser parser = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID));
         return resolve(parser.parseSchemaDocument(), parser.schemaPositions());
     }
 
     /**
-     * {@link #getMetaKernelSchema()} over {@code parsed}, the kernel's parsed source: package-private so {@code
-     * MetaKernelBootstrapResolverTest} can hand it the kernel's declarations in another order, and see the order
+     * {@link #kernelSchema()} over {@code parsed}, the kernel's parsed source: package-private so {@code
+     * KernelBootstrapResolverTest} can hand it the kernel's declarations in another order, and see the order
      * they are written in consulted for nothing.
      */
     static TsonSchema resolve(SchemaDocument parsed, SchemaPositions positions) {
@@ -143,8 +143,8 @@ public final class MetaKernelBootstrapResolver {
     }
 
     /**
-     * The entries {@link #getMetaKernelSchema()} builds by hand, by the names the desugared kernel gives them -- what
-     * {@code MetaKernelBootstrapResolverTest} holds against the measured wait cycle.
+     * The entries {@link #kernelSchema()} builds by hand, by the names the desugared kernel gives them -- what
+     * {@code KernelBootstrapResolverTest} holds against the measured wait cycle.
      */
     static Set<String> preLoaded() {
         SchemaDocument parsed = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID))
@@ -206,7 +206,7 @@ public final class MetaKernelBootstrapResolver {
         private final Map<String, TsonSchema.EntryFacts> facts;
         private final WaitOrder order;
         private final DefinitionResolver resolver;
-        private final DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        private final DataBindContext context = SchemaModelNameBinder.defaultContext();
 
         Bootstrap(SchemaDocument document, Set<String> declared, SchemaPositions positions,
                   Map<String, TsonSchema.EntryFacts> facts) {
@@ -277,7 +277,7 @@ public final class MetaKernelBootstrapResolver {
         }
 
         /**
-         * The {@link DefinitionMetaReader}: {@code value} read against constructor {@code type}'s reader, compiled
+         * The {@link ConstructionReader}: {@code value} read against constructor {@code type}'s reader, compiled
          * from the entries ready now; a read that reaches an entry not yet ready makes it ready and starts over.
          */
         private Top read(String type, DataValue value) {
@@ -361,8 +361,8 @@ public final class MetaKernelBootstrapResolver {
      * {@code numeric.count} the integer family's {@code min}, {@code max} and {@code size}, for {@code meta.type_ref}
      * a reference's {@code of} and {@code allow_sibling} ({@link #refinedReference}), and the rest refused by name
      * rather than pretending to be general. Ordinary resolution merges through a {@code DataClassObjectWriter}
-     * round trip and the governing meta's compiled reader ({@code DefinitionResolver.resolveAtomRefinement}), which
-     * is the reader being produced.
+     * round trip and the compiled reader of the vocabulary declaring the constructor ({@code
+     * DefinitionResolver.resolveAtomRefinement}), which is the reader being produced.
      */
     private static Type refinedBody(String name, AtomRefinement refinement, Top target) {
         if (target instanceof ReferenceBody reference) {
@@ -451,7 +451,7 @@ public final class MetaKernelBootstrapResolver {
      * {@code enum}; and a record of tokens for {@code reference_type}, for {@code map} and for the {@code
      * array}/{@code set_type} binding records {@link SchemaDesugarer} lifts.
      *
-     * <p>Package-private so {@code MetaKernelBootstrapResolverTest} can reach the refusals the real kernel never
+     * <p>Package-private so {@code KernelBootstrapResolverTest} can reach the refusals the real kernel never
      * does.
      */
     static Top instanceBody(String name, Instance instance) {
