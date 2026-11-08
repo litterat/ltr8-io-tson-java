@@ -2,7 +2,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TypeRefAnnotationTest {
 
     private static Top read(String document) {
-        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaModelNameBinder.defaultContext()))
                 .objectReader().withSchema(TsonBundledSchemas.META_ID)
                 .readAs(document, "meta.top", Top.class);
     }
@@ -60,7 +60,7 @@ class TypeRefAnnotationTest {
                   n => !meta.record_field { type: @doc:"the token itself" text }
                 } }"""));
 
-        String written = new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(type);
+        String written = new TsonObjectWriter(SchemaModelNameBinder.defaultContext()).toTson(type);
 
         assertTrue(written.contains("@doc"), written);
         assertTrue(written.contains("the token itself"), written);

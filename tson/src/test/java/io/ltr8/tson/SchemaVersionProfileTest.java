@@ -7,7 +7,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
@@ -83,7 +83,7 @@ class SchemaVersionProfileTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        DataNameBinder binder = name -> "order".equals(name) ? Order.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "order".equals(name) ? Order.class : SchemaModelNameBinder.INSTANCE.resolve(name);
         DataBindContext context = DataBindContext.builder().nameBinder(binder).profile(profile)
                 .registerAtoms(AtomContext.hostTypes()).build();
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)).withDataBindContext(context));

@@ -5,17 +5,14 @@ import io.ltr8.annotation.Transparent;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonObjectReader;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -92,9 +89,9 @@ class AtomBoundClassUnderSchemaTest {
 
     // ── Setup ────────────────────────────────────────────────────────────
 
-    /** {@code invoice} binds to {@code bound}; every other name resolves as the meta layer's own. */
+    /** {@code invoice} binds to {@code bound}; every other name resolves as the schema model's own. */
     private static DataBindContext context(Class<?> bound, boolean withBridge) {
-        DataNameBinder binder = name -> "invoice".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "invoice".equals(name) ? bound : SchemaModelNameBinder.INSTANCE.resolve(name);
         DataBindContext.Builder builder = DataBindContext.builder().nameBinder(binder)
                 .registerAtoms(AtomContext.hostTypes());
         return (withBridge ? builder.registerAtom(Money.class, new MoneyBridge()) : builder).build();

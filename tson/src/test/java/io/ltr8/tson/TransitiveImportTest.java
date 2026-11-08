@@ -99,8 +99,8 @@ class TransitiveImportTest {
 
     /**
      * The transitive half: {@code d} imports only {@code a-3.tn} and names {@code text}, which {@code a-3.tn}
-     * reaches through its own import of core.tn. The flat namespace makes it available -- the behaviour
-     * §2.2.3 forbids and #55 argues for, and the same rule §3.3.1 already states for {@code !!meta}.
+     * reaches through its own import of core.tn. The flat namespace makes it available: one namespace per schema,
+     * its whole import closure (SPEC-FEEDBACK.md #7).
      */
     @Test
     void aNameReachedThroughAnImportsOwnImportIsInScope() {

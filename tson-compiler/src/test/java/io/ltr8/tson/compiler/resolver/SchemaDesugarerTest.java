@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * denotes before resolution, so {@code DefinitionResolver} only ever sees a bare reference or {@code !C
  * value}.
  *
- * <p>No governing meta appears in any fixture, and that is the point of the phase's current shape: the sugar
+ * <p>No fixture's desugaring consults an import, and that is the point of the phase's current shape: the sugar
  * set is closed and grammar-supplied, so the head each form desugars to and the vocabulary field each
  * argument fills are a fixed table (§5.3), not something read off a constructor's parameter list.
  *

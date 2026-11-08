@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -11,7 +11,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -32,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ChoiceSugarResolutionTest {
 
-    /** Governed by the kernel, which declares the {@code choice} constructor; its compiled form bootstraps on demand. */
+    /** Importing the kernel, which declares the {@code choice} constructor; its compiled form bootstraps on demand. */
     private static TsonSchema resolve(String body) {
         String document = """
                 !!id:"https://example.test/choice-sugar.tn"
@@ -41,8 +40,8 @@ class ChoiceSugarResolutionTest {
                 %s
                 }
                 """.formatted(body);
-        SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(),
-                TsonBundledSchemas::fetch));
+        SchemaResolver resolver = new SchemaResolver(new TsonCompiledVocabularyRegistry(
+                SchemaModelNameBinder.defaultContext(), TsonBundledSchemas::fetch));
         return resolver.resolveSchema(new TsonSchemaParser(document).parseSchemaDocument());
     }
 

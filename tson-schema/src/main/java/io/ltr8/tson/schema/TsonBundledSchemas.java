@@ -22,8 +22,8 @@ import java.util.Optional;
  *
  * <p>Both the identities and their source text live here, in {@code tson-schema}: "what these documents
  * are" (identity) and "where their content lives" (fetch) sit in the one module every consumer of them
- * already depends on -- {@code tson-compiler}'s {@code TsonCompiledMetaRegistry},
- * {@code MetaKernelBootstrapResolver} and {@code TsonSchema.namespaceSources} among them,
+ * already depends on -- {@code tson-compiler}'s {@code TsonCompiledVocabularyRegistry},
+ * {@code KernelBootstrapResolver} and {@code TsonSchema.namespaceSources} among them,
  * {@code tson-compiler} depending on this module and never the reverse.
  *
  * <p>{@link #fetch} is a static method on a class of constants, so there is no instance to implement

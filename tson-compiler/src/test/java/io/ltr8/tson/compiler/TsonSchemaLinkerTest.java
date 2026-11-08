@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Hand-built schemas only -- {@code tson-schema} has no dependency on {@code tson-compiler}, so it
- * can't reach {@code MetaKernelBootstrapResolver} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
+ * can't reach {@code KernelBootstrapResolver} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
  * in {@code tson-compiler} for the real end-to-end check against meta.tn itself).
  *
  */
@@ -68,14 +68,7 @@ class TsonSchemaLinkerTest {
         return body;
     }
 
-    /**
-     * {@code !!meta} is {@link TsonBundledSchemas#META_ID} itself -- every caller passes {@code
-     * null} for {@code loader}, so the structure namespace this would otherwise supply is always
-     * empty regardless of what URI it names; using the real kernel identity instead lets a
-     * hand-built local entry declare its own {@code constructor: true} vocabulary without tripping
-     * {@code TsonSchemaLinker}'s own "only the kernel may declare constructors" check, which
-     * compares against that exact identity, not merely "is this schema self-referencing."
-     */
+    /** A schema of {@code entries} alone, importing nothing. */
     private static TsonSchema schemaOf(Map<String, Top> entries) {
         return new TsonSchema("https://example.test/s.tn", List.of(), entries);
     }
@@ -714,24 +707,16 @@ class TsonSchemaLinkerTest {
                 linked.originOf("shared_name"));
     }
 
-    /**
-     * An import ties to no level (SPEC-FEEDBACK.md #7): whatever either schema's {@code !!meta}, the importer takes
-     * the imported namespace -- an ordinary schema importing a kernel-governed one, the reverse, and two schemas
-     * under different metas.
-     */
+    /** An import's entries join the importer's one namespace beside its own (SPEC-FEEDBACK.md #7). */
     @Test
-    void anImportLinksWhateverEitherSchemasMeta() {
-        for (List<String> metas : List.of(List.of("https://example.test/meta-core.tn", TsonBundledSchemas.META_ID),
-                List.of(TsonBundledSchemas.META_ID, "https://example.test/meta-core.tn"),
-                List.of("https://example.test/meta-api.tn", "https://example.test/meta-core.tn"))) {
-            TsonLinkedSchema linked = linkImporting(metas.get(0), metas.get(1));
+    void anImportLinksIntoTheImportersNamespace() {
+        TsonLinkedSchema linked = linkImporting();
 
-            assertEquals(Set.of("imported_a", "local_a"), linked.schema().entries().keySet(), metas::toString);
-        }
+        assertEquals(Set.of("imported_a", "local_a"), linked.schema().entries().keySet());
     }
 
-    /** {@code importer.tn}, governed by {@code importerMeta}, importing {@code import.tn} under {@code importedMeta}. */
-    private static TsonLinkedSchema linkImporting(String importerMeta, String importedMeta) {
+    /** {@code importer.tn}, importing {@code import.tn}. */
+    private static TsonLinkedSchema linkImporting() {
         TsonLinkedSchema imported = new TsonLinkedSchema(new TsonSchema("https://example.test/import.tn",
                 List.of(), Map.of("imported_a", emptyRecord())));
         Map<String, TsonLinkedSchema> byIdentity =

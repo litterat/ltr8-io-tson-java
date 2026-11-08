@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * lookup reads as precedence.
  *
  * <p><b>The ordering half has no read-side witness, and that is a gap in the tests rather than in the
- * rule.</b> No annotation the meta layer declares changes how a value reads -- everything that decides a
+ * rule.</b> No annotation the kernel declares changes how a value reads -- everything that decides a
  * spelling belongs to the type, the alphabet a {@code bytes} value is written in included ({@code
  * bytes_type.encoding}, [TSON-SCHEMA] §5.5) -- so ordering can only be asserted over resolved output until
  * some annotation carries read-side force. §5.8 gives the rule read-side force wherever one does.

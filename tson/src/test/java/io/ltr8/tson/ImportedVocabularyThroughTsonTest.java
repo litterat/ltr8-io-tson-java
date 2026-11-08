@@ -7,9 +7,8 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.consumer.Operation;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -29,22 +28,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A consumer's own meta-layer vocabulary, reached through the front door. {@code
- * MetaLayerVocabularyTest} pins the mechanism itself against a hand-built {@code
- * TsonCompiledMetaRegistry}; this pins that a caller gets it from {@link Tson#defaults()} without giving up
+ * A consumer's own imported vocabulary, reached through the front door. {@code
+ * ImportedVocabularyTest} pins the mechanism itself against a hand-built {@code
+ * TsonCompiledVocabularyRegistry}; this pins that a caller gets it from {@link Tson#defaults()} without giving up
  * the reader, the writer or the per-mode registries that come with a {@link Tson}.
  *
- * <p>{@link ProcessorConfig#metaNameBinder} is the whole difference. It is composed over {@link
- * SchemaMetaNameBinder#INSTANCE} rather than replacing it, so what it changes is which names resolve and
- * nothing else -- the standard library still compiles in object-binding mode, which is the thing the
- * internal context is fixed to protect.
+ * <p>The configured bind context's name binder ({@link ProcessorConfig#withDataBindContext}) is the whole difference. It is
+ * composed over {@link SchemaModelNameBinder#INSTANCE} rather than replacing it, so what it changes is which names resolve
+ * and nothing else -- the standard library still compiles in object-binding mode, which is the thing the internal context is
+ * fixed to protect.
  */
-class MetaLayerConstructorThroughTsonTest {
+class ImportedVocabularyThroughTsonTest {
 
     private static final String META_HTTP = "https://example.test/meta-http.tn";
     private static final String API = "https://example.test/api.tn";
 
-    /** The meta-layer schema: an operation record, and the namespace type whose values are operations. */
+    /** The vocabulary schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
@@ -63,7 +62,7 @@ class MetaLayerConstructorThroughTsonTest {
             }
             """;
 
-    /** An ordinary API schema governed by it -- two real types, and one entry that is a value, not a type. */
+    /** An ordinary API schema importing it -- two real types, and one entry that is a value, not a type. */
     private static final String API_SCHEMA = """
             !!id:"https://example.test/api.tn"
             !!import:"https://example.test/meta-http.tn"
@@ -99,7 +98,7 @@ class MetaLayerConstructorThroughTsonTest {
 
     /** The point of the whole exercise: each resolved value of the namespace <em>is</em> the consumer's own class. */
     @Test
-    void aConsumersMetaLayerRecordBindsThroughTheDefaults() {
+    void aConsumersImportedRecordBindsThroughTheDefaults() {
         TsonLinkedSchema linked = tson().resolve(API_SCHEMA);
 
         Namespace<?> api = assertInstanceOf(Namespace.class, ((ValueEntry) linked.schema().entries().get("api")).value());
@@ -156,7 +155,7 @@ class MetaLayerConstructorThroughTsonTest {
     @Test
     void anUnknownNameReportsTheConsumersOwnSearchPath() {
         DataBindException thrown = assertThrows(DataBindException.class,
-                () -> SchemaMetaNameBinder.extendedWith(CONSUMER_NAMES).resolve("no_such_constructor"));
+                () -> SchemaModelNameBinder.extendedWith(CONSUMER_NAMES).resolve("no_such_constructor"));
 
         assertTrue(thrown.getMessage().contains("io.ltr8.tson.consumer.NoSuchConstructor"), thrown.getMessage());
     }
@@ -164,12 +163,12 @@ class MetaLayerConstructorThroughTsonTest {
     /** The composed binder is a {@link DataNameBinder}, so a caller assembling a context themselves gets the same names. */
     @Test
     void theComposedBinderResolvesBothVocabularies() throws DataBindException {
-        DataNameBinder binder = SchemaMetaNameBinder.extendedWith(CONSUMER_NAMES);
+        DataNameBinder binder = SchemaModelNameBinder.extendedWith(CONSUMER_NAMES);
 
         assertEquals(Operation.class, binder.resolve("operation"));
         assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("meta.record"));
 
-        DataBindContext context = SchemaMetaNameBinder.contextExtendedWith(CONSUMER_NAMES);
+        DataBindContext context = SchemaModelNameBinder.contextExtendedWith(CONSUMER_NAMES);
         assertEquals(Operation.class, context.getDescriptor("operation").typeClass());
     }
 }

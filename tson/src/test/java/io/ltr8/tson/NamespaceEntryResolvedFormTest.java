@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * An entry built with a namespace type in resolved output ([TSON-SCHEMA] §8.1): written as written, the constructor's
- * tag on the map, and read back under the meta layer that declares the constructor to the same {@link Namespace} --
+ * tag on the map, and read back under the schema that declares the constructor to the same {@link Namespace} --
  * the read a Class 2 schema-layer vector's expected side takes ({@link ResolvedForm#readResolved}).
  */
 class NamespaceEntryResolvedFormTest {

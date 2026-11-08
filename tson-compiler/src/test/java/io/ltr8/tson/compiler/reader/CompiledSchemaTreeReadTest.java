@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CompiledSchemaTreeReadTest {
 
     private static TsonCompiledSchema compiled() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.tree());
     }

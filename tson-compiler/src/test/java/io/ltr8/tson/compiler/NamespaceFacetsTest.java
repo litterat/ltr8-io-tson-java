@@ -37,7 +37,7 @@ class NamespaceFacetsTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         List<Diagnostic> problems = new ArrayList<>();
-        TsonCompiledMetaRegistry.withStandardLibrary(SuiteBindings.context(), source)
+        TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(), source)
                 .resolveLinked(META, problems::add);
         return problems;
     }

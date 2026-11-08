@@ -2,10 +2,10 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Proves {@code TsonSchemaRegistry}/{@code TsonSchemaLinker} (both in {@code tson-schema}) actually work
  * end-to-end against the real {@code meta.tn} fixture -- this test lives here, not in
  * {@code tson-schema}'s own test tree, because it's the only module with both {@link
- * MetaKernelBootstrapResolver} and {@code tson-schema} available (that module has no dependency on {@code
+ * KernelBootstrapResolver} and {@code tson-schema} available (that module has no dependency on {@code
  * tson-compiler} at all).
  *
  * <p>Uses {@link TsonSchemaLinker#linkBootstrap}, not {@link TsonSchemaLinker#link} directly, to turn
@@ -50,7 +50,7 @@ class MetaKernelSchemaRegistryTest {
 
     @Test
     void linksTheRealMetaKernelSchemaWhoseSugarFormsTheDesugarPhaseAlreadyResolved() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
 
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
 
@@ -84,13 +84,13 @@ class MetaKernelSchemaRegistryTest {
     /**
      * The raw bootstrap output, wrapped (not genuinely linked -- {@code register} only takes a
      * {@link TsonLinkedSchema} now, so there's no other way to even attempt this) is refused --
-     * the kernel's own {@code !!meta} names itself, so nothing can resolve it the ordinary way,
+     * the kernel declares every constructor it applies, so nothing can resolve it the ordinary way,
      * whatever form it is in.
      */
     @Test
     void registeringTheRawBootstrapMetaKernelDirectlyIsRejected() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        TsonLinkedSchema unlinked = new TsonLinkedSchema(MetaKernelBootstrapResolver.getMetaKernelSchema());
+        TsonLinkedSchema unlinked = new TsonLinkedSchema(KernelBootstrapResolver.kernelSchema());
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> registry.register(unlinked));
@@ -106,7 +106,7 @@ class MetaKernelSchemaRegistryTest {
      */
     @Test
     void neitherRawNorLinkedBootstrapFormCanEverBeRegistered() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
 
@@ -125,7 +125,7 @@ class MetaKernelSchemaRegistryTest {
      * The one way the kernel's own identity can actually end up registered: resolved via ordinary
      * {@code SchemaResolver.resolveSchema} against a loader whose own bootstrap branch supplies the
      * complete structure namespace (so even a forward-referencing declaration like {@code boolean =>
-     * !enum [...]} resolves correctly, the same as {@code MetaKernelBootstrapResolver}'s own two-pass logic
+     * !enum [...]} resolves correctly, the same as {@code KernelBootstrapResolver}'s own two-pass logic
      * achieves, just via the generic mechanism instead) -- {@code resolveSchema} never sets {@code
      * bootstrap}, so the result passes {@link TsonSchemaRegistry#register}'s guard even though its own
      * entries are identical to the real, linked the kernel. Mirrors {@code
@@ -135,8 +135,8 @@ class MetaKernelSchemaRegistryTest {
     void registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledMetaRegistry compiledRegistry = new TsonCompiledMetaRegistry(context);
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
+        TsonCompiledVocabularyRegistry compiledRegistry = new TsonCompiledVocabularyRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
         String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);

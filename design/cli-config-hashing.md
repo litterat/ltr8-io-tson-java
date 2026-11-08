@@ -260,9 +260,9 @@ list**, distinct because a `DataNameBinder` is fixed when a `DataBindContext` is
 - `AtomContext.defaultContext()` — the built-in atoms' host types, **no name binder**. The consumer and schemaless
   default: what `ProcessorConfig.dataBindContext()` holds unless `withDataBindContext` states one, and the base a
   consumer layers a binder onto. `Tson.of` composes the schema model's binder and registrations onto whichever it is
-  (`SchemaMetaNameBinder.over`), and `Tson.dataBindContext()` returns that composition.
+  (`SchemaModelNameBinder.over`), and `Tson.dataBindContext()` returns that composition.
   `registerAtoms(AtomContext.hostTypes())` adds the same list to any builder, so it lives in one place.
-- `SchemaMetaNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three registrations
+- `SchemaModelNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three registrations
   for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose `SourcePositionStringBridge`
   names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a `DataNameBinder` over
   `io.ltr8.tson.schema` that answers only for every entry of meta.tn (its root names and its members of its six maps)

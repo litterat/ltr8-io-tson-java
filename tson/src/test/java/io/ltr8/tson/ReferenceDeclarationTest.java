@@ -22,14 +22,14 @@ class ReferenceDeclarationTest {
     private static final String META = "https://tson.io/2026/39/m/meta.tn";
     private static final String CORE = "https://tson.io/2026/39/m/core.tn";
 
-    private static String schema(String id, String meta, String imported, String declarations) {
+    private static String schema(String id, String firstImport, String secondImport, String declarations) {
         return """
                 !!id:"%s"
                 !!import:"%s"
                 !!import:"%s"
                 !schema {
                 %s
-                }""".formatted(id, meta, imported, declarations);
+                }""".formatted(id, firstImport, secondImport, declarations);
     }
 
     private static final String PICKS = """
@@ -47,18 +47,18 @@ class ReferenceDeclarationTest {
                 PICKS)));
     }
 
-    /** A meta layer declares one, and so does a schema it governs. */
+    /** A vocabulary schema declares one, and so does a schema importing it. */
     @Test
-    void aSchemaAMetaLayerGovernsDeclaresAReference() {
-        String metaId = "https://example.test/meta-picks.tn";
-        String layer = schema(metaId, KERNEL, META, """
+    void aVocabularyAndASchemaImportingItEachDeclareAReference() {
+        String vocabularyId = "https://example.test/meta-picks.tn";
+        String vocabulary = schema(vocabularyId, KERNEL, META, """
                   picked => { m: meta.ref<picked> }""");
-        String governed = schema("https://example.test/governed-picks.tn", metaId, CORE, PICKS);
+        String importing = schema("https://example.test/governed-picks.tn", vocabularyId, CORE, PICKS);
         Tson tson = Tson.of(ProcessorConfig.defaults()
-                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(metaId, layer)))));
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(vocabularyId, vocabulary)))));
 
-        assertEquals(List.of(), tson.validateSchema(layer), "the meta layer itself declares a reference");
-        assertEquals(List.of(), tson.validateSchema(governed));
+        assertEquals(List.of(), tson.validateSchema(vocabulary), "the vocabulary itself declares a reference");
+        assertEquals(List.of(), tson.validateSchema(importing));
     }
 
     @Test
@@ -71,7 +71,7 @@ class ReferenceDeclarationTest {
     }
 
     @Test
-    void aKernelGovernedSchemaDeclaresAReference() {
+    void aSchemaImportingTheKernelAloneDeclaresAReference() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/meta-picks.tn", KERNEL,
                 META, KERNEL_PICKS)));
     }

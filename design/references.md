@@ -161,8 +161,8 @@ text.
   has no closure at all and keeps an application or a sibling reference as a `TsonReference` (`design/tree-model.md`),
   with no referent.
 
-Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter
-positions), `design/meta-layer-namespaces.md` (value entries' slots), `design/record-dispatch.md` (the positional form).
+Related: `design/linking-and-compilation.md` (the judgements), `design/held-template-bodies.md` (parameter positions),
+`design/namespace-types-and-value-entries.md` (value entries' slots), `design/record-dispatch.md` (the positional form).
 
 **Why two facts, and why the store is positional.** Store and judgement are Strachey's environment and typed
 pointer: under immutable, alias-free data the environment maps a name to an address, `(namespace, key)`, and a

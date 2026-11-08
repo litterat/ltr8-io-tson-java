@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -158,7 +158,7 @@ class RecordClosureTest {
                         new Token("NONE", Token.Form.UNQUOTED))))));
         TsonSchema schema = new TsonSchema("https://example.test/bind-closure.tn",
                 List.of(), entries);
-        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        DataBindContext context = SchemaModelNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(new TsonLinkedSchema(schema),
                 ValueReaderFactoryRegistry.bind(context));
         DiagnosticsCollector problems = new DiagnosticsCollector();

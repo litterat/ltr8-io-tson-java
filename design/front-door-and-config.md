@@ -20,8 +20,8 @@ the registries a `Tson` holds, and `validate`. Current form only; history lives 
   its one compiled-schema cache.
 - `validate` never throws for a bad input document, and `TsonDiagnostics.ofBaseSyntaxError` rethrows
   anything that is not a base-syntax failure.
-- One bind context serves schemas and data: `Tson.of` composes `SchemaMetaNameBinder.INSTANCE` with the configured context's
-  binder (`SchemaMetaNameBinder.over`). An entry of meta.tn (a root name or a member of one of its six maps) or a library's
+- One bind context serves schemas and data: `Tson.of` composes `SchemaModelNameBinder.INSTANCE` with the configured context's
+  binder (`SchemaModelNameBinder.over`). An entry of meta.tn (a root name or a member of one of its six maps) or a library's
   member under its map (`numeric`, `temporal`, `net`) binds to the schema model, by its path (`numeric.integer_type` to
   `io.ltr8.tson.schema.numeric.IntegerType`), and never the consumer's; every other name is the consumer's, a member a
   consumer's schema contributes to an open map included, and so is one that mangles to a model class no entry declares
@@ -29,7 +29,7 @@ the registries a `Tson` holds, and `validate`. Current form only; history lives 
 
 Related: `design/facades-and-tree.md` (the readers a `Tson` hands out), `design/writers-and-document-header.md`
 (`TsonDocumentPeek`, the writers), `design/tree-model.md`, `design/linking-and-compilation.md` (registries),
-`design/meta-layer-namespaces.md` (value entries and how they bind), `design/cli-config-hashing.md`.
+`design/namespace-types-and-value-entries.md` (value entries and how they bind), `design/cli-config-hashing.md`.
 
 ## Front door: `Tson` (`tson` module) and `ProcessorConfig` (`tson-base`)
 
@@ -160,7 +160,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   - **A `null` return is not a second way to say it, and is refused where the loader calls a source.** It
     carries no `Reason`, so a deployment refusing a reference and a host that did not answer would arrive
     indistinguishable — and unguarded it would surface as a `NullPointerException` several frames inside the
-    registry, nowhere near the source that caused it. `TsonCompiledMetaRegistry.fetch` raises an
+    registry, nowhere near the source that caused it. `TsonCompiledVocabularyRegistry.fetch` raises an
     `IllegalStateException` naming the source and the rule, which keeps it a *fault*: a broken source is the
     deployment's bug, not a verdict on the document that happened to name the schema, so `SchemaFailure`'s
     default rethrows it. Treating `null` as a miss instead would make the wrong spelling work and hide every
@@ -213,39 +213,38 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   its `!!import`s (schemaless when it declares none), the object form checking the target class up
   front. **Both are built over this instance's own `treeRegistry()`/`bindRegistry()`, so every reader shares
   one compiled-schema cache** — a schema compiles once per `Tson`, not once per reader. The readers take a
-  `TsonCompiledSchemaRegistry` rather than a `TsonCompiledMetaRegistry` for exactly that reason; since the
+  `TsonCompiledSchemaRegistry` rather than a `TsonCompiledVocabularyRegistry` for exactly that reason; since the
   read mode isn't visible in the registry's type, each constructor checks a package-private `mode()` and
   rejects the wrong one up front instead of failing on a cast at the first value.
   `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (built from
   `ProcessorConfig.withDataBindContext`, default `AtomContext.defaultContext()`, as above). `schemaRegistry()`/`loader()`
   reach the underlying machinery.
 - **A `Tson` is one profile, and the schema being read never picks it.** Routing a document to the right
-  profile stays the application's job. The alternative — the schema declaring its own profile through a
-  meta-layer annotation — links a *coding* decision to a *format* one and buys less flexibility than it
+  profile stays the application's job. The alternative — the schema declaring its own profile through an
+  annotation — links a *coding* decision to a *format* one and buys less flexibility than it
   costs, since the application then cannot bind one schema two ways. Selection is by an opaque label for the
   same reason it is not by matching the schema's field set: no serialization library does that, and the
   parameter names it would need are not retained for a secondary constructor. Reconsider only if something
   needs to re-derive the binding without the application in between.
-- **One bind context, schemas and data.** `ProcessorConfig.withDataBindContext` configures the classes types bind to,
-  whether a data document's `order` → `Order` or a schema's value entry `create_order => !operation { … }` → `Operation`
-  (`design/meta-layer-namespaces.md`); both are values of types some schema declares, and one namespace per schema
-  leaves no second vocabulary to bind separately. `Tson.of` builds the context the core resolves schemas through and the
-  bind registry and object readers read data through, `SchemaMetaNameBinder.over(configured)`: the configured binder,
-  profile and atom registrations (`DataBindContext.toBuilder`, `nameBinder`), composed with
-  `SchemaMetaNameBinder.INSTANCE`, and the schema model's own registrations (`Token`, `SourcePosition`, `Ref`, the atom
-  host types) added where absent (`ResolverBindContext.registerAbsent`). The split is by name, not by a failed lookup:
-  `INSTANCE` answers for exactly every entry of meta.tn, its root names and its members of `meta`, `atom`, `numeric`,
-  `unicode`, `net` and `binary` by path, and the members numeric.tn, temporal.tn and net.tn declare under `numeric`,
-  `temporal` and `net`, read from the bundled sources (so the set cannot drift), and the consumer's binder for
-  everything else. So a kernel name always binds to the schema model, by the rule a consumer's dotted name follows: each
-  segment before the last a sub-package of `io.ltr8.tson.schema`, the last mangled to PascalCase (`numeric.integer_type`
-  to `numeric.IntegerType`, `unicode.text_type` to `unicode.TextType`), with an alias table keyed by full path where the
-  entry's name does not reach its class (`meta.record` to `meta.RecordBody`, `temporal.datetime_type` to
-  `temporal.DateTimeType`). The model has one package per namespace so that rule holds: a class lives where its entry is
-  declared. A vocabulary name the model binds no class for (`enum`, a root name, which mangles into
-  `io.ltr8.tson.schema` itself) falls back along its tightening chain rather than to a consumer class, and a name no
-  library schema declares never reaches the model's packages however it mangles -- they also hold the resolver's own
-  classes (`Token`, `EntryKind`, `OpenEntry`, `ValueEntry`), which are no schema's vocabulary. The libraries' roots,
+- **One bind context, schemas and data.** `ProcessorConfig.withDataBindContext` configures the classes types bind to, whether
+  a data document's `order` → `Order` or a schema's value entry `create_order => !operation { … }` → `Operation`
+  (`design/namespace-types-and-value-entries.md`); both are values of types some schema declares, and one namespace per
+  schema leaves no second vocabulary to bind separately. `Tson.of` builds the context the core resolves schemas through and
+  the bind registry and object readers read data through, `SchemaModelNameBinder.over(configured)`: the configured binder,
+  profile and atom registrations (`DataBindContext.toBuilder`, `nameBinder`), composed with `SchemaModelNameBinder.INSTANCE`,
+  and the schema model's own registrations (`Token`, `SourcePosition`, `Ref`, the atom host types) added where absent
+  (`ResolverBindContext.registerAbsent`). The split is by name, not by a failed lookup: `INSTANCE` answers for exactly every
+  entry of meta.tn, its root names and its members of `meta`, `atom`, `numeric`, `unicode`, `net` and `binary` by path, and
+  the members numeric.tn, temporal.tn and net.tn declare under `numeric`, `temporal` and `net`, read from the bundled sources
+  (so the set cannot drift), and the consumer's binder for everything else. So a kernel name always binds to the schema
+  model, by the rule a consumer's dotted name follows: each segment before the last a sub-package of `io.ltr8.tson.schema`,
+  the last mangled to PascalCase (`numeric.integer_type` to `numeric.IntegerType`, `unicode.text_type` to
+  `unicode.TextType`), with an alias table keyed by full path where the entry's name does not reach its class (`meta.record`
+  to `meta.RecordBody`, `temporal.datetime_type` to `temporal.DateTimeType`). The model has one package per namespace so that
+  rule holds: a class lives where its entry is declared. A vocabulary name the model binds no class for (`enum`, a root name,
+  which mangles into `io.ltr8.tson.schema` itself) falls back along its tightening chain rather than to a consumer class, and
+  a name no library schema declares never reaches the model's packages however it mangles -- they also hold the resolver's
+  own classes (`Token`, `EntryKind`, `OpenEntry`, `ValueEntry`), which are no schema's vocabulary. The libraries' roots,
   core.tn and policy.tn are outside the set: their values are data (the CLI binds policy.tn's `policy.processor` and its
-  parts to its own classes). A value entry whose type the context binds no class for is held as a tree, so the schema
-  still loads and validates; the bind registry refuses it (`design/compiled-registries.md`).
+  parts to its own classes). A value entry whose type the context binds no class for is held as a tree, so the schema still
+  loads and validates; the bind registry refuses it (`design/compiled-registries.md`).

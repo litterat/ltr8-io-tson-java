@@ -76,7 +76,7 @@ class SidecarSchemasTest {
         // schema file, deliberately, so one file's own failure doesn't leave a shared registry in a half-registered
         // state for the next. Bound as the class2 runner binds, since a fixture's namespace values read only into
         // classes.
-        TsonCompiledSchemaLoader loader = TsonCompiledMetaRegistry.withStandardLibrary(SuiteBindings.context(),
+        TsonCompiledSchemaLoader loader = TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(),
                 id -> fetch(schemasRoot, id));
 
         TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);

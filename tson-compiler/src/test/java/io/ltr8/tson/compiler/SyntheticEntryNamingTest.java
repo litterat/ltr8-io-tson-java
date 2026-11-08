@@ -4,7 +4,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +57,7 @@ class SyntheticEntryNamingTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         return TsonCompiledSchemaRegistry.tree(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source)).get(ID);
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source)).get(ID);
     }
 
     /** Every problem in one read, so each fixture below is one assertion over the same compiled schema. */
@@ -81,7 +81,7 @@ class SyntheticEntryNamingTest {
         };
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         new TsonTreeReader(TsonCompiledSchemaRegistry.tree(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source)))
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source)))
                 .withDiagnostics(problems)
                 .read("!!import:\"" + ID + "\"\n" + document);
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics()::toString);

@@ -11,7 +11,7 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -66,7 +66,7 @@ import java.util.Optional;
  *
  * <p><b>One binding serves schemas and data.</b> The core resolves through the same context the object readers bind
  * with, {@link #dataBindContext()}: the configured context with the kernel's vocabulary composed under its binder and
- * asked first ({@code SchemaMetaNameBinder.over}), so every kernel name binds to the schema model whatever the
+ * asked first ({@code SchemaModelNameBinder.over}), so every kernel name binds to the schema model whatever the
  * consumer's binder says, and a schema's value entries ({@code create_order => !operation { ... }}) bind to the
  * consumer's classes as its data does. A value entry no class binds is held as a tree: the schema loads and
  * validates, and {@link #bindRegistry()} refuses it with {@code BIND_MISMATCH} at the entry.
@@ -86,7 +86,7 @@ import java.util.Optional;
  */
 public final class Tson {
 
-    private final TsonCompiledMetaRegistry core;
+    private final TsonCompiledVocabularyRegistry core;
     private final TsonCompiledSchemaRegistry tree;
     private final TsonCompiledSchemaRegistry bind;
     private final DataBindContext dataBindContext;
@@ -99,7 +99,7 @@ public final class Tson {
      */
     private final ProcessorPolicy policy;
 
-    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, ProcessorPolicy policy) {
+    Tson(TsonCompiledVocabularyRegistry core, DataBindContext dataBindContext, ProcessorPolicy policy) {
         this.policy = policy;
         this.core = core;
         this.dataBindContext = dataBindContext;
@@ -129,9 +129,9 @@ public final class Tson {
         // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
         // can't resolve the !enum/!integer instances a meta-schema declares). One context serves the core
         // and the object readers: the configured one, the kernel's names composed under its binder.
-        DataBindContext context = SchemaMetaNameBinder.over(config.dataBindContext());
+        DataBindContext context = SchemaModelNameBinder.over(config.dataBindContext());
         SchemaSource source = config.schemaAccess().source();
-        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
+        TsonCompiledVocabularyRegistry core = TsonCompiledVocabularyRegistry.withStandardLibrary(
                 context, source, config.processorPolicy().identifierPolicy(), config.processorPolicy().limits());
         return new Tson(core, context, config.processorPolicy());
     }
@@ -387,8 +387,8 @@ public final class Tson {
     }
 
     /**
-     * The resolution core as the on-demand loader -- e.g. {@code loader().loadMeta(TsonBundledSchemas.NUMERIC_ID)}
-     * to reach a compiled meta-schema directly.
+     * The resolution core as the on-demand loader -- e.g. {@code
+     * loader().loadVocabulary(TsonBundledSchemas.NUMERIC_ID)} to reach a schema's compiled vocabulary directly.
      */
     public TsonCompiledSchemaLoader loader() {
         return core;

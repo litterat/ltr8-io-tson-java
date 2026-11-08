@@ -18,9 +18,9 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   any other constructor is held as a `ValueEntry` where the head composes `meta.top` and not `meta.type` (its instances are
   no types), and refused as `NOT_IMPLEMENTED` where it composes `meta.type` (`SchemaResolver.constructed`).
 - `!C { … }` applies a constructor exactly when `C` IS-A `meta.top` (§4.1) — there is no constructor marker — and
-  `TsonCompiledMetaSchema.buildConstructors` filters on the same predicate, so every constructor head has a reader.
-  With `C` any other type the entry is a value of `C` (`resolveValueEntry`, `design/meta-layer-namespaces.md`), never
-  a refusal for want of applicability.
+  `TsonCompiledVocabulary.buildConstructors` filters on the same predicate, so every constructor head has a reader. With `C`
+  any other type the entry is a value of `C` (`resolveValueEntry`, `design/namespace-types-and-value-entries.md`), never a
+  refusal for want of applicability.
 - `meta.template` is resolver vocabulary (§8.1): IS-A `meta.top`, yet a source declaration applying it, closed or open, is an
   author error (`requireAuthorable`).
 - An atom instance is **ATOM-kinded and not itself applicable**; both halves are needed, and IS-A `meta.atom` alone runs
@@ -100,9 +100,10 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `meta.type` (`s => !step { … }` over `step => meta.top & { … }`), the instance is no type, so it is held as the value it
   is, the way a value entry's payload is: `ValueEntry(step, object)` where the bind context binds `step` to a class,
   `ValueEntry(step, tree)` where none does, so the schema loads and validates without host classes, and a schema obtained to
-  bind refuses the tree-held entry with `BIND_MISMATCH` (`design/meta-layer-namespaces.md`). Where the head composes
-  `meta.type` (`c => meta.product & { … }`), the instance would be a type, whose body must be one of the schema model's, and
-  it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an instance is open work.
+  bind refuses the tree-held entry with `BIND_MISMATCH` (`design/namespace-types-and-value-entries.md`). Where the head
+  composes `meta.type` (`c => meta.product & { … }`), the instance would be a type, whose body must be one of the schema
+  model's, and it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an instance is
+  open work.
 - **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
   substituted as a token and read by the position it lands in, so a slot typed `meta.type_ref` takes a type where
   an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where

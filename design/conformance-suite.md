@@ -124,19 +124,19 @@ whole-name (§8.2's SHOULD) and relaxes through `withIdentifierPolicy`, which §
 than ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
 may legitimately be anything.
 
-**A fixture's own records get host classes, and the runner supplies them.** A schema's value entries bind to the
-classes the reading application's bind context names ([TSON-SCHEMA] §4.1, `design/meta-layer-namespaces.md`); one no
-class binds is held as a tree, which loads and validates but which a schema obtained to bind refuses, so a vector
-over `fixtures/meta-service.tn`'s `interface` and `bindings` — the link layer's values-by-name vectors — is judged
-against bound values. The corpus states the records in its fixture schemas and stays language-agnostic; the host side
-is the runner's: `SuiteBindings` (`tson-compiler/src/testShared`) carries a plain record per fixture record
-(`Method`, `RpcMethod`, `Binding`, `HeaderSet`, `Route`, …), named for it so the name binder's package convention finds
-it, a member of a nested schema map in one sub-package per earlier segment (`geo.route` binds
-`io.ltr8.tson.suite.data.geo.Route`), composed onto the library's own binder (`SchemaMetaNameBinder.contextExtendedWith`),
-and handed to the front door as the one context schemas and data bind through
-(`ProcessorConfig.withDataBindContext(SuiteBindings.context())`). `SidecarSchemasTest` resolves the fixtures under the same
-binding. A new fixture record is a new host record beside them; the fixture's `@doc` lists the records its value entries
-hold, which is the corpus's half of the contract (`RUNNER.md`).
+**A fixture's own records get host classes, and the runner supplies them.** A schema's value entries bind to the classes
+the reading application's bind context names ([TSON-SCHEMA] §4.1, `design/namespace-types-and-value-entries.md`); one no
+class binds is held as a tree, which loads and validates but which a schema obtained to bind refuses, so a vector over
+`fixtures/meta-service.tn`'s `interface` and `bindings` — the link layer's values-by-name vectors — is judged against
+bound values. The corpus states the records in its fixture schemas and stays language-agnostic; the host side is the
+runner's: `SuiteBindings` (`tson-compiler/src/testShared`) carries a plain record per fixture record (`Method`,
+`RpcMethod`, `Binding`, `HeaderSet`, `Route`, …), named for it so the name binder's package convention finds it, a
+member of a nested schema map in one sub-package per earlier segment (`geo.route` binds
+`io.ltr8.tson.suite.data.geo.Route`), composed onto the library's own binder
+(`SchemaModelNameBinder.contextExtendedWith`), and handed to the front door as the one context schemas and data bind
+through (`ProcessorConfig.withDataBindContext(SuiteBindings.context())`). `SidecarSchemasTest` resolves the fixtures
+under the same binding. A new fixture record is a new host record beside them; the fixture's `@doc` lists the records
+its value entries hold, which is the corpus's half of the contract (`RUNNER.md`).
 **A `schema/` vector's expected side is read under the subject's first `!!import`** (`ResolvedForm.readResolved`, a
 `withImports(…).readAs(text, "meta.schema")` read, its root tag `!schema` the kernel root's alias of `meta.schema`; the
 pre-loaded kernel where the subject imports nothing), and the object reader binds through `SuiteBindings` too: a fixture

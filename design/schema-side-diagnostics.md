@@ -14,7 +14,7 @@ check.
 - A failed declaration leaves an empty-record placeholder that keeps the declaration's own type parameters; a
   desugar-reported declaration is replaced with an `absorbed` stand-in, never passed through.
 - A phase runs only if the one before it reported nothing, and a schema that reported anything is never registered —
-  in `Tson.validateSchema` and in `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)` alike.
+  in `Tson.validateSchema` and in `TsonCompiledVocabularyRegistry.resolveLinked(uri, receiver)` alike.
 - The exception's class picks the code: a gap is `NOT_IMPLEMENTED`, a bind mismatch (an unbindable target class
   included) `BIND_MISMATCH`, a refusal its §8.2 code; every `SchemaFailure` branch is a positive verdict and the default
   rethrows.
@@ -146,13 +146,13 @@ the declaration alone (the reference may resolve once the declaration does). The
 mode. javac draws the boundary there (every entry is attributed before `shouldStopPolicyIfError` blocks the next
 phase), and Swift never reaches SILGen after a Sema error. **A schema that reported anything is never registered.**
 
-`TsonCompiledMetaRegistry.resolveLinked(uri, receiver)` composes the same three phases behind the same gates — it is
+`TsonCompiledVocabularyRegistry.resolveLinked(uri, receiver)` composes the same three phases behind the same gates — it is
 how a *data* read reports on the schema its `!!import` names — so `tson validate` and `tson compile` give the same
 account of the same broken schema. It registers only a clean schema and otherwise returns `null`.
 
 **What still throws even with a receiver** makes the namespace itself unusable rather than one entry wrong: an
 `!!import` that will not load, a local declaration colliding with an imported name, a reference whose target owns a different
-`!!id` than it was fetched under (§2.2.1's cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Continuing would
+`!!id` than it was fetched under (§2.2.1's cross-check, `TsonCompiledVocabularyRegistry.crossCheckId`). Continuing would
 report a page of unresolved references that are all consequences of the one problem. `Tson.validateSchema` catches
 these and reports them against RFC 6901's root pointer (`""`), since they concern the document rather than a
 declaration: a `SchemaValidationException` or `ContentHashMismatchException` as `SCHEMA_ERROR`, a

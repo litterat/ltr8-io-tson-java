@@ -4,7 +4,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.consumer.GapOp;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
@@ -21,8 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Names in a namespace value at the slots tson-java-http's meta layer ({@code meta-http.tn}) uses, each judged by its
- * slot's declared type.
+ * Names in a namespace value at the slots tson-java-http's vocabulary schema ({@code meta-http.tn}) uses, each judged
+ * by its slot's declared type.
  *
  * <ol>
  *   <li>An application at a type-name slot of a value body is refused with the alias spelling named: nothing lifts
@@ -67,8 +67,8 @@ class TypeNameSlotGapsTest {
     private static final DataNameBinder HOSTS =
             new DataNameBinder.DefaultDataNameBinder(Set.of("io.ltr8.tson.compiler.consumer"), Map.of());
 
-    private static TsonCompiledMetaRegistry registry() {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.contextExtendedWith(HOSTS), SOURCE);
+    private static TsonCompiledVocabularyRegistry registry() {
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.contextExtendedWith(HOSTS), SOURCE);
     }
 
     /** A schema under the meta above declaring {@code order}, the record template {@code box}, and {@code more}. */

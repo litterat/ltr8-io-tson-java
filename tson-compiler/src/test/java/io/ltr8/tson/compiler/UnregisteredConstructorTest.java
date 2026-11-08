@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ValueEntry;
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * is held as the value it is, as a tree where no class binds it, so both schemas load and validate without host
  * classes. A schema obtained to bind refuses it ({@code SameDocumentConstructorTest} in the front door).
  */
-class UnregisteredMetaConstructorTest {
+class UnregisteredConstructorTest {
 
     private static final Map<String, String> DOCUMENTS = new LinkedHashMap<>();
 
@@ -45,7 +45,7 @@ class UnregisteredMetaConstructorTest {
                 """);
     }
 
-    private static TsonCompiledMetaRegistry core() {
+    private static TsonCompiledVocabularyRegistry core() {
         SchemaSource source = uri -> {
             for (Map.Entry<String, String> document : DOCUMENTS.entrySet()) {
                 if (CanonicalIdentity.sameIdentity(uri, document.getKey())) {
@@ -54,15 +54,15 @@ class UnregisteredMetaConstructorTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
     }
 
     /** The declaring schema itself is fine, and stays usable. */
     @Test
-    void theMetaSchemaStillLoadsAndStillDeclaresTheConstructor() {
+    void theDeclaringSchemaStillLoadsAndStillDeclaresTheConstructor() {
         assertTrue(core().resolveLinked("https://example.test/meta-unreg.tn").schema().entries()
                 .containsKey("operation"));
-        assertTrue(core().loadMeta("https://example.test/meta-unreg.tn").schema().entries()
+        assertTrue(core().loadVocabulary("https://example.test/meta-unreg.tn").schema().entries()
                 .containsKey("operation"));
     }
 

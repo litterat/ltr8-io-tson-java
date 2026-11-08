@@ -19,16 +19,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-DATA] §8.2's name hygiene at an identifier-keyed map in a <em>schema</em> governed by a meta layer: the
+ * [TSON-DATA] §8.2's name hygiene at an identifier-keyed map in a namespace value a <em>schema</em> holds: the
  * map's keys are names there as in a data document. A namespace value's values bind to the consumer's own class,
  * so the linker cannot see into them; its payload is read under the identifier policy instead.
  *
- * <p>The shape is a meta layer for interfaces, {@code iface => { methods: {method_name => …} } } held in a namespace
- * type {@code ifaces}, each interface written in a schema the meta governs, so every method name is a key of a map
+ * <p>The shape is a vocabulary for interfaces, {@code iface => { methods: {method_name => …} } } held in a namespace
+ * type {@code ifaces}, each interface written in a schema importing it, so every method name is a key of a map
  * read as part of that schema. The scope is isolated by Latin {@code pass} beside Cyrillic {@code раѕѕ}, each
  * single-script, as {@code IdentifierValueHygieneTest} does.
  */
-class GovernedSchemaHygieneTest {
+class NamespaceValueHygieneTest {
 
     /** {@code раѕѕ}: Cyrillic, single-script, and alike with Latin {@code pass}. */
     private static final String CYRILLIC_PASS = "раѕѕ";
@@ -36,8 +36,8 @@ class GovernedSchemaHygieneTest {
     /** {@code аdmin}, its first letter U+0430: a mixed-script name. */
     private static final String MIXED = "аdmin";
 
-    private static final String IFACE_META_ID = "https://example.test/2026/39/iface-meta-1.tn";
-    private static final String META = """
+    private static final String IFACE_VOCABULARY_ID = "https://example.test/2026/39/iface-meta-1.tn";
+    private static final String VOCABULARY = """
             !!id:"https://example.test/2026/39/iface-meta-1.tn"
             !!import:"https://tson.io/2026/39/m/meta.tn"
             !schema {
@@ -58,7 +58,7 @@ class GovernedSchemaHygieneTest {
               iface       => { methods: {method_name => text} }
             }""";
 
-    /** The meta's {@code iface}, bound so a governed schema's payload can be read at all. */
+    /** The vocabulary's {@code iface}, bound so an importing schema's payload can be read at all. */
     @Typename(name = "iface")
     public record Iface(Map<String, String> methods) {
     }
@@ -68,7 +68,7 @@ class GovernedSchemaHygieneTest {
     }
 
     private static Tson tson(IdentifierPolicy identifiers) {
-        SchemaSource source = SchemaSource.ofMap(Map.of(IFACE_META_ID, META, DATA_ID, DATA_SCHEMA));
+        SchemaSource source = SchemaSource.ofMap(Map.of(IFACE_VOCABULARY_ID, VOCABULARY, DATA_ID, DATA_SCHEMA));
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withIdentifierPolicy(identifiers)
                 .withDataBindContext(io.ltr8.bind.DataBindContext.builder()
@@ -79,18 +79,21 @@ class GovernedSchemaHygieneTest {
         return problems.stream().map(Diagnostic::code).toList();
     }
 
-    /** A schema governed by the meta above, declaring one interface, {@code orders}, whose method map is {@code methods}. */
-    private static String governed(String methods) {
-        return governed("", methods);
+    /**
+     * A schema importing the vocabulary above, declaring one interface, {@code orders}, whose method map is {@code
+     * methods}.
+     */
+    private static String importing(String methods) {
+        return importing("", methods);
     }
 
-    private static String governed(String annotation, String methods) {
+    private static String importing(String annotation, String methods) {
         return """
                 !!id:"https://example.test/2026/39/orders-1.tn"
                 !!import:"%s"
                 !schema {
                   apis => %s!ifaces { orders => { methods: { %s } } }
-                }""".formatted(IFACE_META_ID, annotation, methods);
+                }""".formatted(IFACE_VOCABULARY_ID, annotation, methods);
     }
 
     /** The control: in a data document, the map's keys are names. */
@@ -106,36 +109,36 @@ class GovernedSchemaHygieneTest {
     }
 
     @Test
-    void aGovernedSchemaWithDistinctNamesLoads() {
-        assertEquals(List.of(), tson().validateSchema(governed("pass => a  fail => b")));
+    void aSchemaWithDistinctNamesLoads() {
+        assertEquals(List.of(), tson().validateSchema(importing("pass => a  fail => b")));
     }
 
     /** Each refusal is reported against the declaration, under its rule's code, naming the key it refused. */
     @Test
-    void inAGovernedSchemaTheKeysAreNamesToo() {
-        List<Diagnostic> confusable = tson().validateSchema(governed("pass => a  " + CYRILLIC_PASS + " => b"));
+    void inASchemaTheKeysAreNamesToo() {
+        List<Diagnostic> confusable = tson().validateSchema(importing("pass => a  " + CYRILLIC_PASS + " => b"));
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(confusable));
         assertEquals(Optional.of("/apis"), confusable.getFirst().schemaPointer());
         assertTrue(confusable.getFirst().message().contains("at /orders/methods/" + CYRILLIC_PASS),
                 confusable.toString());
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
-                codes(tson().validateSchema(governed(MIXED + " => a"))));
+                codes(tson().validateSchema(importing(MIXED + " => a"))));
     }
 
     /** An annotation's value is as opaque to the linker as a namespace value, and is judged the same way. */
     @Test
     void anAnnotationValuesKeysAreNamesToo() {
-        assertEquals(List.of(), tson().validateSchema(governed("@routes:{ pass => a } ", "pass => a")));
+        assertEquals(List.of(), tson().validateSchema(importing("@routes:{ pass => a } ", "pass => a")));
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), codes(tson().validateSchema(
-                governed("@routes:{ pass => a  " + CYRILLIC_PASS + " => b } ", "pass => a"))));
+                importing("@routes:{ pass => a  " + CYRILLIC_PASS + " => b } ", "pass => a"))));
     }
 
     /** The fail-fast path throws the refusal, still telling it from a malformed schema by its type and code. */
     @Test
     void theFailFastPathThrowsARefusal() {
         SchemaRefusalException refused = assertThrows(SchemaRefusalException.class,
-                () -> tson().resolve(governed(MIXED + " => a")));
+                () -> tson().resolve(importing(MIXED + " => a")));
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, refused.code());
     }
 
@@ -143,6 +146,6 @@ class GovernedSchemaHygieneTest {
     @Test
     void aRelaxedPolicyAdmitsTheSchema() {
         assertEquals(List.of(), tson(IdentifierPolicy.none())
-                .validateSchema(governed("pass => a  " + CYRILLIC_PASS + " => b  " + MIXED + " => c")));
+                .validateSchema(importing("pass => a  " + CYRILLIC_PASS + " => b  " + MIXED + " => c")));
     }
 }

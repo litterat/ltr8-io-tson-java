@@ -193,7 +193,7 @@ public final class TsonSchemaLinker {
     public static TsonLinkedSchema linkBootstrap(TsonSchema bootstrap) {
         if (!bootstrap.bootstrap()) {
             throw new SchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
-                    + "bootstrap reader (MetaKernelBootstrapResolver.getMetaKernelSchema()) -- "
+                    + "bootstrap reader (KernelBootstrapResolver.kernelSchema()) -- "
                     + "TsonSchemaLinker.linkBootstrap exists specifically for that case; call "
                     + "link directly for an ordinary schema instead");
         }

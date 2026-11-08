@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.atom.Rational;
@@ -126,7 +126,7 @@ class AtomValueReaderTest {
     /**
      * {@code iri_type}/{@code regex_type} are the one known exception discussed in {@link
      * AtomTypeReader}'s own Javadoc -- their RFC citation is a *schema-composed* default that
-     * generic binding can't fill in during schema *resolution*, so {@code MetaKernelBootstrapResolver} hand-
+     * generic binding can't fill in during schema *resolution*, so {@code KernelBootstrapResolver} hand-
      * picks their binding instead. That gap is upstream of this layer entirely: by the time the
      * real {@code iri}/{@code regex} entries reach here, their constraints are already correctly
      * filled in, so reading real *data* against them works exactly like every other family --
@@ -134,7 +134,7 @@ class AtomValueReaderTest {
      */
     @Test
     void iriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema metaKernel = KernelBootstrapResolver.kernelSchema();
         Map<String, Object> result = readAgainstRealEntry("iri", metaKernel.entries().get("iri"),
                 "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
@@ -144,7 +144,7 @@ class AtomValueReaderTest {
 
     @Test
     void regexUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema metaKernel = KernelBootstrapResolver.kernelSchema();
         Map<String, Object> result = readAgainstRealEntry("regex", metaKernel.entries().get("regex"),
                 "{ value: \"[a-z]+\" }");
 

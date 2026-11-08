@@ -6,7 +6,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.consumer.Pairing;
 import io.ltr8.tson.compiler.consumer.PinnedSetting;
@@ -32,10 +32,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A value written by name at a slot typed {@code meta.ref<T>} ([TSON-SCHEMA] §5.12), end to end: a meta layer declaring an
- * interface, a namespace of methods, and a namespace of HTTP bindings each naming the method it serves, a schema
- * under it declaring an interface, and a schema importing that one binding a method -- the read that keeps the name,
- * the linker that resolves it and judges its referent, and each refusal with the step it names.
+ * A value written by name at a slot typed {@code meta.ref<T>} ([TSON-SCHEMA] §5.12), end to end: a vocabulary schema
+ * declaring an interface, a namespace of methods, and a namespace of HTTP bindings each naming the method it serves, a
+ * schema importing it declaring an interface, and a schema importing that one binding a method -- the read that keeps the
+ * name, the linker that resolves it and judges its referent, and each refusal with the step it names.
  */
 class ValuesByNameTest {
 
@@ -107,8 +107,8 @@ class ValuesByNameTest {
     private static final DataNameBinder HOSTS = new DataNameBinder.DefaultDataNameBinder(
             Set.of("io.ltr8.tson.suite.data", "io.ltr8.tson.compiler.consumer"), Map.of());
 
-    private static TsonCompiledMetaRegistry registry() {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.contextExtendedWith(HOSTS), SOURCE);
+    private static TsonCompiledVocabularyRegistry registry() {
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.contextExtendedWith(HOSTS), SOURCE);
     }
 
     /** A schema under the meta above, importing orders.tn and core.tn, declaring {@code declarations}. */
@@ -356,10 +356,10 @@ class ValuesByNameTest {
                   %s => { a: %s }
                 }
                 """.formatted(id, constructor, fieldType));
-        DataBindContext context = SchemaMetaNameBinder.contextExtendedWith(new DataNameBinder.DefaultDataNameBinder(
+        DataBindContext context = SchemaModelNameBinder.contextExtendedWith(new DataNameBinder.DefaultDataNameBinder(
                 Set.of("io.ltr8.tson.compiler.consumer"), Map.of()));
         BindMismatchException thrown = assertThrows(BindMismatchException.class,
-                () -> TsonCompiledMetaRegistry.withStandardLibrary(context, SOURCE).loadMeta(id));
+                () -> TsonCompiledVocabularyRegistry.withStandardLibrary(context, SOURCE).loadVocabulary(id));
         assertTrue(thrown.getMessage().contains(expected), thrown.getMessage());
     }
 
@@ -372,7 +372,7 @@ class ValuesByNameTest {
      */
     @Test
     void resolvedOutputWritesTheNameAsWrittenAndReadsItBack() {
-        TsonCompiledMetaRegistry registry = registry();
+        TsonCompiledVocabularyRegistry registry = registry();
         String id = api("written", """
                 routes => !bindings { post_orders => { method: orders.place_order  verb: POST  route: "/orders" } }""");
         Object body = registry.resolveLinked(id).schema().entries().get("routes");
@@ -380,7 +380,7 @@ class ValuesByNameTest {
         String written = new TsonObjectWriter(SuiteBindings.context()).toTson(body);
         assertTrue(written.replaceAll("\\s+", " ").contains("method: orders.place_order"), written);
 
-        Map<?, ?> read = (Map<?, ?>) registry.loadMeta(META_SERVICE).compiledSchema().find("meta.schema").orElseThrow()
+        Map<?, ?> read = (Map<?, ?>) registry.loadVocabulary(META_SERVICE).compiledSchema().find("meta.schema").orElseThrow()
                 .read(TestDocuments.document("!schema { routes => " + written + " }"));
         assertEquals(((ValueEntry) body).value(), read.get("routes"));
     }
@@ -517,7 +517,7 @@ class ValuesByNameTest {
                 "read against 'int32'");
     }
 
-    /** A record, a type of the schema being read, is read by that type's reader: the governing layer holds none. */
+    /** A record, a type of the schema being read, is read by that type's reader: the imported vocabulary holds none. */
     @Test
     void aHeldRecordIsReadAgainstALocalType() {
         assertEquals(List.of(), problems(api("held-record", """

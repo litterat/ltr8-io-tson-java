@@ -4,7 +4,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
@@ -13,7 +13,6 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>{@code RecordField.position} is {@code @Unbound}, on {@code Top.position}'s precedent:
  * §8.1's {@code meta.record_field} declares no such field, so nothing fills it and strict binding would call it a
  * mismatch. It is not carried in the annotation channel, which is schema data -- it resolves one hop against
- * the governing meta (§6) and round-trips into resolver output, none of which is true of a source position.
+ * the schema's namespace (§6) and round-trips into resolver output, none of which is true of a source position.
  */
 class PerFieldSchemaPositionTest {
 
@@ -53,8 +52,8 @@ class PerFieldSchemaPositionTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         TsonCompiledSchema compiled = TsonCompiledSchemaRegistry.tree(core).get(ID);
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         compiled.get("r").read(TestDocuments.document(data, problems));

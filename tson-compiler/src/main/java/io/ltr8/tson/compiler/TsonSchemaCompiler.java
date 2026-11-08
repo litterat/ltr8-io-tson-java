@@ -78,7 +78,7 @@ public final class TsonSchemaCompiler {
     /**
      * Compiles {@code linkedSchema} against a factory set -- every body's constructor is dispatched through
      * {@code factories} alone. A read registry compiles a schema in its mode this way, and {@link
-     * TsonCompiledMetaSchema#compile} compiles vocabulary in object-binding mode, the kernel's pre-loaded
+     * TsonCompiledVocabulary#compile} compiles vocabulary in object-binding mode, the kernel's pre-loaded
      * stand-in ({@link TsonSchema#bootstrap()}) among it.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
@@ -247,7 +247,7 @@ public final class TsonSchemaCompiler {
             // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key
             // family.
             Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
-            ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(read));
+            ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
             TsonTypeReader<?> built = factory.create(name, read,
                     new ValueReaderContext(linked, readers, namesMeaning, referrers));
             if (body instanceof NamespaceBody && TsonSchema.SCHEMA.equals(name) && linked.isKernel(name)) {

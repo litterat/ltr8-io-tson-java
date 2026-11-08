@@ -28,14 +28,14 @@ class ConstructorLevelDisciplineTest {
 
     private static final String ID = "https://example.test/m.tn";
 
-    private static List<Diagnostic> problems(String meta, String imported, String declarations) {
+    private static List<Diagnostic> problems(String firstImport, String secondImport, String declarations) {
         String source = """
                 !!id:"https://example.test/m.tn"
                 !!import:"%s"
                 !!import:"%s"
                 !schema {
                 %s }
-                """.formatted(meta, imported, declarations);
+                """.formatted(firstImport, secondImport, declarations);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
                 .validateSchema(source);
     }
@@ -44,9 +44,9 @@ class ConstructorLevelDisciplineTest {
     private static final String META = "https://tson.io/2026/39/m/meta.tn";
     private static final String CORE = "https://tson.io/2026/39/m/core.tn";
 
-    /** In a meta-schema, deriving from a constructor is ordinary — and the result is one. */
+    /** In any schema, deriving from a constructor is ordinary — and the result is one. */
     @Test
-    void aMetaSchemaMayDeriveFromAConstructor() {
+    void aSchemaMayDeriveFromAConstructor() {
         assertEquals(List.of(), problems(KERNEL, KERNEL, """
                   c        => meta.product & { id: meta.identifier }
                   composed => c & { extra: meta.identifier }
@@ -55,7 +55,7 @@ class ConstructorLevelDisciplineTest {
 
     /** Refining a kernel constructor is the same case. */
     @Test
-    void aMetaSchemaMayRefineAConstructor() {
+    void aSchemaMayRefineAConstructor() {
         assertEquals(List.of(), problems(KERNEL, KERNEL, "  refined => meta.array ^ { ordered?: = false }"));
     }
 

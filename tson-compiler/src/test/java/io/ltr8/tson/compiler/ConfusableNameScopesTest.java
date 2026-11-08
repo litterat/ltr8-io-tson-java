@@ -5,7 +5,7 @@ import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
@@ -70,8 +70,8 @@ class ConfusableNameScopesTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledSchemaRegistry.tree(TsonCompiledMetaRegistry.withStandardLibrary(
-                SchemaMetaNameBinder.defaultContext(), source, identifiers)).get(ID);
+        return TsonCompiledSchemaRegistry.tree(TsonCompiledVocabularyRegistry.withStandardLibrary(
+                SchemaModelNameBinder.defaultContext(), source, identifiers)).get(ID);
     }
 
     private static String refused(String declarations) {

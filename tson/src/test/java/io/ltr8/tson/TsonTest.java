@@ -2,7 +2,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledVocabulary;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The same real scenario {@code TinySchemaImportsCoreTn1Test} proves by hand-assembling
- * {@code TsonSchemaRegistry}/{@code TsonCompiledMetaRegistry} directly -- a small, user-defined schema
+ * {@code TsonSchemaRegistry}/{@code TsonCompiledVocabularyRegistry} directly -- a small, user-defined schema
  * importing core.tn -- but through this class's own public front door instead, confirming the builder
  * genuinely replaces that wiring.
  */
@@ -37,11 +37,11 @@ class TsonTest {
             """;
 
     /**
-     * A type library named as {@code !!meta} contributes its namespace as an {@code !!import} does
-     * (SPEC-FEEDBACK.md #7): core.tn's {@code uuid} resolves.
+     * An imported type library contributes its namespace (SPEC-FEEDBACK.md #7): core.tn's {@code uuid}
+     * resolves.
      */
     @Test
-    void aTypeLibraryNamedAsTheMetaIsImported() {
+    void anImportedTypeLibrarysNamesResolve() {
         TsonLinkedSchema linked = Tson.standard().resolve("""
                 !!id:"https://example.test/oops.tn"
                 !!import:"https://tson.io/2026/39/m/core.tn"
@@ -57,7 +57,7 @@ class TsonTest {
         Tson tson = Tson.standard();
 
         TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
-        // Merged view: the two local declarations, plus core.tn's whole closure, meta.tn's and the kernel's
+        // Merged view: the two local declarations, plus core.tn's whole closure, the kernel's
         // entries among it -- TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved
         // TsonSchema resolve()'s own resolution step produces internally, which stays local-only.
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(linked.schema().id());
@@ -119,7 +119,7 @@ class TsonTest {
     void theStandardLibraryItselfIsReachableThroughTheLoader() {
         Tson tson = Tson.standard();
 
-        TsonCompiledMetaSchema meta = tson.loader().loadMeta(TsonBundledSchemas.META_ID);
+        TsonCompiledVocabulary meta = tson.loader().loadVocabulary(TsonBundledSchemas.META_ID);
 
         assertTrue(meta.schema().entries().containsKey("unicode.text_type"));
     }
@@ -139,7 +139,8 @@ class TsonTest {
         assertEquals(io.ltr8.tson.schema.meta.RecordBody.class,
                 tson.dataBindContext().nameBinder().resolve("meta.record"),
                 "the kernel's name binds to the schema model whatever the consumer's binder says");
-        assertTrue(tson.loader().loadMeta(TsonBundledSchemas.META_ID).schema().entries().containsKey("unicode.text_type"),
+        assertTrue(tson.loader().loadVocabulary(TsonBundledSchemas.META_ID).schema().entries()
+                        .containsKey("unicode.text_type"),
                 "and the standard library resolves through the same context");
     }
 

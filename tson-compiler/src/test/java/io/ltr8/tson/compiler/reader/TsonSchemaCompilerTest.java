@@ -77,11 +77,10 @@ class TsonSchemaCompilerTest {
 
     @Test
     void anEntryWithNoRegisteredFactoryDoesNotBlockCompilingTheRestOfTheSchemaButFailsOnlyWhenActuallyRead() {
-        // "orphan" is an instance of a meta layer's own namespace type -- [TSON-SCHEMA] §2.2.2's extension
-        // point, and the only kind of entry left that this library can build no reader for, every kernel and
-        // meta constructor having one. TsonSchemaCompiler.compile() still builds the whole schema eagerly,
-        // including "orphan" itself (get("orphan") succeeds); "used" (which never references "orphan") reads
-        // normally either way.
+        // "orphan" is an instance of a schema's own namespace type -- the only kind of entry left that this library can
+        // build no reader for, every kernel and bundled-library constructor having one. TsonSchemaCompiler.compile() still
+        // builds the whole schema eagerly, including "orphan" itself (get("orphan") succeeds); "used" (which never
+        // references "orphan") reads normally either way.
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("used", RecordBody.of(RecordBody.fieldMap()));
         entries.put("orphan", new ValueEntry("endpoints",

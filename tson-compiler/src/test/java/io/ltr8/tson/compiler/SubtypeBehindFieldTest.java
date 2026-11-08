@@ -4,7 +4,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.consumer.SbOp;
 import io.ltr8.tson.compiler.consumer.SbResource;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -59,8 +59,8 @@ class SubtypeBehindFieldTest {
     private static final DataNameBinder HOSTS = new DataNameBinder.DefaultDataNameBinder(
             Set.of("io.ltr8.tson.compiler.consumer"), Map.of());
 
-    private static TsonCompiledMetaRegistry registry() {
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.contextExtendedWith(HOSTS), SOURCE);
+    private static TsonCompiledVocabularyRegistry registry() {
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.contextExtendedWith(HOSTS), SOURCE);
     }
 
     private static List<Diagnostic> problems(String label, String entry) {

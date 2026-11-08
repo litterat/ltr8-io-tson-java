@@ -1,11 +1,12 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledVocabulary;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
@@ -32,17 +33,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class MetaKernelEndToEndTest {
 
     private static TsonCompiledSchema compiled() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         return rawCompile(linked);
     }
 
     /**
-     * The raw {@link TsonCompiledSchema} underneath a bootstrap {@link TsonCompiledMetaSchema} --
-     * unlike {@link TsonCompiledMetaSchema#reader}, {@link TsonCompiledSchema#get} reads *any*
+     * The raw {@link TsonCompiledSchema} underneath a bootstrap {@link TsonCompiledVocabulary} --
+     * unlike {@link TsonCompiledVocabulary#reader}, {@link TsonCompiledSchema#get} reads *any*
      * entry, not just the ones with {@code constructor() == true}, which every test in this class
      * needs (e.g. {@code numeric.integer_size}, {@code meta.field_group}, ordinary records with no constructor of
-     * their own). Mirrors {@link io.ltr8.tson.compiler.TsonCompiledMetaRegistry#bootstrap}'s own first
+     * their own). Mirrors {@link TsonCompiledVocabularyRegistry#bootstrap}'s own first
      * step exactly, without the final re-wrap that method's own return value would otherwise force.
      */
     private static TsonCompiledSchema rawCompile(TsonLinkedSchema linked) {
@@ -60,7 +61,7 @@ class MetaKernelEndToEndTest {
      */
     @Test
     void everyRealEntryCompilesCleanly() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema raw = KernelBootstrapResolver.kernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         TsonSchema registered = linked.schema();
         TsonCompiledSchema compiled = rawCompile(linked);

@@ -9,7 +9,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -49,7 +49,7 @@ class AtomTargetAdmissionTest {
                 %s
                 }
                 """.formatted(decls);
-        DataNameBinder binder = name -> "t".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "t".equals(name) ? bound : SchemaModelNameBinder.INSTANCE.resolve(name);
         SchemaSource source = uri -> schema;
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)

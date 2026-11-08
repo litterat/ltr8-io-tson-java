@@ -3,14 +3,14 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
@@ -26,9 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * A small, user-defined schema -- not one of this library's own bundled documents -- that imports
- * {@code core.tn} (governed by {@code meta.tn}, the same as {@code core.tn} itself) and uses two
+ * {@code core.tn} (and {@code meta.tn}, as {@code core.tn} itself does) and uses two
  * of its real declarations, plus a small, locally-declared one-field record bound to a real Java
- * class the caller supplies manually (not resolved via {@link SchemaMetaNameBinder}'s own {@code
+ * class the caller supplies manually (not resolved via {@link SchemaModelNameBinder}'s own {@code
  * io.ltr8.tson.schema} convention -- {@code my_record} has no class there at all). The point:
  * proving {@code core.tn} can be {@code !!import}ed by an *ordinary* consuming schema, not just
  * registered on its own the way {@link CoreSchemaImportTest} does, and that a real consumer's own
@@ -47,7 +47,7 @@ class TinySchemaImportsCoreTn1Test {
 
     /**
      * The Java shape {@code my_record => { value: int32 }} is manually bound to below -- deliberately outside {@code
-     * io.ltr8.tson.schema}, so {@link SchemaMetaNameBinder}'s own namespace convention can't find it by accident.
+     * io.ltr8.tson.schema}, so {@link SchemaModelNameBinder}'s own namespace convention can't find it by accident.
      */
     public record MyRecord(Integer value) {
     }
@@ -65,15 +65,15 @@ class TinySchemaImportsCoreTn1Test {
 
     /**
      * A {@link DataNameBinder} that manually resolves {@code "my_record"} to {@link MyRecord}
-     * directly, falling back to {@link SchemaMetaNameBinder#INSTANCE}'s own {@code
+     * directly, falling back to {@link SchemaModelNameBinder#INSTANCE}'s own {@code
      * io.ltr8.tson.schema} convention for every other name this test's own compile still needs
      * (the kernel's/meta.tn's/core.tn's own composite constructors -- {@code record}, {@code
-     * array}, ...) -- exactly the pattern {@link SchemaMetaNameBinder}'s own class Javadoc describes
+     * array}, ...) -- exactly the pattern {@link SchemaModelNameBinder}'s own class Javadoc describes
      * for "a caller binding their own schema to their own Java library."
      */
     private static final DataNameBinder MANUAL_BINDER = schemaTypeName -> "my_record".equals(schemaTypeName)
             ? MyRecord.class
-            : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+            : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
 
     @Test
     void aTinySchemaThatImportsCoreTn1RegistersAndCompilesCleanly() {
@@ -81,7 +81,8 @@ class TinySchemaImportsCoreTn1Test {
         // The schema model's own atom registrations (a reference's text form among them) beside the binder.
         DataBindContext context = ResolverBindContext.registerDefaults(DataBindContext.builder()
                 .nameBinder(MANUAL_BINDER)).build();
-        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, context, TsonBundledSchemas::fetch);
+        TsonCompiledVocabularyRegistry registry =
+                new TsonCompiledVocabularyRegistry(schemaRegistry, context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         // the kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own
@@ -91,7 +92,7 @@ class TinySchemaImportsCoreTn1Test {
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(resolvedMetaKernel);
 
-        loader.loadMeta(TsonBundledSchemas.META_ID);
+        loader.loadVocabulary(TsonBundledSchemas.META_ID);
         loader.resolveLinked(TsonBundledSchemas.CORE_ID); // must be registered before the tiny schema's own !!import can find it
 
         SchemaDocument tinyDocument = new TsonSchemaParser(TINY_DOCUMENT).parseSchemaDocument();

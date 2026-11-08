@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.ReadException;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.suite.SuiteCheckout;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -54,8 +54,8 @@ class SidecarSchemaReadTest {
             }
             return read(schemas.resolve(canonical.substring(prefix.length())));
         };
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core)
                 .get(SUITE_SCHEMA_PREFIX + layer + "-sidecar.tn")
                 .get(layer + "_sidecar");
@@ -237,7 +237,7 @@ class SidecarSchemaReadTest {
         accepts("parser", """
                 {
                   spec: "§1.5"
-                  description: "A header carrying !!meta is a schema document"
+                  description: "A root tagged !schema is a schema document"
                   schema-document: _
                 }""");
     }

@@ -8,7 +8,7 @@ import io.ltr8.tson.compiler.ast.DataValue;
  * {@code type} is the annotation's own name, resolved in the schema's namespace (§3.3.3) by the caller, which
  * reads it through the compiled form of the schema that declared it; {@code value} is the authored data value.
  *
- * <p>Separate from {@link DefinitionMetaReader} despite the identical parameters, because the two read
+ * <p>Separate from {@link ConstructionReader} despite the identical parameters, because the two read
  * genuinely different things and only one of them has a bounded return. A constructor body always binds to a
  * {@code schema.meta} type, so that hook returns {@link io.ltr8.tson.schema.meta.Top}; an annotation binds to
  * whatever its name resolves to -- {@code @doc:"..."} yields a {@code String} -- so this one returns {@code

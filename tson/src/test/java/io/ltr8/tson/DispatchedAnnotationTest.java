@@ -10,7 +10,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.tree.TsonValue;
 import java.util.List;
@@ -63,7 +63,7 @@ class DispatchedAnnotationTest {
 
     private static Tson tson() {
         Map<String, Class<?>> names = Map.of("shape", Shape.class, "circle", Circle.class, "holder", Holder.class);
-        DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaMetaNameBinder.INSTANCE.resolve(n);
+        DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaModelNameBinder.INSTANCE.resolve(n);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
                         .registerAtoms(AtomContext.hostTypes()).build()));

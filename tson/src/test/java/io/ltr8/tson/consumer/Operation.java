@@ -5,10 +5,10 @@ import io.ltr8.tson.schema.meta.TypeRef;
 
 
 /**
- * A consumer's own meta-layer record: an HTTP operation, which describes an endpoint rather than the shape of
+ * A consumer's own vocabulary record: an HTTP operation, which describes an endpoint rather than the shape of
  * a data value, held as a value of a namespace type. The front-door peer of {@code
  * io.ltr8.tson.compiler.consumer.Operation} -- same three-part wiring, reached through {@link io.ltr8.tson.Tson}
- * rather than by building a compiled meta registry by hand.
+ * rather than by building a compiled vocabulary registry by hand.
  */
 @Typename(name = "operation")
 public record Operation(String path, String method, TypeRef request, TypeRef response) {

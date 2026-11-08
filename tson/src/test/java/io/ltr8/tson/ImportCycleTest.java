@@ -24,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * StackOverflowError}: an {@code Error} raised by ordinary author input, which no {@code Diagnostic} ever
  * sees and which the CLI's exit-code policy cannot classify. Being <em>in flight</em> is the whole signal,
  * and the chain of identities in flight is what makes the message actionable.
- *
- * <p>The same guard covers the {@code !!meta} chain, every link of which is resolved the same way.
  */
 class ImportCycleTest {
 
@@ -35,12 +33,12 @@ class ImportCycleTest {
     private final Map<String, String> documents = new LinkedHashMap<>();
 
     /**
-     * A schema importing every {@code imports} entry and declaring one record of its own. core.tn comes
-     * along always, as it does in any practical schema -- it is bundled and resolves before the fixtures
-     * do, so it never appears in a reported chain.
+     * A schema importing {@code firstImport} and every {@code imports} entry, and declaring one record of its own. core.tn
+     * comes along always, as it does in any practical schema -- it is bundled and resolves before the fixtures do, so it
+     * never appears in a reported chain.
      */
-    private void schema(String id, String meta, List<String> imports, String body) {
-        StringBuilder text = new StringBuilder("!!id:\"" + id + "\"\n!!import:\"" + meta + "\"\n");
+    private void schema(String id, String firstImport, List<String> imports, String body) {
+        StringBuilder text = new StringBuilder("!!id:\"" + id + "\"\n!!import:\"" + firstImport + "\"\n");
         text.append("!!import:\"").append(CORE).append("\"\n");
         imports.forEach(each -> text.append("!!import:\"").append(each).append("\"\n"));
         documents.put(id, text.append("!schema {\n").append(body).append("\n}\n").toString());
@@ -111,9 +109,12 @@ class ImportCycleTest {
         assertTrue(!message.contains("entry.tn"), "the entry point is not on the cycle: " + message);
     }
 
-    /** A {@code !!meta} chain that closes on itself is the same defect, and the same guard catches it. */
+    /**
+     * A cycle the entry point only reaches -- {@code uses.tn} importing one of a pair that import each other -- is
+     * the same defect, and the same guard catches it.
+     */
     @Test
-    void aMetaChainCycleIsRejectedToo() {
+    void aCycleTheEntryOnlyReachesIsRejectedToo() {
         schema("https://example.test/meta-a.tn", "https://example.test/meta-b.tn", List.of(), "  ma => { x: text }");
         schema("https://example.test/meta-b.tn", "https://example.test/meta-a.tn", List.of(), "  mb => { x: text }");
         schema("https://example.test/uses.tn", "https://example.test/meta-a.tn", List.of(), "  u => { x: text }");

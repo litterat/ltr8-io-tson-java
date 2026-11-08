@@ -45,7 +45,7 @@ class ClosedBodyReferencesTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledMetaRegistry.withStandardLibrary(SuiteBindings.context(), source)
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(), source)
                 .resolveLinked(ID, problems::add);
     }
 
@@ -79,7 +79,7 @@ class ClosedBodyReferencesTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         return TsonCompiledSchemaRegistry.tree(
-                TsonCompiledMetaRegistry.withStandardLibrary(SuiteBindings.context(), source)).get(ID);
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(), source)).get(ID);
     }
 
     /**

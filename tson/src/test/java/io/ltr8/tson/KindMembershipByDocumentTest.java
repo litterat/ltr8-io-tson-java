@@ -23,7 +23,7 @@ class KindMembershipByDocumentTest {
     }
 
     @Test
-    void aDataDocumentUnderMetaJudgesMembershipInMetasClosure() {
+    void aDataDocumentImportingTheKernelAloneJudgesMembershipInItsClosure() {
         assertEquals(List.of(), validate("""
                 !!import:"https://tson.io/2026/39/m/meta.tn"
                 !meta.record_field { type: integer }

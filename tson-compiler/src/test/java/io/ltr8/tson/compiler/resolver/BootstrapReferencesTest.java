@@ -15,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The bootstrap route states references the way ordinary resolution does.
  *
- * <p>{@link MetaKernelBootstrapResolver} resolves the kernel by a shorter route -- two passes and no
- * materialisation, because {@code !!meta} naming itself leaves ordinary resolution nothing to bootstrap
- * from. Shorter, not different: this output governs every schema whose {@code !!meta} is the kernel, so a
- * use site the two routes disagreed about would be two answers to one question. Several tests drive this
+ * <p>{@link KernelBootstrapResolver} resolves the kernel by a shorter route -- two passes and no
+ * materialisation, because the kernel declares every constructor it applies, which leaves ordinary resolution
+ * nothing to bootstrap from. Shorter, not different: every schema importing the kernel reads through this output, so
+ * a use site the two routes disagreed about would be two answers to one question. Several tests drive this
  * route deliberately to exercise every step, which is exactly why it must not quietly diverge.
  *
  * <p>What that now means is that a use site names the entry the author wrote and nothing is attached to
@@ -37,7 +37,7 @@ class BootstrapReferencesTest {
     /** The kernel's own references, stated as written -- the fixture's own spelling. */
     @Test
     void aUseSiteNamesWhatWasWrittenOnTheBootstrapRouteToo() {
-        TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema kernel = KernelBootstrapResolver.kernelSchema();
 
         RecordField name = field(kernel.entries().get("meta.template_param"), "name");
         assertEquals("meta.param_name", name.typeRef().name());
@@ -47,7 +47,7 @@ class BootstrapReferencesTest {
     /** And a position naming something that is not an alias is unaffected here as well. */
     @Test
     void aNonAliasIsUnaffectedOnTheBootstrapRoute() {
-        Top recordField = MetaKernelBootstrapResolver.getMetaKernelSchema()
+        Top recordField = KernelBootstrapResolver.kernelSchema()
                 .entries().get("meta.record_field");
 
         assertEquals("meta.field_type_ref", field(recordField, "type").typeRef().name());
@@ -57,7 +57,7 @@ class BootstrapReferencesTest {
     /** The chain stays walkable through the entries, which is what a reader collapses it by. */
     @Test
     void anAliasEntryKeepsItsHopOnTheBootstrapRoute() {
-        Top typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("meta.type_name");
+        Top typeName = KernelBootstrapResolver.kernelSchema().entries().get("meta.type_name");
 
         assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("meta.identifier"),
                 assertInstanceOf(Alias.class, typeName).target());

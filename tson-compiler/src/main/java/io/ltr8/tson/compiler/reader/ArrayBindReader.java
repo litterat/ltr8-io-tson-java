@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -147,7 +148,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
      * making a real effort to get the *element* type right: the schema's own {@code element_type}
      * name is resolved to a real bound Java class the same way any other schema type name is,
      * falling back to {@link String} only when that name has no real bound class at all, {@code schema.meta}
-     * having none for {@link io.ltr8.tson.compiler.config.SchemaMetaNameBinder} to find by that name.
+     * having none for {@link SchemaModelNameBinder} to find by that name.
      * {@code token} specifically is a known, accepted imprecision the other direction: it resolves
      * *without* falling back, but to {@link io.ltr8.tson.schema.meta.Token} -- a real class, just the
      * wrong one (the raw literal wrapper §5.2/§5.10 field modifiers use, not the plain {@link String}

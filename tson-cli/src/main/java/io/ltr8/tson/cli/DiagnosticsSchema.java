@@ -7,7 +7,7 @@ import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.unicode.RestrictionLevel;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 
 import java.io.IOException;
@@ -45,7 +45,7 @@ final class DiagnosticsSchema {
         case "diagnostic_code" -> Diagnostic.Code.class;
         case "outcome" -> Outcome.class;
         case "policy.restriction_level" -> RestrictionLevel.class;
-        default -> SchemaMetaNameBinder.INSTANCE.resolve(name);
+        default -> SchemaModelNameBinder.INSTANCE.resolve(name);
     };
 
     private DiagnosticsSchema() {

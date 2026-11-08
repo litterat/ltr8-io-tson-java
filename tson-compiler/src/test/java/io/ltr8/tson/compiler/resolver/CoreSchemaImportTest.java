@@ -3,9 +3,8 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.reader.Dom;
-import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.net.CidrNetwork;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -22,37 +21,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The same proof {@link MetaSchemaImportTest} gives for meta.tn, one rung further up the schema
- * ladder: registers the kernel explicitly (its own well-known bootstrap case, per {@link
- * TsonCompiledMetaRegistry}'s own Javadoc), then loads meta.tn and {@code core.tn} through
- * the fully generic fetch-parse-resolve-register-compile path -- exactly the sequence {@link
- * TsonBundledSchemas}'s own class Javadoc documents as the intended way to load this library's
- * three bundled schema documents.
+ * The same proof {@link NetSchemaImportTest} gives for net.tn, for core.tn: registers the kernel explicitly (its own
+ * well-known bootstrap case, per {@link TsonCompiledVocabularyRegistry}'s own Javadoc), then loads meta.tn and {@code
+ * core.tn} through the fully generic fetch-parse-resolve-register-compile path -- exactly the sequence {@link
+ * TsonBundledSchemas}'s own class Javadoc documents as the intended way to load this library's three bundled schema
+ * documents.
  *
  * <p>Every real {@code core.tn} declaration resolves in a single source-order pass, the same way
  * meta.tn's own 31 do -- core.tn's own declaration order already places each dependency before its
- * use, so no {@code MetaKernelBootstrapResolver}-style two-pass ordering is needed here either.
+ * use, so no {@code KernelBootstrapResolver}-style two-pass ordering is needed here either.
  */
 class CoreSchemaImportTest {
 
     /**
-     * The registered {@link TsonSchemaRegistry} plus the exact {@link TsonCompiledMetaRegistry}
+     * The registered {@link TsonSchemaRegistry} plus the exact {@link TsonCompiledVocabularyRegistry}
      * that loaded everything into it -- a second call reusing this same loader hits {@code
-     * TsonCompiledMetaRegistry}'s own cache (see {@link TsonCompiledMetaRegistry#load}'s own case
+     * TsonCompiledVocabularyRegistry}'s own cache (see {@link TsonCompiledVocabularyRegistry#loadVocabulary}'s own case
      * 1) rather than attempting to register {@code core.tn} a second time, which {@link
      * TsonSchemaRegistry#register} would correctly reject as a duplicate identity.
      */
-    private record Loaded(TsonSchemaRegistry schemaRegistry, TsonCompiledMetaRegistry registry) {
+    private record Loaded(TsonSchemaRegistry schemaRegistry, TsonCompiledVocabularyRegistry registry) {
     }
 
     private static Loaded loadMetaKernelMetaAndCore() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
+        TsonCompiledVocabularyRegistry registry = new TsonCompiledVocabularyRegistry(schemaRegistry,
+                SchemaModelNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         // meta.tn's own !!import needs the kernel present in the *shared* registry first --
         // the kernel's own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry
-        // itself (see TsonCompiledMetaRegistry's own Javadoc), so it's registered separately,
+        // itself (see TsonCompiledVocabularyRegistry's own Javadoc), so it's registered separately,
         // resolved ordinarily against this same loader (whose own bootstrap branch supplies the
         // structure namespace).
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
@@ -60,7 +59,7 @@ class CoreSchemaImportTest {
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(resolvedMetaKernel);
 
-        loader.loadMeta(TsonBundledSchemas.META_ID);
+        loader.loadVocabulary(TsonBundledSchemas.META_ID);
         loader.resolveLinked(TsonBundledSchemas.CORE_ID); // core.tn is a non-meta import: resolved, not compiled here
         loader.resolveLinked(TsonBundledSchemas.NET_ID); // and so is net.tn
 
@@ -119,7 +118,7 @@ class CoreSchemaImportTest {
     }
 
     /**
-     * {@link TsonCompiledMetaRegistry#register} (reached via {@code loader.load}, inside {@link
+     * {@link TsonCompiledVocabularyRegistry#register} (reached via {@code loader.load}, inside {@link
      * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own entries as a side
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to

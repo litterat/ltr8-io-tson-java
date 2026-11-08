@@ -4,9 +4,9 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The two per-mode flavors of {@link TsonCompiledSchemaRegistry} ({@link TsonCompiledSchemaRegistry#tree}
- * and {@link TsonCompiledSchemaRegistry#bind}) over one shared {@link TsonCompiledMetaRegistry} resolution
+ * and {@link TsonCompiledSchemaRegistry#bind}) over one shared {@link TsonCompiledVocabularyRegistry} resolution
  * core. Proves the overlay the split is built for: a single bind-mode core resolves a user schema once,
  * and each registry reads the same schema in its own mode -- a queryable TsonValue tree, object-binding to
  * a caller's own Java class -- so the "read mode" is which registry you hold, not a parameter threaded
@@ -30,7 +30,7 @@ class TsonCompiledSchemaRegistryTest {
 
     /**
      * The Java shape {@code my_record => { value: int32 }} binds to in object-binding mode -- outside {@code
-     * io.ltr8.tson.schema}, so {@link SchemaMetaNameBinder}'s own convention can't find it by accident.
+     * io.ltr8.tson.schema}, so {@link SchemaModelNameBinder}'s own convention can't find it by accident.
      */
     public record MyRecord(Integer value) {
     }
@@ -46,20 +46,23 @@ class TsonCompiledSchemaRegistryTest {
             """;
     private static final String DATA = "{ value: 7 }";
 
-    /** Resolves {@code my_record} to {@link MyRecord}, falling back to {@link SchemaMetaNameBinder}'s own convention for the composite constructors (record/array/...) the compile still needs. */
+    /**
+     * Resolves {@code my_record} to {@link MyRecord}, falling back to {@link SchemaModelNameBinder}'s own convention
+     * for the composite constructors (record/array/...) the compile still needs.
+     */
     private static final DataNameBinder MANUAL_BINDER = name -> "my_record".equals(name)
             ? MyRecord.class
-            : SchemaMetaNameBinder.INSTANCE.resolve(name);
+            : SchemaModelNameBinder.INSTANCE.resolve(name);
 
     /** A fresh core with the standard library loaded and the one user schema fetchable through the source. */
-    private static TsonCompiledMetaRegistry core() {
+    private static TsonCompiledVocabularyRegistry core() {
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, SCHEMA_ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
+        return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
     }
 
     @Test
@@ -81,7 +84,7 @@ class TsonCompiledSchemaRegistryTest {
 
     @Test
     void oneCoreBacksBothModes() {
-        TsonCompiledMetaRegistry core = core();
+        TsonCompiledVocabularyRegistry core = core();
         TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core);
         DataBindContext context = ResolverBindContext.registerAbsent(DataBindContext.builder().nameBinder(MANUAL_BINDER)
                 .registerAtoms(AtomContext.hostTypes())).build();
@@ -96,7 +99,7 @@ class TsonCompiledSchemaRegistryTest {
 
     @Test
     void theCoreCompilesOnlyTheSchemasAResolutionReadsThrough() {
-        TsonCompiledMetaRegistry core = core();
+        TsonCompiledVocabularyRegistry core = core();
 
         // The kernel documents are the vocabulary every bundled schema's constructions read through -- compiled and
         // cached here.
@@ -143,7 +146,7 @@ class TsonCompiledSchemaRegistryTest {
      */
     @Test
     void aReaderRejectsARegistryOfTheWrongMode() {
-        TsonCompiledMetaRegistry core = core();
+        TsonCompiledVocabularyRegistry core = core();
         DataBindContext context = ResolverBindContext.registerAbsent(DataBindContext.builder().nameBinder(MANUAL_BINDER)
                 .registerAtoms(AtomContext.hostTypes())).build();
         TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core);
@@ -155,7 +158,7 @@ class TsonCompiledSchemaRegistryTest {
 
     @Test
     void readingAUserSchemaResolvesItInTheCoreButDoesNotCompileItThere() {
-        TsonCompiledMetaRegistry core = core();
+        TsonCompiledVocabularyRegistry core = core();
         TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
 
         // The core resolved+registered the user schema -- its linked form is available -- but never

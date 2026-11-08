@@ -16,7 +16,7 @@ import java.util.Objects;
  * blacklisting hosts, or disk-only resolution). A caller wanting a specific policy implements this
  * interface (e.g. checking {@code uri} against an allowed-host list before ever opening a
  * connection, or refusing any {@code http(s)} scheme outright and only reading from a local
- * classpath/filesystem location) and hands it to a {@code TsonCompiledMetaRegistry}'s own
+ * classpath/filesystem location) and hands it to a {@code TsonCompiledVocabularyRegistry}'s own
  * {@code (TsonSchemaRegistry, DataBindContext, SchemaSource)} constructor. Two implementations
  * ship: {@code HttpSchemaSource} and {@code FileSchemaSource}, both in the {@code tson}
  * module, both denying by default.

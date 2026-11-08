@@ -60,9 +60,9 @@ import java.util.stream.Stream;
  * bind to the consumer's classes through one context. {@link #over} is that context: a name in the vocabulary binds
  * here and nowhere else, so a consumer cannot rebind it, and every other name goes to the consumer's binder.
  */
-public final class SchemaMetaNameBinder {
+public final class SchemaModelNameBinder {
 
-    private SchemaMetaNameBinder() {
+    private SchemaModelNameBinder() {
     }
 
     /** The package a vocabulary name's segments before the last are sub-packages of. */

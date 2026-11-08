@@ -5,7 +5,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 
 
 /**
- * A meta-layer record holding a type's name at a kind-typed slot ({@code request: meta.ref<record>}) and a value's
+ * A vocabulary record holding a type's name at a kind-typed slot ({@code request: meta.ref<record>}) and a value's
  * name at a reference-typed one ({@code method?: meta.ref<method>}), both as {@link TypeRef}s: the class declares
  * nothing of either, and {@code ValuesByNameTest} shows each judged by its slot.
  */

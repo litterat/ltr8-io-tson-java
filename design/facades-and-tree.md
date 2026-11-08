@@ -145,7 +145,7 @@ admit UTS #39's own `Toys-Я-Us`.
       Events are replayed from a buffer rather than re-lexed, so a lookahead holds only what it looked past.
     - An annotation *after* the type-ref stays a syntax error, correctly — the grammar admits one order.
 - **A schema that *resolves* badly reports like one, even mid-read.** `tree.get(uri, receiver)` /
-  `bind.get(uri, receiver)` (over `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)`) resolve and link
+  `bind.get(uri, receiver)` (over `TsonCompiledVocabularyRegistry.resolveLinked(uri, receiver)`) resolve and link
   the named schema collecting, so validating a data document against a broken schema reports **every**
   declaration at fault — the same account `tson compile` gives, since the schema is equally broken either
   way. Those diagnostics go to the **facade's own receiver, not through `ctx.report`**, which would rebuild

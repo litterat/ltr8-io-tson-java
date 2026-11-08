@@ -111,14 +111,14 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   synthetic (no factory for an open body), both a library-gap report for a plainly invalid document. The message
   mirrors the linker's schema-side sentence for the same mistake and adds the route — name the application
   in the schema, write that name in the data.
-- **`TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema`.** A schema compiled as vocabulary, in the
-  resolution core's bind mode, is the `TsonCompiledMetaSchema` subtype — a compiled schema plus the instance reader
+- **`TsonCompiledSchema` is `sealed permits TsonCompiledVocabulary`.** A schema compiled as vocabulary, in the
+  resolution core's bind mode, is the `TsonCompiledVocabulary` subtype — a compiled schema plus the instance reader
   of each constructor in its namespace (`reader(name)`), what a schema importing it reads a `!C { … }` body through.
   Any schema may be compiled so (`design/compiled-registries.md`); a schema compiled for reading data is a bare
   `TsonCompiledSchema`.
 - **One compile, one factory set:** `compile(linked, ValueReaderFactoryResolver)` dispatches each body's constructor
   through the mode's factories, with no scoping, since linking already established that every head a schema applies
-  is in its namespace. `TsonCompiledMetaSchema.compile` wraps the same walk, mapping a constructor with no factory
+  is in its namespace. `TsonCompiledVocabulary.compile` wraps the same walk, mapping a constructor with no factory
   to an `ErrorReader` naming the schema that declared it (`unbuildable`).
 - **Two output modes share each reader family** via a `*AbstractReader` base plus `*TreeReader`/`*BindReader`
   subclasses (`Record`/`Array`/`Map`/`Tuple`). Tree mode produces an immutable `tson-tree` `TsonValue`

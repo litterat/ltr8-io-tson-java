@@ -7,7 +7,7 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +39,7 @@ class FixedToVoidBindTest {
     private static Tson bound() {
         SchemaSource source = uri -> SCHEMA;
         DataBindContext context = DataBindContext.builder()
-                .nameBinder(DataNameBinder.ofMap(Map.of("person", Person.class)).orElse(SchemaMetaNameBinder.INSTANCE))
+                .nameBinder(DataNameBinder.ofMap(Map.of("person", Person.class)).orElse(SchemaModelNameBinder.INSTANCE))
                 .registerAtoms(AtomContext.hostTypes())
                 .build();
         Tson tson = Tson.of(ProcessorConfig.defaults()

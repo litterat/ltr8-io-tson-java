@@ -127,7 +127,7 @@ class Class2ConformanceSuiteTest {
     /**
      * A schema document, and what §8 says it resolves to.
      *
-     * <p>The expected side is read with this implementation's own meta.tn-governed reader, so a vector that
+     * <p>The expected side is read with this implementation's own reader of meta.tn's model, so a vector that
      * writes something meta.tn does not admit fails here rather than being compared as-is -- which is what
      * makes the corpus's expected side validated data rather than a transcript.
      */
@@ -372,7 +372,7 @@ class Class2ConformanceSuiteTest {
      * defaults, refuted assertions, failed ingest checks -- is a resolver error, however value-like the
      * violated rule, because it is detected while resolving the schema. Validation errors are reserved for
      * data checked against a successfully loaded schema." A schema-authoring mistake that this library
-     * happens to catch through the meta-schema's own compiled reader arrives carrying a record-shaped code,
+     * happens to catch through the kernel's own compiled reader arrives carrying a record-shaped code,
      * and it is still a resolver error: the code says which rule, the phase says which category.
      *
      * <p>What is still checked per diagnostic is that each one is a <em>verdict</em>. A gap, a binding

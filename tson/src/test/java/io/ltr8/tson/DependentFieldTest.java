@@ -8,7 +8,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -298,7 +298,7 @@ class DependentFieldTest {
     }
 
     private static Tson bound(Class<?> cell) {
-        DataNameBinder binder = name -> "cell".equals(name) ? cell : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataNameBinder binder = name -> "cell".equals(name) ? cell : SchemaModelNameBinder.INSTANCE.resolve(name);
         return Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, CELLS))))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
@@ -324,7 +324,7 @@ class DependentFieldTest {
     @Test
     void aBoundDependentFieldWrittenWithoutItsGroupMemberSiblingIsRefused() {
         DataNameBinder binder = name -> "grouped".equals(name) ? Grouped.class
-                : SchemaMetaNameBinder.INSTANCE.resolve(name);
+                : SchemaModelNameBinder.INSTANCE.resolve(name);
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, CELLS))))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)

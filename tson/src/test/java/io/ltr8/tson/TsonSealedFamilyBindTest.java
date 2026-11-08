@@ -6,7 +6,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
 
@@ -61,7 +61,7 @@ class TsonSealedFamilyBindTest {
         DataBindContext context = DataBindContext.builder()
                 .nameBinder(DataNameBinder.ofMap(Map.of(
                         "channel", Channel.class, "msg", Msg.class,
-                        "ping", Ping.class, "pong", Pong.class)).orElse(SchemaMetaNameBinder.INSTANCE))
+                        "ping", Ping.class, "pong", Pong.class)).orElse(SchemaModelNameBinder.INSTANCE))
                 .registerAtoms(AtomContext.hostTypes())
                 .build();
         Tson tson = Tson.of(ProcessorConfig.defaults()

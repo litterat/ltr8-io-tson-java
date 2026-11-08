@@ -176,7 +176,7 @@ does narrow, such as a media type that must parse, is a type of its own.
   `IdentifierType.profile()` builds the `IdentifierProfile` on each call, and `IdentifierParser` holds the one it
   built, so a read builds nothing. The kernel declares two instances, told apart by entry name:
   `meta.identifier => !unicode.identifier_type { continue_add: "-" }` (`IdentifierType.IDENTIFIER`) and `net.scheme_name`
-  (`IdentifierType.SCHEME_NAME`). `MetaKernelBootstrapResolver` refuses either stating any other body, so the
+  (`IdentifierType.SCHEME_NAME`). `KernelBootstrapResolver` refuses either stating any other body, so the
   constants and the declarations cannot drift. Every schema whose closure holds the kernel reaches its `meta.identifier`,
   and so cannot declare one of its own; a differently named identifier family is a `unicode.identifier_type` instance. How
   the profile facets behave under refinement and what `coherenceCheck` holds them to is

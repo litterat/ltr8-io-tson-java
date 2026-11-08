@@ -3,7 +3,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Atom;
@@ -18,7 +18,6 @@ import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,7 +57,7 @@ class OpenEntryResolvedFormTest {
      * visible as a value rather than as a clean verdict.
      */
     private static Tson metaBoundTson() {
-        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaModelNameBinder.defaultContext()));
     }
 
     /** {@code spec/fixtures}, found by walking up rather than assumed relative to a working directory. */
@@ -232,7 +231,7 @@ class OpenEntryResolvedFormTest {
      * the derivation and a model that quietly stops agreeing with the rule it states.
      *
      * <p><b>The rule has four branches and two of them are special cases</b>: branch 4 is a namespace lookup,
-     * and it reaches the <em>governing meta</em> rather than the entry's own schema for most of core.tn --
+     * and it reaches an <em>imported</em> schema rather than the entry's own for most of core.tn --
      * {@code integer} is {@code !integer_type {}} and {@code integer_type} is meta.tn's -- which the value's
      * Java shape answers on its own, a body's class being the branch of {@code Top} its constructor builds.
      *
@@ -263,7 +262,7 @@ class OpenEntryResolvedFormTest {
                   holder => { p: pair<text, int32> }
                 }
                 """);
-        // A meta layer whose templates compose onto a base kind: each application closes to a constructor,
+        // A schema whose templates compose onto a base kind: each application closes to a constructor,
         // whose kind is its chain's base kind and not its !record body's PRODUCT.
         tson.resolve("""
                 !!id:"https://example.com/kind-constructors.tn"

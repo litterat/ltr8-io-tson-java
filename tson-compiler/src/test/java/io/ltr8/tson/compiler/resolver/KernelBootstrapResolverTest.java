@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.numeric.IntegerType;
@@ -21,9 +22,8 @@ import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.net.IriType;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
 
@@ -54,22 +54,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * from what is ready -- and its output is the kernel's ordinary resolution entry for entry. The pre-loaded set is
  * held to the kernel's measured wait cycle ({@code SPEC-FEEDBACK.md #4}, rule 4).
  */
-class MetaKernelBootstrapResolverTest {
+class KernelBootstrapResolverTest {
 
     @Test
     void headerDirectivesCarryThroughFromTheDocument() {
-        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         // The kernel's header is its !!id alone: it imports nothing, and is pre-loaded rather than resolved (§3.4).
         assertTrue(CanonicalIdentity.canonicalize(schema.id()).endsWith("/m/meta.tn"));
         assertEquals(List.of(), schema.imports());
-        // getMetaKernelSchema() is the one and only place that ever sets this -- see TsonSchema's own Javadoc.
+        // kernelSchema() is the one and only place that ever sets this -- see TsonSchema's own Javadoc.
         assertTrue(schema.bootstrap());
     }
 
     @Test
     void resolvesTheOrdinarilyResolvableDeclarations() {
-        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         // A sample spanning every construct DefinitionResolver already handles on its own.
         for (String name : List.of("meta.top", "meta.atom", "meta.product", "meta.sum", "meta.alias",
@@ -81,7 +81,7 @@ class MetaKernelBootstrapResolverTest {
 
     @Test
     void voidAndIdentifierEachResolveToTheirOwnConstructorsBody() {
-        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         Map<String, Top> expected = Map.of("void", new VoidType(), "meta.identifier", IdentifierType.IDENTIFIER);
         Map<String, String> constructors = Map.of("void", "meta.void_type", "meta.identifier",
@@ -97,7 +97,7 @@ class MetaKernelBootstrapResolverTest {
 
     @Test
     void integerResolvesToAnUnconstrainedIntegerTypeBodyWithAtomKind() {
-        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         Top integer = schema.entries().get("integer");
         assertEquals(EntryKind.ATOM, EntryKind.of(integer, n -> true));
@@ -108,7 +108,7 @@ class MetaKernelBootstrapResolverTest {
     void booleanResolvesEvenThoughEnumItselfIsDeclaredLaterInTheFile() {
         // boolean => !enum [true false] appears near the top of the file and enum much later: the order is the
         // entries' waits, never the order they are written in.
-        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         Top booleanDef = schema.entries().get("boolean");
         assertEquals(EntryKind.ATOM, EntryKind.of(booleanDef, n -> true));
@@ -117,7 +117,7 @@ class MetaKernelBootstrapResolverTest {
 
     @Test
     void everyEnumInstanceInTheFixtureResolves() {
-        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("meta.product_access_type"));
         assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("meta.product_size_type"));
@@ -128,7 +128,7 @@ class MetaKernelBootstrapResolverTest {
 
     @Test
     void textIriRegexResolveToTheirUnconstrainedTypeBodiesWithAtomKind() {
-        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         Top text = schema.entries().get("text");
         assertEquals(EntryKind.ATOM, EntryKind.of(text, n -> true));
@@ -163,7 +163,7 @@ class MetaKernelBootstrapResolverTest {
      */
     @Test
     void theFixtureDeclarationsResolveAlongsideSevenDesugaredEntries() {
-        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
+        TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         assertEquals(94, schema.entries().size());
         for (String head : List.of("array_array_text_1", "array_text_1", "array_type_ref",
@@ -196,7 +196,7 @@ class MetaKernelBootstrapResolverTest {
         }
         Set<String> handBuilt = new TreeSet<>();
         // A content hash is §8.2's to spell, and the fixture writes a placeholder for it.
-        MetaKernelBootstrapResolver.preLoaded().forEach(name ->
+        KernelBootstrapResolver.preLoaded().forEach(name ->
                 handBuilt.add(name.replaceFirst("_[0-9a-f]{8}$", "_xxhash")));
         assertEquals(read, handBuilt);
     }
@@ -209,9 +209,9 @@ class MetaKernelBootstrapResolverTest {
      */
     @Test
     void theBootstrapComesOutAsTheKernelsOrdinaryResolution() {
-        TsonSchema bootstrap = TsonSchemaLinker.linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema())
+        TsonSchema bootstrap = TsonSchemaLinker.linkBootstrap(KernelBootstrapResolver.kernelSchema())
                 .schema();
-        TsonSchema ordinary = TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(),
+        TsonSchema ordinary = TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(),
                         SchemaSource.registeredOnly()).schemaRegistry().get(TsonBundledSchemas.META_ID)
                 .orElseThrow().schema();
 
@@ -252,7 +252,7 @@ class MetaKernelBootstrapResolverTest {
         Map<String, SchemaMap.Declaration> permuted = new LinkedHashMap<>();
         reorder.apply(new ArrayList<>(document.body().declarations().keySet()))
                 .forEach(name -> permuted.put(name, document.body().declarations().get(name)));
-        TsonSchema schema = MetaKernelBootstrapResolver.resolve(new SchemaDocument(document.id(), document.imports(),
+        TsonSchema schema = KernelBootstrapResolver.resolve(new SchemaDocument(document.id(), document.imports(),
                 new SchemaMap(document.body().annotations(), permuted)), parser.schemaPositions());
         Map<String, String> outcome = new TreeMap<>();
         // A nested map is derived from its members' entries, in the order they are declared: its names are compared.
@@ -271,7 +271,7 @@ class MetaKernelBootstrapResolverTest {
     @Test
     void aTargetNoPreLoadedInstanceAppliesIsRefused() {
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> MetaKernelBootstrapResolver.instanceBody("x", emptyInstance("meta.void_type")));
+                () -> KernelBootstrapResolver.instanceBody("x", emptyInstance("meta.void_type")));
         assertTrue(thrown.getMessage().contains("meta.void_type"));
     }
 
@@ -281,7 +281,7 @@ class MetaKernelBootstrapResolverTest {
                 new TokenValue("oops", TokenForm.UNQUOTED)));
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> MetaKernelBootstrapResolver.instanceBody("text", nonEmpty));
+                () -> KernelBootstrapResolver.instanceBody("text", nonEmpty));
         assertTrue(thrown.getMessage().contains("unicode.text_type"));
     }
 }
