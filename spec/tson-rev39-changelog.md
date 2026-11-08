@@ -805,7 +805,7 @@ and wording items are applied as the review wrote them, among them: Part 1's tag
 production renamed `tag` and its token production `qualified-name-token`, with an
 `application` production split out of `reference`; a resolved form called a schema document
 in canonical form rather than a data document; "governing" retired from Parts 1 and 3
-outside §7.8's own use; `meta.record_template.type` named beside `meta.record_field.type`
+outside §7.8's own use; `meta.record_template_field.type` named beside `meta.record_field.type`
 as the two slots `meta.field_type_ref` types; the NAMESPACE kind dropped, a value entry
 taking no kind of its own; "kind" given both its senses in §1.4; `chain.subtypes` stated
 over the namespace of the schema being resolved; the collision rule's exception for open
