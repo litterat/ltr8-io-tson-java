@@ -12,9 +12,9 @@ description: >
 
 # TSON Part 3: JSON Encoding
 
-## 2026 Revision 38
+## 2026 Revision 39
 
-**Status:** Working revision. The 2026 revision series is subject to change without compatibility guarantees. When finalised, this specification will be published as part of **TSON version 1** and frozen on the terms of [TSON-DATA] §1.2 principle 6. This is the third published revision of Part 3. It is written against Revision 38 of [TSON-DATA] and [TSON-SCHEMA] and published with them; §1.6 lists every type-system change it depends on and where each now lives.
+**Status:** Working revision. The 2026 revision series is subject to change without compatibility guarantees. When finalised, this specification will be published as part of **TSON version 1** and frozen on the terms of [TSON-DATA] §1.2 principle 6. This is the fourth published revision of Part 3. It is written against Revision 39 of [TSON-DATA] and [TSON-SCHEMA] and published with them; §1.6 lists every type-system change it depends on and where each now lives.
 
 **Series:** TSON Specification, Part 3 of 3
 
@@ -90,7 +90,7 @@ An implementation MAY be encode-only or decode-only; each side's obligations sta
 
 ### 1.6 The Type-System Changes This Document Consumes
 
-This document was drafted against four type-system changes: three landed in Revision 35 and the fourth, item 3, in Revision 36, which also brought items 5 and 6. Items 7 to 14 are Revision 37's, and items 15 to 19 are Revision 38's and item 20 is Revision 39's, each listed against the sections it changes. Each is listed with where it now lives and what this document consumes; the owning documents define them, and nothing here restates a rule they carry.
+This document was drafted against four type-system changes: three landed in Revision 35 and the fourth, item 3, in Revision 36, which also brought items 5 and 6. Items 7 to 14 are Revision 37's, items 15 to 19 are Revision 38's, and items 20 to 22 are Revision 39's, each listed against the sections it changes. Each is listed with where it now lives and what this document consumes; the owning documents define them, and nothing here restates a rule they carry.
 
 1. **No `null` value in the notation** ([TSON-DATA] §2.9, §4.4, §6; [TSON-SCHEMA] §4.2, §7.3). Base type resolution is boolean → number → string and applies only at a position nothing types — Revision 36 restates its applicability over the position rather than the header ([TSON-DATA] §4.1), which is the reading §4.1 here already took; `void` admits `_` alone. Consumed by: the whole of §7 — this document reads JSON `null` as the void sentinel's spelling, which is coherent only in a model that holds no null value — and by [TSON-DATA] §6, which names this document as the JSON reader.
 
@@ -131,6 +131,10 @@ This document was drafted against four type-system changes: three landed in Revi
 19. **Refused and undetermined** ([TSON-DATA] §8.1, §8.2, §9.1; [TSON-SCHEMA] §10.1, §11.2) — not a type-system change but the outcome model [TSON-DATA] §8.1 carries, listed because this document reports in it. Beside the four categories, a document this processor declines under its own configuration — its name policies, its limits, a schema it does not hold and will not fetch or one past its size limit — is **refused**, a rejection here and never a finding about validity; one whose schema it could not obtain, with nothing at the reference or no answer, is **undetermined**, and nothing was judged. Consumed by §9.4 and §10.1.
 
 20. **One directive** ([TSON-DATA] §2.2, §3.3; [TSON-SCHEMA] §2.2.3, §7.1): a header is an optional `!!id` followed by zero or more `!!import`s, and `!!import` is the one directive that binds — a document is a schema exactly when its root is tagged `!schema`, and a data document may import several schemas, its values read under one namespace over their closures with the ordinary collision rule between them, its root naming its type. The binding member follows the directive: `$import`, a list of references where a single one stood. Consumed by §3.2–§3.5, §8.5 and §10.4.
+
+21. **Dependent fields** ([TSON-DATA] §2.5, §7.4; [TSON-SCHEMA] §4.2, §5.2, §5.12): a record field may be typed by a sibling field of the same record, `value?: type!`, so that each instance's dependent field is read against the type its sibling's value names; the sibling is required, defaulted, pinned or a group member, never voidable, and a free sibling — one neither pinned nor a discriminator — is written before the dependent field, since the reader reaches it with the sibling's value in hand and holds nothing back. The kernel's `meta.reference_type` carries `allow_sibling`, true at a record field's type (`meta.field_type_ref`) and false everywhere else. Consumed by §5.6, where a sibling reference is a string holding the text encoding's `kind!`; and by §6.1.6, whose member-order rule gains its one exception — a free sibling MUST precede its dependent member, the one ordering constraint this encoding places on members after the selectors, and one JSON's own model does not have.
+
+22. **Qualified names, from the root** ([TSON-DATA] §3.1, §3.2, §7.4, §7.7; [TSON-SCHEMA] §3.3, §4.1, §5.12): a schema's namespace is one flat set — its own entries and its import closure — in which every name resolves from the root; a schema map may be nested as an entry (`geo => !schema { … }`), its members named by their paths (`geo.address`); a tag, an annotation name and a reference are qualified names, segments joined by `.`; and the kernel is one pre-loaded document, `meta.tn`, its common vocabulary at the root and its machinery under six maps (`meta.record`, `unicode.text_type`, `atom.ordering`), beside three data-format libraries (`numeric.tn`, `temporal.tn`, `net.tn`) that `core.tn` bundles. Consumed by §3.3, where `$type` is a qualified name resolved from the schema's root, and by §5.6, where a kind's string holds one and a reference naming values holds the qualified name of a value.
 
 Three things this document once anticipated did not land as drafted and are recorded so that no reader looks for them. An `@rest` annotation designating a record field to be flattened was declared in Revision 35 and is retired in Revision 36: this encoding has no flattened tail, undeclared members are §6.1.1's closure error, and open-ended data is carried by a map-typed field written the same way in both encodings. A `required_keys` facet on `map` is deferred for the same reason: named required keys are declared record fields, open-ended ones are a map-typed field beside them (§6.1.1), and maps stay homogeneous. And `unknown`, a position admitting an untyped value of any shape, has no successor: the open sum is the kernel's `meta.declared` ([TSON-SCHEMA] §7.8), drawing its value's type from the governing schema's closure under a rule this encoding consumes directly — *a value at a declared position must name its type* (§5.7, §8.5) — and a value of a schema the governing one does not import is not admitted at any position.
 
@@ -691,9 +695,9 @@ The atom parsing contracts this document reaches through §5.1 carry their own n
 
 | Reference | Title | URL |
 |-----------|-------|-----|
-| TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/38/tson-part1-data |
-| TSON-SCHEMA | TSON Part 2: Type System and Schema | https://tson.io/2026/38/tson-part2-schema |
-| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/38/tson-guide |
+| TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/39/tson-part1-data |
+| TSON-SCHEMA | TSON Part 2: Type System and Schema | https://tson.io/2026/39/tson-part2-schema |
+| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/39/tson-guide |
 
 ### 11.3 Informative References
 
