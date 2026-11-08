@@ -78,7 +78,7 @@ data document ──!!import──▶ schema ──!!import──▶ library ─
 
 Reading order runs the other way: this document stands alone, and a Class 1 processor (§1.5) needs nothing from [TSON-SCHEMA] or [TSON-JSON]. Each part adds capability without modifying the parts below it. The lexer defined in this document is complete: higher parts introduce no new tokens, no new lexer modes, and no changes to character classification. Within the 2026 series the lexer has changed twice under principle 6, and this paragraph is where a revision that touches it says so: Revision 35 changed the escape production (§7.2.2), and Revision 37 emits a bare `+` as a special token (§7.2.4, §7.2.5) where it had been a lexer error, for the at-least-one field group of the schema grammar ([TSON-SCHEMA] §5.11). No token a data document lexed to before Revision 37 is changed by it: `+5` and `+0.5` begin unquoted tokens as they did. Revision 38 left the lexer alone and moved one judgement out of the parser: a field name is any unquoted or single-line token, and whether its text is an identifier is the resolver's question in a schemaless document and the schema's under one (§2.5, [TSON-SCHEMA] §5.2). Revision 39 leaves the lexer alone too, and changes the data grammar at four positions, each over tokens the lexer already emits: a reference carrying an argument list is a core value, so `<` and `>` have a grammar role in data (§7.4); a sibling reference, an unquoted token followed by an adjacent `!`, is a core value (§7.4); a type annotation and an annotation name are qualified names (§3.1, §3.2); and the header is the one place a directive stands (§2.2, §3.3).
 
-[TSON-SCHEMA] defines a second document kind, the **schema document**, recognised by its root's tag (§2.2). A schema document is parsed by a sibling grammar — the schema grammar — that shares this document's lexer and core value rules: its declaration grammar gives the reserved special tokens (§7.2.5) their meaning, and [TSON-SCHEMA] defines the operation of the `import` directive on it (§3.3). None of that syntax appears in data documents: in the data grammar, a reserved special token is a parse error, and a `!!` token whose name is not followed by an adjacent `:` is a parse error.
+[TSON-SCHEMA] defines a second document kind, the **schema document**, recognised by its root's tag (§2.2). A schema document is parsed by a companion grammar — the schema grammar — that shares this document's lexer and core value rules: its declaration grammar gives the reserved special tokens (§7.2.5) their meaning, and [TSON-SCHEMA] defines the operation of the `import` directive on it (§3.3). None of that syntax appears in data documents: in the data grammar, a reserved special token is a parse error, and a `!!` token whose name is not followed by an adjacent `:` is a parse error.
 
 
 ### 1.4 Notation and Keywords
@@ -160,7 +160,7 @@ The two header directives name the document and import its schema; the root valu
 A TSON document is the outermost structure: a **header** followed by a body. The header is a fixed sequence of directives — names, order, and cardinality are enforced by the grammar (§3.3, §7.4) — and the body is one data value:
 
 ```
-document         = [ id-directive ws ] *( import-directive ws ) data-value ws
+document         = [ id-directive ] ws *( import-directive ws ) data-value ws
 
 id-directive     = "!!" "id"     ":" single-line-token
 import-directive = "!!" "import" ":" single-line-token
@@ -211,9 +211,9 @@ Content addressing composes: a data document may reference its schema by hashed 
 The data grammar has one value rule. A **data value** is zero or more annotations, an optional type annotation, and a core value; it occurs everywhere a value does — record field values, map keys and entry values, array elements, and the document's root.
 
 ```
-data-value       = *annotation [type-ref] core-value
+data-value       = *annotation [tag] core-value
 
-type-ref         = "!" qualified-name
+tag              = "!" qualified-name
 
 core-value       = record / map / array
                  / empty-brace
@@ -343,7 +343,7 @@ Whether a record field that carries no value is written as `_` or left out is a 
 ## 3. Augmentation
 
 
-Augmentation adds metadata, type information, and directives to values without modifying the structural grammar. All augmentation is optional and is expressed within the value rules (§2.3) and the header (§2.2).
+Augmentation adds metadata and type information to values, and directives to the document, without modifying the structural grammar. All augmentation is optional and is expressed within the value rules (§2.3) and the header (§2.2).
 
 TSON supports three augmentation features: configuration directives (`!!`), annotations (`@`), and type annotations (`!name`). Directives are permitted only in the document header (§2.2); annotations and type annotations are available on every data value. Augmentation attaches to the value that follows it.
 
@@ -359,7 +359,7 @@ An annotation attaches metadata to a value without modifying the value itself: t
 annotation = "@" qualified-name [ ":" data-value ]
 ```
 
-The name is an unquoted token whose text matches the qualified-name grammar (§7.7): one or more identifiers joined by `.`, each matched in full. A one-segment name, `@doc`, names an entry of the governing schema's root; a dotted name, `@atom.ordering`, names a member of a schema map nested in that root, resolved from the root as every name is ([TSON-SCHEMA] §3.3.3, §5.12). Schemaless, a dotted name is kept as written. A token in name position that fails the grammar — a segment that is no identifier, an empty segment (`@x..y`), a leading or trailing dot — is a parse error. Every identifier is expressible unquoted (§7.1), so the position loses nothing by admitting no quoted form.
+The name is an unquoted token whose text matches the qualified-name grammar (§7.7): one or more identifiers joined by `.`, each matched in full. A one-segment name, `@doc`, names an entry of the document's root namespace ([TSON-SCHEMA] §3.3); a dotted name, `@atom.ordering`, names a member of a schema map nested in that root, resolved from the root as every name is ([TSON-SCHEMA] §3.3.3, §5.12). Schemaless, a dotted name is kept as written. A token in name position that fails the grammar — a segment that is no identifier, a leading or trailing dot (`@x.`) — is a parse error. Every identifier is expressible unquoted (§7.1), so the position loses nothing by admitting no quoted form.
 
 **Adjacency and termination.** The `:` (when present) MUST be adjacent to the annotation name. When the `:` is absent, at least one whitespace character MUST follow the annotation name. These rules make annotation boundaries lexically determined by the single character after the name.
 
@@ -378,10 +378,10 @@ At the data-format layer, annotations are preserved, ordered metadata with no fu
 A type annotation associates a named type with the following value: the prefix operator `!` immediately followed (without whitespace) by a qualified name forming the type name.
 
 ```
-type-ref = "!" qualified-name
+tag = "!" qualified-name
 ```
 
-As for annotation names, the type name is an unquoted token whose text matches the qualified-name grammar (§7.7); `!42x` is a parse error, not a reference to an undeclared type. A one-segment name names an entry of the governing schema's root; a dotted name, `!geo.address`, names the member `address` of the schema map `geo` nested in it, resolved from the root ([TSON-SCHEMA] §5.12), and a name whose walk reaches no member is an unresolved type like any other. At least one whitespace character MUST separate the type name from a following token; no separator is required before a structural delimiter. `!person { name: Alice }` and `!person{name:Alice}` are both valid; `!int32"5"` is a parse error — write `!int32 "5"`.
+As for annotation names, the type name is an unquoted token whose text matches the qualified-name grammar (§7.7); `!42x` is a parse error, not a reference to an undeclared type. A one-segment name names an entry of the document's root namespace ([TSON-SCHEMA] §3.3); a dotted name, `!geo.address`, names the member `address` of the schema map `geo` nested in it, resolved from the root ([TSON-SCHEMA] §5.12), and a name whose walk reaches no member is an unresolved type like any other. At least one whitespace character MUST separate the type name from a following token; no separator is required before a structural delimiter. `!person { name: Alice }` and `!person{name:Alice}` are both valid; `!int32"5"` is a parse error — write `!int32 "5"`.
 
 At the document level, a type annotation identifies the expected type of the document's contained value; within structural types, it identifies the type of the value that follows. A type annotation applies to the value, not its contents: `!person { name: Alice }` tags the record, not its fields.
 
@@ -432,7 +432,7 @@ Base type resolution applies to a token that carries no built-in type annotation
 
 A Class 1 value is one of four things — an untyped token, a token carrying a built-in annotation from §5's vocabulary, a container, or a reference (§7.4) — and this section governs only the first. The vocabulary is the schemaless way to say what a token *means*: `!date 2025-03-13`, `!uuid 9f1c…`, `!int32 007` are typed and checked with no schema in scope. Base resolution is what a token gets when its author chose not to say and nothing else says for them.
 
-**A reference resolves nothing schemaless.** A reference carrying an argument list is kept as a structured value — the qualified name's segments and its arguments, each argument itself a reference or a token read by this section, a nested application another such value — with its text recreatable and no referent, there being no namespace to resolve in. A sibling reference is kept as its field name and the mark. A dotted type annotation or annotation name is kept as written. None of them is refused: what a reference names is the business of the type that reads it ([TSON-SCHEMA] §4.2), and a Class 1 processor preserves it as it preserves a tag it does not act on.
+**A reference resolves nothing schemaless.** A reference carrying an argument list is kept as a structured value — the qualified name's segments and its arguments, each argument itself a reference or a token read by this section, a nested application another such value — with its text recreatable and no referent, there being no namespace to resolve in. A sibling reference is kept as its field name and the mark. A dotted annotation name is kept as written; a dotted type annotation names nothing in §5's vocabulary and is §3.2's resolver error. None of the others is refused: what a reference names is the business of the type that reads it ([TSON-SCHEMA] §4.2), and a Class 1 processor preserves it as it preserves a tag it does not act on.
 
 
 ### 4.2 Boolean
@@ -665,7 +665,7 @@ The three extension characters are all `Pattern_Syntax` and therefore immutable,
 
 **Profile boundaries.** Every extension character is required by a production of the number grammar (§7.6): `Nd` for digits, `-`/`+` for signs and exponent signs, `.` for the decimal point and `.inf`/`.infinity`/`.nan`. The extension characters remain token-profile members, but their bare single-character forms are claimed by the grammar or excluded: `-` alone is the subtraction operator ([TSON-SCHEMA] §5.9), `+` alone the at-least-one mark of a field group ([TSON-SCHEMA] §5.11), `..` is the range token (§7.2.4), and a bare `.` has no role — a qualified name's `.` stands between two identifiers and never alone (§7.7) — so the single-character strings are written quoted (`"-"`, `"+"`, `"."`). Content kinds the profile cannot cover totally — paths, URIs with a scheme, monetary amounts, rationals, networks, percentages, ranges, and the temporal kinds that carry a clock time (RFC 3339 `full-time` and `date-time`, and any duration written with the colon forms) — are excluded entirely, so their quoting rule is *always*, never a per-character scan (full derivation in [TSON-GUIDE]). A calendar date (`2025-03-13`) lies wholly inside the profile and is spellable bare; a time never is, the colon being the one character that ends it.
 
-**Quoting by kind.** The profile makes the quoting decision a property of what a value *is*, not of the characters it happens to contain. A generator's decision procedure is two clauses: quote if any character falls outside the profile, and quote if the bare token would resolve to something other than the intended string (`"true"`, `"42"`, `"0x71C7…"`, §4) — and, where the bare token would parse as a reference with arguments, a quoted token being never a reference (§7.4).
+**Quoting by kind.** The profile makes the quoting decision a property of what a value *is*, not of the characters it happens to contain. A generator's decision procedure is two clauses: quote if any character falls outside the profile, and quote if the bare token would resolve to something other than the intended string (`"true"`, `"42"`, `"0x71C7…"`, §4); text spelled like a reference (`box<T>`) is caught by the first clause, `<` being outside the profile, and a quoted token is never a reference (§7.4).
 
 **Format characters and controls.** No character with General_Category `Cf`, and no control character, is in `XID_Continue`; none may appear in an unquoted token. This includes the bidirectional formatting controls U+061C, U+202A–U+202E and U+2066–U+2069, the soft hyphen, and the word joiner, and it is the rule the security considerations of §9.4 rest on. Host-language identifier predicates frequently compute `ID_*` rather than `XID_*`, and frequently admit the identifier-ignorable characters on top; they are not substitutes for the properties named here. The two exceptions are the joining controls ZWNJ (U+200C) and ZWJ (U+200D), which **are** `XID_Continue` — UAX #31 made them default identifier characters when it withdrew its former contextual requirement, relocating the safety rule to UTS #39 — and which the token profile therefore admits. They are ordinary spelling in the scripts that use them (a ZWNJ separates the morphemes of a Persian word; both control conjunct formation in Indic scripts) and invisible only where they do no shaping work. The identifier grammar (§7.7) applies UTS #39's contextual rule for joining controls, which admits them where they have a shaping effect and rejects them where they are invisible, so `ad<ZWNJ>min` is not an identifier while `کتاب‌ها` is. The two rules land together: a token profile that admits the joiners is safe only because the identifier layer checks their context.
 
@@ -790,7 +790,7 @@ Four special characters have grammar roles in data values:
 <  >  — the argument list of a reference (§7.4)
 ```
 
-`!` keeps its prefix role and gains a postfix one: `kind!` lexes as an unquoted token and an adjacent special token, and adjacency tells the two roles apart — a prefix `!` is adjacent to the token after it, a postfix `!` to the token before it and followed by whitespace (§7.5). `<` and `>` are each one token: `map<text list<int32>>` lexes as `map` `<` `text` `list` `<` `int32` `>` `>`, and `>>` is two tokens.
+`!` keeps its prefix role and gains a postfix one: `kind!` lexes as an unquoted token and an adjacent special token, and adjacency tells the two roles apart — a prefix `!` is adjacent to the token after it, a postfix `!` to the token before it and followed by whitespace or the end of the document (§7.5). `<` and `>` are each one token: `map<text list<int32>>` lexes as `map` `<` `text` `list` `<` `int32` `>` `>`, and `>>` is two tokens.
 
 The remaining eleven — `&` `?` `~` `=` `|` `;` `(` `)` `^` `-` `+` — are reserved by the schema grammar of [TSON-SCHEMA] and have no role in data values; in a data value, each is a parse error. (`-` and `+` reach special-token mode only through the boundary rule of §7.2.4: followed by a continuation-set character either begins an ordinary unquoted token, so signed numbers and hyphenated names are unaffected. `+` joined the set in Revision 37; a bare `+` was a lexer error before it and is a parse error in a data value now.)
 
@@ -956,14 +956,14 @@ HEXDIG        = ; 0-9 / A-F / a-f
 The parser consumes the token stream and produces a document tree. The `document` rule reads the header and then one data value, the root; its kind is the root's tag (§2.2). Adjacency requirements that ABNF concatenation cannot express are enforced via source-position comparison; see §7.5.
 
 ```
-document        = [ id-directive ws ] *( import-directive ws )
+document        = [ id-directive ] ws *( import-directive ws )
                   data-value ws
                 ; a data document, or a schema document where the
-                ; root's type-ref is "!schema" — the root is then
+                ; root's tag is "!schema" — the root is then
                 ; the schema-map defined in [TSON-SCHEMA], and a
                 ; Class 1 processor rejects it (§1.5, §8.1).
                 ; Classification reads the header, the root's
-                ; annotations and its type-ref, never its core value.
+                ; annotations and its tag, never its core value.
 
 id-directive     = "!!" "id"     ":" single-line-token
 import-directive = "!!" "import" ":" single-line-token
@@ -975,10 +975,10 @@ import-directive = "!!" "import" ":" single-line-token
                 ; and "schema" among them — and a directive past the
                 ; header are parse errors (§3.3).
 
-data-value      = *annotation [type-ref] core-value
+data-value      = *annotation [tag] core-value
 
-type-ref        = "!" qualified-name
-                ; a tag: no argument list (§3.2)
+tag             = "!" qualified-name-token
+                ; a type annotation: no argument list (§3.2)
 
 core-value      = record / map / array
                 / empty-brace / void / reference / token
@@ -998,8 +998,8 @@ array           = "[" ws [ data-value
 
 ; ── References ────────────────────────────────────────────
 
-reference       = sibling-ref
-                / qualified-name "<" ws type-args ws ">"
+reference       = sibling-ref / application
+application     = qualified-name-token "<" ws type-args ws ">"
                 ; a reference with arguments: "<" adjacent to the
                 ; qualified-name (§7.5), whitespace free inside the
                 ; list, one value delivered whole. A qualified-name
@@ -1008,7 +1008,7 @@ reference       = sibling-ref
                 ; elsewhere.
 
 type-args       = type-arg *( separator type-arg ) [ ws "," ]
-type-arg        = reference / token
+type-arg        = application / token
                 ; a token that is a qualified-name is a reference
                 ; with no arguments; any other token (a number, a
                 ; quoted token) is a value argument. A quoted token is
@@ -1022,13 +1022,13 @@ sibling-ref     = unquoted-token "!"
                 ; The token is one segment, an identifier: it holds
                 ; no ".". A quoted token is never a sibling reference.
                 ; It is never a type-arg, and a tag ("!" qualified-
-                ; name) is never one. Read as a reference by a
+                ; name-token) is never one. Read as a reference by a
                 ; position typed by one that admits it ([TSON-SCHEMA]
                 ; §5.2, §8.1).
 
 ; ── Shared terminals ──────────────────────────────────────
 
-annotation      = "@" qualified-name [ ":" data-value ]
+annotation      = "@" qualified-name-token [ ":" data-value ]
 token           = unquoted-token / single-line-token
                 / multi-line-token
 field-name      = unquoted-token / single-line-token
@@ -1039,13 +1039,13 @@ field-name      = unquoted-token / single-line-token
                 ; the record's name type judges it
 empty-brace     = "{" ws "}"
 void            = "_"
-qualified-name  = unquoted-token
-                ; segments joined by "." (§7.7), each matched in
-                ; full against the identifier grammar: `order`,
-                ; `geo.address`. One token, since "." is a token
-                ; character; a leading, trailing or doubled "." is
-                ; a parse error. At type-ref, annotation and
-                ; sibling-ref the spelling is an unquoted token.
+qualified-name-token = unquoted-token
+                ; text matches qualified-name (§7.7): segments joined
+                ; by ".", each matched in full against the identifier
+                ; grammar: `order`, `geo.address`. One token, since "."
+                ; is a token character; a leading, trailing or doubled
+                ; "." is a parse error. At a tag and an annotation the
+                ; spelling is an unquoted token.
 ```
 
 
@@ -1162,7 +1162,7 @@ Three rules apply on top of the production:
 2. **Joining controls.** ZWNJ (U+200C) and ZWJ (U+200D) are `XID_Continue` and so are admitted by the production, but only in the contexts UTS #39 §3.1.1.1 defines for joining controls — conditions A1, A2, and B on the `Joining_Type`, `General_Category`, `Canonical_Combining_Class`, and `Indic_Syllabic_Category` of the neighbouring characters, under the two global conditions that the identifier be in NFC and be single-script (ignoring Common and Inherited). A joining control outside those contexts makes the text not an identifier. The rule admits the joiners where they have a shaping effect (Persian `کتاب‌ها`, an Indic conjunct) and rejects them where they are invisible — every position in a Latin name — and it is what makes the token profile's admission of the joiners (§7.1) safe. An implementation MUST implement all three conditions; the Arabic condition alone admits Persian and rejects Malayalam, which is the wrong line.
 3. **No reserved words.** The grammar excludes nothing by name: there is no keyword list, and `true` and `false` are identifiers like any other — the two words that have a special reading under base type resolution (§4.2) are, under a schema, the members of the kernel's `boolean` enum `[true false]` ([TSON-SCHEMA] §7.4), `null` is an ordinary string (§4.4), and `abstract` and `final` are identifiers that [TSON-SCHEMA] §12.1 reads as marks at exactly one position of the schema grammar and nowhere else. The one lexical reservation the format makes — the token-initial underscore, occupied by the void sentinel (§7.1) — is not a reservation on names at all: `_` is `XID_Continue` only, so no identifier begins with it, and `_` and `_id` are not identifiers (§2.5).
 
-A token at a naming position whose decoded text fails this grammar is a parse error at every position the data grammar marks `qualified-name` (§7.4 — annotation names, type-annotation names and the head of a reference, each segment judged) and at every naming position of the schema grammar ([TSON-SCHEMA] §12.1) but a declared field name; at a field name it is a resolver error in a document that names no schema (§2.5), and under a schema the record's name type judges it — this grammar where the type is the kernel's `meta.identifier`, the declared profile otherwise ([TSON-SCHEMA] §5.2). Map keys are values, not names, and are never matched against it at this layer (§2.6). Under a schema, a key — or any other value — whose declared type is an identifier family is matched against that family's own profile as part of reading the value ([TSON-SCHEMA] §7.4), and where the family is the kernel's `meta.identifier` that profile is this grammar, stated as data.
+A token at a naming position whose decoded text fails this grammar is a parse error at every position the data grammar marks `qualified-name` (§7.4 — annotation names, type-annotation names, the head of a reference and the token of a sibling reference, each segment judged) and at every naming position of the schema grammar ([TSON-SCHEMA] §12.1) but a declared field name; at a field name it is a resolver error in a document that names no schema (§2.5), and under a schema the record's name type judges it — this grammar where the type is the kernel's `meta.identifier`, the declared profile otherwise ([TSON-SCHEMA] §5.2). Map keys are values, not names, and are never matched against it at this layer (§2.6). Under a schema, a key — or any other value — whose declared type is an identifier family is matched against that family's own profile as part of reading the value ([TSON-SCHEMA] §7.4), and where the family is the kernel's `meta.identifier` that profile is this grammar, stated as data.
 
 The grammar is built on `XID_Start`, `XID_Continue`, NFC and `Canonical_Combining_Class`, which the Unicode Standard has stabilised — a character never leaves `XID_Start` or `XID_Continue`, and its normalization and combining class never change once it is assigned, though new characters enter as scripts are encoded (§7.1) — so a text valid at one Unicode version is valid at every later one, and a content-addressed schema's validity (§2.2.1) can be lost to no Unicode Character Database refresh. The joining-control contexts of rule 2 are the one exception: they also read `Joining_Type`, `Script`, `General_Category` and `Indic_Syllabic_Category`, which the stability policy does not cover, so the guarantee holds of every name except one admitted only through a joiner's context, whose admission at a later version depends on those properties of its characters being unchanged. A processor on an earlier version rejects a name a later one accepts — unquoted, its new character is a lexer error (§7.1); quoted, its text is no identifier, the error the position reports above — and its report names the version it validated against. The name-hygiene mechanisms of §8.2, which depend on data that can move a name from valid to refused, are deliberately kept out of validity for that reason.
 

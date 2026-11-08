@@ -64,7 +64,7 @@ public final class TsonBundledSchemas {
     public static final String META_SHA256 = "c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5";
 
     /** numeric's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/numeric.tn}'s !!id. */
-    public static final String NUMERIC_SHA256 = "6e36be00055879adfab963e30651bae8ca7371b24776cc2d6cf2285ff4f2d446";
+    public static final String NUMERIC_SHA256 = "dfa66c5d3775a7845776db737f07b16630824f2434f6587aface2f88b77bf0f2";
 
     /** temporal's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/temporal.tn}'s !!id. */
     public static final String TEMPORAL_SHA256 = "fb4ada8f238de82821e7fcf512c21980a8b73c8df9260cdf295ba0157cc3971e";
@@ -73,7 +73,7 @@ public final class TsonBundledSchemas {
     public static final String NET_SHA256 = "371fc20c8628b5461b56a7a28f2559a1cfde4eda718f72d60ceb1b5a007bac06";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. */
-    public static final String CORE_SHA256 = "7cc227d2388f6dac6f26b2ea57cd1bb51a08fbaa4041396ce24173cbd8c2cff1";
+    public static final String CORE_SHA256 = "4e8d9c43cbbabf6a73548b819ac74e06e18859b573d05ce99988ae9d4d9a562e";
 
     /** policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s !!id. */
     public static final String POLICY_SHA256 = "e9cb5b9305ddec62f0e18e7ee7ed3d2a087d97a243a48b411daa11f5071a496f";

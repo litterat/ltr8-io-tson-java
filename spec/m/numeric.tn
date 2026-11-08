@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=6e36be00055879adfab963e30651bae8ca7371b24776cc2d6cf2285ff4f2d446"
+!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=dfa66c5d3775a7845776db737f07b16630824f2434f6587aface2f88b77bf0f2"
 !!import:"https://tson.io/2026/39/m/meta.tn?sha256=c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5"
 @doc:"""
   TSON numeric — the numeric type library (2026 Revision 39 draft).
@@ -94,8 +94,10 @@
       and may be narrowed to false to exclude those representation artifacts.
       The bounds are optional domain restrictions validated against the value as
       written, before rounding, so they are exact `number`s rather than values
-      on the grid; they do not bound the special values. Not a
-      narrowing of the exact tier: infinities and NaN are not exact numbers.
+      on the grid; they judge the infinities as ordered values and admit no
+      NaN, so `allow_nan` decides NaN only where no bound is written
+      ([TSON-SCHEMA] §5.5, §5.7). Not a narrowing of the exact tier:
+      infinities and NaN are not exact numbers.
 
       Bounds follow the header's field-group rule. There is no `multiple_of`;
       use the exact tier (`decimal_type`) when a step is required. A text-class

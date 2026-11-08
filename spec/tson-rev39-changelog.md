@@ -1,7 +1,7 @@
 ---
 title: "TSON 2026 Revision 39 — Change Log"
 against: "TSON 2026 Revision 38 (Working Draft)"
-status: "Adjudicated 2026-11-08. The six normative artifacts and five resolved fixtures are at `/2026/39/` identities, each pin verified over the shipped bytes and listed in Part 2 §13.2 (§6). Part 1, Part 2, Part 3 and the Developer Guide are revised against them in the order §3 lists; Part 3 arrived partly consumed and is completed in a second pass (§7); an independent verification pass over the four documents, the register and the artifacts is recorded in §8, and the implementation's own (§9) once run."
+status: "Adjudicated 2026-11-08. The six normative artifacts and five resolved fixtures are at `/2026/39/` identities, each pin verified over the shipped bytes, numeric and core re-stamped after the implementation's pass, and listed in Part 2 §13.2 (§6). Part 1, Part 2, Part 3 and the Developer Guide are revised against them in the order §3 lists; Part 3 arrived partly consumed and is completed in a second pass (§7); an independent verification pass over the four documents, the register and the artifacts is recorded in §8, and the implementation's own, which folded sixty findings into the text, in §9."
 inputs:
   - "SPEC-FEEDBACK.md (24 entries, renumbered against Revision 38; all new — Revision 38 closed every entry open against Revision 37)"
   - "Revised companion artifacts at /2026/39/ identities: meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn, policy.tn and five resolved fixtures (implementing #3, #4, #5, #6, #7, #8, #9, #10, #11, #12, #13, #14, #15, #16, #17, #18, #19 and #21)"
@@ -270,7 +270,7 @@ open text in the specification.
 13. **§3.3** — the closed positional set is `id` then `import`; the table has two rows;
     `!!meta` and `!!schema` are parse errors naming `!!import` (#6, #8).
 14. **§4, §4.1, §4.4** — a schemaless read keeps a reference with arguments, a dotted tag
-    and a sibling reference as structured values, resolving nothing (#13, #14, §21).
+    and a sibling reference as structured values, resolving nothing (#13, #14, #21).
 15. **§5.1, §5.5, §5.6** — the library column names the kernel (`meta.tn`) for `!void`,
     `!boolean`, `!text`, `!bytes`, `!regex`, `!iri`, `!iri_reference`, `!integer` and
     `!int64`; `numeric` for `!number`, `!rational`, `!complex`, the other widths and the
@@ -562,7 +562,7 @@ only — the specification text carries no open questions.
 | #1 (reading) | A refinement source is a trigger position and the refinement IS-A the entry the application denotes, order-independently — the register's (a). | **[editorial]** — for confirmation; the implementation runs order-dependently until closed. |
 | #9 (reading) | §5.7's constructor-refinement exception goes: no bundled constructor refinement replaces a pin, and there is no meta level for the exception to be about. | **[editorial]** — for confirmation. |
 | #12 (remainder) | Whether an expansion — an application nothing declares — states `@meta.application` too, so every entry an application closed to names the reference that closed it; two applications closing to one record would give one entry two. | Open — the resolver keeps it in memory only. |
-| #13 (remainder) | Whether a value argument may be any token (running) or only those §12.1's `value-literal` admits. | Open — the text states the running grammar. |
+| #13 (remainder) | Whether a value argument should be narrowed below `token` — to the number, quoted-string and non-name forms — where today any token is admitted and an unquoted name is read as its parameter's recorded type says. | Open — the text states the running grammar. |
 | #14 (remainder) | Lexical scope: a bare name inside a map resolving in that map first, then outward, with a way to say "from the root" and a shadowing rule. | Open — every name resolves from the root. |
 | #14 (remainder) | Synthetics homed by the innermost map, identity by path. | Open — waits on lexical scope; synthetics mint at the root. |
 | #14 (remainder) | Who may contribute to a map: any document may, and a library cannot keep a map's unclaimed paths its own. | Open — the open rule is stated. |
@@ -575,11 +575,11 @@ only — the specification text carries no open questions.
 | #21 (remainder) | Whether the end of the document counts as following whitespace after a sibling reference (running: it does). | Open — the text states the running rule. |
 | #21 (remainder) | Whether a field group member's type takes a sibling reference (running: it does). | Open — the text states the running rule. |
 | #21 (remainder) | Whether a sibling and its dependent field in two options of one group is refused (running: admitted, the dependent field then writable in no document). | Open. |
-| #21 (remainder) | Whether a literal under a closed type is judged on a template nothing applies (running: hygiene only; the value is judged when an application closes the field). | Open. |
+| #21 (remainder) | Whether a literal under a closed type is judged on a template nothing applies. | **Closed** (§9): judged at the declaration, against the closed field's type; the implementation moves from the deferred reading and adds a vector. |
 | #21 (remainder) | A field whose name needs quoting cannot be a sibling; `"name"!` is refused. | Open — recorded. |
 | #21 (remainder) | Which host component a bound dependent field takes (running: `Object`, registered as an atom). | Open — a processor's choice. |
 | #21 (remainder) | A sibling in a template field typed by a parameter (`kind: meta.type_ref = T`), waiting on whether a pin on a `meta.type_ref` slot may carry a type parameter. | Open. |
-| #23 (reading) | A bound excludes NaN and judges the infinities; "ordered" for "totally ordered". | **[editorial]** — decided at adjudication; the implementation's NaN rule and infinity defect are to be closed. |
+| #23 (reading) | A bound excludes NaN and judges the infinities; "ordered" for "totally ordered". | **[editorial]** — decided at adjudication; the implementation's NaN rule and infinity defect are to be closed. A bounded float's discrimination class is read off `allow_nan` and `allow_infinity` *as written*, whatever its bounds admit (§9). |
 | #8 (reading) | Classification reads past the root's leading annotations, wider than Revision 38's "two directives of lookahead and no value parsing". | **[editorial]** — the running reading; the alternative, a schema's annotations after its tag, was declined. |
 | §1 (naming) | `policy.tn`'s `policy.script_policy` beside Part 1 §8.2's "token policy". | **[editorial]** — the record's name stands as received; the policy keeps its name in prose. |
 | Rev 38 #4, #6, #8 (considered) | An identity atom; `allow_zone`; `uri_template`. | **Not taken** — stand recorded. |
@@ -587,20 +587,29 @@ only — the specification text carries no open questions.
 Decisions taken 2026-11-08: #1 the register's (a); #2 closed by #7; #3 the two sentences;
 #9 the exception gone; #20 the expansion rule; #22 the renames; #23 the proposal in full;
 #24 the sentence; every other entry as the register proposes and the artifacts build.
+Three more at the fourth pass (§9): #19's closed-type literal is judged at the declaration;
+a sibling reference at a refinement source, a composition operand or a map key parses and
+the resolver refuses it, matching the code; a bounded float's discrimination class is read
+off `allow_nan` and `allow_infinity` as written, whatever its bounds admit.
 
 ---
 
 ## 6. Artifact work
 
 1. **Received at Revision 39** — all eleven artifacts carry "2026 Revision 39 draft" and
-   `/2026/39/` identities. The six normative pins are carried as received: kernel
-   (`meta.tn`) `c9b069b6…`, numeric `6e36be00…`, temporal `fb4ada8f…`, net `371fc20c…`,
-   core `7cc227d2…`, policy `e9cb5b93…`; Part 2 §13.2 carries the six rows. Each pin was
-   checked against sha256 over the bytes past the `!!id` line of the copy received and
-   **matched** (§8). The chain is consistent — numeric, temporal, net and policy each pin
-   the kernel at `c9b069b6…`; core pins numeric, temporal and net at the digests above; the
-   kernel pins nothing, importing nothing. Hash *values* remain non-normative; only the
-   pin's shape is.
+   `/2026/39/` identities, and each normative pin was checked against sha256 over the
+   bytes past the `!!id` line of the copy received and **matched**: kernel (`meta.tn`)
+   `c9b069b6…`, numeric `6e36be00…`, temporal `fb4ada8f…`, net `371fc20c…`, core
+   `7cc227d2…`, policy `e9cb5b93…` (§8). The chain is consistent — numeric, temporal, net
+   and policy each pin the kernel; core pins the three libraries; the kernel pins nothing,
+   importing nothing. Hash *values* remain non-normative; only the pin's shape is.
+1a. **Re-stamped after the fourth pass** (§9). `numeric.tn`'s `float_type` doc said its
+   bounds "do not bound the special values", against Part 2 §5.5 and §5.7 under #23; it now
+   says they judge the infinities as ordered values and admit no NaN. Two pins move:
+   numeric `dfa66c5d…`, core `4e8d9c43…` (core's import of numeric carrying the new
+   digest); kernel, temporal, net and policy are unchanged, and Part 2 §13.2 carries the
+   six rows. The three kernel doc lines in item 3 stand as received and would move every
+   pin; they wait for the next kernel re-stamp.
 2. **The artifact set changes shape.** `meta-kernel.tn` is gone, merged into `meta.tn`,
    the kernel; `numeric.tn` and `temporal.tn` are new; `meta-kernel-resolved.tn` is gone and
    `numeric-resolved.tn` and `temporal-resolved.tn` are new; `policy.tn` has no fixture.
@@ -768,9 +777,41 @@ What the pass found, and what was done:
 
 ## 9. Fourth pass: the implementation's verification
 
-To be run by the implementer against the adjudicated text, entry by entry, before
-publication, with each of §5's editorial readings checked against running code. Findings
-are recorded here when the pass runs; the register then opens against Revision 39 with
-whatever the pass raises, together with what §2 records as not yet running (#1's
-order-independent closing, #2's alias refusal to go, #20's head edge, #23's NaN and
-infinity rules).
+Run by the implementer against the adjudicated text — six reviewers, each checking a
+group of entries against the revised text rather than this log, the main grammar errors
+and the §3.3.4 sentence re-checked by hand. All 24 entries were found delivered; what the
+pass raised was sixty defects in the revised text, folded into Parts 1, 2 and 3 in this
+pass. Three needed a decision, taken as follows: **#19** — a literal under a closed field
+type in a record template is judged at the declaration, not when the template closes, the
+type being closed and the verdict unable to vary by application (Part 2 §5.10; a code
+change and a vector, and §5's #21 remainder closes); **#21/#22** — a sibling reference at
+a refinement source, a composition operand or a map key parses, as at every reference
+position, and the resolver refuses it naming the slot, which is what the code does and
+what §5.2 already said (§12.1's `refined-def`, `supertype-ref` and `map-key`); **#23** —
+a bounded float's discrimination class is read off `allow_nan` and `allow_infinity` as
+written, whatever its bounds admit, a class being a fact of the declaration and the
+explicit narrowing the route Part 3 §5.4 already names (Part 2 §5.4, Part 3 §5.4). The
+errors fixed first: §12.1's `type-def` and §12.2 still named `type-ref` after #22's
+rename, so `x => [int32]`, `x => (a | b)` and `x => kind!` did not parse; the `document`
+rule in Parts 1 and 2 had lost the leading whitespace Revision 38 allowed; Part 2 let
+`!meta.schema` classify a root where Part 1 and the code admit `!schema` alone; Part 1's
+`type-arg` admitted a sibling reference against its own comment; §8.2's identity paragraph
+reduced nested applications where §6, §8.1 and the kernel keep them as written; §3.3.1
+called namespace types constructors and refused `!integer 5` as a value entry, which §4.1
+admits; four sentences let the kernel's "map instances" be refined, against §5.7
+(`meta.namespace => meta.map ^ { … }` is the record form over a constructor); and
+`numeric.tn`'s `float_type` doc contradicted #23, re-stamped in §6. The inconsistencies
+and wording items are applied as the review wrote them, among them: Part 1's tag
+production renamed `tag` and its token production `qualified-name-token`, with an
+`application` production split out of `reference`; a resolved form called a schema document
+in canonical form rather than a data document; "governing" retired from Parts 1 and 3
+outside §7.8's own use; `meta.record_template.type` named beside `meta.record_field.type`
+as the two slots `meta.field_type_ref` types; the NAMESPACE kind dropped, a value entry
+taking no kind of its own; "kind" given both its senses in §1.4; `chain.subtypes` stated
+over the namespace of the schema being resolved; the collision rule's exception for open
+maps stated in §2.2.3; and the Revision 38 "form" sentence in §5.10 replaced. One new
+code gap is recorded for the backlog beside the four §2 already lists: Part 2 §5.5 judges a
+float's bounds against the value as written, before rounding, and the implementation
+compares the rounded double. The register opens against Revision 39 with that gap and
+with #1's order-independent closing, #2's alias refusal to go, #20's head edge and #23's
+NaN and infinity rules.
