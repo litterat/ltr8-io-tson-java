@@ -161,7 +161,7 @@ refusal and not a verdict, whichever order the chain is reached in; the bundled 
 whatever a deployment sets.
 
 The kernel, meta.tn (#15), measured from `meta-resolved.tn`'s own declarations, no compiled reader consulted, has one
-wait cycle, holding `meta.record` and 25 more of its 85 entries (`boolean`, `integer`, `text`, `numeric.count` and
+wait cycle, holding `meta.record` and 24 more of its 88 entries (`boolean`, `integer`, `text`, `numeric.count` and
 `numeric.integer_size` (#16), the enum and set machinery, `meta.field_group`, `meta.record_field`, `meta.type_chain`,
 `meta.map` and its instance `meta.field_map`, `meta.type_ref`, and the synthetics they name), every other entry ordered
 after it, the longest chain 4; the kernel holds that cycle's closure and the concepts that go with it (#15). The kernel
@@ -175,13 +175,13 @@ every reader of the schema exists, before the schema is handed out. Link remains
 bad pin or default still fails the load (rule 6).
 
 What is not running: a resolved form is still read under its source's imports rather than by this algorithm over its own
-entries (§8.1, "Resolved forms" in the proposal), so a fixture holding an instance of a constructor it declares does not read
-back. And rule 2's example pair, a constructor whose facet is typed by its own instance (`decimal_type` beside `number`),
-runs only as numeric.tn declares it. `decimal_type` composes a base kind directly, and a constructor that does makes a new
-form, which a processor backs with readers and writers of its own: an extension point, not schema vocabulary. This library
-backs the forms the kernel and the data-format libraries declare and no other, so it refuses an instance of any other such
-constructor as `NOT_IMPLEMENTED`. Refining an existing constructor with a field of its own (`c => record & { extra: text }`)
-is no new form and should follow record composition; it is refused the same way today.
+entries (§8.1, "Resolved forms" in the proposal), so a fixture holding an instance of a constructor it declares reads back
+only beside its source. And rule 2's example pair, a constructor whose facet is typed by its own instance (`decimal_type`
+beside `number`), runs only as numeric.tn declares it. `decimal_type` composes a base kind directly, and a constructor that
+does makes a new form, which a processor backs with readers and writers of its own: an extension point, not schema
+vocabulary. This library backs the forms the kernel and the data-format libraries declare and no other, so it refuses an
+instance of any other such constructor as `NOT_IMPLEMENTED`. Refining an existing constructor with a field of its own (`c =>
+record & { extra: text }`) is no new form and should follow record composition; it is refused the same way today.
 
 **Resolution, a proposal.** Terms:
 
@@ -494,7 +494,7 @@ once any entry holds a value. And with one namespace per schema (#7), a meta lay
   under the kernel and any schema importing it directly: a data document importing temporal.tn that writes
   `!meta.record_field { type: int32 }` is refused, `int32` being no member of `meta.type_ref` in temporal.tn's closure.
 - **The kernel's wait cycle** (#4) holds `map`, `field_map` being its instance, and not `namespace` or
-  `meta.field_name`, `field_map`'s keys being `text`: 26 of the kernel's 85 entries, longest chain 4 (#4). The
+  `meta.field_name`, `field_map`'s keys being `text`: 25 of the kernel's 88 entries, longest chain 4 (#4). The
   bootstrap builds `field_map` by hand with the rest of the pre-loaded set.
 - **Hosts.** One bind context serves schemas and data; the names the kernel declares and the libraries' members of `numeric`,
   `temporal` and `net` always bind to the schema model (#15), and every other name binds through the consumer's binder. A
@@ -566,8 +566,7 @@ constructor's declaration is a record (`uuid_type => atom & { … }`) and a reco
 **What is running.**
 
 - **One atom.** The kernel declares `reference => atom & { of: meta.type_ref }` (`of` a qualified name, #14).
-  `kind_type` and `ref_type` are gone, and with #12's removal of the records `type_ref` and `type_argument` the kernel
-  holds 85 entries (79 declarations, #15).
+  `kind_type` and `ref_type` are gone, and so, with #12, are the records `type_ref` and `type_argument`.
 - **One spelling.** `ref => <T> !reference { of: T }` is the kernel's one template over it, and no `kind` stands beside
   it: what `of` names decides what a slot holds, so a second spelling could say nothing the first does not.
   `meta.ref<record>` reads as a reference to a record type and `meta.ref<method>` as one to a method value. The two
@@ -630,8 +629,7 @@ binds.
 
 - **One value.** The `reference` atom's values are the reference #13 makes data grammar: a qualified name with an
   optional argument list, `geo.address<T>`, each argument a reference or a token. `type_ref` and `type_argument` are
-  gone; `alias.target`, `meta.type_chain.parents` and the `application` annotation are typed `meta.type_ref`. The kernel
-  holds 85 entries (79 declarations, #15).
+  gone; `alias.target`, `meta.type_chain.parents` and the `application` annotation are typed `meta.type_ref`.
 - **Written unquoted, canonically.** Resolved output and held text write an open application as source does, one
   space between arguments and no comma: `!alias { target: pair<uuid B> }`, `chain: { parents: [result<T>] }`.
 - **The value is an object, in every mode.** A reference read at a reference-typed position, in a tree read and a
