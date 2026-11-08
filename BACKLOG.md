@@ -145,6 +145,29 @@ spec-required case:
   in `value`. Classify each argument against its parameter's kind before closing nested applications, and add an
   invalid vector.
 
+- [ ] **A dependent field whose sibling names an unbound type fails each read, not the bind-mode compile.** With
+  `payload: kind!` and `kind` admitting a type no class binds, a document naming that type throws
+  `MissingBindingException` from `RecordBindReader.descriptorFor` during the read. A consumer turns that into a server
+  error that any sender can trigger. The method's own contract is that a missing binding is a misconfiguration
+  reported when the schema compiles in bind mode, but a dependent field's target is chosen per document, so it is
+  reached lazily. When a record holding a dependent field compiles in bind mode, check every type the sibling's
+  reference admits (narrowed by a pin or by a discriminator's members) and refuse the schema there, naming the field
+  and the first unbound type. The schema narrows that set by refining the reference (`meta.ref<meta.record>` under
+  `meta.ref<meta.type>`). A free `meta.type_ref` sibling admits the kernel's records and every minted entry, so it
+  compiles in bind mode only where it is refined. The same set, as an accessor on the compiled schema, is what a
+  consumer checking it at startup assembles by hand today (`ltr8-io-tson-java-http`'s `ChosenTypes`). Do the same in
+  `tson-json`'s bind path.
+
+- [ ] **A reference inside an annotation's value is not judged** ([TSON-SCHEMA] §5.12, §6). With `binds =>
+  @meta.annotation [meta.ref<protocol>]`, a schema writing `@binds:[nothing_declares_this]` loads: the annotation
+  value's shape is checked, but no name in it, so the name arrives unresolved. An annotation's value is judged against
+  its declared type at load, and a name in it is judged as one in a field value is. So run the link's field-value check
+  (`TsonSchemaLinker.checkFieldValues`, with `ValuesByName.reach` for a reference over values) over every annotation
+  value in a schema document, the name resolved in the annotating document's namespace (§3.3.3) and reported at the
+  annotation. Add `link/invalid` vectors for a type reference and a value reference that name nothing, and a
+  `link/valid` one. A consumer pins today's behaviour (`ltr8-io-tson-java-http`,
+  `UpstreamGapsTest.aReferenceInsideAnAnnotationValueIsNotJudged`).
+
 - [ ] **An annotation inside a value read through an imported type's reader resolves in the declaring schema's
   namespace.** [TSON-SCHEMA] §3.3.3 resolves an annotation in the annotating document's namespace, and a value
   entry's payload (or any value) read through a reader its type's declaring schema compiled looks the annotation up

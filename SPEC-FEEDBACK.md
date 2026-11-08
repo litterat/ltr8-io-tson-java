@@ -1373,7 +1373,14 @@ field's type is a gap.
     can form; flattening puts inherited fields first, so a base's sibling precedes a subtype's dependent field);
   - it is typed by a reference whose `of` is a constructor or `top`, past its alias hops: `meta.type_ref`,
     `meta.field_type_ref`, a `meta.ref<C>` over a constructor, a refinement of one; `int32`, a value reference
-    (`meta.ref<method>`) and a dependent field are refused;
+    (`meta.ref<method>`) and a dependent field are refused. A value names no type, so a reference over values cannot
+    type a dependent field. **Reaching a type through a value is deliberately absent**, in any spelling: in
+    `{ exchange: meta.ref<exchange>  body: exchange!.request }`, `body` would be read against the `request` field of
+    the exchange the packet addresses. That evaluates a path through a value at read time, so a read would wait on value
+    entries being resolved. The schema's vocabulary stays names and closed forms. A body tied to its exchange is
+    written as an envelope template applied once per exchange, with the exchange pinned in each application
+    (`place_order_envelope => envelope<new_order> & { exchange?: = orders.place_order }`). §5.2's text states the
+    refusal with this reason. (The evidence is a consumer's: the rpc wire form in `ltr8-io-tson-java-http`.)
   - it is there to read whenever the dependent field is: required, defaulted, pinned, or a field group's member with
     the dependent field optional. It is never voidable, and optional with no default it is refused. A member beside a
     required dependent field is refused, as is a refinement making such a field required, the rule being asked of the
@@ -1515,7 +1522,7 @@ refused. Which host component a bound dependent field takes (running: `Object`, 
 type the binding names are the alternatives). A sibling in a template field typed by a parameter (`kind: meta.type_ref =
 T`) waits on whether a pin on a `meta.type_ref` slot may carry a type parameter.
 
-## 22. [TSON-SCHEMA] §5.3, §8.1, §12.1 — `type-ref` names an expression, and `meta.type_ref` a reference
+## 22. [TSON-SCHEMA] §1.2, §3.3.5, §5.1, §5.3, §5.7, §5.11, §8.1, §12.1 — "type-ref", "type reference", "sibling"
 
 **Problem.** §12.1's `type-ref` covers the structural forms as well as references: `type-ref = paren-type /
 bracket-type / map-type / type-name "<" type-args ">" / type-name` (and `/ sibling-ref` under #21). A choice, an
@@ -1526,6 +1533,25 @@ form is never its value: resolution lifts every one to an entry and leaves a ref
 name means two things across the grammar and the kernel, and a reader of §12.1 who knows `meta.type_ref` takes
 `type-ref` for the narrower thing. The narrower production has no name of its own: `map-key`, `supertype-ref` and
 `refined-def`'s head each spell `type-name ["<" type-args ">"]` out in place.
+
+The prose phrase "type reference" is wider still. It names a value's `!name` tag ("Every type reference (`!name`)",
+§1.2), an alias declaration (`id => uuid ; type reference (§8.3)`, §5.1), the grammar's `type-ref` with its structural
+forms (§12.1), and the kernel's `meta.type_ref`, the names of types with the sibling reference withdrawn (#21). A tag
+is no reference to a type in the kernel's sense: it is resolved, but it is not a value of `meta.type_ref`.
+
+"Sibling" has the same problem in the other direction. #21 makes it a technical term, the field whose value types a
+dependent field: it is in a facet's name (`allow_sibling`), a grammar production (`sibling-ref`) and the diagnostics.
+Part 2 also uses the word informally, for five other things:
+- a same-named entry core declares beside the kernel's, "a fresh sibling" (§3.3.5, and so §3.3.3, §4.2, §5.10 and §9;
+  this sense goes with §3.3.5 under #7);
+- a family founded by construction, "Construction creates siblings, not subtypes" (§5.5, §8.1);
+- two refinements of one source, "two sibling refinements such as `int8` and `int32`" (§5.10);
+- a facet's neighbours, "`float_type`'s `allow_nan` and its three siblings" (§5.7);
+- a field group's other members, "contiguous with its sibling members" (§5.11).
+
+The evidence is partly a consumer's. The HTTP layer in `ltr8-io-tson-java-http` met both words while citing the
+draft, and proposed "selector" for the typing field. That is not adopted: Part 2 already uses "selector" for a family's
+discriminating field (§5.1, §5.2) and for a facet kind (§5.7), and a sibling need not be a discriminator.
 
 **What is running.** The grammar text unchanged, and the AST named by what each form is, mirroring the resolved model
 and the kernel: `TypeExpr` is what `type-ref` parses to; `TypeRef` is the reference, a name or an application (as
@@ -1539,3 +1565,8 @@ the reference in the AST.
 restating it. `type-expr`'s alternatives become the structural forms, `sibling-ref` (#21) and `type-ref`. No
 document's meaning changes; prose that says "type-ref" meaning any type position (§5.3's "every type-ref position",
 §5.7's "elided type-refs") reads "type expression".
+
+"Type reference" is kept for `type-ref` and `meta.type_ref`, a name with any arguments. §1.2 calls a `!name` a tag, and
+§5.1's comment calls an alias's body a reference. "Sibling" is kept for #21's typing field alone, and the five informal
+uses are reworded: "a same-named entry" (gone with §3.3.5 regardless), "peers" or "fresh constructions" for a
+construction's family, "two refinements of one source", "its three companions", and "the group's other members".
