@@ -34,8 +34,9 @@ derived — and the static check that runs before any of it.
 - Every application the pass closes, an expansion's included, is recorded against the entry it closed to
   (`closedApplications`, as met and with its arguments closed; a generated head's own intermediate form skipped), and
   `SchemaResolver` stores the list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written.
-  It is what a data read resolves an application against (`ReferenceBody.entryOf`, `design/references.md`), and what
-  a message names a minted entry by (`EntryDisplayName`).
+  It is what a data read resolves an application against (`ReferenceBody.entryOf`, `design/references.md`), its
+  arguments followed past their alias chains as `dereferenced` follows them here, and what a message names a minted
+  entry by (`EntryDisplayName`).
 - A composition operand never closes, open or closed: it is absorbed by value and mints nothing. A closed refinement
   source is closed on demand, through the same materialiser instance.
 - Which parents were applications is read off the **held** tree's chain `parents`, not off the closed one, whose

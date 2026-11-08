@@ -60,6 +60,7 @@ class CrossEncodingParityTest {
               }
               sized  => [text; 2..3]
               unique => set<text>
+              label  => text
               stamps => set<datetime>
               pair   => [text, int32]
               capped => {
@@ -585,6 +586,16 @@ class CrossEncodingParityTest {
                 {"t": "set<text>"}""");
         sameVerdict("ided", "{ id: set<text> }", """
                 {"id": "set<text>"}""");
+    }
+
+    /**
+     * An argument is compared past its alias chain ([TSON-SCHEMA] §8.2): over {@code label => text}, {@code set<label>}
+     * is {@code set<text>}, which the schema closes as {@code unique}, in either encoding.
+     */
+    @Test
+    void anAliasedArgumentAtAKindIsJudgedThroughItsEntryByBoth() {
+        bothAccept("typed", "{ t: set<label> }", """
+                {"t": "set<label>"}""");
     }
 
     /**

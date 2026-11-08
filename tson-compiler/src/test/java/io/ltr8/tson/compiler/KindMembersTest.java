@@ -84,7 +84,7 @@ class KindMembersTest {
 
         // core's own `uuid` is a member too: the closure is the schema's, imports included.
         assertEquals(List.of("customer_id", "stock_id", "uuid", "v4_stock_id"), ids.memberNames());
-        assertEquals("net.uuid_type", ids.of());
+        assertEquals("net.uuid_type", ids.of().text());
     }
 
     @Test
@@ -333,8 +333,8 @@ class KindMembersTest {
         assertEquals(List.of("meta.field_type_ref", "meta.type_ref"),
                 TypeChain.supertypesOf(kind(linked, "meta.identifier_ref")));
         assertTrue(TypeChain.subtypesOf(kind(linked, "meta.type_ref")).contains("meta.identifier_ref"));
-        assertEquals("meta.namespace", kind(linked, "namespaces").of());
-        assertEquals("big_order", kind(linked, "big_orders").of());
+        assertEquals("meta.namespace", kind(linked, "namespaces").of().text());
+        assertEquals("big_order", kind(linked, "big_orders").of().text());
         List<String> namespaces = kind(linked, "namespaces").memberNames();
         assertTrue(namespaces.contains("api") && !namespaces.contains("meta.field_map"), namespaces::toString);
         assertTrue(kind(linked, "products").memberNames().containsAll(kind(linked, "maps").memberNames()));

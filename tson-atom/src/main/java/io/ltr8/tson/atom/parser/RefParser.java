@@ -62,7 +62,8 @@ public record RefParser(ReferenceBody reference, boolean judgesValues) implement
         try {
             reached = values.get().reach("this reference", read);
         } catch (SchemaValidationException refused) {
-            throw new AtomValidationException(refused.getMessage(), "the name of a value of '" + reference.of() + "'");
+            throw new AtomValidationException(refused.getMessage(),
+                    "the name of a value of '" + reference.of().text() + "'");
         }
         return read.withClosure(named -> named.equals(read) ? Optional.ofNullable(reached) : Optional.empty());
     }

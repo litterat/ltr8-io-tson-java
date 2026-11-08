@@ -164,7 +164,7 @@ final class DependentFields {
             return false; // a closed record names an application's entry bare; an open one is judged when it closes
         }
         Top target = namespace.get(AliasChain.terminal(type.name(), namespace));
-        return target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of(), namespace::get);
+        return target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get);
     }
 
     /**

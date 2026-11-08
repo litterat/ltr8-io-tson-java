@@ -110,8 +110,9 @@ value model, so it is stated once, where the model is walked:
 - A record's field types (a record template's only where they name none of its parameters), an array's element, a
   map's and a namespace type's `key_type` and `value_type`, a tuple's elements, a choice's variants, and an alias's
   target, each a `TypeRef`, arguments and all.
-- A reference's `of`, as a bare name. `meta.ref<T>` closes its argument before substituting, so `of` names an entry,
-  a lifted synthetic among them (`meta.ref<[box<text>]>`), which the merge renames like any other reference.
+- A reference's `of`, a `TypeRef`, arguments and all: an application written in the body (`!meta.reference_type {
+  of: box<text> }`) closes here, as `meta.ref<T>` closes its argument before substituting, so `of` names an entry, a
+  lifted synthetic among them (`meta.ref<[box<text>]>`), which the merge renames like any other reference.
 - Nothing in any other atom (its facets are values), a declared type, a held body (its tokens are unresolved until
   substitution), or a value entry (data writes no sugar form, and its names are judged at link by `ValuesByName`).
 

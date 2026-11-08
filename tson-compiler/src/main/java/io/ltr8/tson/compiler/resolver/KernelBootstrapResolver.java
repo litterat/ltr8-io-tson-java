@@ -395,7 +395,7 @@ public final class KernelBootstrapResolver {
      * else.
      */
     private static Type refinedReference(String name, AtomRefinement refinement, ReferenceBody source) {
-        String of = source.of();
+        String of = source.of().name();
         boolean allowSibling = source.allowSibling();
         for (RecordValue.Field binding : bindingFields(name, refinement)) {
             switch (binding.name()) {
@@ -405,7 +405,7 @@ public final class KernelBootstrapResolver {
                         + "' with '" + binding.name() + "'; the bootstrap merges of and allow_sibling only");
             }
         }
-        return new ReferenceBody(of, allowSibling);
+        return new ReferenceBody(TypeRef.of(of), allowSibling);
     }
 
     /** A {@code size} binding, {@code { bits: N  signed: B }}: a record of two tokens, as {@code integer_size} reads. */
@@ -467,7 +467,7 @@ public final class KernelBootstrapResolver {
             case "enum" -> toEnumBody(instance.value());
             // `!meta.reference_type { of: type }`: `of` and `allow_sibling`, true where the instance leaves it out, are
             // the authored fields, and the index is derived when the kernel links, as every reference's is.
-            case "meta.reference_type" -> new ReferenceBody(bindingField(instance.value(), "of"),
+            case "meta.reference_type" -> new ReferenceBody(TypeRef.of(bindingField(instance.value(), "of")),
                     fieldToken(instance.value(), "allow_sibling").map(Boolean::parseBoolean).orElse(true));
             // `field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }`.
             case "meta.map" -> new MapBody(TypeRef.of(bindingField(instance.value(), "key_type")),

@@ -92,7 +92,8 @@ public final class NameType {
         if (type.definition() == null) {
             return false;
         }
-        String of = slotKind(entry, constructor, local, structure).map(ReferenceBody::of).orElse(IDENTIFIER_TYPE);
+        String of = slotKind(entry, constructor, local, structure).map(reference -> reference.of().name())
+                .orElse(IDENTIFIER_TYPE);
         return KindMembers.isMember(type.definition(), TsonSchema.constructorOf(type.definition()), of,
                 type.lookup(), structure);
     }

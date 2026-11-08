@@ -10,9 +10,10 @@ is why they are the linker's. Current form only; history lives in git.
   or IS-A it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling,
   which is one, `meta.ref<T>`: `meta.ref<meta.record>` holds type names, and `meta.ref<api>`, over a type that is no
   constructor, names values (`ValuesByName`, `design/references.md`).
-- Every reference's derived `index` (`Index(namesTypes, members, applications, entries, shown)`: the members sorted;
-  the entry each application the closure closed denotes, every `@meta.application` and every entry's
-  `TsonSchema.EntryFacts.closes`, expansions included; the final namespace's entries, which a reference read in data
+- Every reference's derived `index` (`Index(namesTypes, members, applications, aliases, entries, shown, values)`: the
+  members sorted; the entry each application the closure closed denotes, every `@meta.application` and every entry's
+  `TsonSchema.EntryFacts.closes`, expansions included; each alias entry to the end of its chain, which a data
+  application's arguments are compared past (§8.2); the final namespace's entries, which a reference read in data
   names through `ReferenceBody.closure()`; and the members as a message shows them, a minted one by its application
   through `EntryDisplayName.authored`, one with no spelling left out) is recomputed for **every** reference in the
   closure, imports included (`TsonSchemaLinker.computeKinds`), and never trusted from a body. It is `@Unbound` and

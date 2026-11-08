@@ -20,6 +20,11 @@ import java.util.function.BiPredicate;
  * {@code meta.ref<record>} and {@code !meta.reference_type { of: record  allow_sibling: false }} are one instance; the
  * template is a spelling, and the slot's meaning comes from {@link #of}.
  *
+ * <p><b>{@link #of} is a {@link TypeRef}</b>, the kernel typing it {@code meta.type_ref}, so a body may write an
+ * application there: {@code !meta.reference_type { of: box<text> }} is {@code meta.ref<box<text>>}. Resolution closes
+ * it to the entry it denotes, as it closes an application at any type position, so a resolved body's {@code of} is a
+ * name; one that kept its arguments did not close, and the link refuses it.
+ *
  * <p><b>{@link #allowSibling} says whether a sibling reference ({@code kind!}) is a value</b> ([TSON-SCHEMA] §5.2,
  * §8.1). The grammar reads one wherever a reference stands, and the facet admits or refuses it, as {@code allow_nan}
  * admits or refuses NaN at a {@code float_type}: true by default, the widest reading, and withdrawn by a refinement.
@@ -48,26 +53,29 @@ import java.util.function.BiPredicate;
  * import already minted unifies with it rather than colliding (§8.2).
  */
 @Typename(name = "meta.reference_type")
-public record ReferenceBody(TypeChain chain, String of, @Field("allow_sibling") boolean allowSibling,
+public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling") boolean allowSibling,
                             @Unbound Optional<Index> index) implements Atom {
 
     /**
-     * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are
-     * types, and the members where it does -- the names of the closure the slot admits, sorted -- with the entry each
-     * application the closure closed denotes, an expansion's included, so a value written as an application is
-     * judged through the entry it names, and the closure's entries, which a reference read here names ({@link
-     * #closure}). {@code shown} is the members as a message names them: a minted entry by the application that
-     * closed to it, as written, and one with no spelling left out. {@code values}, for a reference that names
-     * values, is what a qualified name reaches in that closure ({@link Values}); empty for one that names types, and
-     * for a link of a resolution in progress, whose pending entries hold no value yet.
+     * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are types,
+     * and the members where it does -- the names of the closure the slot admits, sorted -- with the entry each application
+     * the closure closed denotes, an expansion's included, so a value written as an application is judged through the entry
+     * it names, each alias entry of the closure to the entry at the end of its chain, which an argument written as an alias
+     * is followed to ({@link #entryOf}), and the closure's entries, which a reference read here names ({@link #closure}).
+     * {@code shown} is the members as a message names them: a minted entry by the application that closed to it, as written,
+     * and one with no spelling left out. {@code values}, for a reference that names values, is what a qualified name reaches
+     * in that closure ({@link Values}); empty for one that names types, and for a link of a resolution in progress, whose
+     * pending entries hold no value yet.
      */
     public record Index(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
-                        Map<String, Top> entries, List<String> shown, @Unbound Optional<Values> values) {
+                        Map<String, String> aliases, Map<String, Top> entries, List<String> shown,
+                        @Unbound Optional<Values> values) {
 
         public Index {
             members = List.copyOf(members);
             shown = List.copyOf(shown);
             applications = Map.copyOf(applications);
+            aliases = Map.copyOf(aliases);
             Objects.requireNonNull(entries, "entries");
             Objects.requireNonNull(values, "values");
         }
@@ -110,13 +118,13 @@ public record ReferenceBody(TypeChain chain, String of, @Field("allow_sibling") 
      * A reference as an author declares it, placed in no chain -- the linker derives its {@link #index} -- admitting
      * a sibling reference or refusing one as {@code allowSibling} says.
      */
-    public ReferenceBody(String of, boolean allowSibling) {
+    public ReferenceBody(TypeRef of, boolean allowSibling) {
         this(TypeChain.EMPTY, of, allowSibling, Optional.empty());
     }
 
-    /** A reference as {@code meta.ref<T>} declares it: {@code allow_sibling: false}. */
+    /** A reference over the entry {@code of} names, as {@code meta.ref<T>} declares it: {@code allow_sibling: false}. */
     public static ReferenceBody of(String of) {
-        return new ReferenceBody(of, false);
+        return new ReferenceBody(TypeRef.of(of), false);
     }
 
     @Override
@@ -125,19 +133,24 @@ public record ReferenceBody(TypeChain chain, String of, @Field("allow_sibling") 
     }
 
     /**
-     * This reference with its derived index: {@code namesTypes}, the members sorted, the closure's applications, and
-     * its entries.
+     * This reference with its derived index: {@code namesTypes}, the members sorted, the closure's applications, its
+     * alias entries each to the end of its chain, and its entries.
      */
     public ReferenceBody linked(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
-                                Map<String, Top> entries, List<String> shown) {
-        return linked(namesTypes, members, applications, entries, shown, Optional.empty());
+                                Map<String, String> aliases, Map<String, Top> entries, List<String> shown) {
+        return linked(namesTypes, members, applications, aliases, entries, shown, Optional.empty());
     }
 
-    /** {@link #linked(boolean, List, Map, Map, List)} with what a name this reference holds reaches ({@link Values}). */
+    /**
+     * {@link #linked(boolean, List, Map, Map, Map, List)} with what a name this reference holds reaches ({@link
+     * Values}).
+     */
     public ReferenceBody linked(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
-                                Map<String, Top> entries, List<String> shown, Optional<Values> values) {
+                                Map<String, String> aliases, Map<String, Top> entries, List<String> shown,
+                                Optional<Values> values) {
         return new ReferenceBody(chain, of, allowSibling, Optional.of(new Index(namesTypes,
-                members.stream().sorted().toList(), applications, entries, shown.stream().sorted().toList(), values)));
+                members.stream().sorted().toList(), applications, aliases, entries, shown.stream().sorted().toList(),
+                values)));
     }
 
     /**
@@ -170,7 +183,10 @@ public record ReferenceBody(TypeChain chain, String of, @Field("allow_sibling") 
      * The entry {@code reference} denotes in the closure this reference was linked over: a name is its own entry, and
      * an application resolves bottom-up by structural identity ([TSON-SCHEMA] §8.2) -- each argument that is itself an
      * application first, to the entry the closure closed it to, then the application over those entries, against
-     * the applications the closure closed. Empty where nothing in the closure closed it.
+     * the applications the closure closed. Each argument is compared after following its alias chain, as §8.2
+     * compares an application's arguments, so over {@code user_id => uuid} the data reference {@code box<user_id>}
+     * denotes what {@code box<uuid>} does: the key resolution recorded for every application it closed. Empty where
+     * nothing in the closure closed it.
      */
     public Optional<String> entryOf(TypeRef reference) {
         if (index.isEmpty()) {
@@ -186,12 +202,14 @@ public record ReferenceBody(TypeChain chain, String of, @Field("allow_sibling") 
         }
         List<TypeArgument> closed = new ArrayList<>(reference.arguments().size());
         for (TypeArgument argument : reference.arguments()) {
-            if (argument instanceof TypeArgument.Ref nested && !nested.ref().arguments().isEmpty()) {
-                Optional<String> inner = entryOf(nested.ref());
+            if (argument instanceof TypeArgument.Ref nested) {
+                Optional<String> inner = nested.ref().arguments().isEmpty()
+                        ? Optional.of(nested.ref().name()) : entryOf(nested.ref());
                 if (inner.isEmpty()) {
                     return Optional.empty();
                 }
-                closed.add(new TypeArgument.Ref(TypeRef.of(inner.get())));
+                closed.add(new TypeArgument.Ref(TypeRef.of(index.get().aliases().getOrDefault(inner.get(),
+                        inner.get()))));
             } else {
                 closed.add(argument);
             }
@@ -234,7 +252,8 @@ public record ReferenceBody(TypeChain chain, String of, @Field("allow_sibling") 
      * narrows. A widening, and an {@code of} unrelated to the source's, is refused.
      */
     public List<String> ofNarrowing(ReferenceBody refined, BiPredicate<String, String> isA) {
-        return isA.test(refined.of, of) ? List.of() : List.of("of '" + refined.of + "' is not '" + of
+        return isA.test(refined.of.name(), of.name()) ? List.of() : List.of("of '" + refined.of.text() + "' is not '"
+                + of.text()
                 + "' or IS-A it, so the refinement admits names the source refuses -- a refinement narrows 'of' (§5.7)");
     }
 

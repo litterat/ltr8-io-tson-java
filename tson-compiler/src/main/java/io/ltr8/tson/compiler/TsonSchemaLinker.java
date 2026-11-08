@@ -1173,10 +1173,21 @@ public final class TsonSchemaLinker {
         applications.forEach((name, application) -> denoted.putIfAbsent(application, name));
         // Every application the resolver closed to an entry of the closure, an expansion's among them.
         facts.forEach((name, known) -> known.closes().forEach(application -> denoted.putIfAbsent(application, name)));
+        // Each alias to the end of its chain: an application's arguments are compared past their aliases (§8.2), as
+        // the resolver keyed every application it closed (`TemplateMaterialiser.dereferenced`).
+        Map<String, String> aliases = new LinkedHashMap<>();
+        merged.forEach((name, definition) -> {
+            if (definition instanceof Alias) {
+                String terminal = AliasChain.terminal(name, merged);
+                if (!terminal.equals(name)) {
+                    aliases.put(name, terminal);
+                }
+            }
+        });
         Map<String, Top> result = null;
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             if (entry.getValue() instanceof ReferenceBody reference) {
-                boolean namesTypes = KindMembers.namesTypes(reference.of(), structure);
+                boolean namesTypes = KindMembers.namesTypes(reference.of().name(), structure);
                 List<String> members = namesTypes ? KindMembers.of(reference, merged,
                         name -> constructorOf(name, merged.get(name), facts), structure) : List.of();
 
@@ -1192,8 +1203,8 @@ public final class TsonSchemaLinker {
                     members = java.util.stream.Stream.concat(members.stream(), pending.stream()).distinct().toList();
                 }
                 result.put(entry.getKey(), reference.linked(namesTypes, members, namesTypes ? denoted : Map.of(),
-                        entries, shown, namesTypes || !pending.isEmpty() ? Optional.empty()
-                                : Optional.of(valuesOf(reference.of(), reached))));
+                        namesTypes ? aliases : Map.of(), entries, shown, namesTypes || !pending.isEmpty() ? Optional.empty()
+                                : Optional.of(valuesOf(reference.of().name(), reached))));
             }
         }
         return result == null ? merged : result;
@@ -1430,8 +1441,12 @@ public final class TsonSchemaLinker {
             // §5.12): what it admits is the names whose entries' values are of it, which is the slot's judgement
             // wherever a name is written. The index is the linker's own computation, so nothing else is validated.
             case ReferenceBody reference -> {
-                if (namespace.get(AliasChain.terminal(reference.of(), namespace)) == null) {
-                    throw new UnresolvedReference(entryName, " of", reference.of());
+                // An application in `of` closes during resolution to the entry it denotes; one that kept its
+                // arguments did not close, and names nothing: its head is unresolved, applied or not.
+                boolean resolves = namespace.get(AliasChain.terminal(reference.of().name(), namespace)) != null;
+                if (!resolves || !reference.of().arguments().isEmpty()) {
+                    throw new UnresolvedReference(entryName, " of",
+                            resolves ? reference.of().text() : reference.of().name());
                 }
                 KindMembers.ofRefusal(reference, namespace::get).ifPresent(refusal -> {
                     throw new SchemaValidationException("'" + entryName + "' is a reference, but " + refusal);
@@ -1832,7 +1847,7 @@ public final class TsonSchemaLinker {
             return;
         }
         Token value = field.value().get();
-        if (target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of(), namespace::get)) {
+        if (target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get)) {
             checkKindValue(entryName, fieldName, field, value, reference, namespace, constructors);
             return;
         }
@@ -1840,7 +1855,7 @@ public final class TsonSchemaLinker {
             // A value's qualified name, judged by what it reaches as a value body's names are (§5.12).
             byName.reach("'" + entryName + "': field '" + fieldName + "''s "
                     + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value"),
-                    TypeRef.of(value.text()), reference.of());
+                    TypeRef.of(value.text()), reference.of().name());
             return;
         }
         Optional<AtomType<?>> parser = AtomParsers.forType(target,
@@ -1874,7 +1889,7 @@ public final class TsonSchemaLinker {
     private static void checkKindValue(String entryName, String fieldName, RecordField field, Token value,
                                        ReferenceBody kind, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors) {
-        if (KindMembers.isMember(value.text(), kind.of(), namespace::get, constructors, namespace::get)) {
+        if (KindMembers.isMember(value.text(), kind.of().name(), namespace::get, constructors, namespace::get)) {
             return;
         }
         throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
@@ -1883,7 +1898,7 @@ public final class TsonSchemaLinker {
                 + " is not a value of that type -- " + (namespace.get(value.text()) == null
                         ? "it names nothing in scope"
                         : "'" + value.text() + "' is not a member of the kind, the names of the entries whose "
-                                + "values are of '" + kind.of() + "'")
+                                + "values are of '" + kind.of().text() + "'")
                 + ". §5.2 makes a field's fixed or default value a value of the field's own declared type");
     }
 

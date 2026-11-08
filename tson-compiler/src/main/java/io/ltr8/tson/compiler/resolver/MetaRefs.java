@@ -102,12 +102,12 @@ final class MetaRefs {
             // closed alias follow its target onto the entry materialisation minted for it, and a partial
             // application keep the arguments it binds.
             case Alias alias -> new Alias(map.apply(alias.target()));
-            // `of` holds a name: `meta.ref<T>` closes its argument before substituting it, so `of` names the
-            // entry the argument denotes -- a lifted synthetic among them, which the merge renames like any other
-            // reference. It maps as the bare reference it is, as a chain's names do; an application written in
-            // the body itself stays text and is refused at link. The index is carried, derived at link.
-            case ReferenceBody reference -> new ReferenceBody(reference.chain(),
-                    map.apply(TypeRef.of(reference.of())).name(), reference.allowSibling(), reference.index());
+            // `of` is a type reference like any other, arguments and all: `!meta.reference_type { of: box<text> }`
+            // closes its application here as `meta.ref<box<text>>` closes its argument before substituting it,
+            // so either way `of` names the entry the application denotes, which the merge renames like any other
+            // reference (§4.2). The index is carried, derived at link.
+            case ReferenceBody reference -> new ReferenceBody(reference.chain(), map.apply(reference.of()),
+                    reference.allowSibling(), reference.index());
             // Every other atom's facets are values, never references; a declared type holds its chain alone.
             case Atom atom -> atom;
             case DeclaredType declared -> declared;

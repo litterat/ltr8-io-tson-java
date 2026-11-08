@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiPredicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -68,7 +69,7 @@ class TopKindHierarchyTest {
     @Test
     void aReferenceIsItsOf() {
         ReferenceBody linked = ReferenceBody.of("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
-                Map.of(), List.of("stock_id", "customer_id"));
+                Map.of(), Map.of(), List.of("stock_id", "customer_id"));
 
         assertEquals(ReferenceBody.of("uuid_type"), linked);
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
@@ -83,6 +84,27 @@ class TopKindHierarchyTest {
         assertEquals(List.of(), linked.ofNarrowing(ReferenceBody.of("uuid_v4_type"), isA));
         assertEquals(1, linked.ofNarrowing(ReferenceBody.of("text_type"), isA).size());
         assertEquals(1, ReferenceBody.of("uuid_v4_type").ofNarrowing(ReferenceBody.of("uuid_type"), isA).size());
+    }
+
+    /**
+     * An application resolves by the identity [TSON-SCHEMA] §8.2 gives it: each argument past its alias chain, a
+     * nested one first to the entry it closed to. Over {@code user_id => uuid} and {@code uid => user_id}, {@code
+     * box<user_id>} is {@code box<uuid>} and {@code box<box<uid>>} is {@code box<box<uuid>>}; a name that is no alias
+     * is compared as itself.
+     */
+    @Test
+    void anApplicationIsResolvedPastItsArgumentsAliases() {
+        ReferenceBody linked = ReferenceBody.of("type").linked(true, List.of("boxed", "nested"),
+                Map.of(box(TypeRef.of("uuid")), "boxed", box(TypeRef.of("boxed")), "nested"),
+                Map.of("user_id", "uuid", "uid", "uuid"), Map.of(), List.of());
+
+        assertEquals(Optional.of("boxed"), linked.entryOf(box(TypeRef.of("user_id"))));
+        assertEquals(Optional.of("nested"), linked.entryOf(box(box(TypeRef.of("uid")))));
+        assertEquals(Optional.empty(), linked.entryOf(box(TypeRef.of("order_id"))));
+    }
+
+    private static TypeRef box(TypeRef argument) {
+        return TypeRef.of("box", List.of(new TypeArgument.Ref(argument)));
     }
 
     @Test
