@@ -205,7 +205,9 @@ at a kind-typed position (`meta.ref<T>`, `meta.type_ref`) arrives in tree mode a
 (`as(TypeRef.class)`), never a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names
 in the schema it was read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text,
 a type mismatch. A record field's type (`meta.field_type_ref`, the reference whose `allow_sibling` is left true) may hold
-a sibling reference, read as a `schema.meta.SiblingRef`; every other reference refuses one.
+a sibling reference, read as a `schema.meta.SiblingRef`; every other reference refuses one. A position typed by a reference
+over a type that is no constructor (`meta.ref<order>`) holds a value's qualified name (`o1`, `book.first`), judged by what it
+reaches in the schema, and its `TypeRef`'s `referent()` is that value.
 
 **A dependent field, `v?: kind!`, is read against the type its sibling names in each instance** (Part 2 §5.2): `{ kind:
 point  v: { x: 1  y: 2 } }`. Write a free sibling before its dependent field (a pinned or discriminator sibling may come

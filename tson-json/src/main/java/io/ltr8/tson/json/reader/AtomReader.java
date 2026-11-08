@@ -13,6 +13,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -51,7 +52,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
     static final ValueReaderFactory ENUM = (name, definition, context) -> "boolean".equals(name)
             ? new AtomReader<>(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
                     () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
-                    AtomForm.BOOLEAN, context.locationOf(name), null)
+                    AtomForm.BOOLEAN, context.locationOf(name), null, false)
             : of(name, definition, context);
 
     /** {@code void_type}: the void sentinel and nothing else, read as [TSON-JSON] §5.7 states for JSON. */
@@ -69,22 +70,38 @@ final class AtomReader<T> implements JsonTypeReader<T> {
      */
     private final IdentifierProfile names;
 
+    /**
+     * Whether this reads a reference ({@code meta.ref<T>}, a kind or a value by name), whose value is the {@code
+     * TypeRef} itself: a component holding one is bound to it directly ({@link #readsAReference}).
+     */
+    private final boolean reference;
+
     private AtomReader(String name, AtomType<T> parser, AtomForm form, JsonSchemaLocation schemaLocation,
-                       IdentifierProfile names) {
+                       IdentifierProfile names, boolean reference) {
         this.name = name;
         this.parser = parser;
         this.form = form;
         this.schemaLocation = schemaLocation;
         this.names = names;
+        this.reference = reference;
+    }
+
+    /**
+     * Whether this reads a reference. A reference's value finds what it names ({@code TypeRef.referent}, and a {@code
+     * Ref} the value delivered), which a bridge over its text would drop, so a component holding a {@code TypeRef} or
+     * a {@code Ref} binds the family's own production rather than a bridge from its name.
+     */
+    boolean readsAReference() {
+        return reference;
     }
 
     private static JsonTypeReader<?> of(String name, Top definition, ValueReaderContext context) {
-        AtomType<?> parser = AtomParsers.forType(definition, context.linked().enumForm(name)).orElseThrow(
+        AtomType<?> parser = AtomParsers.forRead(definition, context.linked().enumForm(name)).orElseThrow(
                 () -> new IllegalStateException(
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition));
         IdentifierProfile names = definition instanceof IdentifierType identifier ? identifier.profile() : null;
         return new AtomReader<>(name, parser, AtomForm.of(definition), context.locationOf(name),
-                names);
+                names, definition instanceof ReferenceBody);
     }
 
     /**
@@ -93,7 +110,8 @@ final class AtomReader<T> implements JsonTypeReader<T> {
      * that class, which is a disagreement between a schema and a bound class, found before any document.
      */
     Optional<AtomReader<?>> boundTo(Class<?> target) {
-        return parser.boundTo(target).map(bound -> new AtomReader<>(name, bound, form, schemaLocation, names));
+        return parser.boundTo(target).map(bound -> new AtomReader<>(name, bound, form, schemaLocation, names,
+                reference));
     }
 
     @Override

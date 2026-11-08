@@ -16,14 +16,17 @@ import java.util.Optional;
 /**
  * A reference-typed position ({@code meta.ref<T>}) whose bound component is a {@link io.ltr8.tson.schema.meta.TypeRef}
  * or a {@link io.ltr8.tson.schema.meta.Ref}: the value is a value's qualified name ([TSON-SCHEMA] §5.12), such as
- * {@code orders.place_order}, read as written into a {@code TypeRef} whose {@code name} is the token and whose
- * arguments are none, or into a {@code Ref} the linker delivers the value into.
+ * {@code orders.place_order}.
  *
- * <p><b>Nothing here parses segments.</b> The linker splits the name and applies the identifier grammar to each
- * segment, where it also resolves them.
+ * <p><b>In a schema document the name is kept as written</b>, in a {@code TypeRef} whose {@code name} is the token and
+ * whose arguments are none, or in a {@code Ref} the linker delivers the value into. Nothing here parses segments: the
+ * linker splits the name and applies the identifier grammar to each segment, where it also resolves them. Every name
+ * read there is recorded ({@link TsonReadContext#heldByName}) with its slot and the slot's declared type, and the
+ * linker judges that collection.
  *
- * <p><b>Every name it reads is recorded</b> ({@link TsonReadContext#heldByName}): in a schema document the read
- * collects each with its slot and the slot's declared type, and the linker judges that collection.
+ * <p><b>In a data document the name is judged at the read</b>, by the reference's atom bound to the component
+ * ({@code inData}): what it reaches in the governing schema's closure, a {@code Ref} receiving that value and a {@code
+ * TypeRef} carrying it as its referent.
  *
  * <p><b>What a name is, stated once for every reader that asks</b> ({@link #nameIn}): an <b>unquoted</b> token. A
  * quoted token is text, never a name. {@link RecordAbstractReader} asks the same question to decide when §5.6's
@@ -44,10 +47,14 @@ final class ReferenceNameReader implements TsonTypeReader<Object> {
     /** The slot's declared type, {@code meta.ref<T>}, which each name read here is recorded with. */
     private final TsonSchema.SlotType type;
 
-    ReferenceNameReader(String expected, boolean toCell, TsonSchema.SlotType type) {
+    /** The reference's atom bound to the component, which reads and judges a name a data document writes. */
+    private final TsonTypeReader<?> inData;
+
+    ReferenceNameReader(String expected, boolean toCell, TsonSchema.SlotType type, TsonTypeReader<?> inData) {
         this.expected = expected;
         this.toCell = toCell;
         this.type = type;
+        this.inData = inData;
     }
 
     /** The name {@code event} spells, or empty where it is no unquoted token. */
@@ -60,6 +67,9 @@ final class ReferenceNameReader implements TsonTypeReader<Object> {
     public Object read(TsonReadContext ctx) {
         TsonEvent event = ctx.peek();
         Optional<String> name = nameIn(event);
+        if (name.isPresent() && !ctx.readsSchemaNames()) {
+            return inData.read(ctx);
+        }
         if (name.isPresent()) {
             ctx.next();
             io.ltr8.tson.schema.meta.TypeRef reference = io.ltr8.tson.schema.meta.TypeRef.of(name.get());

@@ -139,6 +139,12 @@ class CrossEncodingParityTest {
               defaulted   => { kind?: meta.type_ref ~ int32  v?: kind! }
               grouped     => { ( kind: meta.type_ref | name: text )  v?: kind! }
               tmpl        => <T> { item: T }
+              order       => { id: text }
+              customer    => { name: text }
+              o1          => !order { id: A-1 }
+              c1          => !customer { name: Ada }
+              order_ref   => meta.ref<order>
+              order_pick  => { which: order_ref  also?: meta.ref<order> ~ o1 }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -579,6 +585,28 @@ class CrossEncodingParityTest {
                 {"t": "set<text>"}""");
         sameVerdict("ided", "{ id: set<text> }", """
                 {"id": "set<text>"}""");
+    }
+
+    /**
+     * A reference over a type that is no constructor names a value of the governing schema, judged by what the name
+     * reaches ([TSON-SCHEMA] §4.2, §5.12): TSON writes the name unquoted, JSON the same text as a string. A name
+     * reaching nothing, a value of another type or a type is refused by both, on the same code at the same pointer,
+     * and a default written inline is the value both hold where the field is omitted.
+     */
+    @Test
+    void aValueByNameIsJudgedByWhatItReachesInBoth() {
+        bothAccept("order_pick", "{ which: o1 }", """
+                {"which": "o1"}""");
+        bothAccept("order_pick", "{ which: o1  also: o1 }", """
+                {"which": "o1", "also": "o1"}""");
+        for (String refused : List.of("nope", "c1", "order")) {
+            sameVerdict("order_pick", "{ which: " + refused + " }", """
+                    {"which": "%s"}""".formatted(refused));
+            assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/which")),
+                    tson("order_pick", "{ which: " + refused + " }"), refused);
+        }
+        sameVerdict("order_pick", "{ which: o1  also: c1 }", """
+                {"which": "o1", "also": "c1"}""");
     }
 
     /** An application nothing in the closure closed names no type the schema closes, and is refused by both. */

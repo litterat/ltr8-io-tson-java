@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
@@ -348,6 +349,10 @@ final class RecordExtension {
         Top target = merged.get(terminal);
         if (target == null || OpenEntry.isOpen(target) || target instanceof Alias) {
             return Optional.empty();
+        }
+        if (target instanceof ReferenceBody reference && !reference.namesTypes()) {
+            // A value's name: the pins compare by the name, and what each reaches is checkFieldValue's to judge.
+            return AtomParsers.inSchemaDocument(reference);
         }
         return AtomParsers.forType(target, enumForms.getOrDefault(terminal, Normalization.NONE));
     }

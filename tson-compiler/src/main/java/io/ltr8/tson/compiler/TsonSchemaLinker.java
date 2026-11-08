@@ -730,7 +730,9 @@ public final class TsonSchemaLinker {
         }
         // A reference read under this schema names an entry of the final namespace, assembled below.
         AtomicReference<Map<String, Top>> closure = new AtomicReference<>(Map.of());
-        merged = computeKinds(merged, facts, merged::get, applications, pending, new java.util.AbstractMap<>() {
+        // And a name read under a reference that names values reaches a value of that final namespace.
+        AtomicReference<ValuesByName> reached = new AtomicReference<>();
+        merged = computeKinds(merged, facts, merged::get, applications, pending, reached, new java.util.AbstractMap<>() {
             @Override
             public Top get(Object name) {
                 return closure.get().get(name);
@@ -760,13 +762,22 @@ public final class TsonSchemaLinker {
         Set<String> blamedOnce = new LinkedHashSet<>();
         Map<String, Top> namespace = merged;
         Function<String, Optional<String>> constructors = name -> constructorOf(name, namespace.get(name), facts);
+        ValuesByName byName = new ValuesByName(schema, merged, facts, origins, values);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             try {
                 // Named by what the author wrote, not by the content-derived name a derived entry carries:
                 // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
                 // a name §8.2 makes non-normative and nobody ever typed.
                 validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
-                        merged, constructors, other -> displayName(other, namespace, facts, applications));
+                        merged, constructors, other -> displayName(other, namespace, facts, applications), byName);
+            } catch (UnsupportedOperationException gap) {
+                // A field's value naming a value through a step this library does not yet follow: the gap it is.
+                if (receiver == null) {
+                    throw gap;
+                }
+                String against = reportedAgainst(entry.getKey(), merged, facts);
+                receiver.report(TsonDiagnostics.ofSchemaGap(localIdentity(schema), against, gap.getMessage(),
+                        at(facts, against)));
             } catch (UnresolvedReference e) {
                 if (pending.contains(e.name())) {
                     continue; // a declaration not yet ready: judged when the whole schema links
@@ -797,6 +808,7 @@ public final class TsonSchemaLinker {
         AnnotatedMap<String, Top> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
         closure.set(annotated);
+        reached.set(new ValuesByName(schema, annotated, facts, origins, values));
 
         TsonLinkedSchema linked = new TsonLinkedSchema(new TsonSchema(schema.id(), schema.imports(), annotated,
                 schema.bootstrap(), schema.valuesByName(), schema.heldValues(), facts), origins, enumForms, nameTypes);
@@ -1143,15 +1155,20 @@ public final class TsonSchemaLinker {
      * already resolved. A reference that names types and has no members admits no value, and the inhabitance check
      * reports it.
      *
+     * <p>A reference over any other type carries what a qualified name reaches ({@link ReferenceBody.Values}): judged
+     * by {@link ValuesByName} over the final namespace, which {@code reached} holds once the link has assembled it, so
+     * a data document's read judges the name as a value body's is.
+     *
      * <p>A partial link ({@link #linkReady}) admits each {@code pending} name as a member of every reference that
-     * names types: a declaration not yet ready has no value to judge, and a pin or default naming it is judged when the
-     * whole schema links, as a reference to it is.
+     * names types, and gives a reference that names values nothing to reach: a declaration not yet ready has no value
+     * to judge, and a pin or default naming it is judged when the whole schema links, as a reference to it is.
      *
      * @param structure where a constructor is looked up first: the schema's one namespace, as {@code merged} is
      */
     private static Map<String, Top> computeKinds(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
                                                  Function<String, Top> structure, Map<String, TypeRef> applications,
-                                                 Set<String> pending, Map<String, Top> entries) {
+                                                 Set<String> pending, AtomicReference<ValuesByName> reached,
+                                                 Map<String, Top> entries) {
         Map<TypeRef, String> denoted = new LinkedHashMap<>();
         applications.forEach((name, application) -> denoted.putIfAbsent(application, name));
         // Every application the resolver closed to an entry of the closure, an expansion's among them.
@@ -1175,10 +1192,26 @@ public final class TsonSchemaLinker {
                     members = java.util.stream.Stream.concat(members.stream(), pending.stream()).distinct().toList();
                 }
                 result.put(entry.getKey(), reference.linked(namesTypes, members, namesTypes ? denoted : Map.of(),
-                        entries, shown));
+                        entries, shown, namesTypes || !pending.isEmpty() ? Optional.empty()
+                                : Optional.of(valuesOf(reference.of(), reached))));
             }
         }
         return result == null ? merged : result;
+    }
+
+    /**
+     * What a name read under a reference over {@code of}, a type that is no constructor, reaches: judged by {@link
+     * ValuesByName} over the final namespace, which {@code reached} holds once the link has assembled it.
+     */
+    private static ReferenceBody.Values valuesOf(String of, AtomicReference<ValuesByName> reached) {
+        return (where, name) -> {
+            ValuesByName judged = reached.get();
+            if (judged == null) {
+                throw new IllegalStateException("'" + name.text() + "' is read under 'meta.ref<" + of + ">' before "
+                        + "the schema linking it has assembled its namespace");
+            }
+            return judged.reach(where, name, of);
+        };
     }
 
     /**
@@ -1283,7 +1316,7 @@ public final class TsonSchemaLinker {
 
     private static void validateEntry(String name, Top def, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors,
-                                       Function<String, String> shown) {
+                                       Function<String, String> shown, ValuesByName byName) {
         checkOpenEntryUsesEveryParameter(name, def);
         // A chain reaches a constructor whenever a refinement derives from one -- the kernel's own `set_type =>
         // array ^ {...}` resolves with [array, product, top, type] -- and every name on it is in the one namespace,
@@ -1298,11 +1331,12 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def, namespace, constructors, shown);
+        validateBody(name, def, namespace, constructors, shown, byName);
     }
 
     private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
-                                      Function<String, Optional<String>> constructors, Function<String, String> shown) {
+                                      Function<String, Optional<String>> constructors, Function<String, String> shown,
+                                      ValuesByName byName) {
         if (OpenEntry.isOpen(body)) {
             // A held body is opaque to everything that needs to know what a reference *resolves to*: that
             // cannot be settled until substitution supplies the arguments, so type-kind validation and
@@ -1325,7 +1359,8 @@ public final class TsonSchemaLinker {
                 for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
                     if (field.getValue().type() instanceof TypeRef type) {
                         validateTypeRef(type, namespace, constructors, entryName, " field '" + field.getKey() + "'");
-                        checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors);
+                        checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors,
+                                byName);
                     }
                 }
                 for (FieldGroup group : r.groups()) {
@@ -1772,10 +1807,14 @@ public final class TsonSchemaLinker {
      * <p><b>Atoms and enums only, and the rest is refused.</b> A field typed by a record, container or choice
      * carries no value ({@link #notAScalarType}). Only a closed record reaches here: a record template's member is
      * checked once materialisation has substituted its arguments, against the argument it was closed with.
+     *
+     * <p><b>A reference's value is a name.</b> At a reference over a constructor it is judged a member ({@link
+     * #checkKindValue}); at one over any other type it is a value's qualified name, judged by what it reaches as a
+     * value body's names are ({@link ValuesByName#reach}), and refused against this entry.
      */
     private static void checkFieldValue(String entryName, String fieldName, RecordField field,
                                         Map<String, Top> namespace,
-                                        Function<String, Optional<String>> constructors) {
+                                        Function<String, Optional<String>> constructors, ValuesByName byName) {
         if (field.value().isEmpty()) {
             return;
         }
@@ -1795,6 +1834,13 @@ public final class TsonSchemaLinker {
         Token value = field.value().get();
         if (target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of(), namespace::get)) {
             checkKindValue(entryName, fieldName, field, value, reference, namespace, constructors);
+            return;
+        }
+        if (target instanceof ReferenceBody reference) {
+            // A value's qualified name, judged by what it reaches as a value body's names are (§5.12).
+            byName.reach("'" + entryName + "': field '" + fieldName + "''s "
+                    + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value"),
+                    TypeRef.of(value.text()), reference.of());
             return;
         }
         Optional<AtomType<?>> parser = AtomParsers.forType(target,

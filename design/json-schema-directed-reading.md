@@ -28,6 +28,11 @@ JSON inputs are in `design/cli-config-hashing.md`.
   closure closed being refused. A sibling reference's string, `"kind!"`, is read by the same production and admitted
   only where the reference's `allow_sibling` admits it, a record field's type; elsewhere it is refused as a constraint
   the value breaks, as the TSON reader refuses it ([TSON-JSON] §5.6). A tree read keeps the `JsonString` as written.
+- A reference over a type that is no constructor (`meta.ref<order>`) is an atom too, read from a string holding a
+  value's qualified name and judged by what it reaches in the governing schema, as the TSON reader judges it
+  (`AtomParsers.forRead`, `RefParser` over the lookup the link left on the reference, `ReferenceBody.Values`). A
+  schema-stated value at one (`FieldValue`) is decoded the same way. `AtomParsers.forType` is the pre-link callers'
+  and refuses such a reference as a gap, so no JSON reader asks it for an atom position.
 - A dependent field (`v?: kind!`, [TSON-SCHEMA] §5.2) is read by `DependentReader` through its record, against the
   type its sibling names in the same object, with TSON's rules (`design/readers-and-diagnostics.md`): the pin, the
   sibling written before it, or the sibling's default; a free sibling written after the member is refused naming both
@@ -253,7 +258,9 @@ standalone array or tuple binds to an unmodifiable `List` of its values' natural
 unmodifiable `Map`; a record field declaring `long[]`, `List<Long>`, `Set<UUID>`, an `@Tuple` class or
 `Map<LocalDate, BigDecimal>` reads the same position again for that class. A tuple binds by its component and not by
 its schema name because an inline tuple's entry name is minted, and no binding map can hold it. `BindTargets` is the
-one place that meets a component — an atom through `AtomReader.boundTo`, a container rebuilt over the component's class
+one place that meets a component — an atom through `AtomReader.boundTo` (a reference's `TypeRef` or `Ref` component
+bound to the family's own production rather than a bridge from its name, so the `TypeRef` keeps its referent and the
+`Ref` is delivered), a container rebuilt over the component's class
 with every element, key and value bound in turn, a record checked against it — and every disagreement joins the record's
 one `BindMismatchException`. So an element of a `List<Long>` over `[int32]` is a `Long`, where `tson-compiler` reads it
 at the family's natural class.

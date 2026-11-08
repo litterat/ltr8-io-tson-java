@@ -843,9 +843,15 @@ final class DefinitionResolver {
         try {
             value = constructionReader.readValue(head.name(), readAs(payload, head.name()));
         } catch (ReadException e) {
+            String at = e.diagnostic().path().filter(path -> !path.isEmpty()).map(path -> "at " + path + ": ")
+                    .orElse("");
+            if (e.diagnostic().code() == Diagnostic.Code.NOT_IMPLEMENTED) {
+                // A payload this library cannot yet read is its gap, never a verdict on the payload.
+                throw new UnsupportedOperationException("'" + name + "': the body cannot yet be read against '"
+                        + head.name() + "' -- " + at + e.getMessage(), e);
+            }
             throw payloadFailure("'" + name + "': the body", "'" + name + "': the body is no value of the type '"
-                    + head.name() + "' -- " + e.diagnostic().path().filter(path -> !path.isEmpty())
-                            .map(path -> "at " + path + ": ").orElse("") + e.getMessage(), e);
+                    + head.name() + "' -- " + at + e.getMessage(), e);
         } catch (BindMismatchException e) {
             String where = "'" + name + "': " + e.getMessage();
             throw e instanceof MissingBindingException ? new MissingBindingException(where)

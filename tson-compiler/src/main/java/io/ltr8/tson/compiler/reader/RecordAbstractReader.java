@@ -353,11 +353,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         /**
          * The reader of {@code field}'s declared type, the one choice every {@link FieldReaders} falls back to. A
          * dependent field's type is chosen per instance by its sibling's value, so its reader is a {@link
-         * DependentFieldReader}, which the record hands that value.
+         * DependentFieldReader}, which the record hands that value. A type still written as an application is one a
+         * resolution in progress has not closed yet, whose head is no type: an {@link UnclosedApplicationReader}.
          */
         static TsonTypeReader<?> declared(TsonTypeReaderResolver resolver, ValueReaderContext context, String name,
                                           RecordField field) {
             return switch (field.type()) {
+                case TypeRef type when !type.arguments().isEmpty() -> new UnclosedApplicationReader(name, type);
                 case TypeRef type -> resolver.resolve(type.name());
                 case SiblingRef sibling -> new DependentFieldReader(name, sibling.field(), resolver, context);
             };

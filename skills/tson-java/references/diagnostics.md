@@ -48,10 +48,11 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
   not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in one
-  document both get reported. No construct the bundled schemas declare reaches one; what still can is
-  a value's qualified name at a reference-typed position of a data document (`meta.ref<T>` over a type that is no
-  constructor), and, in a schema, an instance of a constructor of types
-  the schema declares itself (`c => meta.product & { … }`, `x => !c { … }`). A constructor, a type or an annotation type
+  document both get reported. No construct the bundled schemas declare reaches one; what still can is,
+  in a schema, an instance of a constructor of types the schema declares itself (`c => meta.product & { … }`,
+  `x => !c { … }`), and a value entry read against a record of the same document whose field is typed by an
+  application written inline (`holder => { r: meta.ref<order> }`, `h => !holder { r: o1 }`; name the application
+  instead, `order_ref => meta.ref<order>`). A constructor, a type or an annotation type
   declared in the same document is otherwise read in wait order, whichever is written first. A data tag
   naming a schema's value entry (`!orders { … }` over `orders => !api { … }`) is no gap: it is `TYPE_MISMATCH`,
   a value and not a type.

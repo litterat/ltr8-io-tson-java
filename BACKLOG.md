@@ -46,11 +46,6 @@ spec-required case:
   `@meta.application` is the application as written, nested arguments unreduced (`pair<box<text> int32>`), and
   reaches the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
   an aliased application declared in an import and applied in the importer, and reduce on ingest if it misses.
-- [ ] **A kind-typed field's default naming a later entry throws `IllegalStateException`.** A record field written
-  `k: meta.ref<meta.record> = later`, with `later` declared after a value read reaches the field, escapes as an internal
-  invariant break whose message calls `ref` "a template … not a type until it is applied". The default is a held
-  value (SPEC-FEEDBACK.md #4 rule 3) and should be judged once every entry is ready. Reproduce, add the failing test,
-  and route the judgement through the held-value settle.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to
@@ -59,13 +54,15 @@ spec-required case:
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **A value entry read against a type declared beside it cannot read a field typed by an inline application.**
-  `holder => { r: meta.ref<meta.record> }` with `held => !holder { r: order }` in one schema is refused: "'ref' is a
-  template taking 1 type argument … a data type-ref carries no arguments". The reader compiled from the entries
-  ready so far (`SchemaResolver.readySoFar`) reaches the field's application before its minted entry is ready.
-  Naming the application (`records => meta.ref<meta.record>`, `holder => { r: records }`) reads. A record template applied
-  inline (`{ b: box<text> }`) fails the same way, reported as "no schema in this closure declares a subtype of
-  'box', and it is abstract", and so does a value of a map or namespace type whose `value_type` is `box<text>`. Make
-  the application wait in the order, as a named one does, and add a `link/valid` vector writing it inline.
+  `holder => { r: meta.ref<meta.record> }` with `held => !holder { r: order }` in one schema is `NOT_IMPLEMENTED`
+  ("field 'r' is typed by the application 'meta.ref<meta.record>' written inline …"): the reader compiled from the
+  entries ready so far (`SchemaResolver.readySoFar`) meets the field still typed by the application, whose minted entry
+  materialisation makes only after every declaration is ready, and reads it with an `UnclosedApplicationReader`. Naming
+  the application (`records => meta.ref<meta.record>`, `holder => { r: records }`) reads. A record template applied
+  inline (`{ b: box<text> }`) is the same gap, and so is a value of a map or namespace type whose `value_type` is
+  `box<text>`. Make the application wait in the order, as a named one does -- close it on demand
+  (`TemplateMaterialiser.closeApplication`) and type the ready copy's field by the minted name -- and add a
+  `link/valid` vector writing it inline.
 - [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1;
   `SPEC-FEEDBACK.md #4`, the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
   `meta.schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
@@ -119,18 +116,6 @@ spec-required case:
   component, so the host holds no value for it and `ValuesByName.fieldOf` finds no component to read. The value is the
   schema's own, the field's pinned value in the record type, so the walk should take it from the declared
   `RecordField` and continue; no test covers the case yet.
-- [ ] **A data document's value at a reference-typed position is not read** ([TSON-SCHEMA] §4.2, §5.12). Any schema
-  may declare `meta.ref<T>` (SPEC-FEEDBACK.md #7), and a data document's read reaches `AtomTypeReader`, which reports
-  `NOT_IMPLEMENTED` there (and `tson-json`'s `AtomReader` compiles the position to an `ErrorReader`): a reference is
-  judged by what its name reaches when a schema links, and a data document is never linked. The name is to resolve in
-  the governing schema's namespace and
-  be judged as a value body's names are (`ValuesByName`), against the schema's value entries.
-- [ ] **A value a schema writes at a reference-typed field is not judged** ([TSON-SCHEMA] §4.2, §5.12). In any
-  schema, `rpick => { m: meta.ref<order> = os.o1 }` (or `~`) reaches `AtomParsers.forType`'s token-level reading from the
-  linker's field-value check, which a reference has none of, and the `UnsupportedOperationException` escapes
-  `validateSchema` rather than arriving as a `NOT_IMPLEMENTED` diagnostic. The name is to be recorded with the field's
-  slot type and judged as a value body's names are (`ValuesByName.judge`), or the default refused if a reference
-  admits none.
 - [ ] **JSON bind delivers a `Namespace` at a namespace-typed slot.** The TSON reader builds one where the host
   component is a `Namespace` (`reader.BindTargets`, over a `MapBindReader` that carries the constructor's name);
   `tson-json`'s `BindTargets`/`BindMapBuilder` meet a namespace type's map with no constructor name, so a `Namespace`

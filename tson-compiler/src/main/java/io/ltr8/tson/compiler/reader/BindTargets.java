@@ -45,14 +45,15 @@ import java.util.Optional;
  * to judge, whatever the target holds. A {@code Reference} target reads as a {@code TypeRef} one does, a type reference
  * being a reference, and admits a sibling reference besides, which a {@code TypeRef} target refuses at its token, naming the
  * slot ([TSON-SCHEMA] §5.2's position rule). A {@code Ref} or {@code TypeRef} target at a reference-typed slot ({@code
- * meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives the value when the
- * schema links, a {@code TypeRef} the name alone. A {@code TypeRef} target at a kind-typed slot ({@code
- * meta.record_field.type} is {@code meta.type_ref}, a meta's {@code request: meta.ref<record>}) reads through a {@link
- * TypeNameSlotReader}: a type's name, or in a kernel body an application still to close, written unquoted. Any
- * other target there is bound as at an atom and wrapped in a {@link RecordedNameReader}, which records the name it
- * read. The slot declares the spelling, so a {@code TypeRef} or {@code Ref} target is a mismatch at a record-typed
- * slot, which holds the record's value inline, and at any other atom, where a token is a literal and never a
- * reference.</li>
+ * meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives the value the
+ * name reaches -- when the schema links, for a name a schema document writes, and at the read for one in a data
+ * document -- and a {@code TypeRef} the name, carrying that value as its referent in a data document. A {@code
+ * TypeRef} target at a kind-typed slot ({@code meta.record_field.type} is {@code meta.type_ref}, a meta's {@code
+ * request: meta.ref<record>}) reads through a {@link TypeNameSlotReader}: a type's name, or in a kernel body an
+ * application still to close, written unquoted. Any other target there is bound as at an atom and wrapped in a {@link
+ * RecordedNameReader}, which records the name it read. The slot declares the spelling, so a {@code TypeRef} or
+ * {@code Ref} target is a mismatch at a record-typed slot, which holds the record's value inline, and at any other
+ * atom, where a token is a literal and never a reference.</li>
  * </ul>
  * A dependent field ({@link DependentFieldReader}) binds to an {@code Object} component, which receives what the
  * type its sibling names reads to, and to nothing narrower.
@@ -101,8 +102,10 @@ final class BindTargets {
         if (byName && readsARef(reader)) {
             // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
             // TypeRef -- so the atom's own bridge (Ref's name form) is not applied on top of it.
+            AtomTypeReader<?> atom = slotAtom(reader);
             TsonTypeReader<?> named = new ReferenceNameReader(expectedAt(reader, what), payload.typeClass() == Ref.class,
-                    slotAtom(reader).slotType());
+                    atom.slotType(), atom.boundTo(payload.typeClass()).orElseThrow(() -> new IllegalStateException(
+                            what + " reads a reference, whose atom binds no " + payload.typeClass().getSimpleName())));
             return AnnotationBoxing.wrap(named, target, site.annotationTypes());
         } else if (typeRef && readsAKind(reader)) {
             // The same for a type's name or an application: the reader produces the TypeRef itself, so the atom's
@@ -122,7 +125,7 @@ final class BindTargets {
                 // and the name is recorded as a TypeRef host's would be.
                 AtomTypeReader<?> atom = slotAtom(reader);
                 TsonTypeReader<?> refusing = readsARef(reader)
-                        ? new ReferenceNameReader(expectedAt(reader, what), false, atom.slotType())
+                        ? new ReferenceNameReader(expectedAt(reader, what), false, atom.slotType(), bound)
                         : new TypeNameSlotReader(atom, site.annotationTypes(), what, false);
                 bound = new RecordedNameReader(bound, atom.slotType(), refusing);
             }

@@ -31,7 +31,8 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   the account of every slot.
 - A value by name (`TsonSchema.valuesByName`) resolves its first segment in the schema's merged namespace, alias
   hops followed; its referent's declared type must IS-A the slot's, compared by canonical identity.
-  Local entries only, after `validateEntry`.
+  Local entries only, after `validateEntry`. A field's default or pin at a reference naming values, and a name a data
+  document writes at one, are judged by the same walk (`ValuesByName.reach`).
 - `entryOrigins`, `enumForms` and `nameTypes` are on `TsonLinkedSchema`, never on `TsonSchema` or an entry's value,
   and each is merged through imports.
 - A namespace type resolves to a `NamespaceBody`, and a value of it is read as the map `NamespaceBody.read()` states:
@@ -254,6 +255,18 @@ slot's declared type (`TsonSchema.SlotType`), and `checkValuesByName` judges eac
 over a constructor the name as a member (`judgeMember`), over any other type by the walk, the value it reaches
 delivered into the host's `Ref` cell. The walk itself, by key and by field through the binding's
 descriptor, is `design/namespace-types-and-value-entries.md`'s; what is the linker's is below.
+
+The same walk judges two more names, so one rule decides what a value's name reaches wherever it is written:
+
+- **A field's default or pin at a reference naming values** (`checkFieldValue`, from `validateEntry`): the token is
+  judged by `ValuesByName.reach` over `merged`, and a refusal is a `SCHEMA_ERROR` against the entry declaring the field,
+  opening `'rpick': field 'which''s default …`. A FIXED-field step reported as a gap is `NOT_IMPLEMENTED` against that
+  entry too.
+- **A name a data document writes** at one: `computeKinds` gives every reference naming values a lookup
+  (`ReferenceBody.Values`, `valuesOf`) over a `ValuesByName` built once the link has assembled its final namespace
+  (the `reached` holder, set beside `closure`), so the governing schema's compiled readers judge the name at the read
+  (`design/references.md`). A link of a resolution in progress (`linkReady`) gives none: its pending entries hold no
+  value, and a reference there reads its grammar alone, a held value at one being judged when the whole schema links.
 
 - **The grammar is judged here.** `ValuesByName.segments` splits the name at each `.` and requires each segment to be
   a [TSON-DATA] §7.7 identifier, none empty and no arguments, so `orders.1x`, `.orders` and `orders.` are refused

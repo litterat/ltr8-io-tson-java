@@ -639,9 +639,11 @@ constructor (`request: meta.ref<meta.record>`) it binds a `TypeRef` holding a ty
 closes (`set<text>`, written unquoted), whose `referent()` is the value of the entry it names — a tree read
 delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type
 (`method: meta.ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and
-then a key of its namespace value, or a field of a record value) and, once the schema has linked, the value it names
-(`method().get()`), or a `TypeRef` for the name alone. The resolver records each with its slot as it reads the value, and the
-linker judges it there.
+then a key of its namespace value, or a field of a record value) and the value it names (`method().get()`), or a `TypeRef`
+whose `referent()` is that value, or a `String` the name. In a schema the resolver records each with its slot as it reads the
+value, and the linker judges it and delivers the value; in a data document the read judges the name in the governing schema
+(`ATOM_CONSTRAINT_VIOLATION` where it reaches nothing, a type, or a value of another type) and delivers at once. The value is
+the schema's own value entry's, bound or a tree as the schema holds it.
 
 ---
 
