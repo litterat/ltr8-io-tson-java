@@ -75,8 +75,8 @@ public final class HeldBody {
             throw new IllegalStateException("a record template is a record_template, never held text "
                     + "(§5.10): " + parameters);
         }
-        // Every parameter starts unbounded: a written or inherited bound is stamped once the whole schema has
-        // resolved (ParameterTypes), which a held body is built well before.
+        // Parameters by name: the declaration's written bounds are put on where it resolves
+        // (DefinitionResolver.withBounds), a lifted form's parameters having none.
         return new TemplateBody(parameters.stream().map(TemplateParam::new).toList(),
                 WRITER.toTson(application));
     }

@@ -330,12 +330,29 @@ final class DefinitionResolver {
      * path already funnels through, regardless of which internal {@code resolve*} method built the value.
      */
     Top resolve(SchemaMap.Declaration declaration, Optional<SourcePosition> declarationPosition) {
-        Top resolved = withExtension(declaration, resolveTypeDef(declaration.name(), declaration.typeDef()));
+        Top resolved = withBounds(declaration,
+                withExtension(declaration, resolveTypeDef(declaration.name(), declaration.typeDef())));
         Annotations annotations = annotationsOf(declaration.name(), declaration.typeDefAnnotations());
         TsonSchema.EntryFacts known = factsOf(declaration.name());
         facts.put(declaration.name(), known.withPosition(declarationPosition.or(known::position))
                 .withAnnotations(annotations));
         return resolved;
+    }
+
+    /**
+     * An open entry with each parameter carrying the bound its declaration wrote ({@code <T: text>}, §5.10), the
+     * others unbounded: a parameter is its name and its written bound, known in full where it is declared, and
+     * nothing about it is inferred. Whether a bound names a type, and whether a parameter passed on is written with a
+     * bound its callee admits, are judged once every declaration is ready ({@link ParameterTypes#check}).
+     */
+    private Top withBounds(SchemaMap.Declaration declaration, Top resolved) {
+        if (declaration.parameterTypes().isEmpty() || !OpenEntry.isOpen(resolved)) {
+            return resolved;
+        }
+        Map<String, TemplateParam> bounded = new LinkedHashMap<>();
+        declaration.parameterTypes().forEach((parameter, written) -> bounded.put(parameter,
+                new TemplateParam(parameter, Optional.of(parameterType(parameter, written)))));
+        return OpenEntry.withParameters(resolved, bounded);
     }
 
     /** {@code name}'s facts as resolution has recorded them so far. */
@@ -1127,7 +1144,7 @@ final class DefinitionResolver {
         return open;
     }
 
-    /** Every parameter unbounded: a written or inherited bound is stamped once the schema has resolved. */
+    /** Every parameter by name: a written bound is put on where the declaration resolves ({@link #withBounds}). */
     private static List<TemplateParam> typeParameters(List<String> parameters) {
         return parameters.stream().map(TemplateParam::new).toList();
     }
@@ -2758,7 +2775,7 @@ final class DefinitionResolver {
      * type-ref. A written type names a type or an application of one; a container sugar form is not lifted at
      * this position, so it has no entry to name and is refused here in those terms.
      */
-    io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeExpr written) {
+    private io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeExpr written) {
         if (written instanceof SiblingRef sibling) {
             throw new SchemaValidationException(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field())
                     .refusedAt("the type of parameter '" + parameter + "'"));

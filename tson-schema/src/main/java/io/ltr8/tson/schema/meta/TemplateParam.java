@@ -14,8 +14,8 @@ import java.util.Optional;
  * application, and an argument for it is a reference, so it records no type of its own: what an argument is read as is
  * always {@code meta.type_ref}.
  *
- * <p><b>{@link #bound} is written or inherited</b>: a declaration writes {@code <T: text>}, and a parameter passed to
- * another template inherits that template's bound for the position.
+ * <p><b>{@link #bound} is what the declaration writes</b>, {@code <T: text>}, and otherwise absent: nothing about a
+ * parameter is inferred, so a parameter is known in full where it is declared.
  */
 @Typename(name = "meta.template_param")
 public record TemplateParam(String name, Optional<TypeRef> bound) {

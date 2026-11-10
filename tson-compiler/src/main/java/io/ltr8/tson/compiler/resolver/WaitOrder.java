@@ -256,8 +256,8 @@ final class WaitOrder implements DefinitionGetter {
 
     /**
      * Drops the compiled readers, so the next read compiles the entries as they stand: called once every
-     * declaration is ready, after which a resolution rewrites entries in place (materialisation, parameter
-     * stamping) rather than adding them one by one.
+     * declaration is ready, after which a resolution rewrites entries in place (materialisation, a condemned
+     * template's placeholder) rather than adding them one by one.
      */
     void settled() {
         bound = null;

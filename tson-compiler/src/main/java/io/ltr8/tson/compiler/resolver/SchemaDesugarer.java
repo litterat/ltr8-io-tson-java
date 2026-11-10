@@ -816,8 +816,8 @@ final class SchemaDesugarer {
      * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
      * fixed on the {@code record} constructor and an unmarked field's facts are {@code meta.record_field}'s own
      * defaults, so neither is stated -- the same economy {@link #arrayBinding} makes with an unmarked element's
-     * {@code state}. The parameters close the payload, each unbounded until the schema has resolved and its written or
-     * inherited bound is stamped.
+     * {@code state}. The parameters close the payload by name; the bound each is written with is put on where the
+     * declaration resolves.
      */
     private DataValue recordTemplate(RecordDef record) {
         return recordTemplatePayload(recordBinding(record), currentParameters);

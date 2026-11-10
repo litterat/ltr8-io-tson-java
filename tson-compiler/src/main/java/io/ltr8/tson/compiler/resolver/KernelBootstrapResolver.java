@@ -34,8 +34,6 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.ReferenceBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
@@ -239,7 +237,7 @@ public final class KernelBootstrapResolver {
                 throw error;
             });
             completeChains();
-            stampParameters();
+            checkParameters();
             Map<String, Top> ordered = new LinkedHashMap<>();
             declarations.keySet().forEach(name -> ordered.put(name, entries.get(name)));
             return ordered;
@@ -334,25 +332,15 @@ public final class KernelBootstrapResolver {
         }
 
         /**
-         * §5.10's parameter types, derived once every entry is ready, as {@link SchemaResolver} derives a schema's
-         * -- a held body names its parameters and nothing about what each is read as.
+         * §5.10's parameters, checked once every entry is ready, as {@link SchemaResolver} checks a schema's: where
+         * each stands, and each written bound. A failure is a broken kernel.
          */
-        private void stampParameters() {
-            Map<String, Map<String, TypeRef>> written = new LinkedHashMap<>();
-            declarations.forEach((name, declaration) -> {
-                Map<String, TypeRef> types = new LinkedHashMap<>();
-                declaration.parameterTypes().forEach((parameter, ref) ->
-                        types.put(parameter, resolver.parameterType(parameter, ref)));
-                if (!types.isEmpty()) {
-                    written.put(name, types);
-                }
-            });
-            Map<String, Map<String, TemplateParam>> parameters = ParameterTypes.inferAll(entries,
-                    declarations.keySet(), written, entries::get, (name, error) -> {
+        private void checkParameters() {
+            ParameterTypes.check(entries, declarations.keySet(),
+                    name -> facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).synthetic(), entries::get,
+                    (name, error) -> {
                         throw error;
                     });
-            entries.replaceAll((name, definition) -> parameters.containsKey(name)
-                    ? OpenEntry.withParameters(definition, parameters.get(name)) : definition);
         }
     }
 
