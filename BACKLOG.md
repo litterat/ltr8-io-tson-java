@@ -215,6 +215,39 @@ spec-required case:
   whose selector is a group member, voidable or optional-and-unpinned passes the checks a closed base fails.
   Check them on the template's own fields, and add `link/invalid` vectors.
 
+- [ ] **A restatement that changes a pin is accepted** ([TSON-SCHEMA] §5.7, §5.2). With `base => { pet_type: text =
+  "pet"  name: text }`, `dog => base & { pet_type: = "dog" }` loads; §5.7's restatement "MUST NOT change a pin", and a
+  discriminated family's arrangement (§5.2) rests on it — a subtype of a member that could re-pin its parent's
+  selector would break the family's one-level dispatch. Refuse a FIXED restatement whose value differs, under the
+  field type's own equality (§5.5, so `= 255` over `= 0xFF` is the identity case), in composition and refinement
+  bodies alike, at the restating declaration. Add `schema/invalid` vectors for both operators and a `schema/valid` one
+  for the identity restatement.
+- [ ] **An author-written `@meta.synthetic` is accepted** ([TSON-SCHEMA] §6). `@meta.synthetic x => { a: text }`
+  loads; §6 makes an author's spelling of either resolver-attached annotation a resolver error, and
+  `DefinitionResolver` refuses `@meta.application` but not its sibling. Refuse it at the same point, at both
+  declaration positions, and add a `schema/invalid` vector.
+- [ ] **A nested schema map declared twice in one document is accepted** ([TSON-SCHEMA] §2.1, §2.2.3;
+  [TSON-DATA] §2.6). `geo => !schema { a => … }` beside `geo => !schema { b => … }` in one schema map loads, its
+  members merged. The schema body is a map "in syntax and in semantics" (§2.1), so the repeated key is a duplicate
+  (a resolver error); §2.2.3's union of a nested map is across the documents of a closure, each contributing by
+  declaring the map once. Add a `schema/invalid` vector.
+- [ ] **A template that applies itself forever loads while nothing applies it** ([TSON-SCHEMA] §5.10).
+  `loop => <T> loop<T>` resolves; §5.10 says what is wrong with that declaration is that it applies itself forever and
+  denotes no type, and that is what its diagnostic names — a fact of the declaration, not of an application. Refuse
+  an alias template whose target chain returns to itself with no constructor between, at the declaration, and add a
+  `schema/invalid` vector.
+- [ ] **A loop of aliases is reported as unproductive recursion** ([TSON-SCHEMA] §3.4.1 rule 4, §8.3). `a => b`
+  beside `b => a` is refused with §5.10.1's message ("can never be satisfied by any document … nothing in that chain
+  can be left out"); §3.4.1 says a loop of aliases is not a wait cycle and §8.3 refuses it as an alias chain with no
+  terminal. The verdict is right; report the chain (`'a' is an alias of 'b', an alias of 'a', which names no type`)
+  once, at the first entry, before the productivity check sees it.
+- [ ] **A tag naming a nested member by its bare name is a mismatch, not an unresolved name** ([TSON-SCHEMA] §3.3,
+  §7.2). Under `geo => !schema { address => { … } }` and `order => { shipping: geo.address }`, `!order { shipping:
+  !address { … } }` reports `TYPE_MISMATCH` ("'address' is not admissible at a 'geo.address' position"), though
+  `address` resolves to nothing at the root — a bare name "names the root's `address` or fails to resolve" (§3.3).
+  That is `UNKNOWN_TYPE_REF`, the resolver category, as the same tag already gets at a `meta.declared` position.
+  Resolve the tag before judging admissibility at every typed position, and add a `class2/validate` vector.
+
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@meta.disjoint` is the precedent both follow: an annotation with
@@ -451,6 +484,27 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   restamp `policy.tn` and the schemas that pin it. The Revision 39 change log keeps the received name, with the
   policy keeping its name in prose, so this waits for a revision to carry it.
 
+- [ ] **Schemaless `!integer` and `!regex` are refused** ([TSON-DATA] §5.5, §5.6). `{ a: !integer 5 }` and
+  `{ a: !regex "^a+$" }` with no `!!import` report `UNKNOWN_TYPE_REF` ("not a built-in type"); both are rows of the
+  built-in vocabulary (the kernel's `integer` and `regex`), and `!int64`, the other kernel row, is accepted. Add the
+  two rows to the schemaless vocabulary, check the rest of §5.3–§5.6's table against it, and add `class1` vectors for
+  each.
+- [ ] **A `precision` above 9 loads** ([TSON-SCHEMA] §5.5, §7.4's coherence paragraph). `!temporal.time_type {
+  precision: 10 }` and `!time ^ { precision: 10 }` resolve; a precision above 9 is a schema-load coherence error on
+  `time_type`, `datetime_type` and `duration_type`. Add the check beside the families' other coherence rules (so it
+  runs again at materialisation) and `schema/invalid` vectors.
+- [ ] **A float format this library does not implement crashes as a schema error.** `!numeric.float_type { format:
+  BINARY16 }` reports `SCHEMA_ERROR` wrapping `IllegalArgumentException: No enum constant …FloatType.Format.BINARY16`:
+  `numeric.ieee_format` declares `BINARY16`, `BINARY128` and `BINARY256`, and `FloatType.Format` holds only
+  `BINARY32` and `BINARY64`. The schema is valid, so this is a gap: either implement the three grids in `FloatParser`
+  or bind the three members and refuse a body naming one as `NOT_IMPLEMENTED`, never through the enum's lookup.
+- [ ] **`tson compile` and `tson validate` refuse a schema with no `!!id`** ([TSON-SCHEMA] §2.2.1, §10.1).
+  `compile` on an id-less schema reports `SCHEMA_ERROR` "!!id is required to register this schema", and a data file
+  importing it by a relative reference (`!!import:"noid.tn"`) reports "schema noid.tn has no !!id". §10.1 lets an
+  id-less schema be registered under an application-supplied identity — it has no published identity and cannot be
+  hash-pinned — so the CLI, which holds the file, can register it under its file URI and resolve a relative import
+  against the importing file's. A schema error is the wrong outcome either way; `SchemaResolver` throws it.
+
 - [ ] **A float's bounds skip NaN and the infinities** ([TSON-SCHEMA] §5.5, §5.7). `FloatParser`'s
   validation returns before the bound checks for a NaN `allow_nan` admits and an infinity `allow_infinity` admits, so
   `!float64 ^ { max: 100 }` accepts `+.inf` and `.nan`. An infinity is ordered, so judge it against the bounds like any
@@ -473,7 +527,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `!r { t: !text_list [a] }` reads "'text_list' is not admissible at a 'array_text_4cc4a482' position". The position
   is to be named as `EntryDisplayName` names it everywhere else (`[text]`), in the message and in `admissible()`'s
   list; the JSON readers (`DispatchTagReader`, `RecordPlan`) already pass a display name. Pin it with a tree-mode
-  test on that schema.
+  test on that schema. A kind's member list leaks internal names the same way: a `meta.type_ref` refusal lists
+  `[array_text_1_c67f2b5e; 1..]`, a sugar form over a synthetic rendered by the synthetic's key.
 
 - [ ] **Whether a closed set of text binds to a host enum.** [TSON-SCHEMA] §7.4 lets an enum bind to "a host enum by a
   mapping the binder owns". `text_enum` is gone from the kernel, and a closed set of text that is no name is now
@@ -492,17 +547,20 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   placeholder for any key that is not a single token with `ValueIdentity.nameOf(key)` or `String.valueOf(key)`, so
   `counts: { @doc:"x" 0x10 => oops }` reports `/counts/16` where the unannotated key reports `/counts/0x10`, and a
   compound key `grid: { {x: 1 y: 2} => oops }` reports `/grid/TsonRecord[fields={x=1, y=2}, …]` in tree mode and
-  `/grid/Point[x=1, y=2]` when bound, naming the reading application's class; the duplicate-key message quotes the
-  same rendering. An annotated single-token key takes its step from the token's spelling, which means keeping the key
-  token's text across the annotations before it; a compound key keeps `?` until it has a pointer form. The JSON
-  encoding writes such a map as pairs and reports `/grid/0/1`, so the two encodings disagree about the step too.
+  `/grid/Point[x=1, y=2]` when bound, naming the reading application's class; the duplicate-key message quotes the same
+  rendering. A schemaless duplicate whose key is a reference (`set<text>` beside `set< text >`) is refused correctly
+  and printed as `duplicate key '?'`; its spelling is the application's canonical text. An annotated single-token key
+  takes its step from the token's spelling, which means keeping the key token's text across the annotations before it;
+  a compound key keeps `?` until it has a pointer form. The JSON encoding writes such a map as pairs and reports
+  `/grid/0/1`, so the two encodings disagree about the step too.
 
-- [ ] **A tuple refused a scalar prints the event record.** `only: meta.tuple1<text>` given `a` reports
-  `expected a tuple (array-shaped) for '[text]', found TokenEvent[text=a, form=UNQUOTED, position=…]`:
-  `TypeRefCheck.describe` names a record, map, array, `{}` and `_` and falls back to `String.valueOf` for anything
-  else, so a scalar token arrives as its `toString`. It has 18 callers, all exposed the same way; a scalar wants its
-  token text (and form, where quoting is the difference). `JsonAtoms.describe` is the JSON side's counterpart and
-  `CrossEncodingParityTest` the check that the two describe one value alike.
+- [ ] **A tuple refused a scalar prints the event record.** `only: meta.tuple1<text>` given `a` reports `expected a
+  tuple (array-shaped) for '[text]', found TokenEvent[text=a, form=UNQUOTED, position=…]`: `TypeRefCheck.describe`
+  names a record, map, array, `{}` and `_` and falls back to `String.valueOf` for anything else, so a scalar token
+  arrives as its `toString`. It has 18 callers, all exposed the same way, and a constructor body's reference-typed slot
+  given a quoted token (`!meta.array { element_type: "text" }`) prints it the same way through another path; a scalar
+  wants its token text (and form, where quoting is the difference). `JsonAtoms.describe` is the JSON side's counterpart
+  and `CrossEncodingParityTest` the check that the two describe one value alike.
 
 - [ ] **A base-syntax diagnostic does not say whether it is a lexer error or a parse error.** [TSON-DATA] §8.1 makes
   them two categories, and [TSON-JSON] §9.4's table sorts JSON's failures into them (malformed text, invalid UTF-8 and
