@@ -19,7 +19,6 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -160,8 +159,7 @@ final class RecordPlan {
                     siblingOf[i] = at;
                     typesADependent[at] = true;
                     dependents = true;
-                    schemaReaders[i] = new DependentReader(declared, sibling.field(), context,
-                            siblingType(body.fields().get(sibling.field()), context));
+                    schemaReaders[i] = new DependentReader(declared, sibling.field(), context);
                 }
             }
         }
@@ -171,15 +169,6 @@ final class RecordPlan {
                 .toArray(GroupPlan[]::new);
         this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().keySet()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
-    }
-
-    /** The reference typing a dependent field's {@code sibling}, past its alias hops, or null where it is none. */
-    private static ReferenceBody siblingType(RecordField sibling, ValueReaderContext context) {
-        if (!(sibling.type() instanceof TypeRef type)) {
-            return null;
-        }
-        return AliasChain.terminal(context.schema(), type.name()).map(AliasChain.Resolved::definition)
-                .filter(ReferenceBody.class::isInstance).map(ReferenceBody.class::cast).orElse(null);
     }
 
     /** The field slot an NFC member name fills, in the name type's form, or -1 where it names no field. */

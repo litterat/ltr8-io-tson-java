@@ -32,11 +32,10 @@ derived — and the static check that runs before any of it.
   `@meta.application:pair<box<text> int32>`, a bare-name argument followed through its alias chain (§8.2), and an
   argument at a value parameter a value token. An expansion carries no `@meta.application`.
 - Every application the pass closes, an expansion's included, is recorded against the entry it closed to
-  (`closedApplications`, as met and with its arguments closed; a generated head's own intermediate form skipped), and
-  `SchemaResolver` stores the list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written.
-  It is what a data read resolves an application against (`ReferenceBody.entryOf`, `design/references.md`), its
-  arguments followed past their alias chains as `dereferenced` follows them here, and what a message names a minted
-  entry by (`EntryDisplayName`).
+  (`closedApplications`, as met; a generated head's own intermediate form skipped), and `SchemaResolver` stores the
+  list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written. It is what a message names a
+  minted entry by (`EntryDisplayName`). No read resolves an application against it: data holds a reference as a
+  name (§4.2, `design/references.md`).
 - A composition operand never closes, open or closed: it is absorbed by value and mints nothing. A closed refinement
   source is closed on demand, through the same materialiser instance.
 - Which parents were applications is read off the **held** tree's chain `parents`, not off the closed one, whose

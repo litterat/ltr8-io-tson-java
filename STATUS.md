@@ -38,11 +38,11 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `meta.type_ref`, and judges a name type by membership (Part 2 §4.2). A refinement narrows `of` to the source's or
       a type IS-A it, judged at link (Part 2 §5.7)
 - [x] An application is a reference value (Part 2 §4.2, §8.2) — a reference with arguments is
-      data grammar ([TSON-DATA] §7.4), written unquoted (`t: set<text>`, `@meta.application:response<order 201>`, an open
-      alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonApplicationReference`, and at a kind-typed
-      position it reads to a `TypeRef` that resolves level by level, by structural identity, to the entry the schema closed
-      it to, its `referent()` that entry's value. An application the schema never closes is refused; a quoted token is never
-      a reference. In JSON the same text is a string
+      data grammar ([TSON-DATA] §7.4), written unquoted (`set<text>`, `@meta.application:response<order 201>`, an open
+      alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonApplicationReference`. In a schema document
+      it is a reference at a reference slot; in a data document a reference is a name, so an application at a kind-typed
+      position is refused whether or not the schema closes it, and a name reads to a `TypeRef` whose `referent()` is the
+      entry's value. A quoted token is never a reference. In JSON the same text is a string, refused alike
 - [x] A sibling reference is a reference value (Part 1 §7.4, Part 2 §4.2) — `kind!` parses in data
       and in sugar, its `!` followed by whitespace, and in JSON the same text is a string; it stands only at a record
       field's type, the one slot whose type, `meta.field_type_ref`, keeps `meta.reference_type`'s `allow_sibling`, and

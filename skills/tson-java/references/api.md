@@ -635,8 +635,8 @@ context binds one (by name, or by `@Typename`), or a `TsonValue` where none does
 references. A slot
 typed by a reference (`ReferenceBody`, spelled `meta.ref<T>`) holds what its `T` decides: over a
 constructor (`request: meta.ref<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root,
-`geo.address` for a member of a nested `!schema` map) or an application the schema
-closes (`set<text>`, written unquoted), whose `referent()` is the value of the entry it names — a tree read
+`geo.address` for a member of a nested `!schema` map; an application, `set<text>`, is refused there, and a document
+names the entry the schema declares for it), whose `referent()` is the value of the entry it names — a tree read
 delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type
 (`method: meta.ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and
 then a key of its namespace value, or a field of a record value) and the value it names (`method().get()`), or a `TypeRef`

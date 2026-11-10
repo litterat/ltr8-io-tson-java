@@ -97,7 +97,7 @@ final class HeldValues {
         }
         String naming = where + " is the dependent field '" + value.field() + "', typed by its sibling '"
                 + value.sibling() + "'";
-        String type = switch (ValuesByName.typeNamed(value.named().get(), value.declared(), merged)) {
+        String type = switch (ValuesByName.typeNamed(value.named().get(), merged)) {
             case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
             case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
                     + ", which holds " + none.held() + " -- so its value has no type to be read against");
@@ -118,7 +118,7 @@ final class HeldValues {
                     @Override
                     public void heldAsWritten(TsonSchema.HeldValue nested) {
                         work.add(new TsonSchema.HeldValue(under(slot, nested.slot()), nested.field(), nested.sibling(),
-                                nested.declared(), nested.named(), nested.written()));
+                                nested.named(), nested.written()));
                     }
                 }, true);
         compiled().get(type).read(ctx);

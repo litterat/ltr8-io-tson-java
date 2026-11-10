@@ -732,7 +732,7 @@ public final class TsonSchemaLinker {
         AtomicReference<Map<String, Top>> closure = new AtomicReference<>(Map.of());
         // And a name read under a reference that names values reaches a value of that final namespace.
         AtomicReference<ValuesByName> reached = new AtomicReference<>();
-        merged = computeKinds(merged, facts, merged::get, applications, pending, reached, new java.util.AbstractMap<>() {
+        merged = computeKinds(merged, facts, merged::get, pending, reached, new java.util.AbstractMap<>() {
             @Override
             public Top get(Object name) {
                 return closure.get().get(name);
@@ -1145,10 +1145,9 @@ public final class TsonSchemaLinker {
      * KindMembers}' construction walk. Every reference in the closure is recomputed, an imported one included: the
      * index is computed over the <em>governing</em> schema's closure, so one reference holds different members in two
      * schemas importing different sets, and whatever a body arrived carrying is discarded rather than trusted. A
-     * reference over a constructor also carries the applications the closure closed, each with the entry it denotes
-     * -- its {@code @meta.application}s and every application the resolver closed ({@code EntryFacts.closes}) -- so a
-     * data value written as an application is judged through that entry. The
-     * index is never written: resolved output states {@code of} alone.
+     * message lists the members an author can write: data holds a reference as a name (§4.2), so a minted entry, which
+     * no author named, is left out of the shown list. The index is never written: resolved output states {@code of}
+     * alone.
      *
      * <p>Before the name-type checks, {@code checkNames} and validation, and after {@link #computeSubtypes}, which
      * no member depends on: the walk reads each entry's constructor and the constructors' {@code supertypes}, both
@@ -1166,24 +1165,8 @@ public final class TsonSchemaLinker {
      * @param structure where a constructor is looked up first: the schema's one namespace, as {@code merged} is
      */
     private static Map<String, Top> computeKinds(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                                 Function<String, Top> structure, Map<String, TypeRef> applications,
-                                                 Set<String> pending, AtomicReference<ValuesByName> reached,
-                                                 Map<String, Top> entries) {
-        Map<TypeRef, String> denoted = new LinkedHashMap<>();
-        applications.forEach((name, application) -> denoted.putIfAbsent(application, name));
-        // Every application the resolver closed to an entry of the closure, an expansion's among them.
-        facts.forEach((name, known) -> known.closes().forEach(application -> denoted.putIfAbsent(application, name)));
-        // Each alias to the end of its chain: an application's arguments are compared past their aliases (§8.2), as
-        // the resolver keyed every application it closed (`TemplateMaterialiser.dereferenced`).
-        Map<String, String> aliases = new LinkedHashMap<>();
-        merged.forEach((name, definition) -> {
-            if (definition instanceof Alias) {
-                String terminal = AliasChain.terminal(name, merged);
-                if (!terminal.equals(name)) {
-                    aliases.put(name, terminal);
-                }
-            }
-        });
+                                                 Function<String, Top> structure, Set<String> pending,
+                                                 AtomicReference<ValuesByName> reached, Map<String, Top> entries) {
         Map<String, Top> result = null;
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             if (entry.getValue() instanceof ReferenceBody reference) {
@@ -1194,16 +1177,14 @@ public final class TsonSchemaLinker {
                 if (result == null) {
                     result = new LinkedHashMap<>(merged);
                 }
-                // A message lists the members as an author can write them: a minted one by its application.
-                List<String> shown = members.stream().map(name -> EntryDisplayName.authored(name, merged.get(name),
-                        facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), applications.containsKey(name)
-                                ? Optional.of(applications.get(name)) : Optional.empty()))
-                        .flatMap(Optional::stream).distinct().toList();
+                // A message lists the members as an author writes them: by name, a minted one, named by nobody, left out.
+                List<String> shown = members.stream()
+                        .filter(name -> !facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).synthetic()).toList();
                 if (namesTypes && !pending.isEmpty()) {
                     members = java.util.stream.Stream.concat(members.stream(), pending.stream()).distinct().toList();
                 }
-                result.put(entry.getKey(), reference.linked(namesTypes, members, namesTypes ? denoted : Map.of(),
-                        namesTypes ? aliases : Map.of(), entries, shown, namesTypes || !pending.isEmpty() ? Optional.empty()
+                result.put(entry.getKey(), reference.linked(namesTypes, members, entries, shown,
+                        namesTypes || !pending.isEmpty() ? Optional.empty()
                                 : Optional.of(valuesOf(reference.of().name(), reached))));
             }
         }
@@ -1289,7 +1270,6 @@ public final class TsonSchemaLinker {
                                     + "one of them, or a version of each that agrees on where '" + name
                                     + "' is declared");
                         }
-                        facts.put(name, ImportedSynthetics.unified(facts.get(name), arriving));
                     }
                     merged.put(name, unified(merged.get(name), entry.getValue()));
                     continue;

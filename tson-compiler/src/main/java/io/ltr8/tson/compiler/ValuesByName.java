@@ -403,7 +403,7 @@ final class ValuesByName {
             throw new SchemaValidationException(naming + ", which the value does not hold, so the name has no type "
                     + "to go on through");
         }
-        return switch (typeNamed(named, declared, merged)) {
+        return switch (typeNamed(named, merged)) {
             case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
             case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
                     + ", which holds " + none.held() + " -- so the name has no type to go on through");
@@ -411,13 +411,12 @@ final class ValuesByName {
     }
 
     /**
-     * What a sibling declared {@code sibling} and holding {@code named} types its dependent field by in the namespace
-     * {@code merged}: the read path's rule ({@link DependentFieldReader#typeNamed}), the sibling's reference resolving
-     * an application, and a value entry naming no type either.
+     * What a sibling holding {@code named} types its dependent field by in the namespace
+     * {@code merged}: the read path's rule ({@link DependentFieldReader#typeNamed}), and a value entry naming no type
+     * either.
      */
-    static DependentFieldReader.TypeNamed typeNamed(Reference named, RecordField sibling, Map<String, Top> merged) {
-        DependentFieldReader.TypeNamed typed = DependentFieldReader.typeNamed(named,
-                DependentFieldReader.siblingType(sibling, merged::get), merged::get);
+    static DependentFieldReader.TypeNamed typeNamed(Reference named, Map<String, Top> merged) {
+        DependentFieldReader.TypeNamed typed = DependentFieldReader.typeNamed(named, merged::get);
         if (typed instanceof DependentFieldReader.TypeNamed.Entry entry
                 && AliasChain.terminalDefinition(entry.name(), merged).orElse(null) instanceof ValueEntry value) {
             return new DependentFieldReader.TypeNamed.None("'" + named.text() + "', " + aValueNoType(value));

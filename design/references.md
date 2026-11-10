@@ -30,11 +30,9 @@ field names a whole-type or whole-value parameter under its own label (`type_par
   namespace, the root's entries and the import closure, and each further segment selects in what it reached: a member
   of a nested `!schema` map, a key of a namespace value, a field of a record value. Inside `geo`, a sibling is
   `geo.address`, and a bare `address` is the root's or unresolved. There is no lexical scope, so no shadowing rule.
-- The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members, applications,
-  aliases, entries, shown, values)`: the entry each application the closure closed denotes, an `@meta.application` or an
-  expansion's `EntryFacts.closes`; each alias entry to the end of its chain (`AliasChain.terminal`), which an application's
-  arguments are compared past; the final namespace's entries, which a reference read here names; the members as a message
-  names them, a minted one by its application; and, for a reference naming values in a whole link, `values`, a lookup
+- The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members, entries,
+  shown, values)`: the final namespace's entries, which a name read here finds; the members as a message lists them, the
+  names an author writes, a minted entry left out; and, for a reference naming values in a whole link, `values`, a lookup
   (`ReferenceBody.Values`) that judges a qualified name over the final namespace by `ValuesByName`'s walk, empty in a link of
   a resolution in progress), and `ValuesByName` re-derives it from `of` over the final namespace whatever the read guessed;
   `TsonSchema.SlotType`'s `KIND` and `REFERENCE` roles are only how the read read the name. The index is never written: a
@@ -118,7 +116,7 @@ field names a whole-type or whole-value parameter under its own label (`type_par
   applicability, and counts `meta.top` by name and origin.
 - A type parameter is one whose `type` is `meta.type_ref` (`TemplateParam.TYPE_REF`); a parameter standing at a
   `meta.type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
-- A kind-typed slot whose host component is a `TypeRef` reads through `KindSlotReader`: a bare token through the
+- A kind-typed slot whose host component is a `TypeRef` reads through `TypeNameSlotReader`: a bare token through the
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the
   slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A `ReferenceEvent` is an application,
   its `TypeRef` taken as the stream parsed it; a malformed one (`box<text`) is a parse error, and a quoted token,
@@ -126,17 +124,16 @@ field names a whole-type or whole-value parameter under its own label (`type_par
   value: resolved output holds one where an application is open, and
   a sugar lift writes one into the slot it fills, which the closer mints an entry for afterwards. In a value body
   (`TsonReadContext.readsValueBody`, a value entry's payload) nothing lifts or mints, so it is refused and the alias
-  spelling named: `order_box => box<order>`, then the bare name. In a data document the kind's reader (`KindParser`)
-  judges an application through the entry it denotes, resolved bottom-up by structural identity
-  (`ReferenceBody.entryOf`): each argument that is itself an application first, then the application over those
-  entries, each argument compared past its alias chain (§8.2: over `user_id => uuid`, `box<user_id>` is
-  `box<uuid>`), as the resolver keyed every application it closed (`TemplateMaterialiser.dereferenced`), against
-  every application the closure closed, `@meta.application`s and the `EntryFacts.closes` the resolver
-  records (`TemplateMaterialiser.closedApplications`, generated heads skipped). A schema loads only when every
-  application in it closes, so data never creates one: an application nothing in the closure closed is refused
-  (`ATOM_CONSTRAINT_VIOLATION`, "names no type this schema closes"), as a name no member is. The name itself is
-  recorded by the kind's `AtomTypeReader`, in a schema document only, and name hygiene judges each name an
-  application writes.
+  spelling named: `order_box => box<order>`, then the bare name. The name itself is recorded by the kind's
+  `AtomTypeReader`, in a schema document only, and name hygiene judges each name an application writes.
+- **In a data document a reference is a name** (§4.2). The kind's parser (`TypeNameRefParser`, shared by both
+  encodings) refuses an application, `ATOM_CONSTRAINT_VIOLATION` at the slot, whether or not the closure closes it:
+  `set<text>` is refused where the schema declares `names => set<text>`, and the document names `names`. The grammar
+  reads it, so it is no parse error. Nothing in data is resolved against the applications a schema closed: the index
+  holds no application map and no alias map, and a dependent field whose sibling holds an application is refused at
+  the sibling (`DependentFieldReader.typeNamed`), which the sibling's own read has already done. Which mode a read is
+  in is the reader's, never the document's: a schema document and a resolved form read through
+  `AtomParsers.inSchemaDocument`'s grammar-only parser, so an application stays a value there (`readsSchemaNames`).
 - A recorded name carries its slot's declared type from the reader that read it (`TsonSchema.SlotType`: the role and
   the reference's `of`), so the linker never walks the path back through the meta's declarations, and a slot only a
   tagged subtype declares is judged however deep the value sits.
@@ -164,9 +161,9 @@ field names a whole-type or whole-value parameter under its own label (`type_par
   through its binding's descriptor, so a value reached through a field is delivered as one reached by key.
 - One host shape for every reference: a `TypeRef`, whatever the slot, in a tree read as in a bound one (a `String`
   host receives its canonical text). Only the judgement differs by slot, and it is the slot's, never the host's.
-- **A reference read in data finds what it names.** `TypeRef.referent()` is the value of the entry it denotes in the
-  closure it was read under: `KindParser` attaches `ReferenceBody.closure()`, which resolves through `entryOf` over
-  the index's `entries`, and every nested argument carries the same closure, so each level's referent resolves. Read
+- **A reference read in data finds what it names.** `TypeRef.referent()` is the value of the entry its name names in
+  the closure it was read under: `TypeNameRefParser` attaches `ReferenceBody.closure()`, which looks the name up in the
+  index's `entries`; a reference with arguments names nothing there. Read
   in data at a slot naming values, its referent is the value its name reached (`RefParser`), the governing schema's
   own value, bound or tree-held as the value entry is. The closure is a component excluded from `equals`, `hashCode`
   and `toString`. A reference read in a schema document, or built by hand, carries `Closure.NONE` and names nothing.

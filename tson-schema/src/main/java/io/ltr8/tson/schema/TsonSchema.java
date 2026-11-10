@@ -6,7 +6,6 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -109,8 +108,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * {@code synthetic} is the key's {@code @meta.synthetic} mark as {@link #factsOf} reads it: a form no author
      * named, which a message names by its spelling or not at all. {@code closes} is every application the resolver
      * closed to this entry, as it met them, an expansion's among them, which carries no {@code @meta.application}: what
-     * lets a data read resolve an application by structural identity to the entry the schema closed it to
-     * ([TSON-SCHEMA] §7.4, §8.2).
+     * a message names an expansion by.
      */
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
                              Optional<String> constructor, Optional<String> refines, boolean synthetic,
@@ -196,20 +194,18 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * A dependent field's value a value body holds as written ([TSON-SCHEMA] §5.2), to be judged when the schema
      * links against the type its sibling names: that type is one of the reading schema's namespace, which the readers
      * of the layer governing the document do not hold. {@code slot} is the path from the body to the value, as for
-     * {@link ValueByName}; {@code field} and {@code sibling} name the dependent field and its sibling, and {@code
-     * declared} is the sibling's declaration, whose reference resolves an application the sibling holds. {@code named}
+     * {@link ValueByName}; {@code field} and {@code sibling} name the dependent field and its sibling. {@code named}
      * is what the sibling holds in this instance -- its pin, the value written, or its default -- and is empty where
      * the read produced no reference there, a refusal it has reported. {@code written} is the value as written, opaque
      * to this model: what the engine that read it replays to judge it.
      */
-    public record HeldValue(List<String> slot, String field, String sibling, RecordField declared,
-                            Optional<Reference> named, Object written) {
+    public record HeldValue(List<String> slot, String field, String sibling, Optional<Reference> named,
+                            Object written) {
 
         public HeldValue {
             slot = List.copyOf(slot);
             Objects.requireNonNull(field, "field");
             Objects.requireNonNull(sibling, "sibling");
-            Objects.requireNonNull(declared, "declared");
             Objects.requireNonNull(named, "named");
             Objects.requireNonNull(written, "written");
         }

@@ -103,3 +103,41 @@ document already does, and keeps a quoted token's meaning (text) the same at eve
 is not meaning here either, so `"int32"` is the reference — should then be stated in §7.4 and [TSON-SCHEMA] §5.3,
 since both currently read against it, and the schema-document refusals above become errors in this implementation.
 Until it closes, the implementation keeps the split described above.
+
+## 3. [TSON-SCHEMA] §4.2, §5.3, §5.10 — templates as open records: a proposal for Revision 40, and what of it runs
+
+**Problem.** §5.10 gives a template two representations and a parameter two kinds. A record template is its own
+constructor and a family base; every other open entry is held as text, because a value parameter can stand wherever
+a token stands, so a body carrying one is typed by no constructor's shape until it closes. The cost is the largest in
+the series: held bodies, parameter types and bounds derived by a fixed point across templates, a head edge at a
+closed operand, and a lookup that resolves an application written in *data* against the applications a schema closed
+(§4.2). No bundled schema and no consumer schema measured declares a value parameter, a template over anything but a
+record, or a template named bare at a position.
+
+**The proposal**, in three sentences.
+
+1. A template is an open record: `meta.record` carries `parameters`, each a type standing at a field's type or as an
+   argument of an application there or in a parent, and nowhere else. A reference names an open record only as the
+   head of an application.
+2. `C<args>` over a constructor is construction sugar: `!C { f1: a1 … }` over its required fields typed by a
+   reference naming types, in declaration order, as `[T]` and `{K => V}` already are.
+3. At a reference slot of a schema document `H<args>` is a reference, substituting where `H` is an open record and
+   constructing where it is a constructor. In a data document a reference is a name.
+
+What follows from them: no value parameters, no derived bounds, no template named as a type, no template over a body
+that is not a record, and no `meta.template` or `meta.record_template`.
+
+**What is running** on the Revision 40 proposal branch, step by step. Everything not listed is Revision 39's.
+
+- *§4.2, an application in a data document: running.* In a data document a value at a reference-typed slot is a
+  name. One carrying an argument list is a validation error whether or not the schema's closure closed that
+  application, in both encodings: a constraint violation of the reference atom, whose message gives the remedy, the
+  entry the schema declares for the application. A schema document and a resolved form still hold applications, the
+  resolved form being read as one because its reader is told so. The lookup of an application in data against the
+  closure's applications is gone, and a refusal's list of admitted names leaves out minted entries. [TSON-JSON]
+  §1.6, §5 and §5.6 are edited to match. Left as it was: data may still write a minted entry's internal name.
+
+**Resolution proposed.** In §4.2, replace "and in a data document an application at a reference-typed slot names the
+entry the closure closed it to … a schema closing every application it holds before it loads" with "and in a data
+document a reference is a name: an application is a validation error". The text for the other steps follows as each
+lands.

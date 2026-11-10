@@ -4,14 +4,13 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.net.UuidType;
 import org.junit.jupiter.api.Test;
@@ -23,6 +22,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -51,7 +51,6 @@ class TypeNameRefReadTest {
               typed       => { t: meta.type_ref }
               label       => text
               caption     => label
-              refined     => !text ^ {}
             }""";
 
     private static final SchemaSource SOURCE = uri -> IDS_SCHEMA;
@@ -89,66 +88,50 @@ class TypeNameRefReadTest {
     }
 
     /**
-     * An application resolves level by level, by structural identity, to the entries the schema closed: the
-     * inner {@code box<text>} to {@code inner}, then {@code pair<inner int32>} to {@code outer}. Whitespace is free.
+     * A declared application is named by its entry: {@code outer => pair<box<text> int32>} is a type, and data
+     * names it {@code outer}, which finds that entry.
      */
     @Test
-    void aNestedApplicationResolvesBottomUpToTheEntryTheSchemaClosed() {
-        TypeRef read = reference(read("!typed { t: pair< box<text>, int32 > }").get("t"));
-        assertEquals("pair<box<text> int32>", read.text());
+    void aDeclaredApplicationIsNamedByItsEntry() {
+        TypeRef read = reference(read("!typed { t: outer }").get("t"));
+        assertEquals("outer", read.text());
         Top outer = tson().bindRegistry().core().resolveLinked(IDS).schema().entries().get("outer");
         assertEquals(outer, read.referent().orElseThrow());
-        TypeRef inner = ((TypeArgument.Ref) read.arguments().getFirst()).ref();
-        assertEquals("box<text>", inner.text());
-        assertEquals(tson().bindRegistry().core().resolveLinked(IDS).schema().entries().get("inner"),
-                inner.referent().orElseThrow());
     }
 
     /**
-     * An argument is compared past its alias chain, as [TSON-SCHEMA] §8.2 gives an application its identity: over
-     * {@code caption => label => text}, {@code box<caption>} is {@code box<text>}, which the schema closes as {@code
-     * inner}, and so is the argument of {@code pair<box<label> int32>}, which is {@code outer}.
+     * In a data document a reference is a name ([TSON-SCHEMA] §4.2): an application is refused at its slot whether
+     * the schema closes it ({@code box<text>}, declared as {@code inner}; {@code pair<box<text> int32>}, as {@code
+     * outer}; {@code box<caption>}, {@code box<text>} past an alias) or not ({@code box<int32>}), as a constraint
+     * the value breaks, the grammar having read it.
      */
     @Test
-    void anArgumentIsComparedPastItsAliasChain() {
-        Namespace<Top> entries = tson().bindRegistry().core().resolveLinked(IDS).schema().entries();
-        assertEquals(entries.get("inner"), reference(read("!typed { t: box<caption> }").get("t")).referent()
-                .orElseThrow());
-        TypeRef nested = reference(read("!typed { t: pair<box<label> int32> }").get("t"));
-        assertEquals("pair<box<label> int32>", nested.text(), "the reference keeps the spelling the data wrote");
-        assertEquals(entries.get("outer"), nested.referent().orElseThrow());
-    }
-
-    /** A refinement is a type of its own, no alias: {@code box<refined>} is no application the schema closes. */
-    @Test
-    void anArgumentRefiningATypeIsNoAliasOfIt() {
-        List<Diagnostic> problems = problems("!typed { t: box<refined> }");
-        assertEquals(1, problems.size(), problems.toString());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
+    void anApplicationIsRefusedWhetherOrNotTheSchemaClosesIt() {
+        for (String application : List.of("box<text>", "pair< box<text>, int32 >", "box<caption>", "box<int32>")) {
+            List<Diagnostic> problems = problems("!typed { t: " + application + " }");
+            assertEquals(1, problems.size(), application + ": " + problems);
+            Diagnostic problem = problems.getFirst();
+            assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code(), application);
+            assertEquals(Optional.of("/t"), problem.path(), application);
+            assertTrue(problem.message().contains("in a data document a reference is a name"), problem.message());
+            assertTrue(problem.expected().contains("inner") && problem.expected().contains("outer"),
+                    problem.expected());
+        }
     }
 
     /**
-     * A refusal lists the kind's members as an author can write them: the entry {@code meta.ref<net.uuid_type>}
-     * closed to is minted under a name nobody wrote, and the list names it by its application.
+     * A refusal lists the kind's members as an author writes them, by name: the entry {@code meta.ref<net.uuid_type>}
+     * closed to is minted under a name nobody wrote, and data cannot write the application, so the list leaves it out.
      */
     @Test
-    void aRefusalNamesAMintedMemberByItsApplication() {
+    void aRefusalListsOnlyTheNamesAnAuthorWrites() {
         List<Diagnostic> problems = problems("!typed { t: nope }");
         assertEquals(1, problems.size(), problems.toString());
         String message = problems.getFirst().message();
-        assertTrue(message.contains("meta.ref<net.uuid_type>"), message);
+        assertTrue(message.contains("inner"), message);
+        assertFalse(message.contains("meta.ref<net.uuid_type>"), message);
         assertFalse(message.contains("reference_uuid_type"), message);
         assertFalse(problems.getFirst().expected().contains("reference_uuid_type"), problems.getFirst().expected());
-    }
-
-    /** An application nothing in the closure closed names no type the schema closes, and is refused. */
-    @Test
-    void anApplicationNothingClosedIsRefused() {
-        List<Diagnostic> problems = problems("!typed { t: box<int32> }");
-        assertEquals(1, problems.size(), problems.toString());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
-        assertTrue(problems.getFirst().message().contains("names no type this schema closes"),
-                problems.getFirst().message());
     }
 
     @Test
@@ -195,19 +178,25 @@ class TypeNameRefReadTest {
     public record Typed(TypeRef t) {
     }
 
-    /** Bind mode resolves an aliased argument as a tree read does: the bound reference names the entry. */
+    /**
+     * Bind mode reads the slot as a tree read does: the bound reference names the declared entry, and an application
+     * is refused.
+     */
     @Test
-    void bindModeComparesAnArgumentPastItsAliasChain() {
+    void bindModeNamesTheDeclaredEntryAndRefusesAnApplication() {
         Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE))
                 .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("typed", Typed.class))
                                 .orElse(SchemaModelNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
 
-        Typed typed = tson.objectReader().read("!!import:\"" + IDS + "\"\n!typed { t: box<caption> }", Typed.class);
+        Typed typed = tson.objectReader().read("!!import:\"" + IDS + "\"\n!typed { t: inner }", Typed.class);
 
         assertEquals(tson.bindRegistry().core().resolveLinked(IDS).schema().entries().get("inner"),
                 typed.t().referent().orElseThrow());
+        ReadException refused = assertThrows(ReadException.class, () -> tson.objectReader()
+                .read("!!import:\"" + IDS + "\"\n!typed { t: box<text> }", Typed.class));
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, refused.diagnostic().code());
     }
 
     @Test

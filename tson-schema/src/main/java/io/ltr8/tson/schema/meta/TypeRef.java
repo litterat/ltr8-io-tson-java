@@ -18,14 +18,12 @@ import java.util.Optional;
  * map<text integer>}. Identity is the parsed form and never the spelling, so {@code result< T >} and {@code
  * result<T>} are one reference.
  *
- * <p><b>{@link #referent} is what the reference names</b> in the closure it was read under: the value of the entry a
- * name or an application denotes, an application resolved level by level by structural identity, so in {@code
- * foo<bar<text>>} the argument names the entry {@code bar<text>} closed to and the whole the entry {@code foo}'s
- * application closed to. Its arguments are references in turn. A reference read where a closure is known carries
- * it ({@link #closure}), attached by the kind's parser from the reference type's linked index ({@code
- * ReferenceBody.closure}). One read in data at a position naming values ({@code meta.ref<order>}) names the value its
- * name reached in the governing schema ({@code ReferenceBody.Values}). One built by hand, or read inside a schema
- * document being resolved, carries {@link Closure#NONE}, and names nothing.
+ * <p><b>{@link #referent} is what the reference names</b> in the closure it was read under: the value of the entry its
+ * name names. Data holds a reference as a name ([TSON-SCHEMA] §4.2), so an application names nothing there. A
+ * reference read where a closure is known carries it ({@link #closure}), attached by the kind's parser from the
+ * reference type's linked index ({@code ReferenceBody.closure}). One read in data at a position naming values
+ * ({@code meta.ref<order>}) names the value its name reached in the governing schema ({@code ReferenceBody.Values}).
+ * One built by hand, or read inside a schema document being resolved, carries {@link Closure#NONE}, and names nothing.
  *
  * <p>An argument-carrying reference survives only where an application is still open: a record template's
  * {@code chain.parents} and field types, held text, and the {@code @meta.application} annotation. A closed application

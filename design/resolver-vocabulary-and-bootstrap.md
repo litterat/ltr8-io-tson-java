@@ -227,7 +227,7 @@ annotation is: there is no author to resolve against, and the value is fixed.
   closes a template application, the application it is the instantiation of, `@meta.application:box<int32>`, a
   `meta.type_ref` reference carrying arguments, written unquoted and stated as written: nested arguments unreduced
   (`@meta.application:pair<box<text> int32>`), a bare-name argument past its alias hops, an argument at a value parameter
-  a value token (`TemplateMaterialiser.asWritten`). An expansion carries none; what a data read and a message need
+  a value token (`TemplateMaterialiser.asWritten`). An expansion carries none; what a message needs
   of it is `TsonSchema.EntryFacts.closes`, held in memory and never written. It is about the entry, not about a
   type — a record template's member, a value entry (`order_api => orders<order>` over `orders => <T> !interface {
   get => { response: T } }`), the `Alias` a non-record template's application closes to — which is why it is no

@@ -188,10 +188,9 @@ final class TemplateMaterialiser {
     private final Map<String, String> expansionsByApplication = new LinkedHashMap<>();
 
     /**
-     * Every application this pass closed, as it was met and with its arguments closed, to the entry it closed to --
-     * an expansion's included, which records no {@code @meta.application}. Held beside the entries, never written: it is
-     * what lets a data read resolve an application to the entry by structural identity ({@link
-     * #closedApplications}).
+     * Every application this pass closed, as it was met, to the entry it closed to -- an expansion's included, which
+     * records no {@code @meta.application}. Held beside the entries, never written: it is what a message names an
+     * expansion by, a form no author named ({@link #closedApplications}).
      */
     private final Map<TypeRef, String> closedApplications = new LinkedHashMap<>();
 
@@ -448,7 +447,6 @@ final class TemplateMaterialiser {
                     ? closeRecordTemplate(head, record, bindings)
                     : closeHeld(head, template, open, bindings).body();
             closedApplications.putIfAbsent(plain(application), declaredName);
-            closedApplications.putIfAbsent(TypeRef.of(head, arguments), declaredName);
             return instantiation(declaredName, closed, TypeRef.of(head, arguments), application);
         } finally {
             heads.remove(heads.size() - 1);
@@ -479,7 +477,6 @@ final class TemplateMaterialiser {
         // A generated head's application is an open synthetic closing its own intermediate form: nobody wrote it.
         if (entry != null && !generated.contains(ref.name())) {
             closedApplications.putIfAbsent(plain(ref), entry);
-            closedApplications.putIfAbsent(TypeRef.of(ref.name(), arguments), entry);
         }
         return entry == null ? TypeRef.of(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
     }
