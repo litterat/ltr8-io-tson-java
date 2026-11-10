@@ -28,27 +28,27 @@ class ImportedSyntheticTest {
     private static final Map<String, String> DOCUMENTS = Map.of(
             "https://example.test/tags.tn", """
                     !!id:"https://example.test/tags.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
                     !schema { tagged => { tags: [text] } }""",
             "https://example.test/labels.tn", """
                     !!id:"https://example.test/labels.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
                     !schema { labelled => { labels: [text] } }""",
             "https://example.test/listed.tn", """
                     !!id:"https://example.test/listed.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
                     !schema { listed => <T> { items: [T] }  texts => listed<text> }""",
             "https://example.test/thing-one.tn", """
                     !!id:"https://example.test/thing-one.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
                     !schema { thing => { tags: [text] } }""",
             "https://example.test/thing-two.tn", """
                     !!id:"https://example.test/thing-two.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
                     !schema { thing => { tags: [text] } }""",
             "https://example.test/shapes.tn", """
                     !!id:"https://example.test/shapes.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
                     !schema {
                       shaped => { either: (text | integer)  pairs: {text => integer}  tags: [text] }
                       held   => <T> { items: [T]  either: (T | text) }
@@ -157,7 +157,7 @@ class ImportedSyntheticTest {
         String minted = mintedForTextArray();
         Tson tson = tson(Map.of("https://example.test/forged.tn", """
                 !!id:"https://example.test/forged.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { @meta.synthetic %s => !meta.array { element_type: integer } }""".formatted(minted)));
 
         assertThrows(IllegalStateException.class, () -> tson.validateSchema("""
@@ -172,7 +172,7 @@ class ImportedSyntheticTest {
         String minted = mintedForTextArray();
         Tson tson = tson(Map.of("https://example.test/declared.tn", """
                 !!id:"https://example.test/declared.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { %s => !meta.array { element_type: text } }""".formatted(minted)));
 
         List<Diagnostic> problems = tson.validateSchema("""

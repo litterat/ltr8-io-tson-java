@@ -57,7 +57,7 @@ class ImportedVocabularyTest {
     /** (1) The vocabulary schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               operation => {
                 path:     text
@@ -122,7 +122,7 @@ class ImportedVocabularyTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!import:"https://example.test/meta-http.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   search_request  => { q: text }
                   search_response => { hits: [text] }

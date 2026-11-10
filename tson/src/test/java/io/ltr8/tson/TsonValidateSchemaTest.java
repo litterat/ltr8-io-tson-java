@@ -26,8 +26,8 @@ class TsonValidateSchemaTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/validate-schema-test.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema\s""";
 
     private static List<Diagnostic> check(String body) {
@@ -50,7 +50,7 @@ class TsonValidateSchemaTest {
         };
         List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(refusing))).validateSchema("""
                 !!id:"https://example.test/importer.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://example.test/nowhere.tn"
                 !schema { t => text }
                 """);
@@ -488,7 +488,7 @@ class TsonValidateSchemaTest {
     void anUnloadableImportIsReportedAgainstTheDocument() {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/bad-import.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://example.test/nothing-here.tn"
                 !schema { my_int => int32 }
                 """);
@@ -507,7 +507,7 @@ class TsonValidateSchemaTest {
     void anImportWhoseTargetOwnsAnotherIdentityIsReportedAgainstTheDocument() {
         String lib = """
                 !!id:"https://example.test/its-real-name.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { widget => { name: text } }
                 """;
         Tson tson = Tson.of(ProcessorConfig.defaults()
@@ -520,7 +520,7 @@ class TsonValidateSchemaTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/mismatched-import.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://example.test/fetched-as.tn"
                 !schema { holder => { w: widget } }
                 """);

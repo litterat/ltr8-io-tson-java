@@ -43,8 +43,8 @@ class KindMembersTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/kinds.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema
             """;
 
@@ -198,7 +198,7 @@ class KindMembersTest {
     void aMemberDeclaredInAnImportIsAMember() {
         TsonLinkedSchema linked = link("""
                 !!id:"https://example.test/kinds.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://example.test/kind-ids.tn"
                 !schema {
                   customer_id => !net.uuid_type {}
@@ -206,8 +206,8 @@ class KindMembersTest {
                 }
                 """, """
                 !!id:"https://example.test/kind-ids.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   stock_id => !net.uuid_type {}
                   some_id  => meta.ref<net.uuid_type>
@@ -261,7 +261,7 @@ class KindMembersTest {
     void aKindOfNamespaceHoldsEveryNamespaceType() {
         ReferenceBody namespaces = kind(link("""
                 !!id:"https://example.test/kinds.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   api        => !meta.namespace { key_type: meta.identifier  value_type: text }
                   namespaces => !meta.reference_type { of: meta.namespace }
@@ -281,7 +281,7 @@ class KindMembersTest {
     void aNamespaceTypeIsAMapAndNoRecord() {
         TsonLinkedSchema linked = link("""
                 !!id:"https://example.test/kinds.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   api        => !meta.namespace { key_type: meta.identifier  value_type: text }
                   labels     => !meta.map { key_type: meta.identifier  value_type: text }
@@ -428,16 +428,16 @@ class KindMembersTest {
         // declare its own `uuid_type`, and `meta` itself is the name it cannot declare.
         assertTrue(link("""
                 !!id:"https://example.test/kinds.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   uuid_type => text
                 }
                 """, "").schema().entries().containsKey("uuid_type"));
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 !!id:"https://example.test/kinds.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   meta => text
                 }
@@ -450,7 +450,7 @@ class KindMembersTest {
     void anEmptyKindAdmitsNoValueAndIsRefusedAsUninhabited() {
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link("""
                 !!id:"https://example.test/kinds.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   pick_type => meta.atom & {}
                   ids => !meta.reference_type { of: pick_type }
@@ -499,7 +499,7 @@ class KindMembersTest {
     void theKernelsIdentifierRefHoldsItsIdentifierFamilies() {
         TsonLinkedSchema meta = TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(),
                 uri -> { throw new IllegalStateException("unexpected fetch: " + uri); })
-                .resolveLinked("https://tson.io/2026/39/m/meta.tn");
+                .resolveLinked("https://tson.io/2026/40/m/meta.tn");
 
         assertEquals(List.of("meta.field_name", "meta.identifier", "meta.param_name", "meta.type_name",
                 "net.scheme_name"), kind(meta, "meta.identifier_ref").memberNames());
@@ -534,7 +534,7 @@ class KindMembersTest {
     void aPinnedNameTypeIsJudgedAMemberWhereThePinIsWritten() {
         String header = """
                 !!id:"https://example.test/kinds.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema
                 """;
         link(header + """

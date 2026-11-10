@@ -88,12 +88,12 @@ class TsonDocumentPeekTest {
     void classifiesASchemaDocumentByItsRootTag() {
         TsonDocumentPeek peek = TsonDocumentPeek.of("""
                 !!id:"https://example.com/order.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { order => { id: int32 } }
                 """);
 
         assertTrue(peek.isSchemaDocument());
-        assertEquals(List.of("https://tson.io/2026/39/m/core.tn"), peek.header().imports());
+        assertEquals(List.of("https://tson.io/2026/40/m/core.tn"), peek.header().imports());
         assertEquals(Optional.of("https://example.com/order.tn"), peek.header().id());
     }
 

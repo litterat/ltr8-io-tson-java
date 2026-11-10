@@ -42,8 +42,8 @@ class ResolutionOrderTest {
      */
     private static final List<String> SAME_DOCUMENT = List.of("""
             !!id:"https://example.test/order.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               counted => meta.array ^ { ordered?: = false }
               counts  => !counted { element_type: int32  min_items: 1 }
@@ -62,8 +62,8 @@ class ResolutionOrderTest {
             }
             """, """
             !!id:"https://example.test/nested.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               geo => !schema {
                 counted => meta.array ^ { ordered?: = false }

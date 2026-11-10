@@ -38,22 +38,22 @@ public final class TsonBundledSchemas {
      * pre-loaded and bound to the software's revision, and the one this library's compiled-reader machinery is built
      * against.
      */
-    public static final String META_ID = "https://tson.io/2026/39/m/meta.tn";
+    public static final String META_ID = "https://tson.io/2026/40/m/meta.tn";
 
     /** numeric's own real, published identity -- see {@code spec/m/numeric.tn}'s own {@code !!id}. */
-    public static final String NUMERIC_ID = "https://tson.io/2026/39/m/numeric.tn";
+    public static final String NUMERIC_ID = "https://tson.io/2026/40/m/numeric.tn";
 
     /** temporal's own real, published identity -- see {@code spec/m/temporal.tn}'s own {@code !!id}. */
-    public static final String TEMPORAL_ID = "https://tson.io/2026/39/m/temporal.tn";
+    public static final String TEMPORAL_ID = "https://tson.io/2026/40/m/temporal.tn";
 
     /** net's own real, published identity -- see {@code spec/m/net.tn}'s own {@code !!id}. */
-    public static final String NET_ID = "https://tson.io/2026/39/m/net.tn";
+    public static final String NET_ID = "https://tson.io/2026/40/m/net.tn";
 
     /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
-    public static final String CORE_ID = "https://tson.io/2026/39/m/core.tn";
+    public static final String CORE_ID = "https://tson.io/2026/40/m/core.tn";
 
     /** policy's own real, published identity -- see {@code spec/m/policy.tn}'s own {@code !!id}. */
-    public static final String POLICY_ID = "https://tson.io/2026/39/m/policy.tn";
+    public static final String POLICY_ID = "https://tson.io/2026/40/m/policy.tn";
 
     /**
      * The kernel's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s own {@code
@@ -61,22 +61,22 @@ public final class TsonBundledSchemas {
      * pre-loaded schema can be verified, and so the shipped resource can be checked against its own published digest
      * ({@link #declaredSha256}).
      */
-    public static final String META_SHA256 = "c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5";
+    public static final String META_SHA256 = "1037233d2a53e8938ce0e5b50af594d81035a6f047045eba4c5544e28e1bc026";
 
     /** numeric's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/numeric.tn}'s !!id. */
-    public static final String NUMERIC_SHA256 = "dfa66c5d3775a7845776db737f07b16630824f2434f6587aface2f88b77bf0f2";
+    public static final String NUMERIC_SHA256 = "99bf646e8f1dcf16932e835dd76b9c03573b0db09c2fe172ed417b9e612ae120";
 
     /** temporal's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/temporal.tn}'s !!id. */
-    public static final String TEMPORAL_SHA256 = "fb4ada8f238de82821e7fcf512c21980a8b73c8df9260cdf295ba0157cc3971e";
+    public static final String TEMPORAL_SHA256 = "5c56ca1153e894a6ebbad7cbb5b0986b29771e7e9e0b02cca654e1a68e923ad8";
 
     /** net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code !!id}. */
-    public static final String NET_SHA256 = "371fc20c8628b5461b56a7a28f2559a1cfde4eda718f72d60ceb1b5a007bac06";
+    public static final String NET_SHA256 = "c482c5c0174314cb7f92049280caed05a7b3b981a375b8573b176d16b6ecad17";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. */
-    public static final String CORE_SHA256 = "4e8d9c43cbbabf6a73548b819ac74e06e18859b573d05ce99988ae9d4d9a562e";
+    public static final String CORE_SHA256 = "0f5ddcf3fc77ea3006f9692ec22e6f66c27ae5086401140dcfb77efec13753f9";
 
     /** policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s !!id. */
-    public static final String POLICY_SHA256 = "e9cb5b9305ddec62f0e18e7ee7ed3d2a087d97a243a48b411daa11f5071a496f";
+    public static final String POLICY_SHA256 = "01be9c4543884cad107e13738db18175543f4ae35307349b83cbba0026af9a8d";
 
     /**
      * The six identities in dependency order: the kernel, the three libraries importing it alone, core importing the

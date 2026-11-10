@@ -23,8 +23,8 @@ class TextNormalizationTest {
     private static final String ID = "https://example.test/normalized-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/normalized-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               header_name => !unicode.identifier_type { start: NONE  continue: NONE
                 start_add: "abcdefghijklmnopqrstuvwxyz"  continue_add: "abcdefghijklmnopqrstuvwxyz0123456789-"
@@ -175,8 +175,8 @@ class TextNormalizationTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/normalized-enum.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   accented => !enum ["caf\u00e9" tea]
                   order    => { drink: accented }

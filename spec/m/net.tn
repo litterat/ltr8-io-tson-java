@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/39/m/net.tn?sha256=371fc20c8628b5461b56a7a28f2559a1cfde4eda718f72d60ceb1b5a007bac06"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5"
+!!id:"https://tson.io/2026/40/m/net.tn?sha256=c482c5c0174314cb7f92049280caed05a7b3b981a375b8573b176d16b6ecad17"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=1037233d2a53e8938ce0e5b50af594d81035a6f047045eba4c5544e28e1bc026"
 @doc:"""
-  TSON net — the network and identifier type library (2026 Revision 39
+  TSON net — the network and identifier type library (2026 Revision 40
   draft).
 
   Its root holds the network and identifier types a data schema writes:

@@ -110,7 +110,7 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
   importing core.tn forms; the copies differ only in the `subtypes` each route credited, so they union, `unified`).
   Two *different* schemas declaring one name is an error naming both, the bundled documents' root names included:
   every closure reaching them reserves their names. Because identities carry the spec revision, a
-  closure reaching both `/2026/37/m/core.tn` and `/2026/39/m/core.tn` is refused here rather than surfacing later as a
+  closure reaching both `/2026/37/m/core.tn` and `/2026/40/m/core.tn` is refused here rather than surfacing later as a
   field conflict between two identically spelled types. Listing one schema twice, or under two spellings of one
   identity, is redundant rather than an error. An unregistered import is a `SchemaValidationException`.
 - **A synthetic's identity is its form, not its origin** (`resolver.ImportedSynthetics`, called by both merges). Its

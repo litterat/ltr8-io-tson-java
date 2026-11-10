@@ -1238,7 +1238,7 @@ public final class TsonSchemaLinker {
      * of entries, so re-arrival is unification, not conflict. Two *different* schemas declaring one name is
      * the real collision, and it is still an error: distinct types cannot share a name in a flat namespace.
      * That is also what makes a revision mismatch (one route reaching {@code /2026/37/m/core.tn}, another
-     * {@code /2026/39/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
+     * {@code /2026/40/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
      * conflict between two identically-spelled types much later.
      *
      * <p><b>A synthetic's identity is its form</b> (§8.2): two documents that each mint one synthetic, neither

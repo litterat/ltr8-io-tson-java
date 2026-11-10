@@ -42,7 +42,7 @@ class TemplateClosesByApplicationTest {
     private static String vocabulary(String extraDeclarations) {
         return """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   base       => {}
                   my_bounded => <N> meta.array ^ { max_items?: = N }

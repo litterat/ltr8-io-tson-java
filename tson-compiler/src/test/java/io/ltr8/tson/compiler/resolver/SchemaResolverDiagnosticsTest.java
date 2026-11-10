@@ -43,8 +43,8 @@ class SchemaResolverDiagnosticsTest {
      */
     private static final String FOUR_BROKEN = """
             !!id:"https://example.test/broken.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               widens => !uint8 ^ { min: -10  max: 300 }
               fine => int32
@@ -128,8 +128,8 @@ class SchemaResolverDiagnosticsTest {
     void aDeclarationThatFailsWhileNestedIsReportedOnceAndAgainstItself() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   child => !uint8 ^ { min: -10 }
                   parent => child & { extra: int32 }
@@ -151,8 +151,8 @@ class SchemaResolverDiagnosticsTest {
     void aBodyTheConstructorsVocabularyRejectsJoinsTheOtherDiagnostics() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   bad_min => !integer ^ { min: "abc" }
                   bad_max => !integer ^ { max: "xyz" }
@@ -186,8 +186,8 @@ class SchemaResolverDiagnosticsTest {
     void everyInvalidSugarFormIsReportedInOnePass() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   vacuous => [int32; 0..]
                   inverted => [int32; 5..3]
@@ -214,8 +214,8 @@ class SchemaResolverDiagnosticsTest {
     void aSugarFormErrorAndAResolutionErrorAreBothReported() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   vacuous => [int32; 0..]
                   widens => !uint8 ^ { min: -10  max: 300 }
@@ -239,8 +239,8 @@ class SchemaResolverDiagnosticsTest {
     void aDependentOfAFailedSugarFormDoesNotReportAConsequence() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   vacuous => [int32; 0..]
                   user => vacuous & { extra: int32 }
@@ -256,8 +256,8 @@ class SchemaResolverDiagnosticsTest {
     void withoutAReceiverAnInvalidSugarFormStillThrows() {
         TsonSchemaParser parser = new TsonSchemaParser("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   vacuous => [int32; 0..]
                   fine => int32

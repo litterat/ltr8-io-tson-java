@@ -37,8 +37,8 @@ class TypeNameRefReadTest {
 
     private static final String IDS_SCHEMA = """
             !!id:"https://example.test/kind-ids.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               stock_id    => !net.uuid_type {}
               customer_id => !net.uuid_type {}

@@ -37,8 +37,8 @@ class JsonChoiceReadTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/choice-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               scalar_or_list => ( text | int32 | boolean | [text] )
               any_json       => ( text | number | boolean | [any_json?] | {text => any_json?} )

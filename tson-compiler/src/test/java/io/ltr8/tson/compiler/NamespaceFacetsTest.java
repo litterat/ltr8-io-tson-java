@@ -24,7 +24,7 @@ class NamespaceFacetsTest {
     private static List<Diagnostic> link(String declarations) {
         String text = """
                 !!id:"https://example.test/meta-facets.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   method => { request?: meta.ref<meta.record> }
                   %s

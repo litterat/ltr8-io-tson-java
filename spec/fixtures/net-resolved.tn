@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/39/m/net-resolved.tn"
-!!import:"https://tson.io/2026/39/m/meta.tn"
+!!id:"https://tson.io/2026/40/m/net-resolved.tn"
+!!import:"https://tson.io/2026/40/m/meta.tn"
 @doc:"""
-  Resolver-output fixture for net.tn (2026 Revision 39 draft).
+  Resolver-output fixture for net.tn (2026 Revision 40 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-resolved.tn, and the header note in
   numeric-resolved.tn applies here: net.tn imports meta.tn alone, its

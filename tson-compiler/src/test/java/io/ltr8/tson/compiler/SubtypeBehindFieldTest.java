@@ -36,7 +36,7 @@ class SubtypeBehindFieldTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/sb-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   sb_endpoint  => abstract {}
                   sb_op        => sb_endpoint & { request?: meta.type_ref }
@@ -68,7 +68,7 @@ class SubtypeBehindFieldTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!import:"https://example.test/sb-meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order => { sku: text }
                   %s

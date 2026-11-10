@@ -33,7 +33,7 @@ class ClosedBodyReferencesTest {
     private static TsonLinkedSchema linked(String declarations, List<Diagnostic> problems) {
         String text = """
                 !!id:"https://example.test/closed-body-refs.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   box => <T> { v: T }
                   %s
@@ -66,7 +66,7 @@ class ClosedBodyReferencesTest {
     private static TsonCompiledSchema compiled(String declarations) {
         String text = """
                 !!id:"https://example.test/closed-body-refs.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   box => <T> { v: T }
                   %s

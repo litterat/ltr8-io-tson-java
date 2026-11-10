@@ -40,8 +40,8 @@ class ApplicabilityIsIsATopTest {
     private static List<Diagnostic> problems(String declarations) {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s }
                 """.formatted(declarations);
@@ -75,8 +75,8 @@ class ApplicabilityIsIsATopTest {
     void everySpellingOfAnAliasDenotesTheSameEntry() {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   bare    => int32
                   closed  => !meta.alias { target: int32 }
@@ -111,7 +111,7 @@ class ApplicabilityIsIsATopTest {
     void applicationFollowsAnAliasToItsTarget() {
         String meta = """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   alias_array => meta.array
                   two_hops    => alias_array
@@ -121,7 +121,7 @@ class ApplicabilityIsIsATopTest {
             String user = """
                     !!id:"https://example.test/u.tn"
                     !!import:"https://example.test/m.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     !schema { tags => !%s { element_type: text } }
                     """.formatted(head);
             List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
@@ -195,7 +195,7 @@ class ApplicabilityIsIsATopTest {
     void anAbstractConstructorWithNothingComposingItSaysSo() {
         String vocabulary = """
                 !!id:"https://example.test/marker-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   marker => abstract meta.top & {}
                 }

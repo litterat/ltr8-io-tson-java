@@ -31,8 +31,8 @@ class ValueRefReadTest {
 
     private static final String SHOP_SCHEMA = """
             !!id:"https://example.test/shop.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               order      => { id: text  qty: int32 }
               rush_order => order & { by: text }
@@ -166,8 +166,8 @@ class ValueRefReadTest {
     private static List<Diagnostic> schemaProblems(String body) {
         String schema = """
                 !!id:"https://example.test/picks.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order     => { id: text }
                   customer  => { name: text }
@@ -208,8 +208,8 @@ class ValueRefReadTest {
     void aFamilyIsDiscriminatedByAValuesName() {
         String schema = """
                 !!id:"https://example.test/family.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order     => { id: text }
                   o1        => !order { id: A-1 }

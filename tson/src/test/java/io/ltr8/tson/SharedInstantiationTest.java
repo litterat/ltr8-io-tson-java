@@ -25,9 +25,9 @@ import io.ltr8.tson.base.SchemaValidationException;
  */
 class SharedInstantiationTest {
 
-    private static final String META = "https://tson.io/2026/39/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
-    private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
+    private static final String META = "https://tson.io/2026/40/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/40/m/core.tn";
+    private static final String KERNEL = "https://tson.io/2026/40/m/meta.tn";
 
     /**
      * meta.tn lifts {@code [meta.type_ref]} itself; this schema imports meta.tn and lifts it again. Both mint the same

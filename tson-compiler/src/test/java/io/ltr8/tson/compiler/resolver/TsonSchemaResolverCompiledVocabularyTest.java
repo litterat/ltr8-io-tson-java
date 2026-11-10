@@ -176,7 +176,7 @@ class TsonSchemaResolverCompiledVocabularyTest {
 
     private static final String MINI_DOCUMENT = """
             !!id:"https://example.test/mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               nothing => !meta.void_type {}
             }
@@ -246,7 +246,7 @@ class TsonSchemaResolverCompiledVocabularyTest {
 
     private static final String KERNEL_IMPORTING_MARKS = """
             !!id:"https://example.test/marks.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               pet => abstract { pet_type: meta.identifier =?  nick: meta.identifier }
             }
@@ -254,14 +254,14 @@ class TsonSchemaResolverCompiledVocabularyTest {
 
     private static final String KERNEL_IMPORTING_UNKNOWN_MARK = """
             !!id:"https://example.test/unknown-mark.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               pet => @totally_unknown_xyz { nick: meta.identifier }
             }
             """;
 
     private static final String MINI_DOCUMENT_NO_ID = """
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               nothing => !meta.void_type {}
             }
@@ -282,7 +282,7 @@ class TsonSchemaResolverCompiledVocabularyTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
             !!id:"mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               nothing => !meta.void_type {}
             }
@@ -300,7 +300,7 @@ class TsonSchemaResolverCompiledVocabularyTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !!import:"meta.tn"
             !schema {
               nothing => !meta.void_type {}
@@ -319,7 +319,7 @@ class TsonSchemaResolverCompiledVocabularyTest {
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               my_type => meta.atom & {}
             }
@@ -346,7 +346,7 @@ class TsonSchemaResolverCompiledVocabularyTest {
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               meta => !meta.void_type {}
             }
@@ -368,8 +368,8 @@ class TsonSchemaResolverCompiledVocabularyTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               placeholder => unit
             }
@@ -402,13 +402,13 @@ class TsonSchemaResolverCompiledVocabularyTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         String importingTheKernel = """
                 !!id:"https://example.test/mini.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { my_type => { v: meta.identifier } }
                 """;
         String importingTheKernelAndCore = """
                 !!id:"https://example.test/mini.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { my_type => { v: text } }
                 """;
         for (String source : List.of(importingTheKernel, importingTheKernelAndCore)) {
@@ -427,13 +427,13 @@ class TsonSchemaResolverCompiledVocabularyTest {
         Map<String, String> sources = Map.of(
                 "https://example.test/meta-api.tn", """
                         !!id:"https://example.test/meta-api.tn"
-                        !!import:"https://tson.io/2026/39/m/meta.tn"
+                        !!import:"https://tson.io/2026/40/m/meta.tn"
                         !schema { status_name => meta.identifier }
                         """,
                 "https://example.test/orders.tn", """
                         !!id:"https://example.test/orders.tn"
                         !!import:"https://example.test/meta-api.tn"
-                        !!import:"https://tson.io/2026/39/m/core.tn"
+                        !!import:"https://tson.io/2026/40/m/core.tn"
                         !schema { order => { sku: text  quantity: int32 } }
                         """);
         SchemaSource local = SchemaSource.ofMap(sources);
@@ -489,7 +489,7 @@ class TsonSchemaResolverCompiledVocabularyTest {
         TsonCompiledSchemaLoader loader = registry;
 
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> loader.loadVocabulary("https://tson.io/2026/39/m/core.tn"));
+                () -> loader.loadVocabulary("https://tson.io/2026/40/m/core.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 

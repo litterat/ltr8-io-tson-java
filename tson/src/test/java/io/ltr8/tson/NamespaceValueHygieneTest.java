@@ -36,10 +36,10 @@ class NamespaceValueHygieneTest {
     /** {@code аdmin}, its first letter U+0430: a mixed-script name. */
     private static final String MIXED = "аdmin";
 
-    private static final String IFACE_VOCABULARY_ID = "https://example.test/2026/39/iface-meta-1.tn";
+    private static final String IFACE_VOCABULARY_ID = "https://example.test/2026/40/iface-meta-1.tn";
     private static final String VOCABULARY = """
-            !!id:"https://example.test/2026/39/iface-meta-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!id:"https://example.test/2026/40/iface-meta-1.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               method_name => meta.identifier
               iface       => { methods: {method_name => text} }
@@ -47,11 +47,11 @@ class NamespaceValueHygieneTest {
               routes      => @meta.annotation {method_name => text}
             }""";
 
-    private static final String DATA_ID = "https://example.test/2026/39/iface-data-1.tn";
+    private static final String DATA_ID = "https://example.test/2026/40/iface-data-1.tn";
     private static final String DATA_SCHEMA = """
-            !!id:"https://example.test/2026/39/iface-data-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!id:"https://example.test/2026/40/iface-data-1.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               slug  => !unicode.identifier_type { continue_add: "-" }
               method_name => slug
@@ -89,7 +89,7 @@ class NamespaceValueHygieneTest {
 
     private static String importing(String annotation, String methods) {
         return """
-                !!id:"https://example.test/2026/39/orders-1.tn"
+                !!id:"https://example.test/2026/40/orders-1.tn"
                 !!import:"%s"
                 !schema {
                   apis => %s!ifaces { orders => { methods: { %s } } }

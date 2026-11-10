@@ -34,8 +34,8 @@ class DependentFieldTest {
     private static String schema(String declarations) {
         return """
                 !!id:"%s"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s
                 }""".formatted(ID, declarations);
@@ -230,7 +230,7 @@ class DependentFieldTest {
     @Test
     void theKernelsRecordFieldValueIsReadAgainstItsType() {
         Tson tson = Tson.standard();
-        String meta = "!!import:\"https://tson.io/2026/39/m/meta.tn\"\n";
+        String meta = "!!import:\"https://tson.io/2026/40/m/meta.tn\"\n";
         assertEquals(List.of(), tson.validate(meta + "!meta.record_field { type: integer  optional: true  "
                 + "role: DEFAULT  value: 5 }"));
         assertEquals(Optional.of("/value"), only(tson.validate(meta + "!meta.record_field { type: boolean  "
@@ -243,7 +243,7 @@ class DependentFieldTest {
     @Test
     void theKernelsTemplateFieldValueIsReadAgainstItsType() {
         Tson tson = Tson.standard();
-        String meta = "!!import:\"https://tson.io/2026/39/m/meta.tn\"\n";
+        String meta = "!!import:\"https://tson.io/2026/40/m/meta.tn\"\n";
         assertEquals(List.of(), tson.validate(meta + "!meta.record_template_field { type: integer  optional: true  "
                 + "role: DEFAULT  value: 5 }"));
         assertEquals(List.of(), tson.validate(meta + "!meta.record_template_field { type_param: T  optional: true  "
@@ -273,7 +273,7 @@ class DependentFieldTest {
     @Test
     void theFacetAdmitsASiblingAtAFieldsTypeAlone() {
         Tson tson = Tson.standard();
-        String meta = "!!import:\"https://tson.io/2026/39/m/meta.tn\"\n";
+        String meta = "!!import:\"https://tson.io/2026/40/m/meta.tn\"\n";
         assertEquals(List.of(), tson.validate(meta + "!meta.record { fields: { kind => { type: meta.type_ref }  "
                 + "value => { type: kind!  optional: true } } }"));
         assertEquals(Optional.of("/element_type"), only(tson.validate(meta + "!meta.array { element_type: kind! }"))

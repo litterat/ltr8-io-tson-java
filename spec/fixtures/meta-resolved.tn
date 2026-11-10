@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/39/m/meta-resolved.tn"
+!!id:"https://tson.io/2026/40/m/meta-resolved.tn"
 @doc:"""
-  Resolver-output fixture for meta.tn, the kernel (2026 Revision 39
+  Resolver-output fixture for meta.tn, the kernel (2026 Revision 40
   draft). Parse the source schema, run the resolver, canonicalise,
   compare.
 

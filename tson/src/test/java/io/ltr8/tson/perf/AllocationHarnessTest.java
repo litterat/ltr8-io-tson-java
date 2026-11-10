@@ -60,8 +60,8 @@ class AllocationHarnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/orders-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
               line => { sku: text  quantity: int32  price: float64 }

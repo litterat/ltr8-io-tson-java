@@ -17,9 +17,9 @@ class MediaTypeSchemaTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
-            !!import:"https://tson.io/2026/39/m/net.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/net.tn"
             !schema {
               content_type => !net.media_type_type { allow_parameters: true }
               json_type => !net.media_type_type { types: [application]  suffixes: [json] }
@@ -86,9 +86,9 @@ class MediaTypeSchemaTest {
     void aRefinementOnlyNarrows() {
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/widen.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
-                !!import:"https://tson.io/2026/39/m/net.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/net.tn"
                 !schema {
                   json_type => !net.media_type_type { suffixes: [json] }
                   wider => !json_type ^ { suffixes: [json xml] }
@@ -96,9 +96,9 @@ class MediaTypeSchemaTest {
                 """));
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/regrant.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
-                !!import:"https://tson.io/2026/39/m/net.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/net.tn"
                 !schema { with_params => !media_type ^ { allow_parameters: true } }
                 """));
     }
@@ -108,9 +108,9 @@ class MediaTypeSchemaTest {
         for (String facet : List.of("types: []", "suffixes: [\"a+b\"]", "types: [\"*\"]")) {
             assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                     !!id:"https://example.test/incoherent.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
-                    !!import:"https://tson.io/2026/39/m/net.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/net.tn"
                     !schema { odd => !net.media_type_type { %s } }
                     """.formatted(facet)), facet);
         }

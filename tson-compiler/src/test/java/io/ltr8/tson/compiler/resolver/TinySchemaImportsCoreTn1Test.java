@@ -54,8 +54,8 @@ class TinySchemaImportsCoreTn1Test {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tiny-core-import.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               my_int => int32
               my_percentage => !integer ^ { min: 1  max: 100 }

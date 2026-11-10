@@ -40,9 +40,9 @@ class ConstructorLevelDisciplineTest {
                 .validateSchema(source);
     }
 
-    private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
-    private static final String META = "https://tson.io/2026/39/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
+    private static final String KERNEL = "https://tson.io/2026/40/m/meta.tn";
+    private static final String META = "https://tson.io/2026/40/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/40/m/core.tn";
 
     /** In any schema, deriving from a constructor is ordinary — and the result is one. */
     @Test
@@ -64,7 +64,7 @@ class ConstructorLevelDisciplineTest {
     void theDerivedEntryIsItselfConstructorLevel() {
         String source = """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   c        => meta.product & { id: meta.identifier }
                   composed => c & { extra: meta.identifier }
@@ -89,15 +89,15 @@ class ConstructorLevelDisciplineTest {
         String libraryId = "https://example.test/lib.tn";
         String library = """
                 !!id:"https://example.test/lib.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   steps => !meta.namespace { key_type: meta.identifier  value_type: text }
                 }
                 """;
         String importer = """
                 !!id:"https://example.test/app.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://example.test/lib.tn"
                 !schema {
                   plan => !steps { first => "a"  second => "b" }

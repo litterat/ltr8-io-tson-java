@@ -21,7 +21,7 @@ class KindResolvedFormTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/kind-resolved.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               stock_id    => !net.uuid_type {}
               customer_id => !net.uuid_type {}

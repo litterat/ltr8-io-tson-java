@@ -38,14 +38,14 @@ class ValueEntryTest {
 
     private static final Map<String, String> DOCUMENTS = Map.of(LIB, """
             !!id:"https://example.test/ops.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               operation => { path: text  request: meta.ref<meta.record>  response: meta.type_ref }
             }
             """, API, """
             !!id:"https://example.test/ops-api.tn"
             !!import:"https://example.test/ops.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               order        => { sku: text }
               create_order => !operation { path: "/orders"  request: order  response: order }

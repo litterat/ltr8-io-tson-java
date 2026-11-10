@@ -77,8 +77,8 @@ class HeldFieldValueTest {
     private static TsonCompiledSchema load(String body) {
         String schema = """
                 !!id:"https://example.test/held-field-value.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema
                 """ + body;
         SchemaSource source = uri -> {

@@ -28,8 +28,8 @@ class TsonTest {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tson-test.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               my_int => int32
               my_percentage => !integer ^ { min: 1  max: 100 }
@@ -44,7 +44,7 @@ class TsonTest {
     void anImportedTypeLibrarysNamesResolve() {
         TsonLinkedSchema linked = Tson.standard().resolve("""
                 !!id:"https://example.test/oops.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   my_thing => uuid
                 }
@@ -153,8 +153,8 @@ class TsonTest {
     void aNameNoLibrarySchemaDeclaresBindsThroughTheConsumer() throws Exception {
         String schema = """
                 !!id:"https://example.test/tokens.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   token => { text: text }
                   entry_kind => { label: text }

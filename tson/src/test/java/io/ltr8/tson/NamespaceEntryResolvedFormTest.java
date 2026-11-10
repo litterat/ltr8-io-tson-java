@@ -26,7 +26,7 @@ class NamespaceEntryResolvedFormTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-api.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               status_name => meta.identifier
               method      => { request?: meta.ref<meta.record>  response?: meta.type_ref  errors?: [meta.ref<meta.record>]
@@ -38,7 +38,7 @@ class NamespaceEntryResolvedFormTest {
     private static final String SCHEMA = """
             !!id:"https://example.test/api.tn"
             !!import:"https://example.test/meta-api.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               order      => { sku: text }
               order_list => [order]

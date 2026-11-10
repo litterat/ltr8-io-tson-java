@@ -41,7 +41,7 @@ class TypeNameSlotGapsTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/gap-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   gap_status        => !numeric.integer_type { min: 100  max: 599 }
                   gap_reply         => { status: gap_status  body: meta.type_ref }
@@ -77,7 +77,7 @@ class TypeNameSlotGapsTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!import:"https://example.test/gap-meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order => { sku: text }
                   box   => <T> { v: T }

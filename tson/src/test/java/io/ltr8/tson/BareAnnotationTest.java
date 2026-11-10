@@ -18,8 +18,8 @@ class BareAnnotationTest {
     private static List<Diagnostic> validate(String declaration) {
         return Tson.standard().validateSchema("""
                 !!id:"https://example.test/bare-1.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   %s
                 }

@@ -235,7 +235,7 @@ class SchemalessValidationTest {
     void aSchemaDocumentWhereDataWasExpectedIsADiagnostic() {
         List<Diagnostic> diagnostics = validate("""
                 !!id:"https://example.test/s-1.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { point => { x: int32 } }""");
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, diagnostics.getFirst().code());

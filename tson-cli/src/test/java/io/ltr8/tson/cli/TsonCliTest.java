@@ -82,8 +82,8 @@ class TsonCliTest {
     /** A schema that loads clean. */
     private static final String PLAIN_SCHEMA = """
             !!id:"https://example.test/cli-plain.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               plain => { n: int32 }
             }
@@ -214,8 +214,8 @@ class TsonCliTest {
         for (String body : List.of("!schema { widens => !uint8 ^ { min: -10 } }", "!schema { narrow => !uint8 ^ 5 }")) {
             Path schema = writeFile(dir, "authorerror.tn", """
                     !!id:"https://example.test/cli-author-error.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     %s
                     """.formatted(body));
 
@@ -243,8 +243,8 @@ class TsonCliTest {
     void dataNamingATemplateIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "paged.tn", """
                 !!id:"https://example.test/cli-paged.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order => { id: text }
                   paged => <T> { items: [T] }
@@ -461,7 +461,7 @@ class TsonCliTest {
     void aSchemaPastTheWaitDepthIsRefused(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "chain.tn", """
                 !!id:"https://example.test/chain.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   w0 => w1 & { a: text }
                   w1 => w2 & { b: text }
@@ -496,8 +496,8 @@ class TsonCliTest {
         // when schema files are also present. A plain, well-formed value is valid.
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-arg-test.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");
@@ -512,8 +512,8 @@ class TsonCliTest {
     void validateEndToEndThroughMainDispatchExitsZeroForValidData(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-arg-test-2.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", """
@@ -532,8 +532,8 @@ class TsonCliTest {
     void dashReadsOneDataDocumentFromStandardInput(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-stdin.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { my_int => int32 }
                 """);
         String data = "!!import:\"https://example.test/cli-stdin.tn\"\n!my_int 42\n";

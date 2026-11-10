@@ -25,8 +25,8 @@ class RestatedFieldTypeTest {
     private static TsonLinkedSchema link(String body) {
         String schema = """
                 !!id:"https://example.test/restated.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema
                 """ + body;
         return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), uri -> {

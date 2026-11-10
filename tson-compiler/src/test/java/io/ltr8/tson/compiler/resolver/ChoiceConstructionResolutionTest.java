@@ -32,7 +32,7 @@ class ChoiceConstructionResolutionTest {
 
     private static final String CHOICE_DOCUMENT = """
             !!id:"https://example.test/choice.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               contact => !meta.choice { variants: [text integer] }
             }

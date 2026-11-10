@@ -46,8 +46,8 @@ class BytesEncodingSelectorTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               hexdigest => !binary.bytes_type { encoding: HEX  length: 4 }
               b32       => !binary.bytes_type { encoding: BASE32 }
@@ -172,8 +172,8 @@ class BytesEncodingSelectorTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/refine-encoding.tn"
-                        !!import:"https://tson.io/2026/39/m/meta.tn"
-                        !!import:"https://tson.io/2026/39/m/core.tn"
+                        !!import:"https://tson.io/2026/40/m/meta.tn"
+                        !!import:"https://tson.io/2026/40/m/core.tn"
                         !schema { hexbytes => !bytes ^ { encoding: HEX } }
                         """));
 
@@ -188,8 +188,8 @@ class BytesEncodingSelectorTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"%s"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { sha4 => !bytes ^ { length: 4 }  holder => { d: sha4 } }
                 """.formatted(id));
 

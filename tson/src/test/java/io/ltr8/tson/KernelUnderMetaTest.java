@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class KernelUnderMetaTest {
 
     private static List<Diagnostic> problems(String body) {
-        return problems("https://tson.io/2026/39/m/core.tn", body);
+        return problems("https://tson.io/2026/40/m/core.tn", body);
     }
 
     private static List<Diagnostic> problems(String imported, String body) {
@@ -122,7 +122,7 @@ class KernelUnderMetaTest {
     void metaIsOneOpenNamespaceAcrossItsContributors() {
         TsonLinkedSchema linked = Tson.standard().resolve("""
                 !!id:"https://example.test/contributes.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { meta => !schema { code_type => unicode.text_type ^ { max_length?: = 4 } } }
                 """);
         Namespace<?> members = (Namespace<?>) ((ValueEntry) linked.schema().entries().get("meta")).value();
@@ -221,7 +221,7 @@ class KernelUnderMetaTest {
     void aRefinementNamesTheKernelsInstanceBare() {
         TsonSchema schema = Tson.standard().resolve("""
                 !!id:"https://example.test/r.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { small => !integer ^ { min: 0 } }
                 """).schema();
         assertEquals(List.of("integer"), TypeChain.supertypesOf(schema.entries().get("small")));

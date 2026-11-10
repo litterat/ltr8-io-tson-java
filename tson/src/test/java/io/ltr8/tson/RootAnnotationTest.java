@@ -34,8 +34,8 @@ class RootAnnotationTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/api-2.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               api => { name: text }
               since => text

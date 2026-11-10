@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/39/m/numeric.tn?sha256=dfa66c5d3775a7845776db737f07b16630824f2434f6587aface2f88b77bf0f2"
-!!import:"https://tson.io/2026/39/m/meta.tn?sha256=c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5"
+!!id:"https://tson.io/2026/40/m/numeric.tn?sha256=99bf646e8f1dcf16932e835dd76b9c03573b0db09c2fe172ed417b9e612ae120"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=1037233d2a53e8938ce0e5b50af594d81035a6f047045eba4c5544e28e1bc026"
 @doc:"""
-  TSON numeric — the numeric type library (2026 Revision 39 draft).
+  TSON numeric — the numeric type library (2026 Revision 40 draft).
 
   Its root holds the numbers a data schema writes: the exact `number` and
   `rational`, `complex`, the sized integers `int8` to `int256` (but `int64`,

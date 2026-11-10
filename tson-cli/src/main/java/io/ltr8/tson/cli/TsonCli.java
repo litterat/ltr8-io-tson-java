@@ -220,14 +220,14 @@ public final class TsonCli {
             tokens as the syntax allows, for a reader that reads the schema rather than loading it -- a
             language model given it in a prompt. The !!id, every !!import pin, and every @doc are
             removed; a reference to the spec's own library is shortened
-            to its revision and name (!!import:"39/core"). Each directive and each declaration gets one
+            to its revision and name (!!import:"40/core"). Each directive and each declaration gets one
             line, with whitespace inside it collapsed to single spaces. Other annotations stay, and other
             references keep their URLs.
 
             options:
               --keep-docs    keep @doc
 
-            The output is valid syntax but not a loadable schema -- nothing resolves "39/core" -- so the
+            The output is valid syntax but not a loadable schema -- nothing resolves "40/core" -- so the
             file is never rewritten.
 
             exit codes: 0 printed, 1 not a well-formed schema document, 2 usage error or unreadable file""";

@@ -36,7 +36,7 @@ class RefHostShapeTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/ref-host-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   rh_method              => { request?: meta.ref<meta.record> }
                   rh_interface           => !meta.namespace { key_type: meta.identifier  value_type: rh_method }
@@ -74,7 +74,7 @@ class RefHostShapeTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!import:"https://example.test/ref-host-meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order  => { sku: text }
                   orders => !rh_interface { place => { request: order } }

@@ -9,4 +9,4 @@ Read `design/cli-config-hashing.md`.
   filename; `.json` is the one extension read, and its
   `--schema`/`--type` binding errors are usage errors.
 - The report goes to stdout unchanged; non-verdict notes go to stderr. Machine formats always carry the `policy` field.
-- The CLI's own schemas are `https://tson.io/2026/39/io/ltr8/cli/<name>.tn`; `diagnostics.tn` imports the spec's `core.tn` and `policy.tn`.
+- The CLI's own schemas are `https://tson.io/2026/40/io/ltr8/cli/<name>.tn`; `diagnostics.tn` imports the spec's `core.tn` and `policy.tn`.

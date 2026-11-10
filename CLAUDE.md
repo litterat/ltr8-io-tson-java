@@ -59,10 +59,10 @@ checks them. `design/process.md` has the procedure, and the rules for what a sch
 
 **Branches.** `main` is the reference implementation of the *published* revision (39): identities `/2026/39/m/`,
 version `0.39.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`,
-`r2026-38`), each added when the next revision merges. **No proposal branch is open.** Work the published spec cannot
-carry opens `r2026-40-proposal`, with a corpus branch of the same name, carrying Revision 40 identities and version
-`0.40.0-SNAPSHOT`; it merges when the spec lands and not before. Proposal work branches off it and PRs into it; work
-the published revision can carry still goes to `main`. Check the branch before quoting identities or the version.
+`r2026-38`), each added when the next revision merges. **`r2026-40-proposal` is open**, with a corpus branch of the
+same name, for work the published spec cannot carry; it carries Revision 40 identities (`/2026/40/m/`) and version
+`0.40.0-SNAPSHOT`, and merges when the spec lands and not before. Proposal work branches off it and PRs into it; work
+Revision 39 can carry still goes to `main`. Check the branch before quoting identities or the version.
 `design/process.md` has the procedure.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
@@ -141,7 +141,7 @@ says so. `UnsupportedOperationException`: this library has not implemented that 
 internal invariant broke. The test: *a schema error's verdict doesn't change when this library improves; a gap's does.*
 A gap travels as `Diagnostic.Code.NOT_IMPLEMENTED`, and the CLI's exit 1 vs 70 rides on that code.
 
-**Project-owned schema `!!id`:** `https://tson.io/2026/39/io/ltr8/<group>/<name>.tn`. Between releases the schema is
+**Project-owned schema `!!id`:** `https://tson.io/2026/40/io/ltr8/<group>/<name>.tn`. Between releases the schema is
 edited in place; a release fixes the document under its identity (§10). Use `.tn`, never `.tn1`.
 
 **Line wrapping:** 125 characters, comments and code. Count characters, not bytes (`scripts/check-line-length.sh`).
@@ -182,7 +182,7 @@ No system Gradle — always the wrapper. `build` also runs javadoc (doclint), so
 ./gradlew :tson-base:test :tson-json:test
 ./gradlew :tson-cli:installDist      # then tson-cli/build/install/tson/bin/tson validate ...
 ./gradlew :tson:allocationReport     # allocation harness, numbers on stdout
-./gradlew publishToMavenLocal        # io.ltr8:<module>:0.39.0-SNAPSHOT; no remote repository, deliberately
+./gradlew publishToMavenLocal        # io.ltr8:<module>:0.40.0-SNAPSHOT; no remote repository, deliberately
 scripts/restamp-bundled-schemas.sh --check
 ```
 
